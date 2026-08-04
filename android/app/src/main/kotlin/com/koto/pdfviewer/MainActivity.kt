@@ -3,6 +3,7 @@ package com.koto.pdfviewer
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -11,8 +12,10 @@ import java.io.FileOutputStream
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.koto.pdfviewer/intent"
+    private val SHARE_CHANNEL = "com.koto.pdf_viewer/share"
     private var initialPdfPath: String? = null
     private var methodChannel: MethodChannel? = null
+    private var shareMethodChannel: MethodChannel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,6 +30,8 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        
+        // Original intent channel
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel?.setMethodCallHandler { call, result ->
             if (call.method == "getInitialPdfPath") {
@@ -34,6 +39,56 @@ class MainActivity : FlutterActivity() {
                 initialPdfPath = null
             } else {
                 result.notImplemented()
+            }
+        }
+        
+        // Share channel
+        shareMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHARE_CHANNEL)
+        shareMethodChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "shareViaEmail" -> {
+                    val filePath = call.argument<String>("filePath")
+                    val subject = call.argument<String>("subject")
+                    if (filePath != null) {
+                        val success = shareViaEmail(filePath, subject)
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "File path is required", null)
+                    }
+                }
+                "shareViaMessaging" -> {
+                    val filePath = call.argument<String>("filePath")
+                    val text = call.argument<String>("text")
+                    if (filePath != null) {
+                        val success = shareViaMessaging(filePath, text)
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "File path is required", null)
+                    }
+                }
+                "shareViaCloud" -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath != null) {
+                        val success = shareViaCloud(filePath)
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "File path is required", null)
+                    }
+                }
+                "isAppInstalled" -> {
+                    val packageName = call.argument<String>("packageName")
+                    if (packageName != null) {
+                        try {
+                            val installed = isAppInstalled(packageName)
+                            result.success(installed)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(false)
+                    }
+                }
+                else -> result.notImplemented()
             }
         }
     }
@@ -115,5 +170,166 @@ class MainActivity : FlutterActivity() {
             }
         }
         return result
+    }
+    
+    // Share to EMAIL APPS ONLY
+    private fun shareViaEmail(filePath: String, subject: String?): Boolean {
+        return try {
+            val file = File(filePath)
+            if (!file.exists()) return false
+
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                file
+            )
+
+            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, subject ?: "PDF Document")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            // Email selector - shows ONLY email apps
+            val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("mailto:")
+            }
+            sendIntent.selector = emailIntent
+
+            if (sendIntent.resolveActivity(packageManager) != null) {
+                startActivity(sendIntent)
+                true
+            } else {
+                startActivity(Intent.createChooser(sendIntent, "Изпрати по Email"))
+                true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // Share to MESSAGING APPS ONLY (Viber, WhatsApp, Messenger, Telegram)
+    private fun shareViaMessaging(filePath: String, text: String?): Boolean {
+        return try {
+            val file = File(filePath)
+            if (!file.exists()) return false
+
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                file
+            )
+
+            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_TEXT, text ?: "")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            // Filter only messaging apps
+            val messagingApps = listOf(
+                "com.viber.voip",
+                "com.whatsapp",
+                "com.facebook.orca",
+                "org.telegram.messenger"
+            )
+
+            val targetedIntents = mutableListOf<Intent>()
+            val resInfo = packageManager.queryIntentActivities(sendIntent, 0)
+            
+            for (info in resInfo) {
+                val packageName = info.activityInfo.packageName
+                if (messagingApps.any { packageName.contains(it) }) {
+                    val targetIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/pdf"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_TEXT, text)
+                        setPackage(packageName)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    targetedIntents.add(targetIntent)
+                }
+            }
+
+            val chooserIntent = Intent.createChooser(sendIntent, "Изпрати по съобщение")
+            if (targetedIntents.isNotEmpty()) {
+                chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, targetedIntents.toTypedArray())
+            }
+            
+            startActivity(chooserIntent)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // Share to CLOUD STORAGE ONLY (Google Drive, Dropbox, OneDrive)
+    private fun shareViaCloud(filePath: String): Boolean {
+        return try {
+            val file = File(filePath)
+            if (!file.exists()) return false
+
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                file
+            )
+
+            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            // Filter only cloud storage apps
+            val cloudApps = listOf(
+                "com.google.android.apps.docs",
+                "com.dropbox.android",
+                "com.microsoft.skydrive",
+                "com.box.android"
+            )
+
+            val targetedIntents = mutableListOf<Intent>()
+            val resInfo = packageManager.queryIntentActivities(sendIntent, 0)
+            
+            for (info in resInfo) {
+                val packageName = info.activityInfo.packageName
+                if (cloudApps.any { packageName.contains(it) }) {
+                    val targetIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/pdf"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        setPackage(packageName)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    targetedIntents.add(targetIntent)
+                }
+            }
+
+            val chooserIntent = Intent.createChooser(sendIntent, "Качи в облак")
+            if (targetedIntents.isNotEmpty()) {
+                chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, targetedIntents.toTypedArray())
+            }
+            
+            startActivity(chooserIntent)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // Check if app is installed
+    private fun isAppInstalled(packageName: String): Boolean {
+        return try {
+            val packageManager = applicationContext.packageManager
+            packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 }

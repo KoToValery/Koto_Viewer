@@ -7,6 +7,7 @@ import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/file_source_service.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
+import 'widgets/share_options_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   final ValueChanged<bool> onToggleTheme;
@@ -767,46 +768,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: Card(
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.all(12),
-                              leading: Container(
-                                width: 44,
-                                height: 60,
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.red.shade100),
-                                ),
-                                child: Center(
-                                  child: Icon(
-                                    Icons.picture_as_pdf_rounded,
-                                    color: Colors.red.shade400,
-                                    size: 28,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                item.name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                              ),
-                              subtitle: Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Text(
-                                  '${item.formattedSize} • ${dateFormat.format(item.lastOpened)}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                                ),
-                              ),
-                              trailing: _currentMode == FileSourceMode.recent
-                                  ? IconButton(
-                                      icon: const Icon(Icons.close, size: 20),
-                                      tooltip: 'Remove from recent',
-                                      onPressed: () => _removeRecentFile(item.path),
-                                    )
-                                  : const Icon(Icons.chevron_right, size: 20),
+                            child: InkWell(
                               onTap: () {
                                 if (fileExists) {
                                   _openPdfScreen(item.path);
@@ -823,6 +785,84 @@ class _HomeScreenState extends State<HomeScreen> {
                                   }
                                 }
                               },
+                              onLongPress: () {
+                                if (fileExists) {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (context) => ShareOptionsSheet(filePath: item.path),
+                                  );
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 44,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.red.shade100),
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.picture_as_pdf_rounded,
+                                          color: Colors.red.shade400,
+                                          size: 28,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.name,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            '${item.formattedSize} • ${dateFormat.format(item.lastOpened)}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Share button
+                                    IconButton(
+                                      icon: const Icon(Icons.share_outlined, size: 22),
+                                      tooltip: 'Изпрати',
+                                      onPressed: () {
+                                        if (fileExists) {
+                                          showModalBottomSheet(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) => ShareOptionsSheet(filePath: item.path),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                    // Remove/More button
+                                    if (_currentMode == FileSourceMode.recent)
+                                      IconButton(
+                                        icon: const Icon(Icons.close, size: 20),
+                                        tooltip: 'Remove from recent',
+                                        onPressed: () => _removeRecentFile(item.path),
+                                      )
+                                    else
+                                      const Icon(Icons.chevron_right, size: 20),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         );
