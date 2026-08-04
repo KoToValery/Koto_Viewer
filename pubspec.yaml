@@ -47,6 +47,7 @@ dependencies:
   shelf: ^1.4.2
   network_info_plus: ^6.0.2
   qr_flutter: ^4.1.0
+  device_info_plus: ^11.1.0
 
 dev_dependencies:
   flutter_test:

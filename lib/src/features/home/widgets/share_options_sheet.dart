@@ -15,37 +15,37 @@ class ShareOptionsSheet extends StatelessWidget {
 
   Future<void> _shareViaEmail(BuildContext context) async {
     Navigator.pop(context);
-    
+
     final success = await NativeShareService.shareViaEmail(filePath);
-    
+
     if (!success && context.mounted) {
-      _showError(context, 'Грешка при споделяне по Email');
+      _showError(context, 'Error sharing via Email');
     }
   }
 
   Future<void> _shareViaMessaging(BuildContext context) async {
     Navigator.pop(context);
-    
+
     final success = await NativeShareService.shareViaMessaging(filePath);
-    
+
     if (!success && context.mounted) {
-      _showError(context, 'Грешка при споделяне по съобщения');
+      _showError(context, 'Error sharing via messaging');
     }
   }
 
   Future<void> _shareViaCloud(BuildContext context) async {
     Navigator.pop(context);
-    
+
     final success = await NativeShareService.shareViaCloud(filePath);
-    
+
     if (!success && context.mounted) {
-      _showError(context, 'Грешка при качване в облак');
+      _showError(context, 'Error uploading to cloud');
     }
   }
 
   void _shareViaLocalNetwork(BuildContext context) {
     Navigator.pop(context);
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -55,7 +55,7 @@ class ShareOptionsSheet extends StatelessWidget {
 
   Future<void> _shareWithAll(BuildContext context) async {
     Navigator.pop(context);
-    
+
     try {
       await Share.shareXFiles(
         [XFile(filePath)],
@@ -63,7 +63,7 @@ class ShareOptionsSheet extends StatelessWidget {
       );
     } catch (e) {
       if (context.mounted) {
-        _showError(context, 'Грешка при споделяне: $e');
+        _showError(context, 'Error sharing: $e');
       }
     }
   }
@@ -146,7 +146,7 @@ class ShareOptionsSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Изпрати документ',
+                        'Send Document',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: theme.colorScheme.onSurface,
@@ -176,7 +176,7 @@ class ShareOptionsSheet extends StatelessWidget {
             icon: Icons.email_rounded,
             color: AppTheme.primaryColor,
             title: 'Email',
-            subtitle: 'Gmail, Outlook и други',
+            subtitle: 'Gmail, Outlook and more',
             isDark: isDark,
             onTap: () => _shareViaEmail(context),
           ),
@@ -186,8 +186,8 @@ class ShareOptionsSheet extends StatelessWidget {
           _ShareOptionTile(
             icon: Icons.chat_bubble_rounded,
             color: AppTheme.accentColor,
-            title: 'Съобщение',
-            subtitle: 'Viber, WhatsApp, Messenger',
+            title: 'Message',
+            subtitle: 'Viber, WhatsApp, Messenger, Telegram',
             isDark: isDark,
             onTap: () => _shareViaMessaging(context),
           ),
@@ -197,7 +197,7 @@ class ShareOptionsSheet extends StatelessWidget {
           _ShareOptionTile(
             icon: Icons.cloud_upload_rounded,
             color: AppTheme.secondaryColor,
-            title: 'Облак',
+            title: 'Cloud',
             subtitle: 'Google Drive, Dropbox, OneDrive',
             isDark: isDark,
             onTap: () => _shareViaCloud(context),
@@ -208,8 +208,8 @@ class ShareOptionsSheet extends StatelessWidget {
           _ShareOptionTile(
             icon: Icons.wifi_rounded,
             color: const Color(0xFF9333EA), // Purple color for local network
-            title: 'Локална мрежа',
-            subtitle: 'Сподели с QR код в WiFi мрежата',
+            title: 'Local Network',
+            subtitle: 'Share with QR code over WiFi',
             isDark: isDark,
             onTap: () => _shareViaLocalNetwork(context),
           ),
@@ -225,7 +225,7 @@ class ShareOptionsSheet extends StatelessWidget {
               color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
             ),
             label: Text(
-              'Всички опции',
+              'All Options',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
                 fontWeight: FontWeight.w500,
@@ -326,4 +326,3 @@ class _ShareOptionTile extends StatelessWidget {
     );
   }
 }
-

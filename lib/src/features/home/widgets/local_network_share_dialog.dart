@@ -7,19 +7,18 @@ import 'package:qr_flutter/qr_flutter.dart';
 class LocalNetworkShareDialog extends StatefulWidget {
   final String filePath;
 
-  const LocalNetworkShareDialog({
-    super.key,
-    required this.filePath,
-  });
+  const LocalNetworkShareDialog({super.key, required this.filePath});
 
   @override
-  State<LocalNetworkShareDialog> createState() => _LocalNetworkShareDialogState();
+  State<LocalNetworkShareDialog> createState() =>
+      _LocalNetworkShareDialogState();
 }
 
 class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
   bool _isStarting = true;
   bool _hasError = false;
   String? _serverUrl;
+  String? _serverName;
   String? _errorMessage;
 
   @override
@@ -30,7 +29,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
 
   @override
   void dispose() {
-    // Don't stop server here - user might want to keep sharing
+    LocalServerService.stopServer();
     super.dispose();
   }
 
@@ -42,11 +41,16 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
 
     try {
       final fileName = widget.filePath.split(Platform.pathSeparator).last;
-      final url = await LocalServerService.startServer(widget.filePath, fileName: fileName);
+      final url = await LocalServerService.startServer(
+        widget.filePath,
+        fileName: fileName,
+      );
 
       if (url != null && mounted) {
+        await Future.delayed(const Duration(milliseconds: 100));
         setState(() {
           _serverUrl = url;
+          _serverName = LocalServerService.serverName;
           _isStarting = false;
         });
       } else {
@@ -75,7 +79,19 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
       Clipboard.setData(ClipboardData(text: _serverUrl!));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('URL копиран в клипборда'),
+          content: Text('URL copied to clipboard'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _copyNameToClipboard() {
+    if (_serverName != null) {
+      Clipboard.setData(ClipboardData(text: _serverName!));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Server name copied to clipboard'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -85,11 +101,12 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
   @override
   Widget build(BuildContext context) {
     final fileName = widget.filePath.split(Platform.pathSeparator).last;
+    final theme = Theme.of(context);
 
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -100,28 +117,37 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.purple.shade100,
+                    color: const Color(0xFFF3E8FF),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.wifi, color: Colors.purple, size: 28),
+                  child: const Icon(
+                    Icons.wifi,
+                    color: Color(0xFF7E22CE),
+                    size: 26,
+                  ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Локална мрежа',
+                        'Local Network',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 19,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
-                        fileName,
+                        _serverName != null
+                            ? '$_serverName • $fileName'
+                            : fileName,
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
+                          fontSize: 11.5,
+                          color: theme.textTheme.bodyMedium?.color?.withValues(
+                            alpha: 0.65,
+                          ),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -130,174 +156,317 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.close, size: 22),
                   onPressed: () => Navigator.of(context).pop(),
+                  splashRadius: 22,
                 ),
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
 
             // Content
             if (_isStarting)
-              const Padding(
-                padding: EdgeInsets.all(40),
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Стартиране на сървър...'),
-                  ],
-                ),
-              )
+              _buildLoading()
             else if (_hasError)
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Грешка',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _errorMessage ?? 'Не може да се стартира сървър',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _startServer,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Опитай отново'),
-                    ),
-                  ],
-                ),
-              )
+              _buildError(context)
             else
-              Column(
-                children: [
-                  // QR Code
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade300, width: 2),
-                    ),
-                    child: QrImageView(
-                      data: _serverUrl!,
-                      version: QrVersions.auto,
-                      size: 200,
-                      backgroundColor: Colors.white,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Instructions
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: const [
-                            Icon(Icons.info_outline, size: 20, color: Colors.blue),
-                            SizedBox(width: 8),
-                            Text(
-                              'Как да използвам:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '1. Уверете се, че компютърът е в същата WiFi мрежа\n'
-                          '2. Сканирайте QR кода или отворете линка\n'
-                          '3. Изтеглете или прегледайте PDF-а',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // URL Display
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _serverUrl!,
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.copy, size: 20),
-                          onPressed: _copyToClipboard,
-                          tooltip: 'Копирай',
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Stop button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _stopServer,
-                      icon: const Icon(Icons.stop),
-                      label: const Text('Спри споделянето'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Warning
-                  Text(
-                    '⚠️ Сървърът ще работи докато не го спрете',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.orange.shade700,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+              _buildSuccess(context),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLoading() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 36),
+      child: Column(
+        children: [
+          SizedBox(
+            width: 44,
+            height: 44,
+            child: CircularProgressIndicator(strokeWidth: 3),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Starting server...',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Getting your network address',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, size: 56, color: Color(0xFFEF4444)),
+          const SizedBox(height: 14),
+          const Text(
+            'Cannot start sharing',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _errorMessage?.replaceAll('Exception: ', '') ??
+                'Make sure you are connected to WiFi or a local network and try again.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _startServer,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text(
+              'Try Again',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuccess(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // QR Code
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+              width: 2,
+            ),
+          ),
+          child: QrImageView(
+            data: _serverUrl!,
+            version: QrVersions.auto,
+            size: 180,
+            backgroundColor: Colors.white,
+            eyeStyle: const QrEyeStyle(
+              eyeShape: QrEyeShape.square,
+              color: Color(0xFF4338CA),
+            ),
+            dataModuleStyle: const QrDataModuleStyle(
+              dataModuleShape: QrDataModuleShape.square,
+              color: Colors.black,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Instructions
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFBFDBFE)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 17, color: Color(0xFF1D4ED8)),
+                  SizedBox(width: 6),
+                  Text(
+                    'Scan or open the link',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E40AF),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '1. Connect the other device to the same WiFi\n'
+                '2. Scan the QR code or copy the URL\n'
+                '3. Download or view the PDF in any browser',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.blueGrey.shade700,
+                  height: 1.55,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Server Name (Short readable name)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF3B0764) : const Color(0xFFFAF5FF),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark ? const Color(0xFF581C87) : const Color(0xFFE9D5FF),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.badge_outlined,
+                size: 17,
+                color: Color(0xFF7E22CE),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Server Name',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        color: isDark
+                            ? Colors.purple.shade200
+                            : Colors.purple.shade700,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: .15,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      _serverName ?? 'KotoPDF',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF6B21A8),
+                        letterSpacing: .2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_all_outlined, size: 19),
+                onPressed: _copyNameToClipboard,
+                tooltip: 'Copy name',
+                color: const Color(0xFF7E22CE),
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+                splashRadius: 18,
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        // URL Display
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.link, size: 17, color: Colors.grey),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Link Address',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      _serverUrl!,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_outlined, size: 19),
+                onPressed: _copyToClipboard,
+                tooltip: 'Copy URL',
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+                splashRadius: 18,
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 18),
+
+        // Stop button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _stopServer,
+            icon: const Icon(Icons.stop_circle_outlined, size: 18),
+            label: const Text(
+              'Stop Sharing',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              elevation: 0,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        Text(
+          'Server stays on while this session is active',
+          style: TextStyle(fontSize: 11, color: Colors.orange.shade700),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }

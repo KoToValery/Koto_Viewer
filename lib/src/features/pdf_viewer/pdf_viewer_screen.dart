@@ -1,20 +1,16 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:printing/printing.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
+import '../home/widgets/share_options_sheet.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
 
-  const PdfViewerScreen({
-    super.key,
-    required this.filePath,
-    this.title,
-  });
+  const PdfViewerScreen({super.key, required this.filePath, this.title});
 
   @override
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
@@ -31,7 +27,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   void initState() {
     super.initState();
-    _fileName = widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
+    _fileName =
+        widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
     _saveToRecentFiles();
   }
 
@@ -51,32 +48,25 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } catch (_) {}
   }
 
-  Future<void> _sharePdf() async {
-    try {
-      final file = XFile(widget.filePath);
-      await Share.shareXFiles([file], text: 'Sharing PDF: $_fileName');
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sharing file: $e')),
-        );
-      }
-    }
+  void _sharePdf() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ShareOptionsSheet(filePath: widget.filePath),
+    );
   }
 
   Future<void> _printPdf() async {
     try {
       final file = File(widget.filePath);
       final bytes = await file.readAsBytes();
-      await Printing.layoutPdf(
-        onLayout: (_) => bytes,
-        name: _fileName,
-      );
+      await Printing.layoutPdf(onLayout: (_) => bytes, name: _fileName);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error printing file: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error printing file: $e')));
       }
     }
   }
@@ -147,9 +137,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              _isDarkModeView ? Icons.light_mode : Icons.dark_mode,
-            ),
+            icon: Icon(_isDarkModeView ? Icons.light_mode : Icons.dark_mode),
             tooltip: 'Toggle Invert Colors',
             onPressed: () {
               setState(() {
@@ -174,15 +162,28 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           ColorFiltered(
             colorFilter: _isDarkModeView
                 ? const ColorFilter.matrix([
-                    -1.0, 0.0, 0.0, 0.0, 255.0,
-                    0.0, -1.0, 0.0, 0.0, 255.0,
-                    0.0, 0.0, -1.0, 0.0, 255.0,
-                    0.0, 0.0, 0.0, 1.0, 0.0,
+                    -1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    255.0,
+                    0.0,
+                    -1.0,
+                    0.0,
+                    0.0,
+                    255.0,
+                    0.0,
+                    0.0,
+                    -1.0,
+                    0.0,
+                    255.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
                   ])
-                : const ColorFilter.mode(
-                    Colors.transparent,
-                    BlendMode.dst,
-                  ),
+                : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
             child: PdfViewer.file(
               widget.filePath,
               controller: _pdfController,
@@ -203,10 +204,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               ),
             ),
           ),
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(),
-            ),
+          if (_isLoading) const Center(child: CircularProgressIndicator()),
         ],
       ),
       bottomNavigationBar: BottomAppBar(
@@ -230,7 +228,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             GestureDetector(
               onTap: _showJumpToPageDialog,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
