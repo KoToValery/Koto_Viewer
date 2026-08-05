@@ -96,6 +96,11 @@ class FileSourceService {
     await prefs.setString(_keySortOption, option.key);
   }
 
+  static bool _isSupportedFile(String path) {
+    final lower = path.toLowerCase();
+    return lower.endsWith('.pdf') || lower.endsWith('.dxf');
+  }
+
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {
     final mode = await getSourceMode();
     List<PdfItem> files = [];
@@ -108,7 +113,7 @@ class FileSourceService {
         final customPath = await getCustomFolderPath();
         if (customPath != null && customPath.isNotEmpty) {
           final customDir = Directory(customPath);
-          files = await _scanDirectoryForPdfs(customDir);
+          files = await _scanDirectoryForFiles(customDir);
         }
         break;
     }
@@ -121,23 +126,22 @@ class FileSourceService {
     if (sortOption == SortOption.name) {
       files.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     } else {
-      // sort by date descending
       files.sort((a, b) => b.lastOpened.compareTo(a.lastOpened));
     }
     return files;
   }
 
-  static Future<List<PdfItem>> _scanDirectoryForPdfs(Directory dir) async {
+  static Future<List<PdfItem>> _scanDirectoryForFiles(Directory dir) async {
     if (!dir.existsSync()) return [];
 
-    final List<PdfItem> pdfItems = [];
+    final List<PdfItem> items = [];
     try {
       final List<FileSystemEntity> entities = dir.listSync(recursive: false);
       for (final entity in entities) {
-        if (entity is File && entity.path.toLowerCase().endsWith('.pdf')) {
+        if (entity is File && _isSupportedFile(entity.path)) {
           final stat = entity.statSync();
           final fileName = entity.path.split(Platform.pathSeparator).last;
-          pdfItems.add(
+          items.add(
             PdfItem(
               path: entity.path,
               name: fileName,
@@ -150,6 +154,6 @@ class FileSourceService {
     } catch (e) {
       debugPrint('Error scanning directory ${dir.path}: $e');
     }
-    return pdfItems;
+    return items;
   }
 }

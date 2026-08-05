@@ -233,12 +233,17 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
   Widget _buildSuccess(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final mdnsOk = LocalServerService.mdnsRegistered;
+    final displayUrl = LocalServerService.preferredDisplayUrl;
     final localUrl = LocalServerService.localDomainUrl;
     final port = LocalServerService.port;
     final needsPortInLocalUrl = port != null && port != 80;
-    final fullLocalUrl = needsPortInLocalUrl
-        ? '$localUrl:$port'
-        : localUrl;
+    final fullLocalUrl = needsPortInLocalUrl ? '$localUrl:$port' : localUrl;
+
+    final isDxf = widget.filePath.toLowerCase().endsWith('.dxf');
+    final qrPrimaryColor = isDxf
+        ? const Color(0xFF059669)
+        : const Color(0xFF4F46E5);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -254,13 +259,13 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
             ),
           ),
           child: QrImageView(
-            data: _serverUrl!,
+            data: displayUrl.isNotEmpty ? displayUrl : _serverUrl!,
             version: QrVersions.auto,
             size: 180,
             backgroundColor: Colors.white,
-            eyeStyle: const QrEyeStyle(
+            eyeStyle: QrEyeStyle(
               eyeShape: QrEyeShape.square,
-              color: Color(0xFF4F46E5),
+              color: qrPrimaryColor,
             ),
             dataModuleStyle: const QrDataModuleStyle(
               dataModuleShape: QrDataModuleShape.square,
@@ -268,6 +273,30 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
             ),
           ),
         ),
+        const SizedBox(height: 8),
+        if (mdnsOk)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD1FAE5),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle, size: 14, color: Color(0xFF059669)),
+                SizedBox(width: 4),
+                Text(
+                  '.local address active',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF065F46),
+                  ),
+                ),
+              ],
+            ),
+          ),
 
         const SizedBox(height: 16),
 
@@ -281,8 +310,8 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Row(
+            children: [
+              const Row(
                 children: [
                   Icon(Icons.info_outline, size: 17, color: Color(0xFF4F46E5)),
                   SizedBox(width: 6),
@@ -296,13 +325,13 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                   ),
                 ],
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
-                '1. Connect the other device to the same WiFi\n'
+                '1. Connect the other device to the same local Network\n'
                 '2. Scan the QR code or copy the URL below\n'
-                '3. Or try http://kotoview.local on macOS/iOS/Linux\n'
-                '4. Download or view the PDF in any browser',
-                style: TextStyle(
+                '3. Or try $fullLocalUrl on macOS/iOS/Linux\n'
+                '4. Download the file in any browser',
+                style: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFF3730A3),
                   height: 1.55,
@@ -325,11 +354,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
           ),
           child: Row(
             children: [
-              const Icon(
-                Icons.language,
-                size: 17,
-                color: Color(0xFF4F46E5),
-              ),
+              const Icon(Icons.language, size: 17, color: Color(0xFF4F46E5)),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -423,7 +448,8 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
               ),
               IconButton(
                 icon: const Icon(Icons.copy_all_outlined, size: 19),
-                onPressed: () => _copyToClipboard(_serverName ?? 'KotoView', 'Server name'),
+                onPressed: () =>
+                    _copyToClipboard(_serverName ?? 'KotoView', 'Server name'),
                 tooltip: 'Copy name',
                 color: const Color(0xFF7E22CE),
                 padding: const EdgeInsets.all(6),

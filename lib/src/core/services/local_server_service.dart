@@ -18,6 +18,7 @@ class LocalServerService {
   static DateTime? _startedAt;
   static final Random _random = Random();
   static Registration? _mdnsRegistration;
+  static bool _mdnsRegistered = false;
 
   static const String _baseName = 'KotoView';
   static const String _localHostname = 'kotoview';
@@ -25,7 +26,13 @@ class LocalServerService {
   static const Duration defaultShutdownTimeout = Duration(minutes: 15);
   static const int _preferredPort = 8080;
 
-  static String get localDomainUrl => 'http://$_localHostname.local';
+  static String get localDomainUrl {
+    if (_port == null) return 'http://$_localHostname.local';
+    if (_port == 80) return 'http://$_localHostname.local';
+    return 'http://$_localHostname.local:$_port';
+  }
+
+  static String get localDomainUrlNoPort => 'http://$_localHostname.local';
 
   /// Generate a short, memorable server name like KotoView-A1B2
   static String _generateShortName() {
@@ -61,10 +68,20 @@ class LocalServerService {
     throw Exception('Could not bind to any port');
   }
 
+  static bool get mdnsRegistered => _mdnsRegistered;
+
+  static String get preferredDisplayUrl {
+    if (_mdnsRegistered) {
+      return localDomainUrl;
+    }
+    return _serverUrl ?? '';
+  }
+
   /// Register mDNS service (Bonjour / .local) so the server is reachable via kotoview.local
   static Future<void> _registerMdnsService(int port) async {
     try {
       await _unregisterMdnsService();
+      _mdnsRegistered = false;
 
       final service = Service(
         name: _localHostname,
@@ -73,20 +90,25 @@ class LocalServerService {
       );
 
       _mdnsRegistration = await register(service);
+      _mdnsRegistered = true;
 
       // ignore: avoid_print
       print('🔔 mDNS registered: $_localHostname.local:_http._tcp:$port');
+      // ignore: avoid_print
+      print('🌐 Access via: $localDomainUrl');
     } catch (e) {
       // ignore: avoid_print
       print('⚠️  mDNS registration failed: $e');
       // ignore: avoid_print
       print('   Server is still accessible via IP address.');
       _mdnsRegistration = null;
+      _mdnsRegistered = false;
     }
   }
 
   /// Unregister mDNS service
   static Future<void> _unregisterMdnsService() async {
+    _mdnsRegistered = false;
     if (_mdnsRegistration != null) {
       try {
         await unregister(_mdnsRegistration!);
@@ -100,7 +122,40 @@ class LocalServerService {
     }
   }
 
-  /// Start the local server and share a PDF file
+  static String _getContentType(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'dxf':
+        return 'application/dxf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  static String _getFileTypeLabel(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'pdf':
+        return 'PDF Document';
+      case 'dxf':
+        return 'DXF Drawing';
+      default:
+        return 'File';
+    }
+  }
+
+  static String _getFileIcon(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'pdf':
+        return '📄';
+      case 'dxf':
+        return '📐';
+      default:
+        return '📁';
+    }
+  }
+
+  /// Start the local server and share a file (PDF or DXF)
   static Future<String?> startServer(
     String filePath, {
     String? fileName,
@@ -116,6 +171,10 @@ class LocalServerService {
       final fileBytes = await file.readAsBytes();
       final displayName =
           fileName ?? filePath.split(Platform.pathSeparator).last;
+
+      final ext = displayName.contains('.')
+          ? displayName.split('.').last.toLowerCase()
+          : '';
 
       _serverName = _generateShortName();
 
@@ -145,6 +204,10 @@ class LocalServerService {
         }
       }
 
+      final contentType = _getContentType(ext);
+      final fileTypeLabel = _getFileTypeLabel(ext);
+      final fileIcon = _getFileIcon(ext);
+
       final handler = const shelf.Pipeline().addHandler((
         shelf.Request request,
       ) {
@@ -155,7 +218,7 @@ class LocalServerService {
 
           if (path == '' || path == '/') {
             return shelf.Response.ok(
-              _buildHtmlPage(displayName),
+              _buildHtmlPage(displayName, fileTypeLabel, fileIcon, ext),
               headers: {'Content-Type': 'text/html; charset=utf-8'},
             );
           }
@@ -164,7 +227,7 @@ class LocalServerService {
             return shelf.Response.ok(
               Stream.fromIterable([fileBytes]),
               headers: {
-                'Content-Type': 'application/pdf',
+                'Content-Type': contentType,
                 'Content-Disposition':
                     'attachment; filename="${Uri.encodeComponent(displayName)}"',
                 'Content-Length': fileBytes.length.toString(),
@@ -178,7 +241,7 @@ class LocalServerService {
             return shelf.Response.ok(
               Stream.fromIterable([fileBytes]),
               headers: {
-                'Content-Type': 'application/pdf',
+                'Content-Type': contentType,
                 'Content-Disposition':
                     'inline; filename="${Uri.encodeComponent(displayName)}"',
                 'Content-Length': fileBytes.length.toString(),
@@ -309,8 +372,27 @@ class LocalServerService {
   }
 
   /// Build HTML page for download
-  static String _buildHtmlPage(String fileName) {
+  static String _buildHtmlPage(
+    String fileName,
+    String fileTypeLabel,
+    String fileIcon,
+    String extension,
+  ) {
     final name = _serverName ?? _baseName;
+
+    final isDxf = extension.toLowerCase() == 'dxf';
+    final bgGradient = isDxf
+        ? 'linear-gradient(135deg, #059669 0%, #10B981 100%)'
+        : 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)';
+    final chipBg = isDxf ? '#D1FAE5' : '#EDE9FE';
+    final chipColor = isDxf ? '#059669' : '#4F46E5';
+    final fromColor = isDxf ? '#059669' : '#4F46E5';
+    final btnDownloadBg = isDxf ? '#059669' : '#4F46E5';
+    final btnViewBg = isDxf ? '#10B981' : '#7C3AED';
+    final downloadBtnText = isDxf ? '📥 Download DXF' : '📥 Download PDF';
+    final viewBtnText = isDxf ? '📥 Open DXF File' : '👁️ View in Browser';
+    final titleSuffix = isDxf ? 'DXF Share' : 'PDF Share';
+
     return '''
 <!DOCTYPE html>
 <html lang="en">
@@ -318,12 +400,12 @@ class LocalServerService {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>$name - PDF Share</title>
+    <title>$name - $titleSuffix</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            background: $bgGradient;
             min-height: 100vh;
             display: flex; justify-content: center; align-items: center; padding: 16px;
         }
@@ -333,14 +415,14 @@ class LocalServerService {
             padding: 28px; max-width: 440px; width: 100%; text-align: center;
         }
         .chip {
-            display: inline-block; background: #EDE9FE; color: #4F46E5;
+            display: inline-block; background: $chipBg; color: $chipColor;
             padding: 6px 14px; border-radius: 999px;
             font-weight: 700; font-size: 13px; letter-spacing: .3px;
             margin-bottom: 18px;
         }
         .icon { font-size: 68px; margin-bottom: 10px; }
         h1 { color: #111827; font-size: 22px; margin-bottom: 4px; font-weight: 800; }
-        .from { color: #4F46E5; font-size: 14px; margin-bottom: 16px; font-weight: 600; }
+        .from { color: $fromColor; font-size: 14px; margin-bottom: 16px; font-weight: 600; }
         .filename {
             background: #F9FAFB; border: 1px solid #E5E7EB;
             padding: 12px; border-radius: 10px;
@@ -361,8 +443,8 @@ class LocalServerService {
             transition: transform .15s, box-shadow .15s;
         }
         .btn:active { transform: translateY(1px); }
-        .btn-download { background: #4F46E5; color: white; }
-        .btn-view { background: #7C3AED; color: white; }
+        .btn-download { background: $btnDownloadBg; color: white; }
+        .btn-view { background: $btnViewBg; color: white; }
         @media (max-width: 420px) {
             .container { padding: 22px 18px; border-radius: 14px; }
             h1 { font-size: 20px; }
@@ -373,8 +455,8 @@ class LocalServerService {
 <body>
     <div class="container">
         <div class="chip">$name</div>
-        <div class="icon">📄</div>
-        <h1>PDF Document</h1>
+        <div class="icon">$fileIcon</div>
+        <h1>$fileTypeLabel</h1>
         <div class="from">shared from $_baseName</div>
         <div class="filename">$fileName</div>
         <div class="meta">
@@ -384,8 +466,8 @@ class LocalServerService {
             <div>🌐 Local: <span>$localDomainUrl</span></div>
         </div>
         <div class="buttons">
-            <a href="/download" class="btn btn-download">📥 Download PDF</a>
-            <a href="/view" class="btn btn-view" target="_blank">👁️ View in Browser</a>
+            <a href="/download" class="btn btn-download">$downloadBtnText</a>
+            <a href="/view" class="btn btn-view" target="_blank">$viewBtnText</a>
         </div>
     </div>
 </body>

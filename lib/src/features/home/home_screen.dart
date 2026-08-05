@@ -9,6 +9,119 @@ import '../../core/services/file_source_service.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 
+class FileTypeIcon extends StatelessWidget {
+  final KotoFileType type;
+  final double width;
+  final double height;
+
+  const FileTypeIcon({
+    super.key,
+    required this.type,
+    this.width = 44,
+    this.height = 60,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    switch (type) {
+      case KotoFileType.pdf:
+        return _buildPdfIcon();
+      case KotoFileType.dxf:
+        return _buildDxfIcon();
+      case KotoFileType.other:
+        return _buildGenericIcon();
+    }
+  }
+
+  Widget _buildPdfIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF2FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFC7D2FE)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.picture_as_pdf_rounded,
+              color: const Color(0xFF4F46E5),
+              size: width * 0.58,
+            ),
+            Text(
+              'PDF',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF4F46E5),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDxfIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF6EE7B7)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.draw_rounded,
+              color: const Color(0xFF059669),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'DXF',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF059669),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenericIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.insert_drive_file_rounded,
+          color: Colors.grey.shade600,
+          size: width * 0.6,
+        ),
+      ),
+    );
+  }
+}
+
 class HomeScreen extends StatefulWidget {
   final ValueChanged<bool> onToggleTheme;
   final bool isDarkMode;
@@ -94,12 +207,12 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf'],
+        allowedExtensions: ['pdf', 'dxf'],
       );
 
       if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
-        _openPdfScreen(filePath);
+        _openFileScreen(filePath);
       }
     } catch (e) {
       if (mounted) {
@@ -110,7 +223,32 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _openPdfScreen(String filePath) async {
+  Future<void> _openDxfWithExternal(String filePath) async {
+    try {
+      final Uri uri = Uri.file(filePath);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No app found to open DXF. Try sharing the file instead.',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error opening DXF: $e')));
+      }
+    }
+  }
+
+  void _openFileScreen(String filePath) async {
     final file = File(filePath);
     if (file.existsSync()) {
       final stat = file.statSync();
@@ -125,7 +263,13 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (mounted) {
+    if (!mounted) return;
+
+    final lower = filePath.toLowerCase();
+    if (lower.endsWith('.dxf')) {
+      _openDxfWithExternal(filePath);
+      _loadFiles();
+    } else {
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => PdfViewerScreen(filePath: filePath),
@@ -498,7 +642,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSourceHeader(ThemeData theme) {
     String subtitleText = '';
     if (_currentMode == FileSourceMode.recent) {
-      subtitleText = 'Recently opened PDF files';
+      subtitleText = 'Recently opened files (PDF, DXF)';
     } else if (_currentMode == FileSourceMode.custom) {
       subtitleText = _customFolderPath != null && _customFolderPath!.isNotEmpty
           ? _customFolderPath!
@@ -740,7 +884,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Open PDF Document',
+                          'Open PDF or DXF File',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 22,
@@ -749,7 +893,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Select any PDF file from your phone storage to view immediately.',
+                          'Select any PDF or DXF file from your storage to view or share.',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 14,
@@ -800,7 +944,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       children: [
                         Icon(
-                          Icons.picture_as_pdf_outlined,
+                          Icons.folder_copy_outlined,
                           size: 64,
                           color: theme.textTheme.bodyMedium?.color?.withValues(
                             alpha: 0.4,
@@ -812,7 +956,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   (_customFolderPath == null ||
                                       _customFolderPath!.isEmpty)
                               ? 'No folder selected'
-                              : 'No PDF files found',
+                              : 'No PDF or DXF files found',
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontSize: 18,
                             color: theme.textTheme.bodyMedium?.color,
@@ -822,7 +966,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           _currentMode == FileSourceMode.custom
                               ? 'Tap the folder icon to select a directory.'
-                              : 'Recently opened PDF files will appear here.',
+                              : 'Recently opened PDF/DXF files will appear here.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium,
                         ),
@@ -855,7 +999,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: InkWell(
                             onTap: () {
                               if (fileExists) {
-                                _openPdfScreen(item.path);
+                                _openFileScreen(item.path);
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -886,24 +1030,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               padding: const EdgeInsets.all(12),
                               child: Row(
                                 children: [
-                                  Container(
-                                    width: 44,
-                                    height: 60,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEEF2FF),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: const Color(0xFFC7D2FE),
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.picture_as_pdf_rounded,
-                                        color: const Color(0xFF4F46E5),
-                                        size: 28,
-                                      ),
-                                    ),
-                                  ),
+                                  FileTypeIcon(type: item.fileType),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(

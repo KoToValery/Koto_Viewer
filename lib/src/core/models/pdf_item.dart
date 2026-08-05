@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+enum KotoFileType { pdf, dxf, other }
+
 class PdfItem {
   final String path;
   final String name;
@@ -14,6 +16,18 @@ class PdfItem {
     required this.lastOpened,
     this.pageCount = 0,
   });
+
+  KotoFileType get fileType {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.pdf')) return KotoFileType.pdf;
+    if (lower.endsWith('.dxf')) return KotoFileType.dxf;
+    return KotoFileType.other;
+  }
+
+  String get fileExtension {
+    if (!name.contains('.')) return '';
+    return name.split('.').last.toLowerCase();
+  }
 
   String get formattedSize {
     if (sizeInBytes < 1024) return '$sizeInBytes B';
@@ -45,7 +59,8 @@ class PdfItem {
 
   String toJson() => json.encode(toMap());
 
-  factory PdfItem.fromJson(String source) => PdfItem.fromMap(json.decode(source));
+  factory PdfItem.fromJson(String source) =>
+      PdfItem.fromMap(json.decode(source));
 
   PdfItem copyWith({
     String? path,

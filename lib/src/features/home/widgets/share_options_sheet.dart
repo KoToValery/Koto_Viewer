@@ -5,13 +5,19 @@ import '../../../core/services/native_share_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
+enum _ShareFileType { pdf, dxf, other }
+
+_ShareFileType _detectFileType(String path) {
+  final lower = path.toLowerCase();
+  if (lower.endsWith('.pdf')) return _ShareFileType.pdf;
+  if (lower.endsWith('.dxf')) return _ShareFileType.dxf;
+  return _ShareFileType.other;
+}
+
 class ShareOptionsSheet extends StatelessWidget {
   final String filePath;
 
-  const ShareOptionsSheet({
-    super.key,
-    required this.filePath,
-  });
+  const ShareOptionsSheet({super.key, required this.filePath});
 
   Future<void> _shareViaEmail(BuildContext context) async {
     Navigator.pop(context);
@@ -56,11 +62,15 @@ class ShareOptionsSheet extends StatelessWidget {
   Future<void> _shareWithAll(BuildContext context) async {
     Navigator.pop(context);
 
+    final type = _detectFileType(filePath);
+    final subject = type == _ShareFileType.dxf
+        ? 'DXF Drawing'
+        : type == _ShareFileType.pdf
+        ? 'PDF Document'
+        : 'File';
+
     try {
-      await Share.shareXFiles(
-        [XFile(filePath)],
-        subject: 'PDF Document',
-      );
+      await Share.shareXFiles([XFile(filePath)], subject: subject);
     } catch (e) {
       if (context.mounted) {
         _showError(context, 'Error sharing: $e');
@@ -85,6 +95,19 @@ class ShareOptionsSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final fileName = filePath.split(Platform.pathSeparator).last;
+    final fileType = _detectFileType(filePath);
+
+    final bool isDxf = fileType == _ShareFileType.dxf;
+    final Color cardColorStart = isDxf
+        ? const Color(0xFF059669)
+        : AppTheme.primaryColor;
+    final Color cardColorEnd = isDxf
+        ? const Color(0xFF10B981)
+        : AppTheme.secondaryColor;
+    final IconData fileIcon = isDxf
+        ? Icons.draw_rounded
+        : Icons.picture_as_pdf_rounded;
+    final String sendLabel = isDxf ? 'Send DXF Drawing' : 'Send Document';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -113,8 +136,8 @@ class ShareOptionsSheet extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppTheme.primaryColor.withValues(alpha: isDark ? 0.18 : 0.08),
-                  AppTheme.secondaryColor.withValues(alpha: isDark ? 0.12 : 0.05),
+                  cardColorStart.withValues(alpha: isDark ? 0.18 : 0.08),
+                  cardColorEnd.withValues(alpha: isDark ? 0.12 : 0.05),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -127,18 +150,14 @@ class ShareOptionsSheet extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                    gradient: LinearGradient(
+                      colors: [cardColorStart, cardColorEnd],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.picture_as_pdf_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
+                  child: Icon(fileIcon, color: Colors.white, size: 22),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -146,7 +165,7 @@ class ShareOptionsSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Send Document',
+                        sendLabel,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: theme.colorScheme.onSurface,
@@ -157,7 +176,9 @@ class ShareOptionsSheet extends StatelessWidget {
                         fileName,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontSize: 12.5,
-                          color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                          color: theme.textTheme.bodyMedium?.color?.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -227,7 +248,9 @@ class ShareOptionsSheet extends StatelessWidget {
             label: Text(
               'All Options',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.6,
+                ),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -307,7 +330,9 @@ class _ShareOptionTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12.5),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 12.5,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -317,7 +342,9 @@ class _ShareOptionTile extends StatelessWidget {
               Icon(
                 Icons.chevron_right_rounded,
                 size: 22,
-                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.4),
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.4,
+                ),
               ),
             ],
           ),
