@@ -7,18 +7,17 @@ import 'src/features/pdf_viewer/pdf_viewer_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const KotoPdfViewerApp());
+  runApp(const KotoViewApp());
 }
 
-class KotoPdfViewerApp extends StatefulWidget {
-  const KotoPdfViewerApp({super.key});
+class KotoViewApp extends StatefulWidget {
+  const KotoViewApp({super.key});
 
   @override
-  State<KotoPdfViewerApp> createState() => _KotoPdfViewerAppState();
+  State<KotoViewApp> createState() => _KotoViewAppState();
 }
 
-class _KotoPdfViewerAppState extends State<KotoPdfViewerApp>
-    with WidgetsBindingObserver {
+class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final IntentService _intentService = IntentService();
   bool _isDarkMode = false;
@@ -84,15 +83,12 @@ class _KotoPdfViewerAppState extends State<KotoPdfViewerApp>
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigatorKey,
-      title: 'Koto PDF Viewer',
+      title: 'KotoView',
       debugShowCheckedModeBanner: false,
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
       theme: AppTheme.lightThemeData(),
       darkTheme: AppTheme.darkThemeData(),
-      home: HomeScreen(
-        onToggleTheme: _toggleTheme,
-        isDarkMode: _isDarkMode,
-      ),
+      home: HomeScreen(onToggleTheme: _toggleTheme, isDarkMode: _isDarkMode),
     );
   }
 }

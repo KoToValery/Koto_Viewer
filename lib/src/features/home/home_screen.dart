@@ -64,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await FileSourceService.setSourceMode(newMode);
     await _loadFiles();
   }
-  
+
   Future<void> _switchSort(SortOption newSort) async {
     await FileSourceService.setSortOption(newSort);
     await _loadFiles();
@@ -72,7 +72,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<bool> _pickCustomFolder() async {
     try {
-      final String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+      final String? selectedDirectory = await FilePicker.platform
+          .getDirectoryPath();
       if (selectedDirectory != null && selectedDirectory.isNotEmpty) {
         await FileSourceService.setCustomFolderPath(selectedDirectory);
         await FileSourceService.setSourceMode(FileSourceMode.custom);
@@ -81,9 +82,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking folder: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking folder: $e')));
       }
     }
     return false;
@@ -144,7 +145,9 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear Recent Files'),
-        content: const Text('Are you sure you want to clear your recent files history?'),
+        content: const Text(
+          'Are you sure you want to clear your recent files history?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -181,18 +184,23 @@ class _HomeScreenState extends State<HomeScreen> {
           if (selectedIndex == 1) currentAmount = 5.0;
           if (selectedIndex == 2) currentAmount = 7.0;
           if (selectedIndex == 3) {
-            currentAmount = double.tryParse(customController.text.replaceAll(',', '.'));
+            currentAmount = double.tryParse(
+              customController.text.replaceAll(',', '.'),
+            );
           }
 
-          final bool isButtonEnabled = selectedIndex != null &&
+          final bool isButtonEnabled =
+              selectedIndex != null &&
               currentAmount != null &&
               currentAmount > 0;
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: Row(
               children: const [
-                Icon(Icons.favorite, color: Colors.pinkAccent),
+                Icon(Icons.favorite, color: Color(0xFF7C3AED)),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -209,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Koto PDF Viewer is a 100% free app with no ads.',
+                    'KotoView is a 100% free app with no ads.',
                     style: TextStyle(fontSize: 13, color: Colors.black87),
                   ),
                   const SizedBox(height: 12),
@@ -254,19 +262,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: customController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Enter amount in € (max 20€)',
                         hintText: 'e.g. 10',
                         isDense: true,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         suffixText: '€',
                       ),
                       onChanged: (val) {
-                        final parsed = double.tryParse(val.replaceAll(',', '.'));
+                        final parsed = double.tryParse(
+                          val.replaceAll(',', '.'),
+                        );
                         if (parsed != null && parsed > 20) {
                           customController.text = '20';
-                          customController.selection = TextSelection.fromPosition(
+                          customController
+                              .selection = TextSelection.fromPosition(
                             TextPosition(offset: customController.text.length),
                           );
                         }
@@ -282,7 +297,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: selectedIndex == null ? Colors.deepOrange : Colors.grey.shade700,
+                      color: selectedIndex == null
+                          ? Colors.deepOrange
+                          : Colors.grey.shade700,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -291,22 +308,46 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isButtonEnabled ? Colors.black : Colors.grey.shade300,
-                            foregroundColor: isButtonEnabled ? Colors.white : Colors.grey.shade600,
+                            backgroundColor: isButtonEnabled
+                                ? Colors.black
+                                : Colors.grey.shade300,
+                            foregroundColor: isButtonEnabled
+                                ? Colors.white
+                                : Colors.grey.shade600,
                             padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          icon: Icon(Icons.credit_card, size: 18, color: isButtonEnabled ? Colors.blueAccent : Colors.grey),
-                          label: const FittedBox(child: Text('Revolut', style: TextStyle(fontWeight: FontWeight.bold))),
+                          icon: Icon(
+                            Icons.credit_card,
+                            size: 18,
+                            color: isButtonEnabled
+                                ? Colors.blueAccent
+                                : Colors.grey,
+                          ),
+                          label: const FittedBox(
+                            child: Text(
+                              'Revolut',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
                           onPressed: !isButtonEnabled
                               ? null
                               : () async {
-                                  final amountStr = currentAmount!.truncateToDouble() == currentAmount
+                                  final amountStr =
+                                      currentAmount!.truncateToDouble() ==
+                                          currentAmount
                                       ? currentAmount.toInt().toString()
                                       : currentAmount.toStringAsFixed(2);
-                                  final Uri url = Uri.parse('https://revolut.me/kostadc1ug/${amountStr}EUR');
+                                  final Uri url = Uri.parse(
+                                    'https://revolut.me/kostadc1ug/${amountStr}EUR',
+                                  );
                                   if (await canLaunchUrl(url)) {
-                                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                                    await launchUrl(
+                                      url,
+                                      mode: LaunchMode.externalApplication,
+                                    );
                                   }
                                 },
                         ),
@@ -315,20 +356,43 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isButtonEnabled ? const Color(0xFF003087) : Colors.grey.shade300,
-                            foregroundColor: isButtonEnabled ? Colors.white : Colors.grey.shade600,
+                            backgroundColor: isButtonEnabled
+                                ? const Color(0xFF003087)
+                                : Colors.grey.shade300,
+                            foregroundColor: isButtonEnabled
+                                ? Colors.white
+                                : Colors.grey.shade600,
                             padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          icon: Icon(Icons.payment, size: 18, color: isButtonEnabled ? Colors.lightBlueAccent : Colors.grey),
-                          label: const FittedBox(child: Text('PayPal', style: TextStyle(fontWeight: FontWeight.bold))),
+                          icon: Icon(
+                            Icons.payment,
+                            size: 18,
+                            color: isButtonEnabled
+                                ? Colors.lightBlueAccent
+                                : Colors.grey,
+                          ),
+                          label: const FittedBox(
+                            child: Text(
+                              'PayPal',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
                           onPressed: !isButtonEnabled
                               ? null
                               : () async {
-                                  final amountStr = currentAmount!.toStringAsFixed(2);
-                                  final Uri url = Uri.parse('https://www.paypal.com/donate/?business=kotocadastre@atomicmail.io&amount=$amountStr&currency_code=EUR');
+                                  final amountStr = currentAmount!
+                                      .toStringAsFixed(2);
+                                  final Uri url = Uri.parse(
+                                    'https://www.paypal.com/donate/?business=kotocadastre@atomicmail.io&amount=$amountStr&currency_code=EUR',
+                                  );
                                   if (await canLaunchUrl(url)) {
-                                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                                    await launchUrl(
+                                      url,
+                                      mode: LaunchMode.externalApplication,
+                                    );
                                   }
                                 },
                         ),
@@ -365,10 +429,10 @@ class _HomeScreenState extends State<HomeScreen> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.pink.shade50 : Colors.grey.shade100,
+          color: isSelected ? const Color(0xFFEDE9FE) : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? Colors.pinkAccent : Colors.grey.shade300,
+            color: isSelected ? const Color(0xFF7C3AED) : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -382,7 +446,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: Colors.black87,
+                    ),
                   ),
                   Text(
                     subtitle,
@@ -393,7 +461,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Text(
               amount,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.pinkAccent),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF7C3AED),
+              ),
             ),
           ],
         ),
@@ -404,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showAboutDialog() {
     showAboutDialog(
       context: context,
-      applicationName: 'Koto PDF Viewer',
+      applicationName: 'KotoView',
       applicationVersion: '1.0.0',
       applicationIcon: Container(
         padding: const EdgeInsets.all(8),
@@ -412,11 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
           color: Theme.of(context).colorScheme.primary,
           shape: BoxShape.circle,
         ),
-        child: const Icon(
-          Icons.picture_as_pdf,
-          color: Colors.white,
-          size: 32,
-        ),
+        child: const Icon(Icons.picture_as_pdf, color: Colors.white, size: 32),
       ),
       children: [
         const SizedBox(height: 12),
@@ -446,7 +514,9 @@ class _HomeScreenState extends State<HomeScreen> {
               child: PopupMenuButton<FileSourceMode>(
                 initialValue: _currentMode,
                 onSelected: _switchMode,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -480,7 +550,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             subtitleText,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                              color: theme.textTheme.bodyMedium?.color
+                                  ?.withValues(alpha: 0.6),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -514,28 +585,34 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            
+
             // Sort Button
             PopupMenuButton<SortOption>(
               initialValue: _currentSort,
               onSelected: _switchSort,
               tooltip: 'Sort by',
               icon: const Icon(Icons.sort),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               itemBuilder: (context) => [
                 PopupMenuItem(
                   value: SortOption.date,
                   child: Row(
                     children: [
                       Icon(
-                        Icons.date_range, 
-                        color: _currentSort == SortOption.date ? theme.colorScheme.primary : Colors.grey
+                        Icons.date_range,
+                        color: _currentSort == SortOption.date
+                            ? theme.colorScheme.primary
+                            : Colors.grey,
                       ),
                       const SizedBox(width: 12),
                       Text(
                         'Date',
                         style: TextStyle(
-                          fontWeight: _currentSort == SortOption.date ? FontWeight.bold : FontWeight.normal
+                          fontWeight: _currentSort == SortOption.date
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -546,14 +623,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Row(
                     children: [
                       Icon(
-                        Icons.sort_by_alpha, 
-                        color: _currentSort == SortOption.name ? theme.colorScheme.primary : Colors.grey
+                        Icons.sort_by_alpha,
+                        color: _currentSort == SortOption.name
+                            ? theme.colorScheme.primary
+                            : Colors.grey,
                       ),
                       const SizedBox(width: 12),
                       Text(
                         'Name',
                         style: TextStyle(
-                          fontWeight: _currentSort == SortOption.name ? FontWeight.bold : FontWeight.normal
+                          fontWeight: _currentSort == SortOption.name
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -601,23 +682,18 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 8),
             const Expanded(
-              child: Text(
-                'Koto PDF Viewer',
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text('KotoView', overflow: TextOverflow.ellipsis),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.favorite, color: Colors.pinkAccent),
+            icon: const Icon(Icons.favorite, color: Color(0xFF7C3AED)),
             tooltip: 'Support Developer',
             onPressed: _showSupportDeveloperDialog,
           ),
           IconButton(
-            icon: Icon(
-              widget.isDarkMode ? Icons.light_mode : Icons.dark_mode,
-            ),
+            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
             tooltip: 'Toggle Theme',
             onPressed: () => widget.onToggleTheme(!widget.isDarkMode),
           ),
@@ -652,7 +728,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.3,
+                          ),
                           blurRadius: 16,
                           offset: const Offset(0, 8),
                         ),
@@ -724,11 +802,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         Icon(
                           Icons.picture_as_pdf_outlined,
                           size: 64,
-                          color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.4),
+                          color: theme.textTheme.bodyMedium?.color?.withValues(
+                            alpha: 0.4,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _currentMode == FileSourceMode.custom && (_customFolderPath == null || _customFolderPath!.isEmpty)
+                          _currentMode == FileSourceMode.custom &&
+                                  (_customFolderPath == null ||
+                                      _customFolderPath!.isEmpty)
                               ? 'No folder selected'
                               : 'No PDF files found',
                           style: theme.textTheme.titleLarge?.copyWith(
@@ -739,8 +821,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 8),
                         Text(
                           _currentMode == FileSourceMode.custom
-                                  ? 'Tap the folder icon to select a directory.'
-                                  : 'Recently opened PDF files will appear here.',
+                              ? 'Tap the folder icon to select a directory.'
+                              : 'Recently opened PDF files will appear here.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium,
                         ),
@@ -751,124 +833,143 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: const Icon(Icons.folder_open),
                             label: const Text('Select Folder'),
                           ),
-                        ]
+                        ],
                       ],
                     ),
                   ),
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = _pdfFiles[index];
-                        final fileExists = File(item.path).existsSync();
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final item = _pdfFiles[index];
+                      final fileExists = File(item.path).existsSync();
 
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Card(
-                            child: InkWell(
-                              onTap: () {
-                                if (fileExists) {
-                                  _openPdfScreen(item.path);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Card(
+                          child: InkWell(
+                            onTap: () {
+                              if (fileExists) {
+                                _openPdfScreen(item.path);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'File no longer exists on the device.',
+                                    ),
+                                  ),
+                                );
+                                if (_currentMode == FileSourceMode.recent) {
+                                  _removeRecentFile(item.path);
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('File no longer exists on the device.'),
-                                    ),
-                                  );
-                                  if (_currentMode == FileSourceMode.recent) {
-                                    _removeRecentFile(item.path);
-                                  } else {
-                                    _loadFiles();
-                                  }
+                                  _loadFiles();
                                 }
-                              },
-                              onLongPress: () {
-                                if (fileExists) {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    backgroundColor: Colors.transparent,
-                                    builder: (context) => ShareOptionsSheet(filePath: item.path),
-                                  );
-                                }
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 44,
-                                      height: 60,
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.shade50,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.red.shade100),
+                              }
+                            },
+                            onLongPress: () {
+                              if (fileExists) {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) =>
+                                      ShareOptionsSheet(filePath: item.path),
+                                );
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEEF2FF),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: const Color(0xFFC7D2FE),
                                       ),
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.picture_as_pdf_rounded,
-                                          color: Colors.red.shade400,
-                                          size: 28,
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.picture_as_pdf_rounded,
+                                        color: const Color(0xFF4F46E5),
+                                        size: 28,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.name,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            item.name,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '${item.formattedSize} • ${dateFormat.format(item.lastOpened)}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 13,
                                           ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            '${item.formattedSize} • ${dateFormat.format(item.lastOpened)}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                                          ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
-                                    // Share button
+                                  ),
+                                  // Share button
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.share_outlined,
+                                      size: 22,
+                                    ),
+                                    tooltip: 'Изпрати',
+                                    onPressed: () {
+                                      if (fileExists) {
+                                        showModalBottomSheet(
+                                          context: context,
+                                          isScrollControlled: true,
+                                          backgroundColor: Colors.transparent,
+                                          builder: (context) =>
+                                              ShareOptionsSheet(
+                                                filePath: item.path,
+                                              ),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  // Remove/More button
+                                  if (_currentMode == FileSourceMode.recent)
                                     IconButton(
-                                      icon: const Icon(Icons.share_outlined, size: 22),
-                                      tooltip: 'Изпрати',
-                                      onPressed: () {
-                                        if (fileExists) {
-                                          showModalBottomSheet(
-                                            context: context,
-                                            isScrollControlled: true,
-                                            backgroundColor: Colors.transparent,
-                                            builder: (context) => ShareOptionsSheet(filePath: item.path),
-                                          );
-                                        }
-                                      },
-                                    ),
-                                    // Remove/More button
-                                    if (_currentMode == FileSourceMode.recent)
-                                      IconButton(
-                                        icon: const Icon(Icons.close, size: 20),
-                                        tooltip: 'Remove from recent',
-                                        onPressed: () => _removeRecentFile(item.path),
-                                      )
-                                    else
-                                      const Icon(Icons.chevron_right, size: 20),
-                                  ],
-                                ),
+                                      icon: const Icon(Icons.close, size: 20),
+                                      tooltip: 'Remove from recent',
+                                      onPressed: () =>
+                                          _removeRecentFile(item.path),
+                                    )
+                                  else
+                                    const Icon(Icons.chevron_right, size: 20),
+                                ],
                               ),
                             ),
                           ),
-                        );
-                      },
-                      childCount: _pdfFiles.length,
-                    ),
+                        ),
+                      );
+                    }, childCount: _pdfFiles.length),
                   ),
                 ),
             ],

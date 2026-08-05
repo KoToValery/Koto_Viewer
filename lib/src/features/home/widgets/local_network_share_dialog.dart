@@ -74,28 +74,14 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
     }
   }
 
-  void _copyToClipboard() {
-    if (_serverUrl != null) {
-      Clipboard.setData(ClipboardData(text: _serverUrl!));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('URL copied to clipboard'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  void _copyNameToClipboard() {
-    if (_serverName != null) {
-      Clipboard.setData(ClipboardData(text: _serverName!));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Server name copied to clipboard'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+  void _copyToClipboard(String text, String label) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label copied to clipboard'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -111,18 +97,17 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3E8FF),
+                    color: const Color(0xFFEDE9FE),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.wifi,
-                    color: Color(0xFF7E22CE),
+                    color: Color(0xFF4F46E5),
                     size: 26,
                   ),
                 ),
@@ -165,7 +150,6 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
 
             const SizedBox(height: 18),
 
-            // Content
             if (_isStarting)
               _buildLoading()
             else if (_hasError)
@@ -249,11 +233,16 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
   Widget _buildSuccess(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final localUrl = LocalServerService.localDomainUrl;
+    final port = LocalServerService.port;
+    final needsPortInLocalUrl = port != null && port != 80;
+    final fullLocalUrl = needsPortInLocalUrl
+        ? '$localUrl:$port'
+        : localUrl;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // QR Code
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -271,7 +260,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
             backgroundColor: Colors.white,
             eyeStyle: const QrEyeStyle(
               eyeShape: QrEyeShape.square,
-              color: Color(0xFF4338CA),
+              color: Color(0xFF4F46E5),
             ),
             dataModuleStyle: const QrDataModuleStyle(
               dataModuleShape: QrDataModuleShape.square,
@@ -282,40 +271,40 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
 
         const SizedBox(height: 16),
 
-        // Instructions
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
+            color: const Color(0xFFEEF2FF),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFBFDBFE)),
+            border: Border.all(color: const Color(0xFFC7D2FE)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
+            children: const [
+              Row(
                 children: [
-                  Icon(Icons.info_outline, size: 17, color: Color(0xFF1D4ED8)),
+                  Icon(Icons.info_outline, size: 17, color: Color(0xFF4F46E5)),
                   SizedBox(width: 6),
                   Text(
                     'Scan or open the link',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E40AF),
+                      color: Color(0xFF4338CA),
                       fontSize: 13,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 '1. Connect the other device to the same WiFi\n'
-                '2. Scan the QR code or copy the URL\n'
-                '3. Download or view the PDF in any browser',
+                '2. Scan the QR code or copy the URL below\n'
+                '3. Or try http://kotoview.local on macOS/iOS/Linux\n'
+                '4. Download or view the PDF in any browser',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.blueGrey.shade700,
+                  color: Color(0xFF3730A3),
                   height: 1.55,
                 ),
               ),
@@ -325,7 +314,67 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
 
         const SizedBox(height: 12),
 
-        // Server Name (Short readable name)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF312E81) : const Color(0xFFEDE9FE),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark ? const Color(0xFF4338CA) : const Color(0xFFC4B5FD),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.language,
+                size: 17,
+                color: Color(0xFF4F46E5),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Local Address (.local)',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        color: isDark
+                            ? Colors.indigo.shade200
+                            : Colors.indigo.shade700,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: .15,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      fullLocalUrl,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF4F46E5),
+                        letterSpacing: .1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_all_outlined, size: 19),
+                onPressed: () => _copyToClipboard(fullLocalUrl, 'Local URL'),
+                tooltip: 'Copy local URL',
+                color: const Color(0xFF4F46E5),
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+                splashRadius: 18,
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
@@ -340,7 +389,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
               const Icon(
                 Icons.badge_outlined,
                 size: 17,
-                color: Color(0xFF7E22CE),
+                color: Color(0xFF7C3AED),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -360,7 +409,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                     ),
                     const SizedBox(height: 1),
                     Text(
-                      _serverName ?? 'KotoPDF',
+                      _serverName ?? 'KotoView',
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 16,
@@ -374,7 +423,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
               ),
               IconButton(
                 icon: const Icon(Icons.copy_all_outlined, size: 19),
-                onPressed: _copyNameToClipboard,
+                onPressed: () => _copyToClipboard(_serverName ?? 'KotoView', 'Server name'),
                 tooltip: 'Copy name',
                 color: const Color(0xFF7E22CE),
                 padding: const EdgeInsets.all(6),
@@ -387,7 +436,6 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
 
         const SizedBox(height: 8),
 
-        // URL Display
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
@@ -403,7 +451,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Link Address',
+                      'IP Address',
                       style: TextStyle(
                         fontSize: 9.5,
                         color: Colors.grey.shade600,
@@ -425,7 +473,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
               ),
               IconButton(
                 icon: const Icon(Icons.copy_outlined, size: 19),
-                onPressed: _copyToClipboard,
+                onPressed: () => _copyToClipboard(_serverUrl!, 'IP URL'),
                 tooltip: 'Copy URL',
                 padding: const EdgeInsets.all(6),
                 constraints: const BoxConstraints(),
@@ -437,7 +485,6 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
 
         const SizedBox(height: 18),
 
-        // Stop button
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(

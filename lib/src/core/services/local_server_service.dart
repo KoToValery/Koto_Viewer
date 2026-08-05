@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:network_info_plus/network_info_plus.dart';
+import 'package:nsd/nsd.dart';
 
 /// Local HTTP server for sharing PDF files over local network
 class LocalServerService {
@@ -16,12 +17,17 @@ class LocalServerService {
   static Timer? _autoShutdownTimer;
   static DateTime? _startedAt;
   static final Random _random = Random();
+  static Registration? _mdnsRegistration;
 
-  static const String _baseName = 'KotoPDF';
+  static const String _baseName = 'KotoView';
+  static const String _localHostname = 'kotoview';
   static const int _nameSuffixLength = 4;
   static const Duration defaultShutdownTimeout = Duration(minutes: 15);
+  static const int _preferredPort = 8080;
 
-  /// Generate a short, memorable server name like KotoPDF-A1B2
+  static String get localDomainUrl => 'http://$_localHostname.local';
+
+  /// Generate a short, memorable server name like KotoView-A1B2
   static String _generateShortName() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final suffix = String.fromCharCodes(
@@ -31,6 +37,67 @@ class LocalServerService {
       ),
     );
     return '$_baseName-$suffix';
+  }
+
+  /// Try to bind server on preferredPort, fallback to random free port
+  static Future<HttpServer> _bindServer(shelf.Handler handler) async {
+    HttpServer? server;
+    final portsToTry = <int>[_preferredPort, 80, 8081, 8082, 0];
+
+    for (final port in portsToTry) {
+      try {
+        server = await shelf_io.serve(
+          handler,
+          InternetAddress.anyIPv4,
+          port,
+          shared: true,
+        );
+        return server;
+      } catch (_) {
+        continue;
+      }
+    }
+
+    throw Exception('Could not bind to any port');
+  }
+
+  /// Register mDNS service (Bonjour / .local) so the server is reachable via kotoview.local
+  static Future<void> _registerMdnsService(int port) async {
+    try {
+      await _unregisterMdnsService();
+
+      final service = Service(
+        name: _localHostname,
+        type: '_http._tcp',
+        port: port,
+      );
+
+      _mdnsRegistration = await register(service);
+
+      // ignore: avoid_print
+      print('🔔 mDNS registered: $_localHostname.local:_http._tcp:$port');
+    } catch (e) {
+      // ignore: avoid_print
+      print('⚠️  mDNS registration failed: $e');
+      // ignore: avoid_print
+      print('   Server is still accessible via IP address.');
+      _mdnsRegistration = null;
+    }
+  }
+
+  /// Unregister mDNS service
+  static Future<void> _unregisterMdnsService() async {
+    if (_mdnsRegistration != null) {
+      try {
+        await unregister(_mdnsRegistration!);
+        // ignore: avoid_print
+        print('🔕 mDNS unregistered');
+      } catch (e) {
+        // ignore: avoid_print
+        print('⚠️  mDNS unregister failed: $e');
+      }
+      _mdnsRegistration = null;
+    }
   }
 
   /// Start the local server and share a PDF file
@@ -50,15 +117,12 @@ class LocalServerService {
       final displayName =
           fileName ?? filePath.split(Platform.pathSeparator).last;
 
-      // Generate short memorable name
       _serverName = _generateShortName();
 
-      // Get local IP address
       final networkInfo = NetworkInfo();
       _ipAddress = await networkInfo.getWifiIP();
 
       if (_ipAddress == null || _ipAddress!.isEmpty) {
-        // Fallback: try to enumerate interfaces
         try {
           final interfaces = await NetworkInterface.list(
             includeLoopback: false,
@@ -84,7 +148,6 @@ class LocalServerService {
       final handler = const shelf.Pipeline().addHandler((
         shelf.Request request,
       ) {
-        // Refresh auto-shutdown timer on every request
         resetAutoShutdownTimer();
 
         try {
@@ -137,30 +200,36 @@ class LocalServerService {
         }
       });
 
-      // Bind to all IPv4 interfaces on a random free port
-      _server = await shelf_io.serve(
-        handler,
-        InternetAddress.anyIPv4,
-        0,
-        shared: true,
-      );
+      _server = await _bindServer(handler);
       _server!.autoCompress = true;
       _server!.sessionTimeout = 5 * 60;
 
+      _port = _server!.port;
+      _serverUrl = _port == 80
+          ? 'http://$_ipAddress'
+          : 'http://$_ipAddress:$_port';
+
+      await _registerMdnsService(_port!);
+
       _isRunning = true;
       _startedAt = DateTime.now();
-      _port = _server!.port;
-      _serverUrl = 'http://$_ipAddress:$_port';
 
       _scheduleAutoShutdown();
 
+      // ignore: avoid_print
       print('✅ Server started at $_serverUrl');
+      // ignore: avoid_print
+      print('🌐 Local domain: $localDomainUrl');
+      // ignore: avoid_print
       print('📛 Name: $_serverName');
+      // ignore: avoid_print
       print('⏱️  Auto-shutdown in ${defaultShutdownTimeout.inMinutes} min');
 
       return _serverUrl;
     } catch (e, stackTrace) {
+      // ignore: avoid_print
       print('❌ Error starting server: $e');
+      // ignore: avoid_print
       print(stackTrace);
       _isRunning = false;
       return null;
@@ -171,6 +240,7 @@ class LocalServerService {
     _cancelAutoShutdown();
     final t = timeout ?? defaultShutdownTimeout;
     _autoShutdownTimer = Timer(t, () {
+      // ignore: avoid_print
       print('⏰ Auto-shutdown timer fired');
       stopServer();
     });
@@ -200,6 +270,7 @@ class LocalServerService {
   static Future<void> stopServer() async {
     _cancelAutoShutdown();
     _startedAt = null;
+    await _unregisterMdnsService();
     if (_server != null) {
       try {
         await _server!.close(force: true);
@@ -210,6 +281,7 @@ class LocalServerService {
       _ipAddress = null;
       _port = null;
       _isRunning = false;
+      // ignore: avoid_print
       print('🛑 Server stopped');
     }
   }
@@ -220,7 +292,7 @@ class LocalServerService {
   /// Get current server URL
   static String? get serverUrl => _serverUrl;
 
-  /// Short memorable server name e.g. KotoPDF-A3K7
+  /// Short memorable server name e.g. KotoView-A3K7
   static String? get serverName => _serverName;
 
   /// Get IP address
@@ -229,10 +301,10 @@ class LocalServerService {
   /// Get port
   static int? get port => _port;
 
-  /// Display name e.g. KotoPDF-A3K7 ::: 45678
+  /// Display name e.g. KotoView-A3K7 ::: 45678
   static String get serverDisplayName {
     final name = _serverName ?? _baseName;
-    final p = _port ?? 8080;
+    final p = _port ?? _preferredPort;
     return '$name • $p';
   }
 
@@ -251,7 +323,7 @@ class LocalServerService {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
             min-height: 100vh;
             display: flex; justify-content: center; align-items: center; padding: 16px;
         }
@@ -261,14 +333,14 @@ class LocalServerService {
             padding: 28px; max-width: 440px; width: 100%; text-align: center;
         }
         .chip {
-            display: inline-block; background: #EEF2FF; color: #4338CA;
+            display: inline-block; background: #EDE9FE; color: #4F46E5;
             padding: 6px 14px; border-radius: 999px;
             font-weight: 700; font-size: 13px; letter-spacing: .3px;
             margin-bottom: 18px;
         }
         .icon { font-size: 68px; margin-bottom: 10px; }
         h1 { color: #111827; font-size: 22px; margin-bottom: 4px; font-weight: 800; }
-        .from { color: #667eea; font-size: 14px; margin-bottom: 16px; font-weight: 600; }
+        .from { color: #4F46E5; font-size: 14px; margin-bottom: 16px; font-weight: 600; }
         .filename {
             background: #F9FAFB; border: 1px solid #E5E7EB;
             padding: 12px; border-radius: 10px;
@@ -289,8 +361,8 @@ class LocalServerService {
             transition: transform .15s, box-shadow .15s;
         }
         .btn:active { transform: translateY(1px); }
-        .btn-download { background: #667eea; color: white; }
-        .btn-view { background: #10B981; color: white; }
+        .btn-download { background: #4F46E5; color: white; }
+        .btn-view { background: #7C3AED; color: white; }
         @media (max-width: 420px) {
             .container { padding: 22px 18px; border-radius: 14px; }
             h1 { font-size: 20px; }
@@ -309,6 +381,7 @@ class LocalServerService {
             <div>📛 Server: <span>$name</span></div>
             <div>📍 IP: <span>${_ipAddress ?? '—'}</span></div>
             <div>🔌 Port: <span>${_port ?? '—'}</span></div>
+            <div>🌐 Local: <span>$localDomainUrl</span></div>
         </div>
         <div class="buttons">
             <a href="/download" class="btn btn-download">📥 Download PDF</a>
