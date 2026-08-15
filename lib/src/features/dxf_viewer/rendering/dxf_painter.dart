@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/dxf_color_table.dart';
 import '../models/dxf_models.dart';
 import 'dxf_math.dart';
+import 'dxf_snap_helper.dart';
 
 /// Theme presets for the CAD viewer background.
 enum DxfCanvasTheme {
@@ -54,11 +55,6 @@ class DxfMeasurement {
   double? get distance => p2Cad != null ? (p2Cad! - p1Cad).distance : null;
   double? get deltaX => p2Cad != null ? (p2Cad!.dx - p1Cad.dx).abs() : null;
   double? get deltaY => p2Cad != null ? (p2Cad!.dy - p1Cad.dy).abs() : null;
-  double? get angleDeg {
-    if (p2Cad == null) return null;
-    final angle = math.atan2(p2Cad!.dy - p1Cad.dy, p2Cad!.dx - p1Cad.dx) * 180.0 / math.pi;
-    return (angle + 360.0) % 360.0;
-  }
 }
 
 /// CustomPainter for rendering entire DXF drawing.
@@ -68,7 +64,7 @@ class DxfPainter extends CustomPainter {
   final double currentScale;
   final DxfMeasurement? measurement;
   final DxfEntity? highlightedEntity;
-  final String? searchQuery;
+  final DxfSnapResult? snapResult;
   final bool showGrid;
 
   DxfPainter({
@@ -77,7 +73,7 @@ class DxfPainter extends CustomPainter {
     this.currentScale = 1.0,
     this.measurement,
     this.highlightedEntity,
-    this.searchQuery,
+    this.snapResult,
     this.showGrid = true,
   });
 
@@ -165,14 +161,14 @@ class DxfPainter extends CustomPainter {
       );
     }
 
-    // 3. Draw Search Highlights
-    if (searchQuery != null && searchQuery!.trim().isNotEmpty) {
-      _drawSearchHighlights(canvas, toCanvas);
-    }
-
-    // 4. Draw Highlighted Entity
+    // 3. Draw Highlighted Entity
     if (highlightedEntity != null) {
       _drawEntityHighlight(canvas, highlightedEntity!, toCanvas);
+    }
+
+    // 4. Draw Active Snap Marker
+    if (snapResult != null) {
+      _drawSnapMarker(canvas, snapResult!, toCanvas);
     }
 
     // 5. Draw Active Measurement Overlay
@@ -805,39 +801,54 @@ class DxfPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
-  void _drawSearchHighlights(Canvas canvas, Offset Function(Offset) toCanvas) {
-    final query = searchQuery!.trim().toLowerCase();
-    final highlightPaint = Paint()
-      ..color = const Color(0xFFFFD600).withValues(alpha: 0.35)
-      ..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..color = const Color(0xFFFFD600)
+  void _drawSnapMarker(
+    Canvas canvas,
+    DxfSnapResult snap,
+    Offset Function(Offset) toCanvas,
+  ) {
+    final pos = toCanvas(snap.point);
+    const double size = 7.0;
+
+    final markerPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0 / currentScale.clamp(0.5, 10.0);
+      ..strokeWidth = 1.5
+      ..isAntiAlias = true;
 
-    for (final entity in document.entities) {
-      String? text;
-      Offset? pos;
-      double h = 5.0;
+    final fillPaint = Paint()
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
 
-      if (entity is DxfText && entity.text.toLowerCase().contains(query)) {
-        text = entity.text;
-        pos = entity.alignPoint ?? entity.insertPoint;
-        h = entity.height;
-      } else if (entity is DxfMText && entity.cleanText.toLowerCase().contains(query)) {
-        text = entity.cleanText;
-        pos = entity.insertPoint;
-        h = entity.height;
-      }
+    switch (snap.type) {
+      case DxfSnapType.endpoint:
+      case DxfSnapType.point:
+        // Diamond marker ◇
+        final path = Path()
+          ..moveTo(pos.dx, pos.dy - size)
+          ..lineTo(pos.dx + size, pos.dy)
+          ..lineTo(pos.dx, pos.dy + size)
+          ..lineTo(pos.dx - size, pos.dy)
+          ..close();
+        canvas.drawPath(path, fillPaint);
+        canvas.drawPath(path, markerPaint);
+        break;
 
-      if (text != null && pos != null) {
-        final canvasPos = toCanvas(pos);
-        final approxW = (text.length * h * 0.7).clamp(h * 2, 5000.0);
-        final rect = Rect.fromLTWH(canvasPos.dx - 2, canvasPos.dy - h * 1.2, approxW + 4, h * 1.5);
-        final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(3));
-        canvas.drawRRect(rrect, highlightPaint);
-        canvas.drawRRect(rrect, borderPaint);
-      }
+      case DxfSnapType.midpoint:
+        // Triangle marker △
+        final path = Path()
+          ..moveTo(pos.dx, pos.dy - size)
+          ..lineTo(pos.dx + size, pos.dy + size * 0.8)
+          ..lineTo(pos.dx - size, pos.dy + size * 0.8)
+          ..close();
+        canvas.drawPath(path, fillPaint);
+        canvas.drawPath(path, markerPaint);
+        break;
+
+      case DxfSnapType.center:
+        // Circle marker ○
+        canvas.drawCircle(pos, size * 0.85, fillPaint);
+        canvas.drawCircle(pos, size * 0.85, markerPaint);
+        break;
     }
   }
 
@@ -878,9 +889,9 @@ class DxfPainter extends CustomPainter {
     final linePaint = Paint()
       ..color = const Color(0xFFFF5252)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0 / currentScale.clamp(0.5, 10.0);
+      ..strokeWidth = 1.4;
 
-    final dotRadius = 4.0 / currentScale.clamp(0.5, 10.0);
+    const double dotRadius = 3.0;
     canvas.drawCircle(p1, dotRadius, dotPaint);
 
     if (m.p2Cad != null) {
@@ -888,17 +899,16 @@ class DxfPainter extends CustomPainter {
       canvas.drawCircle(p2, dotRadius, dotPaint);
       canvas.drawLine(p1, p2, linePaint);
 
-      // Measurement Callout Bubble
+      // Compact L-Only Measurement Callout Bubble
       final double dist = m.distance!;
-      final double angle = m.angleDeg!;
-      final String text = 'L: ${DxfMath.formatDistance(dist)} | ∠: ${DxfMath.formatAngle(angle)}\nΔX: ${DxfMath.formatDistance(m.deltaX!)}  ΔY: ${DxfMath.formatDistance(m.deltaY!)}';
+      final String text = 'L: ${DxfMath.formatDistance(dist)}';
 
       final textPainter = TextPainter(
         text: TextSpan(
           text: text,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 11.0,
+            fontSize: 9.5,
             fontWeight: FontWeight.bold,
             fontFamily: 'monospace',
           ),
@@ -909,26 +919,26 @@ class DxfPainter extends CustomPainter {
 
       final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
       final bubbleRect = Rect.fromCenter(
-        center: mid + const Offset(0, -22),
-        width: textPainter.width + 16,
-        height: textPainter.height + 10,
+        center: mid + const Offset(0, -14),
+        width: textPainter.width + 10,
+        height: textPainter.height + 6,
       );
 
       final bgPaint = Paint()
-        ..color = const Color(0xEE1E293B)
+        ..color = const Color(0xF01E293B)
         ..style = PaintingStyle.fill;
       final borderBubble = Paint()
         ..color = const Color(0xFFFF5252)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0;
 
-      final rrect = RRect.fromRectAndRadius(bubbleRect, const Radius.circular(6));
+      final rrect = RRect.fromRectAndRadius(bubbleRect, const Radius.circular(4));
       canvas.drawRRect(rrect, bgPaint);
       canvas.drawRRect(rrect, borderBubble);
 
       textPainter.paint(
         canvas,
-        Offset(bubbleRect.left + 8, bubbleRect.top + 5),
+        Offset(bubbleRect.left + 5, bubbleRect.top + 3),
       );
     }
   }
@@ -940,7 +950,7 @@ class DxfPainter extends CustomPainter {
         oldDelegate.currentScale != currentScale ||
         oldDelegate.measurement != measurement ||
         oldDelegate.highlightedEntity != highlightedEntity ||
-        oldDelegate.searchQuery != searchQuery ||
+        oldDelegate.snapResult != snapResult ||
         oldDelegate.showGrid != showGrid;
   }
 }

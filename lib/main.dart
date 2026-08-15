@@ -6,8 +6,11 @@ import 'src/features/home/home_screen.dart';
 import 'src/features/pdf_viewer/pdf_viewer_screen.dart';
 import 'src/features/dxf_viewer/dxf_viewer_screen.dart';
 
-void main() {
+import 'src/core/services/coordinate_system_service.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await CoordinateSystemService.init();
   runApp(const KotoViewApp());
 }
 

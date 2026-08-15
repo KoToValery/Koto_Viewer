@@ -1,20 +1,24 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import '../../core/models/pdf_item.dart';
+import '../../core/services/coordinate_system_service.dart';
 import '../../core/services/recent_files_service.dart';
+import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../home/widgets/share_options_sheet.dart';
 import 'models/dxf_models.dart';
 import 'parser/dxf_parser.dart';
 import 'rendering/dxf_math.dart';
 import 'rendering/dxf_painter.dart';
+import 'rendering/dxf_snap_helper.dart';
+import 'widgets/dxf_import_dialog.dart';
 import 'widgets/dxf_info_sheet.dart';
 import 'widgets/dxf_layer_sheet.dart';
 import 'widgets/dxf_measurement_overlay.dart';
-import 'widgets/dxf_search_bar.dart';
 
 class DxfViewerScreen extends StatefulWidget {
   final String filePath;
@@ -32,7 +36,6 @@ class DxfViewerScreen extends StatefulWidget {
 
 class _DxfViewerScreenState extends State<DxfViewerScreen> {
   final TransformationController _transformController = TransformationController();
-  final TextEditingController _searchController = TextEditingController();
 
   DxfDocument? _document;
   bool _isLoading = true;
@@ -46,14 +49,11 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   double _currentScale = 1.0;
   Offset _currentCadCoord = Offset.zero;
 
-  // Measurement tool
+  // Measurement & Snap tool
   bool _isMeasureMode = false;
+  bool _snapEnabled = true;
   DxfMeasurement? _measurement;
-
-  // Search tool
-  bool _isSearchOpen = false;
-  List<DxfEntity> _searchMatches = [];
-  int _currentSearchIdx = 0;
+  DxfSnapResult? _hoveredSnap;
 
   // Layout & viewport
   Size _viewportSize = Size.zero;
@@ -70,7 +70,6 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   void dispose() {
     _transformController.removeListener(_onTransformChanged);
     _transformController.dispose();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -157,7 +156,6 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     final newScale = (scale * factor).clamp(0.001, 1000.0);
 
-    // Zoom centered on viewport center
     final dx = center.dx - (center.dx - translation.x) * (newScale / scale);
     final dy = center.dy - (center.dy - translation.y) * (newScale / scale);
 
@@ -194,37 +192,26 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     return Offset(cadX, cadY);
   }
 
-  Offset _cadToScene(Offset cadPoint) {
-    if (_document == null || _viewportSize.isEmpty) return Offset.zero;
-
+  double _getCadFitScale() {
+    if (_document == null || _viewportSize.isEmpty) return 1.0;
     final double docW = math.max(_document!.width, 1.0);
     final double docH = math.max(_document!.height, 1.0);
-
     const double padding = 32.0;
     final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
     final double availH = math.max(_viewportSize.height - padding * 2, 10.0);
-
-    final double fitScale = math.min(availW / docW, availH / docH);
-
-    final double tx = (_viewportSize.width - docW * fitScale) / 2.0;
-    final double ty = (_viewportSize.height - docH * fitScale) / 2.0;
-
-    final double minX = _document!.bounds.left;
-    final double maxY = _document!.bounds.bottom > _document!.bounds.top
-        ? _document!.bounds.bottom
-        : _document!.bounds.top;
-
-    final double sceneX = tx + (cadPoint.dx - minX) * fitScale;
-    final double sceneY = ty + (maxY - cadPoint.dy) * fitScale;
-
-    return Offset(sceneX, sceneY);
+    return math.min(availW / docW, availH / docH);
   }
 
   void _handleCanvasTap(TapUpDetails details) {
     if (_document == null) return;
 
     final scenePoint = _transformController.toScene(details.localPosition);
-    final cadPoint = _sceneToCad(scenePoint);
+    final rawCadPoint = _sceneToCad(scenePoint);
+
+    // If snapped, use the exact snapped landmark point
+    final cadPoint = (_isMeasureMode && _snapEnabled && _hoveredSnap != null)
+        ? _hoveredSnap!.point
+        : rawCadPoint;
 
     setState(() {
       _currentCadCoord = cadPoint;
@@ -249,85 +236,120 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     final scenePoint = _transformController.toScene(event.localPosition);
     final cadPoint = _sceneToCad(scenePoint);
 
+    DxfSnapResult? snap;
+    if (_isMeasureMode && _snapEnabled) {
+      final fitScale = _getCadFitScale();
+      // 18 screen pixels tolerance converted to CAD coordinates
+      final toleranceCad = 18.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
+      snap = DxfSnapHelper.findSnapPoint(
+        document: _document!,
+        cadPoint: cadPoint,
+        toleranceCad: toleranceCad,
+      );
+    }
+
     setState(() {
-      _currentCadCoord = cadPoint;
+      _currentCadCoord = snap != null ? snap.point : cadPoint;
+      _hoveredSnap = snap;
     });
   }
 
-  // --- Search Logic ---
-  void _onSearchChanged(String query) {
-    if (_document == null || query.trim().isEmpty) {
+  /// Handles importing an additional DXF drawing into the current workspace.
+  Future<void> _importDxfFile() async {
+    if (_document == null) return;
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+      );
+
+      if (result == null || result.files.single.path == null) return;
+
+      final filePath = result.files.single.path!;
+      final file = File(filePath);
+
+      if (!filePath.toLowerCase().endsWith('.dxf')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select a valid .dxf file to import.')),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Parsing DXF for import...'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+
+      final importedDoc = await DxfParser.parseFromFile(file);
+      final activeCrs = CoordinateSystemService.activeSystemNotifier.value;
+
+      if (!mounted) return;
+
+      final action = await DxfImportDialog.show(
+        context: context,
+        file: file,
+        currentDoc: _document!,
+        importedDoc: importedDoc,
+        activeCrs: activeCrs,
+      );
+
+      if (action == null || !mounted) return;
+
+      // Merge imported document into current document
+      final mergedLayers = Map<String, DxfLayer>.from(_document!.layers);
+      for (final entry in importedDoc.layers.entries) {
+        if (!mergedLayers.containsKey(entry.key)) {
+          mergedLayers[entry.key] = entry.value;
+        }
+      }
+
+      final mergedBlocks = Map<String, DxfBlock>.from(_document!.blocks);
+      for (final entry in importedDoc.blocks.entries) {
+        mergedBlocks[entry.key] = entry.value;
+      }
+
+      final mergedEntities = List<DxfEntity>.from(_document!.entities)..addAll(importedDoc.entities);
+      final mergedBounds = _document!.bounds.expandToInclude(importedDoc.bounds);
+
+      final mergedStats = Map<String, int>.from(_document!.entityStats);
+      for (final entry in importedDoc.entityStats.entries) {
+        mergedStats[entry.key] = (mergedStats[entry.key] ?? 0) + entry.value;
+      }
+
       setState(() {
-        _searchMatches = [];
-        _currentSearchIdx = 0;
+        _document = DxfDocument(
+          layers: mergedLayers,
+          blocks: mergedBlocks,
+          entities: mergedEntities,
+          headerVars: _document!.headerVars,
+          bounds: mergedBounds,
+          entityStats: mergedStats,
+        );
       });
-      return;
-    }
 
-    final q = query.trim().toLowerCase();
-    final matches = <DxfEntity>[];
-
-    for (final e in _document!.entities) {
-      if (e is DxfText && e.text.toLowerCase().contains(q)) {
-        matches.add(e);
-      } else if (e is DxfMText && e.cleanText.toLowerCase().contains(q)) {
-        matches.add(e);
-      } else if (e is DxfDimension && (e.textOverride?.toLowerCase().contains(q) ?? false)) {
-        matches.add(e);
+      final importedName = filePath.split(Platform.pathSeparator).last;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Successfully imported ${importedDoc.totalEntities} entities from $importedName'),
+          action: SnackBarAction(
+            label: 'Fit Screen',
+            onPressed: _fitToScreen,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error importing DXF: $e')),
+        );
       }
     }
-
-    setState(() {
-      _searchMatches = matches;
-      _currentSearchIdx = 0;
-    });
-
-    if (matches.isNotEmpty) {
-      _jumpToMatch(0);
-    }
-  }
-
-  void _jumpToMatch(int index) {
-    if (_searchMatches.isEmpty || _document == null || _viewportSize.isEmpty) return;
-    final entity = _searchMatches[index];
-
-    Offset? pos;
-    if (entity is DxfText) {
-      pos = entity.alignPoint ?? entity.insertPoint;
-    } else if (entity is DxfMText) {
-      pos = entity.insertPoint;
-    } else if (entity is DxfDimension) {
-      pos = entity.textPoint;
-    }
-
-    if (pos != null) {
-      final scenePoint = _cadToScene(pos);
-      const double zoomLevel = 4.0;
-      final tx = _viewportSize.width / 2 - scenePoint.dx * zoomLevel;
-      final ty = _viewportSize.height / 2 - scenePoint.dy * zoomLevel;
-
-      final matrix = Matrix4.identity()
-        ..translate(tx, ty)
-        ..scale(zoomLevel);
-
-      _transformController.value = matrix;
-    }
-  }
-
-  void _nextMatch() {
-    if (_searchMatches.isEmpty) return;
-    setState(() {
-      _currentSearchIdx = (_currentSearchIdx + 1) % _searchMatches.length;
-    });
-    _jumpToMatch(_currentSearchIdx);
-  }
-
-  void _previousMatch() {
-    if (_searchMatches.isEmpty) return;
-    setState(() {
-      _currentSearchIdx = (_currentSearchIdx - 1 + _searchMatches.length) % _searchMatches.length;
-    });
-    _jumpToMatch(_currentSearchIdx);
   }
 
   void _showLayersSheet() {
@@ -350,6 +372,13 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       fileName: _fileName,
       fileSizeBytes: _fileSizeBytes,
     );
+  }
+
+  void _showCoordinateSettings() async {
+    final selected = await CoordinateSettingsDialog.show(context);
+    if (selected != null && mounted) {
+      setState(() {});
+    }
   }
 
   void _shareDxf() {
@@ -378,6 +407,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final activeCrs = CoordinateSystemService.activeSystemNotifier.value;
 
     return Scaffold(
       backgroundColor: _canvasTheme.bgColor,
@@ -393,11 +423,12 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             ),
             if (_document != null)
               Text(
-                '${_document!.totalEntities} entities • ${_document!.totalLayers} layers',
+                '${_document!.totalEntities} entities • ${_document!.totalLayers} layers • ${activeCrs.name}',
                 style: TextStyle(
                   fontSize: 11,
                   color: theme.textTheme.bodySmall?.color,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
           ],
         ),
@@ -407,6 +438,13 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             icon: const Icon(Icons.fit_screen_outlined),
             tooltip: 'Fit to Screen (Zoom Extents)',
             onPressed: _document != null ? _fitToScreen : null,
+          ),
+
+          // Import DXF
+          IconButton(
+            icon: const Icon(Icons.add_to_photos_outlined),
+            tooltip: 'Import DXF into Drawing',
+            onPressed: _document != null ? _importDxfFile : null,
           ),
 
           // Layer Manager
@@ -427,26 +465,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                 ? () {
                     setState(() {
                       _isMeasureMode = !_isMeasureMode;
-                      if (!_isMeasureMode) _measurement = null;
-                    });
-                  }
-                : null,
-          ),
-
-          // Search in Drawing
-          IconButton(
-            icon: Icon(
-              Icons.search,
-              color: _isSearchOpen ? theme.colorScheme.primary : null,
-            ),
-            tooltip: 'Search Text',
-            onPressed: _document != null
-                ? () {
-                    setState(() {
-                      _isSearchOpen = !_isSearchOpen;
-                      if (!_isSearchOpen) {
-                        _searchController.clear();
-                        _searchMatches = [];
+                      if (!_isMeasureMode) {
+                        _measurement = null;
+                        _hoveredSnap = null;
                       }
                     });
                   }
@@ -489,11 +510,17 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             }).toList(),
           ),
 
-          // More Options (Info, Share, Print)
+          // More Options
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'import':
+                  _importDxfFile();
+                  break;
+                case 'crs':
+                  _showCoordinateSettings();
+                  break;
                 case 'info':
                   _showInfoSheet();
                   break;
@@ -511,6 +538,26 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'import',
+                child: Row(
+                  children: [
+                    Icon(Icons.add_to_photos_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Import DXF File'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'crs',
+                child: Row(
+                  children: [
+                    Icon(Icons.public_rounded, size: 20),
+                    SizedBox(width: 12),
+                    Text('Coordinate System'),
+                  ],
+                ),
+              ),
               PopupMenuItem(
                 value: 'grid',
                 child: Row(
@@ -521,33 +568,33 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                   ],
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'info',
                 child: Row(
                   children: [
                     Icon(Icons.info_outline, size: 20),
-                    const SizedBox(width: 12),
-                    const Text('Drawing Properties'),
+                    SizedBox(width: 12),
+                    Text('Drawing Properties'),
                   ],
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'share',
                 child: Row(
                   children: [
                     Icon(Icons.share_outlined, size: 20),
-                    const SizedBox(width: 12),
-                    const Text('Share File'),
+                    SizedBox(width: 12),
+                    Text('Share File'),
                   ],
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'print',
                 child: Row(
                   children: [
                     Icon(Icons.print_outlined, size: 20),
-                    const SizedBox(width: 12),
-                    const Text('Print / Export'),
+                    SizedBox(width: 12),
+                    Text('Print / Export'),
                   ],
                 ),
               ),
@@ -631,7 +678,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                           theme: _canvasTheme,
                           currentScale: _currentScale,
                           measurement: _measurement,
-                          searchQuery: _isSearchOpen ? _searchController.text : null,
+                          snapResult: _isMeasureMode && _snapEnabled ? _hoveredSnap : null,
                           showGrid: _showGrid,
                         ),
                       ),
@@ -639,38 +686,22 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                   ),
                 ),
 
-                // Top Search Bar
-                if (_isSearchOpen)
-                  Positioned(
-                    top: 12,
-                    left: 16,
-                    right: 16,
-                    child: DxfSearchBar(
-                      controller: _searchController,
-                      matchCount: _searchMatches.length,
-                      currentMatchIndex: _currentSearchIdx,
-                      onChanged: _onSearchChanged,
-                      onNext: _nextMatch,
-                      onPrevious: _previousMatch,
-                      onClose: () {
-                        setState(() {
-                          _isSearchOpen = false;
-                          _searchController.clear();
-                          _searchMatches = [];
-                        });
-                      },
-                    ),
-                  ),
-
                 // Top Measure Status Bar
                 if (_isMeasureMode)
                   Positioned(
-                    top: _isSearchOpen ? 72 : 12,
+                    top: 12,
                     left: 16,
                     right: 16,
                     child: Center(
                       child: DxfMeasurementOverlay(
                         measurement: _measurement,
+                        snapEnabled: _snapEnabled,
+                        onToggleSnap: () {
+                          setState(() {
+                            _snapEnabled = !_snapEnabled;
+                            if (!_snapEnabled) _hoveredSnap = null;
+                          });
+                        },
                         onClear: () {
                           setState(() {
                             _measurement = null;
@@ -680,6 +711,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                           setState(() {
                             _isMeasureMode = false;
                             _measurement = null;
+                            _hoveredSnap = null;
                           });
                         },
                       ),
@@ -698,10 +730,10 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                       border: Border.all(color: Colors.white12),
                     ),
                     child: Text(
-                      'X: ${DxfMath.formatDistance(_currentCadCoord.dx)}  Y: ${DxfMath.formatDistance(_currentCadCoord.dy)}  |  Zoom: ${(_currentScale * 100).toStringAsFixed(0)}%',
+                      'X: ${DxfMath.formatDistance(_currentCadCoord.dx)}  Y: ${DxfMath.formatDistance(_currentCadCoord.dy)}  |  Zoom: ${(_currentScale * 100).toStringAsFixed(0)}%  |  ${activeCrs.name}',
                       style: const TextStyle(
                         color: Colors.white70,
-                        fontSize: 11,
+                        fontSize: 10.5,
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.w600,
                       ),

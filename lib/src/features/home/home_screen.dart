@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/file_source_service.dart';
+import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
 import '../dxf_viewer/dxf_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
@@ -278,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.other:
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Unsuported format.')));
+        ).showSnackBar(const SnackBar(content: Text('Unsupported format.')));
         return;
     }
 
@@ -645,10 +646,15 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         const SizedBox(height: 12),
         const Text(
-          'A lightweight, fast, and 100% free PDF viewer designed to complement your mobile apps.',
+          'A lightweight, fast, and 100% free PDF and CAD viewer with support for BGS 2005 and global coordinate systems.',
         ),
       ],
     );
+  }
+
+  void _showCoordinateSettings() async {
+    await CoordinateSettingsDialog.show(context);
+    if (mounted) setState(() {});
   }
 
   Widget _buildSourceHeader(ThemeData theme) {
@@ -843,6 +849,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.public_rounded),
+            tooltip: 'Coordinate System Settings',
+            onPressed: _showCoordinateSettings,
+          ),
           IconButton(
             icon: const Icon(Icons.favorite, color: Color(0xFF7C3AED)),
             tooltip: 'Support Developer',
@@ -1074,7 +1085,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       Icons.share_outlined,
                                       size: 22,
                                     ),
-                                    tooltip: 'Изпрати',
+                                    tooltip: 'Share',
                                     onPressed: () {
                                       if (fileExists) {
                                         showModalBottomSheet(
