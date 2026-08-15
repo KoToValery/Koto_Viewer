@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_color_table.dart';
+import 'package:kotoview/src/features/dxf_viewer/models/dxf_display_settings.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/dxf_viewer/parser/dxf_parser.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_math.dart';
@@ -385,6 +386,86 @@ EOF
 
       final resolvedTrueColor = DxfColorTable.resolveColor(trueColor: 65280, isDarkBackground: true);
       expect(resolvedTrueColor, const Color(0xFF00FF00));
+    });
+
+    test('Parses HATCH with circular boundary edge without center chord', () {
+      const dxfContent = '''
+0
+SECTION
+2
+ENTITIES
+0
+HATCH
+8
+Landscaping
+2
+SOLID
+70
+1
+91
+1
+92
+2
+93
+1
+72
+2
+10
+50.0
+20
+50.0
+40
+25.0
+50
+0.0
+51
+360.0
+73
+1
+97
+0
+0
+ENDSEC
+0
+EOF
+''';
+
+      final doc = DxfParser.parseString(dxfContent);
+      expect(doc.entities.length, 1);
+
+      final hatch = doc.entities[0] as DxfHatch;
+      expect(hatch.boundaryPaths.length, 1);
+      final loop = hatch.boundaryPaths[0];
+      expect(loop.length, greaterThan(6));
+
+      // Check all points are on circle circumference (r=25 from (50,50)), NOT at center
+      for (final pt in loop) {
+        final distToCenter = (pt - const Offset(50, 50)).distance;
+        expect((distToCenter - 25.0).abs(), lessThan(0.01));
+      }
+    });
+
+    test('DxfDisplaySettings serialization and defaults', () {
+      const defaultSettings = DxfDisplaySettings();
+      expect(defaultSettings.lineThicknessScale, 1.0);
+      expect(defaultSettings.measurementScale, 1.4);
+      expect(defaultSettings.pointSize, 4.0);
+      expect(defaultSettings.pointStyle, DxfPointStyle.dot);
+
+      final modified = defaultSettings.copyWith(
+        lineThicknessScale: 1.8,
+        measurementScale: 0.8,
+        pointSize: 6.0,
+        pointStyle: DxfPointStyle.circleDot,
+      );
+
+      final jsonStr = modified.toJson();
+      final restored = DxfDisplaySettings.fromJson(jsonStr);
+
+      expect(restored.lineThicknessScale, 1.8);
+      expect(restored.measurementScale, 0.8);
+      expect(restored.pointSize, 6.0);
+      expect(restored.pointStyle, DxfPointStyle.circleDot);
     });
   });
 }

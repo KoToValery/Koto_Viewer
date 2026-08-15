@@ -165,46 +165,106 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                 );
                 final count = _layerCounts[layer.name] ?? 0;
 
-                return SwitchListTile.adaptive(
-                  value: layer.isVisible,
-                  onChanged: (val) {
-                    setState(() {
-                      layer.isVisible = val;
-                    });
-                    widget.onLayersChanged();
-                  },
-                  secondary: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: theme.colorScheme.outline.withValues(alpha: 0.4),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: color.withValues(alpha: 0.3),
-                          blurRadius: 4,
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Layer Color Indicator
+                      Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.35),
+                              blurRadius: 5,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                  title: Text(
-                    layer.name.isEmpty ? 'Unnamed Layer' : layer.name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      decoration: layer.isVisible ? null : TextDecoration.lineThrough,
-                      color: layer.isVisible ? null : theme.disabledColor,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '$count ${count == 1 ? "entity" : "entities"} ${layer.isFrozen ? "• Frozen" : ""}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.textTheme.bodySmall?.color,
-                    ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Layer Details & Line Weight Selector
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              layer.name.isEmpty ? 'Unnamed Layer' : layer.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                decoration: layer.isVisible ? null : TextDecoration.lineThrough,
+                                color: layer.isVisible ? null : theme.disabledColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$count ${count == 1 ? "обект" : "обекта"} ${layer.isFrozen ? "• Замразен" : ""}',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: theme.textTheme.bodySmall?.color,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+
+                            // Line Thickness Toggle (Тънки / Дебели)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildLineWeightOption(
+                                  label: 'Тънки',
+                                  isSelected: !layer.isThick,
+                                  onTap: () {
+                                    if (layer.isThick) {
+                                      setState(() {
+                                        layer.isThick = false;
+                                      });
+                                      widget.onLayersChanged();
+                                    }
+                                  },
+                                  theme: theme,
+                                ),
+                                const SizedBox(width: 6),
+                                _buildLineWeightOption(
+                                  label: 'Дебели',
+                                  isSelected: layer.isThick,
+                                  isThickIndicator: true,
+                                  onTap: () {
+                                    if (!layer.isThick) {
+                                      setState(() {
+                                        layer.isThick = true;
+                                      });
+                                      widget.onLayersChanged();
+                                    }
+                                  },
+                                  theme: theme,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Visibility Switch
+                      Switch.adaptive(
+                        value: layer.isVisible,
+                        onChanged: (val) {
+                          setState(() {
+                            layer.isVisible = val;
+                          });
+                          widget.onLayersChanged();
+                        },
+                      ),
+                    ],
                   ),
                 );
               },
@@ -212,6 +272,57 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
           ),
           const SizedBox(height: 16),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLineWeightOption({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required ThemeData theme,
+    bool isThickIndicator = false,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary.withValues(alpha: 0.18)
+              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.dividerColor.withValues(alpha: 0.25),
+            width: isSelected ? 1.2 : 0.8,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 14,
+              height: isThickIndicator ? 3.0 : 1.2,
+              decoration: BoxDecoration(
+                color: isSelected ? theme.colorScheme.primary : Colors.grey,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? theme.colorScheme.primary : theme.textTheme.bodySmall?.color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

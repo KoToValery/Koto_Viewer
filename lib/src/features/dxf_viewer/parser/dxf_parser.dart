@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/dxf_models.dart';
+import '../rendering/dxf_math.dart';
 
 /// Represents a single DXF Group Code and Value pair.
 class _DxfPair {
@@ -979,8 +980,7 @@ class DxfParser {
         bool isSolid = true;
         double patternAngle = 0;
         double patternScale = 1;
-        final List<List<Offset>> boundaryPaths = [];
-        List<Offset>? currentLoop;
+        final boundaryPaths = _parseHatchBoundaryPaths(entityPairs);
 
         for (final p in entityPairs) {
           switch (p.code) {
@@ -996,27 +996,7 @@ class DxfParser {
             case 41:
               patternScale = p.doubleValue;
               break;
-            case 92:
-              // New boundary path loop
-              if (currentLoop != null && currentLoop.isNotEmpty) {
-                boundaryPaths.add(currentLoop);
-              }
-              currentLoop = [];
-              break;
-            case 10:
-              currentLoop ??= [];
-              currentLoop.add(Offset(p.doubleValue, 0));
-              break;
-            case 20:
-              if (currentLoop != null && currentLoop.isNotEmpty) {
-                final last = currentLoop.last;
-                currentLoop[currentLoop.length - 1] = Offset(last.dx, p.doubleValue);
-              }
-              break;
           }
-        }
-        if (currentLoop != null && currentLoop.isNotEmpty) {
-          boundaryPaths.add(currentLoop);
         }
 
         entity = DxfHatch(
@@ -1240,5 +1220,202 @@ class DxfParser {
     result = result.replaceAll(r'\\', r'\');
 
     return result.trim();
+  }
+
+  /// Parses HATCH boundary path loops from entity pairs.
+  static List<List<Offset>> _parseHatchBoundaryPaths(List<_DxfPair> pairs) {
+    final List<List<Offset>> paths = [];
+    final int len = pairs.length;
+    int i = 0;
+
+    while (i < len) {
+      if (pairs[i].code == 92) {
+        final flag = pairs[i].intValue;
+        final bool isPolyline = (flag & 4) != 0;
+        i++;
+
+        if (isPolyline) {
+          int hasBulge = 0;
+          int isClosed = 1;
+
+          while (i < len && pairs[i].code != 93 && pairs[i].code != 10 && pairs[i].code != 92) {
+            if (pairs[i].code == 72) hasBulge = pairs[i].intValue;
+            if (pairs[i].code == 73) isClosed = pairs[i].intValue;
+            i++;
+          }
+          if (i < len && pairs[i].code == 93) {
+            i++;
+          }
+
+          final List<DxfPolylineVertex> vertices = [];
+          double vx = 0, vy = 0, vBulge = 0;
+          bool hasV = false;
+
+          void flushV() {
+            if (hasV) {
+              vertices.add(DxfPolylineVertex(x: vx, y: vy, bulge: vBulge));
+              vBulge = 0;
+            }
+          }
+
+          while (i < len && pairs[i].code != 92 && pairs[i].code != 97 && pairs[i].code != 75) {
+            final p = pairs[i];
+            if (p.code == 10) {
+              flushV();
+              vx = p.doubleValue;
+              hasV = true;
+            } else if (p.code == 20) {
+              vy = p.doubleValue;
+            } else if (p.code == 42 && hasBulge != 0) {
+              vBulge = p.doubleValue;
+            }
+            i++;
+          }
+          flushV();
+
+          if (vertices.isNotEmpty) {
+            final List<Offset> loopPoints = [];
+            final count = vertices.length;
+            final endIdx = isClosed != 0 ? count : count - 1;
+            for (int k = 0; k < endIdx; k++) {
+              final v1 = vertices[k];
+              final v2 = vertices[(k + 1) % count];
+              if (v1.bulge.abs() > 1e-6) {
+                final arcPts = DxfMath.generateBulgeArcPoints(v1.offset, v2.offset, v1.bulge);
+                if (loopPoints.isNotEmpty && arcPts.isNotEmpty && (loopPoints.last - arcPts.first).distanceSquared < 1e-10) {
+                  loopPoints.addAll(arcPts.skip(1));
+                } else {
+                  loopPoints.addAll(arcPts);
+                }
+              } else {
+                if (loopPoints.isEmpty || (loopPoints.last - v1.offset).distanceSquared > 1e-10) {
+                  loopPoints.add(v1.offset);
+                }
+                loopPoints.add(v2.offset);
+              }
+            }
+            if (loopPoints.isNotEmpty) {
+              paths.add(loopPoints);
+            }
+          }
+        } else {
+          // Non-polyline boundary: sequence of edges
+          if (i < len && pairs[i].code == 93) {
+            i++;
+          }
+
+          final List<Offset> loopPoints = [];
+          while (i < len && pairs[i].code != 92 && pairs[i].code != 97 && pairs[i].code != 75) {
+            if (pairs[i].code == 72) {
+              final edgeType = pairs[i].intValue;
+              i++;
+              if (edgeType == 1) {
+                // Line edge: 10, 20 (start), 11, 21 (end)
+                double x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+                while (i < len && pairs[i].code != 72 && pairs[i].code != 92 && pairs[i].code != 97 && pairs[i].code != 75) {
+                  final p = pairs[i];
+                  if (p.code == 10) {
+                    x1 = p.doubleValue;
+                  } else if (p.code == 20) {
+                    y1 = p.doubleValue;
+                  } else if (p.code == 11) {
+                    x2 = p.doubleValue;
+                  } else if (p.code == 21) {
+                    y2 = p.doubleValue;
+                  }
+                  i++;
+                }
+                if (loopPoints.isEmpty || (loopPoints.last - Offset(x1, y1)).distanceSquared > 1e-10) {
+                  loopPoints.add(Offset(x1, y1));
+                }
+                loopPoints.add(Offset(x2, y2));
+              } else if (edgeType == 2) {
+                // Circular arc edge: 10, 20 (center), 40 (r), 50 (startA), 51 (endA), 73 (isCCW)
+                double cx = 0, cy = 0, r = 0, startA = 0, endA = 360;
+                bool isCCW = true;
+                while (i < len && pairs[i].code != 72 && pairs[i].code != 92 && pairs[i].code != 97 && pairs[i].code != 75) {
+                  final p = pairs[i];
+                  if (p.code == 10) {
+                    cx = p.doubleValue;
+                  } else if (p.code == 20) {
+                    cy = p.doubleValue;
+                  } else if (p.code == 40) {
+                    r = p.doubleValue;
+                  } else if (p.code == 50) {
+                    startA = p.doubleValue;
+                  } else if (p.code == 51) {
+                    endA = p.doubleValue;
+                  } else if (p.code == 73) {
+                    isCCW = p.intValue != 0;
+                  }
+                  i++;
+                }
+                if (r > 0) {
+                  double sweep = isCCW ? (endA - startA) : (startA - endA);
+                  if (sweep <= 0) sweep += 360.0;
+                  final int segs = (32 * (sweep / 360.0)).clamp(8, 48).toInt();
+                  final double step = (sweep * math.pi / 180.0) / segs;
+                  final double startRad = startA * math.pi / 180.0;
+                  final double dir = isCCW ? 1.0 : -1.0;
+
+                  for (int s = 0; s <= segs; s++) {
+                    final double rad = startRad + s * step * dir;
+                    final pt = Offset(cx + r * math.cos(rad), cy + r * math.sin(rad));
+                    if (loopPoints.isEmpty || (loopPoints.last - pt).distanceSquared > 1e-10) {
+                      loopPoints.add(pt);
+                    }
+                  }
+                }
+              } else if (edgeType == 3) {
+                // Elliptic arc edge
+                double cx = 0, cy = 0, mx = 0, my = 0, ratio = 1.0, sp = 0, ep = 2 * math.pi;
+                while (i < len && pairs[i].code != 72 && pairs[i].code != 92 && pairs[i].code != 97 && pairs[i].code != 75) {
+                  final p = pairs[i];
+                  if (p.code == 10) {
+                    cx = p.doubleValue;
+                  } else if (p.code == 20) {
+                    cy = p.doubleValue;
+                  } else if (p.code == 11) {
+                    mx = p.doubleValue;
+                  } else if (p.code == 21) {
+                    my = p.doubleValue;
+                  } else if (p.code == 40) {
+                    ratio = p.doubleValue;
+                  } else if (p.code == 50) {
+                    sp = p.doubleValue;
+                  } else if (p.code == 51) {
+                    ep = p.doubleValue;
+                  }
+                  i++;
+                }
+                final pts = DxfMath.generateEllipsePoints(
+                  Offset(cx, cy),
+                  Offset(mx, my),
+                  ratio,
+                  startParam: sp,
+                  endParam: ep,
+                  segments: 32,
+                );
+                for (final pt in pts) {
+                  if (loopPoints.isEmpty || (loopPoints.last - pt).distanceSquared > 1e-10) {
+                    loopPoints.add(pt);
+                  }
+                }
+              } else {
+                i++;
+              }
+            } else {
+              i++;
+            }
+          }
+          if (loopPoints.isNotEmpty) {
+            paths.add(loopPoints);
+          }
+        }
+      } else {
+        i++;
+      }
+    }
+    return paths;
   }
 }

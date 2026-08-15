@@ -89,5 +89,16 @@ void main() {
       );
       expect(snap4, isNull);
     });
+
+    test('DxfLayer isThick defaults to false and can be toggled', () {
+      final layer = DxfLayer(name: 'Parcels');
+      expect(layer.isThick, isFalse);
+
+      layer.isThick = true;
+      expect(layer.isThick, isTrue);
+
+      final copy = layer.copyWith(isThick: false);
+      expect(copy.isThick, isFalse);
+    });
   });
 }

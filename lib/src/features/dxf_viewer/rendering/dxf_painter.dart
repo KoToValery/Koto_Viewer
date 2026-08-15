@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/dxf_color_table.dart';
+import '../models/dxf_display_settings.dart';
 import '../models/dxf_models.dart';
 import 'dxf_math.dart';
 import 'dxf_snap_helper.dart';
@@ -66,6 +67,7 @@ class DxfPainter extends CustomPainter {
   final DxfEntity? highlightedEntity;
   final DxfSnapResult? snapResult;
   final bool showGrid;
+  final DxfDisplaySettings settings;
 
   DxfPainter({
     required this.document,
@@ -75,6 +77,7 @@ class DxfPainter extends CustomPainter {
     this.highlightedEntity,
     this.snapResult,
     this.showGrid = true,
+    this.settings = const DxfDisplaySettings(),
   });
 
   @override
@@ -134,7 +137,8 @@ class DxfPainter extends CustomPainter {
         isDarkBackground: theme.isDark,
       );
 
-      final strokeWidth = _calcStrokeWidth(entity.lineWeight);
+      final isThick = layer?.isThick ?? false;
+      final strokeWidth = _calcStrokeWidth(entity.lineWeight, isThick: isThick);
 
       final strokePaint = Paint()
         ..color = color
@@ -177,19 +181,22 @@ class DxfPainter extends CustomPainter {
     }
   }
 
-  double _calcStrokeWidth(double? lineWeight) {
+  double _calcStrokeWidth(double? lineWeight, {bool isThick = false}) {
+    final scale = currentScale.clamp(0.001, 10000.0);
+    final thickness = isThick ? 2.6 : 1.0;
     if (lineWeight != null && lineWeight > 0) {
       // Lineweight in DXF is in mm, map reasonably to screen pixels
-      return (lineWeight * 1.5).clamp(0.5, 8.0) / currentScale.clamp(0.1, 10.0);
+      return ((lineWeight * 1.5).clamp(0.4, 8.0) * thickness) / scale;
     }
-    // Default crisp 1.2px stroke adapted to zoom scale
-    return (1.2 / currentScale).clamp(0.3, 3.0);
+    // Default thin crisp stroke (1.1px) or thick stroke (2.8px) adapted to zoom scale
+    return ((isThick ? 2.8 : 1.1) * settings.lineThicknessScale) / scale;
   }
 
   void _drawGrid(Canvas canvas, Size size) {
+    final scale = currentScale.clamp(0.001, 10000.0);
     final gridPaint = Paint()
       ..color = theme.gridColor.withValues(alpha: 0.45)
-      ..strokeWidth = 0.5 / currentScale.clamp(0.5, 5.0)
+      ..strokeWidth = 0.5 / scale
       ..isAntiAlias = true;
 
     final double step = _calculateGridStep(size);
@@ -226,16 +233,49 @@ class DxfPainter extends CustomPainter {
     required Map<String, DxfBlock> blocks,
     required Map<String, DxfLayer> layers,
   }) {
+    final scale = currentScale.clamp(0.001, 10000.0);
+
     if (entity is DxfLine) {
       final p1 = toCanvas(entity.p1);
       final p2 = toCanvas(entity.p2);
       canvas.drawLine(p1, p2, strokePaint);
     } else if (entity is DxfPoint) {
       final p = toCanvas(entity.point);
-      final double markSize = 4.0 / currentScale.clamp(0.5, 10.0);
-      canvas.drawCircle(p, markSize, strokePaint);
-      canvas.drawLine(Offset(p.dx - markSize, p.dy), Offset(p.dx + markSize, p.dy), strokePaint);
-      canvas.drawLine(Offset(p.dx, p.dy - markSize), Offset(p.dx, p.dy + markSize), strokePaint);
+      final double markSize = (settings.pointSize * 0.75) / scale;
+      final double ptStroke = (1.2 * settings.lineThicknessScale) / scale;
+
+      final ptStrokePaint = Paint()
+        ..color = strokePaint.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = ptStroke
+        ..isAntiAlias = true;
+
+      final ptFillPaint = Paint()
+        ..color = strokePaint.color
+        ..style = PaintingStyle.fill
+        ..isAntiAlias = true;
+
+      switch (settings.pointStyle) {
+        case DxfPointStyle.dot:
+          canvas.drawCircle(p, markSize, ptFillPaint);
+          break;
+        case DxfPointStyle.cross:
+          canvas.drawLine(Offset(p.dx - markSize, p.dy), Offset(p.dx + markSize, p.dy), ptStrokePaint);
+          canvas.drawLine(Offset(p.dx, p.dy - markSize), Offset(p.dx, p.dy + markSize), ptStrokePaint);
+          break;
+        case DxfPointStyle.xCross:
+          final double d = markSize * 0.7071;
+          canvas.drawLine(Offset(p.dx - d, p.dy - d), Offset(p.dx + d, p.dy + d), ptStrokePaint);
+          canvas.drawLine(Offset(p.dx - d, p.dy + d), Offset(p.dx + d, p.dy - d), ptStrokePaint);
+          break;
+        case DxfPointStyle.circle:
+          canvas.drawCircle(p, markSize, ptStrokePaint);
+          break;
+        case DxfPointStyle.circleDot:
+          canvas.drawCircle(p, markSize, ptStrokePaint);
+          canvas.drawCircle(p, markSize * 0.35, ptFillPaint);
+          break;
+      }
     } else if (entity is DxfCircle) {
       final center = toCanvas(entity.center);
       canvas.drawCircle(center, entity.radius * fitScale, strokePaint);
@@ -363,9 +403,13 @@ class DxfPainter extends CustomPainter {
           v2.offset,
           v1.bulge,
         );
-        allPoints.addAll(arcPoints);
+        if (allPoints.isNotEmpty && arcPoints.isNotEmpty && (allPoints.last - arcPoints.first).distanceSquared < 1e-10) {
+          allPoints.addAll(arcPoints.skip(1));
+        } else {
+          allPoints.addAll(arcPoints);
+        }
       } else {
-        if (allPoints.isEmpty || allPoints.last != v1.offset) {
+        if (allPoints.isEmpty || (allPoints.last - v1.offset).distanceSquared > 1e-10) {
           allPoints.add(v1.offset);
         }
         allPoints.add(v2.offset);
@@ -413,9 +457,13 @@ class DxfPainter extends CustomPainter {
           v2.offset,
           v1.bulge,
         );
-        allPoints.addAll(arcPoints);
+        if (allPoints.isNotEmpty && arcPoints.isNotEmpty && (allPoints.last - arcPoints.first).distanceSquared < 1e-10) {
+          allPoints.addAll(arcPoints.skip(1));
+        } else {
+          allPoints.addAll(arcPoints);
+        }
       } else {
-        if (allPoints.isEmpty || allPoints.last != v1.offset) {
+        if (allPoints.isEmpty || (allPoints.last - v1.offset).distanceSquared > 1e-10) {
           allPoints.add(v1.offset);
         }
         allPoints.add(v2.offset);
@@ -654,7 +702,6 @@ class DxfPainter extends CustomPainter {
       path.close();
 
       canvas.drawPath(path, fillPaint);
-      canvas.drawPath(path, strokePaint);
     }
   }
 
@@ -706,10 +753,11 @@ class DxfPainter extends CustomPainter {
             isDarkBackground: theme.isDark,
           );
 
+          final isThick = childLayer?.isThick ?? false;
           final strokePaint = Paint()
             ..color = childColor
             ..style = PaintingStyle.stroke
-            ..strokeWidth = _calcStrokeWidth(child.lineWeight)
+            ..strokeWidth = _calcStrokeWidth(child.lineWeight, isThick: isThick)
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round;
 
@@ -765,12 +813,13 @@ class DxfPainter extends CustomPainter {
     canvas.drawLine(p1, p2, paint);
 
     if (dim.textOverride != null && dim.textOverride!.isNotEmpty) {
+      final scale = currentScale.clamp(0.001, 10000.0);
       final textPainter = TextPainter(
         text: TextSpan(
           text: dim.textOverride,
           style: TextStyle(
             color: paint.color,
-            fontSize: 12.0 / currentScale.clamp(0.5, 5.0),
+            fontSize: (11.0 * settings.measurementScale) / scale,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -807,12 +856,14 @@ class DxfPainter extends CustomPainter {
     Offset Function(Offset) toCanvas,
   ) {
     final pos = toCanvas(snap.point);
-    const double size = 7.0;
+    final scale = currentScale.clamp(0.001, 10000.0);
+    final double size = (settings.pointSize * 1.5) / scale;
+    final double strokeW = (1.5 * settings.lineThicknessScale) / scale;
 
     final markerPaint = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
+      ..strokeWidth = strokeW
       ..isAntiAlias = true;
 
     final fillPaint = Paint()
@@ -863,6 +914,7 @@ class DxfPainter extends CustomPainter {
     final p1 = toCanvas(Offset(bounds.left, bounds.top));
     final p2 = toCanvas(Offset(bounds.right, bounds.bottom));
     final canvasRect = Rect.fromPoints(p1, p2);
+    final scale = currentScale.clamp(0.001, 10000.0);
 
     final glowPaint = Paint()
       ..color = const Color(0xFF00E5FF).withValues(alpha: 0.25)
@@ -870,9 +922,9 @@ class DxfPainter extends CustomPainter {
     final borderPaint = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5 / currentScale.clamp(0.5, 10.0);
+      ..strokeWidth = (2.0 * settings.lineThicknessScale) / scale;
 
-    final rrect = RRect.fromRectAndRadius(canvasRect.inflate(4), const Radius.circular(4));
+    final rrect = RRect.fromRectAndRadius(canvasRect.inflate(4 / scale), Radius.circular(4 / scale));
     canvas.drawRRect(rrect, glowPaint);
     canvas.drawRRect(rrect, borderPaint);
   }
@@ -882,33 +934,46 @@ class DxfPainter extends CustomPainter {
     DxfMeasurement m,
     Offset Function(Offset) toCanvas,
   ) {
+    final scale = currentScale.clamp(0.001, 10000.0);
     final p1 = toCanvas(m.p1Cad);
+
+    final double dotRadius = (settings.pointSize * 0.85) / scale;
+    final double lineStroke = (1.5 * settings.lineThicknessScale) / scale;
+    final double mScale = settings.measurementScale;
+
     final dotPaint = Paint()
       ..color = const Color(0xFFFF5252)
       ..style = PaintingStyle.fill;
+    final dotBorderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0 / scale;
+
     final linePaint = Paint()
       ..color = const Color(0xFFFF5252)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
+      ..strokeWidth = lineStroke;
 
-    const double dotRadius = 3.0;
     canvas.drawCircle(p1, dotRadius, dotPaint);
+    canvas.drawCircle(p1, dotRadius, dotBorderPaint);
 
     if (m.p2Cad != null) {
       final p2 = toCanvas(m.p2Cad!);
       canvas.drawCircle(p2, dotRadius, dotPaint);
+      canvas.drawCircle(p2, dotRadius, dotBorderPaint);
       canvas.drawLine(p1, p2, linePaint);
 
       // Compact L-Only Measurement Callout Bubble
       final double dist = m.distance!;
       final String text = 'L: ${DxfMath.formatDistance(dist)}';
 
+      final double fontSize = (9.5 * mScale) / scale;
       final textPainter = TextPainter(
         text: TextSpan(
           text: text,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
-            fontSize: 9.5,
+            fontSize: fontSize,
             fontWeight: FontWeight.bold,
             fontFamily: 'monospace',
           ),
@@ -918,10 +983,15 @@ class DxfPainter extends CustomPainter {
       textPainter.layout();
 
       final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
+      final double padH = (6.0 * mScale) / scale;
+      final double padV = (3.0 * mScale) / scale;
+      final double offsetY = (-14.0 * mScale) / scale;
+      final double cornerRadius = (4.0 * mScale) / scale;
+
       final bubbleRect = Rect.fromCenter(
-        center: mid + const Offset(0, -14),
-        width: textPainter.width + 10,
-        height: textPainter.height + 6,
+        center: mid + Offset(0, offsetY),
+        width: textPainter.width + padH * 2,
+        height: textPainter.height + padV * 2,
       );
 
       final bgPaint = Paint()
@@ -930,15 +1000,15 @@ class DxfPainter extends CustomPainter {
       final borderBubble = Paint()
         ..color = const Color(0xFFFF5252)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0;
+        ..strokeWidth = (1.0 * settings.lineThicknessScale) / scale;
 
-      final rrect = RRect.fromRectAndRadius(bubbleRect, const Radius.circular(4));
+      final rrect = RRect.fromRectAndRadius(bubbleRect, Radius.circular(cornerRadius));
       canvas.drawRRect(rrect, bgPaint);
       canvas.drawRRect(rrect, borderBubble);
 
       textPainter.paint(
         canvas,
-        Offset(bubbleRect.left + 5, bubbleRect.top + 3),
+        Offset(bubbleRect.left + padH, bubbleRect.top + padV),
       );
     }
   }
@@ -951,6 +1021,7 @@ class DxfPainter extends CustomPainter {
         oldDelegate.measurement != measurement ||
         oldDelegate.highlightedEntity != highlightedEntity ||
         oldDelegate.snapResult != snapResult ||
-        oldDelegate.showGrid != showGrid;
+        oldDelegate.showGrid != showGrid ||
+        oldDelegate.settings != settings;
   }
 }

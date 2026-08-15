@@ -28,6 +28,7 @@ class DxfLayer {
   bool isVisible;
   final bool isFrozen;
   final double? lineweight;
+  bool isThick;
 
   DxfLayer({
     required this.name,
@@ -36,6 +37,7 @@ class DxfLayer {
     this.isVisible = true,
     this.isFrozen = false,
     this.lineweight,
+    this.isThick = false,
   });
 
   DxfLayer copyWith({
@@ -45,6 +47,7 @@ class DxfLayer {
     bool? isVisible,
     bool? isFrozen,
     double? lineweight,
+    bool? isThick,
   }) {
     return DxfLayer(
       name: name ?? this.name,
@@ -53,6 +56,7 @@ class DxfLayer {
       isVisible: isVisible ?? this.isVisible,
       isFrozen: isFrozen ?? this.isFrozen,
       lineweight: lineweight ?? this.lineweight,
+      isThick: isThick ?? this.isThick,
     );
   }
 }
