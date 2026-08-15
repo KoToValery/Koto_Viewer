@@ -7,6 +7,7 @@ import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/file_source_service.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
+import '../dxf_viewer/dxf_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 
 class FileTypeIcon extends StatelessWidget {
@@ -151,6 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadFiles() async {
     setState(() => _isLoading = true);
+
     final mode = await FileSourceService.getSourceMode();
     final sort = await FileSourceService.getSortOption();
     final customPath = await FileSourceService.getCustomFolderPath();
@@ -174,6 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!success) return;
       }
     }
+
     await FileSourceService.setSourceMode(newMode);
     await _loadFiles();
   }
@@ -187,6 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final String? selectedDirectory = await FilePicker.platform
           .getDirectoryPath();
+
       if (selectedDirectory != null && selectedDirectory.isNotEmpty) {
         await FileSourceService.setCustomFolderPath(selectedDirectory);
         await FileSourceService.setSourceMode(FileSourceMode.custom);
@@ -200,19 +204,17 @@ class _HomeScreenState extends State<HomeScreen> {
         ).showSnackBar(SnackBar(content: Text('Error picking folder: $e')));
       }
     }
+
     return false;
   }
 
-  Future<void> _pickAndOpenPdf() async {
+  Future<void> _pickAndOpenFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'dxf'],
-      );
+      final result = await FilePicker.platform.pickFiles(type: FileType.any);
 
       if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
-        _openFileScreen(filePath);
+        await _openFileScreen(filePath);
       }
     } catch (e) {
       if (mounted) {
@@ -223,65 +225,69 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openDxfWithExternal(String filePath) async {
-    try {
-      final Uri uri = Uri.file(filePath);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'No app found to open DXF. Try sharing the file instead.',
-              ),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error opening DXF: $e')));
-      }
-    }
-  }
-
-  void _openFileScreen(String filePath) async {
+  Future<void> _openFileScreen(String filePath) async {
     final file = File(filePath);
-    if (file.existsSync()) {
-      final stat = file.statSync();
-      final name = filePath.split(Platform.pathSeparator).last;
-      await RecentFilesService.addRecentFile(
-        PdfItem(
-          path: filePath,
-          name: name,
-          sizeInBytes: stat.size,
-          lastOpened: DateTime.now(),
-        ),
-      );
+
+    if (!await file.exists()) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('File does not exist.')));
+
+      if (_currentMode == FileSourceMode.recent) {
+        await _removeRecentFile(filePath);
+      } else {
+        await _loadFiles();
+      }
+
+      return;
     }
+
+    final stat = await file.stat();
+    final name = filePath.split(Platform.pathSeparator).last;
+
+    final item = PdfItem(
+      path: filePath,
+      name: name,
+      sizeInBytes: stat.size,
+      lastOpened: DateTime.now(),
+    );
+
+    await RecentFilesService.addRecentFile(item);
 
     if (!mounted) return;
 
-    final lower = filePath.toLowerCase();
-    if (lower.endsWith('.dxf')) {
-      _openDxfWithExternal(filePath);
-      _loadFiles();
-    } else {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => PdfViewerScreen(filePath: filePath),
-        ),
-      );
-      _loadFiles();
+    switch (item.fileType) {
+      case KotoFileType.pdf:
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => PdfViewerScreen(filePath: filePath),
+          ),
+        );
+        break;
+
+      case KotoFileType.dxf:
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => DxfViewerScreen(filePath: filePath),
+          ),
+        );
+        break;
+
+      case KotoFileType.other:
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Unsuported format.')));
+        return;
     }
+
+    await _loadFiles();
   }
 
   Future<void> _removeRecentFile(String path) async {
     await RecentFilesService.removeRecentFile(path);
-    _loadFiles();
+    await _loadFiles();
   }
 
   Future<void> _clearAllRecent() async {
@@ -311,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirmed == true) {
       await RecentFilesService.clearAll();
-      _loadFiles();
+      await _loadFiles();
     }
   }
 
@@ -379,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: '🥐',
                     title: 'Cappuccino with croissant',
                     amount: '€5',
-                    subtitle: 'So there\'s no working on an empty stomach.',
+                    subtitle: "So there's no working on an empty stomach.",
                     onTap: () => setDialogState(() => selectedIndex = 1),
                   ),
                   const SizedBox(height: 6),
@@ -422,6 +428,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         final parsed = double.tryParse(
                           val.replaceAll(',', '.'),
                         );
+
                         if (parsed != null && parsed > 20) {
                           customController.text = '20';
                           customController
@@ -429,6 +436,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             TextPosition(offset: customController.text.length),
                           );
                         }
+
                         setDialogState(() {});
                       },
                     ),
@@ -484,9 +492,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                           currentAmount
                                       ? currentAmount.toInt().toString()
                                       : currentAmount.toStringAsFixed(2);
+
                                   final Uri url = Uri.parse(
                                     'https://revolut.me/kostadc1ug/${amountStr}EUR',
                                   );
+
                                   if (await canLaunchUrl(url)) {
                                     await launchUrl(
                                       url,
@@ -529,9 +539,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               : () async {
                                   final amountStr = currentAmount!
                                       .toStringAsFixed(2);
+
                                   final Uri url = Uri.parse(
                                     'https://www.paypal.com/donate/?business=kotocadastre@atomicmail.io&amount=$amountStr&currency_code=EUR',
                                   );
+
                                   if (await canLaunchUrl(url)) {
                                     await launchUrl(
                                       url,
@@ -641,6 +653,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSourceHeader(ThemeData theme) {
     String subtitleText = '';
+
     if (_currentMode == FileSourceMode.recent) {
       subtitleText = 'Recently opened files (PDF, DXF)';
     } else if (_currentMode == FileSourceMode.custom) {
@@ -730,7 +743,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Sort Button
             PopupMenuButton<SortOption>(
               initialValue: _currentSort,
               onSelected: _switchSort,
@@ -854,7 +866,6 @@ class _HomeScreenState extends State<HomeScreen> {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // Hero Action Section
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
@@ -901,7 +912,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 20),
                         ElevatedButton.icon(
-                          onPressed: _pickAndOpenPdf,
+                          onPressed: _pickAndOpenFile,
                           icon: const Icon(Icons.folder_open_rounded),
                           label: const Text(
                             'Browse Files',
@@ -929,10 +940,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // File Source Selector Header
               _buildSourceHeader(theme),
 
-              // PDF Files List or Empty State
               if (_isLoading)
                 const SliverFillRemaining(
                   child: Center(child: CircularProgressIndicator()),
@@ -1008,6 +1017,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                 );
+
                                 if (_currentMode == FileSourceMode.recent) {
                                   _removeRecentFile(item.path);
                                 } else {
@@ -1059,7 +1069,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ],
                                     ),
                                   ),
-                                  // Share button
                                   IconButton(
                                     icon: const Icon(
                                       Icons.share_outlined,
@@ -1080,7 +1089,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                       }
                                     },
                                   ),
-                                  // Remove/More button
                                   if (_currentMode == FileSourceMode.recent)
                                     IconButton(
                                       icon: const Icon(Icons.close, size: 20),

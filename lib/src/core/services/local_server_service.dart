@@ -1,129 +1,367 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+
+import 'package:network_info_plus/network_info_plus.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:network_info_plus/network_info_plus.dart';
-import 'package:nsd/nsd.dart';
 
-/// Local HTTP server for sharing PDF files over local network
+/// LAN HTTP server for sharing one PDF or DXF file.
+/// Uses an IPv4 address and port only, without tokens or mDNS.
 class LocalServerService {
+  LocalServerService._();
+
   static HttpServer? _server;
   static String? _serverUrl;
-  static bool _isRunning = false;
-  static String? _serverName;
   static String? _ipAddress;
   static int? _port;
+  static String? _serverName;
+
+  static bool _isRunning = false;
+
   static Timer? _autoShutdownTimer;
-  static DateTime? _startedAt;
-  static final Random _random = Random();
-  static Registration? _mdnsRegistration;
-  static bool _mdnsRegistered = false;
+  static DateTime? _shutdownAt;
+
+  static final Random _random = Random.secure();
 
   static const String _baseName = 'KotoView';
-  static const String _localHostname = 'kotoview';
-  static const int _nameSuffixLength = 4;
-  static const Duration defaultShutdownTimeout = Duration(minutes: 15);
   static const int _preferredPort = 8080;
+  static const Duration defaultShutdownTimeout = Duration(minutes: 15);
 
-  static String get localDomainUrl {
-    if (_port == null) return 'http://$_localHostname.local';
-    if (_port == 80) return 'http://$_localHostname.local';
-    return 'http://$_localHostname.local:$_port';
+  static bool get isRunning => _isRunning;
+  static String? get serverUrl => _serverUrl;
+  static String? get shareUrl => _serverUrl;
+  static String? get ipAddress => _ipAddress;
+  static int? get port => _port;
+  static String? get serverName => _serverName;
+
+  static String get serverDisplayName {
+    final name = _serverName ?? _baseName;
+    final port = _port ?? _preferredPort;
+    return '$name • $port';
   }
 
-  static String get localDomainUrlNoPort => 'http://$_localHostname.local';
+  static int get remainingSeconds {
+    final shutdownAt = _shutdownAt;
 
-  /// Generate a short, memorable server name like KotoView-A1B2
-  static String _generateShortName() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    final suffix = String.fromCharCodes(
-      Iterable.generate(
-        _nameSuffixLength,
-        (_) => chars.codeUnitAt(_random.nextInt(chars.length)),
-      ),
+    if (!_isRunning || shutdownAt == null) {
+      return 0;
+    }
+
+    final seconds = shutdownAt.difference(DateTime.now()).inSeconds;
+    return seconds < 0 ? 0 : seconds;
+  }
+
+  /// Starts the local server and returns its local address.
+  ///
+  /// Example: http://192.168.1.25:8080
+  static Future<String?> startServer(
+    String filePath, {
+    String? fileName,
+    Duration? shutdownTimeout,
+  }) async {
+    await stopServer();
+
+    try {
+      final file = File(filePath);
+
+      if (!await file.exists()) {
+        throw FileSystemException('File does not exist', filePath);
+      }
+
+      final ip = await _resolveLanIpv4();
+
+      if (ip == null) {
+        throw StateError(
+          'No LAN IPv4 address found. Connect the device to Wi-Fi first.',
+        );
+      }
+
+      final resolvedName = _safeFileName(
+        fileName ?? file.path.split(Platform.pathSeparator).last,
+      );
+
+      final extension = _extensionOf(resolvedName);
+      final serverName = _generateServerName();
+
+      final handler = _buildHandler(
+        file: file,
+        fileName: resolvedName,
+        extension: extension,
+        serverName: serverName,
+      );
+
+      final server = await _bindServer(handler);
+
+      _server = server;
+      _ipAddress = ip;
+      _port = server.port;
+      _serverName = serverName;
+      _isRunning = true;
+
+      _serverUrl = server.port == 80
+          ? 'http://$ip'
+          : 'http://$ip:${server.port}';
+
+      _scheduleAutoShutdown(timeout: shutdownTimeout ?? defaultShutdownTimeout);
+
+      // ignore: avoid_print
+      print('KotoView server started: $_serverUrl');
+
+      return _serverUrl;
+    } catch (e, stackTrace) {
+      // ignore: avoid_print
+      print('Failed to start KotoView server: $e');
+      // ignore: avoid_print
+      print(stackTrace);
+
+      await stopServer();
+      return null;
+    }
+  }
+
+  static shelf.Handler _buildHandler({
+    required File file,
+    required String fileName,
+    required String extension,
+    required String serverName,
+  }) {
+    final contentType = _contentTypeFor(extension);
+    final fileTypeLabel = _fileTypeLabelFor(extension);
+    final fileIcon = _fileIconFor(extension);
+
+    return (shelf.Request request) async {
+      _refreshAutoShutdownTimer();
+
+      final path = request.url.path;
+
+      if (path.isEmpty || path == '/') {
+        return shelf.Response.ok(
+          _buildHtmlPage(
+            serverName: serverName,
+            fileName: fileName,
+            fileTypeLabel: fileTypeLabel,
+            fileIcon: fileIcon,
+            extension: extension,
+            currentUrl: _serverUrl ?? '',
+          ),
+          headers: const {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+          },
+        );
+      }
+
+      if (path == 'download') {
+        return _fileResponse(
+          file: file,
+          fileName: fileName,
+          contentType: contentType,
+          inline: false,
+        );
+      }
+
+      if (path == 'view' && extension == 'pdf') {
+        return _fileResponse(
+          file: file,
+          fileName: fileName,
+          contentType: contentType,
+          inline: true,
+        );
+      }
+
+      return shelf.Response.notFound('Not found.', headers: _textHeaders);
+    };
+  }
+
+  static Future<shelf.Response> _fileResponse({
+    required File file,
+    required String fileName,
+    required String contentType,
+    required bool inline,
+  }) async {
+    if (!await file.exists()) {
+      return shelf.Response.notFound(
+        'The shared file is no longer available.',
+        headers: _textHeaders,
+      );
+    }
+
+    final length = await file.length();
+    final disposition = inline ? 'inline' : 'attachment';
+    final asciiName = _asciiFallbackFileName(fileName);
+    final encodedName = Uri.encodeComponent(fileName);
+
+    return shelf.Response.ok(
+      file.openRead(),
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': length.toString(),
+        'Content-Disposition':
+            "$disposition; filename=\"$asciiName\"; filename*=UTF-8''$encodedName",
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+        'X-Content-Type-Options': 'nosniff',
+      },
     );
-    return '$_baseName-$suffix';
   }
 
-  /// Try to bind server on preferredPort, fallback to random free port
   static Future<HttpServer> _bindServer(shelf.Handler handler) async {
-    HttpServer? server;
-    final portsToTry = <int>[_preferredPort, 80, 8081, 8082, 0];
+    const ports = <int>[_preferredPort, 8081, 8082, 8083, 0];
 
-    for (final port in portsToTry) {
+    Object? lastError;
+
+    for (final port in ports) {
       try {
-        server = await shelf_io.serve(
+        return await shelf_io.serve(
           handler,
           InternetAddress.anyIPv4,
           port,
           shared: true,
         );
-        return server;
-      } catch (_) {
-        continue;
+      } catch (e) {
+        lastError = e;
       }
     }
 
-    throw Exception('Could not bind to any port');
+    throw StateError('Could not bind HTTP server: $lastError');
   }
 
-  static bool get mdnsRegistered => _mdnsRegistered;
-
-  static String get preferredDisplayUrl {
-    if (_mdnsRegistered) {
-      return localDomainUrl;
-    }
-    return _serverUrl ?? '';
-  }
-
-  /// Register mDNS service (Bonjour / .local) so the server is reachable via kotoview.local
-  static Future<void> _registerMdnsService(int port) async {
+  static Future<String?> _resolveLanIpv4() async {
     try {
-      await _unregisterMdnsService();
-      _mdnsRegistered = false;
+      final wifiIp = await NetworkInfo().getWifiIP();
 
-      final service = Service(
-        name: _localHostname,
-        type: '_http._tcp',
-        port: port,
+      if (_isUsableLanIpv4(wifiIp)) {
+        return wifiIp;
+      }
+    } catch (_) {
+      // Fall back to listing interfaces.
+    }
+
+    try {
+      final interfaces = await NetworkInterface.list(
+        includeLoopback: false,
+        type: InternetAddressType.IPv4,
       );
 
-      _mdnsRegistration = await register(service);
-      _mdnsRegistered = true;
-
-      // ignore: avoid_print
-      print('🔔 mDNS registered: $_localHostname.local:_http._tcp:$port');
-      // ignore: avoid_print
-      print('🌐 Access via: $localDomainUrl');
-    } catch (e) {
-      // ignore: avoid_print
-      print('⚠️  mDNS registration failed: $e');
-      // ignore: avoid_print
-      print('   Server is still accessible via IP address.');
-      _mdnsRegistration = null;
-      _mdnsRegistered = false;
-    }
-  }
-
-  /// Unregister mDNS service
-  static Future<void> _unregisterMdnsService() async {
-    _mdnsRegistered = false;
-    if (_mdnsRegistration != null) {
-      try {
-        await unregister(_mdnsRegistration!);
-        // ignore: avoid_print
-        print('🔕 mDNS unregistered');
-      } catch (e) {
-        // ignore: avoid_print
-        print('⚠️  mDNS unregister failed: $e');
+      for (final interface in interfaces) {
+        for (final address in interface.addresses) {
+          if (_isUsableLanIpv4(address.address)) {
+            return address.address;
+          }
+        }
       }
-      _mdnsRegistration = null;
+    } catch (_) {
+      return null;
     }
+
+    return null;
   }
 
-  static String _getContentType(String extension) {
-    switch (extension.toLowerCase()) {
+  static bool _isUsableLanIpv4(String? address) {
+    if (address == null || address.isEmpty) {
+      return false;
+    }
+
+    final ip = InternetAddress.tryParse(address);
+
+    if (ip == null || ip.type != InternetAddressType.IPv4) {
+      return false;
+    }
+
+    if (ip.isLoopback || ip.isLinkLocal) {
+      return false;
+    }
+
+    final parts = address.split('.').map(int.tryParse).toList();
+
+    if (parts.length != 4 || parts.any((part) => part == null)) {
+      return false;
+    }
+
+    final a = parts[0]!;
+    final b = parts[1]!;
+
+    return a == 10 ||
+        (a == 172 && b >= 16 && b <= 31) ||
+        (a == 192 && b == 168);
+  }
+
+  static void resetAutoShutdownTimer({Duration? timeout}) {
+    if (!_isRunning) {
+      return;
+    }
+
+    _scheduleAutoShutdown(timeout: timeout ?? defaultShutdownTimeout);
+  }
+
+  static void _refreshAutoShutdownTimer() {
+    resetAutoShutdownTimer();
+  }
+
+  static void _scheduleAutoShutdown({required Duration timeout}) {
+    _autoShutdownTimer?.cancel();
+    _shutdownAt = DateTime.now().add(timeout);
+
+    _autoShutdownTimer = Timer(timeout, () {
+      // ignore: discarded_futures
+      stopServer();
+    });
+  }
+
+  static Future<void> stopServer() async {
+    _autoShutdownTimer?.cancel();
+    _autoShutdownTimer = null;
+    _shutdownAt = null;
+
+    final server = _server;
+
+    _server = null;
+    _serverUrl = null;
+    _ipAddress = null;
+    _port = null;
+    _serverName = null;
+    _isRunning = false;
+
+    if (server != null) {
+      try {
+        await server.close(force: true);
+      } catch (_) {
+        // The server may already be closed.
+      }
+    }
+
+    // ignore: avoid_print
+    print('KotoView server stopped');
+  }
+
+  static String _generateServerName() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+    final suffix = String.fromCharCodes(
+      List<int>.generate(
+        4,
+        (_) => chars.codeUnitAt(_random.nextInt(chars.length)),
+      ),
+    );
+
+    return '$_baseName-$suffix';
+  }
+
+  static String _extensionOf(String fileName) {
+    final dotIndex = fileName.lastIndexOf('.');
+
+    if (dotIndex < 0 || dotIndex == fileName.length - 1) {
+      return '';
+    }
+
+    return fileName.substring(dotIndex + 1).toLowerCase();
+  }
+
+  static String _contentTypeFor(String extension) {
+    switch (extension) {
       case 'pdf':
         return 'application/pdf';
       case 'dxf':
@@ -133,19 +371,19 @@ class LocalServerService {
     }
   }
 
-  static String _getFileTypeLabel(String extension) {
-    switch (extension.toLowerCase()) {
+  static String _fileTypeLabelFor(String extension) {
+    switch (extension) {
       case 'pdf':
-        return 'PDF Document';
+        return 'PDF document';
       case 'dxf':
-        return 'DXF Drawing';
+        return 'DXF drawing';
       default:
         return 'File';
     }
   }
 
-  static String _getFileIcon(String extension) {
-    switch (extension.toLowerCase()) {
+  static String _fileIconFor(String extension) {
+    switch (extension) {
       case 'pdf':
         return '📄';
       case 'dxf':
@@ -155,323 +393,139 @@ class LocalServerService {
     }
   }
 
-  /// Start the local server and share a file (PDF or DXF)
-  static Future<String?> startServer(
-    String filePath, {
-    String? fileName,
-  }) async {
-    try {
-      await stopServer();
-
-      final file = File(filePath);
-      if (!file.existsSync()) {
-        throw Exception('File does not exist');
-      }
-
-      final fileBytes = await file.readAsBytes();
-      final displayName =
-          fileName ?? filePath.split(Platform.pathSeparator).last;
-
-      final ext = displayName.contains('.')
-          ? displayName.split('.').last.toLowerCase()
-          : '';
-
-      _serverName = _generateShortName();
-
-      final networkInfo = NetworkInfo();
-      _ipAddress = await networkInfo.getWifiIP();
-
-      if (_ipAddress == null || _ipAddress!.isEmpty) {
-        try {
-          final interfaces = await NetworkInterface.list(
-            includeLoopback: false,
-            type: InternetAddressType.IPv4,
-          );
-          for (final iface in interfaces) {
-            for (final addr in iface.addresses) {
-              if (!addr.address.startsWith('127.') &&
-                  !addr.address.startsWith('169.254')) {
-                _ipAddress = addr.address;
-                break;
-              }
-            }
-            if (_ipAddress != null) break;
-          }
-        } catch (_) {}
-
-        if (_ipAddress == null || _ipAddress!.isEmpty) {
-          throw Exception('Not connected to a network');
-        }
-      }
-
-      final contentType = _getContentType(ext);
-      final fileTypeLabel = _getFileTypeLabel(ext);
-      final fileIcon = _getFileIcon(ext);
-
-      final handler = const shelf.Pipeline().addHandler((
-        shelf.Request request,
-      ) {
-        resetAutoShutdownTimer();
-
-        try {
-          final path = request.url.path;
-
-          if (path == '' || path == '/') {
-            return shelf.Response.ok(
-              _buildHtmlPage(displayName, fileTypeLabel, fileIcon, ext),
-              headers: {'Content-Type': 'text/html; charset=utf-8'},
-            );
-          }
-
-          if (path == 'download') {
-            return shelf.Response.ok(
-              Stream.fromIterable([fileBytes]),
-              headers: {
-                'Content-Type': contentType,
-                'Content-Disposition':
-                    'attachment; filename="${Uri.encodeComponent(displayName)}"',
-                'Content-Length': fileBytes.length.toString(),
-                'Cache-Control': 'no-store',
-                'Access-Control-Allow-Origin': '*',
-              },
-            );
-          }
-
-          if (path == 'view') {
-            return shelf.Response.ok(
-              Stream.fromIterable([fileBytes]),
-              headers: {
-                'Content-Type': contentType,
-                'Content-Disposition':
-                    'inline; filename="${Uri.encodeComponent(displayName)}"',
-                'Content-Length': fileBytes.length.toString(),
-                'Cache-Control': 'no-store',
-                'Access-Control-Allow-Origin': '*',
-              },
-            );
-          }
-
-          return shelf.Response.notFound(
-            'Not Found',
-            headers: {'Content-Type': 'text/plain'},
-          );
-        } catch (e) {
-          return shelf.Response.internalServerError(
-            body: 'Server error: $e',
-            headers: {'Content-Type': 'text/plain'},
-          );
-        }
-      });
-
-      _server = await _bindServer(handler);
-      _server!.autoCompress = true;
-      _server!.sessionTimeout = 5 * 60;
-
-      _port = _server!.port;
-      _serverUrl = _port == 80
-          ? 'http://$_ipAddress'
-          : 'http://$_ipAddress:$_port';
-
-      await _registerMdnsService(_port!);
-
-      _isRunning = true;
-      _startedAt = DateTime.now();
-
-      _scheduleAutoShutdown();
-
-      // ignore: avoid_print
-      print('✅ Server started at $_serverUrl');
-      // ignore: avoid_print
-      print('🌐 Local domain: $localDomainUrl');
-      // ignore: avoid_print
-      print('📛 Name: $_serverName');
-      // ignore: avoid_print
-      print('⏱️  Auto-shutdown in ${defaultShutdownTimeout.inMinutes} min');
-
-      return _serverUrl;
-    } catch (e, stackTrace) {
-      // ignore: avoid_print
-      print('❌ Error starting server: $e');
-      // ignore: avoid_print
-      print(stackTrace);
-      _isRunning = false;
-      return null;
-    }
+  static String _safeFileName(String value) {
+    final cleaned = value.replaceAll(RegExp(r'[\r\n"]'), '_').trim();
+    return cleaned.isEmpty ? 'shared-file' : cleaned;
   }
 
-  static void _scheduleAutoShutdown({Duration? timeout}) {
-    _cancelAutoShutdown();
-    final t = timeout ?? defaultShutdownTimeout;
-    _autoShutdownTimer = Timer(t, () {
-      // ignore: avoid_print
-      print('⏰ Auto-shutdown timer fired');
-      stopServer();
-    });
+  static String _asciiFallbackFileName(String value) {
+    return value.replaceAll(RegExp(r'[^\x20-\x7E]'), '_').replaceAll('"', '_');
   }
 
-  static void _cancelAutoShutdown() {
-    _autoShutdownTimer?.cancel();
-    _autoShutdownTimer = null;
-  }
+  static const Map<String, String> _textHeaders = {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'X-Content-Type-Options': 'nosniff',
+  };
 
-  /// Reset (refresh) the auto-shutdown timer after activity.
-  static void resetAutoShutdownTimer({Duration? timeout}) {
-    if (_isRunning) {
-      _scheduleAutoShutdown(timeout: timeout);
-    }
-  }
+  static String _buildHtmlPage({
+    required String serverName,
+    required String fileName,
+    required String fileTypeLabel,
+    required String fileIcon,
+    required String extension,
+    required String currentUrl,
+  }) {
+    final isPdf = extension == 'pdf';
 
-  /// Seconds remaining until the server auto-stops (0 if not running).
-  static int get remainingSeconds {
-    if (_startedAt == null) return 0;
-    final elapsed = DateTime.now().difference(_startedAt!);
-    final rem = defaultShutdownTimeout - elapsed;
-    return rem.isNegative ? 0 : rem.inSeconds;
-  }
+    final title = _escapeHtml('$serverName — $fileTypeLabel');
+    final safeFileName = _escapeHtml(fileName);
+    final safeUrl = _escapeHtml(currentUrl);
 
-  /// Stop the local server
-  static Future<void> stopServer() async {
-    _cancelAutoShutdown();
-    _startedAt = null;
-    await _unregisterMdnsService();
-    if (_server != null) {
-      try {
-        await _server!.close(force: true);
-      } catch (_) {}
-      _server = null;
-      _serverUrl = null;
-      _serverName = null;
-      _ipAddress = null;
-      _port = null;
-      _isRunning = false;
-      // ignore: avoid_print
-      print('🛑 Server stopped');
-    }
-  }
-
-  /// Check if server is running
-  static bool get isRunning => _isRunning;
-
-  /// Get current server URL
-  static String? get serverUrl => _serverUrl;
-
-  /// Short memorable server name e.g. KotoView-A3K7
-  static String? get serverName => _serverName;
-
-  /// Get IP address
-  static String? get ipAddress => _ipAddress;
-
-  /// Get port
-  static int? get port => _port;
-
-  /// Display name e.g. KotoView-A3K7 ::: 45678
-  static String get serverDisplayName {
-    final name = _serverName ?? _baseName;
-    final p = _port ?? _preferredPort;
-    return '$name • $p';
-  }
-
-  /// Build HTML page for download
-  static String _buildHtmlPage(
-    String fileName,
-    String fileTypeLabel,
-    String fileIcon,
-    String extension,
-  ) {
-    final name = _serverName ?? _baseName;
-
-    final isDxf = extension.toLowerCase() == 'dxf';
-    final bgGradient = isDxf
-        ? 'linear-gradient(135deg, #059669 0%, #10B981 100%)'
-        : 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)';
-    final chipBg = isDxf ? '#D1FAE5' : '#EDE9FE';
-    final chipColor = isDxf ? '#059669' : '#4F46E5';
-    final fromColor = isDxf ? '#059669' : '#4F46E5';
-    final btnDownloadBg = isDxf ? '#059669' : '#4F46E5';
-    final btnViewBg = isDxf ? '#10B981' : '#7C3AED';
-    final downloadBtnText = isDxf ? '📥 Download DXF' : '📥 Download PDF';
-    final viewBtnText = isDxf ? '📥 Open DXF File' : '👁️ View in Browser';
-    final titleSuffix = isDxf ? 'DXF Share' : 'PDF Share';
+    final viewButton = isPdf
+        ? '''
+<a class="button secondary" href="/view" target="_blank" rel="noopener">
+  View PDF
+</a>
+'''
+        : '';
 
     return '''
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>$name - $titleSuffix</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: $bgGradient;
-            min-height: 100vh;
-            display: flex; justify-content: center; align-items: center; padding: 16px;
-        }
-        .container {
-            background: white; border-radius: 18px;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.25);
-            padding: 28px; max-width: 440px; width: 100%; text-align: center;
-        }
-        .chip {
-            display: inline-block; background: $chipBg; color: $chipColor;
-            padding: 6px 14px; border-radius: 999px;
-            font-weight: 700; font-size: 13px; letter-spacing: .3px;
-            margin-bottom: 18px;
-        }
-        .icon { font-size: 68px; margin-bottom: 10px; }
-        h1 { color: #111827; font-size: 22px; margin-bottom: 4px; font-weight: 800; }
-        .from { color: $fromColor; font-size: 14px; margin-bottom: 16px; font-weight: 600; }
-        .filename {
-            background: #F9FAFB; border: 1px solid #E5E7EB;
-            padding: 12px; border-radius: 10px;
-            word-break: break-word; color: #374151;
-            font-size: 13px; margin-bottom: 8px;
-        }
-        .meta {
-            text-align: left; background: #F3F4F6;
-            border-radius: 10px; padding: 12px 14px; margin-bottom: 18px;
-            font-size: 12px; color: #4B5563; line-height: 1.6;
-        }
-        .meta span { font-weight: 600; color: #1F2937; }
-        .buttons { display: flex; flex-direction: column; gap: 10px; }
-        .btn {
-            padding: 14px 20px; border: none; border-radius: 10px;
-            font-size: 15px; font-weight: 700; cursor: pointer;
-            text-decoration: none; display: block;
-            transition: transform .15s, box-shadow .15s;
-        }
-        .btn:active { transform: translateY(1px); }
-        .btn-download { background: $btnDownloadBg; color: white; }
-        .btn-view { background: $btnViewBg; color: white; }
-        @media (max-width: 420px) {
-            .container { padding: 22px 18px; border-radius: 14px; }
-            h1 { font-size: 20px; }
-            .icon { font-size: 56px; }
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>$title</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #111827;
+      color: #f9fafb;
+    }
+    .card {
+      width: min(100%, 460px);
+      padding: 28px;
+      border: 1px solid #374151;
+      border-radius: 18px;
+      background: #1f2937;
+      box-shadow: 0 20px 45px rgba(0,0,0,.35);
+      text-align: center;
+    }
+    .icon { font-size: 64px; margin-bottom: 12px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    .type { color: #93c5fd; font-weight: 700; margin-bottom: 18px; }
+    .name {
+      padding: 12px;
+      background: #111827;
+      border-radius: 10px;
+      overflow-wrap: anywhere;
+      margin-bottom: 18px;
+    }
+    .url {
+      margin: 18px 0;
+      padding: 10px;
+      border-radius: 10px;
+      background: #111827;
+      color: #d1d5db;
+      font: 12px monospace;
+      overflow-wrap: anywhere;
+      text-align: left;
+    }
+    .button {
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      padding: 14px;
+      border-radius: 10px;
+      color: #fff;
+      background: #2563eb;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .button.secondary { background: #374151; }
+    .note {
+      margin-top: 18px;
+      color: #9ca3af;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="chip">$name</div>
-        <div class="icon">$fileIcon</div>
-        <h1>$fileTypeLabel</h1>
-        <div class="from">shared from $_baseName</div>
-        <div class="filename">$fileName</div>
-        <div class="meta">
-            <div>📛 Server: <span>$name</span></div>
-            <div>📍 IP: <span>${_ipAddress ?? '—'}</span></div>
-            <div>🔌 Port: <span>${_port ?? '—'}</span></div>
-            <div>🌐 Local: <span>$localDomainUrl</span></div>
-        </div>
-        <div class="buttons">
-            <a href="/download" class="btn btn-download">$downloadBtnText</a>
-            <a href="/view" class="btn btn-view" target="_blank">$viewBtnText</a>
-        </div>
+  <main class="card">
+    <div class="icon">$fileIcon</div>
+    <h1>$title</h1>
+    <div class="type">$fileTypeLabel</div>
+    <div class="name">$safeFileName</div>
+
+    <a class="button" href="/download">Download file</a>
+    $viewButton
+
+    <div class="url">$safeUrl</div>
+    <div class="note">
+      This link works only while KotoView sharing is active and both devices
+      are connected to the same local network.
     </div>
+  </main>
 </body>
 </html>
 ''';
+  }
+
+  static String _escapeHtml(String value) {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
   }
 }

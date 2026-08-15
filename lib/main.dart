@@ -4,6 +4,7 @@ import 'src/core/services/intent_service.dart';
 import 'src/core/services/local_server_service.dart';
 import 'src/features/home/home_screen.dart';
 import 'src/features/pdf_viewer/pdf_viewer_screen.dart';
+import 'src/features/dxf_viewer/dxf_viewer_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,20 +30,34 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
     _intentService.listenForPdfIntents((filePath) {
       if (filePath.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _openPdfScreen(filePath);
+          _openFileScreen(filePath);
         });
       }
     });
   }
 
-  void _openPdfScreen(String filePath) {
-    final state = _navigatorKey.currentState;
-    if (state != null) {
-      state.push(
-        MaterialPageRoute(
-          builder: (context) => PdfViewerScreen(filePath: filePath),
-        ),
-      );
+  void _openFileScreen(String filePath) {
+    final extension = filePath.split('.').last.toLowerCase();
+    final navigator = _navigatorKey.currentState;
+
+    if (navigator == null) return;
+
+    switch (extension) {
+      case 'pdf':
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) => PdfViewerScreen(filePath: filePath),
+          ),
+        );
+        break;
+
+      case 'dxf':
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) => DxfViewerScreen(filePath: filePath),
+          ),
+        );
+        break;
     }
   }
 

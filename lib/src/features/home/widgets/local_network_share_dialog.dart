@@ -233,12 +233,10 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
   Widget _buildSuccess(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final mdnsOk = LocalServerService.mdnsRegistered;
-    final displayUrl = LocalServerService.preferredDisplayUrl;
-    final localUrl = LocalServerService.localDomainUrl;
-    final port = LocalServerService.port;
-    final needsPortInLocalUrl = port != null && port != 80;
-    final fullLocalUrl = needsPortInLocalUrl ? '$localUrl:$port' : localUrl;
+
+    // Взимаме само IP url-а, който LocalServerService.startServer е върнал.
+    // Той вече съдържа генерирания тоукън.
+    final displayUrl = _serverUrl ?? '';
 
     final isDxf = widget.filePath.toLowerCase().endsWith('.dxf');
     final qrPrimaryColor = isDxf
@@ -259,7 +257,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
             ),
           ),
           child: QrImageView(
-            data: displayUrl.isNotEmpty ? displayUrl : _serverUrl!,
+            data: displayUrl,
             version: QrVersions.auto,
             size: 180,
             backgroundColor: Colors.white,
@@ -273,30 +271,6 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        if (mdnsOk)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFD1FAE5),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check_circle, size: 14, color: Color(0xFF059669)),
-                SizedBox(width: 4),
-                Text(
-                  '.local address active',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF065F46),
-                  ),
-                ),
-              ],
-            ),
-          ),
 
         const SizedBox(height: 16),
 
@@ -326,12 +300,11 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 '1. Connect the other device to the same local Network\n'
                 '2. Scan the QR code or copy the URL below\n'
-                '3. Or try $fullLocalUrl on macOS/iOS/Linux\n'
-                '4. Download the file in any browser',
-                style: const TextStyle(
+                '3. Download the file in any browser',
+                style: TextStyle(
                   fontSize: 12,
                   color: Color(0xFF3730A3),
                   height: 1.55,
@@ -340,65 +313,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
             ],
           ),
         ),
-
         const SizedBox(height: 12),
-
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF312E81) : const Color(0xFFEDE9FE),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isDark ? const Color(0xFF4338CA) : const Color(0xFFC4B5FD),
-            ),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.language, size: 17, color: Color(0xFF4F46E5)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Local Address (.local)',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        color: isDark
-                            ? Colors.indigo.shade200
-                            : Colors.indigo.shade700,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: .15,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      fullLocalUrl,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF4F46E5),
-                        letterSpacing: .1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.copy_all_outlined, size: 19),
-                onPressed: () => _copyToClipboard(fullLocalUrl, 'Local URL'),
-                tooltip: 'Copy local URL',
-                color: const Color(0xFF4F46E5),
-                padding: const EdgeInsets.all(6),
-                constraints: const BoxConstraints(),
-                splashRadius: 18,
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 8),
 
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -459,7 +374,6 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
             ],
           ),
         ),
-
         const SizedBox(height: 8),
 
         Container(
@@ -486,7 +400,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                     ),
                     const SizedBox(height: 1),
                     Text(
-                      _serverUrl!,
+                      displayUrl,
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11.5,
@@ -499,7 +413,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
               ),
               IconButton(
                 icon: const Icon(Icons.copy_outlined, size: 19),
-                onPressed: () => _copyToClipboard(_serverUrl!, 'IP URL'),
+                onPressed: () => _copyToClipboard(displayUrl, 'URL'),
                 tooltip: 'Copy URL',
                 padding: const EdgeInsets.all(6),
                 constraints: const BoxConstraints(),
@@ -508,7 +422,6 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
             ],
           ),
         ),
-
         const SizedBox(height: 18),
 
         SizedBox(
@@ -531,9 +444,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
             ),
           ),
         ),
-
         const SizedBox(height: 10),
-
         Text(
           'Server stays on while this session is active',
           style: TextStyle(fontSize: 11, color: Colors.orange.shade700),

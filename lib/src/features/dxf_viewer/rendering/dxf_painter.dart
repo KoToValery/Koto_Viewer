@@ -1,0 +1,929 @@
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import '../models/dxf_color_table.dart';
+import '../models/dxf_models.dart';
+import 'dxf_math.dart';
+
+/// Theme presets for the CAD viewer background.
+enum DxfCanvasTheme {
+  darkCad(
+    name: 'CAD Dark',
+    bgColor: Color(0xFF14171A),
+    gridColor: Color(0xFF22272E),
+    isDark: true,
+  ),
+  blueprint(
+    name: 'Blueprint Navy',
+    bgColor: Color(0xFF0D1B2A),
+    gridColor: Color(0xFF1B263B),
+    isDark: true,
+  ),
+  paperWhite(
+    name: 'Paper White',
+    bgColor: Color(0xFFF8F9FA),
+    gridColor: Color(0xFFE9ECEF),
+    isDark: false,
+  ),
+  slateGrey(
+    name: 'Technical Slate',
+    bgColor: Color(0xFF2B303A),
+    gridColor: Color(0xFF383F4C),
+    isDark: true,
+  );
+
+  final String name;
+  final Color bgColor;
+  final Color gridColor;
+  final bool isDark;
+
+  const DxfCanvasTheme({
+    required this.name,
+    required this.bgColor,
+    required this.gridColor,
+    required this.isDark,
+  });
+}
+
+/// Measurement state model.
+class DxfMeasurement {
+  final Offset p1Cad;
+  final Offset? p2Cad;
+
+  const DxfMeasurement({required this.p1Cad, this.p2Cad});
+
+  double? get distance => p2Cad != null ? (p2Cad! - p1Cad).distance : null;
+  double? get deltaX => p2Cad != null ? (p2Cad!.dx - p1Cad.dx).abs() : null;
+  double? get deltaY => p2Cad != null ? (p2Cad!.dy - p1Cad.dy).abs() : null;
+  double? get angleDeg {
+    if (p2Cad == null) return null;
+    final angle = math.atan2(p2Cad!.dy - p1Cad.dy, p2Cad!.dx - p1Cad.dx) * 180.0 / math.pi;
+    return (angle + 360.0) % 360.0;
+  }
+}
+
+/// CustomPainter for rendering entire DXF drawing.
+class DxfPainter extends CustomPainter {
+  final DxfDocument document;
+  final DxfCanvasTheme theme;
+  final double currentScale;
+  final DxfMeasurement? measurement;
+  final DxfEntity? highlightedEntity;
+  final String? searchQuery;
+  final bool showGrid;
+
+  DxfPainter({
+    required this.document,
+    required this.theme,
+    this.currentScale = 1.0,
+    this.measurement,
+    this.highlightedEntity,
+    this.searchQuery,
+    this.showGrid = true,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double minX = document.bounds.left;
+    final double maxY = document.bounds.bottom > document.bounds.top
+        ? document.bounds.bottom
+        : document.bounds.top;
+
+    // Helper: convert CAD point (Y up) to Canvas point (Y down)
+    Offset toCanvas(Offset cadPoint) {
+      return Offset(
+        cadPoint.dx - minX,
+        maxY - cadPoint.dy,
+      );
+    }
+
+    // 1. Draw subtle CAD background grid if enabled
+    if (showGrid) {
+      _drawGrid(canvas, size);
+    }
+
+    // 2. Draw Entities
+    for (final entity in document.entities) {
+      final layer = document.layers[entity.layer];
+      if (layer != null && !layer.isVisible) {
+        continue;
+      }
+
+      final color = DxfColorTable.resolveColor(
+        colorIndex: entity.colorIndex,
+        trueColor: entity.trueColor,
+        layerColor: layer != null
+            ? DxfColorTable.resolveColor(
+                colorIndex: layer.colorIndex,
+                trueColor: layer.trueColor,
+                isDarkBackground: theme.isDark,
+              )
+            : null,
+        isDarkBackground: theme.isDark,
+      );
+
+      final strokeWidth = _calcStrokeWidth(entity.lineWeight);
+
+      final strokePaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..isAntiAlias = true;
+
+      final fillPaint = Paint()
+        ..color = color.withValues(alpha: 0.35)
+        ..style = PaintingStyle.fill
+        ..isAntiAlias = true;
+
+      _renderEntity(
+        canvas: canvas,
+        entity: entity,
+        strokePaint: strokePaint,
+        fillPaint: fillPaint,
+        toCanvas: toCanvas,
+        blocks: document.blocks,
+        layers: document.layers,
+      );
+    }
+
+    // 3. Draw Search Highlights
+    if (searchQuery != null && searchQuery!.trim().isNotEmpty) {
+      _drawSearchHighlights(canvas, toCanvas);
+    }
+
+    // 4. Draw Highlighted Entity
+    if (highlightedEntity != null) {
+      _drawEntityHighlight(canvas, highlightedEntity!, toCanvas);
+    }
+
+    // 5. Draw Active Measurement Overlay
+    if (measurement != null) {
+      _drawMeasurement(canvas, measurement!, toCanvas);
+    }
+  }
+
+  double _calcStrokeWidth(double? lineWeight) {
+    if (lineWeight != null && lineWeight > 0) {
+      // Lineweight in DXF is in mm, map reasonably to screen pixels
+      return (lineWeight * 1.5).clamp(0.5, 8.0) / currentScale.clamp(0.1, 10.0);
+    }
+    // Default crisp 1.2px stroke adapted to zoom scale
+    return (1.2 / currentScale).clamp(0.3, 3.0);
+  }
+
+  void _drawGrid(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = theme.gridColor.withValues(alpha: 0.45)
+      ..strokeWidth = 0.5 / currentScale.clamp(0.5, 5.0)
+      ..isAntiAlias = true;
+
+    final double step = _calculateGridStep(size);
+    if (step <= 0) return;
+
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+  }
+
+  double _calculateGridStep(Size size) {
+    final maxDim = math.max(size.width, size.height);
+    if (maxDim <= 0) return 50.0;
+    double step = 100.0;
+    while (step * 20 < maxDim) {
+      step *= 10.0;
+    }
+    while (step * 2 > maxDim && step > 10.0) {
+      step /= 10.0;
+    }
+    return step;
+  }
+
+  void _renderEntity({
+    required Canvas canvas,
+    required DxfEntity entity,
+    required Paint strokePaint,
+    required Paint fillPaint,
+    required Offset Function(Offset) toCanvas,
+    required Map<String, DxfBlock> blocks,
+    required Map<String, DxfLayer> layers,
+  }) {
+    if (entity is DxfLine) {
+      final p1 = toCanvas(entity.p1);
+      final p2 = toCanvas(entity.p2);
+      canvas.drawLine(p1, p2, strokePaint);
+    } else if (entity is DxfPoint) {
+      final p = toCanvas(entity.point);
+      final double markSize = 4.0 / currentScale.clamp(0.5, 10.0);
+      canvas.drawCircle(p, markSize, strokePaint);
+      canvas.drawLine(Offset(p.dx - markSize, p.dy), Offset(p.dx + markSize, p.dy), strokePaint);
+      canvas.drawLine(Offset(p.dx, p.dy - markSize), Offset(p.dx, p.dy + markSize), strokePaint);
+    } else if (entity is DxfCircle) {
+      final center = toCanvas(entity.center);
+      canvas.drawCircle(center, entity.radius, strokePaint);
+    } else if (entity is DxfArc) {
+      _renderArc(canvas, entity, strokePaint, toCanvas);
+    } else if (entity is DxfEllipse) {
+      _renderEllipse(canvas, entity, strokePaint, toCanvas);
+    } else if (entity is DxfLwPolyline) {
+      _renderLwPolyline(canvas, entity, strokePaint, toCanvas);
+    } else if (entity is DxfPolyline) {
+      _renderPolyline(canvas, entity, strokePaint, toCanvas);
+    } else if (entity is DxfSpline) {
+      _renderSpline(canvas, entity, strokePaint, toCanvas);
+    } else if (entity is DxfText) {
+      _renderText(canvas, entity, strokePaint.color, toCanvas);
+    } else if (entity is DxfMText) {
+      _renderMText(canvas, entity, strokePaint.color, toCanvas);
+    } else if (entity is DxfSolid) {
+      _renderSolid(canvas, entity, fillPaint, strokePaint, toCanvas);
+    } else if (entity is DxfHatch) {
+      _renderHatch(canvas, entity, fillPaint, strokePaint, toCanvas);
+    } else if (entity is DxfInsert) {
+      _renderInsert(
+        canvas: canvas,
+        insert: entity,
+        blocks: blocks,
+        layers: layers,
+        toCanvas: toCanvas,
+      );
+    } else if (entity is DxfDimension) {
+      _renderDimension(canvas, entity, strokePaint, toCanvas, blocks, layers);
+    } else if (entity is DxfLeader) {
+      _renderLeader(canvas, entity, strokePaint, toCanvas);
+    }
+  }
+
+  void _renderArc(
+    Canvas canvas,
+    DxfArc arc,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+  ) {
+    final double cx = arc.center.dx;
+    final double cy = arc.center.dy;
+    final double r = arc.radius;
+    if (r <= 0) return;
+
+    double sweep = arc.endAngleDeg - arc.startAngleDeg;
+    if (sweep <= 0) sweep += 360.0;
+
+    final int segments = (48 * (sweep / 360.0)).clamp(8, 64).toInt();
+    final double step = (sweep * math.pi / 180.0) / segments;
+    final double startRad = arc.startAngleDeg * math.pi / 180.0;
+
+    final path = Path();
+    final firstCad = Offset(
+      cx + r * math.cos(startRad),
+      cy + r * math.sin(startRad),
+    );
+    final firstCanvas = toCanvas(firstCad);
+    path.moveTo(firstCanvas.dx, firstCanvas.dy);
+
+    for (int i = 1; i <= segments; i++) {
+      final double rad = startRad + i * step;
+      final cadPoint = Offset(
+        cx + r * math.cos(rad),
+        cy + r * math.sin(rad),
+      );
+      final canvasPoint = toCanvas(cadPoint);
+      path.lineTo(canvasPoint.dx, canvasPoint.dy);
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  void _renderEllipse(
+    Canvas canvas,
+    DxfEllipse ellipse,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+  ) {
+    final points = DxfMath.generateEllipsePoints(
+      ellipse.center,
+      ellipse.majorAxisEndOffset,
+      ellipse.minorRatio,
+      startParam: ellipse.startParam,
+      endParam: ellipse.endParam,
+    );
+
+    if (points.isEmpty) return;
+    final path = Path();
+    final p0 = toCanvas(points.first);
+    path.moveTo(p0.dx, p0.dy);
+
+    for (int i = 1; i < points.length; i++) {
+      final p = toCanvas(points[i]);
+      path.lineTo(p.dx, p.dy);
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  void _renderLwPolyline(
+    Canvas canvas,
+    DxfLwPolyline poly,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (poly.vertices.isEmpty) return;
+
+    final path = Path();
+    final List<Offset> allPoints = [];
+
+    final int count = poly.vertices.length;
+    final int endIdx = poly.isClosed ? count : count - 1;
+
+    for (int i = 0; i < endIdx; i++) {
+      final v1 = poly.vertices[i];
+      final v2 = poly.vertices[(i + 1) % count];
+
+      if (v1.bulge.abs() > 1e-6) {
+        final arcPoints = DxfMath.generateBulgeArcPoints(
+          v1.offset,
+          v2.offset,
+          v1.bulge,
+        );
+        allPoints.addAll(arcPoints);
+      } else {
+        if (allPoints.isEmpty || allPoints.last != v1.offset) {
+          allPoints.add(v1.offset);
+        }
+        allPoints.add(v2.offset);
+      }
+    }
+
+    if (allPoints.isEmpty) return;
+
+    final first = toCanvas(allPoints.first);
+    path.moveTo(first.dx, first.dy);
+
+    for (int i = 1; i < allPoints.length; i++) {
+      final p = toCanvas(allPoints[i]);
+      path.lineTo(p.dx, p.dy);
+    }
+
+    if (poly.isClosed) {
+      path.close();
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  void _renderPolyline(
+    Canvas canvas,
+    DxfPolyline poly,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (poly.vertices.isEmpty) return;
+
+    final path = Path();
+    final List<Offset> allPoints = [];
+
+    final int count = poly.vertices.length;
+    final int endIdx = poly.isClosed ? count : count - 1;
+
+    for (int i = 0; i < endIdx; i++) {
+      final v1 = poly.vertices[i];
+      final v2 = poly.vertices[(i + 1) % count];
+
+      if (v1.bulge.abs() > 1e-6) {
+        final arcPoints = DxfMath.generateBulgeArcPoints(
+          v1.offset,
+          v2.offset,
+          v1.bulge,
+        );
+        allPoints.addAll(arcPoints);
+      } else {
+        if (allPoints.isEmpty || allPoints.last != v1.offset) {
+          allPoints.add(v1.offset);
+        }
+        allPoints.add(v2.offset);
+      }
+    }
+
+    if (allPoints.isEmpty) return;
+
+    final first = toCanvas(allPoints.first);
+    path.moveTo(first.dx, first.dy);
+
+    for (int i = 1; i < allPoints.length; i++) {
+      final p = toCanvas(allPoints[i]);
+      path.lineTo(p.dx, p.dy);
+    }
+
+    if (poly.isClosed) {
+      path.close();
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  void _renderSpline(
+    Canvas canvas,
+    DxfSpline spline,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+  ) {
+    final points = spline.controlPoints.isNotEmpty
+        ? DxfMath.evaluateSpline(
+            spline.degree,
+            spline.controlPoints,
+            knots: spline.knots,
+            weights: spline.weights,
+          )
+        : spline.fitPoints;
+
+    if (points.isEmpty) return;
+
+    final path = Path();
+    final p0 = toCanvas(points.first);
+    path.moveTo(p0.dx, p0.dy);
+
+    for (int i = 1; i < points.length; i++) {
+      final p = toCanvas(points[i]);
+      path.lineTo(p.dx, p.dy);
+    }
+
+    if (spline.isClosed) {
+      path.close();
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  void _renderText(
+    Canvas canvas,
+    DxfText entity,
+    Color color,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (entity.text.trim().isEmpty) return;
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: entity.text,
+        style: TextStyle(
+          color: color,
+          fontSize: entity.height,
+          fontFamily: 'Roboto',
+          height: 1.0,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+
+    final pos = toCanvas(entity.alignPoint ?? entity.insertPoint);
+
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
+
+    // Rotate (CAD rotation is CCW, so on canvas with Y down, rotation is -angle)
+    final double rad = -entity.rotationDeg * math.pi / 180.0;
+    canvas.rotate(rad);
+
+    // Text alignment offset
+    double ox = 0.0;
+    double oy = -textPainter.height; // Baseline alignment adjustment
+
+    switch (entity.hAlign) {
+      case 1: // Center
+      case 4: // Middle
+        ox = -textPainter.width / 2.0;
+        break;
+      case 2: // Right
+        ox = -textPainter.width;
+        break;
+      default:
+        ox = 0.0;
+    }
+
+    textPainter.paint(canvas, Offset(ox, oy));
+    canvas.restore();
+  }
+
+  void _renderMText(
+    Canvas canvas,
+    DxfMText entity,
+    Color color,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (entity.cleanText.trim().isEmpty) return;
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: entity.cleanText,
+        style: TextStyle(
+          color: color,
+          fontSize: entity.height,
+          fontFamily: 'Roboto',
+          height: 1.25,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.left,
+    );
+
+    if (entity.refWidth != null && entity.refWidth! > 0) {
+      textPainter.layout(maxWidth: entity.refWidth!);
+    } else {
+      textPainter.layout();
+    }
+
+    final pos = toCanvas(entity.insertPoint);
+
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
+
+    final double rad = -entity.rotationDeg * math.pi / 180.0;
+    canvas.rotate(rad);
+
+    // Attachment Point offsets (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
+    double ox = 0.0;
+    double oy = 0.0;
+
+    switch (entity.attachmentPoint) {
+      case 1: // Top Left
+        ox = 0;
+        oy = 0;
+        break;
+      case 2: // Top Center
+        ox = -textPainter.width / 2.0;
+        oy = 0;
+        break;
+      case 3: // Top Right
+        ox = -textPainter.width;
+        oy = 0;
+        break;
+      case 4: // Middle Left
+        ox = 0;
+        oy = -textPainter.height / 2.0;
+        break;
+      case 5: // Middle Center
+        ox = -textPainter.width / 2.0;
+        oy = -textPainter.height / 2.0;
+        break;
+      case 6: // Middle Right
+        ox = -textPainter.width;
+        oy = -textPainter.height / 2.0;
+        break;
+      case 7: // Bottom Left
+        ox = 0;
+        oy = -textPainter.height;
+        break;
+      case 8: // Bottom Center
+        ox = -textPainter.width / 2.0;
+        oy = -textPainter.height;
+        break;
+      case 9: // Bottom Right
+        ox = -textPainter.width;
+        oy = -textPainter.height;
+        break;
+    }
+
+    textPainter.paint(canvas, Offset(ox, oy));
+    canvas.restore();
+  }
+
+  void _renderSolid(
+    Canvas canvas,
+    DxfSolid solid,
+    Paint fillPaint,
+    Paint strokePaint,
+    Offset Function(Offset) toCanvas,
+  ) {
+    final p0 = toCanvas(solid.p0);
+    final p1 = toCanvas(solid.p1);
+    final p2 = toCanvas(solid.p2);
+    final p3 = toCanvas(solid.p3);
+
+    final path = Path()
+      ..moveTo(p0.dx, p0.dy)
+      ..lineTo(p1.dx, p1.dy)
+      ..lineTo(p3.dx, p3.dy)
+      ..lineTo(p2.dx, p2.dy)
+      ..close();
+
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, strokePaint);
+  }
+
+  void _renderHatch(
+    Canvas canvas,
+    DxfHatch hatch,
+    Paint fillPaint,
+    Paint strokePaint,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (hatch.boundaryPaths.isEmpty) return;
+
+    for (final loop in hatch.boundaryPaths) {
+      if (loop.isEmpty) continue;
+      final path = Path();
+      final p0 = toCanvas(loop.first);
+      path.moveTo(p0.dx, p0.dy);
+      for (int i = 1; i < loop.length; i++) {
+        final p = toCanvas(loop[i]);
+        path.lineTo(p.dx, p.dy);
+      }
+      path.close();
+
+      canvas.drawPath(path, fillPaint);
+      canvas.drawPath(path, strokePaint);
+    }
+  }
+
+  void _renderInsert({
+    required Canvas canvas,
+    required DxfInsert insert,
+    required Map<String, DxfBlock> blocks,
+    required Map<String, DxfLayer> layers,
+    required Offset Function(Offset) toCanvas,
+  }) {
+    final block = blocks[insert.blockName];
+    if (block == null || block.entities.isEmpty) return;
+
+    for (int r = 0; r < insert.rowCount; r++) {
+      for (int c = 0; c < insert.colCount; c++) {
+        final double offsetX = insert.insertPoint.dx + c * insert.colSpacing;
+        final double offsetY = insert.insertPoint.dy + r * insert.rowSpacing;
+
+        canvas.save();
+
+        // Convert base location to canvas
+        final basePos = toCanvas(Offset(offsetX, offsetY));
+        canvas.translate(basePos.dx, basePos.dy);
+
+        // Rotate
+        final rad = -insert.rotationDeg * math.pi / 180.0;
+        canvas.rotate(rad);
+
+        // Scale
+        canvas.scale(insert.scaleX, insert.scaleY);
+
+        // Draw child entities of block (with block base point offset)
+        final blockBaseX = block.basePoint.dx;
+        final blockBaseY = block.basePoint.dy;
+
+        Offset localToCanvas(Offset childCadPoint) {
+          return Offset(
+            childCadPoint.dx - blockBaseX,
+            -(childCadPoint.dy - blockBaseY),
+          );
+        }
+
+        for (final child in block.entities) {
+          final childLayer = layers[child.layer];
+          if (childLayer != null && !childLayer.isVisible) continue;
+
+          final childColor = DxfColorTable.resolveColor(
+            colorIndex: child.colorIndex ?? insert.colorIndex,
+            trueColor: child.trueColor ?? insert.trueColor,
+            layerColor: childLayer != null
+                ? DxfColorTable.resolveColor(
+                    colorIndex: childLayer.colorIndex,
+                    trueColor: childLayer.trueColor,
+                    isDarkBackground: theme.isDark,
+                  )
+                : null,
+            isDarkBackground: theme.isDark,
+          );
+
+          final strokePaint = Paint()
+            ..color = childColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = _calcStrokeWidth(child.lineWeight)
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round;
+
+          final fillPaint = Paint()
+            ..color = childColor.withValues(alpha: 0.35)
+            ..style = PaintingStyle.fill;
+
+          _renderEntity(
+            canvas: canvas,
+            entity: child,
+            strokePaint: strokePaint,
+            fillPaint: fillPaint,
+            toCanvas: localToCanvas,
+            blocks: blocks,
+            layers: layers,
+          );
+        }
+
+        canvas.restore();
+      }
+    }
+  }
+
+  void _renderDimension(
+    Canvas canvas,
+    DxfDimension dim,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+    Map<String, DxfBlock> blocks,
+    Map<String, DxfLayer> layers,
+  ) {
+    // If dimension references an anonymous block *D..., render the block
+    if (dim.blockName != null && blocks.containsKey(dim.blockName)) {
+      final block = blocks[dim.blockName]!;
+      for (final e in block.entities) {
+        _renderEntity(
+          canvas: canvas,
+          entity: e,
+          strokePaint: paint,
+          fillPaint: Paint()..color = paint.color.withValues(alpha: 0.3),
+          toCanvas: toCanvas,
+          blocks: blocks,
+          layers: layers,
+        );
+      }
+      return;
+    }
+
+    // Otherwise fallback: draw dimension line between def points + text
+    final p1 = toCanvas(dim.defPoint1);
+    final p2 = toCanvas(dim.defPoint2 ?? dim.textPoint);
+    canvas.drawLine(p1, p2, paint);
+
+    if (dim.textOverride != null && dim.textOverride!.isNotEmpty) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: dim.textOverride,
+          style: TextStyle(
+            color: paint.color,
+            fontSize: 12.0 / currentScale.clamp(0.5, 5.0),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      final tp = toCanvas(dim.textPoint);
+      textPainter.paint(canvas, Offset(tp.dx - textPainter.width / 2, tp.dy - textPainter.height / 2));
+    }
+  }
+
+  void _renderLeader(
+    Canvas canvas,
+    DxfLeader leader,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (leader.vertices.length < 2) return;
+
+    final path = Path();
+    final p0 = toCanvas(leader.vertices.first);
+    path.moveTo(p0.dx, p0.dy);
+
+    for (int i = 1; i < leader.vertices.length; i++) {
+      final p = toCanvas(leader.vertices[i]);
+      path.lineTo(p.dx, p.dy);
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  void _drawSearchHighlights(Canvas canvas, Offset Function(Offset) toCanvas) {
+    final query = searchQuery!.trim().toLowerCase();
+    final highlightPaint = Paint()
+      ..color = const Color(0xFFFFD600).withValues(alpha: 0.35)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = const Color(0xFFFFD600)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 / currentScale.clamp(0.5, 10.0);
+
+    for (final entity in document.entities) {
+      String? text;
+      Offset? pos;
+      double h = 5.0;
+
+      if (entity is DxfText && entity.text.toLowerCase().contains(query)) {
+        text = entity.text;
+        pos = entity.alignPoint ?? entity.insertPoint;
+        h = entity.height;
+      } else if (entity is DxfMText && entity.cleanText.toLowerCase().contains(query)) {
+        text = entity.cleanText;
+        pos = entity.insertPoint;
+        h = entity.height;
+      }
+
+      if (text != null && pos != null) {
+        final canvasPos = toCanvas(pos);
+        final approxW = (text.length * h * 0.7).clamp(h * 2, 5000.0);
+        final rect = Rect.fromLTWH(canvasPos.dx - 2, canvasPos.dy - h * 1.2, approxW + 4, h * 1.5);
+        final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(3));
+        canvas.drawRRect(rrect, highlightPaint);
+        canvas.drawRRect(rrect, borderPaint);
+      }
+    }
+  }
+
+  void _drawEntityHighlight(
+    Canvas canvas,
+    DxfEntity entity,
+    Offset Function(Offset) toCanvas,
+  ) {
+    final bounds = entity.getBoundingBox(document.blocks);
+    if (bounds == null) return;
+
+    final p1 = toCanvas(Offset(bounds.left, bounds.top));
+    final p2 = toCanvas(Offset(bounds.right, bounds.bottom));
+    final canvasRect = Rect.fromPoints(p1, p2);
+
+    final glowPaint = Paint()
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5 / currentScale.clamp(0.5, 10.0);
+
+    final rrect = RRect.fromRectAndRadius(canvasRect.inflate(4), const Radius.circular(4));
+    canvas.drawRRect(rrect, glowPaint);
+    canvas.drawRRect(rrect, borderPaint);
+  }
+
+  void _drawMeasurement(
+    Canvas canvas,
+    DxfMeasurement m,
+    Offset Function(Offset) toCanvas,
+  ) {
+    final p1 = toCanvas(m.p1Cad);
+    final dotPaint = Paint()
+      ..color = const Color(0xFFFF5252)
+      ..style = PaintingStyle.fill;
+    final linePaint = Paint()
+      ..color = const Color(0xFFFF5252)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 / currentScale.clamp(0.5, 10.0);
+
+    final dotRadius = 4.0 / currentScale.clamp(0.5, 10.0);
+    canvas.drawCircle(p1, dotRadius, dotPaint);
+
+    if (m.p2Cad != null) {
+      final p2 = toCanvas(m.p2Cad!);
+      canvas.drawCircle(p2, dotRadius, dotPaint);
+      canvas.drawLine(p1, p2, linePaint);
+
+      // Measurement Callout Bubble
+      final double dist = m.distance!;
+      final double angle = m.angleDeg!;
+      final String text = 'L: ${DxfMath.formatDistance(dist)} | ∠: ${DxfMath.formatAngle(angle)}\nΔX: ${DxfMath.formatDistance(m.deltaX!)}  ΔY: ${DxfMath.formatDistance(m.deltaY!)}';
+
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11.0,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'monospace',
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+
+      final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
+      final bubbleRect = Rect.fromCenter(
+        center: mid + const Offset(0, -22),
+        width: textPainter.width + 16,
+        height: textPainter.height + 10,
+      );
+
+      final bgPaint = Paint()
+        ..color = const Color(0xEE1E293B)
+        ..style = PaintingStyle.fill;
+      final borderBubble = Paint()
+        ..color = const Color(0xFFFF5252)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+
+      final rrect = RRect.fromRectAndRadius(bubbleRect, const Radius.circular(6));
+      canvas.drawRRect(rrect, bgPaint);
+      canvas.drawRRect(rrect, borderBubble);
+
+      textPainter.paint(
+        canvas,
+        Offset(bubbleRect.left + 8, bubbleRect.top + 5),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant DxfPainter oldDelegate) {
+    return oldDelegate.document != document ||
+        oldDelegate.theme != theme ||
+        oldDelegate.currentScale != currentScale ||
+        oldDelegate.measurement != measurement ||
+        oldDelegate.highlightedEntity != highlightedEntity ||
+        oldDelegate.searchQuery != searchQuery ||
+        oldDelegate.showGrid != showGrid;
+  }
+}
