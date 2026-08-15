@@ -108,11 +108,53 @@ class DxfParser {
       }
     }
 
-    // Compute bounding box
-    Rect? bounds;
+    // Compute bounding box (filtering out origin outliers e.g. (0,0) in BGS2005 drawings)
+    final List<Rect> validBoxes = [];
     for (final entity in entities) {
       final b = entity.getBoundingBox(blocks);
       if (b != null && b.isFinite && !b.isEmpty) {
+        validBoxes.add(b);
+      }
+    }
+
+    // Auto-register layers referenced by entities or blocks
+    void ensureLayer(String layerName) {
+      final name = layerName.trim();
+      if (name.isNotEmpty && !layers.containsKey(name)) {
+        final colorIdx = ((name.hashCode.abs()) % 7) + 1;
+        layers[name] = DxfLayer(name: name, colorIndex: colorIdx);
+      }
+    }
+
+    for (final entity in entities) {
+      ensureLayer(entity.layer);
+    }
+    for (final block in blocks.values) {
+      for (final entity in block.entities) {
+        ensureLayer(entity.layer);
+      }
+    }
+
+    Rect? bounds;
+    if (validBoxes.isNotEmpty) {
+      List<Rect> filteredBoxes = validBoxes;
+      if (validBoxes.length > 3) {
+        final centersX = validBoxes.map((b) => b.center.dx).toList()..sort();
+        final centersY = validBoxes.map((b) => b.center.dy).toList()..sort();
+        final medianX = centersX[centersX.length ~/ 2];
+        final medianY = centersY[centersY.length ~/ 2];
+
+        final distances = validBoxes.map((b) => (b.center - Offset(medianX, medianY)).distance).toList()..sort();
+        final medianDist = distances[distances.length ~/ 2];
+        final maxAllowedDist = math.max(50000.0, medianDist * 50.0);
+
+        final nonOutliers = validBoxes.where((b) => (b.center - Offset(medianX, medianY)).distance <= maxAllowedDist).toList();
+        if (nonOutliers.isNotEmpty) {
+          filteredBoxes = nonOutliers;
+        }
+      }
+
+      for (final b in filteredBoxes) {
         bounds = bounds == null ? b : bounds.expandToInclude(b);
       }
     }
@@ -175,9 +217,13 @@ class DxfParser {
 
       if (pair.code == 0 && pair.value.trim().toUpperCase() == 'TABLE') {
         idx++;
-        if (idx >= total) break;
-        final tabName = pairs[idx].value.trim().toUpperCase();
-        idx++;
+        String tabName = '';
+        while (idx < total && pairs[idx].code != 0) {
+          if (pairs[idx].code == 2) {
+            tabName = pairs[idx].value.trim().toUpperCase();
+          }
+          idx++;
+        }
 
         if (tabName == 'LAYER') {
           idx = _parseLayerTable(pairs, idx, layers);

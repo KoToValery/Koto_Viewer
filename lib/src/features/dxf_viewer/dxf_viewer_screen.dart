@@ -135,28 +135,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   /// Fit the entire DXF drawing inside the available viewport.
   void _fitToScreen() {
-    if (_document == null || _viewportSize.isEmpty) return;
-
-    final double docW = math.max(_document!.width, 1.0);
-    final double docH = math.max(_document!.height, 1.0);
-
-    const double padding = 32.0;
-    final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
-    final double availH = math.max(_viewportSize.height - padding * 2, 10.0);
-
-    final double scale = math.min(availW / docW, availH / docH);
-
-    final double scaledW = docW * scale;
-    final double scaledH = docH * scale;
-
-    final double tx = (_viewportSize.width - scaledW) / 2.0;
-    final double ty = (_viewportSize.height - scaledH) / 2.0;
-
-    final matrix = Matrix4.identity()
-      ..translate(tx, ty)
-      ..scale(scale);
-
-    _transformController.value = matrix;
+    _transformController.value = Matrix4.identity();
   }
 
   void _zoomIn() {
@@ -176,7 +155,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     final translation = currentMatrix.getTranslation();
     final scale = currentMatrix.getMaxScaleOnAxis();
 
-    final newScale = (scale * factor).clamp(0.0001, 10000.0);
+    final newScale = (scale * factor).clamp(0.001, 1000.0);
 
     // Zoom centered on viewport center
     final dx = center.dx - (center.dx - translation.x) * (newScale / scale);
@@ -189,21 +168,63 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     _transformController.value = newMatrix;
   }
 
-  void _handleCanvasTap(TapUpDetails details) {
-    if (_document == null) return;
+  Offset _sceneToCad(Offset scenePoint) {
+    if (_document == null || _viewportSize.isEmpty) return Offset.zero;
 
-    // Convert tap position to canvas local content coordinates
-    final scenePoint = _transformController.toScene(details.localPosition);
+    final double docW = math.max(_document!.width, 1.0);
+    final double docH = math.max(_document!.height, 1.0);
+
+    const double padding = 32.0;
+    final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
+    final double availH = math.max(_viewportSize.height - padding * 2, 10.0);
+
+    final double fitScale = math.min(availW / docW, availH / docH);
+
+    final double tx = (_viewportSize.width - docW * fitScale) / 2.0;
+    final double ty = (_viewportSize.height - docH * fitScale) / 2.0;
 
     final double minX = _document!.bounds.left;
     final double maxY = _document!.bounds.bottom > _document!.bounds.top
         ? _document!.bounds.bottom
         : _document!.bounds.top;
 
-    // Convert canvas local position to CAD coordinates
-    final double cadX = scenePoint.dx + minX;
-    final double cadY = maxY - scenePoint.dy;
-    final cadPoint = Offset(cadX, cadY);
+    final double cadX = minX + (scenePoint.dx - tx) / fitScale;
+    final double cadY = maxY - (scenePoint.dy - ty) / fitScale;
+
+    return Offset(cadX, cadY);
+  }
+
+  Offset _cadToScene(Offset cadPoint) {
+    if (_document == null || _viewportSize.isEmpty) return Offset.zero;
+
+    final double docW = math.max(_document!.width, 1.0);
+    final double docH = math.max(_document!.height, 1.0);
+
+    const double padding = 32.0;
+    final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
+    final double availH = math.max(_viewportSize.height - padding * 2, 10.0);
+
+    final double fitScale = math.min(availW / docW, availH / docH);
+
+    final double tx = (_viewportSize.width - docW * fitScale) / 2.0;
+    final double ty = (_viewportSize.height - docH * fitScale) / 2.0;
+
+    final double minX = _document!.bounds.left;
+    final double maxY = _document!.bounds.bottom > _document!.bounds.top
+        ? _document!.bounds.bottom
+        : _document!.bounds.top;
+
+    final double sceneX = tx + (cadPoint.dx - minX) * fitScale;
+    final double sceneY = ty + (maxY - cadPoint.dy) * fitScale;
+
+    return Offset(sceneX, sceneY);
+  }
+
+  void _handleCanvasTap(TapUpDetails details) {
+    if (_document == null) return;
+
+    final scenePoint = _transformController.toScene(details.localPosition);
+    final cadPoint = _sceneToCad(scenePoint);
 
     setState(() {
       _currentCadCoord = cadPoint;
@@ -226,16 +247,10 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   void _handlePointerHover(PointerHoverEvent event) {
     if (_document == null) return;
     final scenePoint = _transformController.toScene(event.localPosition);
-    final double minX = _document!.bounds.left;
-    final double maxY = _document!.bounds.bottom > _document!.bounds.top
-        ? _document!.bounds.bottom
-        : _document!.bounds.top;
-
-    final double cadX = scenePoint.dx + minX;
-    final double cadY = maxY - scenePoint.dy;
+    final cadPoint = _sceneToCad(scenePoint);
 
     setState(() {
-      _currentCadCoord = Offset(cadX, cadY);
+      _currentCadCoord = cadPoint;
     });
   }
 
@@ -273,7 +288,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   }
 
   void _jumpToMatch(int index) {
-    if (_searchMatches.isEmpty || _document == null) return;
+    if (_searchMatches.isEmpty || _document == null || _viewportSize.isEmpty) return;
     final entity = _searchMatches[index];
 
     Offset? pos;
@@ -285,18 +300,11 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       pos = entity.textPoint;
     }
 
-    if (pos != null && _viewportSize.isFinite && !_viewportSize.isEmpty) {
-      final double minX = _document!.bounds.left;
-      final double maxY = _document!.bounds.bottom > _document!.bounds.top
-          ? _document!.bounds.bottom
-          : _document!.bounds.top;
-
-      final canvasX = pos.dx - minX;
-      final canvasY = maxY - pos.dy;
-
-      const double zoomLevel = 3.0;
-      final tx = _viewportSize.width / 2 - canvasX * zoomLevel;
-      final ty = _viewportSize.height / 2 - canvasY * zoomLevel;
+    if (pos != null) {
+      final scenePoint = _cadToScene(pos);
+      const double zoomLevel = 4.0;
+      final tx = _viewportSize.width / 2 - scenePoint.dx * zoomLevel;
+      final ty = _viewportSize.height / 2 - scenePoint.dy * zoomLevel;
 
       final matrix = Matrix4.identity()
         ..translate(tx, ty)
@@ -604,9 +612,6 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
               return const SizedBox.shrink();
             }
 
-            final double canvasWidth = math.max(_document!.width, 100.0);
-            final double canvasHeight = math.max(_document!.height, 100.0);
-
             return Stack(
               children: [
                 // Interactive CAD Canvas
@@ -616,11 +621,11 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                     onTapUp: _handleCanvasTap,
                     child: InteractiveViewer(
                       transformationController: _transformController,
-                      minScale: 0.00001,
-                      maxScale: 100000.0,
-                      boundaryMargin: const EdgeInsets.all(double.infinity),
+                      minScale: 0.01,
+                      maxScale: 1000.0,
+                      boundaryMargin: const EdgeInsets.all(1000.0),
                       child: CustomPaint(
-                        size: Size(canvasWidth, canvasHeight),
+                        size: _viewportSize,
                         painter: DxfPainter(
                           document: _document!,
                           theme: _canvasTheme,

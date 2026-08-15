@@ -83,6 +83,23 @@ class DxfPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.isEmpty || size.width <= 0 || size.height <= 0) return;
+
+    final double docW = math.max(document.width, 1.0);
+    final double docH = math.max(document.height, 1.0);
+
+    const double padding = 32.0;
+    final double availW = math.max(size.width - padding * 2, 10.0);
+    final double availH = math.max(size.height - padding * 2, 10.0);
+
+    final double fitScale = math.min(availW / docW, availH / docH);
+
+    final double scaledW = docW * fitScale;
+    final double scaledH = docH * fitScale;
+
+    final double tx = (size.width - scaledW) / 2.0;
+    final double ty = (size.height - scaledH) / 2.0;
+
     final double minX = document.bounds.left;
     final double maxY = document.bounds.bottom > document.bounds.top
         ? document.bounds.bottom
@@ -91,8 +108,8 @@ class DxfPainter extends CustomPainter {
     // Helper: convert CAD point (Y up) to Canvas point (Y down)
     Offset toCanvas(Offset cadPoint) {
       return Offset(
-        cadPoint.dx - minX,
-        maxY - cadPoint.dy,
+        tx + (cadPoint.dx - minX) * fitScale,
+        ty + (maxY - cadPoint.dy) * fitScale,
       );
     }
 
@@ -142,6 +159,7 @@ class DxfPainter extends CustomPainter {
         strokePaint: strokePaint,
         fillPaint: fillPaint,
         toCanvas: toCanvas,
+        fitScale: fitScale,
         blocks: document.blocks,
         layers: document.layers,
       );
@@ -208,6 +226,7 @@ class DxfPainter extends CustomPainter {
     required Paint strokePaint,
     required Paint fillPaint,
     required Offset Function(Offset) toCanvas,
+    required double fitScale,
     required Map<String, DxfBlock> blocks,
     required Map<String, DxfLayer> layers,
   }) {
@@ -223,7 +242,7 @@ class DxfPainter extends CustomPainter {
       canvas.drawLine(Offset(p.dx, p.dy - markSize), Offset(p.dx, p.dy + markSize), strokePaint);
     } else if (entity is DxfCircle) {
       final center = toCanvas(entity.center);
-      canvas.drawCircle(center, entity.radius, strokePaint);
+      canvas.drawCircle(center, entity.radius * fitScale, strokePaint);
     } else if (entity is DxfArc) {
       _renderArc(canvas, entity, strokePaint, toCanvas);
     } else if (entity is DxfEllipse) {
@@ -235,9 +254,9 @@ class DxfPainter extends CustomPainter {
     } else if (entity is DxfSpline) {
       _renderSpline(canvas, entity, strokePaint, toCanvas);
     } else if (entity is DxfText) {
-      _renderText(canvas, entity, strokePaint.color, toCanvas);
+      _renderText(canvas, entity, strokePaint.color, toCanvas, fitScale);
     } else if (entity is DxfMText) {
-      _renderMText(canvas, entity, strokePaint.color, toCanvas);
+      _renderMText(canvas, entity, strokePaint.color, toCanvas, fitScale);
     } else if (entity is DxfSolid) {
       _renderSolid(canvas, entity, fillPaint, strokePaint, toCanvas);
     } else if (entity is DxfHatch) {
@@ -249,9 +268,10 @@ class DxfPainter extends CustomPainter {
         blocks: blocks,
         layers: layers,
         toCanvas: toCanvas,
+        fitScale: fitScale,
       );
     } else if (entity is DxfDimension) {
-      _renderDimension(canvas, entity, strokePaint, toCanvas, blocks, layers);
+      _renderDimension(canvas, entity, strokePaint, toCanvas, fitScale, blocks, layers);
     } else if (entity is DxfLeader) {
       _renderLeader(canvas, entity, strokePaint, toCanvas);
     }
@@ -461,15 +481,17 @@ class DxfPainter extends CustomPainter {
     DxfText entity,
     Color color,
     Offset Function(Offset) toCanvas,
+    double fitScale,
   ) {
     if (entity.text.trim().isEmpty) return;
 
+    final fontSize = math.max(entity.height * fitScale, 0.1);
     final textPainter = TextPainter(
       text: TextSpan(
         text: entity.text,
         style: TextStyle(
           color: color,
-          fontSize: entity.height,
+          fontSize: fontSize,
           fontFamily: 'Roboto',
           height: 1.0,
         ),
@@ -512,15 +534,17 @@ class DxfPainter extends CustomPainter {
     DxfMText entity,
     Color color,
     Offset Function(Offset) toCanvas,
+    double fitScale,
   ) {
     if (entity.cleanText.trim().isEmpty) return;
 
+    final fontSize = math.max(entity.height * fitScale, 0.1);
     final textPainter = TextPainter(
       text: TextSpan(
         text: entity.cleanText,
         style: TextStyle(
           color: color,
-          fontSize: entity.height,
+          fontSize: fontSize,
           fontFamily: 'Roboto',
           height: 1.25,
         ),
@@ -530,7 +554,7 @@ class DxfPainter extends CustomPainter {
     );
 
     if (entity.refWidth != null && entity.refWidth! > 0) {
-      textPainter.layout(maxWidth: entity.refWidth!);
+      textPainter.layout(maxWidth: entity.refWidth! * fitScale);
     } else {
       textPainter.layout();
     }
@@ -644,37 +668,29 @@ class DxfPainter extends CustomPainter {
     required Map<String, DxfBlock> blocks,
     required Map<String, DxfLayer> layers,
     required Offset Function(Offset) toCanvas,
+    required double fitScale,
   }) {
     final block = blocks[insert.blockName];
     if (block == null || block.entities.isEmpty) return;
+
+    final rad = insert.rotationDeg * math.pi / 180.0;
+    final cosA = math.cos(rad);
+    final sinA = math.sin(rad);
+
+    final blockBaseX = block.basePoint.dx;
+    final blockBaseY = block.basePoint.dy;
 
     for (int r = 0; r < insert.rowCount; r++) {
       for (int c = 0; c < insert.colCount; c++) {
         final double offsetX = insert.insertPoint.dx + c * insert.colSpacing;
         final double offsetY = insert.insertPoint.dy + r * insert.rowSpacing;
 
-        canvas.save();
-
-        // Convert base location to canvas
-        final basePos = toCanvas(Offset(offsetX, offsetY));
-        canvas.translate(basePos.dx, basePos.dy);
-
-        // Rotate
-        final rad = -insert.rotationDeg * math.pi / 180.0;
-        canvas.rotate(rad);
-
-        // Scale
-        canvas.scale(insert.scaleX, insert.scaleY);
-
-        // Draw child entities of block (with block base point offset)
-        final blockBaseX = block.basePoint.dx;
-        final blockBaseY = block.basePoint.dy;
-
         Offset localToCanvas(Offset childCadPoint) {
-          return Offset(
-            childCadPoint.dx - blockBaseX,
-            -(childCadPoint.dy - blockBaseY),
-          );
+          final lx = (childCadPoint.dx - blockBaseX) * insert.scaleX;
+          final ly = (childCadPoint.dy - blockBaseY) * insert.scaleY;
+          final rx = lx * cosA - ly * sinA;
+          final ry = lx * sinA + ly * cosA;
+          return toCanvas(Offset(offsetX + rx, offsetY + ry));
         }
 
         for (final child in block.entities) {
@@ -711,12 +727,11 @@ class DxfPainter extends CustomPainter {
             strokePaint: strokePaint,
             fillPaint: fillPaint,
             toCanvas: localToCanvas,
+            fitScale: fitScale,
             blocks: blocks,
             layers: layers,
           );
         }
-
-        canvas.restore();
       }
     }
   }
@@ -726,6 +741,7 @@ class DxfPainter extends CustomPainter {
     DxfDimension dim,
     Paint paint,
     Offset Function(Offset) toCanvas,
+    double fitScale,
     Map<String, DxfBlock> blocks,
     Map<String, DxfLayer> layers,
   ) {
@@ -739,6 +755,7 @@ class DxfPainter extends CustomPainter {
           strokePaint: paint,
           fillPaint: Paint()..color = paint.color.withValues(alpha: 0.3),
           toCanvas: toCanvas,
+          fitScale: fitScale,
           blocks: blocks,
           layers: layers,
         );
