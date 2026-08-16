@@ -467,5 +467,111 @@ EOF
       expect(restored.pointSize, 6.0);
       expect(restored.pointStyle, DxfPointStyle.circleDot);
     });
+
+    test('Parses 3DFACE entity correctly', () {
+      const dxfContent = '''
+0
+SECTION
+2
+ENTITIES
+0
+3DFACE
+8
+Terrain
+10
+0.0
+20
+0.0
+30
+10.0
+11
+10.0
+21
+0.0
+31
+12.0
+12
+10.0
+22
+10.0
+32
+15.0
+13
+0.0
+23
+10.0
+33
+11.0
+0
+ENDSEC
+0
+EOF
+''';
+
+      final doc = DxfParser.parseString(dxfContent);
+      expect(doc.entities.length, 1);
+      expect(doc.entities[0], isA<DxfSolid>());
+      final face = doc.entities[0] as DxfSolid;
+      expect(face.layer, 'Terrain');
+      expect(face.p0, const Offset(0, 0));
+      expect(face.p1, const Offset(10, 0));
+      expect(face.p2, const Offset(10, 10));
+      expect(face.p3, const Offset(0, 10));
+    });
+
+    test('Decodes diverse Cyrillic formats: Unicode, MIF, ASCII codes, and Mojibake', () {
+      const dxfContent = '''
+0
+SECTION
+2
+ENTITIES
+0
+TEXT
+8
+Layer1
+1
+\\M+5C0\\M+5F0\\M+5F5\\M+5E8
+10
+0.0
+20
+0.0
+0
+TEXT
+8
+Layer2
+1
+%%192%%240%%245%%232
+10
+10.0
+20
+10.0
+0
+TEXT
+8
+Layer3
+1
+Àðõèòåêòóðà
+10
+20.0
+20
+20.0
+0
+ENDSEC
+0
+EOF
+''';
+
+      final doc = DxfParser.parseString(dxfContent);
+      expect(doc.entities.length, 3);
+
+      final t1 = doc.entities[0] as DxfText;
+      expect(t1.text, 'Архи');
+
+      final t2 = doc.entities[1] as DxfText;
+      expect(t2.text, 'Архи');
+
+      final t3 = doc.entities[2] as DxfText;
+      expect(t3.text, 'Архитектура');
+    });
   });
 }

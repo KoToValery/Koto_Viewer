@@ -318,14 +318,31 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _pickAndOpenFile() async {
     try {
       final initialDir = await _getDownloadDirectoryPath();
+      // Use FileType.any because Android SAF doesn't register CAD MIME types for DWG/DXF,
+      // which causes Android's file picker to grey them out if FileType.custom is used.
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'dxf', 'dwg', 'PDF', 'DXF', 'DWG'],
+        type: FileType.any,
         initialDirectory: initialDir,
       );
 
       if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
+        final lower = filePath.toLowerCase();
+        if (!lower.endsWith('.pdf') &&
+            !lower.endsWith('.dxf') &&
+            !lower.endsWith('.dwg')) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Please select a supported file (.pdf, .dxf, or .dwg).',
+                ),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
         await _openFileScreen(filePath);
       }
     } catch (e) {
@@ -366,25 +383,33 @@ class _HomeScreenState extends State<HomeScreen> {
       lastOpened: DateTime.now(),
     );
 
-    await RecentFilesService.addRecentFile(item);
-
     if (!mounted) return;
 
     switch (item.fileType) {
       case KotoFileType.pdf:
-        await Navigator.of(context).push(
+        final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => PdfViewerScreen(filePath: filePath),
           ),
         );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
         break;
 
       case KotoFileType.dxf:
-        await Navigator.of(context).push(
+        final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => DxfViewerScreen(filePath: filePath),
           ),
         );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
         break;
 
       case KotoFileType.dwg:
@@ -454,7 +479,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         if (convertedDxfPath != null && mounted) {
-          await Navigator.of(context).push(
+          final bool? success = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
               builder: (context) => DxfViewerScreen(
                 filePath: convertedDxfPath!,
@@ -462,15 +487,24 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           );
-        } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Could not convert DWG file: ${conversionError ?? "Unknown error"}',
+          if (success != false) {
+            await RecentFilesService.addRecentFile(item);
+          } else {
+            await RecentFilesService.removeRecentFile(filePath);
+          }
+        } else {
+          // Failed to convert: ensure it is not kept in Recent Files
+          await RecentFilesService.removeRecentFile(filePath);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Could not convert DWG file: ${conversionError ?? "Unknown error"}',
+                ),
+                backgroundColor: Colors.red.shade700,
               ),
-              backgroundColor: Colors.red.shade700,
-            ),
-          );
+            );
+          }
         }
         break;
 
@@ -1146,6 +1180,33 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildFormatBadge(String label, IconData icon, Color borderColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor.withValues(alpha: 0.65)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1246,28 +1307,38 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        ElevatedButton.icon(
-                          onPressed: _pickAndOpenFile,
-                          icon: const Icon(Icons.folder_open_rounded),
-                          label: const Text(
-                            'Browse Files',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 10,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: _pickAndOpenFile,
+                              icon: const Icon(Icons.folder_open_rounded),
+                              label: const Text(
+                                'Browse Files',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: theme.colorScheme.primary,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 13,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 0,
+                              ),
                             ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: theme.colorScheme.primary,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 14,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 0,
-                          ),
+                            _buildFormatBadge('PDF', Icons.picture_as_pdf_rounded, const Color(0xFFC7D2FE)),
+                            _buildFormatBadge('DXF', Icons.draw_rounded, const Color(0xFF6EE7B7)),
+                            _buildFormatBadge('DWG', Icons.architecture_rounded, const Color(0xFFFECDD3)),
+                          ],
                         ),
                       ],
                     ),

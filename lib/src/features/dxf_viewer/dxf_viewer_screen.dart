@@ -147,6 +147,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         _errorMessage = 'Failed to open DXF file: $e';
         _isLoading = false;
       });
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } catch (_) {}
     }
   }
 
@@ -406,8 +409,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['dxf', 'dwg', 'DXF', 'DWG'],
+        type: FileType.any,
       );
 
       if (result == null || result.files.single.path == null) return;

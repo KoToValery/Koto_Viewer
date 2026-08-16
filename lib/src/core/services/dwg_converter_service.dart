@@ -48,7 +48,7 @@ class DwgConverterService {
 
     // Cache file name includes size, modified timestamp, and engine version for cache validation
     final cachedFileName =
-        '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}_v2.dxf';
+        '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}_v3.dxf';
     final targetDxfPath =
         '${cacheDir.path}${Platform.pathSeparator}$cachedFileName';
     final targetDxfFile = File(targetDxfPath);

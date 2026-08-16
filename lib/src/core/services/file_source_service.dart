@@ -153,7 +153,8 @@ class FileSourceService {
 
     switch (mode) {
       case FileSourceMode.recent:
-        files = await RecentFilesService.getRecentFiles();
+        final rawFiles = await RecentFilesService.getRecentFiles();
+        files = rawFiles.where((item) => File(item.path).existsSync()).toList();
         break;
       case FileSourceMode.custom:
         final customPath = await getCustomFolderPath();

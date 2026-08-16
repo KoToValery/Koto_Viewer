@@ -26,15 +26,61 @@ class DxfParser {
     final Uint8List bytes = await file.readAsBytes();
     String content;
     try {
-      content = utf8.decode(bytes, allowMalformed: true);
+      // 1. Strict UTF-8 decoding
+      content = utf8.decode(bytes);
     } catch (_) {
-      content = latin1.decode(bytes);
+      // 2. If file contains 8-bit ANSI bytes (e.g. Windows-1251 Cyrillic from AutoCAD / ArchiCAD)
+      content = _decodeWindows1251(bytes);
     }
     // For large files (>200KB), parse in background isolate
     if (content.length > 200 * 1024) {
       return compute(_parseStringCompute, content);
     }
     return parseString(content);
+  }
+
+  /// Decodes raw Windows-1251 (CP1251) byte stream to UTF-8 String.
+  static String _decodeWindows1251(Uint8List bytes) {
+    final buffer = StringBuffer();
+    for (final b in bytes) {
+      if (b < 0x80) {
+        buffer.writeCharCode(b);
+      } else if (b >= 0xC0 && b <= 0xDF) {
+        // Cyrillic Capital Letters А .. Я
+        buffer.writeCharCode(0x0410 + (b - 0xC0));
+      } else if (b >= 0xE0 && b <= 0xFF) {
+        // Cyrillic Small Letters а .. я
+        buffer.writeCharCode(0x0430 + (b - 0xE0));
+      } else {
+        switch (b) {
+          case 0xA8: buffer.writeCharCode(0x0401); break; // Ё
+          case 0xB8: buffer.writeCharCode(0x0451); break; // ё
+          case 0xB9: buffer.writeCharCode(0x2116); break; // №
+          case 0xA1: buffer.writeCharCode(0x040E); break; // Ў
+          case 0xA2: buffer.writeCharCode(0x045E); break; // ў
+          case 0xAA: buffer.writeCharCode(0x0404); break; // Є
+          case 0xBA: buffer.writeCharCode(0x0454); break; // є
+          case 0xAF: buffer.writeCharCode(0x0407); break; // Ї
+          case 0xBF: buffer.writeCharCode(0x0457); break; // ї
+          case 0xB2: buffer.writeCharCode(0x0406); break; // І
+          case 0xB3: buffer.writeCharCode(0x0456); break; // і
+          case 0xA4: buffer.writeCharCode(0x00A4); break; // ¤
+          case 0xA7: buffer.writeCharCode(0x00A7); break; // §
+          case 0xAB: buffer.writeCharCode(0x00AB); break; // «
+          case 0xBB: buffer.writeCharCode(0x00BB); break; // »
+          case 0xB0: buffer.writeCharCode(0x00B0); break; // °
+          case 0xB1: buffer.writeCharCode(0x00B1); break; // ±
+          case 0x88: buffer.writeCharCode(0x20AC); break; // €
+          case 0x93: buffer.writeCharCode(0x201C); break; // “
+          case 0x94: buffer.writeCharCode(0x201D); break; // ”
+          case 0x96: buffer.writeCharCode(0x2013); break; // –
+          case 0x97: buffer.writeCharCode(0x2014); break; // —
+          default:
+            buffer.writeCharCode(b);
+        }
+      }
+    }
+    return buffer.toString();
   }
 
   /// Entry point for compute isolate.
@@ -1173,13 +1219,13 @@ class DxfParser {
     return (entity, idx);
   }
 
-  /// Cleans CAD TEXT string, decoding unicode escape sequences and CAD special codes.
+  /// Cleans CAD TEXT string, decoding unicode escape sequences, Cyrillic codepages, and CAD special codes.
   static String _cleanCadText(String text) {
     var result = text;
 
-    // Decode Unicode escape sequences: \U+XXXX (e.g. \U+0410 -> А)
+    // 1. Decode Unicode escape sequences: \U+XXXX or \U+XXXXXXXX (e.g. \U+0410 -> А)
     result = result.replaceAllMapped(
-      RegExp(r'\\U\+([0-9a-fA-F]{4})', caseSensitive: false),
+      RegExp(r'\\[Uu]\+([0-9a-fA-F]{4,8})'),
       (match) {
         final hex = match.group(1);
         if (hex != null) {
@@ -1192,30 +1238,128 @@ class DxfParser {
       },
     );
 
-    // Standard CAD special characters
+    // 2. Decode AutoCAD MIF Cyrillic escape sequences: \M+5XXXX or \M+5XX (e.g. \M+5C0 -> А)
+    result = result.replaceAllMapped(
+      RegExp(r'\\[Mm]\+5([0-9a-fA-F]{2,4})'),
+      (match) {
+        final hex = match.group(1);
+        if (hex != null) {
+          final code = int.tryParse(hex, radix: 16);
+          if (code != null) {
+            final byteVal = code & 0xFF;
+            if (byteVal >= 0xC0 && byteVal <= 0xDF) {
+              return String.fromCharCode(0x0410 + (byteVal - 0xC0));
+            } else if (byteVal >= 0xE0 && byteVal <= 0xFF) {
+              return String.fromCharCode(0x0430 + (byteVal - 0xE0));
+            } else if (byteVal == 0xA8) {
+              return 'Ё';
+            } else if (byteVal == 0xB8) {
+              return 'ё';
+            } else if (byteVal == 0xB9) {
+              return '№';
+            }
+          }
+        }
+        return match.group(0)!;
+      },
+    );
+
+    // 3. Decode AutoCAD ASCII decimal codes for Cyrillic: %%192 .. %%255
+    result = result.replaceAllMapped(
+      RegExp(r'%%([0-9]{3})'),
+      (match) {
+        final numStr = match.group(1);
+        if (numStr != null) {
+          final code = int.tryParse(numStr);
+          if (code != null) {
+            if (code >= 192 && code <= 223) {
+              return String.fromCharCode(0x0410 + (code - 192)); // А..Я
+            } else if (code >= 224 && code <= 255) {
+              return String.fromCharCode(0x0430 + (code - 224)); // а..я
+            } else if (code == 168) {
+              return 'Ё';
+            } else if (code == 184) {
+              return 'ё';
+            } else if (code == 185) {
+              return '№';
+            }
+          }
+        }
+        return match.group(0)!;
+      },
+    );
+
+    // 4. Standard CAD special symbols
     result = result.replaceAll(RegExp(r'%%[dD]'), '°');
     result = result.replaceAll(RegExp(r'%%[pP]'), '±');
     result = result.replaceAll(RegExp(r'%%[cC]'), '⌀');
-    result = result.replaceAll(RegExp(r'%%[uUoO]'), '');
+    result = result.replaceAll(RegExp(r'%%[uUoOkK]'), '');
     result = result.replaceAll(RegExp(r'%%%'), '%');
 
+    // 5. Auto-repair Mojibake (Latin-1 misinterpreted Windows-1251 Cyrillic)
+    result = _repairCyrillicMojibake(result);
+
     return result;
+  }
+
+  /// Automatically detects and repairs Latin-1 Mojibake into Cyrillic.
+  /// (e.g. "Àðõèòåêòóðà" -> "Архитектура")
+  static String _repairCyrillicMojibake(String text) {
+    if (text.isEmpty) return text;
+
+    int mojibakeCount = 0;
+    for (int i = 0; i < text.length; i++) {
+      final code = text.codeUnitAt(i);
+      if (code >= 0xC0 && code <= 0xFF) {
+        mojibakeCount++;
+      } else if (code >= 0x0400 && code <= 0x04FF) {
+        return text;
+      }
+    }
+
+    if (mojibakeCount > 0) {
+      final buffer = StringBuffer();
+      for (int i = 0; i < text.length; i++) {
+        final code = text.codeUnitAt(i);
+        if (code >= 0xC0 && code <= 0xDF) {
+          buffer.writeCharCode(0x0410 + (code - 0xC0));
+        } else if (code >= 0xE0 && code <= 0xFF) {
+          buffer.writeCharCode(0x0430 + (code - 0xE0));
+        } else if (code == 0xA8) {
+          buffer.writeCharCode(0x0401);
+        } else if (code == 0xB8) {
+          buffer.writeCharCode(0x0451);
+        } else if (code == 0xB9) {
+          buffer.writeCharCode(0x2116);
+        } else {
+          buffer.writeCharCode(code);
+        }
+      }
+      return buffer.toString();
+    }
+
+    return text;
   }
 
   /// Cleans MTEXT formatted string, stripping formatting codes and resolving newlines.
   static String _cleanMText(String text) {
     var result = text;
 
-    // First decode unicode
+    // First decode unicode and Cyrillic
     result = _cleanCadText(result);
 
     // Replace paragraph breaks \P with real newline
-    result = result.replaceAll(RegExp(r'\\P', caseSensitive: false), '\n');
+    result = result.replaceAll(RegExp(r'\\[Pp]', caseSensitive: false), '\n');
     result = result.replaceAll(RegExp(r'\\~'), ' ');
 
-    // Remove AutoCAD formatting sequences:
-    // \A1; \H1.5; \W0.8; \Q15; \C1; \F...; \T...;
-    result = result.replaceAll(RegExp(r'\\[AaCcFfHhQqTtWw][^;]*;'), '');
+    // Simplify stacked fractions: \S1/2; or \S1^2; -> 1/2 or 1^2
+    result = result.replaceAllMapped(
+      RegExp(r'\\[Ss]([^;]+);'),
+      (match) => match.group(1)?.replaceAll('^', '') ?? '',
+    );
+
+    // Remove all AutoCAD formatting sequences: \f...;, \F...;, \C...;, \H...;, \W...;, \Q...;, \T...;, \A...;, \pxqc;, etc.
+    result = result.replaceAll(RegExp(r'\\[a-zA-Z][^;]*;'), '');
 
     // Remove underline/overline/strikethrough toggles: \L, \l, \O, \o, \K, \k
     result = result.replaceAll(RegExp(r'\\[LlOoKk]'), '');

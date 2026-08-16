@@ -64,6 +64,8 @@ KOTO_EXPORT int koto_convert_dwg_to_dxf(const char* in_dwg_path, const char* out
     dat.fh = fout;
     dat.version = dwg.header.version;
     dat.from_version = dwg.header.from_version;
+    // Pass DWG codepage (e.g. CP_ANSI_1251 for Cyrillic) so dwg_write_dxf can decode strings properly
+    dat.codepage = dwg.header.codepage ? dwg.header.codepage : 29; // 29 is CP_ANSI_1251
 
     error = dwg_write_dxf(&dat, &dwg);
 
