@@ -116,25 +116,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _fileName,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (_pageCount > 0)
-              Text(
+        title: _pageCount > 0
+            ? Text(
                 'Page $_currentPage of $_pageCount',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.textTheme.bodyMedium?.color,
-                ),
-              ),
-          ],
-        ),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              )
+            : null,
         actions: [
           IconButton(
             icon: Icon(_isDarkModeView ? Icons.light_mode : Icons.dark_mode),

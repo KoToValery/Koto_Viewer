@@ -125,8 +125,15 @@ class MainActivity : FlutterActivity() {
             if (scheme == "file") {
                 uri.path
             } else if (scheme == "content") {
-                val fileName = getFileName(uri) ?: "opened_document.pdf"
-                val sanitizedFileName = if (fileName.endsWith(".pdf", ignoreCase = true)) fileName else "$fileName.pdf"
+                val fileName = getFileName(uri) ?: "opened_document"
+                val lowerName = fileName.lowercase()
+                val sanitizedFileName = if (lowerName.endsWith(".pdf") || lowerName.endsWith(".dxf") || lowerName.endsWith(".dwg")) {
+                    fileName
+                } else if (fileName.contains(".")) {
+                    fileName
+                } else {
+                    "$fileName.pdf"
+                }
                 val tempFile = File(cacheDir, sanitizedFileName)
                 val inputStream = contentResolver.openInputStream(uri)
                     ?: throw java.io.FileNotFoundException("Could not open input stream for URI: $uri")

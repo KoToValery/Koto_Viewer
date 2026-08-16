@@ -406,7 +406,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
+        type: FileType.custom,
+        allowedExtensions: ['dxf', 'dwg', 'DXF', 'DWG'],
       );
 
       if (result == null || result.files.single.path == null) return;
@@ -558,26 +559,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     return Scaffold(
       backgroundColor: _canvasTheme.bgColor,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _fileName,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (_document != null)
-              Text(
-                '${_document!.totalEntities} entities • ${_document!.totalLayers} layers • ${activeCrs.name}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: theme.textTheme.bodySmall?.color,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-          ],
-        ),
+        title: null,
         actions: [
           // Fit to screen (Zoom Extents)
           IconButton(

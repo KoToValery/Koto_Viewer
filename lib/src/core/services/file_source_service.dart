@@ -62,6 +62,7 @@ extension SortOptionExtension on SortOption {
 class FileSourceService {
   static const String _keySourceMode = 'koto_file_source_mode';
   static const String _keyCustomPath = 'koto_custom_folder_path';
+  static const String _keyCustomFolders = 'koto_custom_folder_list';
   static const String _keySortOption = 'koto_sort_option';
 
   static Future<FileSourceMode> getSourceMode() async {
@@ -75,14 +76,59 @@ class FileSourceService {
     await prefs.setString(_keySourceMode, mode.key);
   }
 
+  static Future<List<String>> getCustomFolderList() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_keyCustomFolders) ?? [];
+    // Migration check: If list is empty but single custom path exists, initialize list
+    final singlePath = prefs.getString(_keyCustomPath);
+    if (list.isEmpty && singlePath != null && singlePath.isNotEmpty) {
+      list.add(singlePath);
+      await prefs.setStringList(_keyCustomFolders, list);
+    }
+    return list;
+  }
+
+  static Future<void> addCustomFolder(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_keyCustomFolders) ?? [];
+    if (!list.contains(path)) {
+      list.add(path);
+      await prefs.setStringList(_keyCustomFolders, list);
+    }
+    await prefs.setString(_keyCustomPath, path);
+    await prefs.setString(_keySourceMode, FileSourceMode.custom.key);
+  }
+
+  static Future<void> removeCustomFolder(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_keyCustomFolders) ?? [];
+    list.remove(path);
+    await prefs.setStringList(_keyCustomFolders, list);
+
+    final currentActive = prefs.getString(_keyCustomPath);
+    if (currentActive == path) {
+      if (list.isNotEmpty) {
+        await prefs.setString(_keyCustomPath, list.first);
+      } else {
+        await prefs.remove(_keyCustomPath);
+        await prefs.setString(_keySourceMode, FileSourceMode.recent.key);
+      }
+    }
+  }
+
+  static Future<void> setSelectedCustomFolder(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyCustomPath, path);
+    await prefs.setString(_keySourceMode, FileSourceMode.custom.key);
+  }
+
   static Future<String?> getCustomFolderPath() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyCustomPath);
   }
 
   static Future<void> setCustomFolderPath(String path) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyCustomPath, path);
+    await addCustomFolder(path);
   }
 
   static Future<SortOption> getSortOption() async {
@@ -98,7 +144,7 @@ class FileSourceService {
 
   static bool _isSupportedFile(String path) {
     final lower = path.toLowerCase();
-    return lower.endsWith('.pdf') || lower.endsWith('.dxf');
+    return lower.endsWith('.pdf') || lower.endsWith('.dxf') || lower.endsWith('.dwg');
   }
 
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {

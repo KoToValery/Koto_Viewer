@@ -18,7 +18,6 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
   bool _isStarting = true;
   bool _hasError = false;
   String? _serverUrl;
-  String? _serverName;
   String? _errorMessage;
 
   @override
@@ -50,7 +49,6 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
         await Future.delayed(const Duration(milliseconds: 100));
         setState(() {
           _serverUrl = url;
-          _serverName = LocalServerService.serverName;
           _isStarting = false;
         });
       } else {
@@ -125,9 +123,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _serverName != null
-                            ? '$_serverName • $fileName'
-                            : fileName,
+                        fileName,
                         style: TextStyle(
                           fontSize: 11.5,
                           color: theme.textTheme.bodyMedium?.color?.withValues(
@@ -315,66 +311,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
         ),
         const SizedBox(height: 12),
 
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF3B0764) : const Color(0xFFFAF5FF),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isDark ? const Color(0xFF581C87) : const Color(0xFFE9D5FF),
-            ),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.badge_outlined,
-                size: 17,
-                color: Color(0xFF7C3AED),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Server Name',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        color: isDark
-                            ? Colors.purple.shade200
-                            : Colors.purple.shade700,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: .15,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      _serverName ?? 'KotoView',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF6B21A8),
-                        letterSpacing: .2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.copy_all_outlined, size: 19),
-                onPressed: () =>
-                    _copyToClipboard(_serverName ?? 'KotoView', 'Server name'),
-                tooltip: 'Copy name',
-                color: const Color(0xFF7E22CE),
-                padding: const EdgeInsets.all(6),
-                constraints: const BoxConstraints(),
-                splashRadius: 18,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
+
 
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

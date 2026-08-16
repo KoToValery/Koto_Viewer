@@ -23,7 +23,13 @@ class DxfParser {
 
   /// Parse DXF from File (runs in background isolate via compute for large files).
   static Future<DxfDocument> parseFromFile(File file) async {
-    final String content = await file.readAsString(encoding: utf8);
+    final Uint8List bytes = await file.readAsBytes();
+    String content;
+    try {
+      content = utf8.decode(bytes, allowMalformed: true);
+    } catch (_) {
+      content = latin1.decode(bytes);
+    }
     // For large files (>200KB), parse in background isolate
     if (content.length > 200 * 1024) {
       return compute(_parseStringCompute, content);
@@ -925,6 +931,7 @@ class DxfParser {
         );
         break;
 
+      case '3DFACE':
       case 'SOLID':
       case 'TRACE':
         double x0 = 0, y0 = 0, x1 = 0, y1 = 0, x2 = 0, y2 = 0, x3 = 0, y3 = 0;

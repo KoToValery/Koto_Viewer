@@ -2,10 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/file_source_service.dart';
+import '../../core/services/dwg_converter_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
 import '../dxf_viewer/dxf_viewer_screen.dart';
@@ -30,6 +32,8 @@ class FileTypeIcon extends StatelessWidget {
         return _buildPdfIcon();
       case KotoFileType.dxf:
         return _buildDxfIcon();
+      case KotoFileType.dwg:
+        return _buildDwgIcon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
@@ -104,6 +108,41 @@ class FileTypeIcon extends StatelessWidget {
     );
   }
 
+  Widget _buildDwgIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFECDD3)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.architecture_rounded,
+              color: const Color(0xFFE11D48),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'DWG',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFE11D48),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGenericIcon() {
     return Container(
       width: width,
@@ -144,6 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
   FileSourceMode _currentMode = FileSourceMode.recent;
   SortOption _currentSort = SortOption.date;
   String? _customFolderPath;
+  List<String> _customFolderList = [];
 
   @override
   void initState() {
@@ -157,6 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final mode = await FileSourceService.getSourceMode();
     final sort = await FileSourceService.getSortOption();
     final customPath = await FileSourceService.getCustomFolderPath();
+    final customFolders = await FileSourceService.getCustomFolderList();
     final files = await FileSourceService.getPdfFilesForCurrentSource();
 
     if (mounted) {
@@ -164,6 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentMode = mode;
         _currentSort = sort;
         _customFolderPath = customPath;
+        _customFolderList = customFolders;
         _pdfFiles = files;
         _isLoading = false;
       });
@@ -173,13 +215,59 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _switchMode(FileSourceMode newMode) async {
     if (newMode == FileSourceMode.custom) {
       if (_customFolderPath == null || _customFolderPath!.isEmpty) {
-        final success = await _pickCustomFolder();
-        if (!success) return;
+        if (_customFolderList.isNotEmpty) {
+          await FileSourceService.setSelectedCustomFolder(_customFolderList.first);
+        } else {
+          final success = await _pickCustomFolder();
+          if (!success) return;
+        }
+      } else {
+        await FileSourceService.setSourceMode(FileSourceMode.custom);
       }
+    } else {
+      await FileSourceService.setSourceMode(newMode);
     }
 
-    await FileSourceService.setSourceMode(newMode);
     await _loadFiles();
+  }
+
+  Future<void> _selectCustomFolder(String path) async {
+    await FileSourceService.setSelectedCustomFolder(path);
+    await _loadFiles();
+  }
+
+  Future<void> _confirmRemoveCustomFolder(String path) async {
+    final parts = path.split(Platform.pathSeparator).where((s) => s.isNotEmpty).toList();
+    final folderName = parts.isNotEmpty ? parts.last : path;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Folder'),
+        content: Text(
+          'Remove "$folderName" from saved folders list?\n\n(The files on your device will NOT be deleted.)',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await FileSourceService.removeCustomFolder(path);
+      await _loadFiles();
+    }
   }
 
   Future<void> _switchSort(SortOption newSort) async {
@@ -187,14 +275,32 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadFiles();
   }
 
+  Future<String?> _getDownloadDirectoryPath() async {
+    if (Platform.isAndroid) {
+      const androidDownload = '/storage/emulated/0/Download';
+      final dir = Directory(androidDownload);
+      if (dir.existsSync()) {
+        return androidDownload;
+      }
+    }
+    try {
+      final dir = await getDownloadsDirectory();
+      if (dir != null && dir.existsSync()) {
+        return dir.path;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<bool> _pickCustomFolder() async {
     try {
-      final String? selectedDirectory = await FilePicker.platform
-          .getDirectoryPath();
+      final initialDir = await _getDownloadDirectoryPath();
+      final String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
+        initialDirectory: initialDir,
+      );
 
       if (selectedDirectory != null && selectedDirectory.isNotEmpty) {
-        await FileSourceService.setCustomFolderPath(selectedDirectory);
-        await FileSourceService.setSourceMode(FileSourceMode.custom);
+        await FileSourceService.addCustomFolder(selectedDirectory);
         await _loadFiles();
         return true;
       }
@@ -211,7 +317,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _pickAndOpenFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+      final initialDir = await _getDownloadDirectoryPath();
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'dxf', 'dwg', 'PDF', 'DXF', 'DWG'],
+        initialDirectory: initialDir,
+      );
 
       if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
@@ -274,6 +385,93 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (context) => DxfViewerScreen(filePath: filePath),
           ),
         );
+        break;
+
+      case KotoFileType.dwg:
+        // Show converting progress dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => PopScope(
+            canPop: false,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              content: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 8,
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Converting DWG...',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Converting DWG to DXF for viewing',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        String? convertedDxfPath;
+        String? conversionError;
+
+        try {
+          convertedDxfPath = await DwgConverterService.convertDwgToDxf(
+            filePath,
+          );
+        } catch (e) {
+          conversionError = e.toString();
+        }
+
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // dismiss dialog
+        }
+
+        if (convertedDxfPath != null && mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => DxfViewerScreen(
+                filePath: convertedDxfPath!,
+                title: name,
+              ),
+            ),
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Could not convert DWG file: ${conversionError ?? "Unknown error"}',
+              ),
+              backgroundColor: Colors.red.shade700,
+            ),
+          );
+        }
         break;
 
       case KotoFileType.other:
@@ -646,7 +844,14 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         const SizedBox(height: 12),
         const Text(
-          'A lightweight, fast, and 100% free PDF and CAD viewer with support for BGS 2005 and global coordinate systems.',
+          'A lightweight, fast, and 100% free open-source PDF and CAD (DXF/DWG) viewer with support for BGS 2005 and global coordinate systems.',
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          '• Licensed under GNU General Public License v3.0 (GPLv3)\n'
+          '• DWG conversion powered by GNU LibreDWG\n'
+          '• 100% free and open-source software (FOSS)',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
         ),
       ],
     );
@@ -658,14 +863,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSourceHeader(ThemeData theme) {
+    String titleText = '';
     String subtitleText = '';
 
     if (_currentMode == FileSourceMode.recent) {
-      subtitleText = 'Recently opened files (PDF, DXF)';
+      titleText = 'Recent Files';
+      subtitleText = 'Recently opened files (PDF, DXF, DWG)';
     } else if (_currentMode == FileSourceMode.custom) {
-      subtitleText = _customFolderPath != null && _customFolderPath!.isNotEmpty
-          ? _customFolderPath!
-          : 'No folder selected';
+      if (_customFolderPath != null && _customFolderPath!.isNotEmpty) {
+        final parts = _customFolderPath!
+            .split(Platform.pathSeparator)
+            .where((s) => s.isNotEmpty)
+            .toList();
+        titleText = parts.isNotEmpty ? parts.last : 'Custom Folder';
+        subtitleText = _customFolderPath!;
+      } else {
+        titleText = 'Custom Folder';
+        subtitleText = 'No folder selected';
+      }
     }
 
     return SliverToBoxAdapter(
@@ -674,9 +889,16 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           children: [
             Expanded(
-              child: PopupMenuButton<FileSourceMode>(
-                initialValue: _currentMode,
-                onSelected: _switchMode,
+              child: PopupMenuButton<String>(
+                onSelected: (value) async {
+                  if (value == '__recent__') {
+                    await _switchMode(FileSourceMode.recent);
+                  } else if (value == '__add_new__') {
+                    await _pickCustomFolder();
+                  } else {
+                    await _selectCustomFolder(value);
+                  }
+                },
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -700,7 +922,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Flexible(
                                 child: Text(
-                                  _currentMode.label,
+                                  titleText,
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -724,28 +946,122 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: FileSourceMode.recent,
-                    child: Row(
-                      children: const [
-                        Icon(Icons.history_rounded, color: Colors.orange),
-                        SizedBox(width: 12),
-                        Text('Recent Files'),
-                      ],
+                itemBuilder: (context) {
+                  final List<PopupMenuEntry<String>> items = [];
+
+                  // 1. Recent Files
+                  items.add(
+                    PopupMenuItem<String>(
+                      value: '__recent__',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.history_rounded, color: Colors.orange),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Recent Files',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          if (_currentMode == FileSourceMode.recent)
+                            Icon(
+                              Icons.check,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  PopupMenuItem(
-                    value: FileSourceMode.custom,
-                    child: Row(
-                      children: const [
-                        Icon(Icons.folder_open_rounded, color: Colors.purple),
-                        SizedBox(width: 12),
-                        Text('Custom Folder'),
-                      ],
+                  );
+
+                  items.add(const PopupMenuDivider());
+
+                  // 2. Saved Custom Folders
+                  if (_customFolderList.isNotEmpty) {
+                    for (final folderPath in _customFolderList) {
+                      final parts = folderPath
+                          .split(Platform.pathSeparator)
+                          .where((s) => s.isNotEmpty)
+                          .toList();
+                      final folderName =
+                          parts.isNotEmpty ? parts.last : folderPath;
+                      final isSelected =
+                          _currentMode == FileSourceMode.custom &&
+                          _customFolderPath == folderPath;
+
+                      items.add(
+                        PopupMenuItem<String>(
+                          value: folderPath,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.folder_rounded,
+                                color: isSelected
+                                    ? Colors.purple
+                                    : Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      folderName,
+                                      style: TextStyle(
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      folderPath,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(
+                                  Icons.check,
+                                  size: 18,
+                                  color: theme.colorScheme.primary,
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    items.add(const PopupMenuDivider());
+                  }
+
+                  // 3. Add Custom Folder
+                  items.add(
+                    const PopupMenuItem<String>(
+                      value: '__add_new__',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.create_new_folder_outlined,
+                            color: Colors.blue,
+                          ),
+                          SizedBox(width: 12),
+                          Text('Add Custom Folder...'),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  );
+
+                  return items;
+                },
               ),
             ),
 
@@ -805,12 +1121,20 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
 
-            if (_currentMode == FileSourceMode.custom)
+            if (_currentMode == FileSourceMode.custom) ...[
               IconButton(
-                icon: const Icon(Icons.folder_open),
-                tooltip: 'Change Folder',
+                icon: const Icon(Icons.create_new_folder_outlined),
+                tooltip: 'Add Folder',
                 onPressed: _pickCustomFolder,
               ),
+              if (_customFolderPath != null && _customFolderPath!.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.grey),
+                  tooltip: 'Remove Folder from list',
+                  onPressed: () =>
+                      _confirmRemoveCustomFolder(_customFolderPath!),
+                ),
+            ],
             if (_currentMode == FileSourceMode.recent && _pdfFiles.isNotEmpty)
               TextButton(
                 onPressed: _clearAllRecent,
@@ -906,7 +1230,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Open PDF or DXF File',
+                          'Open PDF, DXF, or DWG File',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 22,
@@ -915,7 +1239,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Select any PDF or DXF file from your storage to view or share.',
+                          'Select any PDF, DXF, or DWG file from your storage to view or share.',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 14,
@@ -976,7 +1300,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   (_customFolderPath == null ||
                                       _customFolderPath!.isEmpty)
                               ? 'No folder selected'
-                              : 'No PDF or DXF files found',
+                              : 'No PDF, DXF, or DWG files found',
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontSize: 18,
                             color: theme.textTheme.bodyMedium?.color,
@@ -986,7 +1310,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           _currentMode == FileSourceMode.custom
                               ? 'Tap the folder icon to select a directory.'
-                              : 'Recently opened PDF/DXF files will appear here.',
+                              : 'Recently opened PDF, DXF, or DWG files will appear here.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium,
                         ),

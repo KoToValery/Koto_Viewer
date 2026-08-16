@@ -14,23 +14,11 @@ enum DxfCanvasTheme {
     gridColor: Color(0xFF22272E),
     isDark: true,
   ),
-  blueprint(
-    name: 'Blueprint Navy',
-    bgColor: Color(0xFF0D1B2A),
-    gridColor: Color(0xFF1B263B),
-    isDark: true,
-  ),
   paperWhite(
     name: 'Paper White',
     bgColor: Color(0xFFF8F9FA),
     gridColor: Color(0xFFE9ECEF),
     isDark: false,
-  ),
-  slateGrey(
-    name: 'Technical Slate',
-    bgColor: Color(0xFF2B303A),
-    gridColor: Color(0xFF383F4C),
-    isDark: true,
   );
 
   final String name;
