@@ -187,7 +187,12 @@ class FileSourceService {
         lower.endsWith('.plt') ||
         lower.endsWith('.hpgl') ||
         lower.endsWith('.hpg') ||
-        lower.endsWith('.prn');
+        lower.endsWith('.prn') ||
+        lower.endsWith('.step') ||
+        lower.endsWith('.stp') ||
+        lower.endsWith('.p21') ||
+        lower.endsWith('.iges') ||
+        lower.endsWith('.igs');
   }
 
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {

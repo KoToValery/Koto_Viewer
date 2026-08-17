@@ -8,10 +8,12 @@ import 'models/mesh_3d.dart';
 import 'parser/stl_parser.dart';
 import 'parser/obj_parser.dart';
 import 'parser/glb_gltf_parser.dart';
+import 'parser/step_parser.dart';
+import 'parser/iges_parser.dart';
 import 'rendering/cad_3d_camera.dart';
 import 'rendering/cad_3d_mesh_painter.dart';
 
-/// Interactive 3D CAD & Model Viewer Screen for STL, OBJ, GLTF, and GLB files.
+/// Interactive 3D CAD & Model Viewer Screen for STL, OBJ, GLTF, GLB, STEP, and IGES files.
 class Dxf3DViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
@@ -72,18 +74,26 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       final lower = widget.filePath.toLowerCase();
       Mesh3D mesh;
 
-      if (lower.endsWith('.stl')) {
+      if (lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.p21')) {
+        mesh = await StepParser.parseFromFile(widget.filePath);
+      } else if (lower.endsWith('.iges') || lower.endsWith('.igs')) {
+        mesh = await IgesParser.parseFromFile(widget.filePath);
+      } else if (lower.endsWith('.stl')) {
         mesh = await StlParser.parseFromFile(widget.filePath);
       } else if (lower.endsWith('.obj')) {
         mesh = await ObjParser.parseFromFile(widget.filePath);
       } else if (lower.endsWith('.glb') || lower.endsWith('.gltf')) {
         mesh = await GlbGltfParser.parseFromFile(widget.filePath);
       } else {
-        // Fallback: try STL then OBJ
+        // Fallback: try STEP -> STL -> OBJ
         try {
-          mesh = await StlParser.parseFromFile(widget.filePath);
+          mesh = await StepParser.parseFromFile(widget.filePath);
         } catch (_) {
-          mesh = await ObjParser.parseFromFile(widget.filePath);
+          try {
+            mesh = await StlParser.parseFromFile(widget.filePath);
+          } catch (_) {
+            mesh = await ObjParser.parseFromFile(widget.filePath);
+          }
         }
       }
 

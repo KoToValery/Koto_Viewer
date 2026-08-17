@@ -5,7 +5,7 @@ import '../../../core/services/native_share_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
-enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, eps, pcb, kicad, plt, other }
+enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, eps, pcb, kicad, plt, step, iges, other }
 
 _ShareFileType _detectFileType(String path) {
   final lower = path.toLowerCase();
@@ -15,6 +15,8 @@ _ShareFileType _detectFileType(String path) {
   if (lower.endsWith('.stl')) return _ShareFileType.stl;
   if (lower.endsWith('.obj')) return _ShareFileType.obj;
   if (lower.endsWith('.glb') || lower.endsWith('.gltf')) return _ShareFileType.glb;
+  if (lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.p21')) return _ShareFileType.step;
+  if (lower.endsWith('.iges') || lower.endsWith('.igs')) return _ShareFileType.iges;
   if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return _ShareFileType.xlsx;
   if (lower.endsWith('.txt') || lower.endsWith('.log') || lower.endsWith('.csv')) return _ShareFileType.txt;
   if (lower.endsWith('.md') || lower.endsWith('.markdown')) return _ShareFileType.md;
@@ -149,7 +151,9 @@ class ShareOptionsSheet extends StatelessWidget {
     final bool isSvg = fileType == _ShareFileType.svg;
     final bool is3d = fileType == _ShareFileType.stl ||
         fileType == _ShareFileType.obj ||
-        fileType == _ShareFileType.glb;
+        fileType == _ShareFileType.glb ||
+        fileType == _ShareFileType.step ||
+        fileType == _ShareFileType.iges;
     final bool isXlsx = fileType == _ShareFileType.xlsx;
     final bool isTxt = fileType == _ShareFileType.txt;
     final bool isMd = fileType == _ShareFileType.md;
@@ -158,99 +162,115 @@ class ShareOptionsSheet extends StatelessWidget {
     final bool isPcb = fileType == _ShareFileType.pcb;
     final bool isKicad = fileType == _ShareFileType.kicad;
     final bool isPlt = fileType == _ShareFileType.plt;
+    final bool isStep = fileType == _ShareFileType.step;
+    final bool isIges = fileType == _ShareFileType.iges;
 
     final Color cardColorStart = isDxf
         ? const Color(0xFF059669)
         : isSvg
             ? const Color(0xFFEA580C)
-            : is3d
-                ? const Color(0xFF0891B2)
-                : isXlsx
-                    ? const Color(0xFF107C41)
-                    : isPcb
-                        ? const Color(0xFF059669)
-                        : isKicad
-                            ? const Color(0xFF0891B2)
-                            : isPlt
-                                ? const Color(0xFFD97706)
-                                : isDocx
-                                    ? const Color(0xFF2563EB)
-                                    : isEps
-                                        ? const Color(0xFF8B5CF6)
-                                        : isTxt
-                                            ? const Color(0xFF475569)
-                                            : isMd
-                                                ? const Color(0xFF4338CA)
-                                                : AppTheme.primaryColor;
+            : isStep
+                ? const Color(0xFF4F46E5)
+                : isIges
+                    ? const Color(0xFF7C3AED)
+                    : is3d
+                        ? const Color(0xFF0891B2)
+                        : isXlsx
+                            ? const Color(0xFF107C41)
+                            : isPcb
+                                ? const Color(0xFF059669)
+                                : isKicad
+                                    ? const Color(0xFF0891B2)
+                                    : isPlt
+                                        ? const Color(0xFFD97706)
+                                        : isDocx
+                                            ? const Color(0xFF2563EB)
+                                            : isEps
+                                                ? const Color(0xFF8B5CF6)
+                                                : isTxt
+                                                    ? const Color(0xFF475569)
+                                                    : isMd
+                                                        ? const Color(0xFF4338CA)
+                                                        : AppTheme.primaryColor;
     final Color cardColorEnd = isDxf
         ? const Color(0xFF10B981)
         : isSvg
             ? const Color(0xFFFB923C)
-            : is3d
-                ? const Color(0xFF06B6D4)
-                : isXlsx
-                    ? const Color(0xFF22C55E)
-                    : isPcb
-                        ? const Color(0xFF34D399)
-                        : isKicad
-                            ? const Color(0xFF06B6D4)
-                            : isPlt
-                                ? const Color(0xFFF59E0B)
-                                : isDocx
-                                    ? const Color(0xFF60A5FA)
-                                    : isEps
-                                        ? const Color(0xFFA78BFA)
-                                        : isTxt
-                                            ? const Color(0xFF64748B)
-                                            : isMd
-                                                ? const Color(0xFF6366F1)
-                                                : AppTheme.secondaryColor;
+            : isStep
+                ? const Color(0xFF6366F1)
+                : isIges
+                    ? const Color(0xFF8B5CF6)
+                    : is3d
+                        ? const Color(0xFF06B6D4)
+                        : isXlsx
+                            ? const Color(0xFF22C55E)
+                            : isPcb
+                                ? const Color(0xFF34D399)
+                                : isKicad
+                                    ? const Color(0xFF06B6D4)
+                                    : isPlt
+                                        ? const Color(0xFFF59E0B)
+                                        : isDocx
+                                            ? const Color(0xFF60A5FA)
+                                            : isEps
+                                                ? const Color(0xFFA78BFA)
+                                                : isTxt
+                                                    ? const Color(0xFF64748B)
+                                                    : isMd
+                                                        ? const Color(0xFF6366F1)
+                                                        : AppTheme.secondaryColor;
     final IconData fileIcon = isDxf
         ? Icons.draw_rounded
         : isSvg
             ? Icons.gesture_rounded
-            : is3d
+            : isStep || isIges
                 ? Icons.view_in_ar_rounded
-                : isXlsx
-                    ? Icons.table_chart_rounded
-                    : isPcb
-                        ? Icons.memory_rounded
-                        : isKicad
-                            ? Icons.developer_board_rounded
-                            : isPlt
-                                ? Icons.architecture_rounded
-                                : isDocx
-                                    ? Icons.article_rounded
-                                    : isEps
-                                        ? Icons.gesture_rounded
-                                        : isTxt
-                                            ? Icons.description_rounded
-                                            : isMd
-                                                ? Icons.menu_book_rounded
-                                                : Icons.picture_as_pdf_rounded;
+                : is3d
+                    ? Icons.view_in_ar_rounded
+                    : isXlsx
+                        ? Icons.table_chart_rounded
+                        : isPcb
+                            ? Icons.memory_rounded
+                            : isKicad
+                                ? Icons.developer_board_rounded
+                                : isPlt
+                                    ? Icons.architecture_rounded
+                                    : isDocx
+                                        ? Icons.article_rounded
+                                        : isEps
+                                            ? Icons.gesture_rounded
+                                            : isTxt
+                                                ? Icons.description_rounded
+                                                : isMd
+                                                    ? Icons.menu_book_rounded
+                                                    : Icons.picture_as_pdf_rounded;
     final String sendLabel = isDxf
         ? 'Send DXF Drawing'
         : isSvg
             ? 'Send SVG Vector'
-            : is3d
-                ? 'Send 3D Model'
-                : isXlsx
-                    ? 'Send Spreadsheet'
-                    : isPcb
-                        ? 'Send PCB Gerber / Drill'
-                        : isKicad
-                            ? 'Send KiCad File'
-                            : isPlt
-                                ? 'Send HPGL Plotter File'
-                                : isDocx
-                                    ? 'Send Word Document'
-                                    : isEps
-                                        ? 'Send EPS Vector'
-                                        : isTxt
-                                            ? 'Send Text Document'
-                                            : isMd
-                                                ? 'Send Markdown Document'
-                                                : 'Send Document';
+            : isStep
+                ? 'Send STEP 3D Model'
+                : isIges
+                    ? 'Send IGES 3D Model'
+                    : is3d
+                        ? 'Send 3D Model'
+                        : isXlsx
+                            ? 'Send Spreadsheet'
+                            : isPcb
+                                ? 'Send PCB Gerber / Drill'
+                                : isKicad
+                                    ? 'Send KiCad File'
+                                    : isPlt
+                                        ? 'Send HPGL Plotter File'
+                                        : isDocx
+                                            ? 'Send Word Document'
+                                            : isEps
+                                                ? 'Send EPS Vector'
+                                                : isTxt
+                                                    ? 'Send Text Document'
+                                                    : isMd
+                                                        ? 'Send Markdown Document'
+                                                        : 'Send Document';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

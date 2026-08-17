@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, other }
 
 class PdfItem {
   final String path;
@@ -27,6 +27,8 @@ class PdfItem {
     if (lower.endsWith('.obj')) return KotoFileType.obj;
     if (lower.endsWith('.gltf')) return KotoFileType.gltf;
     if (lower.endsWith('.glb')) return KotoFileType.glb;
+    if (lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.p21')) return KotoFileType.step;
+    if (lower.endsWith('.iges') || lower.endsWith('.igs')) return KotoFileType.iges;
     if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return KotoFileType.xlsx;
     if (lower.endsWith('.txt') || lower.endsWith('.log') || lower.endsWith('.csv')) return KotoFileType.txt;
     if (lower.endsWith('.md') || lower.endsWith('.markdown')) return KotoFileType.md;
@@ -75,7 +77,11 @@ class PdfItem {
       fileType == KotoFileType.stl ||
       fileType == KotoFileType.obj ||
       fileType == KotoFileType.gltf ||
-      fileType == KotoFileType.glb;
+      fileType == KotoFileType.glb ||
+      fileType == KotoFileType.step ||
+      fileType == KotoFileType.iges;
+  bool get isStep => fileType == KotoFileType.step;
+  bool get isIges => fileType == KotoFileType.iges;
   bool get isXlsx => fileType == KotoFileType.xlsx;
   bool get isTxt => fileType == KotoFileType.txt;
   bool get isMd => fileType == KotoFileType.md;

@@ -70,6 +70,10 @@ class FileTypeIcon extends StatelessWidget {
         return _buildKicadIcon();
       case KotoFileType.plt:
         return _buildPltIcon();
+      case KotoFileType.step:
+        return _buildStepIcon();
+      case KotoFileType.iges:
+        return _buildIgesIcon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
@@ -634,6 +638,76 @@ class FileTypeIcon extends StatelessWidget {
     );
   }
 
+  Widget _buildStepIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF2FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFC7D2FE)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.view_in_ar_rounded,
+              color: const Color(0xFF4F46E5),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'STEP',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF4F46E5),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIgesIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F3FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFDDD6FE)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.view_in_ar_rounded,
+              color: const Color(0xFF7C3AED),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'IGES',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF7C3AED),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGenericIcon() {
     return Container(
       width: width,
@@ -862,12 +936,17 @@ class _HomeScreenState extends State<HomeScreen> {
             !lower.endsWith('.plt') &&
             !lower.endsWith('.hpgl') &&
             !lower.endsWith('.hpg') &&
-            !lower.endsWith('.prn')) {
+            !lower.endsWith('.prn') &&
+            !lower.endsWith('.step') &&
+            !lower.endsWith('.stp') &&
+            !lower.endsWith('.p21') &&
+            !lower.endsWith('.iges') &&
+            !lower.endsWith('.igs')) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Please select a supported file (.pdf, .dxf, .dwg, .svg, .stl, .obj, .glb, .xlsx, .docx, .eps, .gbr, .drl, .kicad_pcb, .plt).',
+                  'Please select a supported file (.pdf, .dxf, .dwg, .svg, .stl, .obj, .glb, .step, .iges, .xlsx, .docx, .eps, .gbr, .drl, .kicad_pcb, .plt).',
                 ),
                 backgroundColor: Colors.orange,
               ),
@@ -1057,6 +1136,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.obj:
       case KotoFileType.gltf:
       case KotoFileType.glb:
+      case KotoFileType.step:
+      case KotoFileType.iges:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => Dxf3DViewerScreen(filePath: filePath),
@@ -1985,6 +2066,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             _buildFormatBadge('PDF', Icons.picture_as_pdf_rounded, const Color(0xFFC7D2FE)),
                             _buildFormatBadge('CAD', Icons.draw_rounded, const Color(0xFF6EE7B7)),
                             _buildFormatBadge('3D', Icons.view_in_ar_rounded, const Color(0xFFA5F3FC)),
+                            _buildFormatBadge('STEP', Icons.layers_rounded, const Color(0xFFC7D2FE)),
                             _buildFormatBadge('PCB', Icons.memory_rounded, const Color(0xFF6EE7B7)),
                             _buildFormatBadge('PLT', Icons.architecture_rounded, const Color(0xFFFDE68A)),
                             _buildFormatBadge('XLSX', Icons.table_chart_rounded, const Color(0xFF86EFAC)),
