@@ -11,6 +11,7 @@ import '../../core/services/dwg_converter_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
 import '../dxf_viewer/dxf_viewer_screen.dart';
+import '../svg_viewer/svg_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 
 class FileTypeIcon extends StatelessWidget {
@@ -34,6 +35,8 @@ class FileTypeIcon extends StatelessWidget {
         return _buildDxfIcon();
       case KotoFileType.dwg:
         return _buildDwgIcon();
+      case KotoFileType.svg:
+        return _buildSvgIcon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
@@ -133,6 +136,41 @@ class FileTypeIcon extends StatelessWidget {
                 fontSize: width * 0.2,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFFE11D48),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSvgIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFED7AA)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.gesture_rounded,
+              color: const Color(0xFFEA580C),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'SVG',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFEA580C),
                 letterSpacing: 0.5,
                 height: 1,
               ),
@@ -330,12 +368,13 @@ class _HomeScreenState extends State<HomeScreen> {
         final lower = filePath.toLowerCase();
         if (!lower.endsWith('.pdf') &&
             !lower.endsWith('.dxf') &&
-            !lower.endsWith('.dwg')) {
+            !lower.endsWith('.dwg') &&
+            !lower.endsWith('.svg')) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Please select a supported file (.pdf, .dxf, or .dwg).',
+                  'Please select a supported file (.pdf, .dxf, .dwg, or .svg).',
                 ),
                 backgroundColor: Colors.orange,
               ),
@@ -505,6 +544,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
           }
+        }
+        break;
+
+      case KotoFileType.svg:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => SvgViewerScreen(filePath: filePath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
         }
         break;
 
@@ -1291,7 +1343,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Open PDF, DXF, or DWG File',
+                          'Open PDF, CAD, or SVG Vector',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 22,
@@ -1300,7 +1352,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Select any PDF, DXF, or DWG file from your storage to view or share.',
+                          'Select any PDF, DXF, DWG, or SVG file from your storage to view or share.',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 14,
@@ -1338,6 +1390,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             _buildFormatBadge('PDF', Icons.picture_as_pdf_rounded, const Color(0xFFC7D2FE)),
                             _buildFormatBadge('DXF', Icons.draw_rounded, const Color(0xFF6EE7B7)),
                             _buildFormatBadge('DWG', Icons.architecture_rounded, const Color(0xFFFECDD3)),
+                            _buildFormatBadge('SVG', Icons.gesture_rounded, const Color(0xFFFED7AA)),
                           ],
                         ),
                       ],

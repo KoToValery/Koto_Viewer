@@ -235,9 +235,12 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
     final displayUrl = _serverUrl ?? '';
 
     final isDxf = widget.filePath.toLowerCase().endsWith('.dxf');
+    final isSvg = widget.filePath.toLowerCase().endsWith('.svg');
     final qrPrimaryColor = isDxf
         ? const Color(0xFF059669)
-        : const Color(0xFF4F46E5);
+        : isSvg
+            ? const Color(0xFFEA580C)
+            : const Color(0xFF4F46E5);
 
     return Column(
       mainAxisSize: MainAxisSize.min,

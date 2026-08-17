@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum KotoFileType { pdf, dxf, dwg, other }
+enum KotoFileType { pdf, dxf, dwg, svg, other }
 
 class PdfItem {
   final String path;
@@ -22,10 +22,12 @@ class PdfItem {
     if (lower.endsWith('.pdf')) return KotoFileType.pdf;
     if (lower.endsWith('.dxf')) return KotoFileType.dxf;
     if (lower.endsWith('.dwg')) return KotoFileType.dwg;
+    if (lower.endsWith('.svg')) return KotoFileType.svg;
     return KotoFileType.other;
   }
 
   bool get isCad => fileType == KotoFileType.dxf || fileType == KotoFileType.dwg;
+  bool get isSvg => fileType == KotoFileType.svg;
 
   String get fileExtension {
     if (!name.contains('.')) return '';

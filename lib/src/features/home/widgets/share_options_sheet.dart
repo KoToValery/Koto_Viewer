@@ -5,12 +5,13 @@ import '../../../core/services/native_share_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
-enum _ShareFileType { pdf, dxf, other }
+enum _ShareFileType { pdf, dxf, svg, other }
 
 _ShareFileType _detectFileType(String path) {
   final lower = path.toLowerCase();
   if (lower.endsWith('.pdf')) return _ShareFileType.pdf;
   if (lower.endsWith('.dxf')) return _ShareFileType.dxf;
+  if (lower.endsWith('.svg')) return _ShareFileType.svg;
   return _ShareFileType.other;
 }
 
@@ -39,6 +40,41 @@ class ShareOptionsSheet extends StatelessWidget {
     }
   }
 
+  Future<void> _shareWithAll(BuildContext context) async {
+    Navigator.pop(context);
+
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        final box = context.findRenderObject() as RenderBox?;
+        final origin = box != null
+            ? box.localToGlobal(Offset.zero) & box.size
+            : null;
+
+        await Share.shareXFiles(
+          [XFile(filePath)],
+          subject: filePath.split(Platform.pathSeparator).last,
+          sharePositionOrigin: origin,
+        );
+      } else if (context.mounted) {
+        _showError(context, 'File does not exist');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showError(context, 'Error opening share dialog: $e');
+      }
+    }
+  }
+
+  void _shareViaLocalNetwork(BuildContext context) {
+    Navigator.pop(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => LocalNetworkShareDialog(filePath: filePath),
+    );
+  }
+
   Future<void> _shareViaCloud(BuildContext context) async {
     Navigator.pop(context);
 
@@ -46,35 +82,6 @@ class ShareOptionsSheet extends StatelessWidget {
 
     if (!success && context.mounted) {
       _showError(context, 'Error uploading to cloud');
-    }
-  }
-
-  void _shareViaLocalNetwork(BuildContext context) {
-    Navigator.pop(context);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => LocalNetworkShareDialog(filePath: filePath),
-    );
-  }
-
-  Future<void> _shareWithAll(BuildContext context) async {
-    Navigator.pop(context);
-
-    final type = _detectFileType(filePath);
-    final subject = type == _ShareFileType.dxf
-        ? 'DXF Drawing'
-        : type == _ShareFileType.pdf
-        ? 'PDF Document'
-        : 'File';
-
-    try {
-      await Share.shareXFiles([XFile(filePath)], subject: subject);
-    } catch (e) {
-      if (context.mounted) {
-        _showError(context, 'Error sharing: $e');
-      }
     }
   }
 
@@ -98,16 +105,27 @@ class ShareOptionsSheet extends StatelessWidget {
     final fileType = _detectFileType(filePath);
 
     final bool isDxf = fileType == _ShareFileType.dxf;
+    final bool isSvg = fileType == _ShareFileType.svg;
     final Color cardColorStart = isDxf
         ? const Color(0xFF059669)
-        : AppTheme.primaryColor;
+        : isSvg
+            ? const Color(0xFFEA580C)
+            : AppTheme.primaryColor;
     final Color cardColorEnd = isDxf
         ? const Color(0xFF10B981)
-        : AppTheme.secondaryColor;
+        : isSvg
+            ? const Color(0xFFFB923C)
+            : AppTheme.secondaryColor;
     final IconData fileIcon = isDxf
         ? Icons.draw_rounded
-        : Icons.picture_as_pdf_rounded;
-    final String sendLabel = isDxf ? 'Send DXF Drawing' : 'Send Document';
+        : isSvg
+            ? Icons.gesture_rounded
+            : Icons.picture_as_pdf_rounded;
+    final String sendLabel = isDxf
+        ? 'Send DXF Drawing'
+        : isSvg
+            ? 'Send SVG Vector'
+            : 'Send Document';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

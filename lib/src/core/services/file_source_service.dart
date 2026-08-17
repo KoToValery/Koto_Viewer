@@ -144,7 +144,10 @@ class FileSourceService {
 
   static bool _isSupportedFile(String path) {
     final lower = path.toLowerCase();
-    return lower.endsWith('.pdf') || lower.endsWith('.dxf') || lower.endsWith('.dwg');
+    return lower.endsWith('.pdf') ||
+        lower.endsWith('.dxf') ||
+        lower.endsWith('.dwg') ||
+        lower.endsWith('.svg');
   }
 
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {
