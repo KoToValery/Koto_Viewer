@@ -69,12 +69,12 @@ flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  background_color_ios: "#4F46E5"
+  background_color_ios: "#2563EB"
   web:
     generate: true
     image_path: "assets/icons/app_icon.png"
-    background_color: "#4F46E5"
-    theme_color: "#4F46E5"
+    background_color: "#2563EB"
+    theme_color: "#2563EB"
   windows:
     generate: true
     image_path: "assets/icons/app_icon.png"
@@ -83,8 +83,8 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/icons/app_icon.png"
   image_path: "assets/icons/app_icon.png"
-  adaptive_icon_background: "#4F46E5"
-  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
+  adaptive_icon_background: "#2563EB"
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

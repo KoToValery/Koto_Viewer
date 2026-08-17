@@ -1052,13 +1052,9 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       applicationName: 'KotoView',
       applicationVersion: '1.0.0',
-      applicationIcon: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Icons.picture_as_pdf, color: Colors.white, size: 32),
+      applicationIcon: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.asset('assets/icons/app_icon.png', width: 44, height: 44),
       ),
       children: [
         const SizedBox(height: 12),
@@ -1401,15 +1397,12 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.picture_as_pdf_rounded,
-                color: theme.colorScheme.primary,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/icons/app_icon.png',
+                width: 32,
+                height: 32,
               ),
             ),
             const SizedBox(width: 8),
