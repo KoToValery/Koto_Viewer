@@ -1,30 +1,28 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
-import 'models/pcb_models.dart';
-import 'parser/gerber_parser.dart';
-import 'parser/drill_parser.dart';
-import '../kicad_viewer/parser/kicad_pcb_parser.dart';
-import '../kicad_viewer/parser/kicad_sch_parser.dart';
-import 'rendering/pcb_painter.dart';
+import '../eps_viewer/models/eps_models.dart';
+import 'models/hpgl_models.dart';
+import 'parser/hpgl_parser.dart';
 
-/// PCB Gerber RS-274X, Excellon Drill, and KiCad PCB Viewer Screen.
-class PcbViewerScreen extends StatefulWidget {
+/// HP-GL CAD Plotter (.plt, .hpgl) Viewer Screen.
+class HpglViewerScreen extends StatefulWidget {
   final String filePath;
 
-  const PcbViewerScreen({super.key, required this.filePath});
+  const HpglViewerScreen({super.key, required this.filePath});
 
   @override
-  State<PcbViewerScreen> createState() => _PcbViewerScreenState();
+  State<HpglViewerScreen> createState() => _HpglViewerScreenState();
 }
 
-class _PcbViewerScreenState extends State<PcbViewerScreen> {
+class _HpglViewerScreenState extends State<HpglViewerScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   int _fileSizeBytes = 0;
 
-  PcbDocument? _document;
-  PcbTheme _pcbTheme = PcbTheme.fr4Green;
+  HpglDocument? _document;
+  EpsCanvasTheme _canvasTheme = EpsCanvasTheme.darkCad;
   bool _showGrid = true;
 
   final TransformationController _transformController = TransformationController();
@@ -34,7 +32,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPcbFile();
+    _loadHpglFile();
   }
 
   @override
@@ -43,7 +41,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     super.dispose();
   }
 
-  Future<void> _loadPcbFile() async {
+  Future<void> _loadHpglFile() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -58,21 +56,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
       _fileSizeBytes = await file.length();
       final bytes = await file.readAsBytes();
 
-      final lower = _fileName.toLowerCase();
-      PcbDocument doc;
-
-      if (lower.endsWith('.kicad_sch') || lower.endsWith('.sch') || lower.endsWith('.kicad_sym')) {
-        doc = KicadSchParser.parse(bytes, fileName: _fileName);
-      } else if (lower.endsWith('.kicad_pcb') || lower.endsWith('.brd')) {
-        doc = KicadPcbParser.parse(bytes, fileName: _fileName);
-      } else if (lower.endsWith('.drl') ||
-          lower.endsWith('.xln') ||
-          lower.endsWith('.exc') ||
-          lower.endsWith('.drd')) {
-        doc = DrillParser.parse(bytes, fileName: _fileName);
-      } else {
-        doc = GerberParser.parse(bytes, fileName: _fileName);
-      }
+      final doc = HpglParser.parse(bytes, fileName: _fileName);
 
       if (mounted) {
         setState(() {
@@ -83,7 +67,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error reading PCB file: $e';
+          _errorMessage = 'Error reading HPGL plotter file: $e';
           _isLoading = false;
         });
       }
@@ -112,6 +96,10 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     final formattedSize = _fileSizeBytes < 1024 * 1024
         ? '${(_fileSizeBytes / 1024).toStringAsFixed(1)} KB'
         : '${(_fileSizeBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+
+    // 1 plotter unit = 0.025 mm (40 units / mm)
+    final widthMm = bounds.width * 0.025;
+    final heightMm = bounds.height * 0.025;
 
     showModalBottomSheet(
       context: context,
@@ -142,10 +130,10 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF059669).withValues(alpha: 0.15),
+                      color: const Color(0xFFD97706).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.memory_rounded, color: Color(0xFF059669)),
+                    child: const Icon(Icons.architecture_rounded, color: Color(0xFFD97706)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -153,7 +141,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'PCB Layer • Properties',
+                          'HPGL Plotter • Properties',
                           style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                         ),
                         Text(
@@ -167,20 +155,13 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                 ],
               ),
               const Divider(height: 24),
-              _buildInfoRow('Layer Type:', _document!.layerType.displayName),
+              _buildInfoRow('File Name:', _fileName),
               _buildInfoRow('File Size:', formattedSize),
-              _buildInfoRow(
-                'Board Dimensions (mm):',
-                '${bounds.widthMm.toStringAsFixed(2)} × ${bounds.heightMm.toStringAsFixed(2)} mm',
-              ),
-              _buildInfoRow(
-                'Board Dimensions (in):',
-                '${bounds.widthInches.toStringAsFixed(2)}" × ${bounds.heightInches.toStringAsFixed(2)}"',
-              ),
-              if (_document!.trackCount > 0) _buildInfoRow('Traces & Tracks:', '${_document!.trackCount} lines/arcs'),
-              if (_document!.padCount > 0) _buildInfoRow('SMD & THT Pads:', '${_document!.padCount} flashed pads'),
-              if (_document!.regionCount > 0) _buildInfoRow('Copper Pours:', '${_document!.regionCount} regions'),
-              if (_document!.holeCount > 0) _buildInfoRow('Drill Holes / Vias:', '${_document!.holeCount} holes'),
+              _buildInfoRow('Drawing Extents (mm):', '${widthMm.toStringAsFixed(1)} × ${heightMm.toStringAsFixed(1)} mm'),
+              _buildInfoRow('Plotter Units:', '${bounds.width.toStringAsFixed(0)} × ${bounds.height.toStringAsFixed(0)} units'),
+              _buildInfoRow('Vector Paths:', '${_document!.elements.length} strokes'),
+              _buildInfoRow('Total Vertices:', '${_document!.totalPoints} points'),
+              _buildInfoRow('Pens Used:', '${_document!.penCount} pens'),
             ],
           ),
         );
@@ -208,10 +189,9 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+      backgroundColor: _canvasTheme.background,
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -229,19 +209,19 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
             ),
             if (_document != null)
               Text(
-                '${_document!.layerType.displayName} • ${_document!.boundingBox.widthMm.toStringAsFixed(1)} × ${_document!.boundingBox.heightMm.toStringAsFixed(1)} mm',
+                '${_document!.elements.length} paths • ${_document!.penCount} pens • ${(_document!.boundingBox.width * 0.025).toStringAsFixed(0)}×${(_document!.boundingBox.height * 0.025).toStringAsFixed(0)} mm',
                 style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
               ),
           ],
         ),
         actions: [
           // Theme Menu
-          PopupMenuButton<PcbTheme>(
+          PopupMenuButton<EpsCanvasTheme>(
             icon: const Icon(Icons.palette_outlined),
-            tooltip: 'PCB Theme',
-            onSelected: (t) => setState(() => _pcbTheme = t),
-            itemBuilder: (context) => PcbTheme.values.map((t) {
-              return PopupMenuItem<PcbTheme>(
+            tooltip: 'Canvas Theme',
+            onSelected: (t) => setState(() => _canvasTheme = t),
+            itemBuilder: (context) => EpsCanvasTheme.values.map((t) {
+              return PopupMenuItem<EpsCanvasTheme>(
                 value: t,
                 child: Row(
                   children: [
@@ -249,14 +229,14 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                       width: 16,
                       height: 16,
                       decoration: BoxDecoration(
-                        color: t.substrate,
+                        color: t.background,
                         shape: BoxShape.circle,
-                        border: Border.all(color: t.copper, width: 1.5),
+                        border: Border.all(color: Colors.grey, width: 1),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Text(t.label),
-                    if (_pcbTheme == t) ...[
+                    if (_canvasTheme == t) ...[
                       const Spacer(),
                       Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
                     ],
@@ -266,24 +246,24 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
             }).toList(),
           ),
 
-          // Grid Toggle
+          // Grid Toggle Button
           IconButton(
             icon: Icon(
               _showGrid ? Icons.grid_on : Icons.grid_off,
               color: _showGrid ? theme.colorScheme.primary : null,
             ),
-            tooltip: '1mm PCB Grid',
+            tooltip: 'Grid',
             onPressed: () => setState(() => _showGrid = !_showGrid),
           ),
 
-          // Information Sheet
+          // Info Dialog
           IconButton(
             icon: const Icon(Icons.info_outline),
-            tooltip: 'PCB Properties',
+            tooltip: 'Plotter Properties',
             onPressed: _showInfoSheet,
           ),
 
-          // Share
+          // Share Button
           IconButton(
             icon: const Icon(Icons.share_outlined),
             tooltip: 'Share',
@@ -296,9 +276,9 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(color: Color(0xFF059669)),
+                  CircularProgressIndicator(color: Color(0xFFD97706)),
                   SizedBox(height: 16),
-                  Text('Loading PCB Gerber / Drill File...', style: TextStyle(color: Colors.white70)),
+                  Text('Loading HPGL Plotter Drawing...', style: TextStyle(color: Colors.white70)),
                 ],
               ),
             )
@@ -314,7 +294,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                         Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: _loadPcbFile,
+                          onPressed: _loadHpglFile,
                           icon: const Icon(Icons.refresh),
                           label: const Text('Retry'),
                         ),
@@ -333,42 +313,14 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                       child: Center(
                         child: CustomPaint(
                           size: Size(
-                            (_document!.boundingBox.widthMm * 10.0) + 40.0,
-                            (_document!.boundingBox.heightMm * 10.0) + 40.0,
+                            math.max(300.0, _document!.boundingBox.width * 0.05),
+                            math.max(300.0, _document!.boundingBox.height * 0.05),
                           ),
-                          painter: PcbPainter(
+                          painter: _HpglPainter(
                             document: _document!,
-                            theme: _pcbTheme,
+                            theme: _canvasTheme,
                             showGrid: _showGrid,
-                            scaleFactor: 10.0,
                           ),
-                        ),
-                      ),
-                    ),
-
-                    // Floating Layer Badge
-                    Positioned(
-                      top: 16,
-                      left: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surface.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.layers_rounded, size: 14, color: _document!.layerType.defaultAccent),
-                            const SizedBox(width: 6),
-                            Text(
-                              _document!.layerType.displayName,
-                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                            ),
-                          ],
                         ),
                       ),
                     ),
@@ -396,7 +348,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                           const SizedBox(height: 8),
                           _buildFloatingButton(
                             icon: Icons.fit_screen_outlined,
-                            tooltip: 'Fit to Board',
+                            tooltip: 'Fit to View',
                             onTap: _resetView,
                             theme: theme,
                           ),
@@ -430,5 +382,92 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         ),
       ),
     );
+  }
+}
+
+class _HpglPainter extends CustomPainter {
+  final HpglDocument document;
+  final EpsCanvasTheme theme;
+  final bool showGrid;
+
+  const _HpglPainter({
+    required this.document,
+    required this.theme,
+    required this.showGrid,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bounds = document.boundingBox;
+    const margin = 20.0;
+    final scale = (bounds.width > 0 && bounds.height > 0)
+        ? math.min((size.width - 40) / bounds.width, (size.height - 40) / bounds.height)
+        : 0.05;
+
+    final docW = bounds.width * scale + margin * 2;
+    final docH = bounds.height * scale + margin * 2;
+
+    // Draw Background
+    canvas.drawRect(Rect.fromLTWH(0, 0, docW, docH), Paint()..color = theme.background);
+
+    // Draw CAD Grid
+    if (showGrid) {
+      final gridPaint = Paint()
+        ..color = theme.gridColor
+        ..strokeWidth = 0.5;
+      const step = 40.0;
+      for (double x = 0; x <= docW; x += step) {
+        canvas.drawLine(Offset(x, 0), Offset(x, docH), gridPaint);
+      }
+      for (double y = 0; y <= docH; y += step) {
+        canvas.drawLine(Offset(0, y), Offset(docW, y), gridPaint);
+      }
+    }
+
+    Offset mapPoint(Offset p) {
+      final x = margin + (p.dx - bounds.minX) * scale;
+      final y = margin + (bounds.maxY - p.dy) * scale; // Invert Y
+      return Offset(x, y);
+    }
+
+    for (final el in document.elements) {
+      if (el.points.isEmpty) continue;
+
+      final path = Path();
+      final p0 = mapPoint(el.points.first);
+      path.moveTo(p0.dx, p0.dy);
+
+      for (int i = 1; i < el.points.length; i++) {
+        final pt = mapPoint(el.points[i]);
+        path.lineTo(pt.dx, pt.dy);
+      }
+
+      if (el.isClosed) {
+        path.close();
+      }
+
+      Color drawColor = el.color;
+      if (theme.isDark && drawColor.computeLuminance() < 0.08) {
+        drawColor = Colors.white70;
+      } else if (!theme.isDark && drawColor.computeLuminance() > 0.92) {
+        drawColor = Colors.black87;
+      }
+
+      final strokePaint = Paint()
+        ..color = drawColor
+        ..strokeWidth = math.max(0.75, el.lineWidth)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+
+      canvas.drawPath(path, strokePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HpglPainter oldDelegate) {
+    return oldDelegate.document != document ||
+        oldDelegate.theme != theme ||
+        oldDelegate.showGrid != showGrid;
   }
 }

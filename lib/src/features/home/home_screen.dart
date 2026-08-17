@@ -19,6 +19,7 @@ import '../markdown_viewer/markdown_viewer_screen.dart';
 import '../docx_viewer/docx_viewer_screen.dart';
 import '../eps_viewer/eps_viewer_screen.dart';
 import '../pcb_viewer/pcb_viewer_screen.dart';
+import '../hpgl_viewer/hpgl_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 
 class FileTypeIcon extends StatelessWidget {
@@ -65,6 +66,10 @@ class FileTypeIcon extends StatelessWidget {
         return _buildPcbIcon();
       case KotoFileType.drl:
         return _buildDrillIcon();
+      case KotoFileType.kicad:
+        return _buildKicadIcon();
+      case KotoFileType.plt:
+        return _buildPltIcon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
@@ -559,6 +564,76 @@ class FileTypeIcon extends StatelessWidget {
     );
   }
 
+  Widget _buildKicadIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFEFF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFA5F3FC)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.developer_board_rounded,
+              color: const Color(0xFF0891B2),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'CAD',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF0891B2),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPltIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.architecture_rounded,
+              color: const Color(0xFFD97706),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'PLT',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFD97706),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGenericIcon() {
     return Container(
       width: width,
@@ -778,12 +853,21 @@ class _HomeScreenState extends State<HomeScreen> {
             !lower.endsWith('.drl') &&
             !lower.endsWith('.xln') &&
             !lower.endsWith('.exc') &&
-            !lower.endsWith('.drd')) {
+            !lower.endsWith('.drd') &&
+            !lower.endsWith('.kicad_pcb') &&
+            !lower.endsWith('.kicad_sch') &&
+            !lower.endsWith('.kicad_sym') &&
+            !lower.endsWith('.sch') &&
+            !lower.endsWith('.brd') &&
+            !lower.endsWith('.plt') &&
+            !lower.endsWith('.hpgl') &&
+            !lower.endsWith('.hpg') &&
+            !lower.endsWith('.prn')) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Please select a supported file (.pdf, .dxf, .dwg, .svg, .stl, .obj, .glb, .xlsx, .docx, .eps, .gbr, .drl).',
+                  'Please select a supported file (.pdf, .dxf, .dwg, .svg, .stl, .obj, .glb, .xlsx, .docx, .eps, .gbr, .drl, .kicad_pcb, .plt).',
                 ),
                 backgroundColor: Colors.orange,
               ),
@@ -1052,9 +1136,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
       case KotoFileType.gbr:
       case KotoFileType.drl:
+      case KotoFileType.kicad:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => PcbViewerScreen(filePath: filePath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.plt:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => HpglViewerScreen(filePath: filePath),
           ),
         );
         if (success != false) {
@@ -1888,6 +1986,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             _buildFormatBadge('CAD', Icons.draw_rounded, const Color(0xFF6EE7B7)),
                             _buildFormatBadge('3D', Icons.view_in_ar_rounded, const Color(0xFFA5F3FC)),
                             _buildFormatBadge('PCB', Icons.memory_rounded, const Color(0xFF6EE7B7)),
+                            _buildFormatBadge('PLT', Icons.architecture_rounded, const Color(0xFFFDE68A)),
                             _buildFormatBadge('XLSX', Icons.table_chart_rounded, const Color(0xFF86EFAC)),
                             _buildFormatBadge('DOCX', Icons.article_rounded, const Color(0xFF93C5FD)),
                             _buildFormatBadge('EPS', Icons.gesture_rounded, const Color(0xFFD8B4FE)),

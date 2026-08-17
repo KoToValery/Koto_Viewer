@@ -5,7 +5,7 @@ import '../../../core/services/native_share_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
-enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, eps, pcb, other }
+enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, eps, pcb, kicad, plt, other }
 
 _ShareFileType _detectFileType(String path) {
   final lower = path.toLowerCase();
@@ -20,6 +20,19 @@ _ShareFileType _detectFileType(String path) {
   if (lower.endsWith('.md') || lower.endsWith('.markdown')) return _ShareFileType.md;
   if (lower.endsWith('.docx') || lower.endsWith('.doc')) return _ShareFileType.docx;
   if (lower.endsWith('.eps')) return _ShareFileType.eps;
+  if (lower.endsWith('.kicad_pcb') ||
+      lower.endsWith('.kicad_sch') ||
+      lower.endsWith('.kicad_sym') ||
+      lower.endsWith('.sch') ||
+      lower.endsWith('.brd')) {
+    return _ShareFileType.kicad;
+  }
+  if (lower.endsWith('.plt') ||
+      lower.endsWith('.hpgl') ||
+      lower.endsWith('.hpg') ||
+      lower.endsWith('.prn')) {
+    return _ShareFileType.plt;
+  }
   if (lower.endsWith('.gbr') ||
       lower.endsWith('.ger') ||
       lower.endsWith('.pho') ||
@@ -143,6 +156,8 @@ class ShareOptionsSheet extends StatelessWidget {
     final bool isDocx = fileType == _ShareFileType.docx;
     final bool isEps = fileType == _ShareFileType.eps;
     final bool isPcb = fileType == _ShareFileType.pcb;
+    final bool isKicad = fileType == _ShareFileType.kicad;
+    final bool isPlt = fileType == _ShareFileType.plt;
 
     final Color cardColorStart = isDxf
         ? const Color(0xFF059669)
@@ -154,15 +169,19 @@ class ShareOptionsSheet extends StatelessWidget {
                     ? const Color(0xFF107C41)
                     : isPcb
                         ? const Color(0xFF059669)
-                        : isDocx
-                            ? const Color(0xFF2563EB)
-                            : isEps
-                                ? const Color(0xFF8B5CF6)
-                                : isTxt
-                                    ? const Color(0xFF475569)
-                                    : isMd
-                                        ? const Color(0xFF4338CA)
-                                        : AppTheme.primaryColor;
+                        : isKicad
+                            ? const Color(0xFF0891B2)
+                            : isPlt
+                                ? const Color(0xFFD97706)
+                                : isDocx
+                                    ? const Color(0xFF2563EB)
+                                    : isEps
+                                        ? const Color(0xFF8B5CF6)
+                                        : isTxt
+                                            ? const Color(0xFF475569)
+                                            : isMd
+                                                ? const Color(0xFF4338CA)
+                                                : AppTheme.primaryColor;
     final Color cardColorEnd = isDxf
         ? const Color(0xFF10B981)
         : isSvg
@@ -173,15 +192,19 @@ class ShareOptionsSheet extends StatelessWidget {
                     ? const Color(0xFF22C55E)
                     : isPcb
                         ? const Color(0xFF34D399)
-                        : isDocx
-                            ? const Color(0xFF60A5FA)
-                            : isEps
-                                ? const Color(0xFFA78BFA)
-                                : isTxt
-                                    ? const Color(0xFF64748B)
-                                    : isMd
-                                        ? const Color(0xFF6366F1)
-                                        : AppTheme.secondaryColor;
+                        : isKicad
+                            ? const Color(0xFF06B6D4)
+                            : isPlt
+                                ? const Color(0xFFF59E0B)
+                                : isDocx
+                                    ? const Color(0xFF60A5FA)
+                                    : isEps
+                                        ? const Color(0xFFA78BFA)
+                                        : isTxt
+                                            ? const Color(0xFF64748B)
+                                            : isMd
+                                                ? const Color(0xFF6366F1)
+                                                : AppTheme.secondaryColor;
     final IconData fileIcon = isDxf
         ? Icons.draw_rounded
         : isSvg
@@ -192,15 +215,19 @@ class ShareOptionsSheet extends StatelessWidget {
                     ? Icons.table_chart_rounded
                     : isPcb
                         ? Icons.memory_rounded
-                        : isDocx
-                            ? Icons.article_rounded
-                            : isEps
-                                ? Icons.gesture_rounded
-                                : isTxt
-                                    ? Icons.description_rounded
-                                    : isMd
-                                        ? Icons.menu_book_rounded
-                                        : Icons.picture_as_pdf_rounded;
+                        : isKicad
+                            ? Icons.developer_board_rounded
+                            : isPlt
+                                ? Icons.architecture_rounded
+                                : isDocx
+                                    ? Icons.article_rounded
+                                    : isEps
+                                        ? Icons.gesture_rounded
+                                        : isTxt
+                                            ? Icons.description_rounded
+                                            : isMd
+                                                ? Icons.menu_book_rounded
+                                                : Icons.picture_as_pdf_rounded;
     final String sendLabel = isDxf
         ? 'Send DXF Drawing'
         : isSvg
@@ -211,15 +238,19 @@ class ShareOptionsSheet extends StatelessWidget {
                     ? 'Send Spreadsheet'
                     : isPcb
                         ? 'Send PCB Gerber / Drill'
-                        : isDocx
-                            ? 'Send Word Document'
-                            : isEps
-                                ? 'Send EPS Vector'
-                                : isTxt
-                                    ? 'Send Text Document'
-                                    : isMd
-                                        ? 'Send Markdown Document'
-                                        : 'Send Document';
+                        : isKicad
+                            ? 'Send KiCad File'
+                            : isPlt
+                                ? 'Send HPGL Plotter File'
+                                : isDocx
+                                    ? 'Send Word Document'
+                                    : isEps
+                                        ? 'Send EPS Vector'
+                                        : isTxt
+                                            ? 'Send Text Document'
+                                            : isMd
+                                                ? 'Send Markdown Document'
+                                                : 'Send Document';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

@@ -178,7 +178,16 @@ class FileSourceService {
         lower.endsWith('.drl') ||
         lower.endsWith('.xln') ||
         lower.endsWith('.exc') ||
-        lower.endsWith('.drd');
+        lower.endsWith('.drd') ||
+        lower.endsWith('.kicad_pcb') ||
+        lower.endsWith('.kicad_sch') ||
+        lower.endsWith('.kicad_sym') ||
+        lower.endsWith('.sch') ||
+        lower.endsWith('.brd') ||
+        lower.endsWith('.plt') ||
+        lower.endsWith('.hpgl') ||
+        lower.endsWith('.hpg') ||
+        lower.endsWith('.prn');
   }
 
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {
