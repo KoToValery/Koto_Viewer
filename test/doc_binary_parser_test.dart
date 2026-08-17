@@ -16,28 +16,67 @@ void main() {
       expect((doc.blocks.first as DocxParagraph).plainText, contains('Здравейте'));
     });
 
-    test('parses RTF .doc format with Cyrillic escapes', () {
-      // Simple RTF with title and paragraph
+    test('parses RTF .doc format with Cyrillic escapes and strips field codes', () {
+      // RTF with title, field instruction {\*\fldinst PAGE \* MERGEFORMAT} and result {\fldrslt 1}
       final rtfString = r'{\rtf1\ansi\ansicpg1251\deff0'
           r'{\fonttbl{\f0\fnil\fcharset204 Arial;}}'
-          r'\viewkind4\uc1\pard\lang1026\b\f0\fs28 Заглавие на документа\b0\par'
-          r'\fs20 Това е втори параграф от документа.\par}';
+          r'{\field{\*\fldinst PAGE \* MERGEFORMAT}{\fldrslt 1}}'
+          r'\viewkind4\uc1\pard\lang1026\b\f0\fs28 Обяснителна записка\b0\par'
+          r'\fs20 Настоящият проект съдържа архитектурни чертежи.\par}';
       final bytes = Uint8List.fromList(utf8.encode(rtfString));
 
       final doc = DocParser.parse(bytes);
       expect(doc.blocks.length >= 2, true);
-      expect((doc.blocks[0] as DocxParagraph).plainText, contains('Заглавие на документа'));
-      expect((doc.blocks[1] as DocxParagraph).plainText, contains('Това е втори параграф'));
+      expect((doc.blocks[0] as DocxParagraph).plainText, contains('Обяснителна записка'));
+      expect((doc.blocks[1] as DocxParagraph).plainText, contains('архитектурни чертежи'));
+
+      // Ensure no field code leaked
+      for (final block in doc.blocks) {
+        if (block is DocxParagraph) {
+          expect(block.plainText.contains('MERGEFORMAT'), false);
+          expect(block.plainText.contains('fldinst'), false);
+        }
+      }
     });
 
-    test('parses OLE CFBF binary stream text', () {
-      // Simulate binary OLE header and WordDocument stream with UTF-16LE Cyrillic
+    test('parses RTF tables into DocxTable with rows and cells', () {
+      final rtfTable = r'{\rtf1\ansi\deff0'
+          r'\trowd\cellx2000\cellx4000'
+          r'\intbl №\cell\intbl Име\cell\row'
+          r'\trowd\cellx2000\cellx4000'
+          r'\intbl 1\cell\intbl Валери\cell\row'
+          r'\pard Край на документа\par}';
+      final bytes = Uint8List.fromList(utf8.encode(rtfTable));
+
+      final doc = DocParser.parse(bytes);
+      expect(doc.tableCount, 1);
+      final table = doc.blocks.whereType<DocxTable>().first;
+      expect(table.rowCount, 2);
+      expect(table.rows[0].cells[0].plainText, '№');
+      expect(table.rows[0].cells[1].plainText, 'Име');
+      expect(table.rows[1].cells[0].plainText, '1');
+      expect(table.rows[1].cells[1].plainText, 'Валери');
+    });
+
+    test('parses OLE CFBF binary stream text, strips field codes and reconstructs tables', () {
+      // Simulate binary OLE header and WordDocument stream with UTF-16LE text and table cells (0x07)
       final header = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
-      final cyrillicText = 'Тестови данни от Word 97-2003';
+
+      // Document text containing a title, table with 0x07 cells, and Word field 0x13..0x14..0x15
+      final textParts = [
+        'Архитектурна записка\r',
+        'Колона 1\x07Колона 2\x07\r',
+        'Стойност A\x07Стойност B\x07\r',
+        '\x13PAGE \\* MERGEFORMAT\x141\x15\r',
+        'Край\r',
+      ];
+
       final utf16Bytes = <int>[];
-      for (final codeUnit in cyrillicText.codeUnits) {
-        utf16Bytes.add(codeUnit & 0xFF);
-        utf16Bytes.add((codeUnit >> 8) & 0xFF);
+      for (final part in textParts) {
+        for (final codeUnit in part.codeUnits) {
+          utf16Bytes.add(codeUnit & 0xFF);
+          utf16Bytes.add((codeUnit >> 8) & 0xFF);
+        }
       }
 
       final fullBytes = Uint8List.fromList([
@@ -48,7 +87,29 @@ void main() {
 
       final doc = DocParser.parse(fullBytes);
       expect(doc.blocks.isNotEmpty, true);
-      expect((doc.blocks.first as DocxParagraph).plainText, contains('Тестови данни'));
+      expect(doc.blocks[0] is DocxParagraph, true);
+      expect((doc.blocks[0] as DocxParagraph).plainText, contains('Архитектурна записка'));
+
+      // Check table reconstructed
+      expect(doc.tableCount, 1);
+      final table = doc.blocks.whereType<DocxTable>().first;
+      expect(table.rowCount, 2);
+      expect(table.rows[0].cells[0].plainText, 'Колона 1');
+      expect(table.rows[0].cells[1].plainText, 'Колона 2');
+
+      // Verify no PAGE \* MERGEFORMAT field instructions
+      for (final block in doc.blocks) {
+        if (block is DocxParagraph) {
+          expect(block.plainText.contains('MERGEFORMAT'), false);
+        }
+      }
+    });
+
+    test('cleanWordText utility cleans stray field and style noise', () {
+      final dirtyText = 'PAGE \\* MERGEFORMAT 123 Table Normal';
+      final cleaned = DocParser.cleanWordText(dirtyText);
+      expect(cleaned.contains('MERGEFORMAT'), false);
+      expect(cleaned.contains('PAGE'), false);
     });
   });
 }

@@ -48,7 +48,7 @@ class DocToPdfConverterService {
         ? fileName.substring(0, fileName.lastIndexOf('.'))
         : fileName;
 
-    final cachedFileName = '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}_v1.pdf';
+    final cachedFileName = '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}_v2.pdf';
     final targetPdfPath = '${cacheDir.path}${Platform.pathSeparator}$cachedFileName';
     final targetPdfFile = File(targetPdfPath);
 
@@ -234,7 +234,24 @@ class DocToPdfConverterService {
     }
 
     // Bullet item or standard paragraph
-    final spans = paragraph.runs.map((run) {
+    final cleanedRuns = paragraph.runs.map((run) {
+      final cleanedText = DocParser.cleanWordText(run.text);
+      return DocxRun(
+        text: cleanedText,
+        isBold: run.isBold,
+        isItalic: run.isItalic,
+        isUnderline: run.isUnderline,
+        isStrike: run.isStrike,
+        color: run.color,
+        fontSize: run.fontSize,
+      );
+    }).where((r) => r.text.isNotEmpty).toList();
+
+    if (cleanedRuns.isEmpty) {
+      return null;
+    }
+
+    final spans = cleanedRuns.map((run) {
       PdfColor? pdfColor;
       if (run.color != null) {
         pdfColor = PdfColor.fromInt(run.color!.toARGB32());
@@ -294,30 +311,59 @@ class DocToPdfConverterService {
   static pw.Widget? _buildTableWidget(DocxTable table) {
     if (table.rows.isEmpty) return null;
 
+    // Calculate maximum columns across all rows to prevent table misalignment
+    int maxCols = 0;
+    for (final row in table.rows) {
+      if (row.cells.length > maxCols) {
+        maxCols = row.cells.length;
+      }
+    }
+    if (maxCols == 0) return null;
+
     return pw.Container(
       margin: const pw.EdgeInsets.symmetric(vertical: 10),
       child: pw.Table(
         border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
         children: table.rows.map((row) {
-          return pw.TableRow(
-            children: row.cells.map((cell) {
+          final rowChildren = <pw.Widget>[];
+
+          for (int c = 0; c < maxCols; c++) {
+            if (c < row.cells.length) {
+              final cell = row.cells[c];
               PdfColor? cellBg;
               if (cell.backgroundColor != null) {
                 cellBg = PdfColor.fromInt(cell.backgroundColor!.toARGB32());
               }
 
-              return pw.Container(
-                color: cellBg,
-                padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: cell.paragraphs.map((p) {
-                    return _buildParagraphWidget(p) ?? pw.SizedBox();
-                  }).toList(),
+              final cellParagraphWidgets = cell.paragraphs
+                  .map((p) => _buildParagraphWidget(p))
+                  .whereType<pw.Widget>()
+                  .toList();
+
+              rowChildren.add(
+                pw.Container(
+                  color: cellBg,
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                  child: cellParagraphWidgets.isNotEmpty
+                      ? pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: cellParagraphWidgets,
+                        )
+                      : pw.SizedBox(height: 12),
                 ),
               );
-            }).toList(),
-          );
+            } else {
+              // Pad with empty cell if row is shorter than maxCols
+              rowChildren.add(
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                  child: pw.SizedBox(height: 12),
+                ),
+              );
+            }
+          }
+
+          return pw.TableRow(children: rowChildren);
         }).toList(),
       ),
     );
