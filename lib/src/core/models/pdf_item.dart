@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, other }
 
 class PdfItem {
   final String path;
@@ -32,6 +32,27 @@ class PdfItem {
     if (lower.endsWith('.md') || lower.endsWith('.markdown')) return KotoFileType.md;
     if (lower.endsWith('.docx') || lower.endsWith('.doc')) return KotoFileType.docx;
     if (lower.endsWith('.eps')) return KotoFileType.eps;
+    if (lower.endsWith('.gbr') ||
+        lower.endsWith('.ger') ||
+        lower.endsWith('.pho') ||
+        lower.endsWith('.art') ||
+        lower.endsWith('.gtl') ||
+        lower.endsWith('.gbl') ||
+        lower.endsWith('.gts') ||
+        lower.endsWith('.gbs') ||
+        lower.endsWith('.gto') ||
+        lower.endsWith('.gbo') ||
+        lower.endsWith('.gko') ||
+        lower.endsWith('.gm1') ||
+        lower.endsWith('.gm2')) {
+      return KotoFileType.gbr;
+    }
+    if (lower.endsWith('.drl') ||
+        lower.endsWith('.xln') ||
+        lower.endsWith('.exc') ||
+        lower.endsWith('.drd')) {
+      return KotoFileType.drl;
+    }
     return KotoFileType.other;
   }
 
@@ -47,7 +68,10 @@ class PdfItem {
   bool get isMd => fileType == KotoFileType.md;
   bool get isDocx => fileType == KotoFileType.docx;
   bool get isEps => fileType == KotoFileType.eps;
-  bool get isVector => isSvg || isEps;
+  bool get isGerber => fileType == KotoFileType.gbr;
+  bool get isDrill => fileType == KotoFileType.drl;
+  bool get isPcb => isGerber || isDrill;
+  bool get isVector => isSvg || isEps || isPcb;
   bool get isTextDoc => isTxt || isMd || isDocx;
 
   String get fileExtension {

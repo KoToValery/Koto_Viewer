@@ -161,7 +161,24 @@ class FileSourceService {
         lower.endsWith('.markdown') ||
         lower.endsWith('.docx') ||
         lower.endsWith('.doc') ||
-        lower.endsWith('.eps');
+        lower.endsWith('.eps') ||
+        lower.endsWith('.gbr') ||
+        lower.endsWith('.ger') ||
+        lower.endsWith('.pho') ||
+        lower.endsWith('.art') ||
+        lower.endsWith('.gtl') ||
+        lower.endsWith('.gbl') ||
+        lower.endsWith('.gts') ||
+        lower.endsWith('.gbs') ||
+        lower.endsWith('.gto') ||
+        lower.endsWith('.gbo') ||
+        lower.endsWith('.gko') ||
+        lower.endsWith('.gm1') ||
+        lower.endsWith('.gm2') ||
+        lower.endsWith('.drl') ||
+        lower.endsWith('.xln') ||
+        lower.endsWith('.exc') ||
+        lower.endsWith('.drd');
   }
 
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {
