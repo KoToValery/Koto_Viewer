@@ -158,7 +158,10 @@ class FileSourceService {
         lower.endsWith('.log') ||
         lower.endsWith('.csv') ||
         lower.endsWith('.md') ||
-        lower.endsWith('.markdown');
+        lower.endsWith('.markdown') ||
+        lower.endsWith('.docx') ||
+        lower.endsWith('.doc') ||
+        lower.endsWith('.eps');
   }
 
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {

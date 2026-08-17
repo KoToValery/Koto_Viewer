@@ -16,6 +16,8 @@ import '../dxf_3d_viewer/dxf_3d_viewer_screen.dart';
 import '../xlsx_viewer/xlsx_viewer_screen.dart';
 import '../text_viewer/text_viewer_screen.dart';
 import '../markdown_viewer/markdown_viewer_screen.dart';
+import '../docx_viewer/docx_viewer_screen.dart';
+import '../eps_viewer/eps_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 
 class FileTypeIcon extends StatelessWidget {
@@ -54,6 +56,10 @@ class FileTypeIcon extends StatelessWidget {
         return _buildTxtIcon();
       case KotoFileType.md:
         return _buildMdIcon();
+      case KotoFileType.docx:
+        return _buildDocxIcon();
+      case KotoFileType.eps:
+        return _buildEpsIcon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
@@ -408,6 +414,76 @@ class FileTypeIcon extends StatelessWidget {
     );
   }
 
+  Widget _buildDocxIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF93C5FD)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.article_rounded,
+              color: const Color(0xFF2563EB),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'DOC',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF2563EB),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEpsIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAF5FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFD8B4FE)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.gesture_rounded,
+              color: const Color(0xFF8B5CF6),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'EPS',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF8B5CF6),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGenericIcon() {
     return Container(
       width: width,
@@ -607,12 +683,15 @@ class _HomeScreenState extends State<HomeScreen> {
             !lower.endsWith('.log') &&
             !lower.endsWith('.csv') &&
             !lower.endsWith('.md') &&
-            !lower.endsWith('.markdown')) {
+            !lower.endsWith('.markdown') &&
+            !lower.endsWith('.docx') &&
+            !lower.endsWith('.doc') &&
+            !lower.endsWith('.eps')) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Please select a supported file (.pdf, .dxf, .dwg, .svg, .stl, .obj, .glb, .gltf, .xlsx, .txt, .md).',
+                  'Please select a supported file (.pdf, .dxf, .dwg, .svg, .stl, .obj, .glb, .gltf, .xlsx, .txt, .md, .docx, .eps).',
                 ),
                 backgroundColor: Colors.orange,
               ),
@@ -844,6 +923,32 @@ class _HomeScreenState extends State<HomeScreen> {
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => MarkdownViewerScreen(filePath: filePath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.docx:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => DocxViewerScreen(filePath: filePath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.eps:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => EpsViewerScreen(filePath: filePath),
           ),
         );
         if (success != false) {
@@ -1677,8 +1782,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             _buildFormatBadge('CAD', Icons.draw_rounded, const Color(0xFF6EE7B7)),
                             _buildFormatBadge('3D', Icons.view_in_ar_rounded, const Color(0xFFA5F3FC)),
                             _buildFormatBadge('XLSX', Icons.table_chart_rounded, const Color(0xFF86EFAC)),
+                            _buildFormatBadge('DOCX', Icons.article_rounded, const Color(0xFF93C5FD)),
                             _buildFormatBadge('TXT', Icons.description_rounded, const Color(0xFFCBD5E1)),
-                            _buildFormatBadge('MD', Icons.menu_book_rounded, const Color(0xFFC7D2FE)),
+                            _buildFormatBadge('EPS', Icons.gesture_rounded, const Color(0xFFD8B4FE)),
                           ],
                         ),
                       ],
