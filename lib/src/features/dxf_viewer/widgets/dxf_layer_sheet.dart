@@ -147,44 +147,78 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
             ),
           ),
 
-          // Global Quick Bar for all layers
+          // Global Quick Bar for all layers with Dropdown
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
             child: Row(
               children: [
                 Icon(
                   Icons.line_weight,
-                  size: 15,
+                  size: 16,
                   color: theme.textTheme.bodySmall?.color,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Text(
-                  'Всички:',
+                  'Дебелина за всички:',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: theme.textTheme.bodySmall?.color,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildQuickAllOption('Оригинална', () => _setAllLineweight(null), theme),
-                        const SizedBox(width: 4),
-                        _buildQuickAllOption('0.12 мм', () => _setAllLineweight(0.12), theme),
-                        const SizedBox(width: 4),
-                        _buildQuickAllOption('0.25 мм', () => _setAllLineweight(0.25), theme),
-                        const SizedBox(width: 4),
-                        _buildQuickAllOption('0.35 мм', () => _setAllLineweight(0.35), theme),
-                        const SizedBox(width: 4),
-                        _buildQuickAllOption('0.70 мм', () => _setAllLineweight(0.70), theme),
+                const Spacer(),
+                Container(
+                  height: 28,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: theme.dividerColor.withValues(alpha: 0.35),
+                      width: 0.9,
+                    ),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<double?>(
+                      value: null,
+                      hint: Text(
+                        'Избери за всички...',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      icon: Icon(Icons.arrow_drop_down, size: 18, color: theme.colorScheme.primary),
+                      isDense: true,
+                      dropdownColor: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      items: [
+                        DropdownMenuItem<double?>(
+                          value: null,
+                          child: _buildDropdownItemRow(label: 'Оригинална', thickness: 1.0, theme: theme),
+                        ),
+                        DropdownMenuItem<double?>(
+                          value: 0.12,
+                          child: _buildDropdownItemRow(label: '0.12 мм', thickness: 0.9, theme: theme),
+                        ),
+                        DropdownMenuItem<double?>(
+                          value: 0.25,
+                          child: _buildDropdownItemRow(label: '0.25 мм', thickness: 1.4, theme: theme),
+                        ),
+                        DropdownMenuItem<double?>(
+                          value: 0.35,
+                          child: _buildDropdownItemRow(label: '0.35 мм', thickness: 2.0, theme: theme),
+                        ),
+                        DropdownMenuItem<double?>(
+                          value: 0.70,
+                          child: _buildDropdownItemRow(label: '0.70 мм', thickness: 3.5, theme: theme),
+                        ),
                       ],
+                      onChanged: (val) {
+                        _setAllLineweight(val);
+                      },
                     ),
                   ),
                 ),
@@ -236,7 +270,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                       ),
                       const SizedBox(width: 12),
 
-                      // Layer Details & Line Weight Selector
+                      // Layer Details & Dropdown Lineweight Selector
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,83 +293,75 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                 color: theme.textTheme.bodySmall?.color,
                               ),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 5),
 
-                            // AutoCAD Lineweight Selector: Оригинална, 0.12 мм, 0.25 мм, 0.35 мм, 0.70 мм
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _buildLineWeightOption(
-                                    label: 'Оригинална',
-                                    previewThickness: (layer.lineweight != null && layer.lineweight! > 0)
-                                        ? (layer.lineweight! * 4.5).clamp(0.9, 3.5)
-                                        : 1.0,
-                                    isSelected: layer.customLineweight == null,
-                                    onTap: () {
-                                      setState(() {
-                                        layer.customLineweight = null;
-                                      });
-                                      widget.onLayersChanged();
-                                    },
-                                    theme: theme,
+                            // Lineweight Dropdown Menu (Падащо меню)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Дебелина: ',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: theme.textTheme.bodySmall?.color,
                                   ),
-                                  const SizedBox(width: 4),
-                                  _buildLineWeightOption(
-                                    label: '0.12 мм',
-                                    previewThickness: 0.9,
-                                    isSelected: layer.customLineweight == 0.12,
-                                    onTap: () {
-                                      setState(() {
-                                        layer.customLineweight = 0.12;
-                                      });
-                                      widget.onLayersChanged();
-                                    },
-                                    theme: theme,
+                                ),
+                                Container(
+                                  height: 27,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: theme.dividerColor.withValues(alpha: 0.3),
+                                      width: 0.8,
+                                    ),
                                   ),
-                                  const SizedBox(width: 4),
-                                  _buildLineWeightOption(
-                                    label: '0.25 мм',
-                                    previewThickness: 1.4,
-                                    isSelected: layer.customLineweight == 0.25,
-                                    onTap: () {
-                                      setState(() {
-                                        layer.customLineweight = 0.25;
-                                      });
-                                      widget.onLayersChanged();
-                                    },
-                                    theme: theme,
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<double?>(
+                                      value: layer.customLineweight,
+                                      isDense: true,
+                                      icon: Icon(Icons.arrow_drop_down, size: 17, color: theme.colorScheme.primary),
+                                      dropdownColor: theme.colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(8),
+                                      items: [
+                                        DropdownMenuItem<double?>(
+                                          value: null,
+                                          child: _buildDropdownItemRow(
+                                            label: 'Оригинална',
+                                            thickness: (layer.lineweight != null && layer.lineweight! > 0)
+                                                ? (layer.lineweight! * 4.5).clamp(0.9, 3.5)
+                                                : 1.0,
+                                            theme: theme,
+                                          ),
+                                        ),
+                                        DropdownMenuItem<double?>(
+                                          value: 0.12,
+                                          child: _buildDropdownItemRow(label: '0.12 мм', thickness: 0.9, theme: theme),
+                                        ),
+                                        DropdownMenuItem<double?>(
+                                          value: 0.25,
+                                          child: _buildDropdownItemRow(label: '0.25 мм', thickness: 1.4, theme: theme),
+                                        ),
+                                        DropdownMenuItem<double?>(
+                                          value: 0.35,
+                                          child: _buildDropdownItemRow(label: '0.35 мм', thickness: 2.0, theme: theme),
+                                        ),
+                                        DropdownMenuItem<double?>(
+                                          value: 0.70,
+                                          child: _buildDropdownItemRow(label: '0.70 мм', thickness: 3.5, theme: theme),
+                                        ),
+                                      ],
+                                      onChanged: (val) {
+                                        setState(() {
+                                          layer.customLineweight = val;
+                                        });
+                                        widget.onLayersChanged();
+                                      },
+                                    ),
                                   ),
-                                  const SizedBox(width: 4),
-                                  _buildLineWeightOption(
-                                    label: '0.35 мм',
-                                    previewThickness: 2.0,
-                                    isSelected: layer.customLineweight == 0.35,
-                                    onTap: () {
-                                      setState(() {
-                                        layer.customLineweight = 0.35;
-                                      });
-                                      widget.onLayersChanged();
-                                    },
-                                    theme: theme,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  _buildLineWeightOption(
-                                    label: '0.70 мм',
-                                    previewThickness: 3.5,
-                                    isSelected: layer.customLineweight == 0.70,
-                                    onTap: () {
-                                      setState(() {
-                                        layer.customLineweight = 0.70;
-                                      });
-                                      widget.onLayersChanged();
-                                    },
-                                    theme: theme,
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -372,80 +398,28 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
     widget.onLayersChanged();
   }
 
-  Widget _buildQuickAllOption(String label, VoidCallback onTap, ThemeData theme) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(4),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-            color: theme.dividerColor.withValues(alpha: 0.3),
-            width: 0.8,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10.5,
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLineWeightOption({
+  Widget _buildDropdownItemRow({
     required String label,
-    required double previewThickness,
-    required bool isSelected,
-    required VoidCallback onTap,
+    required double thickness,
     required ThemeData theme,
   }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.18)
-              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary
-                : theme.dividerColor.withValues(alpha: 0.25),
-            width: isSelected ? 1.2 : 0.8,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: thickness,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary,
+            borderRadius: BorderRadius.circular(1),
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 12,
-              height: previewThickness,
-              decoration: BoxDecoration(
-                color: isSelected ? theme.colorScheme.primary : Colors.grey,
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-            const SizedBox(width: 4.5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? theme.colorScheme.primary : theme.textTheme.bodySmall?.color,
-              ),
-            ),
-          ],
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12),
         ),
-      ),
+      ],
     );
   }
 }

@@ -64,6 +64,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   Offset? _snappedScreenPos;
   DxfSnapResult? _activeMeasureSnap;
   int _activePointersCount = 0;
+  bool _isMultiTouchGesture = false;
 
   // Layout & viewport
   Size _viewportSize = Size.zero;
@@ -262,7 +263,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if (!_isMeasureMode || _document == null) return;
     _activePointersCount++;
     if (_activePointersCount > 1) {
-      // Multi-touch: cancel single finger measurement so InteractiveViewer can pinch-zoom
+      // Multi-touch: mark gesture as multi-touch zoom/pan, cancel single finger measurement
+      _isMultiTouchGesture = true;
       setState(() {
         _touchScreenPos = null;
         _targetScreenPos = null;
@@ -272,11 +274,18 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       return;
     }
 
-    _updateMeasurePointer(event.localPosition);
+    // Only start a single finger measure pointer if we are NOT in the middle of a multi-touch sequence
+    if (!_isMultiTouchGesture) {
+      _updateMeasurePointer(event.localPosition);
+    }
   }
 
   void _handleMeasurePointerMove(PointerMoveEvent event) {
-    if (!_isMeasureMode || _document == null || _activePointersCount != 1) return;
+    if (!_isMeasureMode || _document == null) return;
+    if (_activePointersCount > 1) {
+      _isMultiTouchGesture = true;
+    }
+    if (_isMultiTouchGesture || _activePointersCount != 1) return;
     _updateMeasurePointer(event.localPosition);
   }
 
@@ -324,6 +333,20 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if (!_isMeasureMode) return;
     _activePointersCount = math.max(0, _activePointersCount - 1);
 
+    if (_isMultiTouchGesture) {
+      // If we were in a multi-touch zoom/pan gesture, do NOT place any measurement point
+      setState(() {
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _activeMeasureSnap = null;
+      });
+      if (_activePointersCount == 0) {
+        _isMultiTouchGesture = false; // Reset only when all fingers are lifted
+      }
+      return;
+    }
+
     if (_touchScreenPos != null) {
       final finalCadPt = _activeMeasureSnap?.point ?? _currentCadCoord;
       HapticFeedback.mediumImpact();
@@ -347,6 +370,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   void _handleMeasurePointerCancel(PointerCancelEvent event) {
     _activePointersCount = 0;
+    _isMultiTouchGesture = false;
     setState(() {
       _touchScreenPos = null;
       _targetScreenPos = null;
