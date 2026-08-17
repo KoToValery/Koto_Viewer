@@ -371,6 +371,16 @@ class DocParser {
     final step = is16Bit ? 2 : 1;
 
     while (i < (is16Bit ? bytes.length - 1 : bytes.length)) {
+      // 1. Detect embedded ZIP package (PK\x03\x04 or PK\x01\x02) - e.g. embedded theme.zip / OpenXML parts
+      if (i + 3 < bytes.length &&
+          bytes[i] == 0x50 &&
+          bytes[i + 1] == 0x4B &&
+          (bytes[i + 2] == 0x03 || bytes[i + 2] == 0x01) &&
+          (bytes[i + 3] == 0x04 || bytes[i + 3] == 0x02)) {
+        // Document body ended; reached trailing binary zip / theme package
+        break;
+      }
+
       int codeUnit;
       if (is16Bit) {
         codeUnit = bytes[i] | (bytes[i + 1] << 8);
@@ -420,13 +430,15 @@ class DocParser {
       if (codeUnit == 0x07) {
         final cellText = cleanWordText(currentCellOrPara.toString());
         currentCellOrPara.clear();
-        currentRowCells.add(
-          DocxTableCell(
-            paragraphs: [
-              DocxParagraph(runs: [DocxRun(text: cellText)]),
-            ],
-          ),
-        );
+        if (cellText.isNotEmpty && !_isStyleOrNoise(cellText)) {
+          currentRowCells.add(
+            DocxTableCell(
+              paragraphs: [
+                DocxParagraph(runs: [DocxRun(text: cellText)]),
+              ],
+            ),
+          );
+        }
         i += step;
         continue;
       }
@@ -541,7 +553,10 @@ class DocParser {
   }
 
   static bool _isStyleOrNoise(String text) {
+    if (text.isEmpty) return true;
     final lower = text.toLowerCase();
+
+    // 1. Structural / Office / Theme / OpenXML keywords
     if (lower == 'table normal' ||
         lower == 'normal table' ||
         lower == 'table grid' ||
@@ -551,9 +566,81 @@ class DocParser {
         lower.contains('root entry') ||
         lower.contains('worddocument') ||
         lower.contains('summaryinformation') ||
-        lower.contains('compobj')) {
+        lower.contains('compobj') ||
+        lower.contains('objectpool') ||
+        lower.contains('theme/theme') ||
+        lower.contains('thememanager') ||
+        lower.contains('theme1.xml') ||
+        lower.contains('[content_types]') ||
+        lower.contains('_rels/') ||
+        lower.contains('word/document') ||
+        lower.contains('word/theme')) {
       return true;
     }
+
+    // 2. High-entropy binary garbage check (detect random symbols resulting from parsing raw binary data as CP1251)
+    int unusualSymbols = 0;
+    int lettersOrDigits = 0;
+    int spaces = 0;
+
+    for (final codeUnit in text.codeUnits) {
+      if (codeUnit == 32 || codeUnit == 9) {
+        spaces++;
+      } else if ((codeUnit >= 65 && codeUnit <= 90) ||
+          (codeUnit >= 97 && codeUnit <= 122) ||
+          (codeUnit >= 0x0410 && codeUnit <= 0x044F) ||
+          (codeUnit >= 48 && codeUnit <= 57)) {
+        lettersOrDigits++;
+      } else if (codeUnit == 46 || // .
+          codeUnit == 44 || // ,
+          codeUnit == 58 || // :
+          codeUnit == 59 || // ;
+          codeUnit == 45 || // -
+          codeUnit == 63 || // ?
+          codeUnit == 33 || // !
+          codeUnit == 34 || // "
+          codeUnit == 39 || // '
+          codeUnit == 40 || // (
+          codeUnit == 41 || // )
+          codeUnit == 47 || // /
+          codeUnit == 37 || // %
+          codeUnit == 0x2116) { // №
+        // Normal punctuation
+      } else {
+        unusualSymbols++;
+      }
+    }
+
+    if (lettersOrDigits == 0) return true;
+
+    // If unusual binary symbols make up more than 15% of non-space characters
+    if (unusualSymbols > 1 && (unusualSymbols / (lettersOrDigits + unusualSymbols)) > 0.15) {
+      return true;
+    }
+
+    // 3. Reject chaotic Latin/Cyrillic single-letter alternates without spaces (e.g. "LïдbjÊ/rS½", "qY!ДТ")
+    if (text.length >= 5 && spaces == 0) {
+      int scriptSwitches = 0;
+      int prevScript = -1; // 0 = latin, 1 = cyrillic
+      for (final codeUnit in text.codeUnits) {
+        int script = -1;
+        if ((codeUnit >= 65 && codeUnit <= 90) || (codeUnit >= 97 && codeUnit <= 122)) {
+          script = 0;
+        } else if (codeUnit >= 0x0410 && codeUnit <= 0x044F) {
+          script = 1;
+        }
+        if (script != -1) {
+          if (prevScript != -1 && prevScript != script) {
+            scriptSwitches++;
+          }
+          prevScript = script;
+        }
+      }
+      if (scriptSwitches >= 3) {
+        return true;
+      }
+    }
+
     return false;
   }
 
