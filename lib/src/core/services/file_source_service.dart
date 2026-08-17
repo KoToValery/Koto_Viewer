@@ -161,6 +161,11 @@ class FileSourceService {
         lower.endsWith('.markdown') ||
         lower.endsWith('.docx') ||
         lower.endsWith('.doc') ||
+        lower.endsWith('.pptx') ||
+        lower.endsWith('.ppt') ||
+        lower.endsWith('.ppsx') ||
+        lower.endsWith('.pps') ||
+        lower.endsWith('.rtf') ||
         lower.endsWith('.eps') ||
         lower.endsWith('.gbr') ||
         lower.endsWith('.ger') ||

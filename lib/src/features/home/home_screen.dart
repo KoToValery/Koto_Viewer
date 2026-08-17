@@ -9,6 +9,7 @@ import '../../core/services/recent_files_service.dart';
 import '../../core/services/file_source_service.dart';
 import '../../core/services/dwg_converter_service.dart';
 import '../../core/services/doc_to_pdf_converter_service.dart';
+import '../../core/services/ppt_to_pdf_converter_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
 import '../dxf_viewer/dxf_viewer_screen.dart';
@@ -61,6 +62,11 @@ class FileTypeIcon extends StatelessWidget {
         return _buildMdIcon();
       case KotoFileType.docx:
         return _buildDocxIcon();
+      case KotoFileType.pptx:
+      case KotoFileType.ppt:
+        return _buildPptIcon();
+      case KotoFileType.rtf:
+        return _buildRtfIcon();
       case KotoFileType.eps:
         return _buildEpsIcon();
       case KotoFileType.gbr:
@@ -454,6 +460,76 @@ class FileTypeIcon extends StatelessWidget {
                 fontSize: width * 0.2,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFF2563EB),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPptIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFED7AA)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.slideshow_rounded,
+              color: const Color(0xFFD24726),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'PPT',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFD24726),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRtfIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF2FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFC7D2FE)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.text_snippet_rounded,
+              color: const Color(0xFF4F46E5),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'RTF',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF4F46E5),
                 letterSpacing: 0.5,
                 height: 1,
               ),
@@ -1215,10 +1291,11 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
 
       case KotoFileType.docx:
+      case KotoFileType.rtf:
         String viewPath = filePath;
         bool openedAsPdf = false;
         try {
-          // Seamless mode: convert DOC/DOCX to PDF on the fly
+          // Seamless mode: convert DOC/DOCX/RTF to PDF on the fly
           viewPath = await DocToPdfConverterService.convertToPdf(filePath);
           openedAsPdf = true;
         } catch (e) {
@@ -1239,6 +1316,33 @@ class _HomeScreenState extends State<HomeScreen> {
           await RecentFilesService.addRecentFile(item);
         } else {
           await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.pptx:
+      case KotoFileType.ppt:
+        try {
+          // Seamless mode: convert PPT/PPTX to Landscape PDF on the fly
+          final viewPath = await PptToPdfConverterService.convertToPdf(filePath);
+          final bool? success = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (context) => PdfViewerScreen(
+                filePath: viewPath,
+                title: item.name,
+              ),
+            ),
+          );
+          if (success != false) {
+            await RecentFilesService.addRecentFile(item);
+          } else {
+            await RecentFilesService.removeRecentFile(filePath);
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to load presentation: $e')),
+            );
+          }
         }
         break;
 

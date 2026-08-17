@@ -5,7 +5,7 @@ import '../../../core/services/native_share_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
-enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, eps, pcb, kicad, plt, step, iges, other }
+enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, pptx, rtf, eps, pcb, kicad, plt, step, iges, other }
 
 _ShareFileType _detectFileType(String path) {
   final lower = path.toLowerCase();
@@ -21,6 +21,8 @@ _ShareFileType _detectFileType(String path) {
   if (lower.endsWith('.txt') || lower.endsWith('.log') || lower.endsWith('.csv')) return _ShareFileType.txt;
   if (lower.endsWith('.md') || lower.endsWith('.markdown')) return _ShareFileType.md;
   if (lower.endsWith('.docx') || lower.endsWith('.doc')) return _ShareFileType.docx;
+  if (lower.endsWith('.pptx') || lower.endsWith('.ppt') || lower.endsWith('.ppsx') || lower.endsWith('.pps')) return _ShareFileType.pptx;
+  if (lower.endsWith('.rtf')) return _ShareFileType.rtf;
   if (lower.endsWith('.eps')) return _ShareFileType.eps;
   if (lower.endsWith('.kicad_pcb') ||
       lower.endsWith('.kicad_sch') ||

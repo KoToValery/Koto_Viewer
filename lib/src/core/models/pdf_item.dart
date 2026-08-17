@@ -40,7 +40,7 @@ extension FileCategoryExtension on FileCategory {
   }
 }
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, pptx, ppt, rtf, other }
 
 class PdfItem {
   final String path;
@@ -73,6 +73,9 @@ class PdfItem {
     if (lower.endsWith('.txt') || lower.endsWith('.log') || lower.endsWith('.csv')) return KotoFileType.txt;
     if (lower.endsWith('.md') || lower.endsWith('.markdown')) return KotoFileType.md;
     if (lower.endsWith('.docx') || lower.endsWith('.doc')) return KotoFileType.docx;
+    if (lower.endsWith('.pptx') || lower.endsWith('.ppsx')) return KotoFileType.pptx;
+    if (lower.endsWith('.ppt') || lower.endsWith('.pps')) return KotoFileType.ppt;
+    if (lower.endsWith('.rtf')) return KotoFileType.rtf;
     if (lower.endsWith('.eps')) return KotoFileType.eps;
     if (lower.endsWith('.kicad_pcb') ||
         lower.endsWith('.kicad_sch') ||
@@ -126,6 +129,10 @@ class PdfItem {
   bool get isTxt => fileType == KotoFileType.txt;
   bool get isMd => fileType == KotoFileType.md;
   bool get isDocx => fileType == KotoFileType.docx;
+  bool get isPptx => fileType == KotoFileType.pptx;
+  bool get isPpt => fileType == KotoFileType.ppt;
+  bool get isPresentation => isPptx || isPpt;
+  bool get isRtf => fileType == KotoFileType.rtf;
   bool get isEps => fileType == KotoFileType.eps;
   bool get isGerber => fileType == KotoFileType.gbr;
   bool get isDrill => fileType == KotoFileType.drl;
@@ -133,7 +140,7 @@ class PdfItem {
   bool get isPlotter => fileType == KotoFileType.plt;
   bool get isPcb => isGerber || isDrill || isKicad;
   bool get isVector => isSvg || isEps || isPcb || isPlotter;
-  bool get isTextDoc => isTxt || isMd || isDocx;
+  bool get isTextDoc => isTxt || isMd || isDocx || isRtf || isPresentation;
 
   FileCategory get category {
     if (is3d) return FileCategory.cad3d;

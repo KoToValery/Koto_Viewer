@@ -37,11 +37,20 @@ void main() {
       // Documents
       final pdf = PdfItem(path: '/a/doc.pdf', name: 'doc.pdf', sizeInBytes: 100, lastOpened: now);
       final docx = PdfItem(path: '/a/word.docx', name: 'word.docx', sizeInBytes: 100, lastOpened: now);
+      final pptx = PdfItem(path: '/a/slides.pptx', name: 'slides.pptx', sizeInBytes: 100, lastOpened: now);
+      final ppt = PdfItem(path: '/a/old.ppt', name: 'old.ppt', sizeInBytes: 100, lastOpened: now);
+      final rtf = PdfItem(path: '/a/memo.rtf', name: 'memo.rtf', sizeInBytes: 100, lastOpened: now);
       final xlsx = PdfItem(path: '/a/table.xlsx', name: 'table.xlsx', sizeInBytes: 100, lastOpened: now);
       final txt = PdfItem(path: '/a/readme.txt', name: 'readme.txt', sizeInBytes: 100, lastOpened: now);
       final md = PdfItem(path: '/a/notes.md', name: 'notes.md', sizeInBytes: 100, lastOpened: now);
       expect(pdf.category, equals(FileCategory.documents));
       expect(docx.category, equals(FileCategory.documents));
+      expect(pptx.category, equals(FileCategory.documents));
+      expect(pptx.isPresentation, true);
+      expect(ppt.category, equals(FileCategory.documents));
+      expect(ppt.isPresentation, true);
+      expect(rtf.category, equals(FileCategory.documents));
+      expect(rtf.isRtf, true);
       expect(xlsx.category, equals(FileCategory.documents));
       expect(txt.category, equals(FileCategory.documents));
       expect(md.category, equals(FileCategory.documents));

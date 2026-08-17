@@ -7,6 +7,7 @@ import 'src/core/services/local_server_service.dart';
 import 'src/core/services/recent_files_service.dart';
 import 'src/core/services/dwg_converter_service.dart';
 import 'src/core/services/doc_to_pdf_converter_service.dart';
+import 'src/core/services/ppt_to_pdf_converter_service.dart';
 import 'src/core/services/coordinate_system_service.dart';
 
 import 'src/features/home/home_screen.dart';
@@ -145,6 +146,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
         break;
 
       case KotoFileType.docx:
+      case KotoFileType.rtf:
         try {
           final convertedPdf = await DocToPdfConverterService.convertToPdf(filePath);
           navigator.push(
@@ -160,6 +162,21 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
             MaterialPageRoute(builder: (_) => DocxViewerScreen(filePath: filePath)),
           );
         }
+        break;
+
+      case KotoFileType.pptx:
+      case KotoFileType.ppt:
+        try {
+          final convertedPdf = await PptToPdfConverterService.convertToPdf(filePath);
+          navigator.push(
+            MaterialPageRoute(
+              builder: (_) => PdfViewerScreen(
+                filePath: convertedPdf,
+                title: filePath.split(Platform.pathSeparator).last,
+              ),
+            ),
+          );
+        } catch (_) {}
         break;
 
       case KotoFileType.eps:
