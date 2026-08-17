@@ -106,11 +106,11 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Настройки на изгледа',
+                        'Display Settings',
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        'Дебелина на линии, размери и точки',
+                        'Line thickness, dimensions, and point styles',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
@@ -122,7 +122,7 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                     _update(defaultSettings);
                   },
                   icon: const Icon(Icons.restore, size: 16),
-                  label: const Text('По подразбиране', style: TextStyle(fontSize: 12)),
+                  label: const Text('Default', style: TextStyle(fontSize: 12)),
                 ),
               ],
             ),
@@ -139,7 +139,7 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                   // 1. Line Thickness Section
                   _buildSectionHeader(
                     icon: Icons.line_weight,
-                    title: 'Дебелина на линиите',
+                    title: 'Line Thickness',
                     valueLabel: '${(_current.lineThicknessScale * 100).toStringAsFixed(0)}%',
                     theme: theme,
                   ),
@@ -167,28 +167,28 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _buildPresetChip(
-                        label: 'Тънки',
+                        label: 'Thin',
                         scale: 0.6,
                         current: _current.lineThicknessScale,
                         onTap: () => _update(_current.copyWith(lineThicknessScale: 0.6)),
                         theme: theme,
                       ),
                       _buildPresetChip(
-                        label: 'Нормални',
+                        label: 'Normal',
                         scale: 1.0,
                         current: _current.lineThicknessScale,
                         onTap: () => _update(_current.copyWith(lineThicknessScale: 1.0)),
                         theme: theme,
                       ),
                       _buildPresetChip(
-                        label: 'Удебелени',
+                        label: 'Medium',
                         scale: 1.6,
                         current: _current.lineThicknessScale,
                         onTap: () => _update(_current.copyWith(lineThicknessScale: 1.6)),
                         theme: theme,
                       ),
                       _buildPresetChip(
-                        label: 'Дебели',
+                        label: 'Thick',
                         scale: 2.4,
                         current: _current.lineThicknessScale,
                         onTap: () => _update(_current.copyWith(lineThicknessScale: 2.4)),
@@ -204,7 +204,7 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                   // 2. Measurement Size Section
                   _buildSectionHeader(
                     icon: Icons.straighten,
-                    title: 'Големина на размера (L: ...)',
+                    title: 'Dimension Size (L: ...)',
                     valueLabel: '${(_current.measurementScale * 100).toStringAsFixed(0)}%',
                     theme: theme,
                   ),
@@ -232,28 +232,28 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _buildPresetChip(
-                        label: 'Малък (70%)',
+                        label: 'Small (70%)',
                         scale: 0.7,
                         current: _current.measurementScale,
                         onTap: () => _update(_current.copyWith(measurementScale: 0.7)),
                         theme: theme,
                       ),
                       _buildPresetChip(
-                        label: 'Нормален (100%)',
+                        label: 'Normal (100%)',
                         scale: 1.0,
                         current: _current.measurementScale,
                         onTap: () => _update(_current.copyWith(measurementScale: 1.0)),
                         theme: theme,
                       ),
                       _buildPresetChip(
-                        label: 'Голям (140%)',
+                        label: 'Large (140%)',
                         scale: 1.4,
                         current: _current.measurementScale,
                         onTap: () => _update(_current.copyWith(measurementScale: 1.4)),
                         theme: theme,
                       ),
                       _buildPresetChip(
-                        label: 'Макси (180%)',
+                        label: 'Extra (180%)',
                         scale: 1.8,
                         current: _current.measurementScale,
                         onTap: () => _update(_current.copyWith(measurementScale: 1.8)),
@@ -269,7 +269,7 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                   // 3. Point Size Section
                   _buildSectionHeader(
                     icon: Icons.scatter_plot,
-                    title: 'Големина на точките',
+                    title: 'Point Size',
                     valueLabel: '${_current.pointSize.toStringAsFixed(1)} px',
                     theme: theme,
                   ),
@@ -319,28 +319,28 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _buildPresetChip(
-                        label: 'Дребни (2.5px)',
+                        label: 'Small (2.5px)',
                         scale: 2.5,
                         current: _current.pointSize,
                         onTap: () => _update(_current.copyWith(pointSize: 2.5)),
                         theme: theme,
                       ),
                       _buildPresetChip(
-                        label: 'Нормални (4px)',
+                        label: 'Normal (4px)',
                         scale: 4.0,
                         current: _current.pointSize,
                         onTap: () => _update(_current.copyWith(pointSize: 4.0)),
                         theme: theme,
                       ),
                       _buildPresetChip(
-                        label: 'Големи (6.5px)',
+                        label: 'Large (6.5px)',
                         scale: 6.5,
                         current: _current.pointSize,
                         onTap: () => _update(_current.copyWith(pointSize: 6.5)),
                         theme: theme,
                       ),
                       _buildPresetChip(
-                        label: 'Ясни (9px)',
+                        label: 'Heavy (9px)',
                         scale: 9.0,
                         current: _current.pointSize,
                         onTap: () => _update(_current.copyWith(pointSize: 9.0)),
@@ -359,7 +359,7 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                       Icon(Icons.grain, size: 18, color: theme.colorScheme.primary),
                       const SizedBox(width: 8),
                       const Text(
-                        'Стил на точките в чертежа',
+                        'Point Marker Style',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                       ),
                     ],
@@ -401,7 +401,7 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                style.labelBg,
+                                style.label,
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

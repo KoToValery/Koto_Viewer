@@ -223,7 +223,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
             const SizedBox(width: 10),
             const Expanded(
               child: Text(
-                'SVG Информация',
+                'SVG Information',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
@@ -233,23 +233,23 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow('Файл:', _fileName),
-            _buildInfoRow('Размер:', formattedSize),
+            _buildInfoRow('File:', _fileName),
+            _buildInfoRow('Size:', formattedSize),
             if (_metadata.width != null && _metadata.height != null)
-              _buildInfoRow('Размери:', '${_metadata.width!.toStringAsFixed(1)} × ${_metadata.height!.toStringAsFixed(1)} px'),
+              _buildInfoRow('Dimensions:', '${_metadata.width!.toStringAsFixed(1)} × ${_metadata.height!.toStringAsFixed(1)} px'),
             if (_metadata.viewBox != null)
               _buildInfoRow('viewBox:', '${_metadata.viewBox!.width.toStringAsFixed(0)} × ${_metadata.viewBox!.height.toStringAsFixed(0)}'),
             const Divider(height: 20),
-            _buildInfoRow('Векторни пътища (paths):', '${_metadata.pathCount}'),
-            _buildInfoRow('Геометрични фигури:', '${_metadata.shapeCount}'),
-            _buildInfoRow('Текстови елементи:', '${_metadata.textCount}'),
-            _buildInfoRow('Общо елементи:', '${_metadata.totalElements}'),
+            _buildInfoRow('Vector Paths:', '${_metadata.pathCount}'),
+            _buildInfoRow('Geometric Shapes:', '${_metadata.shapeCount}'),
+            _buildInfoRow('Text Elements:', '${_metadata.textCount}'),
+            _buildInfoRow('Total Elements:', '${_metadata.totalElements}'),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Затвори'),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -339,7 +339,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
           // Theme Switcher Menu
           PopupMenuButton<SvgCanvasTheme>(
             icon: const Icon(Icons.palette_outlined),
-            tooltip: 'Цветова тема на фона',
+            tooltip: 'Canvas Theme',
             onSelected: (t) => setState(() => _canvasTheme = t),
             itemBuilder: (context) => SvgCanvasTheme.values.map((t) {
               return PopupMenuItem<SvgCanvasTheme>(
@@ -373,21 +373,21 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
               _showGrid ? Icons.grid_on : Icons.grid_off,
               color: _showGrid ? theme.colorScheme.primary : null,
             ),
-            tooltip: 'Мрежа (Grid)',
+            tooltip: 'Grid',
             onPressed: () => setState(() => _showGrid = !_showGrid),
           ),
 
           // Info Dialog
           IconButton(
             icon: const Icon(Icons.info_outline),
-            tooltip: 'Информация',
+            tooltip: 'Information',
             onPressed: _showInfoDialog,
           ),
 
           // Share Button
           IconButton(
             icon: const Icon(Icons.share_outlined),
-            tooltip: 'Сподели',
+            tooltip: 'Share',
             onPressed: _shareFile,
           ),
         ],
@@ -425,7 +425,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                     ElevatedButton.icon(
                       onPressed: _loadSvgFile,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Повторен опит'),
+                      label: const Text('Retry'),
                     ),
                   ],
                 ),
@@ -476,21 +476,21 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                   children: [
                     _buildFloatingButton(
                       icon: Icons.add,
-                      tooltip: 'Приближи (+)',
+                      tooltip: 'Zoom In (+)',
                       onTap: _zoomIn,
                       theme: theme,
                     ),
                     const SizedBox(height: 8),
                     _buildFloatingButton(
                       icon: Icons.remove,
-                      tooltip: 'Отдалечи (-)',
+                      tooltip: 'Zoom Out (-)',
                       onTap: _zoomOut,
                       theme: theme,
                     ),
                     const SizedBox(height: 8),
                     _buildFloatingButton(
                       icon: Icons.fit_screen_outlined,
-                      tooltip: 'Центрирай / Начален мащаб',
+                      tooltip: 'Fit to View',
                       onTap: _resetView,
                       theme: theme,
                     ),

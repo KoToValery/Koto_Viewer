@@ -188,26 +188,26 @@ class DxfMeasurePointerPainter extends CustomPainter {
   }
 
   void _drawHudBadge(Canvas canvas, Offset tipPos, bool isSnapped) {
-    String titleText = isSettingSecondPoint ? '2-ра точка' : '1-ва точка';
+    String titleText = isSettingSecondPoint ? '2nd point' : '1st point';
     if (isSnapped && snapType != null) {
       switch (snapType!) {
         case DxfSnapType.endpoint:
-          titleText += ' • Връх';
+          titleText += ' • Endpoint';
           break;
         case DxfSnapType.midpoint:
-          titleText += ' • Среда';
+          titleText += ' • Midpoint';
           break;
         case DxfSnapType.center:
-          titleText += ' • Център';
+          titleText += ' • Center';
           break;
         case DxfSnapType.point:
-          titleText += ' • Точка';
+          titleText += ' • Node';
           break;
         case DxfSnapType.nearest:
-          titleText += ' • Отсечка';
+          titleText += ' • Segment';
           break;
         case DxfSnapType.perpendicular:
-          titleText += ' • Прав ъгъл (90°)';
+          titleText += ' • Perpendicular (90°)';
           break;
       }
     }

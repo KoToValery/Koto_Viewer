@@ -8,8 +8,8 @@ enum Cad3DShadingMode {
   cadShadedEdges('CAD Shaded + Edges', Icons.view_in_ar_rounded),
   smoothShaded('Smooth Shaded', Icons.lightbulb_outline_rounded),
   flatShaded('Flat Shaded', Icons.crop_portrait_rounded),
-  wireframe('Wireframe (Телен модел)', Icons.grid_3x3_rounded),
-  xray('X-Ray (Рентген)', Icons.opacity_rounded);
+  wireframe('Wireframe', Icons.grid_3x3_rounded),
+  xray('X-Ray (Transparent)', Icons.opacity_rounded);
 
   final String label;
   final IconData icon;

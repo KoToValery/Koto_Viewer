@@ -160,7 +160,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Дебелина за всички:',
+                  'Lineweight for all:',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -183,7 +183,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                     child: DropdownButton<double?>(
                       value: null,
                       hint: Text(
-                        'Избери за всички...',
+                        'Select for all...',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,
@@ -197,23 +197,23 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                       items: [
                         DropdownMenuItem<double?>(
                           value: null,
-                          child: _buildDropdownItemRow(label: 'Оригинална', thickness: 1.0, theme: theme),
+                          child: _buildDropdownItemRow(label: 'Original', thickness: 1.0, theme: theme),
                         ),
                         DropdownMenuItem<double?>(
                           value: 0.12,
-                          child: _buildDropdownItemRow(label: '0.12 мм', thickness: 0.9, theme: theme),
+                          child: _buildDropdownItemRow(label: '0.12 mm', thickness: 0.9, theme: theme),
                         ),
                         DropdownMenuItem<double?>(
                           value: 0.25,
-                          child: _buildDropdownItemRow(label: '0.25 мм', thickness: 1.4, theme: theme),
+                          child: _buildDropdownItemRow(label: '0.25 mm', thickness: 1.4, theme: theme),
                         ),
                         DropdownMenuItem<double?>(
                           value: 0.35,
-                          child: _buildDropdownItemRow(label: '0.35 мм', thickness: 2.0, theme: theme),
+                          child: _buildDropdownItemRow(label: '0.35 mm', thickness: 2.0, theme: theme),
                         ),
                         DropdownMenuItem<double?>(
                           value: 0.70,
-                          child: _buildDropdownItemRow(label: '0.70 мм', thickness: 3.5, theme: theme),
+                          child: _buildDropdownItemRow(label: '0.70 mm', thickness: 3.5, theme: theme),
                         ),
                       ],
                       onChanged: (val) {
@@ -287,7 +287,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '$count ${count == 1 ? "обект" : "обекта"} ${layer.isFrozen ? "• Замразен" : ""}${layer.lineweight != null && layer.lineweight! > 0 ? " • DXF: ${layer.lineweight!.toStringAsFixed(2)} mm" : ""}',
+                              '$count ${count == 1 ? "object" : "objects"} ${layer.isFrozen ? "• Frozen" : ""}${layer.lineweight != null && layer.lineweight! > 0 ? " • DXF: ${layer.lineweight!.toStringAsFixed(2)} mm" : ""}',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: theme.textTheme.bodySmall?.color,
@@ -295,12 +295,12 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                             ),
                             const SizedBox(height: 5),
 
-                            // Lineweight Dropdown Menu (Падащо меню)
+                            // Lineweight Dropdown Menu
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  'Дебелина: ',
+                                  'Lineweight: ',
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     color: theme.textTheme.bodySmall?.color,
@@ -328,7 +328,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                         DropdownMenuItem<double?>(
                                           value: null,
                                           child: _buildDropdownItemRow(
-                                            label: 'Оригинална',
+                                            label: 'Original',
                                             thickness: (layer.lineweight != null && layer.lineweight! > 0)
                                                 ? (layer.lineweight! * 4.5).clamp(0.9, 3.5)
                                                 : 1.0,
@@ -337,19 +337,19 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                         ),
                                         DropdownMenuItem<double?>(
                                           value: 0.12,
-                                          child: _buildDropdownItemRow(label: '0.12 мм', thickness: 0.9, theme: theme),
+                                          child: _buildDropdownItemRow(label: '0.12 mm', thickness: 0.9, theme: theme),
                                         ),
                                         DropdownMenuItem<double?>(
                                           value: 0.25,
-                                          child: _buildDropdownItemRow(label: '0.25 мм', thickness: 1.4, theme: theme),
+                                          child: _buildDropdownItemRow(label: '0.25 mm', thickness: 1.4, theme: theme),
                                         ),
                                         DropdownMenuItem<double?>(
                                           value: 0.35,
-                                          child: _buildDropdownItemRow(label: '0.35 мм', thickness: 2.0, theme: theme),
+                                          child: _buildDropdownItemRow(label: '0.35 mm', thickness: 2.0, theme: theme),
                                         ),
                                         DropdownMenuItem<double?>(
                                           value: 0.70,
-                                          child: _buildDropdownItemRow(label: '0.70 мм', thickness: 3.5, theme: theme),
+                                          child: _buildDropdownItemRow(label: '0.70 mm', thickness: 3.5, theme: theme),
                                         ),
                                       ],
                                       onChanged: (val) {

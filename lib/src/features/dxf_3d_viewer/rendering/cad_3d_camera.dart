@@ -4,12 +4,12 @@ import '../models/mesh_3d.dart';
 
 /// 3D Camera Preset Viewpoints.
 enum Cad3DViewPreset {
-  isometric('Изометрия', Icons.view_in_ar_rounded),
-  top('План (Отгоре)', Icons.keyboard_arrow_up_rounded),
-  front('Фасада (Отпред)', Icons.crop_square_rounded),
-  right('Страничен (Дясно)', Icons.keyboard_arrow_right_rounded),
-  bottom('Отдолу', Icons.keyboard_arrow_down_rounded),
-  back('Гръб (Отзад)', Icons.flip_to_back_rounded);
+  isometric('Isometric', Icons.view_in_ar_rounded),
+  top('Top View', Icons.keyboard_arrow_up_rounded),
+  front('Front View', Icons.crop_square_rounded),
+  right('Right View', Icons.keyboard_arrow_right_rounded),
+  bottom('Bottom View', Icons.keyboard_arrow_down_rounded),
+  back('Back View', Icons.flip_to_back_rounded);
 
   final String label;
   final IconData icon;

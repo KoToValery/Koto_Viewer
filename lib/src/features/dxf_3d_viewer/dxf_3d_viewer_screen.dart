@@ -210,7 +210,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '3D Модел • Параметри',
+                        '3D Model • Properties',
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                       ),
                       Text(
@@ -225,27 +225,28 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
             ),
             const Divider(height: 24),
             _buildMetricTile(
-              label: '3D Габарити (X × Y × Z):',
-              value: '${_formatDimension(bounds.sizeX)} × ${_formatDimension(bounds.sizeY)} × ${_formatDimension(bounds.sizeZ)}',
+              label: '3D Dimensions (X × Y × Z):',
+              value: '${_formatDimension(bounds.sizeX)}  ×  ${_formatDimension(bounds.sizeY)}  ×  ${_formatDimension(bounds.sizeZ)}',
               icon: Icons.crop_free_rounded,
+              valueOnNewLine: true,
             ),
             _buildMetricTile(
-              label: 'Брой полигони (Triangles):',
-              value: '${_mesh!.triangleCount} триъгълника',
+              label: 'Polygons (Triangles):',
+              value: '${_mesh!.triangleCount} triangles',
               icon: Icons.change_history_rounded,
             ),
             _buildMetricTile(
-              label: 'Изчислена площ (Area):',
+              label: 'Surface Area:',
               value: '${_mesh!.surfaceArea.toStringAsFixed(1)} mm²',
               icon: Icons.square_foot_rounded,
             ),
             _buildMetricTile(
-              label: 'Изчислен обем (Volume):',
+              label: 'Volume:',
               value: '${(_mesh!.volume / 1000.0).toStringAsFixed(2)} cm³',
               icon: Icons.view_in_ar_rounded,
             ),
             _buildMetricTile(
-              label: 'Размер на файла:',
+              label: 'File Size:',
               value: formattedSize,
               icon: Icons.folder_open_rounded,
             ),
@@ -259,16 +260,36 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     required String label,
     required String value,
     required IconData icon,
+    bool valueOnNewLine = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5.0),
       child: Row(
+        crossAxisAlignment: valueOnNewLine ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           Icon(icon, size: 18, color: Colors.grey),
           const SizedBox(width: 10),
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          const Spacer(),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Expanded(
+            child: valueOnNewLine
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 3),
+                      Text(
+                        value,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF)),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                      Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+          ),
         ],
       ),
     );
@@ -294,50 +315,16 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _fileName,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
-            ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00E5FF).withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    '3D CAD Model',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF00E5FF),
-                    ),
-                  ),
-                ),
-                if (_mesh != null) ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    '${_mesh!.triangleCount} tris',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.textTheme.bodySmall?.color,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
+        title: Text(
+          _fileName,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
           // Quick Views Menu
           PopupMenuButton<Cad3DViewPreset>(
             icon: const Icon(Icons.videocam_outlined),
-            tooltip: 'Изглед (Камера)',
+            tooltip: 'Camera View',
             onSelected: _setViewPreset,
             itemBuilder: (context) => Cad3DViewPreset.values.map((v) {
               return PopupMenuItem<Cad3DViewPreset>(
@@ -356,7 +343,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
           // Shading Mode Menu
           PopupMenuButton<Cad3DShadingMode>(
             icon: Icon(_shadingMode.icon),
-            tooltip: 'Режим на рендериране',
+            tooltip: 'Rendering Mode',
             onSelected: (m) => setState(() => _shadingMode = m),
             itemBuilder: (context) => Cad3DShadingMode.values.map((m) {
               return PopupMenuItem<Cad3DShadingMode>(
@@ -379,7 +366,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
           // Canvas Theme Menu
           PopupMenuButton<Cad3DTheme>(
             icon: const Icon(Icons.palette_outlined),
-            tooltip: 'Цветова тема',
+            tooltip: 'Theme',
             onSelected: (t) => setState(() => _theme = t),
             itemBuilder: (context) => Cad3DTheme.values.map((t) {
               return PopupMenuItem<Cad3DTheme>(
@@ -413,21 +400,21 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
               _showBoundingBox ? Icons.crop_free : Icons.crop_square,
               color: _showBoundingBox ? theme.colorScheme.primary : null,
             ),
-            tooltip: '3D Габарити (Bounding Box)',
+            tooltip: 'Bounding Box',
             onPressed: () => setState(() => _showBoundingBox = !_showBoundingBox),
           ),
 
           // 3D Model Info & Metrics
           IconButton(
             icon: const Icon(Icons.info_outline),
-            tooltip: '3D Параметри & Обем',
+            tooltip: '3D Properties',
             onPressed: _showMetricsSheet,
           ),
 
           // Share
           IconButton(
             icon: const Icon(Icons.share_outlined),
-            tooltip: 'Сподели',
+            tooltip: 'Share',
             onPressed: _shareFile,
           ),
         ],
@@ -465,7 +452,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     ElevatedButton.icon(
                       onPressed: _load3DModel,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Повторен опит'),
+                      label: const Text('Retry'),
                     ),
                   ],
                 ),
@@ -494,32 +481,6 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                 ),
               ),
 
-              // Bottom Dimension Badge
-              if (_mesh != null)
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _theme.background.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.grey.withValues(alpha: 0.3),
-                        width: 0.8,
-                      ),
-                    ),
-                    child: Text(
-                      'X: ${_formatDimension(_mesh!.bounds.sizeX)}  •  Y: ${_formatDimension(_mesh!.bounds.sizeY)}  •  Z: ${_formatDimension(_mesh!.bounds.sizeZ)}',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: _theme.isDark ? Colors.white70 : Colors.black87,
-                      ),
-                    ),
-                  ),
-                ),
-
               // Floating Controls (Zoom +, Zoom -, Fit)
               Positioned(
                 bottom: 24,
@@ -529,21 +490,21 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   children: [
                     _buildFloatingButton(
                       icon: Icons.add,
-                      tooltip: 'Приближи (+)',
+                      tooltip: 'Zoom In (+)',
                       onTap: () => setState(() => _camera.zoomBy(1.2)),
                       theme: theme,
                     ),
                     const SizedBox(height: 8),
                     _buildFloatingButton(
                       icon: Icons.remove,
-                      tooltip: 'Отдалечи (-)',
+                      tooltip: 'Zoom Out (-)',
                       onTap: () => setState(() => _camera.zoomBy(0.8)),
                       theme: theme,
                     ),
                     const SizedBox(height: 8),
                     _buildFloatingButton(
                       icon: Icons.fit_screen_outlined,
-                      tooltip: 'Центрирай / Изометрия',
+                      tooltip: 'Reset / Isometric View',
                       onTap: _resetView,
                       theme: theme,
                     ),
