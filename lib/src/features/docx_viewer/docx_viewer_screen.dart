@@ -5,6 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'models/docx_models.dart';
 import 'parser/docx_parser.dart';
+import 'parser/doc_parser.dart';
+import '../pdf_viewer/pdf_viewer_screen.dart';
+import '../../core/services/doc_to_pdf_converter_service.dart';
 
 /// Microsoft Word Document (.docx) Viewer Screen.
 class DocxViewerScreen extends StatefulWidget {
@@ -63,7 +66,12 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       _fileSizeBytes = await file.length();
       final bytes = await file.readAsBytes();
 
-      final doc = DocxParser.parse(bytes);
+      DocxDocument doc;
+      try {
+        doc = DocxParser.parse(bytes);
+      } catch (_) {
+        doc = DocParser.parse(bytes);
+      }
 
       if (mounted) {
         setState(() {
@@ -78,6 +86,34 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _openAsPdf() async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Generating PDF document...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      final pdfPath = await DocToPdfConverterService.convertToPdf(widget.filePath);
+      if (!mounted) return;
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => PdfViewerScreen(
+            filePath: pdfPath,
+            title: _fileName,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not convert to PDF: $e')),
+      );
     }
   }
 
@@ -287,6 +323,13 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 }
               });
             },
+          ),
+
+          // View as PDF Action
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: 'View as PDF',
+            onPressed: _openAsPdf,
           ),
 
           // Copy All

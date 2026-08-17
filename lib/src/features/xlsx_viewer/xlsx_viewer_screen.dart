@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:share_plus/share_plus.dart';
+import 'excel_formula_evaluator.dart';
 
 /// Interactive Excel Spreadsheet Viewer (.xlsx / .xls)
 class XlsxViewerScreen extends StatefulWidget {
@@ -26,6 +27,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
 
   // Data cache for active sheet: 2D table of formatted strings
   List<List<String>> _sheetData = [];
+  List<List<String?>> _sheetFormulas = [];
   int _maxRows = 0;
   int _maxCols = 0;
   List<double> _colWidths = [];
@@ -34,6 +36,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
   int _selectedRow = -1;
   int _selectedCol = -1;
   String _selectedCellValue = '';
+  String? _selectedFormula;
 
   // Search
   bool _isSearchOpen = false;
@@ -135,35 +138,66 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
     _maxRows = table.maxRows;
     _maxCols = table.maxColumns;
 
-    final List<List<String>> rows = [];
+    final List<List<String>> rows = List.generate(
+      _maxRows,
+      (_) => List.filled(_maxCols, ''),
+    );
+    final List<List<String?>> formulas = List.generate(
+      _maxRows,
+      (_) => List.filled(_maxCols, null),
+    );
     final List<double> widths = List.filled(_maxCols, 80.0);
 
+    // Pass 1: Extract direct values and identify formula cells
     for (int r = 0; r < _maxRows; r++) {
-      final List<String> rowList = [];
       final rowData = table.row(r);
-
       for (int c = 0; c < _maxCols; c++) {
         if (c < rowData.length && rowData[c] != null) {
-          final cellValue = _formatCellValue(rowData[c]?.value);
-          rowList.add(cellValue);
-
-          // Estimate column width from character count (Cyrillic & Latin)
-          final estimatedWidth = math.max(80.0, math.min(380.0, cellValue.length * 9.5 + 24.0));
-          if (estimatedWidth > widths[c]) {
-            widths[c] = estimatedWidth;
+          final val = rowData[c]?.value;
+          if (val is xl.FormulaCellValue) {
+            formulas[r][c] = val.formula;
+          } else {
+            rows[r][c] = _formatCellValue(val);
           }
-        } else {
-          rowList.add('');
         }
       }
-      rows.add(rowList);
+    }
+
+    // Pass 2: Evaluate formulas into calculated values
+    for (int r = 0; r < _maxRows; r++) {
+      for (int c = 0; c < _maxCols; c++) {
+        final formula = formulas[r][c];
+        if (formula != null) {
+          final evaluated = ExcelFormulaEvaluator.evaluate(
+            formula: formula,
+            getCellValue: (row, col) {
+              if (row >= 0 && row < _maxRows && col >= 0 && col < _maxCols) {
+                return rows[row][col];
+              }
+              return null;
+            },
+            maxRows: _maxRows,
+            maxCols: _maxCols,
+          );
+          rows[r][c] = evaluated;
+        }
+
+        // Estimate column width from character count (Cyrillic & Latin)
+        final cellValue = rows[r][c];
+        final estimatedWidth = math.max(80.0, math.min(380.0, cellValue.length * 9.5 + 24.0));
+        if (estimatedWidth > widths[c]) {
+          widths[c] = estimatedWidth;
+        }
+      }
     }
 
     _sheetData = rows;
+    _sheetFormulas = formulas;
     _colWidths = widths;
     _selectedRow = -1;
     _selectedCol = -1;
     _selectedCellValue = '';
+    _selectedFormula = null;
     _calculateSearchMatches();
   }
 
@@ -221,6 +255,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
       _selectedRow = r;
       _selectedCol = c;
       _selectedCellValue = (r < _sheetData.length && c < _sheetData[r].length) ? _sheetData[r][c] : '';
+      _selectedFormula = (r < _sheetFormulas.length && c < _sheetFormulas[r].length) ? _sheetFormulas[r][c] : null;
     });
   }
 
@@ -583,28 +618,73 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                               ),
                             ),
                           ),
+                          if (_selectedFormula != null) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'fx',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(width: 8),
                           Expanded(
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
-                              child: Text(
-                                _selectedCellValue.isEmpty
-                                    ? 'Tap any cell to inspect content'
-                                    : _selectedCellValue,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: _selectedCellValue.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
-                                  color: _selectedCellValue.isEmpty ? Colors.grey : null,
-                                ),
-                              ),
+                              child: _selectedFormula != null
+                                  ? Row(
+                                      children: [
+                                        Text(
+                                          '=${_selectedFormula!.startsWith('=') ? _selectedFormula!.substring(1) : _selectedFormula}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.blue,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '(Result: $_selectedCellValue)',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.normal,
+                                            color: theme.textTheme.bodySmall?.color,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Text(
+                                      _selectedCellValue.isEmpty
+                                          ? 'Tap any cell to inspect content'
+                                          : _selectedCellValue,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: _selectedCellValue.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                                        color: _selectedCellValue.isEmpty ? Colors.grey : null,
+                                      ),
+                                    ),
                             ),
                           ),
-                          if (_selectedCellValue.isNotEmpty)
+                          if (_selectedCellValue.isNotEmpty || _selectedFormula != null)
                             IconButton(
                               icon: const Icon(Icons.copy, size: 16),
                               tooltip: 'Copy Cell Text',
                               onPressed: () {
-                                Clipboard.setData(ClipboardData(text: _selectedCellValue));
+                                final textToCopy = _selectedFormula != null
+                                    ? '=${_selectedFormula!.startsWith('=') ? _selectedFormula!.substring(1) : _selectedFormula}\nResult: $_selectedCellValue'
+                                    : _selectedCellValue;
+                                Clipboard.setData(ClipboardData(text: textToCopy));
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text('Cell content copied to clipboard'),

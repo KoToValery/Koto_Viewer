@@ -8,6 +8,7 @@ import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/file_source_service.dart';
 import '../../core/services/dwg_converter_service.dart';
+import '../../core/services/doc_to_pdf_converter_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
 import '../dxf_viewer/dxf_viewer_screen.dart';
@@ -1214,9 +1215,24 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
 
       case KotoFileType.docx:
+        String viewPath = filePath;
+        bool openedAsPdf = false;
+        try {
+          // Seamless mode: convert DOC/DOCX to PDF on the fly
+          viewPath = await DocToPdfConverterService.convertToPdf(filePath);
+          openedAsPdf = true;
+        } catch (e) {
+          debugPrint('Doc to PDF conversion fallback to docx viewer: $e');
+        }
+
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => DocxViewerScreen(filePath: filePath),
+            builder: (context) => openedAsPdf
+                ? PdfViewerScreen(
+                    filePath: viewPath,
+                    title: item.name,
+                  )
+                : DocxViewerScreen(filePath: filePath),
           ),
         );
         if (success != false) {
