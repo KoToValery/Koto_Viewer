@@ -48,7 +48,7 @@ class DocToPdfConverterService {
         ? fileName.substring(0, fileName.lastIndexOf('.'))
         : fileName;
 
-    final cachedFileName = '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}_v2.pdf';
+    final cachedFileName = '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}_v3.pdf';
     final targetPdfPath = '${cacheDir.path}${Platform.pathSeparator}$cachedFileName';
     final targetPdfFile = File(targetPdfPath);
 

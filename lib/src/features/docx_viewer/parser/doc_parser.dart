@@ -296,80 +296,47 @@ class DocParser {
   // ===========================================================================
 
   static DocxDocument _parseOleDoc(Uint8List bytes) {
-    // 1. Attempt to parse WordDocument stream using FIB (File Information Block)
-    try {
-      final docFromFib = _parseOleDocViaFib(bytes);
-      if (docFromFib != null && docFromFib.blocks.isNotEmpty) {
-        return docFromFib;
-      }
-    } catch (_) {}
+    // 1. Try 16-bit UTF-16LE stream extraction
+    final utf16Doc = _parseOleStream(bytes, is16Bit: true);
 
-    // 2. Fallback: Parse with state machine (filters field instructions & groups cells into tables)
-    return _parseOleDocStreamStateMachine(bytes);
+    // 2. Try 8-bit CP1251 / ANSI stream extraction
+    final cp1251Doc = _parseOleStream(bytes, is16Bit: false);
+
+    // Choose the extraction that produced more meaningful content across the entire document
+    final utf16CharCount = _calculateTotalChars(utf16Doc);
+    final cp1251CharCount = _calculateTotalChars(cp1251Doc);
+
+    if (cp1251CharCount > utf16CharCount) {
+      return cp1251Doc;
+    } else if (utf16CharCount > 0) {
+      return utf16Doc;
+    }
+
+    // 3. Fallback: Parse plain text
+    return _parsePlainText(bytes);
   }
 
-  /// Extracts the main text stream from the WordDocument stream using FIB parameters.
-  static DocxDocument? _parseOleDocViaFib(Uint8List bytes) {
-    // Locate WordDocument stream inside OLE Compound File
-    final wordDocOffset = _findWordDocumentStreamOffset(bytes);
-    if (wordDocOffset < 0 || wordDocOffset + 0x68 > bytes.length) {
-      return null;
-    }
-
-    final fibOffset = wordDocOffset;
-    final wIdent = bytes[fibOffset] | (bytes[fibOffset + 1] << 8);
-    if (wIdent != 0xA5EC) {
-      return null;
-    }
-
-    // fcMin: offset in bytes where text characters start
-    final fcMin = bytes[fibOffset + 0x18] |
-        (bytes[fibOffset + 0x19] << 8) |
-        (bytes[fibOffset + 0x1A] << 16) |
-        (bytes[fibOffset + 0x1B] << 24);
-
-    // ccpText: character count of main document text
-    final ccpText = bytes[fibOffset + 0x4C] |
-        (bytes[fibOffset + 0x4D] << 8) |
-        (bytes[fibOffset + 0x4E] << 16) |
-        (bytes[fibOffset + 0x4F] << 24);
-
-    if (ccpText <= 0 || ccpText > 5000000) {
-      return null;
-    }
-
-    final textStartOffset = wordDocOffset + (fcMin > 0 && fcMin < bytes.length ? fcMin : 512);
-    final textSlice = bytes.sublist(
-      textStartOffset.clamp(0, bytes.length),
-      (textStartOffset + ccpText * 2).clamp(0, bytes.length),
-    );
-
-    return _parseTextStreamIntoBlocks(textSlice);
-  }
-
-  /// Finds the offset of the WordDocument stream inside the OLE file.
-  static int _findWordDocumentStreamOffset(Uint8List bytes) {
-    // In standard Word files, WordDocument is at offset 512 (sector 0) or preceded by directory
-    if (bytes.length > 514 && (bytes[512] | (bytes[513] << 8)) == 0xA5EC) {
-      return 512;
-    }
-    // Search for FIB magic 0xA5EC on 512-byte sector boundaries
-    for (int offset = 512; offset < bytes.length - 2; offset += 512) {
-      if ((bytes[offset] | (bytes[offset + 1] << 8)) == 0xA5EC) {
-        return offset;
+  static int _calculateTotalChars(DocxDocument doc) {
+    int total = 0;
+    for (final block in doc.blocks) {
+      if (block is DocxParagraph) {
+        total += block.plainText.length;
+      } else if (block is DocxTable) {
+        for (final row in block.rows) {
+          for (final cell in row.cells) {
+            total += cell.plainText.length;
+          }
+        }
       }
     }
-    return -1;
+    return total;
   }
 
-  /// Parses text bytes with Word control characters into paragraphs and tables.
-  static DocxDocument _parseOleDocStreamStateMachine(Uint8List bytes) {
-    return _parseTextStreamIntoBlocks(bytes, startOffset: 512);
-  }
-
-  static DocxDocument _parseTextStreamIntoBlocks(
+  /// Parses text bytes from WordDocument stream into paragraphs and tables (supports 16-bit & 8-bit).
+  static DocxDocument _parseOleStream(
     Uint8List bytes, {
-    int startOffset = 0,
+    required bool is16Bit,
+    int startOffset = 512,
   }) {
     final List<DocxBlock> blocks = [];
     final StringBuffer currentCellOrPara = StringBuffer();
@@ -401,32 +368,51 @@ class DocParser {
     }
 
     int i = startOffset;
-    while (i < bytes.length - 1) {
-      final codeUnit = bytes[i] | (bytes[i + 1] << 8);
+    final step = is16Bit ? 2 : 1;
+
+    while (i < (is16Bit ? bytes.length - 1 : bytes.length)) {
+      int codeUnit;
+      if (is16Bit) {
+        codeUnit = bytes[i] | (bytes[i + 1] << 8);
+      } else {
+        final b = bytes[i];
+        if (b >= 0xC0 && b <= 0xFF) {
+          // CP1251 Cyrillic А..я
+          codeUnit = 0x0410 + (b - 0xC0);
+        } else if (b == 0xA8) {
+          codeUnit = 0x0401; // Ё
+        } else if (b == 0xB8) {
+          codeUnit = 0x0451; // ё
+        } else if (b == 0xB9) {
+          codeUnit = 0x2116; // №
+        } else {
+          codeUnit = b;
+        }
+      }
 
       // Word Field handling
       if (codeUnit == 0x13) {
         // Field Start {
         fieldDepth++;
         inFieldInstruction = true;
-        i += 2;
+        i += step;
         continue;
       } else if (codeUnit == 0x14) {
         // Field Separator (instruction ended, result begins)
         inFieldInstruction = false;
-        i += 2;
+        i += step;
         continue;
       } else if (codeUnit == 0x15) {
         // Field End }
         if (fieldDepth > 0) fieldDepth--;
         inFieldInstruction = false;
-        i += 2;
+        i += step;
         continue;
       }
 
       // If inside field instruction (e.g. PAGE \* MERGEFORMAT), ignore characters
       if (inFieldInstruction) {
-        i += 2;
+        i += step;
         continue;
       }
 
@@ -441,12 +427,12 @@ class DocParser {
             ],
           ),
         );
-        i += 2;
+        i += step;
         continue;
       }
 
-      // Paragraph / Row delimiter (0x0D = \r)
-      if (codeUnit == 0x0D || codeUnit == 0x0C) {
+      // Paragraph / Row delimiter (0x0D = \r, 0x0C = \f page break, 0x0A = \n)
+      if (codeUnit == 0x0D || codeUnit == 0x0C || codeUnit == 0x0A) {
         if (currentRowCells.isNotEmpty) {
           // Table row completed
           currentTableRows.add(DocxTableRow(cells: List.from(currentRowCells)));
@@ -454,20 +440,20 @@ class DocParser {
         } else {
           flushCurrentPara();
         }
-        i += 2;
+        i += step;
         continue;
       }
 
       if (_isValidDocCharCode(codeUnit)) {
         currentCellOrPara.write(String.fromCharCode(codeUnit));
-        i += 2;
+        i += step;
       } else {
         if (currentCellOrPara.length > 2) {
           flushCurrentPara();
         } else {
           currentCellOrPara.clear();
         }
-        i += 2;
+        i += step;
       }
     }
 
@@ -475,11 +461,6 @@ class DocParser {
       flushCurrentPara();
     }
     flushCurrentTable();
-
-    // If UTF-16LE yielded no blocks, try 8-bit text streams (CP1251)
-    if (blocks.isEmpty) {
-      return _parsePlainText(bytes);
-    }
 
     return DocxDocument(blocks: blocks);
   }

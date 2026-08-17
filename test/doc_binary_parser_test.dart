@@ -105,6 +105,40 @@ void main() {
       }
     });
 
+    test('parses 8-bit CP1251 multi-page Word .doc binary streams', () {
+      final header = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+
+      // Build 8-bit CP1251 bytes:
+      // 'Страница 1: Обяснителна записка\rСтраница 2: Таблични данни\rСтраница 3: Заключение\r'
+      final cp1251Bytes = <int>[];
+      final rawLines = [
+        'Страница 1: Обяснителна записка\r',
+        'Страница 2: Таблични данни\r',
+        'Страница 3: Заключение\r',
+      ];
+      for (final line in rawLines) {
+        for (final codeUnit in line.codeUnits) {
+          if (codeUnit >= 0x0410 && codeUnit <= 0x044F) {
+            cp1251Bytes.add(0xC0 + (codeUnit - 0x0410));
+          } else {
+            cp1251Bytes.add(codeUnit);
+          }
+        }
+      }
+
+      final fullBytes = Uint8List.fromList([
+        ...header,
+        ...List.filled(504, 0),
+        ...cp1251Bytes,
+      ]);
+
+      final doc = DocParser.parse(fullBytes);
+      expect(doc.paragraphCount, 3);
+      expect((doc.blocks[0] as DocxParagraph).plainText, contains('Страница 1'));
+      expect((doc.blocks[1] as DocxParagraph).plainText, contains('Страница 2'));
+      expect((doc.blocks[2] as DocxParagraph).plainText, contains('Страница 3'));
+    });
+
     test('cleanWordText utility cleans stray field and style noise', () {
       final dirtyText = 'PAGE \\* MERGEFORMAT 123 Table Normal';
       final cleaned = DocParser.cleanWordText(dirtyText);
