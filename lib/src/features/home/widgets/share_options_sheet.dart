@@ -5,7 +5,7 @@ import '../../../core/services/native_share_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
-enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, other }
+enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, other }
 
 _ShareFileType _detectFileType(String path) {
   final lower = path.toLowerCase();
@@ -15,6 +15,9 @@ _ShareFileType _detectFileType(String path) {
   if (lower.endsWith('.stl')) return _ShareFileType.stl;
   if (lower.endsWith('.obj')) return _ShareFileType.obj;
   if (lower.endsWith('.glb') || lower.endsWith('.gltf')) return _ShareFileType.glb;
+  if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return _ShareFileType.xlsx;
+  if (lower.endsWith('.txt') || lower.endsWith('.log') || lower.endsWith('.csv')) return _ShareFileType.txt;
+  if (lower.endsWith('.md') || lower.endsWith('.markdown')) return _ShareFileType.md;
   return _ShareFileType.other;
 }
 
@@ -112,6 +115,9 @@ class ShareOptionsSheet extends StatelessWidget {
     final bool is3d = fileType == _ShareFileType.stl ||
         fileType == _ShareFileType.obj ||
         fileType == _ShareFileType.glb;
+    final bool isXlsx = fileType == _ShareFileType.xlsx;
+    final bool isTxt = fileType == _ShareFileType.txt;
+    final bool isMd = fileType == _ShareFileType.md;
 
     final Color cardColorStart = isDxf
         ? const Color(0xFF059669)
@@ -119,28 +125,52 @@ class ShareOptionsSheet extends StatelessWidget {
             ? const Color(0xFFEA580C)
             : is3d
                 ? const Color(0xFF0891B2)
-                : AppTheme.primaryColor;
+                : isXlsx
+                    ? const Color(0xFF107C41)
+                    : isTxt
+                        ? const Color(0xFF475569)
+                        : isMd
+                            ? const Color(0xFF4338CA)
+                            : AppTheme.primaryColor;
     final Color cardColorEnd = isDxf
         ? const Color(0xFF10B981)
         : isSvg
             ? const Color(0xFFFB923C)
             : is3d
                 ? const Color(0xFF06B6D4)
-                : AppTheme.secondaryColor;
+                : isXlsx
+                    ? const Color(0xFF22C55E)
+                    : isTxt
+                        ? const Color(0xFF64748B)
+                        : isMd
+                            ? const Color(0xFF6366F1)
+                            : AppTheme.secondaryColor;
     final IconData fileIcon = isDxf
         ? Icons.draw_rounded
         : isSvg
             ? Icons.gesture_rounded
             : is3d
                 ? Icons.view_in_ar_rounded
-                : Icons.picture_as_pdf_rounded;
+                : isXlsx
+                    ? Icons.table_chart_rounded
+                    : isTxt
+                        ? Icons.description_rounded
+                        : isMd
+                            ? Icons.menu_book_rounded
+                            : Icons.picture_as_pdf_rounded;
     final String sendLabel = isDxf
         ? 'Send DXF Drawing'
         : isSvg
             ? 'Send SVG Vector'
             : is3d
                 ? 'Send 3D Model'
-                : 'Send Document';
+                : isXlsx
+                    ? 'Send Spreadsheet'
+                    : isTxt
+                        ? 'Send Text Document'
+                        : isMd
+                            ? 'Send Markdown Document'
+                            : 'Send Document';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
