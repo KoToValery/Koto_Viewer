@@ -1299,6 +1299,11 @@ class DxfParser {
     // 5. Auto-repair Mojibake (Latin-1 misinterpreted Windows-1251 Cyrillic)
     result = _repairCyrillicMojibake(result);
 
+    // 6. Clean any embedded MTEXT codes/leftovers if present
+    if (result.contains('\\') || result.contains(';') || result.contains('ql;') || result.contains('t0;')) {
+      result = _stripMTextFormattingCodes(result);
+    }
+
     return result;
   }
 
@@ -1341,33 +1346,65 @@ class DxfParser {
     return text;
   }
 
-  /// Cleans MTEXT formatted string, stripping formatting codes and resolving newlines.
+  /// Cleans MTEXT formatted string, stripping formatting codes, service tags (-ql;, t0;, etc.), and resolving newlines.
   static String _cleanMText(String text) {
     var result = text;
 
     // First decode unicode and Cyrillic
     result = _cleanCadText(result);
 
-    // Replace paragraph breaks \P with real newline
-    result = result.replaceAll(RegExp(r'\\[Pp]', caseSensitive: false), '\n');
-    result = result.replaceAll(RegExp(r'\\~'), ' ');
+    // Strip all MTEXT formatting codes and service tags
+    result = _stripMTextFormattingCodes(result);
 
-    // Simplify stacked fractions: \S1/2; or \S1^2; -> 1/2 or 1^2
+    return result.trim();
+  }
+
+  /// Thoroughly strips AutoCAD MTEXT formatting sequences and residual service tokens.
+  /// (e.g. \fArial...;, \C7;, \H0.25x;, \pxql,t0;, \pi-0.5,l0.5,t0;, -ql;, t0;, \S1/2;)
+  static String _stripMTextFormattingCodes(String text) {
+    var result = text;
+
+    // 1. Simplify stacked fractions: \S1/2; or \S1^2; or \S1#2; -> 1/2 or 1^2
     result = result.replaceAllMapped(
       RegExp(r'\\[Ss]([^;]+);'),
       (match) => match.group(1)?.replaceAll('^', '') ?? '',
     );
 
-    // Remove all AutoCAD formatting sequences: \f...;, \F...;, \C...;, \H...;, \W...;, \Q...;, \T...;, \A...;, \pxqc;, etc.
-    result = result.replaceAll(RegExp(r'\\[a-zA-Z][^;]*;'), '');
+    // 2. Repeatedly strip all standard AutoCAD backslash formatting sequences ending with semicolon:
+    // e.g. \f...;, \F...;, \C...;, \c...;, \H...;, \W...;, \Q...;, \T...;, \A...;, \px...;, \pi...;, \pt...;, \ps...;
+    // Repeat until fixed point to handle nested formatting blocks
+    String prev;
+    int iterations = 0;
+    do {
+      prev = result;
+      // Strip backslash formatting codes ending in semicolon
+      result = result.replaceAll(RegExp(r'\\[a-zA-Z0-9_\-]+[^;]*;', caseSensitive: false), '');
+      // Strip formatting toggles without semicolon: \L, \l, \O, \o, \K, \k, \X, \x
+      result = result.replaceAll(RegExp(r'\\[LlOoKkXx]'), '');
+      // Strip residual braces
+      result = result.replaceAll('{', '').replaceAll('}', '');
+      iterations++;
+    } while (result != prev && iterations < 10);
 
-    // Remove underline/overline/strikethrough toggles: \L, \l, \O, \o, \K, \k
-    result = result.replaceAll(RegExp(r'\\[LlOoKk]'), '');
+    // 3. Replace paragraph breaks \P with real newlines
+    result = result.replaceAll(RegExp(r'\\[Pp]'), '\n');
+    result = result.replaceAll(RegExp(r'\\~'), ' ');
 
-    // Remove group braces { and }
-    result = result.replaceAll('{', '').replaceAll('}', '');
+    // 4. Strip leftover paragraph formatting tags from DWG/DXF converters
+    // such as: -ql;, ql;, qc;, qr;, qj;, qd;, t0;, ,t0;, \pt0;, i0;, l0;, c0;, b0;, etc.
+    // e.g. "-ql;,t0;Text" or ",t0;Text" or "Text -ql;,t0;"
+    result = result.replaceAll(
+      RegExp(
+        r'(?:^|[\s,;\\])-?(?:ql|qc|qr|qj|qd|t\d+(?:\.\d+)?|i-?\d+(?:\.\d+)?|l\d+(?:\.\d+)?|c\d+|x\d+|b\d+|p\d+);',
+        caseSensitive: false,
+      ),
+      '',
+    );
 
-    // Remove remaining backslashes before special chars
+    // Clean up any remaining leading/trailing commas or semicolons from stripped tags
+    result = result.replaceAll(RegExp(r'^[,\s;]+'), '');
+
+    // Remove remaining escaped backslashes
     result = result.replaceAll(r'\\', r'\');
 
     return result.trim();

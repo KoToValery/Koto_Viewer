@@ -47,7 +47,14 @@ class DxfMeasurePointerPainter extends CustomPainter {
     canvas.drawCircle(touchPos, 18, touchBorderPaint);
     canvas.drawCircle(touchPos, 3.5, touchCenterPaint);
 
-    // 2. Draw Sleek Guideline Stem (connecting touch anchor to target apex)
+    // 2. Determine Pointer Apex & Stem Offsets
+    // When snapped, offset arrow apex below the snap icon so the snap icon is 100% visible and uncluttered
+    final double apexTopY = isSnapped ? (effectiveTip.dy + 9.0) : effectiveTip.dy;
+    final double arrowW = isSnapped ? 7.0 : 8.5;
+    final double arrowH = isSnapped ? 10.0 : 14.0;
+    final double stemTopY = apexTopY + arrowH * 0.85;
+
+    // Draw Sleek Guideline Stem (connecting touch anchor to target apex)
     final stemPaint = Paint()
       ..color = baseColor.withValues(alpha: 0.8)
       ..style = PaintingStyle.stroke
@@ -60,10 +67,9 @@ class DxfMeasurePointerPainter extends CustomPainter {
       ..strokeWidth = 5.0
       ..isAntiAlias = true;
 
-    // Stem path with slight taper from finger up to target
     final stemPath = Path()
       ..moveTo(touchPos.dx, touchPos.dy - 18)
-      ..lineTo(effectiveTip.dx, effectiveTip.dy + 14);
+      ..lineTo(effectiveTip.dx, stemTopY);
 
     canvas.drawPath(stemPath, glowStemPaint);
     canvas.drawPath(stemPath, stemPaint);
@@ -79,14 +85,11 @@ class DxfMeasurePointerPainter extends CustomPainter {
       ..strokeWidth = 1.2
       ..isAntiAlias = true;
 
-    const double arrowW = 10.0;
-    const double arrowH = 16.0;
-
     final apexPath = Path()
-      ..moveTo(effectiveTip.dx, effectiveTip.dy) // Sharp tip pointing UP
-      ..lineTo(effectiveTip.dx + arrowW, effectiveTip.dy + arrowH)
-      ..lineTo(effectiveTip.dx, effectiveTip.dy + arrowH * 0.7)
-      ..lineTo(effectiveTip.dx - arrowW, effectiveTip.dy + arrowH)
+      ..moveTo(effectiveTip.dx, apexTopY) // Sharp tip pointing UP
+      ..lineTo(effectiveTip.dx + arrowW, apexTopY + arrowH)
+      ..lineTo(effectiveTip.dx, apexTopY + arrowH * 0.7)
+      ..lineTo(effectiveTip.dx - arrowW, apexTopY + arrowH)
       ..close();
 
     canvas.drawPath(apexPath, arrowPaint);
@@ -110,7 +113,7 @@ class DxfMeasurePointerPainter extends CustomPainter {
   }
 
   void _drawSnapIndicator(Canvas canvas, Offset pos, DxfSnapType type) {
-    const double snapSize = 14.0;
+    const double snapSize = 7.0;
 
     final snapHaloPaint = Paint()
       ..color = const Color(0xFF00E5FF).withValues(alpha: 0.25)
@@ -118,7 +121,7 @@ class DxfMeasurePointerPainter extends CustomPainter {
     final snapLinePaint = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
+      ..strokeWidth = 1.6
       ..isAntiAlias = true;
 
     switch (type) {
@@ -150,7 +153,36 @@ class DxfMeasurePointerPainter extends CustomPainter {
         // Concentric Circles ⊙
         canvas.drawCircle(pos, snapSize, snapHaloPaint);
         canvas.drawCircle(pos, snapSize, snapLinePaint);
-        canvas.drawCircle(pos, 3.0, Paint()..color = const Color(0xFF00E5FF)..style = PaintingStyle.fill);
+        canvas.drawCircle(pos, 2.5, Paint()..color = const Color(0xFF00E5FF)..style = PaintingStyle.fill);
+        break;
+
+      case DxfSnapType.nearest:
+        // Hourglass / Bowtie ⧖ (Classic CAD Nearest / On Segment indicator)
+        const double s = snapSize * 0.8;
+        final hourglass = Path()
+          ..moveTo(pos.dx - s, pos.dy - s)
+          ..lineTo(pos.dx + s, pos.dy - s)
+          ..lineTo(pos.dx - s, pos.dy + s)
+          ..lineTo(pos.dx + s, pos.dy + s)
+          ..close();
+        canvas.drawPath(hourglass, snapHaloPaint);
+        canvas.drawPath(hourglass, snapLinePaint);
+        break;
+
+      case DxfSnapType.perpendicular:
+        // CAD Perpendicular symbol ⟂ with right-angle corner square
+        const double s = snapSize * 0.85;
+        final perpPath = Path()
+          ..moveTo(pos.dx - s, pos.dy + s)
+          ..lineTo(pos.dx + s, pos.dy + s)
+          ..moveTo(pos.dx, pos.dy + s)
+          ..lineTo(pos.dx, pos.dy - s)
+          ..moveTo(pos.dx, pos.dy + s - s * 0.5)
+          ..lineTo(pos.dx + s * 0.5, pos.dy + s - s * 0.5)
+          ..lineTo(pos.dx + s * 0.5, pos.dy + s);
+        canvas.drawPath(perpPath, snapHaloPaint);
+        canvas.drawPath(perpPath, snapLinePaint);
+        canvas.drawCircle(pos, 2.0, Paint()..color = const Color(0xFF00E5FF)..style = PaintingStyle.fill);
         break;
     }
   }
@@ -171,13 +203,25 @@ class DxfMeasurePointerPainter extends CustomPainter {
         case DxfSnapType.point:
           titleText += ' • Точка';
           break;
+        case DxfSnapType.nearest:
+          titleText += ' • Отсечка';
+          break;
+        case DxfSnapType.perpendicular:
+          titleText += ' • Прав ъгъл (90°)';
+          break;
       }
     }
 
     String subText = 'X: ${DxfMath.formatDistance(currentCadCoord.dx)}  Y: ${DxfMath.formatDistance(currentCadCoord.dy)}';
     if (isSettingSecondPoint && p1CadCoord != null) {
       final double liveDist = (currentCadCoord - p1CadCoord!).distance;
-      subText = 'L = ${DxfMath.formatDistance(liveDist)} m  |  $subText';
+      final dx = currentCadCoord.dx - p1CadCoord!.dx;
+      final dy = currentCadCoord.dy - p1CadCoord!.dy;
+      double angleDeg = math.atan2(dy, dx) * 180.0 / math.pi;
+      if (angleDeg < 0) angleDeg += 360.0;
+      final isPerp = snapType == DxfSnapType.perpendicular;
+      final angleStr = isPerp ? ' • 90.0° ⟂' : ' • ${angleDeg.toStringAsFixed(1)}°';
+      subText = 'L = ${DxfMath.formatDistance(liveDist)} m$angleStr  |  $subText';
     }
 
     final titlePainter = TextPainter(

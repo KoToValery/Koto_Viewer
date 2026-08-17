@@ -240,6 +240,61 @@ EOF
       expect(mtext.height, 2.5);
     });
 
+    test('Strips AutoCAD DWG->DXF service formatting codes (-ql;, t0;, \\pxql, etc.)', () {
+      const dxfContent = '''
+0
+SECTION
+2
+ENTITIES
+0
+MTEXT
+8
+Layer1
+1
+\\pxql,t0;Кота +3.50
+10
+0.0
+20
+0.0
+0
+MTEXT
+8
+Layer1
+1
+{\\fArial|b0|i0|c204|p34;\\C7;\\H0.25x;\\pi-0.5,l0.5,t0;-ql;,t0;Вход А}
+10
+10.0
+20
+10.0
+0
+TEXT
+8
+Layer1
+1
+-ql;,t0;Стая 105
+10
+20.0
+20
+20.0
+0
+ENDSEC
+0
+EOF
+''';
+
+      final doc = DxfParser.parseString(dxfContent);
+      expect(doc.entities.length, 3);
+
+      final mtext1 = doc.entities[0] as DxfMText;
+      expect(mtext1.cleanText, 'Кота +3.50');
+
+      final mtext2 = doc.entities[1] as DxfMText;
+      expect(mtext2.cleanText, 'Вход А');
+
+      final text3 = doc.entities[2] as DxfText;
+      expect(text3.text, 'Стая 105');
+    });
+
     test('Parses BLOCKS and INSERT references', () {
       const dxfContent = '''
 0

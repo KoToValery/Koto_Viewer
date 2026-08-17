@@ -28,7 +28,15 @@ class DxfLayer {
   bool isVisible;
   final bool isFrozen;
   final double? lineweight;
-  bool isThick;
+  double? customLineweight; // null = Original (from DXF), or 0.12, 0.25, 0.35, 0.70 mm override
+
+  bool get isThick =>
+      (customLineweight != null && customLineweight! >= 0.35) ||
+      (customLineweight == null && (lineweight != null && lineweight! >= 0.35));
+
+  set isThick(bool val) {
+    customLineweight = val ? 0.70 : 0.12;
+  }
 
   DxfLayer({
     required this.name,
@@ -37,8 +45,13 @@ class DxfLayer {
     this.isVisible = true,
     this.isFrozen = false,
     this.lineweight,
-    this.isThick = false,
-  });
+    this.customLineweight,
+    bool isThick = false,
+  }) {
+    if (isThick && customLineweight == null) {
+      customLineweight = 0.70;
+    }
+  }
 
   DxfLayer copyWith({
     String? name,
@@ -47,17 +60,22 @@ class DxfLayer {
     bool? isVisible,
     bool? isFrozen,
     double? lineweight,
+    double? customLineweight,
     bool? isThick,
   }) {
-    return DxfLayer(
+    final layer = DxfLayer(
       name: name ?? this.name,
       colorIndex: colorIndex ?? this.colorIndex,
       trueColor: trueColor ?? this.trueColor,
       isVisible: isVisible ?? this.isVisible,
       isFrozen: isFrozen ?? this.isFrozen,
       lineweight: lineweight ?? this.lineweight,
-      isThick: isThick ?? this.isThick,
+      customLineweight: customLineweight ?? this.customLineweight,
     );
+    if (isThick != null && customLineweight == null) {
+      layer.isThick = isThick;
+    }
+    return layer;
   }
 }
 

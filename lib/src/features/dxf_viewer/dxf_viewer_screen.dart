@@ -293,10 +293,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if (_snapEnabled && _document != null) {
       final fitScale = _getCadFitScale();
       final toleranceCad = 22.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
+      final basePoint = (_measurement != null && _measurement!.p2Cad == null)
+          ? _measurement!.p1Cad
+          : null;
       snap = DxfSnapHelper.findSnapPoint(
         document: _document!,
         cadPoint: rawCadPt,
         toleranceCad: toleranceCad,
+        basePoint: basePoint,
       );
 
       if (snap != null) {
@@ -390,10 +394,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final fitScale = _getCadFitScale();
       // 18 screen pixels tolerance converted to CAD coordinates
       final toleranceCad = 18.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
+      final basePoint = (_measurement != null && _measurement!.p2Cad == null)
+          ? _measurement!.p1Cad
+          : null;
       snap = DxfSnapHelper.findSnapPoint(
         document: _document!,
         cadPoint: cadPoint,
         toleranceCad: toleranceCad,
+        basePoint: basePoint,
       );
     }
 

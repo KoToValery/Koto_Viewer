@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/FlutterApplication/KotoPDF_Viewer/android/app/src/main/cpp"
+    "cmake.sourceDirectory": "C:/FlutterApplication/KotoPDF_Viewer/android/app/src/main/cpp",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

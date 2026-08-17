@@ -147,6 +147,51 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
             ),
           ),
 
+          // Global Quick Bar for all layers
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.line_weight,
+                  size: 15,
+                  color: theme.textTheme.bodySmall?.color,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Всички:',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: theme.textTheme.bodySmall?.color,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildQuickAllOption('Оригинална', () => _setAllLineweight(null), theme),
+                        const SizedBox(width: 4),
+                        _buildQuickAllOption('0.12 мм', () => _setAllLineweight(0.12), theme),
+                        const SizedBox(width: 4),
+                        _buildQuickAllOption('0.25 мм', () => _setAllLineweight(0.25), theme),
+                        const SizedBox(width: 4),
+                        _buildQuickAllOption('0.35 мм', () => _setAllLineweight(0.35), theme),
+                        const SizedBox(width: 4),
+                        _buildQuickAllOption('0.70 мм', () => _setAllLineweight(0.70), theme),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           const Divider(height: 1),
 
           // Layer List
@@ -208,7 +253,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '$count ${count == 1 ? "обект" : "обекта"} ${layer.isFrozen ? "• Замразен" : ""}',
+                              '$count ${count == 1 ? "обект" : "обекта"} ${layer.isFrozen ? "• Замразен" : ""}${layer.lineweight != null && layer.lineweight! > 0 ? " • DXF: ${layer.lineweight!.toStringAsFixed(2)} mm" : ""}',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: theme.textTheme.bodySmall?.color,
@@ -216,39 +261,81 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                             ),
                             const SizedBox(height: 6),
 
-                            // Line Thickness Toggle (Тънки / Дебели)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildLineWeightOption(
-                                  label: 'Тънки',
-                                  isSelected: !layer.isThick,
-                                  onTap: () {
-                                    if (layer.isThick) {
+                            // AutoCAD Lineweight Selector: Оригинална, 0.12 мм, 0.25 мм, 0.35 мм, 0.70 мм
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildLineWeightOption(
+                                    label: 'Оригинална',
+                                    previewThickness: (layer.lineweight != null && layer.lineweight! > 0)
+                                        ? (layer.lineweight! * 4.5).clamp(0.9, 3.5)
+                                        : 1.0,
+                                    isSelected: layer.customLineweight == null,
+                                    onTap: () {
                                       setState(() {
-                                        layer.isThick = false;
+                                        layer.customLineweight = null;
                                       });
                                       widget.onLayersChanged();
-                                    }
-                                  },
-                                  theme: theme,
-                                ),
-                                const SizedBox(width: 6),
-                                _buildLineWeightOption(
-                                  label: 'Дебели',
-                                  isSelected: layer.isThick,
-                                  isThickIndicator: true,
-                                  onTap: () {
-                                    if (!layer.isThick) {
+                                    },
+                                    theme: theme,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  _buildLineWeightOption(
+                                    label: '0.12 мм',
+                                    previewThickness: 0.9,
+                                    isSelected: layer.customLineweight == 0.12,
+                                    onTap: () {
                                       setState(() {
-                                        layer.isThick = true;
+                                        layer.customLineweight = 0.12;
                                       });
                                       widget.onLayersChanged();
-                                    }
-                                  },
-                                  theme: theme,
-                                ),
-                              ],
+                                    },
+                                    theme: theme,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  _buildLineWeightOption(
+                                    label: '0.25 мм',
+                                    previewThickness: 1.4,
+                                    isSelected: layer.customLineweight == 0.25,
+                                    onTap: () {
+                                      setState(() {
+                                        layer.customLineweight = 0.25;
+                                      });
+                                      widget.onLayersChanged();
+                                    },
+                                    theme: theme,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  _buildLineWeightOption(
+                                    label: '0.35 мм',
+                                    previewThickness: 2.0,
+                                    isSelected: layer.customLineweight == 0.35,
+                                    onTap: () {
+                                      setState(() {
+                                        layer.customLineweight = 0.35;
+                                      });
+                                      widget.onLayersChanged();
+                                    },
+                                    theme: theme,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  _buildLineWeightOption(
+                                    label: '0.70 мм',
+                                    previewThickness: 3.5,
+                                    isSelected: layer.customLineweight == 0.70,
+                                    onTap: () {
+                                      setState(() {
+                                        layer.customLineweight = 0.70;
+                                      });
+                                      widget.onLayersChanged();
+                                    },
+                                    theme: theme,
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -276,23 +363,58 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
     );
   }
 
+  void _setAllLineweight(double? weight) {
+    setState(() {
+      for (final layer in widget.document.layers.values) {
+        layer.customLineweight = weight;
+      }
+    });
+    widget.onLayersChanged();
+  }
+
+  Widget _buildQuickAllOption(String label, VoidCallback onTap, ThemeData theme) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(4),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: theme.dividerColor.withValues(alpha: 0.3),
+            width: 0.8,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLineWeightOption({
     required String label,
+    required double previewThickness,
     required bool isSelected,
     required VoidCallback onTap,
     required ThemeData theme,
-    bool isThickIndicator = false,
   }) {
     return InkWell(
       borderRadius: BorderRadius.circular(6),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
         decoration: BoxDecoration(
           color: isSelected
               ? theme.colorScheme.primary.withValues(alpha: 0.18)
-              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isSelected
@@ -305,18 +427,18 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 14,
-              height: isThickIndicator ? 3.0 : 1.2,
+              width: 12,
+              height: previewThickness,
               decoration: BoxDecoration(
                 color: isSelected ? theme.colorScheme.primary : Colors.grey,
                 borderRadius: BorderRadius.circular(1),
               ),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 4.5),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 color: isSelected ? theme.colorScheme.primary : theme.textTheme.bodySmall?.color,
               ),

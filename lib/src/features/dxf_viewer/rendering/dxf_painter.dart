@@ -125,8 +125,7 @@ class DxfPainter extends CustomPainter {
         isDarkBackground: theme.isDark,
       );
 
-      final isThick = layer?.isThick ?? false;
-      final strokeWidth = _calcStrokeWidth(entity.lineWeight, isThick: isThick);
+      final strokeWidth = _calcStrokeWidth(entity.lineWeight, layer: layer);
 
       final strokePaint = Paint()
         ..color = color
@@ -169,15 +168,31 @@ class DxfPainter extends CustomPainter {
     }
   }
 
-  double _calcStrokeWidth(double? lineWeight, {bool isThick = false}) {
+  double _calcStrokeWidth(double? lineWeight, {DxfLayer? layer, bool isThick = false}) {
     final scale = currentScale.clamp(0.001, 10000.0);
-    final thickness = isThick ? 2.6 : 1.0;
-    if (lineWeight != null && lineWeight > 0) {
-      // Lineweight in DXF is in mm, map reasonably to screen pixels
-      return ((lineWeight * 1.5).clamp(0.4, 8.0) * thickness) / scale;
+
+    // Determine effective lineweight in millimeters:
+    // 1. User custom layer override (0.12, 0.25, 0.35, 0.70 mm)
+    // 2. Entity own lineweight from DXF
+    // 3. Layer original lineweight from DXF
+    double? mm = layer?.customLineweight ?? lineWeight ?? layer?.lineweight;
+
+    if (mm == null && (isThick || (layer?.isThick ?? false))) {
+      mm = 0.70;
     }
-    // Default thin crisp stroke (1.1px) or thick stroke (2.8px) adapted to zoom scale
-    return ((isThick ? 2.8 : 1.1) * settings.lineThicknessScale) / scale;
+
+    if (mm != null && mm > 0) {
+      // AutoCAD standard lineweight mapping (in mm) to screen canvas pixels:
+      // 0.12 mm -> ~0.95 px
+      // 0.25 mm -> ~1.50 px
+      // 0.35 mm -> ~2.20 px
+      // 0.70 mm -> ~3.80 px
+      final basePx = (mm * 5.0).clamp(0.8, 14.0);
+      return (basePx * settings.lineThicknessScale) / scale;
+    }
+
+    // Default crisp standard thin line (~1.1 px)
+    return (1.1 * settings.lineThicknessScale) / scale;
   }
 
   void _drawGrid(Canvas canvas, Size size) {
@@ -741,11 +756,10 @@ class DxfPainter extends CustomPainter {
             isDarkBackground: theme.isDark,
           );
 
-          final isThick = childLayer?.isThick ?? false;
           final strokePaint = Paint()
             ..color = childColor
             ..style = PaintingStyle.stroke
-            ..strokeWidth = _calcStrokeWidth(child.lineWeight, isThick: isThick)
+            ..strokeWidth = _calcStrokeWidth(child.lineWeight, layer: childLayer)
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round;
 
@@ -887,6 +901,34 @@ class DxfPainter extends CustomPainter {
         // Circle marker ○
         canvas.drawCircle(pos, size * 0.85, fillPaint);
         canvas.drawCircle(pos, size * 0.85, markerPaint);
+        break;
+
+      case DxfSnapType.nearest:
+        // Hourglass marker ⧖
+        final double s = size * 0.75;
+        final path = Path()
+          ..moveTo(pos.dx - s, pos.dy - s)
+          ..lineTo(pos.dx + s, pos.dy - s)
+          ..lineTo(pos.dx - s, pos.dy + s)
+          ..lineTo(pos.dx + s, pos.dy + s)
+          ..close();
+        canvas.drawPath(path, fillPaint);
+        canvas.drawPath(path, markerPaint);
+        break;
+
+      case DxfSnapType.perpendicular:
+        // CAD Perpendicular symbol ⟂
+        final double s = size * 0.75;
+        final path = Path()
+          ..moveTo(pos.dx - s, pos.dy + s)
+          ..lineTo(pos.dx + s, pos.dy + s)
+          ..moveTo(pos.dx, pos.dy + s)
+          ..lineTo(pos.dx, pos.dy - s)
+          ..moveTo(pos.dx, pos.dy + s - s * 0.5)
+          ..lineTo(pos.dx + s * 0.5, pos.dy + s - s * 0.5)
+          ..lineTo(pos.dx + s * 0.5, pos.dy + s);
+        canvas.drawPath(path, fillPaint);
+        canvas.drawPath(path, markerPaint);
         break;
     }
   }
