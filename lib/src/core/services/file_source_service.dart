@@ -195,6 +195,29 @@ class FileSourceService {
         lower.endsWith('.igs');
   }
 
+  static List<String> getSafePublicDirectoryPaths() {
+    final List<String> paths = [];
+
+    if (Platform.isAndroid) {
+      final downloadDir = Directory('/storage/emulated/0/Download');
+      if (downloadDir.existsSync()) paths.add(downloadDir.path);
+
+      final docDir = Directory('/storage/emulated/0/Documents');
+      if (docDir.existsSync()) paths.add(docDir.path);
+    } else if (Platform.isWindows) {
+      final userProfile = Platform.environment['USERPROFILE'];
+      if (userProfile != null) {
+        final downloadDir = Directory('$userProfile\\Downloads');
+        if (downloadDir.existsSync()) paths.add(downloadDir.path);
+
+        final docDir = Directory('$userProfile\\Documents');
+        if (docDir.existsSync()) paths.add(docDir.path);
+      }
+    }
+
+    return paths;
+  }
+
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {
     final mode = await getSourceMode();
     List<PdfItem> files = [];
@@ -203,17 +226,39 @@ class FileSourceService {
       case FileSourceMode.recent:
         final rawFiles = await RecentFilesService.getRecentFiles();
         files = rawFiles.where((item) => File(item.path).existsSync()).toList();
+
+        // If recents are empty on first launch, auto-scan safe public directories
+        if (files.isEmpty) {
+          final publicPaths = getSafePublicDirectoryPaths();
+          for (final p in publicPaths) {
+            final dirFiles = await _scanDirectoryForFiles(Directory(p));
+            files.addAll(dirFiles);
+          }
+        }
         break;
+
       case FileSourceMode.custom:
         final customPath = await getCustomFolderPath();
         if (customPath != null && customPath.isNotEmpty) {
           final customDir = Directory(customPath);
           files = await _scanDirectoryForFiles(customDir);
+        } else {
+          final publicPaths = getSafePublicDirectoryPaths();
+          for (final p in publicPaths) {
+            final dirFiles = await _scanDirectoryForFiles(Directory(p));
+            files.addAll(dirFiles);
+          }
         }
         break;
     }
 
-    return await _sortFiles(files);
+    // Deduplicate by path
+    final Map<String, PdfItem> unique = {};
+    for (final f in files) {
+      unique[f.path] = f;
+    }
+
+    return await _sortFiles(unique.values.toList());
   }
 
   static Future<List<PdfItem>> _sortFiles(List<PdfItem> files) async {

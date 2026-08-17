@@ -1,5 +1,45 @@
 import 'dart:convert';
 
+enum FileCategory {
+  all,
+  cad2d,
+  cad3d,
+  pcb,
+  documents,
+}
+
+extension FileCategoryExtension on FileCategory {
+  String get label {
+    switch (this) {
+      case FileCategory.all:
+        return 'All';
+      case FileCategory.cad2d:
+        return '2D CAD';
+      case FileCategory.cad3d:
+        return '3D Models';
+      case FileCategory.pcb:
+        return 'PCB & Hardware';
+      case FileCategory.documents:
+        return 'Documents';
+    }
+  }
+
+  String get shortLabel {
+    switch (this) {
+      case FileCategory.all:
+        return 'All';
+      case FileCategory.cad2d:
+        return '2D CAD';
+      case FileCategory.cad3d:
+        return '3D';
+      case FileCategory.pcb:
+        return 'PCB';
+      case FileCategory.documents:
+        return 'Docs';
+    }
+  }
+}
+
 enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, other }
 
 class PdfItem {
@@ -94,6 +134,13 @@ class PdfItem {
   bool get isPcb => isGerber || isDrill || isKicad;
   bool get isVector => isSvg || isEps || isPcb || isPlotter;
   bool get isTextDoc => isTxt || isMd || isDocx;
+
+  FileCategory get category {
+    if (is3d) return FileCategory.cad3d;
+    if (isCad || isPlotter || isSvg || isEps) return FileCategory.cad2d;
+    if (isPcb) return FileCategory.pcb;
+    return FileCategory.documents;
+  }
 
   String get fileExtension {
     if (!name.contains('.')) return '';

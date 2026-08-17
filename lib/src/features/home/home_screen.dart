@@ -749,11 +749,35 @@ class _HomeScreenState extends State<HomeScreen> {
   SortOption _currentSort = SortOption.date;
   String? _customFolderPath;
   List<String> _customFolderList = [];
+  FileCategory _selectedCategory = FileCategory.all;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadFiles();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  int _getCategoryCount(FileCategory cat) {
+    if (cat == FileCategory.all) return _pdfFiles.length;
+    return _pdfFiles.where((f) => f.category == cat).length;
+  }
+
+  List<PdfItem> get _filteredFiles {
+    return _pdfFiles.where((f) {
+      final matchesCategory =
+          _selectedCategory == FileCategory.all || f.category == _selectedCategory;
+      final matchesSearch = _searchQuery.isEmpty ||
+          f.name.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    }).toList();
   }
 
   Future<void> _loadFiles() async {
@@ -1911,6 +1935,107 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildCategoryFilterBar(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: FileCategory.values.map((cat) {
+            final isSelected = _selectedCategory == cat;
+            final count = _getCategoryCount(cat);
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: FilterChip(
+                selected: isSelected,
+                showCheckmark: false,
+                avatar: Icon(
+                  cat == FileCategory.all
+                      ? Icons.auto_awesome_mosaic_rounded
+                      : cat == FileCategory.cad2d
+                          ? Icons.draw_rounded
+                          : cat == FileCategory.cad3d
+                              ? Icons.view_in_ar_rounded
+                              : cat == FileCategory.pcb
+                                  ? Icons.memory_rounded
+                                  : Icons.description_rounded,
+                  size: 16,
+                  color: isSelected
+                      ? Colors.white
+                      : theme.colorScheme.primary,
+                ),
+                label: Text(
+                  '${cat.label} ($count)',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected
+                        ? Colors.white
+                        : theme.textTheme.bodyMedium?.color,
+                  ),
+                ),
+                backgroundColor: theme.colorScheme.surface,
+                selectedColor: theme.colorScheme.primary,
+                side: BorderSide(
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : theme.dividerColor.withValues(alpha: 0.2),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                onSelected: (_) {
+                  setState(() => _selectedCategory = cat);
+                },
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Search in ${_selectedCategory.label}...',
+          hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          prefixIcon: const Icon(Icons.search, size: 20),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: theme.colorScheme.surface,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
+          ),
+        ),
+        style: const TextStyle(fontSize: 13),
+        onChanged: (val) {
+          setState(() => _searchQuery = val.trim());
+        },
+      ),
+    );
+  }
+
   Widget _buildFormatBadge(String label, IconData icon, Color borderColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -2081,19 +2206,29 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
               _buildSourceHeader(theme),
+              SliverToBoxAdapter(child: _buildCategoryFilterBar(theme)),
+              if (_pdfFiles.isNotEmpty) SliverToBoxAdapter(child: _buildSearchBar(theme)),
 
               if (_isLoading)
                 const SliverFillRemaining(
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (_pdfFiles.isEmpty)
+              else if (_filteredFiles.isEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(40.0),
                     child: Column(
                       children: [
                         Icon(
-                          Icons.folder_copy_outlined,
+                          _selectedCategory == FileCategory.all
+                              ? Icons.folder_copy_outlined
+                              : _selectedCategory == FileCategory.cad2d
+                                  ? Icons.draw_outlined
+                                  : _selectedCategory == FileCategory.cad3d
+                                      ? Icons.view_in_ar_outlined
+                                      : _selectedCategory == FileCategory.pcb
+                                          ? Icons.memory_outlined
+                                          : Icons.description_outlined,
                           size: 64,
                           color: theme.textTheme.bodyMedium?.color?.withValues(
                             alpha: 0.4,
@@ -2101,25 +2236,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _currentMode == FileSourceMode.custom &&
-                                  (_customFolderPath == null ||
-                                      _customFolderPath!.isEmpty)
-                              ? 'No folder selected'
-                              : 'No files found in source',
+                          _searchQuery.isNotEmpty
+                              ? 'No matching files for "$_searchQuery"'
+                              : 'No ${_selectedCategory.label} files found',
                           style: theme.textTheme.titleLarge?.copyWith(
-                            fontSize: 18,
+                            fontSize: 17,
                             color: theme.textTheme.bodyMedium?.color,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _currentMode == FileSourceMode.custom
-                              ? 'Tap the folder icon to select a directory.'
-                              : 'Recently opened files will appear here.',
+                          _searchQuery.isNotEmpty
+                              ? 'Try searching for a different keyword or switch category.'
+                              : 'Use "Browse Files" to open or view ${_selectedCategory.label} documents.',
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium,
+                          style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
                         ),
-                        if (_currentMode == FileSourceMode.custom) ...[
+                        if (_currentMode == FileSourceMode.custom && _searchQuery.isEmpty) ...[
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
                             onPressed: _pickCustomFolder,
@@ -2139,7 +2272,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
-                      final item = _pdfFiles[index];
+                      final item = _filteredFiles[index];
                       final fileExists = File(item.path).existsSync();
 
                       return Padding(

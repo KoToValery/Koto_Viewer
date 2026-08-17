@@ -96,25 +96,29 @@ class MainActivity : FlutterActivity() {
     private fun handleIntent(intent: Intent?, isInitial: Boolean) {
         if (intent == null) return
         val action = intent.action
-        val type = intent.type
 
         var uri: Uri? = null
+
         if (Intent.ACTION_VIEW == action) {
-            uri = intent.data
-        } else if (Intent.ACTION_SEND == action && (type?.startsWith("application/pdf") == true || type == "*/*")) {
-            uri = intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
+            uri = intent.data ?: intent.clipData?.getItemAt(0)?.uri
+        } else if (Intent.ACTION_SEND == action) {
+            uri = (intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri)
+                ?: intent.clipData?.getItemAt(0)?.uri
+                ?: intent.data
+        } else if (Intent.ACTION_SEND_MULTIPLE == action) {
+            val list = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+            uri = list?.firstOrNull() ?: intent.clipData?.getItemAt(0)?.uri
         } else if (intent.data != null) {
             uri = intent.data
+        } else if (intent.clipData != null && intent.clipData!!.itemCount > 0) {
+            uri = intent.clipData!!.getItemAt(0).uri
         }
 
         if (uri != null) {
             val localPath = resolveUriToFilePath(uri)
             if (localPath != null) {
-                if (isInitial || methodChannel == null) {
-                    initialPdfPath = localPath
-                } else {
-                    methodChannel?.invokeMethod("onPdfOpened", localPath)
-                }
+                initialPdfPath = localPath
+                methodChannel?.invokeMethod("onPdfOpened", localPath)
             }
         }
     }
@@ -125,14 +129,26 @@ class MainActivity : FlutterActivity() {
             if (scheme == "file") {
                 uri.path
             } else if (scheme == "content") {
-                val fileName = getFileName(uri) ?: "opened_document"
-                val lowerName = fileName.lowercase()
-                val sanitizedFileName = if (lowerName.endsWith(".pdf") || lowerName.endsWith(".dxf") || lowerName.endsWith(".dwg")) {
-                    fileName
-                } else if (fileName.contains(".")) {
+                val fileName = getFileName(uri) ?: "shared_document"
+                val sanitizedFileName = if (fileName.contains(".")) {
                     fileName
                 } else {
-                    "$fileName.pdf"
+                    val mime = contentResolver.getType(uri)?.lowercase() ?: ""
+                    when {
+                        mime.contains("pdf") -> "$fileName.pdf"
+                        mime.contains("dxf") || mime.contains("autocad") -> "$fileName.dxf"
+                        mime.contains("dwg") -> "$fileName.dwg"
+                        mime.contains("svg") -> "$fileName.svg"
+                        mime.contains("stl") -> "$fileName.stl"
+                        mime.contains("obj") -> "$fileName.obj"
+                        mime.contains("step") || mime.contains("stp") -> "$fileName.step"
+                        mime.contains("iges") || mime.contains("igs") -> "$fileName.iges"
+                        mime.contains("spreadsheet") || mime.contains("excel") || mime.contains("sheet") -> "$fileName.xlsx"
+                        mime.contains("word") || mime.contains("document") -> "$fileName.docx"
+                        mime.contains("text") || mime.contains("plain") -> "$fileName.txt"
+                        mime.contains("markdown") -> "$fileName.md"
+                        else -> "$fileName.pdf"
+                    }
                 }
                 val tempFile = File(cacheDir, sanitizedFileName)
                 val inputStream = contentResolver.openInputStream(uri)
