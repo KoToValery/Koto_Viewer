@@ -5,13 +5,16 @@ import '../../../core/services/native_share_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
-enum _ShareFileType { pdf, dxf, svg, other }
+enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, other }
 
 _ShareFileType _detectFileType(String path) {
   final lower = path.toLowerCase();
   if (lower.endsWith('.pdf')) return _ShareFileType.pdf;
   if (lower.endsWith('.dxf')) return _ShareFileType.dxf;
   if (lower.endsWith('.svg')) return _ShareFileType.svg;
+  if (lower.endsWith('.stl')) return _ShareFileType.stl;
+  if (lower.endsWith('.obj')) return _ShareFileType.obj;
+  if (lower.endsWith('.glb') || lower.endsWith('.gltf')) return _ShareFileType.glb;
   return _ShareFileType.other;
 }
 
@@ -106,26 +109,38 @@ class ShareOptionsSheet extends StatelessWidget {
 
     final bool isDxf = fileType == _ShareFileType.dxf;
     final bool isSvg = fileType == _ShareFileType.svg;
+    final bool is3d = fileType == _ShareFileType.stl ||
+        fileType == _ShareFileType.obj ||
+        fileType == _ShareFileType.glb;
+
     final Color cardColorStart = isDxf
         ? const Color(0xFF059669)
         : isSvg
             ? const Color(0xFFEA580C)
-            : AppTheme.primaryColor;
+            : is3d
+                ? const Color(0xFF0891B2)
+                : AppTheme.primaryColor;
     final Color cardColorEnd = isDxf
         ? const Color(0xFF10B981)
         : isSvg
             ? const Color(0xFFFB923C)
-            : AppTheme.secondaryColor;
+            : is3d
+                ? const Color(0xFF06B6D4)
+                : AppTheme.secondaryColor;
     final IconData fileIcon = isDxf
         ? Icons.draw_rounded
         : isSvg
             ? Icons.gesture_rounded
-            : Icons.picture_as_pdf_rounded;
+            : is3d
+                ? Icons.view_in_ar_rounded
+                : Icons.picture_as_pdf_rounded;
     final String sendLabel = isDxf
         ? 'Send DXF Drawing'
         : isSvg
             ? 'Send SVG Vector'
-            : 'Send Document';
+            : is3d
+                ? 'Send 3D Model'
+                : 'Send Document';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

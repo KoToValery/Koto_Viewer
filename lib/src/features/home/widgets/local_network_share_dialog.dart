@@ -236,11 +236,17 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
 
     final isDxf = widget.filePath.toLowerCase().endsWith('.dxf');
     final isSvg = widget.filePath.toLowerCase().endsWith('.svg');
+    final is3d = widget.filePath.toLowerCase().endsWith('.stl') ||
+        widget.filePath.toLowerCase().endsWith('.obj') ||
+        widget.filePath.toLowerCase().endsWith('.glb') ||
+        widget.filePath.toLowerCase().endsWith('.gltf');
     final qrPrimaryColor = isDxf
         ? const Color(0xFF059669)
         : isSvg
             ? const Color(0xFFEA580C)
-            : const Color(0xFF4F46E5);
+            : is3d
+                ? const Color(0xFF0891B2)
+                : const Color(0xFF4F46E5);
 
     return Column(
       mainAxisSize: MainAxisSize.min,

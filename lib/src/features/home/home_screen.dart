@@ -12,6 +12,7 @@ import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
 import '../dxf_viewer/dxf_viewer_screen.dart';
 import '../svg_viewer/svg_viewer_screen.dart';
+import '../dxf_3d_viewer/dxf_3d_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 
 class FileTypeIcon extends StatelessWidget {
@@ -37,6 +38,13 @@ class FileTypeIcon extends StatelessWidget {
         return _buildDwgIcon();
       case KotoFileType.svg:
         return _buildSvgIcon();
+      case KotoFileType.stl:
+        return _buildStlIcon();
+      case KotoFileType.obj:
+        return _buildObjIcon();
+      case KotoFileType.gltf:
+      case KotoFileType.glb:
+        return _buildGlbIcon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
@@ -171,6 +179,111 @@ class FileTypeIcon extends StatelessWidget {
                 fontSize: width * 0.2,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFFEA580C),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStlIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFEFF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFA5F3FC)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.view_in_ar_rounded,
+              color: const Color(0xFF0891B2),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'STL',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF0891B2),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildObjIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F3FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFDDD6FE)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.category_rounded,
+              color: const Color(0xFF7C3AED),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'OBJ',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF7C3AED),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlbIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.token_rounded,
+              color: const Color(0xFF16A34A),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              '3D',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF16A34A),
                 letterSpacing: 0.5,
                 height: 1,
               ),
@@ -369,12 +482,16 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!lower.endsWith('.pdf') &&
             !lower.endsWith('.dxf') &&
             !lower.endsWith('.dwg') &&
-            !lower.endsWith('.svg')) {
+            !lower.endsWith('.svg') &&
+            !lower.endsWith('.stl') &&
+            !lower.endsWith('.obj') &&
+            !lower.endsWith('.gltf') &&
+            !lower.endsWith('.glb')) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Please select a supported file (.pdf, .dxf, .dwg, or .svg).',
+                  'Please select a supported file (.pdf, .dxf, .dwg, .svg, .stl, .obj, .glb, .gltf).',
                 ),
                 backgroundColor: Colors.orange,
               ),
@@ -551,6 +668,22 @@ class _HomeScreenState extends State<HomeScreen> {
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => SvgViewerScreen(filePath: filePath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.stl:
+      case KotoFileType.obj:
+      case KotoFileType.gltf:
+      case KotoFileType.glb:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => Dxf3DViewerScreen(filePath: filePath),
           ),
         );
         if (success != false) {
@@ -1343,7 +1476,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Open PDF, CAD, or SVG Vector',
+                          'Open PDF, CAD & 3D Models',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 22,
@@ -1352,7 +1485,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Select any PDF, DXF, DWG, or SVG file from your storage to view or share.',
+                          'Select PDF, DXF, DWG, SVG, STL, OBJ, GLTF, or GLB files to view or share.',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 14,
@@ -1388,9 +1521,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             _buildFormatBadge('PDF', Icons.picture_as_pdf_rounded, const Color(0xFFC7D2FE)),
-                            _buildFormatBadge('DXF', Icons.draw_rounded, const Color(0xFF6EE7B7)),
-                            _buildFormatBadge('DWG', Icons.architecture_rounded, const Color(0xFFFECDD3)),
+                            _buildFormatBadge('CAD', Icons.draw_rounded, const Color(0xFF6EE7B7)),
                             _buildFormatBadge('SVG', Icons.gesture_rounded, const Color(0xFFFED7AA)),
+                            _buildFormatBadge('STL', Icons.view_in_ar_rounded, const Color(0xFFA5F3FC)),
+                            _buildFormatBadge('OBJ', Icons.category_rounded, const Color(0xFFDDD6FE)),
+                            _buildFormatBadge('GLB', Icons.token_rounded, const Color(0xFFBBF7D0)),
                           ],
                         ),
                       ],

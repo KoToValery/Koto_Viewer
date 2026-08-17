@@ -147,7 +147,11 @@ class FileSourceService {
     return lower.endsWith('.pdf') ||
         lower.endsWith('.dxf') ||
         lower.endsWith('.dwg') ||
-        lower.endsWith('.svg');
+        lower.endsWith('.svg') ||
+        lower.endsWith('.stl') ||
+        lower.endsWith('.obj') ||
+        lower.endsWith('.gltf') ||
+        lower.endsWith('.glb');
   }
 
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {
