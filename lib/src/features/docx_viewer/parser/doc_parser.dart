@@ -246,7 +246,9 @@ class DocParser {
           } else if (word == 'row') {
             // End of table row
             if (currentRowCells.isNotEmpty) {
-              currentTableRows.add(DocxTableRow(cells: List.from(currentRowCells)));
+              currentTableRows.add(
+                DocxTableRow(cells: List.from(currentRowCells)),
+              );
               currentRowCells.clear();
             }
           } else if (word == 'trowd') {
@@ -358,12 +360,16 @@ class DocParser {
       }
     }
 
-    void flushCurrentPara() {
+    void flushOrAccumulatePara() {
       final text = cleanWordText(currentCellOrPara.toString());
       currentCellOrPara.clear();
       if (text.isNotEmpty && !_isStyleOrNoise(text)) {
-        flushCurrentTable();
-        blocks.add(DocxParagraph(runs: [DocxRun(text: text)]));
+        if (currentRowCells.isNotEmpty) {
+          currentCellOrPara.write(text + ' ');
+        } else {
+          flushCurrentTable();
+          blocks.add(DocxParagraph(runs: [DocxRun(text: text)]));
+        }
       }
     }
 
@@ -386,15 +392,8 @@ class DocParser {
         codeUnit = bytes[i] | (bytes[i + 1] << 8);
       } else {
         final b = bytes[i];
-        if (b >= 0xC0 && b <= 0xFF) {
-          // CP1251 Cyrillic А..я
-          codeUnit = 0x0410 + (b - 0xC0);
-        } else if (b == 0xA8) {
-          codeUnit = 0x0401; // Ё
-        } else if (b == 0xB8) {
-          codeUnit = 0x0451; // ё
-        } else if (b == 0xB9) {
-          codeUnit = 0x2116; // №
+        if (b >= 0x80) {
+          codeUnit = _decodeCp1251Byte(b).codeUnitAt(0);
         } else {
           codeUnit = b;
         }
@@ -428,9 +427,13 @@ class DocParser {
 
       // Table cell delimiter (0x07 = ASCII Bell / Cell Mark)
       if (codeUnit == 0x07) {
-        final cellText = cleanWordText(currentCellOrPara.toString());
+        final rawText = currentCellOrPara.toString();
+        final cellText = cleanWordText(rawText);
         currentCellOrPara.clear();
-        if (cellText.isNotEmpty && !_isStyleOrNoise(cellText)) {
+
+        if (_isStyleOrNoise(cellText)) {
+          currentRowCells.add(DocxTableCell(paragraphs: []));
+        } else if (cellText.isNotEmpty) {
           currentRowCells.add(
             DocxTableCell(
               paragraphs: [
@@ -438,19 +441,24 @@ class DocParser {
               ],
             ),
           );
+        } else {
+          currentRowCells.add(DocxTableCell(paragraphs: []));
         }
         i += step;
         continue;
       }
 
-      // Paragraph / Row delimiter (0x0D = \r, 0x0C = \f page break, 0x0A = \n)
-      if (codeUnit == 0x0D || codeUnit == 0x0C || codeUnit == 0x0A) {
-        if (currentRowCells.isNotEmpty) {
-          // Table row completed
+      // Paragraph / Row delimiter (0x0D = \r, 0x0C = \f page break, 0x0A = \n, 0x0B = soft break)
+      if (codeUnit == 0x0D ||
+          codeUnit == 0x0C ||
+          codeUnit == 0x0A ||
+          codeUnit == 0x0B) {
+        if (currentCellOrPara.isEmpty && currentRowCells.isNotEmpty) {
+          // Empty paragraph mark immediately after cell delimiter -> End of row
           currentTableRows.add(DocxTableRow(cells: List.from(currentRowCells)));
           currentRowCells.clear();
         } else {
-          flushCurrentPara();
+          flushOrAccumulatePara();
         }
         i += step;
         continue;
@@ -461,7 +469,7 @@ class DocParser {
         i += step;
       } else {
         if (currentCellOrPara.length > 2) {
-          flushCurrentPara();
+          flushOrAccumulatePara();
         } else {
           currentCellOrPara.clear();
         }
@@ -470,7 +478,7 @@ class DocParser {
     }
 
     if (currentCellOrPara.isNotEmpty) {
-      flushCurrentPara();
+      flushOrAccumulatePara();
     }
     flushCurrentTable();
 
@@ -539,7 +547,10 @@ class DocParser {
 
     // 2. Strip stray style names if they appear alone in a cell or paragraph
     cleaned = cleaned.replaceAll(
-      RegExp(r'^(Table Normal|Normal Table|Table Grid|Default Paragraph Font)$', caseSensitive: false),
+      RegExp(
+        r'^(Table Normal|Normal Table|Table Grid|Default Paragraph Font)$',
+        caseSensitive: false,
+      ),
       '',
     );
 
@@ -604,7 +615,8 @@ class DocParser {
           codeUnit == 41 || // )
           codeUnit == 47 || // /
           codeUnit == 37 || // %
-          codeUnit == 0x2116) { // №
+          codeUnit == 0x2116) {
+        // №
         // Normal punctuation
       } else {
         unusualSymbols++;
@@ -614,7 +626,8 @@ class DocParser {
     if (lettersOrDigits == 0) return true;
 
     // If unusual binary symbols make up more than 15% of non-space characters
-    if (unusualSymbols > 1 && (unusualSymbols / (lettersOrDigits + unusualSymbols)) > 0.15) {
+    if (unusualSymbols > 1 &&
+        (unusualSymbols / (lettersOrDigits + unusualSymbols)) > 0.15) {
       return true;
     }
 
@@ -624,7 +637,8 @@ class DocParser {
       int prevScript = -1; // 0 = latin, 1 = cyrillic
       for (final codeUnit in text.codeUnits) {
         int script = -1;
-        if ((codeUnit >= 65 && codeUnit <= 90) || (codeUnit >= 97 && codeUnit <= 122)) {
+        if ((codeUnit >= 65 && codeUnit <= 90) ||
+            (codeUnit >= 97 && codeUnit <= 122)) {
           script = 0;
         } else if (codeUnit >= 0x0410 && codeUnit <= 0x044F) {
           script = 1;
@@ -649,7 +663,15 @@ class DocParser {
     if (code >= 0x0400 && code <= 0x04FF) return true; // Cyrillic
     if (code >= 0x0370 && code <= 0x03FF) return true; // Greek
     if (code >= 0x00A0 && code <= 0x024F) return true; // Latin Extended
-    if (code == 9 || code == 10 || code == 13) return true; // Whitespace
+    if (code >= 0x2000 && code <= 0x206F)
+      return true; // Punctuation (quotes, dashes)
+    if (code >= 0x20A0 && code <= 0x20CF) return true; // Currency
+    if (code >= 0x2100 && code <= 0x214F) return true; // Letterlike
+    if (code >= 0x2190 && code <= 0x21FF) return true; // Arrows
+    if (code >= 0x2200 && code <= 0x22FF) return true; // Math
+    if (code >= 0x2500 && code <= 0x257F) return true; // Box Drawing
+    if (code == 9 || code == 10 || code == 11 || code == 13)
+      return true; // Whitespace & soft return
     return false;
   }
 
@@ -667,28 +689,50 @@ class DocParser {
       return String.fromCharCode(0x0410 + (b - 192));
     }
     switch (b) {
-      case 168: return 'Ё';
-      case 184: return 'ё';
-      case 170: return 'Є';
-      case 186: return 'є';
-      case 175: return 'Ї';
-      case 191: return 'ї';
-      case 178: return 'І';
-      case 179: return 'і';
-      case 180: return 'ґ';
-      case 165: return 'Ґ';
-      case 130: return '‚';
-      case 132: return '„';
-      case 133: return '…';
-      case 145: return '‘';
-      case 146: return '’';
-      case 147: return '“';
-      case 148: return '”';
-      case 150: return '–';
-      case 151: return '—';
-      case 160: return ' ';
-      case 185: return '№';
-      default: return String.fromCharCode(b);
+      case 168:
+        return 'Ё';
+      case 184:
+        return 'ё';
+      case 170:
+        return 'Є';
+      case 186:
+        return 'є';
+      case 175:
+        return 'Ї';
+      case 191:
+        return 'ї';
+      case 178:
+        return 'І';
+      case 179:
+        return 'і';
+      case 180:
+        return 'ґ';
+      case 165:
+        return 'Ґ';
+      case 130:
+        return '‚';
+      case 132:
+        return '„';
+      case 133:
+        return '…';
+      case 145:
+        return '‘';
+      case 146:
+        return '’';
+      case 147:
+        return '“';
+      case 148:
+        return '”';
+      case 150:
+        return '–';
+      case 151:
+        return '—';
+      case 160:
+        return ' ';
+      case 185:
+        return '№';
+      default:
+        return String.fromCharCode(b);
     }
   }
 
