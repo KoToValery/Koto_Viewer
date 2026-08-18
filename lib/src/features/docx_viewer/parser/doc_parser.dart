@@ -449,16 +449,30 @@ class DocParser {
       }
 
       // Paragraph / Row delimiter (0x0D = \r, 0x0C = \f page break, 0x0A = \n, 0x0B = soft break)
-      if (codeUnit == 0x0D ||
-          codeUnit == 0x0C ||
-          codeUnit == 0x0A ||
-          codeUnit == 0x0B) {
-        if (currentCellOrPara.isEmpty && currentRowCells.isNotEmpty) {
-          // Empty paragraph mark immediately after cell delimiter -> End of row
-          currentTableRows.add(DocxTableRow(cells: List.from(currentRowCells)));
-          currentRowCells.clear();
+      if (codeUnit == 0x0D || codeUnit == 0x0C || codeUnit == 0x0A || codeUnit == 0x0B) {
+        final text = cleanWordText(currentCellOrPara.toString());
+        currentCellOrPara.clear();
+
+        if (currentRowCells.isNotEmpty) {
+          // If text is empty and the last recorded cell was empty, it's the row terminator
+          if (text.isEmpty && currentRowCells.last.paragraphs.isEmpty) {
+            currentRowCells.removeLast();
+            if (currentRowCells.isNotEmpty) {
+              currentTableRows.add(DocxTableRow(cells: List.from(currentRowCells)));
+              currentRowCells.clear();
+            }
+          } else {
+            // Newline inside a cell, accumulate text
+            if (text.isNotEmpty) {
+              currentCellOrPara.write(text + ' ');
+            }
+          }
         } else {
-          flushOrAccumulatePara();
+          // Normal paragraph outside a table
+          if (text.isNotEmpty && !_isStyleOrNoise(text)) {
+            flushCurrentTable();
+            blocks.add(DocxParagraph(runs: [DocxRun(text: text)]));
+          }
         }
         i += step;
         continue;
@@ -659,6 +673,7 @@ class DocParser {
   }
 
   static bool _isValidDocCharCode(int code) {
+    if (code < 32) return true; // Let cleanWordText handle control chars to prevent word splitting
     if (code >= 32 && code <= 126) return true; // Standard ASCII
     if (code >= 0x0400 && code <= 0x04FF) return true; // Cyrillic
     if (code >= 0x0370 && code <= 0x03FF) return true; // Greek
