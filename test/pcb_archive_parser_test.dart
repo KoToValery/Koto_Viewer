@@ -149,5 +149,75 @@ U1,ATmega328P,TQFP-32,1,Microcontroller 8-bit
       expect(project.boundingBox.widthMm > 0, true);
       expect(project.boundingBox.heightMm > 0, true);
     });
+
+    test('parseZip parses Gerber X2 archives with signed coordinates, macro apertures, and Gerber drills', () {
+      final archive = Archive();
+
+      const topCopperX2 = '''
+G04 PROTEUS GERBER X2 FILE*
+%TF.GenerationSoftware,Labcenter,Proteus,9.1*%
+%TF.FileFunction,Copper,L1,Top*%
+%FSLAX26Y26*%
+%MOIN*%
+%AMPPAD011*
+4,1,4,-0.03,-0.06,0.03,-0.06,0.03,0.06,-0.03,0.06*%
+%ADD10C,0.010000*%
+%ADD71PPAD011*%
+D10*
+X-5093425Y+4084528D02*
+X-5069449Y+4056969D01*
+D71*
+X-5000000Y+4000000D03*
+M02*
+''';
+      archive.addFile(ArchiveFile('Project - CADCAM Top Copper.GBR', topCopperX2.length, utf8.encode(topCopperX2)));
+
+      const drillX2 = '''
+G04 PROTEUS GERBER X2 FILE*
+%TF.FileFunction,Plated,1,2,PTH*%
+%FSLAX26Y26*%
+%MOIN*%
+%ADD122C,0.020000*%
+D122*
+X-5000000Y+4000000D03*
+M02*
+''';
+      archive.addFile(ArchiveFile('Project - CADCAM Drill TOP-BOT Plated.GBR', drillX2.length, utf8.encode(drillX2)));
+
+      const profileX2 = '''
+G04 PROTEUS GERBER X2 FILE*
+%TF.FileFunction,NonPlated,1,2,NPTH*%
+%FSLAX26Y26*%
+%MOIN*%
+%ADD44C,0.004000*%
+D44*
+X-5100000Y+4000000D02*
+X-5100000Y+4100000D01*
+X-4900000Y+4100000D01*
+X-4900000Y+4000000D01*
+X-5100000Y+4000000D01*
+M02*
+''';
+      archive.addFile(ArchiveFile('Project - CADCAM Profile.GBR', profileX2.length, utf8.encode(profileX2)));
+
+      final encoder = ZipEncoder();
+      final zipBytes = Uint8List.fromList(encoder.encode(archive)!);
+
+      final project = PcbArchiveParser.parseZip(
+        zipBytes,
+        archiveName: 'GerberX2_Project.zip',
+        filePath: r'C:\Projects\GerberX2_Project.zip',
+      );
+
+      expect(project.totalLayers, 3);
+      expect(project.layers.any((l) => l.type == PcbLayerType.copperTop), true);
+      expect(project.layers.any((l) => l.type == PcbLayerType.drill), true);
+      expect(project.layers.any((l) => l.type == PcbLayerType.edgeCuts), true);
+
+      // Verify that coordinates with '+' parsed correctly (non-zero height/width)
+      expect(project.boundingBox.widthMm > 0, true);
+      expect(project.boundingBox.heightMm > 0, true);
+    });
   });
 }
+

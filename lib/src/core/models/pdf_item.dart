@@ -103,7 +103,14 @@ class PdfItem {
         lower.endsWith('.gbo') ||
         lower.endsWith('.gko') ||
         lower.endsWith('.gm1') ||
-        lower.endsWith('.gm2')) {
+        lower.endsWith('.gm2') ||
+        lower.endsWith('.top') ||
+        lower.endsWith('.bot') ||
+        lower.endsWith('.smt') ||
+        lower.endsWith('.smb') ||
+        lower.endsWith('.sst') ||
+        lower.endsWith('.ssb') ||
+        lower.endsWith('.edge')) {
       return KotoFileType.gbr;
     }
     if (lower.endsWith('.drl') ||

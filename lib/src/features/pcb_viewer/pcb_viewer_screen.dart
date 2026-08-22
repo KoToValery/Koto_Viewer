@@ -326,8 +326,9 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                               ),
                               subtitle: Text(
                                 '${doc.trackCount > 0 ? "${doc.trackCount} tracks • " : ""}'
-                                '${doc.padCount > 0 ? "${doc.padCount} pads • " : ""}'
-                                '${doc.holeCount > 0 ? "${doc.holeCount} holes" : ""}',
+                                '${doc.padCount > 0 ? (layer.type == PcbLayerType.drill ? "${doc.padCount} drill holes" : "${doc.padCount} pads • ") : ""}'
+                                '${doc.holeCount > 0 ? "${doc.holeCount} holes" : ""}'
+                                '${(doc.trackCount == 0 && doc.padCount == 0 && doc.holeCount == 0) ? "Empty layer" : ""}',
                                 style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
                               ),
                             );

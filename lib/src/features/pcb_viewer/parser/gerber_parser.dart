@@ -51,16 +51,46 @@ class GerberParser {
       if (p.dy + padding > maxY) maxY = p.dy + padding;
     }
 
-    // Clean lines and split by '*' delimiter
-    final rawTokens = text.replaceAll('\r', '').split('*');
+    final Map<String, _MacroDef> macroDefs = {};
 
-    for (String token in rawTokens) {
+    // Tokenize Gerber: Extended commands (%...%) vs regular commands (...*)
+    final List<String> tokens = [];
+    final len = text.length;
+    int i = 0;
+    while (i < len) {
+      while (i < len && text.codeUnitAt(i) <= 32) {
+        i++;
+      }
+      if (i >= len) break;
+
+      if (text[i] == '%') {
+        final end = text.indexOf('%', i + 1);
+        if (end != -1) {
+          tokens.add(text.substring(i, end + 1));
+          i = end + 1;
+        } else {
+          tokens.add(text.substring(i));
+          break;
+        }
+      } else {
+        final end = text.indexOf('*', i);
+        if (end != -1) {
+          tokens.add(text.substring(i, end));
+          i = end + 1;
+        } else {
+          tokens.add(text.substring(i));
+          break;
+        }
+      }
+    }
+
+    for (String token in tokens) {
       token = token.trim();
       if (token.isEmpty) continue;
 
       // 1. Extended Commands (%)
-      if (token.startsWith('%')) {
-        final extBlock = token.replaceAll('%', '').trim();
+      if (token.startsWith('%') && token.endsWith('%')) {
+        final extBlock = token.substring(1, token.length - 1).trim();
 
         // %FSLAX...Y...% -> Format Spec
         if (extBlock.startsWith('FS')) {
@@ -85,17 +115,22 @@ class GerberParser {
         else if (extBlock.startsWith('LP')) {
           isDarkPolarity = extBlock.contains('D');
         }
+        // %AM<name>*...*% -> Aperture Macro Definition
+        else if (extBlock.startsWith('AM')) {
+          _parseMacroDef(extBlock, macroDefs);
+        }
         // %ADD<id><type>,<modifiers>% -> Aperture Definition
         else if (extBlock.startsWith('AD')) {
-          final adMatch = RegExp(r'ADD(\d+)([A-Za-z]+)(?:,(.*))?').firstMatch(extBlock);
+          final cleanExt = extBlock.replaceAll('*', '');
+          final adMatch = RegExp(r'ADD(\d+)([A-Za-z0-9_]+)(?:,(.*))?').firstMatch(cleanExt);
           if (adMatch != null) {
             final id = int.tryParse(adMatch.group(1)!) ?? 10;
             final typeStr = adMatch.group(2)!.toUpperCase();
             final paramsStr = adMatch.group(3) ?? '';
-            final params = paramsStr.split('X').map((s) => double.tryParse(s) ?? 0.0).toList();
+            final params = paramsStr.split(RegExp(r'[X,]')).where((s) => s.isNotEmpty).map((s) => double.tryParse(s) ?? 0.0).toList();
 
             PcbApertureType type = PcbApertureType.circle;
-            double dimX = 0.5;
+            double dimX = 0.5 * unitScale;
             double dimY = 0.0;
 
             if (typeStr == 'C') {
@@ -112,6 +147,17 @@ class GerberParser {
             } else if (typeStr == 'P') {
               type = PcbApertureType.polygon;
               dimX = (params.isNotEmpty ? params[0] : 1.0) * unitScale;
+            } else if (macroDefs.containsKey(typeStr)) {
+              // Custom Aperture Macro
+              final macro = macroDefs[typeStr]!;
+              type = macro.type;
+              dimX = macro.dimX * unitScale;
+              dimY = macro.dimY * unitScale;
+            } else {
+              // Fallback for custom macro names (e.g. PPAD011)
+              type = PcbApertureType.obround;
+              dimX = (params.isNotEmpty ? params[0] : 1.2) * unitScale;
+              dimY = (params.length > 1 ? params[1] : dimX) * unitScale;
             }
 
             apertureTable[id] = PcbAperture(
@@ -166,25 +212,25 @@ class GerberParser {
       double? jVal;
       int? opDCode;
 
-      final xMatch = RegExp(r'X(-?\d+)').firstMatch(token);
+      final xMatch = RegExp(r'X([+-]?\d+)').firstMatch(token);
       if (xMatch != null) {
         final raw = int.tryParse(xMatch.group(1)!) ?? 0;
         xVal = (raw / math.pow(10, xDecimals)) * unitScale;
       }
 
-      final yMatch = RegExp(r'Y(-?\d+)').firstMatch(token);
+      final yMatch = RegExp(r'Y([+-]?\d+)').firstMatch(token);
       if (yMatch != null) {
         final raw = int.tryParse(yMatch.group(1)!) ?? 0;
         yVal = (raw / math.pow(10, yDecimals)) * unitScale;
       }
 
-      final iMatch = RegExp(r'I(-?\d+)').firstMatch(token);
+      final iMatch = RegExp(r'I([+-]?\d+)').firstMatch(token);
       if (iMatch != null) {
         final raw = int.tryParse(iMatch.group(1)!) ?? 0;
         iVal = (raw / math.pow(10, xDecimals)) * unitScale;
       }
 
-      final jMatch = RegExp(r'J(-?\d+)').firstMatch(token);
+      final jMatch = RegExp(r'J([+-]?\d+)').firstMatch(token);
       if (jMatch != null) {
         final raw = int.tryParse(jMatch.group(1)!) ?? 0;
         jVal = (raw / math.pow(10, yDecimals)) * unitScale;
@@ -286,26 +332,126 @@ class GerberParser {
     );
   }
 
+  static void _parseMacroDef(String extBlock, Map<String, _MacroDef> macroDefs) {
+    try {
+      final nameMatch = RegExp(r'^AM([A-Za-z0-9_]+)\*').firstMatch(extBlock);
+      if (nameMatch == null) return;
+      final name = nameMatch.group(1)!.toUpperCase();
+      final body = extBlock.substring(nameMatch.end);
+
+      // Look for primitive 4 (outline polygon) or 1 (circle) or 20/21 (rect)
+      final lines = body.split('*');
+      double minX = double.infinity;
+      double minY = double.infinity;
+      double maxX = -double.infinity;
+      double maxY = -double.infinity;
+
+      for (final line in lines) {
+        final nums = line.split(',').map((s) => double.tryParse(s.trim())).whereType<double>().toList();
+        if (nums.isEmpty) continue;
+        final primCode = nums[0].toInt();
+
+        if (primCode == 4 && nums.length >= 3) {
+          // 4, exposure, numVertices, x1, y1, x2, y2, ...
+          for (int k = 3; k < nums.length - 1; k += 2) {
+            final x = nums[k];
+            final y = nums[k + 1];
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        } else if (primCode == 1 && nums.length >= 2) {
+          // Circle: 1, exposure, diameter, [cx, cy]
+          final diam = nums.length > 2 ? nums[2] : nums[1];
+          macroDefs[name] = _MacroDef(type: PcbApertureType.circle, dimX: diam, dimY: diam);
+          return;
+        } else if ((primCode == 20 || primCode == 21) && nums.length >= 4) {
+          // Vector / Center Rectangle: code, exposure, width, height, ...
+          final w = nums[2];
+          final h = nums[3];
+          macroDefs[name] = _MacroDef(type: PcbApertureType.rectangle, dimX: w, dimY: h);
+          return;
+        }
+      }
+
+      if (minX.isFinite && maxX.isFinite && minY.isFinite && maxY.isFinite) {
+        final w = (maxX - minX).abs();
+        final h = (maxY - minY).abs();
+        macroDefs[name] = _MacroDef(
+          type: PcbApertureType.obround,
+          dimX: math.max(0.2, w > 0 ? w : 1.0),
+          dimY: math.max(0.2, h > 0 ? h : 1.0),
+        );
+      }
+    } catch (_) {}
+  }
+
   static PcbLayerType _detectLayerType(String fileName, String content) {
     final lower = fileName.toLowerCase();
-    final lowerContent = content.substring(0, math.min(content.length, 500)).toLowerCase();
+    final lowerContent = content.substring(0, math.min(content.length, 1000)).toLowerCase();
 
-    // 1. Board Outline / Edge Cuts
-    if (lower.contains('edge') ||
+    // 1. Gerber X2 %TF.FileFunction,...% Metadata Detection
+    final fileFuncMatch = RegExp(r'%TF\.FileFunction,([^%*]+)').firstMatch(content);
+    if (fileFuncMatch != null) {
+      final func = fileFuncMatch.group(1)!.toLowerCase();
+      if (func.contains('copper')) {
+        if (func.contains('bot') || func.contains('l2') || func.contains('solder')) {
+          return PcbLayerType.copperBottom;
+        }
+        return PcbLayerType.copperTop;
+      }
+      if (func.contains('soldermask') || func.contains('mask')) {
+        if (func.contains('bot')) return PcbLayerType.solderMaskBottom;
+        return PcbLayerType.solderMaskTop;
+      }
+      if (func.contains('legend') || func.contains('silk')) {
+        if (func.contains('bot')) return PcbLayerType.silkscreenBottom;
+        return PcbLayerType.silkscreenTop;
+      }
+      if (func.contains('profile')) {
+        return PcbLayerType.edgeCuts;
+      }
+      if (func.contains('nonplated') || func.contains('npth')) {
+        if (lower.contains('profile') || lower.contains('edge') || lower.contains('outline')) {
+          return PcbLayerType.edgeCuts;
+        }
+        return PcbLayerType.drill;
+      }
+      if (func.contains('plated') || func.contains('drill') || func.contains('pth')) {
+        return PcbLayerType.drill;
+      }
+    }
+
+    // 2. Board Outline / Edge Cuts
+    if (lower.contains('profile') ||
+        lower.contains('edge') ||
         lower.contains('outline') ||
         lower.contains('contour') ||
         lower.contains('border') ||
         lower.contains('mechanical') ||
-        lower.contains('profile') ||
         lower.endsWith('.gko') ||
         lower.endsWith('.gm1') ||
         lower.endsWith('.gm2') ||
         lower.endsWith('.gm3') ||
-        lower.endsWith('.dim')) {
+        lower.endsWith('.dim') ||
+        lower.endsWith('.edge')) {
       return PcbLayerType.edgeCuts;
     }
 
-    // 2. Top Silkscreen / Legend
+    // 3. Drill Layers (Gerber X2 / RS-274X Drill Drawings)
+    if (lower.contains('drill') ||
+        lower.contains('plated') ||
+        lower.contains('pth') ||
+        lower.contains('npth') ||
+        lower.endsWith('.drl') ||
+        lower.endsWith('.drd') ||
+        lower.endsWith('.xln') ||
+        lower.endsWith('.exc')) {
+      return PcbLayerType.drill;
+    }
+
+    // 4. Top Silkscreen / Legend
     if (lower.contains('f_silk') ||
         lower.contains('top_silk') ||
         lower.contains('topsilk') ||
@@ -320,7 +466,7 @@ class GerberParser {
       return PcbLayerType.silkscreenTop;
     }
 
-    // 3. Bottom Silkscreen / Legend
+    // 5. Bottom Silkscreen / Legend
     if (lower.contains('b_silk') ||
         lower.contains('bottom_silk') ||
         lower.contains('bottomsilk') ||
@@ -335,7 +481,7 @@ class GerberParser {
       return PcbLayerType.silkscreenBottom;
     }
 
-    // 4. Top Solder Mask / Solder Resist
+    // 6. Top Solder Mask / Solder Resist
     if (lower.contains('f_mask') ||
         lower.contains('top_mask') ||
         lower.contains('topmask') ||
@@ -350,7 +496,7 @@ class GerberParser {
       return PcbLayerType.solderMaskTop;
     }
 
-    // 5. Bottom Solder Mask / Solder Resist
+    // 7. Bottom Solder Mask / Solder Resist
     if (lower.contains('b_mask') ||
         lower.contains('bottom_mask') ||
         lower.contains('bottommask') ||
@@ -365,7 +511,7 @@ class GerberParser {
       return PcbLayerType.solderMaskBottom;
     }
 
-    // 6. Top Copper / Signal (Component Side)
+    // 8. Top Copper / Signal (Component Side)
     if (lower.contains('f_cu') ||
         lower.contains('top_copper') ||
         lower.contains('topcopper') ||
@@ -380,7 +526,7 @@ class GerberParser {
       return PcbLayerType.copperTop;
     }
 
-    // 7. Bottom Copper / Signal (Solder Side)
+    // 9. Bottom Copper / Signal (Solder Side)
     if (lower.contains('b_cu') ||
         lower.contains('bottom_copper') ||
         lower.contains('bottomcopper') ||
@@ -418,3 +564,16 @@ class GerberParser {
     return PcbLayerType.generic;
   }
 }
+
+class _MacroDef {
+  final PcbApertureType type;
+  final double dimX;
+  final double dimY;
+
+  const _MacroDef({
+    required this.type,
+    required this.dimX,
+    required this.dimY,
+  });
+}
+

@@ -196,7 +196,15 @@ class FileSourceService {
         lower.endsWith('.stp') ||
         lower.endsWith('.p21') ||
         lower.endsWith('.iges') ||
-        lower.endsWith('.igs');
+        lower.endsWith('.igs') ||
+        lower.endsWith('.zip') ||
+        lower.endsWith('.top') ||
+        lower.endsWith('.bot') ||
+        lower.endsWith('.smt') ||
+        lower.endsWith('.smb') ||
+        lower.endsWith('.sst') ||
+        lower.endsWith('.ssb') ||
+        lower.endsWith('.edge');
   }
 
   static List<String> getSafePublicDirectoryPaths() {

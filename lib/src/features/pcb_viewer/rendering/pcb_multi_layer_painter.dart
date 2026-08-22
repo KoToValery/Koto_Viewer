@@ -50,17 +50,20 @@ class PcbMultiLayerPainter extends CustomPainter {
     final List<PcbLayerItem> activeLayers = [];
     for (final layer in project.layers) {
       if (!layer.isVisible) continue;
+      final lowerName = layer.fileName.toLowerCase();
 
       if (project.viewSide == PcbViewSide.top) {
         if (layer.type == PcbLayerType.copperBottom ||
             layer.type == PcbLayerType.solderMaskBottom ||
-            layer.type == PcbLayerType.silkscreenBottom) {
+            layer.type == PcbLayerType.silkscreenBottom ||
+            (layer.type == PcbLayerType.generic && (lowerName.contains('bot') || lowerName.contains('bottom')))) {
           continue; // Skip bottom layers in Top view
         }
       } else if (project.viewSide == PcbViewSide.bottom) {
         if (layer.type == PcbLayerType.copperTop ||
             layer.type == PcbLayerType.solderMaskTop ||
-            layer.type == PcbLayerType.silkscreenTop) {
+            layer.type == PcbLayerType.silkscreenTop ||
+            (layer.type == PcbLayerType.generic && (lowerName.contains('top') || lowerName.contains('front')))) {
           continue; // Skip top layers in Bottom view
         }
       }
@@ -108,6 +111,8 @@ class PcbMultiLayerPainter extends CustomPainter {
     required Offset Function(Offset) mapPoint,
     required double scaleFactor,
   }) {
+    final isDrillLayer = document.layerType == PcbLayerType.drill;
+
     // 1. Draw Gerber Commands (Tracks, Arcs, Pads, Regions)
     for (final cmd in document.commands) {
       if (!cmd.isDark) continue;
@@ -152,34 +157,48 @@ class PcbMultiLayerPainter extends CustomPainter {
           final ap = cmd.aperture;
           final apType = ap?.type ?? PcbApertureType.circle;
 
-          final padPaint = Paint()
-            ..color = color
-            ..style = PaintingStyle.fill;
-
-          if (apType == PcbApertureType.circle) {
-            final radiusPx = ((ap?.dimX ?? 1.0) / 2.0) * scaleFactor;
-            canvas.drawCircle(pos, math.max(1.5, radiusPx), padPaint);
-          } else if (apType == PcbApertureType.rectangle) {
-            final wPx = (ap?.dimX ?? 1.0) * scaleFactor;
-            final hPx = (ap?.dimY ?? 1.0) * scaleFactor;
-            canvas.drawRect(
-              Rect.fromCenter(center: pos, width: wPx, height: hPx),
-              padPaint,
-            );
-          } else if (apType == PcbApertureType.obround) {
-            final wPx = (ap?.dimX ?? 1.5) * scaleFactor;
-            final hPx = (ap?.dimY ?? 1.0) * scaleFactor;
-            final r = math.min(wPx, hPx) / 2.0;
-            canvas.drawRRect(
-              RRect.fromRectAndRadius(
-                Rect.fromCenter(center: pos, width: wPx, height: hPx),
-                Radius.circular(r),
-              ),
-              padPaint,
-            );
+          if (isDrillLayer) {
+            final radiusPx = math.max(1.0, ((ap?.dimX ?? 0.8) / 2.0) * scaleFactor);
+            // Annular copper ring
+            final ringPaint = Paint()
+              ..color = theme.copper.withValues(alpha: 0.9)
+              ..style = PaintingStyle.fill;
+            canvas.drawCircle(pos, math.max(radiusPx + 1.8, 2.5), ringPaint);
+            // Dark hole center
+            final holePaint = Paint()
+              ..color = const Color(0xFF0A0A0A)
+              ..style = PaintingStyle.fill;
+            canvas.drawCircle(pos, radiusPx, holePaint);
           } else {
-            final radiusPx = ((ap?.dimX ?? 1.0) / 2.0) * scaleFactor;
-            canvas.drawCircle(pos, math.max(1.5, radiusPx), padPaint);
+            final padPaint = Paint()
+              ..color = color
+              ..style = PaintingStyle.fill;
+
+            if (apType == PcbApertureType.circle) {
+              final radiusPx = ((ap?.dimX ?? 1.0) / 2.0) * scaleFactor;
+              canvas.drawCircle(pos, math.max(1.5, radiusPx), padPaint);
+            } else if (apType == PcbApertureType.rectangle) {
+              final wPx = (ap?.dimX ?? 1.0) * scaleFactor;
+              final hPx = (ap?.dimY ?? 1.0) * scaleFactor;
+              canvas.drawRect(
+                Rect.fromCenter(center: pos, width: wPx, height: hPx),
+                padPaint,
+              );
+            } else if (apType == PcbApertureType.obround) {
+              final wPx = (ap?.dimX ?? 1.5) * scaleFactor;
+              final hPx = (ap?.dimY ?? 1.0) * scaleFactor;
+              final r = math.min(wPx, hPx) / 2.0;
+              canvas.drawRRect(
+                RRect.fromRectAndRadius(
+                  Rect.fromCenter(center: pos, width: wPx, height: hPx),
+                  Radius.circular(r),
+                ),
+                padPaint,
+              );
+            } else {
+              final radiusPx = ((ap?.dimX ?? 1.0) / 2.0) * scaleFactor;
+              canvas.drawCircle(pos, math.max(1.5, radiusPx), padPaint);
+            }
           }
           break;
 

@@ -98,26 +98,7 @@ class PcbArchiveParser {
         continue;
       }
 
-      // 2. CNC Drill Files (Excellon / NC Drill)
-      if (_isDrillFileName(lower) || _isDrillContent(fileBytes)) {
-        try {
-          final doc = DrillParser.parse(fileBytes, fileName: baseName);
-          if (doc.drillHoles.isNotEmpty) {
-            updateGlobalBounds(doc.boundingBox);
-            layers.add(
-              PcbLayerItem(
-                fileName: baseName,
-                type: PcbLayerType.drill,
-                document: doc,
-                order: 90,
-              ),
-            );
-          }
-        } catch (_) {}
-        continue;
-      }
-
-      // 3. Gerber RS-274X Layers (Copper, Mask, Silk, Outline)
+      // 2. Gerber RS-274X / X2 Layers (Copper, Mask, Silk, Outline, Drill drawings)
       if (_isGerberFileName(lower) || _isGerberContent(fileBytes)) {
         try {
           final doc = GerberParser.parse(fileBytes, fileName: baseName);
@@ -130,6 +111,25 @@ class PcbArchiveParser {
                 type: doc.layerType,
                 document: doc,
                 order: order,
+              ),
+            );
+          }
+        } catch (_) {}
+        continue;
+      }
+
+      // 3. CNC Drill Files (Excellon / NC Drill)
+      if (_isDrillFileName(lower) || _isDrillContent(fileBytes)) {
+        try {
+          final doc = DrillParser.parse(fileBytes, fileName: baseName);
+          if (doc.drillHoles.isNotEmpty) {
+            updateGlobalBounds(doc.boundingBox);
+            layers.add(
+              PcbLayerItem(
+                fileName: baseName,
+                type: PcbLayerType.drill,
+                document: doc,
+                order: 80,
               ),
             );
           }
@@ -197,12 +197,7 @@ class PcbArchiveParser {
     return lower.endsWith('.drl') ||
         lower.endsWith('.xln') ||
         lower.endsWith('.exc') ||
-        lower.endsWith('.drd') ||
-        lower.contains('drill') ||
-        lower.contains('plated') ||
-        lower.contains('through hole') ||
-        lower.contains('pth') ||
-        lower.contains('npth');
+        lower.endsWith('.drd');
   }
 
   static bool _isDrillContent(Uint8List bytes) {
@@ -211,7 +206,7 @@ class PcbArchiveParser {
     return sample.contains('M48') ||
         sample.contains('INCH,') ||
         sample.contains('METRIC,') ||
-        (sample.contains('T01') && sample.contains('X'));
+        (sample.contains('T01') && sample.contains('X') && !sample.contains('%FS') && !sample.contains('G04'));
   }
 
   static bool _isGerberFileName(String name) {
@@ -243,12 +238,14 @@ class PcbArchiveParser {
 
   static bool _isGerberContent(Uint8List bytes) {
     if (bytes.length < 10) return false;
-    final sample = String.fromCharCodes(bytes.take(math.min(bytes.length, 400)));
+    final sample = String.fromCharCodes(bytes.take(math.min(bytes.length, 500)));
     return sample.contains('%FS') ||
         sample.contains('%MO') ||
+        sample.contains('%TF') ||
         sample.contains('G04') ||
         sample.contains('D10*') ||
-        sample.contains('D01*');
+        sample.contains('D01*') ||
+        sample.contains('M02*');
   }
 
   static int _getLayerZOrder(PcbLayerType type) {
