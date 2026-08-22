@@ -1793,6 +1793,144 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
+  IconData _getCategoryIcon(FileCategory cat) {
+    switch (cat) {
+      case FileCategory.all:
+        return Icons.auto_awesome_mosaic_rounded;
+      case FileCategory.cad2d:
+        return Icons.draw_rounded;
+      case FileCategory.cad3d:
+        return Icons.view_in_ar_rounded;
+      case FileCategory.pcb:
+        return Icons.memory_rounded;
+      case FileCategory.documents:
+        return Icons.description_rounded;
+    }
+  }
+
+  Widget _buildCategoryDropdown(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    final isCustomCategory = _selectedCategory != FileCategory.all;
+
+    return PopupMenuButton<FileCategory>(
+      initialValue: _selectedCategory,
+      onSelected: (cat) {
+        setState(() => _selectedCategory = cat);
+      },
+      tooltip: 'Filter by category',
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: isCustomCategory
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.7)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.05)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isCustomCategory
+                ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                : theme.dividerColor.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _getCategoryIcon(_selectedCategory),
+              size: 17,
+              color: isCustomCategory
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: Text(
+                '${_selectedCategory.label} (${_getCategoryCount(_selectedCategory)})',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: isCustomCategory
+                      ? theme.colorScheme.onPrimaryContainer
+                      : theme.textTheme.bodyMedium?.color,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: theme.textTheme.bodySmall?.color,
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (context) {
+        return FileCategory.values.map((cat) {
+          final isSelected = _selectedCategory == cat;
+          final count = _getCategoryCount(cat);
+
+          return PopupMenuItem<FileCategory>(
+            value: cat,
+            child: Row(
+              children: [
+                Icon(
+                  _getCategoryIcon(cat),
+                  size: 18,
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : Colors.grey.shade600,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    cat.label,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected ? theme.colorScheme.primary : null,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                        : Colors.grey.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                if (isSelected) ...[
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.check,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
+                ],
+              ],
+            ),
+          );
+        }).toList();
+      },
+    );
+  }
+
   Widget _buildSourceHeader(ThemeData theme) {
     String titleText = '';
     String subtitleText = '';
@@ -1995,7 +2133,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ),
-
+            const SizedBox(width: 8),
+            _buildCategoryDropdown(theme),
             PopupMenuButton<SortOption>(
               initialValue: _currentSort,
               onSelected: _switchSort,
@@ -2072,68 +2211,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Text('Clear'),
               ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryFilterBar(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: Row(
-          children: FileCategory.values.map((cat) {
-            final isSelected = _selectedCategory == cat;
-            final count = _getCategoryCount(cat);
-
-            return Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: FilterChip(
-                selected: isSelected,
-                showCheckmark: false,
-                avatar: Icon(
-                  cat == FileCategory.all
-                      ? Icons.auto_awesome_mosaic_rounded
-                      : cat == FileCategory.cad2d
-                          ? Icons.draw_rounded
-                          : cat == FileCategory.cad3d
-                              ? Icons.view_in_ar_rounded
-                              : cat == FileCategory.pcb
-                                  ? Icons.memory_rounded
-                                  : Icons.description_rounded,
-                  size: 16,
-                  color: isSelected
-                      ? Colors.white
-                      : theme.colorScheme.primary,
-                ),
-                label: Text(
-                  '${cat.label} ($count)',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected
-                        ? Colors.white
-                        : theme.textTheme.bodyMedium?.color,
-                  ),
-                ),
-                backgroundColor: theme.colorScheme.surface,
-                selectedColor: theme.colorScheme.primary,
-                side: BorderSide(
-                  color: isSelected
-                      ? theme.colorScheme.primary
-                      : theme.dividerColor.withValues(alpha: 0.2),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                onSelected: (_) {
-                  setState(() => _selectedCategory = cat);
-                },
-              ),
-            );
-          }).toList(),
         ),
       ),
     );
@@ -2348,7 +2425,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
               _buildSourceHeader(theme),
-              SliverToBoxAdapter(child: _buildCategoryFilterBar(theme)),
               if (_pdfFiles.isNotEmpty) SliverToBoxAdapter(child: _buildSearchBar(theme)),
 
               if (_isLoading)
