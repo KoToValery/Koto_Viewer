@@ -343,9 +343,15 @@ class DxfPainter extends CustomPainter {
       final center = toCanvas(entity.center);
       final r = entity.radius * fitScale;
       final path = Path()..addOval(Rect.fromCircle(center: center, radius: r));
-      _drawStrokePath(canvas, path, strokePaint, entity.lineType, layerLineType);
+      final double effectiveStroke = math.min(strokePaint.strokeWidth, r * 0.45).clamp(0.2, strokePaint.strokeWidth);
+      final circlePaint = Paint()
+        ..color = strokePaint.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = effectiveStroke
+        ..isAntiAlias = true;
+      _drawStrokePath(canvas, path, circlePaint, entity.lineType, layerLineType);
     } else if (entity is DxfArc) {
-      _renderArc(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
+      _renderArc(canvas, entity, strokePaint, toCanvas, fitScale, entity.lineType, layerLineType);
     } else if (entity is DxfEllipse) {
       _renderEllipse(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
     } else if (entity is DxfLwPolyline) {
@@ -383,6 +389,7 @@ class DxfPainter extends CustomPainter {
     DxfArc arc,
     Paint paint,
     Offset Function(Offset) toCanvas,
+    double fitScale,
     String? lineType,
     String? layerLineType,
   ) {
@@ -416,7 +423,15 @@ class DxfPainter extends CustomPainter {
       path.lineTo(canvasPoint.dx, canvasPoint.dy);
     }
 
-    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
+    final double rCanvas = arc.radius * fitScale;
+    final double effectiveStroke = math.min(paint.strokeWidth, rCanvas * 0.45).clamp(0.2, paint.strokeWidth);
+    final arcPaint = Paint()
+      ..color = paint.color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = effectiveStroke
+      ..isAntiAlias = true;
+
+    _drawStrokePath(canvas, path, arcPaint, lineType, layerLineType);
   }
 
   void _renderEllipse(

@@ -505,7 +505,7 @@ EOF
       expect(defaultSettings.lineThicknessScale, 1.0);
       expect(defaultSettings.measurementScale, 1.4);
       expect(defaultSettings.pointSize, 2.0);
-      expect(defaultSettings.pointStyle, DxfPointStyle.dot);
+      expect(defaultSettings.pointStyle, DxfPointStyle.none);
 
       final modified = defaultSettings.copyWith(
         lineThicknessScale: 1.8,

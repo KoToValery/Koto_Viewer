@@ -46,11 +46,11 @@ enum DxfPointStyle {
   });
 
   static DxfPointStyle fromName(String? name) {
-    if (name == null) return DxfPointStyle.dot;
+    if (name == null) return DxfPointStyle.none;
     for (final style in DxfPointStyle.values) {
       if (style.name == name) return style;
     }
-    return DxfPointStyle.dot;
+    return DxfPointStyle.none;
   }
 }
 
@@ -65,7 +65,7 @@ class DxfDisplaySettings {
     this.lineThicknessScale = 1.0,
     this.measurementScale = 1.4,
     this.pointSize = 2.0,
-    this.pointStyle = DxfPointStyle.dot,
+    this.pointStyle = DxfPointStyle.none,
   });
 
   DxfDisplaySettings copyWith({

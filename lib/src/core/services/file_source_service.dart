@@ -230,15 +230,6 @@ class FileSourceService {
       case FileSourceMode.recent:
         final rawFiles = await RecentFilesService.getRecentFiles();
         files = rawFiles.where((item) => File(item.path).existsSync()).toList();
-
-        // If recents are empty on first launch, auto-scan safe public directories
-        if (files.isEmpty) {
-          final publicPaths = getSafePublicDirectoryPaths();
-          for (final p in publicPaths) {
-            final dirFiles = await _scanDirectoryForFiles(Directory(p));
-            files.addAll(dirFiles);
-          }
-        }
         break;
 
       case FileSourceMode.custom:
