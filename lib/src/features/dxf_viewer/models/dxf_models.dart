@@ -29,6 +29,7 @@ class DxfLayer {
   final bool isFrozen;
   final double? lineweight;
   double? customLineweight; // null = Original (from DXF), or 0.12, 0.25, 0.35, 0.70 mm override
+  final String? lineType;
 
   bool get isThick =>
       (customLineweight != null && customLineweight! >= 0.35) ||
@@ -46,6 +47,7 @@ class DxfLayer {
     this.isFrozen = false,
     this.lineweight,
     this.customLineweight,
+    this.lineType,
     bool isThick = false,
   }) {
     if (isThick && customLineweight == null) {
@@ -61,6 +63,7 @@ class DxfLayer {
     bool? isFrozen,
     double? lineweight,
     double? customLineweight,
+    String? lineType,
     bool? isThick,
   }) {
     final layer = DxfLayer(
@@ -71,6 +74,7 @@ class DxfLayer {
       isFrozen: isFrozen ?? this.isFrozen,
       lineweight: lineweight ?? this.lineweight,
       customLineweight: customLineweight ?? this.customLineweight,
+      lineType: lineType ?? this.lineType,
     );
     if (isThick != null && customLineweight == null) {
       layer.isThick = isThick;
@@ -530,6 +534,7 @@ class DxfHatch extends DxfEntity {
   final bool isSolid;
   final double patternAngle;
   final double patternScale;
+  final double? transparency; // 0.0 (transparent) to 1.0 (opaque), e.g. 0.10 for ArchiCAD 10% shadow fills
 
   const DxfHatch({
     required this.boundaryPaths,
@@ -537,6 +542,7 @@ class DxfHatch extends DxfEntity {
     this.isSolid = true,
     this.patternAngle = 0.0,
     this.patternScale = 1.0,
+    this.transparency,
     super.layer,
     super.colorIndex,
     super.trueColor,
@@ -735,6 +741,7 @@ class DxfDocument {
   final Map<String, String> headerVars;
   final Rect bounds;
   final Map<String, int> entityStats;
+  final Map<String, List<double>> lineTypes;
 
   DxfDocument({
     required this.layers,
@@ -743,6 +750,7 @@ class DxfDocument {
     required this.headerVars,
     required this.bounds,
     required this.entityStats,
+    this.lineTypes = const {},
   });
 
   int get totalEntities => entities.length;

@@ -4,6 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Style options for displaying CAD point entities (DxfPoint).
 enum DxfPointStyle {
+  none(
+    label: 'Hidden / Off',
+    labelBg: 'Скрити',
+    symbol: '—',
+  ),
   dot(
     label: 'Filled Dot',
     labelBg: 'Плътна точка',
@@ -53,13 +58,13 @@ enum DxfPointStyle {
 class DxfDisplaySettings {
   final double lineThicknessScale; // 0.3 to 3.5 (default 1.0)
   final double measurementScale; // 0.5 to 2.5 (default 1.0)
-  final double pointSize; // 1.0 to 12.0 in screen pixels (default 4.0)
+  final double pointSize; // 1.0 to 12.0 in screen pixels (default 2.0)
   final DxfPointStyle pointStyle; // point marker style
 
   const DxfDisplaySettings({
     this.lineThicknessScale = 1.0,
     this.measurementScale = 1.4,
-    this.pointSize = 4.0,
+    this.pointSize = 2.0,
     this.pointStyle = DxfPointStyle.dot,
   });
 

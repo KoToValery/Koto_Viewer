@@ -128,6 +128,8 @@ class DxfParser {
     int idx = 0;
     final int total = pairs.length;
 
+    final Map<String, List<double>> lineTypes = {};
+
     while (idx < total) {
       final pair = pairs[idx];
 
@@ -141,7 +143,7 @@ class DxfParser {
         if (secName == 'HEADER') {
           idx = _parseHeaderSection(pairs, idx, headerVars);
         } else if (secName == 'TABLES') {
-          idx = _parseTablesSection(pairs, idx, layers);
+          idx = _parseTablesSection(pairs, idx, layers, lineTypes);
         } else if (secName == 'BLOCKS') {
           idx = _parseBlocksSection(pairs, idx, blocks);
         } else if (secName == 'ENTITIES') {
@@ -222,6 +224,7 @@ class DxfParser {
       headerVars: headerVars,
       bounds: bounds,
       entityStats: entityStats,
+      lineTypes: lineTypes,
     );
   }
 
@@ -252,11 +255,12 @@ class DxfParser {
     return idx;
   }
 
-  /// Parses TABLES section (specifically LAYER table).
+  /// Parses TABLES section (LAYER and LTYPE tables).
   static int _parseTablesSection(
     List<_DxfPair> pairs,
     int startIdx,
     Map<String, DxfLayer> layers,
+    Map<String, List<double>> lineTypes,
   ) {
     int idx = startIdx;
     final int total = pairs.length;
@@ -280,6 +284,8 @@ class DxfParser {
 
         if (tabName == 'LAYER') {
           idx = _parseLayerTable(pairs, idx, layers);
+        } else if (tabName == 'LTYPE') {
+          idx = _parseLtypeTable(pairs, idx, lineTypes);
         } else {
           // Skip other tables
           while (idx < total) {
@@ -288,6 +294,62 @@ class DxfParser {
               break;
             }
             idx++;
+          }
+        }
+      } else {
+        idx++;
+      }
+    }
+    return idx;
+  }
+
+  /// Parses LTYPE table entries into standard pattern lists [dash, gap, dot, gap, ...].
+  static int _parseLtypeTable(
+    List<_DxfPair> pairs,
+    int startIdx,
+    Map<String, List<double>> lineTypes,
+  ) {
+    int idx = startIdx;
+    final int total = pairs.length;
+
+    while (idx < total) {
+      final pair = pairs[idx];
+      if (pair.code == 0 && pair.value.trim().toUpperCase() == 'ENDTAB') {
+        idx++;
+        break;
+      }
+
+      if (pair.code == 0 && pair.value.trim().toUpperCase() == 'LTYPE') {
+        idx++;
+        String ltypeName = '';
+        final List<double> rawDashes = [];
+
+        while (idx < total && pairs[idx].code != 0) {
+          final p = pairs[idx];
+          if (p.code == 2) {
+            ltypeName = p.value.trim();
+          } else if (p.code == 49) {
+            rawDashes.add(p.doubleValue);
+          }
+          idx++;
+        }
+
+        if (ltypeName.isNotEmpty && rawDashes.isNotEmpty) {
+          // Convert DXF 49 codes (positive=dash, negative=space, 0=dot) to absolute lengths
+          final List<double> pattern = [];
+          for (final d in rawDashes) {
+            if (d > 0) {
+              pattern.add(d);
+            } else if (d < 0) {
+              pattern.add(d.abs());
+            } else {
+              pattern.add(1.8); // Dot
+            }
+          }
+          if (pattern.isNotEmpty) {
+            lineTypes[ltypeName] = pattern;
+            lineTypes[ltypeName.toUpperCase()] = pattern;
+            lineTypes[_cleanCadText(ltypeName)] = pattern;
           }
         }
       } else {
@@ -321,12 +383,16 @@ class DxfParser {
         bool isVisible = true;
         bool isFrozen = false;
         double? lineweight;
+        String? lineType;
 
         while (idx < total && pairs[idx].code != 0) {
           final p = pairs[idx];
           switch (p.code) {
             case 2:
-              layerName = p.value.trim();
+              layerName = _cleanCadText(p.value.trim());
+              break;
+            case 6:
+              lineType = p.value.trim();
               break;
             case 62:
               final c = p.intValue;
@@ -358,6 +424,7 @@ class DxfParser {
           isVisible: isVisible,
           isFrozen: isFrozen,
           lineweight: lineweight,
+          lineType: lineType,
         );
       } else {
         idx++;
@@ -502,7 +569,7 @@ class DxfParser {
     for (final p in entityPairs) {
       switch (p.code) {
         case 8:
-          layer = p.value.trim();
+          layer = _cleanCadText(p.value.trim());
           break;
         case 62:
           colorIndex = p.intValue;
@@ -1046,12 +1113,13 @@ class DxfParser {
         bool isSolid = true;
         double patternAngle = 0;
         double patternScale = 1;
+        double? transparency;
         final boundaryPaths = _parseHatchBoundaryPaths(entityPairs);
 
         for (final p in entityPairs) {
           switch (p.code) {
             case 2:
-              patternName = p.value.trim();
+              patternName = _cleanCadText(p.value.trim());
               break;
             case 70:
               isSolid = (p.intValue & 1) != 0;
@@ -1062,6 +1130,47 @@ class DxfParser {
             case 41:
               patternScale = p.doubleValue;
               break;
+            case 440:
+            case 90:
+              final raw = p.intValue;
+              if ((raw & 0xFF000000) != 0) {
+                final int alpha = raw & 0xFF;
+                transparency = (alpha / 255.0).clamp(0.0, 1.0);
+              } else if (raw > 0 && raw <= 255) {
+                transparency = (raw / 255.0).clamp(0.0, 1.0);
+              }
+              break;
+          }
+        }
+
+        final nameUpper = patternName.toUpperCase();
+        final layerUpper = layer.toUpperCase();
+
+        // Automatic inference for ArchiCAD shadow fills and percentage fills if not explicitly set in 440
+        if (transparency == null) {
+          if (nameUpper.contains('10%') ||
+              nameUpper.contains('10_PERCENT') ||
+              nameUpper.contains('PERCENT_10') ||
+              nameUpper.contains('SHADOW') ||
+              nameUpper.contains('СЕНКИ') ||
+              nameUpper.contains('СЯНКА') ||
+              nameUpper.contains('SENKA') ||
+              layerUpper.contains('SHADOW') ||
+              layerUpper.contains('СЕНКИ') ||
+              layerUpper.contains('СЯНКА') ||
+              layerUpper.contains('SENKA') ||
+              layerUpper.contains('TRANSP')) {
+            transparency = 0.10; // ArchiCAD shadow fill (~10% opacity)
+            isSolid = true;
+          } else if (nameUpper.contains('25%') || nameUpper.contains('SOLID_25')) {
+            transparency = 0.25;
+            isSolid = true;
+          } else if (nameUpper.contains('50%') || nameUpper.contains('SOLID_50')) {
+            transparency = 0.50;
+            isSolid = true;
+          } else if (nameUpper.contains('75%') || nameUpper.contains('SOLID_75')) {
+            transparency = 0.75;
+            isSolid = true;
           }
         }
 
@@ -1071,6 +1180,7 @@ class DxfParser {
           isSolid: isSolid,
           patternAngle: patternAngle,
           patternScale: patternScale,
+          transparency: transparency,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
@@ -1503,29 +1613,33 @@ class DxfParser {
             }
           }
         } else {
-          // Non-polyline boundary: sequence of edges
+          // Non-polyline boundary or edge sequence
+          while (i < len && pairs[i].code != 93 && pairs[i].code != 72 && pairs[i].code != 10 && pairs[i].code != 92) {
+            i++;
+          }
           if (i < len && pairs[i].code == 93) {
             i++;
           }
 
           final List<Offset> loopPoints = [];
           while (i < len && pairs[i].code != 92 && pairs[i].code != 97 && pairs[i].code != 75) {
-            if (pairs[i].code == 72) {
+            final p = pairs[i];
+            if (p.code == 72) {
               final edgeType = pairs[i].intValue;
               i++;
               if (edgeType == 1) {
                 // Line edge: 10, 20 (start), 11, 21 (end)
                 double x1 = 0, y1 = 0, x2 = 0, y2 = 0;
                 while (i < len && pairs[i].code != 72 && pairs[i].code != 92 && pairs[i].code != 97 && pairs[i].code != 75) {
-                  final p = pairs[i];
-                  if (p.code == 10) {
-                    x1 = p.doubleValue;
-                  } else if (p.code == 20) {
-                    y1 = p.doubleValue;
-                  } else if (p.code == 11) {
-                    x2 = p.doubleValue;
-                  } else if (p.code == 21) {
-                    y2 = p.doubleValue;
+                  final cp = pairs[i];
+                  if (cp.code == 10) {
+                    x1 = cp.doubleValue;
+                  } else if (cp.code == 20) {
+                    y1 = cp.doubleValue;
+                  } else if (cp.code == 11) {
+                    x2 = cp.doubleValue;
+                  } else if (cp.code == 21) {
+                    y2 = cp.doubleValue;
                   }
                   i++;
                 }
@@ -1538,19 +1652,19 @@ class DxfParser {
                 double cx = 0, cy = 0, r = 0, startA = 0, endA = 360;
                 bool isCCW = true;
                 while (i < len && pairs[i].code != 72 && pairs[i].code != 92 && pairs[i].code != 97 && pairs[i].code != 75) {
-                  final p = pairs[i];
-                  if (p.code == 10) {
-                    cx = p.doubleValue;
-                  } else if (p.code == 20) {
-                    cy = p.doubleValue;
-                  } else if (p.code == 40) {
-                    r = p.doubleValue;
-                  } else if (p.code == 50) {
-                    startA = p.doubleValue;
-                  } else if (p.code == 51) {
-                    endA = p.doubleValue;
-                  } else if (p.code == 73) {
-                    isCCW = p.intValue != 0;
+                  final cp = pairs[i];
+                  if (cp.code == 10) {
+                    cx = cp.doubleValue;
+                  } else if (cp.code == 20) {
+                    cy = cp.doubleValue;
+                  } else if (cp.code == 40) {
+                    r = cp.doubleValue;
+                  } else if (cp.code == 50) {
+                    startA = cp.doubleValue;
+                  } else if (cp.code == 51) {
+                    endA = cp.doubleValue;
+                  } else if (cp.code == 73) {
+                    isCCW = cp.intValue != 0;
                   }
                   i++;
                 }
@@ -1574,21 +1688,21 @@ class DxfParser {
                 // Elliptic arc edge
                 double cx = 0, cy = 0, mx = 0, my = 0, ratio = 1.0, sp = 0, ep = 2 * math.pi;
                 while (i < len && pairs[i].code != 72 && pairs[i].code != 92 && pairs[i].code != 97 && pairs[i].code != 75) {
-                  final p = pairs[i];
-                  if (p.code == 10) {
-                    cx = p.doubleValue;
-                  } else if (p.code == 20) {
-                    cy = p.doubleValue;
-                  } else if (p.code == 11) {
-                    mx = p.doubleValue;
-                  } else if (p.code == 21) {
-                    my = p.doubleValue;
-                  } else if (p.code == 40) {
-                    ratio = p.doubleValue;
-                  } else if (p.code == 50) {
-                    sp = p.doubleValue;
-                  } else if (p.code == 51) {
-                    ep = p.doubleValue;
+                  final cp = pairs[i];
+                  if (cp.code == 10) {
+                    cx = cp.doubleValue;
+                  } else if (cp.code == 20) {
+                    cy = cp.doubleValue;
+                  } else if (cp.code == 11) {
+                    mx = cp.doubleValue;
+                  } else if (cp.code == 21) {
+                    my = cp.doubleValue;
+                  } else if (cp.code == 40) {
+                    ratio = cp.doubleValue;
+                  } else if (cp.code == 50) {
+                    sp = cp.doubleValue;
+                  } else if (cp.code == 51) {
+                    ep = cp.doubleValue;
                   }
                   i++;
                 }
@@ -1606,8 +1720,20 @@ class DxfParser {
                   }
                 }
               } else {
+                continue;
+              }
+            } else if (p.code == 10) {
+              // Direct vertex in loop (code 10, 20)
+              double px = p.doubleValue;
+              double py = 0;
+              if (i + 1 < len && pairs[i + 1].code == 20) {
+                py = pairs[i + 1].doubleValue;
                 i++;
               }
+              if (loopPoints.isEmpty || (loopPoints.last - Offset(px, py)).distanceSquared > 1e-10) {
+                loopPoints.add(Offset(px, py));
+              }
+              i++;
             } else {
               i++;
             }

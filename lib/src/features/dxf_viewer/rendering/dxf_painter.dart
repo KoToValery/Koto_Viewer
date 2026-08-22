@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/dxf_color_table.dart';
 import '../models/dxf_display_settings.dart';
 import '../models/dxf_models.dart';
+import 'dxf_linetype_helper.dart';
 import 'dxf_math.dart';
 import 'dxf_snap_helper.dart';
 
@@ -226,6 +227,58 @@ class DxfPainter extends CustomPainter {
     return step;
   }
 
+  void _drawStrokePath(
+    Canvas canvas,
+    Path path,
+    Paint paint,
+    String? lineType,
+    String? layerLineType,
+  ) {
+    final pattern = DxfLinetypeHelper.resolvePattern(
+      lineType,
+      layerLineType: layerLineType,
+      customLineTypes: document.lineTypes,
+    );
+    if (pattern == null) {
+      canvas.drawPath(path, paint);
+    } else {
+      final scale = currentScale.clamp(0.001, 10000.0);
+      final dashedPath = DxfLinetypeHelper.createDashedPath(
+        path,
+        pattern,
+        scale: (1.5 * settings.lineThicknessScale) / scale,
+      );
+      canvas.drawPath(dashedPath, paint);
+    }
+  }
+
+  void _drawStrokeLine(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    Paint paint,
+    String? lineType,
+    String? layerLineType,
+  ) {
+    final pattern = DxfLinetypeHelper.resolvePattern(
+      lineType,
+      layerLineType: layerLineType,
+      customLineTypes: document.lineTypes,
+    );
+    if (pattern == null) {
+      canvas.drawLine(p1, p2, paint);
+    } else {
+      final scale = currentScale.clamp(0.001, 10000.0);
+      final dashedPath = DxfLinetypeHelper.createDashedLine(
+        p1,
+        p2,
+        pattern,
+        scale: (1.5 * settings.lineThicknessScale) / scale,
+      );
+      canvas.drawPath(dashedPath, paint);
+    }
+  }
+
   void _renderEntity({
     required Canvas canvas,
     required DxfEntity entity,
@@ -237,15 +290,20 @@ class DxfPainter extends CustomPainter {
     required Map<String, DxfLayer> layers,
   }) {
     final scale = currentScale.clamp(0.001, 10000.0);
+    final layer = layers[entity.layer];
+    final String? layerLineType = layer?.lineType;
 
     if (entity is DxfLine) {
       final p1 = toCanvas(entity.p1);
       final p2 = toCanvas(entity.p2);
-      canvas.drawLine(p1, p2, strokePaint);
+      _drawStrokeLine(canvas, p1, p2, strokePaint, entity.lineType, layerLineType);
     } else if (entity is DxfPoint) {
+      if (settings.pointStyle == DxfPointStyle.none || settings.pointSize <= 0) {
+        return;
+      }
       final p = toCanvas(entity.point);
-      final double markSize = (settings.pointSize * 0.75) / scale;
-      final double ptStroke = (1.2 * settings.lineThicknessScale) / scale;
+      final double markSize = math.max(0.6, (settings.pointSize * 0.45) / scale);
+      final double ptStroke = (1.0 * settings.lineThicknessScale) / scale;
 
       final ptStrokePaint = Paint()
         ..color = strokePaint.color
@@ -259,6 +317,8 @@ class DxfPainter extends CustomPainter {
         ..isAntiAlias = true;
 
       switch (settings.pointStyle) {
+        case DxfPointStyle.none:
+          break;
         case DxfPointStyle.dot:
           canvas.drawCircle(p, markSize, ptFillPaint);
           break;
@@ -281,17 +341,19 @@ class DxfPainter extends CustomPainter {
       }
     } else if (entity is DxfCircle) {
       final center = toCanvas(entity.center);
-      canvas.drawCircle(center, entity.radius * fitScale, strokePaint);
+      final r = entity.radius * fitScale;
+      final path = Path()..addOval(Rect.fromCircle(center: center, radius: r));
+      _drawStrokePath(canvas, path, strokePaint, entity.lineType, layerLineType);
     } else if (entity is DxfArc) {
-      _renderArc(canvas, entity, strokePaint, toCanvas);
+      _renderArc(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
     } else if (entity is DxfEllipse) {
-      _renderEllipse(canvas, entity, strokePaint, toCanvas);
+      _renderEllipse(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
     } else if (entity is DxfLwPolyline) {
-      _renderLwPolyline(canvas, entity, strokePaint, toCanvas);
+      _renderLwPolyline(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
     } else if (entity is DxfPolyline) {
-      _renderPolyline(canvas, entity, strokePaint, toCanvas);
+      _renderPolyline(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
     } else if (entity is DxfSpline) {
-      _renderSpline(canvas, entity, strokePaint, toCanvas);
+      _renderSpline(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
     } else if (entity is DxfText) {
       _renderText(canvas, entity, strokePaint.color, toCanvas, fitScale);
     } else if (entity is DxfMText) {
@@ -312,7 +374,7 @@ class DxfPainter extends CustomPainter {
     } else if (entity is DxfDimension) {
       _renderDimension(canvas, entity, strokePaint, toCanvas, fitScale, blocks, layers);
     } else if (entity is DxfLeader) {
-      _renderLeader(canvas, entity, strokePaint, toCanvas);
+      _renderLeader(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
     }
   }
 
@@ -321,6 +383,8 @@ class DxfPainter extends CustomPainter {
     DxfArc arc,
     Paint paint,
     Offset Function(Offset) toCanvas,
+    String? lineType,
+    String? layerLineType,
   ) {
     final double cx = arc.center.dx;
     final double cy = arc.center.dy;
@@ -352,7 +416,7 @@ class DxfPainter extends CustomPainter {
       path.lineTo(canvasPoint.dx, canvasPoint.dy);
     }
 
-    canvas.drawPath(path, paint);
+    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
   }
 
   void _renderEllipse(
@@ -360,6 +424,8 @@ class DxfPainter extends CustomPainter {
     DxfEllipse ellipse,
     Paint paint,
     Offset Function(Offset) toCanvas,
+    String? lineType,
+    String? layerLineType,
   ) {
     final points = DxfMath.generateEllipsePoints(
       ellipse.center,
@@ -379,7 +445,7 @@ class DxfPainter extends CustomPainter {
       path.lineTo(p.dx, p.dy);
     }
 
-    canvas.drawPath(path, paint);
+    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
   }
 
   void _renderLwPolyline(
@@ -387,6 +453,8 @@ class DxfPainter extends CustomPainter {
     DxfLwPolyline poly,
     Paint paint,
     Offset Function(Offset) toCanvas,
+    String? lineType,
+    String? layerLineType,
   ) {
     if (poly.vertices.isEmpty) return;
 
@@ -433,7 +501,7 @@ class DxfPainter extends CustomPainter {
       path.close();
     }
 
-    canvas.drawPath(path, paint);
+    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
   }
 
   void _renderPolyline(
@@ -441,6 +509,8 @@ class DxfPainter extends CustomPainter {
     DxfPolyline poly,
     Paint paint,
     Offset Function(Offset) toCanvas,
+    String? lineType,
+    String? layerLineType,
   ) {
     if (poly.vertices.isEmpty) return;
 
@@ -487,7 +557,7 @@ class DxfPainter extends CustomPainter {
       path.close();
     }
 
-    canvas.drawPath(path, paint);
+    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
   }
 
   void _renderSpline(
@@ -495,6 +565,8 @@ class DxfPainter extends CustomPainter {
     DxfSpline spline,
     Paint paint,
     Offset Function(Offset) toCanvas,
+    String? lineType,
+    String? layerLineType,
   ) {
     final points = spline.controlPoints.isNotEmpty
         ? DxfMath.evaluateSpline(
@@ -520,7 +592,7 @@ class DxfPainter extends CustomPainter {
       path.close();
     }
 
-    canvas.drawPath(path, paint);
+    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
   }
 
   void _renderText(
@@ -716,9 +788,9 @@ class DxfPainter extends CustomPainter {
   ) {
     if (hatch.boundaryPaths.isEmpty) return;
 
+    final path = Path()..fillType = PathFillType.evenOdd;
     for (final loop in hatch.boundaryPaths) {
       if (loop.isEmpty) continue;
-      final path = Path();
       final p0 = toCanvas(loop.first);
       path.moveTo(p0.dx, p0.dy);
       for (int i = 1; i < loop.length; i++) {
@@ -726,9 +798,191 @@ class DxfPainter extends CustomPainter {
         path.lineTo(p.dx, p.dy);
       }
       path.close();
-
-      canvas.drawPath(path, fillPaint);
     }
+
+    // 1. Determine effective transparency / fill opacity
+    double effectiveOpacity = 0.35; // standard default fill opacity
+    if (hatch.transparency != null) {
+      effectiveOpacity = hatch.transparency!.clamp(0.02, 1.0);
+    } else {
+      final nameUpper = hatch.patternName.toUpperCase();
+      final layerUpper = hatch.layer.toUpperCase();
+      if (nameUpper.contains('10%') ||
+          nameUpper.contains('SHADOW') ||
+          nameUpper.contains('СЕНКИ') ||
+          nameUpper.contains('SENKA') ||
+          nameUpper.contains('СЯНКА') ||
+          layerUpper.contains('SHADOW') ||
+          layerUpper.contains('СЕНКИ') ||
+          layerUpper.contains('СЯНКА') ||
+          layerUpper.contains('SENKA') ||
+          layerUpper.contains('TRANSP')) {
+        effectiveOpacity = 0.10; // ArchiCAD shadow fill (~10% opacity)
+      } else if (nameUpper.contains('25%') || nameUpper.contains('SOLID_25')) {
+        effectiveOpacity = 0.25;
+      } else if (nameUpper.contains('50%') || nameUpper.contains('SOLID_50')) {
+        effectiveOpacity = 0.50;
+      } else if (nameUpper.contains('75%') || nameUpper.contains('SOLID_75')) {
+        effectiveOpacity = 0.75;
+      } else if (hatch.isSolid) {
+        effectiveOpacity = 0.40;
+      }
+    }
+
+    final effectiveFillPaint = Paint()
+      ..color = strokePaint.color.withValues(alpha: effectiveOpacity)
+      ..style = PaintingStyle.fill;
+
+    // Draw background translucent / solid fill
+    canvas.drawPath(path, effectiveFillPaint);
+
+    // 2. Draw geometric pattern lines for non-pure-solid hatches
+    final name = hatch.patternName.toUpperCase();
+    final bool isPureSolid = hatch.isSolid &&
+        (name == 'SOLID' ||
+            name == '_SOLID' ||
+            name.contains('%') ||
+            name.contains('SHADOW') ||
+            name.contains('СЕНКИ') ||
+            name.contains('SENKA') ||
+            name.contains('СЯНКА') ||
+            name.contains('TRANSP'));
+
+    if (!isPureSolid) {
+      _renderHatchPatternLines(canvas, path, hatch, strokePaint);
+    }
+  }
+
+  void _renderHatchPatternLines(
+    Canvas canvas,
+    Path clipPath,
+    DxfHatch hatch,
+    Paint strokePaint,
+  ) {
+    final bounds = clipPath.getBounds();
+    if (bounds.isEmpty || bounds.width <= 0 || bounds.height <= 0) return;
+
+    final name = hatch.patternName.toUpperCase();
+    final double scale = currentScale.clamp(0.001, 10000.0);
+    final double rawSpacing = (hatch.patternScale > 0 ? hatch.patternScale : 1.0) * 14.0;
+    final double spacing = (rawSpacing / scale).clamp(3.5, 400.0);
+
+    final patternStrokePaint = Paint()
+      ..color = strokePaint.color.withValues(alpha: 0.65)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (0.85 * settings.lineThicknessScale) / scale
+      ..isAntiAlias = true;
+
+    canvas.save();
+    canvas.clipPath(clipPath);
+
+    final double rad = hatch.patternAngle * math.pi / 180.0;
+
+    if (name.contains('ANSI31') || name.contains('LINE') || name.contains('HATCH') || name.contains('DIAGONAL')) {
+      _drawParallelLines(canvas, bounds, rad + math.pi / 4, spacing, patternStrokePaint);
+    } else if (name.contains('ANSI32') || name.contains('ANSI37') || name.contains('CROSS') || name.contains('GRID') || name.contains('NET')) {
+      _drawParallelLines(canvas, bounds, rad + math.pi / 4, spacing, patternStrokePaint);
+      _drawParallelLines(canvas, bounds, rad - math.pi / 4, spacing, patternStrokePaint);
+    } else if (name.contains('PLANK') || name.contains('FLOOR') || name.contains('HORIZ')) {
+      _drawParallelLines(canvas, bounds, rad, spacing * 1.5, patternStrokePaint);
+    } else if (name.contains('VERT')) {
+      _drawParallelLines(canvas, bounds, rad + math.pi / 2, spacing * 1.5, patternStrokePaint);
+    } else if (name.contains('INSULAT') || name.contains('STYROFOAM') || name.contains('SOLID___DASHED')) {
+      _drawParallelLines(canvas, bounds, rad + math.pi / 4, spacing * 0.8, patternStrokePaint);
+    } else if (name.contains('BRICK') || name.contains('AR-B')) {
+      _drawBrickPattern(canvas, bounds, rad, spacing, patternStrokePaint);
+    } else if (name.contains('CONC') || name.contains('GRAVEL')) {
+      _drawConcretePattern(canvas, bounds, spacing, patternStrokePaint);
+    } else if (name.contains('EARTH') || name.contains('SOIL')) {
+      _drawEarthPattern(canvas, bounds, rad + math.pi / 4, spacing, patternStrokePaint);
+    } else {
+      _drawParallelLines(canvas, bounds, rad + math.pi / 4, spacing, patternStrokePaint);
+    }
+
+    canvas.restore();
+  }
+
+  void _drawParallelLines(
+    Canvas canvas,
+    Rect bounds,
+    double angleRad,
+    double spacing,
+    Paint paint, {
+    double offsetShift = 0.0,
+  }) {
+    if (spacing <= 0) return;
+    final center = bounds.center;
+    final radius = math.sqrt(bounds.width * bounds.width + bounds.height * bounds.height) / 2 + 10;
+
+    final cosA = math.cos(angleRad);
+    final sinA = math.sin(angleRad);
+    final normX = -sinA;
+    final normY = cosA;
+
+    final count = (radius * 2 / spacing).ceil().clamp(1, 600);
+    for (int i = -count; i <= count; i++) {
+      final double offset = i * spacing + offsetShift;
+      final pMid = Offset(center.dx + normX * offset, center.dy + normY * offset);
+      final p1 = Offset(pMid.dx - cosA * radius, pMid.dy - sinA * radius);
+      final p2 = Offset(pMid.dx + cosA * radius, pMid.dy + sinA * radius);
+      canvas.drawLine(p1, p2, paint);
+    }
+  }
+
+  void _drawBrickPattern(
+    Canvas canvas,
+    Rect bounds,
+    double angleRad,
+    double spacing,
+    Paint paint,
+  ) {
+    _drawParallelLines(canvas, bounds, angleRad, spacing, paint);
+    _drawParallelLines(canvas, bounds, angleRad + math.pi / 2, spacing * 2.5, paint);
+  }
+
+  void _drawConcretePattern(
+    Canvas canvas,
+    Rect bounds,
+    double spacing,
+    Paint paint,
+  ) {
+    final double step = math.max(spacing * 0.8, 12.0);
+    final dotPaint = Paint()
+      ..color = paint.color
+      ..style = PaintingStyle.fill;
+
+    for (double x = bounds.left; x < bounds.right; x += step) {
+      for (double y = bounds.top; y < bounds.bottom; y += step) {
+        final double jitterX = (math.sin(x * 12.9898 + y * 78.233) * 43758.5453 % 1.0) * step * 0.6;
+        final double jitterY = (math.cos(x * 39.346 + y * 11.135) * 43758.5453 % 1.0) * step * 0.6;
+        final pt = Offset(x + jitterX, y + jitterY);
+
+        if ((x.toInt() + y.toInt()) % 3 == 0) {
+          final s = step * 0.25;
+          final tri = Path()
+            ..moveTo(pt.dx, pt.dy - s)
+            ..lineTo(pt.dx - s, pt.dy + s)
+            ..lineTo(pt.dx + s, pt.dy + s)
+            ..close();
+          canvas.drawPath(tri, paint);
+        } else {
+          canvas.drawCircle(pt, 1.0, dotPaint);
+        }
+      }
+    }
+  }
+
+  void _drawEarthPattern(
+    Canvas canvas,
+    Rect bounds,
+    double angleRad,
+    double spacing,
+    Paint paint,
+  ) {
+    final double groupSpacing = spacing * 2.2;
+    _drawParallelLines(canvas, bounds, angleRad, groupSpacing, paint);
+    _drawParallelLines(canvas, bounds, angleRad, groupSpacing, paint, offsetShift: spacing * 0.28);
+    _drawParallelLines(canvas, bounds, angleRad, groupSpacing, paint, offsetShift: spacing * 0.56);
   }
 
   void _renderInsert({
@@ -861,6 +1115,8 @@ class DxfPainter extends CustomPainter {
     DxfLeader leader,
     Paint paint,
     Offset Function(Offset) toCanvas,
+    String? lineType,
+    String? layerLineType,
   ) {
     if (leader.vertices.length < 2) return;
 
@@ -872,7 +1128,7 @@ class DxfPainter extends CustomPainter {
       final p = toCanvas(leader.vertices[i]);
       path.lineTo(p.dx, p.dy);
     }
-    canvas.drawPath(path, paint);
+    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
   }
 
   void _drawSnapMarker(

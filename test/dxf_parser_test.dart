@@ -504,7 +504,7 @@ EOF
       const defaultSettings = DxfDisplaySettings();
       expect(defaultSettings.lineThicknessScale, 1.0);
       expect(defaultSettings.measurementScale, 1.4);
-      expect(defaultSettings.pointSize, 4.0);
+      expect(defaultSettings.pointSize, 2.0);
       expect(defaultSettings.pointStyle, DxfPointStyle.dot);
 
       final modified = defaultSettings.copyWith(
