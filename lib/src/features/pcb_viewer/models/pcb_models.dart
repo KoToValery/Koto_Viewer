@@ -179,6 +179,92 @@ class PcbDocument {
   int get holeCount => drillHoles.length;
 }
 
+/// Side of the PCB to view.
+enum PcbViewSide {
+  top('Top Side (Components)'),
+  bottom('Bottom Side (Solder)'),
+  composite('Composite (All Layers)');
+
+  final String label;
+  const PcbViewSide(this.label);
+}
+
+/// A single layer within a multi-layer PCB project.
+class PcbLayerItem {
+  final String fileName;
+  final PcbLayerType type;
+  final PcbDocument document;
+  bool isVisible;
+  double opacity;
+  Color? customColor;
+  int order;
+
+  PcbLayerItem({
+    required this.fileName,
+    required this.type,
+    required this.document,
+    this.isVisible = true,
+    this.opacity = 1.0,
+    this.customColor,
+    this.order = 0,
+  });
+
+  String get displayName {
+    if (fileName.isNotEmpty && fileName != 'layer.gbr') {
+      return '$fileName (${type.displayName})';
+    }
+    return type.displayName;
+  }
+}
+
+/// Bill of Materials (BOM) entry.
+class PcbBomEntry {
+  final String designator;
+  final String value;
+  final String footprint;
+  final String description;
+  final int quantity;
+  final String? partNumber;
+
+  const PcbBomEntry({
+    required this.designator,
+    required this.value,
+    this.footprint = '',
+    this.description = '',
+    this.quantity = 1,
+    this.partNumber,
+  });
+}
+
+/// Complete Multi-Layer PCB Project (e.g. from a Proteus / Altium / KiCad ZIP archive).
+class PcbProject {
+  final String projectName;
+  final String sourcePath;
+  final List<PcbLayerItem> layers;
+  final List<PcbBomEntry> bomEntries;
+  final PcbBoundingBox boundingBox;
+  PcbViewSide viewSide;
+
+  PcbProject({
+    required this.projectName,
+    required this.sourcePath,
+    required this.layers,
+    this.bomEntries = const [],
+    required this.boundingBox,
+    this.viewSide = PcbViewSide.top,
+  });
+
+  int get totalLayers => layers.length;
+  int get visibleLayers => layers.where((l) => l.isVisible).length;
+  int get totalComponents => bomEntries.fold(0, (sum, e) => sum + e.quantity);
+
+  PcbLayerItem? get edgeCutsLayer =>
+      layers.cast<PcbLayerItem?>().firstWhere((l) => l?.type == PcbLayerType.edgeCuts, orElse: () => null);
+
+  List<PcbLayerItem> get drillLayers =>
+      layers.where((l) => l.type == PcbLayerType.drill).toList();
+}
+
 /// Theme for PCB Rendering.
 enum PcbTheme {
   fr4Green(

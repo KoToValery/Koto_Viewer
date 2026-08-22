@@ -547,7 +547,11 @@ class DxfPainter extends CustomPainter {
     );
     textPainter.layout();
 
-    final pos = toCanvas(entity.alignPoint ?? entity.insertPoint);
+    final pos = toCanvas(
+      ((entity.hAlign != 0 || entity.vAlign != 0) && entity.alignPoint != null)
+          ? entity.alignPoint!
+          : entity.insertPoint,
+    );
 
     canvas.save();
     canvas.translate(pos.dx, pos.dy);
@@ -556,10 +560,8 @@ class DxfPainter extends CustomPainter {
     final double rad = -entity.rotationDeg * math.pi / 180.0;
     canvas.rotate(rad);
 
-    // Text alignment offset
+    // Horizontal alignment offset
     double ox = 0.0;
-    double oy = -textPainter.height; // Baseline alignment adjustment
-
     switch (entity.hAlign) {
       case 1: // Center
       case 4: // Middle
@@ -570,6 +572,27 @@ class DxfPainter extends CustomPainter {
         break;
       default:
         ox = 0.0;
+    }
+
+    // Vertical alignment offset (0=Baseline, 1=Bottom, 2=Middle, 3=Top)
+    double oy = -textPainter.height * 0.85; // Default baseline offset
+    switch (entity.vAlign) {
+      case 1: // Bottom
+        oy = -textPainter.height;
+        break;
+      case 2: // Middle
+        oy = -textPainter.height / 2.0;
+        break;
+      case 3: // Top
+        oy = 0.0;
+        break;
+      default:
+        if (entity.hAlign == 4) {
+          // Special case: AutoCAD "Middle" horizontal alignment (hAlign=4, vAlign=0) is centered vertically as well
+          oy = -textPainter.height / 2.0;
+        } else {
+          oy = -textPainter.height * 0.85;
+        }
     }
 
     textPainter.paint(canvas, Offset(ox, oy));

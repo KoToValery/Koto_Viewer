@@ -66,6 +66,11 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   int _activePointersCount = 0;
   bool _isMultiTouchGesture = false;
 
+  // Desktop Middle Mouse Pan & Keyboard Focus
+  Offset? _middlePanStart;
+  Matrix4? _middlePanMatrix;
+  final FocusNode _focusNode = FocusNode();
+
   // Layout & viewport
   Size _viewportSize = Size.zero;
 
@@ -77,10 +82,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     DxfDisplaySettingsService.settingsNotifier.addListener(_onDisplaySettingsChanged);
     _initDisplaySettings();
     _loadDxfFile();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _transformController.removeListener(_onTransformChanged);
     DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged);
     _transformController.dispose();
@@ -179,10 +188,10 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     _zoomBy(1 / 1.35);
   }
 
-  void _zoomBy(double factor) {
+  void _zoomBy(double factor, {Offset? focalPoint}) {
     if (_viewportSize.isEmpty) return;
 
-    final center = Offset(_viewportSize.width / 2, _viewportSize.height / 2);
+    final targetPoint = focalPoint ?? Offset(_viewportSize.width / 2, _viewportSize.height / 2);
     final currentMatrix = _transformController.value;
 
     final translation = currentMatrix.getTranslation();
@@ -190,8 +199,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     final newScale = (scale * factor).clamp(0.001, 1000.0);
 
-    final dx = center.dx - (center.dx - translation.x) * (newScale / scale);
-    final dy = center.dy - (center.dy - translation.y) * (newScale / scale);
+    final dx = targetPoint.dx - (targetPoint.dx - translation.x) * (newScale / scale);
+    final dy = targetPoint.dy - (targetPoint.dy - translation.y) * (newScale / scale);
 
     final newMatrix = Matrix4.identity()
       ..translate(dx, dy)
@@ -276,7 +285,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     // Only start a single finger measure pointer if we are NOT in the middle of a multi-touch sequence
     if (!_isMultiTouchGesture) {
-      _updateMeasurePointer(event.localPosition);
+      _updateMeasurePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
     }
   }
 
@@ -286,13 +295,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       _isMultiTouchGesture = true;
     }
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
-    _updateMeasurePointer(event.localPosition);
+    _updateMeasurePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
   }
 
-  void _updateMeasurePointer(Offset screenPos) {
+  void _updateMeasurePointer(Offset screenPos, {bool isMouse = false}) {
     final touchPos = screenPos;
-    // Position target tip 56 pixels directly above finger
-    final targetPos = screenPos - const Offset(0, 56.0);
+    // On mouse/desktop: target tip is EXACTLY at the cursor (zero offset).
+    // On touch/mobile: position target tip 56 pixels directly above finger so finger doesn't obscure view.
+    final targetPos = isMouse ? screenPos : (screenPos - const Offset(0, 56.0));
     final scenePt = _transformController.toScene(targetPos);
     final rawCadPt = _sceneToCad(scenePt);
 
@@ -377,6 +387,100 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       _snappedScreenPos = null;
       _activeMeasureSnap = null;
     });
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent) {
+      final delta = event.scrollDelta.dy;
+      if (delta < 0) {
+        _zoomBy(1.20, focalPoint: event.localPosition);
+      } else if (delta > 0) {
+        _zoomBy(1 / 1.20, focalPoint: event.localPosition);
+      }
+    }
+  }
+
+  void _handleGeneralPointerDown(PointerDownEvent event) {
+    if ((event.buttons & kTertiaryButton) != 0) {
+      _middlePanStart = event.position;
+      _middlePanMatrix = _transformController.value.clone();
+      return;
+    }
+
+    if (_isMeasureMode) {
+      _handleMeasurePointerDown(event);
+    }
+  }
+
+  void _handleGeneralPointerMove(PointerMoveEvent event) {
+    if (_middlePanStart != null && _middlePanMatrix != null) {
+      final delta = event.position - _middlePanStart!;
+      final newMatrix = _middlePanMatrix!.clone();
+      final translation = newMatrix.getTranslation();
+      newMatrix.setTranslationRaw(translation.x + delta.dx, translation.y + delta.dy, translation.z);
+      _transformController.value = newMatrix;
+      return;
+    }
+
+    if (_isMeasureMode) {
+      _handleMeasurePointerMove(event);
+    }
+  }
+
+  void _handleGeneralPointerUp(PointerUpEvent event) {
+    if (_middlePanStart != null) {
+      _middlePanStart = null;
+      _middlePanMatrix = null;
+      return;
+    }
+
+    if (_isMeasureMode) {
+      _handleMeasurePointerUp(event);
+    }
+  }
+
+  void _handleGeneralPointerCancel(PointerCancelEvent event) {
+    _middlePanStart = null;
+    _middlePanMatrix = null;
+    if (_isMeasureMode) {
+      _handleMeasurePointerCancel(event);
+    }
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      if (event.logicalKey == LogicalKeyboardKey.f3) {
+        setState(() {
+          _snapEnabled = !_snapEnabled;
+          if (!_snapEnabled) {
+            _hoveredSnap = null;
+            _activeMeasureSnap = null;
+            _snappedScreenPos = null;
+          }
+        });
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_snapEnabled ? 'Object Snap (OSNAP) ON [F3]' : 'Object Snap (OSNAP) OFF [F3]'),
+            duration: const Duration(milliseconds: 1200),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+        setState(() {
+          if (_measurement != null) {
+            _measurement = null;
+            _hoveredSnap = null;
+            _touchScreenPos = null;
+            _targetScreenPos = null;
+            _snappedScreenPos = null;
+            _activeMeasureSnap = null;
+          } else if (_isMeasureMode) {
+            _isMeasureMode = false;
+          }
+        });
+      }
+    }
   }
 
   void _handleCanvasTap(TapUpDetails details) {
@@ -768,214 +872,220 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+      body: KeyboardListener(
+        focusNode: _focusNode,
+        autofocus: true,
+        onKeyEvent: _handleKeyEvent,
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
 
-            if (_isLoading) {
-              return Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Loading CAD Drawing...',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            if (_errorMessage != null) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
+              if (_isLoading) {
+                return Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70),
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _loadDxfFile,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Retry'),
+                      const Text(
+                        'Loading CAD Drawing...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white70,
+                        ),
                       ),
                     ],
                   ),
-                ),
-              );
-            }
+                );
+              }
 
-            if (_document == null) {
-              return const SizedBox.shrink();
-            }
+              if (_errorMessage != null) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                        const SizedBox(height: 16),
+                        Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _loadDxfFile,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
 
-            return Stack(
-              children: [
-                // Interactive CAD Canvas with Touch Listener for Measurement
-                Listener(
-                  onPointerDown: _isMeasureMode ? _handleMeasurePointerDown : null,
-                  onPointerMove: _isMeasureMode ? _handleMeasurePointerMove : null,
-                  onPointerUp: _isMeasureMode ? _handleMeasurePointerUp : null,
-                  onPointerCancel: _isMeasureMode ? _handleMeasurePointerCancel : null,
-                  child: MouseRegion(
-                    onHover: _handlePointerHover,
-                    child: GestureDetector(
-                      onTapUp: _isMeasureMode ? null : _handleCanvasTap,
-                      child: InteractiveViewer(
-                        transformationController: _transformController,
-                        panEnabled: !_isMeasureMode,
-                        scaleEnabled: true,
-                        minScale: 0.01,
-                        maxScale: 1000.0,
-                        boundaryMargin: const EdgeInsets.all(1000.0),
-                        child: CustomPaint(
-                          size: _viewportSize,
-                          painter: DxfPainter(
-                            document: _document!,
-                            theme: _canvasTheme,
-                            currentScale: _currentScale,
-                            measurement: _measurement,
-                            snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
-                            showGrid: _showGrid,
-                            settings: _displaySettings,
+              if (_document == null) {
+                return const SizedBox.shrink();
+              }
+
+              return Stack(
+                children: [
+                  // Interactive CAD Canvas with Touch/Mouse Wheel/Middle Pan Listener
+                  Listener(
+                    onPointerSignal: _handlePointerSignal,
+                    onPointerDown: _handleGeneralPointerDown,
+                    onPointerMove: _handleGeneralPointerMove,
+                    onPointerUp: _handleGeneralPointerUp,
+                    onPointerCancel: _handleGeneralPointerCancel,
+                    child: MouseRegion(
+                      onHover: _handlePointerHover,
+                      child: GestureDetector(
+                        onTapUp: _isMeasureMode ? null : _handleCanvasTap,
+                        child: InteractiveViewer(
+                          transformationController: _transformController,
+                          panEnabled: !_isMeasureMode,
+                          scaleEnabled: true,
+                          minScale: 0.001,
+                          maxScale: 1000.0,
+                          boundaryMargin: const EdgeInsets.all(1000.0),
+                          child: CustomPaint(
+                            size: _viewportSize,
+                            painter: DxfPainter(
+                              document: _document!,
+                              theme: _canvasTheme,
+                              currentScale: _currentScale,
+                              measurement: _measurement,
+                              snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
+                              showGrid: _showGrid,
+                              settings: _displaySettings,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
 
-                // Offset Snapping Pointer Overlay (Sharp tip 56px above finger with magnetism halo)
-                if (_isMeasureMode && _touchScreenPos != null && _targetScreenPos != null)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: CustomPaint(
-                        painter: DxfMeasurePointerPainter(
-                          touchPos: _touchScreenPos!,
-                          targetPos: _targetScreenPos!,
-                          snappedPos: _snappedScreenPos,
-                          snapType: _activeMeasureSnap?.type,
-                          currentCadCoord: _currentCadCoord,
-                          p1CadCoord: _measurement?.p1Cad,
-                          isSettingSecondPoint: _measurement != null && _measurement!.p2Cad == null,
+                  // Offset Snapping Pointer Overlay (Sharp tip 56px above finger with magnetism halo)
+                  if (_isMeasureMode && _touchScreenPos != null && _targetScreenPos != null)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: DxfMeasurePointerPainter(
+                            touchPos: _touchScreenPos!,
+                            targetPos: _targetScreenPos!,
+                            snappedPos: _snappedScreenPos,
+                            snapType: _activeMeasureSnap?.type,
+                            currentCadCoord: _currentCadCoord,
+                            p1CadCoord: _measurement?.p1Cad,
+                            isSettingSecondPoint: _measurement != null && _measurement!.p2Cad == null,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Top Measure Status Bar
+                  if (_isMeasureMode)
+                    Positioned(
+                      top: 12,
+                      left: 16,
+                      right: 16,
+                      child: Center(
+                        child: DxfMeasurementOverlay(
+                          measurement: _measurement,
+                          snapEnabled: _snapEnabled,
+                          onToggleSnap: () {
+                            setState(() {
+                              _snapEnabled = !_snapEnabled;
+                              if (!_snapEnabled) {
+                                _hoveredSnap = null;
+                                _activeMeasureSnap = null;
+                                _snappedScreenPos = null;
+                              }
+                            });
+                          },
+                          onClear: () {
+                            setState(() {
+                              _measurement = null;
+                              _touchScreenPos = null;
+                              _targetScreenPos = null;
+                              _snappedScreenPos = null;
+                              _activeMeasureSnap = null;
+                            });
+                          },
+                          onExit: () {
+                            setState(() {
+                              _isMeasureMode = false;
+                              _measurement = null;
+                              _hoveredSnap = null;
+                              _touchScreenPos = null;
+                              _targetScreenPos = null;
+                              _snappedScreenPos = null;
+                              _activeMeasureSnap = null;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+
+                  // Bottom Left Coordinate & Scale HUD
+                  Positioned(
+                    bottom: 16,
+                    left: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xCC1E293B),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: Text(
+                        'X: ${DxfMath.formatDistance(_currentCadCoord.dx)}  Y: ${DxfMath.formatDistance(_currentCadCoord.dy)}  |  Zoom: ${(_currentScale * 100).toStringAsFixed(0)}%  |  ${activeCrs.name}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10.5,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ),
 
-                // Top Measure Status Bar
-                if (_isMeasureMode)
+                  // Bottom Right Floating Navigation Controls
                   Positioned(
-                    top: 12,
-                    left: 16,
+                    bottom: 16,
                     right: 16,
-                    child: Center(
-                      child: DxfMeasurementOverlay(
-                        measurement: _measurement,
-                        snapEnabled: _snapEnabled,
-                        onToggleSnap: () {
-                          setState(() {
-                            _snapEnabled = !_snapEnabled;
-                            if (!_snapEnabled) {
-                              _hoveredSnap = null;
-                              _activeMeasureSnap = null;
-                              _snappedScreenPos = null;
-                            }
-                          });
-                        },
-                        onClear: () {
-                          setState(() {
-                            _measurement = null;
-                            _touchScreenPos = null;
-                            _targetScreenPos = null;
-                            _snappedScreenPos = null;
-                            _activeMeasureSnap = null;
-                          });
-                        },
-                        onExit: () {
-                          setState(() {
-                            _isMeasureMode = false;
-                            _measurement = null;
-                            _hoveredSnap = null;
-                            _touchScreenPos = null;
-                            _targetScreenPos = null;
-                            _snappedScreenPos = null;
-                            _activeMeasureSnap = null;
-                          });
-                        },
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildFloatingButton(
+                          icon: Icons.add,
+                          tooltip: 'Zoom In',
+                          onPressed: _zoomIn,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildFloatingButton(
+                          icon: Icons.remove,
+                          tooltip: 'Zoom Out',
+                          onPressed: _zoomOut,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildFloatingButton(
+                          icon: Icons.center_focus_strong,
+                          tooltip: 'Fit to Screen',
+                          onPressed: _fitToScreen,
+                        ),
+                      ],
                     ),
                   ),
-
-                // Bottom Left Coordinate & Scale HUD
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xCC1E293B),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: Text(
-                      'X: ${DxfMath.formatDistance(_currentCadCoord.dx)}  Y: ${DxfMath.formatDistance(_currentCadCoord.dy)}  |  Zoom: ${(_currentScale * 100).toStringAsFixed(0)}%  |  ${activeCrs.name}',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10.5,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Bottom Right Floating Navigation Controls
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildFloatingButton(
-                        icon: Icons.add,
-                        tooltip: 'Zoom In',
-                        onPressed: _zoomIn,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildFloatingButton(
-                        icon: Icons.remove,
-                        tooltip: 'Zoom Out',
-                        onPressed: _zoomOut,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildFloatingButton(
-                        icon: Icons.center_focus_strong,
-                        tooltip: 'Fit to Screen',
-                        onPressed: _fitToScreen,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

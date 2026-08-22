@@ -19,8 +19,32 @@ class DwgConversionException implements Exception {
 class DwgConverterService {
   static const String _cacheFolder = 'dwg_cache';
 
-  /// Returns true if native LibreDWG converter library is loaded and ready.
-  static bool get isNativeSupported => LibreDwgFfi.isAvailable;
+  /// Locates the bundled or installed dwg2dxf executable on Windows.
+  static String? _findWindowsDwg2DxfExe() {
+    if (!Platform.isWindows) return null;
+
+    final candidates = [
+      // 1. Next to the running executable (e.g. build/windows/x64/runner/Debug/dwg2dxf.exe or Release)
+      '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}dwg2dxf.exe',
+      // 2. In windows/libredwg/bin directory (dev environment)
+      '${Directory.current.path}${Platform.pathSeparator}windows${Platform.pathSeparator}libredwg${Platform.pathSeparator}bin${Platform.pathSeparator}dwg2dxf.exe',
+    ];
+
+    for (final candidate in candidates) {
+      if (File(candidate).existsSync()) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  /// Returns true if native LibreDWG converter library or CLI tool is loaded and ready.
+  static bool get isNativeSupported {
+    if (Platform.isWindows) {
+      return _findWindowsDwg2DxfExe() != null || LibreDwgFfi.isAvailable;
+    }
+    return LibreDwgFfi.isAvailable;
+  }
 
   /// Converts a DWG file at [dwgPath] to a cached DXF file.
   /// If already converted and the source file has not changed,
@@ -60,13 +84,43 @@ class DwgConverterService {
       return targetDxfPath;
     }
 
-    // Run conversion in a background isolate
-    final params = _ConversionParams(
-      inputDwgPath: dwgPath,
-      outputDxfPath: targetDxfPath,
-    );
+    int result = -1;
 
-    final int result = await compute(_runConversionInIsolate, params);
+    // 1. On Windows: Try using bundled dwg2dxf CLI tool
+    final winExe = _findWindowsDwg2DxfExe();
+    if (winExe != null) {
+      try {
+        final processResult = await Process.run(winExe, [
+          '-v0',
+          '-y',
+          '-o',
+          targetDxfPath,
+          dwgPath,
+        ]);
+        if (processResult.exitCode == 0 &&
+            await targetDxfFile.exists() &&
+            await targetDxfFile.length() > 0) {
+          result = 0;
+        } else {
+          debugPrint(
+            'DwgConverterService: dwg2dxf CLI exit ${processResult.exitCode}, stderr: ${processResult.stderr}',
+          );
+          result = processResult.exitCode != 0 ? processResult.exitCode : -1;
+        }
+      } catch (e) {
+        debugPrint('DwgConverterService: Windows CLI conversion error: $e');
+        result = -1;
+      }
+    }
+
+    // 2. Fallback to Isolate FFI conversion (Android, Linux, or if FFI DLL is loaded)
+    if (result != 0 && LibreDwgFfi.isAvailable) {
+      final params = _ConversionParams(
+        inputDwgPath: dwgPath,
+        outputDxfPath: targetDxfPath,
+      );
+      result = await compute(_runConversionInIsolate, params);
+    }
 
     if (result != 0) {
       // Clean up partially written file

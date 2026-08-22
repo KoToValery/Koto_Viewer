@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../eps_viewer/models/eps_models.dart';
@@ -25,6 +26,7 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
   EpsCanvasTheme _canvasTheme = EpsCanvasTheme.darkCad;
   bool _showGrid = true;
 
+  Size _viewportSize = Size.zero;
   final TransformationController _transformController = TransformationController();
 
   String get _fileName => widget.filePath.split(Platform.pathSeparator).last;
@@ -63,6 +65,11 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
           _document = doc;
           _isLoading = false;
         });
+
+        // Auto-fit to screen once rendered
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _fitToScreen();
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -74,18 +81,67 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
     }
   }
 
-  void _resetView() {
-    _transformController.value = Matrix4.identity();
+  /// Calculates the exact translation and scale matrix to center and fit the HPGL drawing in viewport.
+  void _fitToScreen() {
+    if (_document == null || _viewportSize.isEmpty) {
+      _transformController.value = Matrix4.identity();
+      return;
+    }
+
+    final bounds = _document!.boundingBox;
+    final double contentW = bounds.width > 0 ? bounds.width * 0.05 + 40.0 : 500.0;
+    final double contentH = bounds.height > 0 ? bounds.height * 0.05 + 40.0 : 500.0;
+
+    const double padding = 40.0;
+    final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
+    final double availH = math.max(_viewportSize.height - padding * 2, 10.0);
+
+    final double scale = math.min(availW / contentW, availH / contentH);
+
+    final double dx = (_viewportSize.width - contentW * scale) / 2.0;
+    final double dy = (_viewportSize.height - contentH * scale) / 2.0;
+
+    final matrix = Matrix4.identity()
+      ..translate(dx, dy)
+      ..scale(scale, scale);
+
+    _transformController.value = matrix;
   }
 
   void _zoomIn() {
-    final matrix = _transformController.value.clone()..scale(1.25, 1.25);
-    _transformController.value = matrix;
+    _zoomBy(1.3);
   }
 
   void _zoomOut() {
-    final matrix = _transformController.value.clone()..scale(0.8, 0.8);
-    _transformController.value = matrix;
+    _zoomBy(1 / 1.3);
+  }
+
+  void _zoomBy(double factor, {Offset? focalPoint}) {
+    if (_viewportSize.isEmpty) return;
+
+    final targetPoint = focalPoint ?? Offset(_viewportSize.width / 2, _viewportSize.height / 2);
+    final currentMatrix = _transformController.value;
+
+    final translation = currentMatrix.getTranslation();
+    final scale = currentMatrix.getMaxScaleOnAxis();
+
+    final newScale = (scale * factor).clamp(0.002, 2000.0);
+
+    final dx = targetPoint.dx - (targetPoint.dx - translation.x) * (newScale / scale);
+    final dy = targetPoint.dy - (targetPoint.dy - translation.y) * (newScale / scale);
+
+    final newMatrix = Matrix4.identity()
+      ..translate(dx, dy)
+      ..scale(newScale);
+
+    _transformController.value = newMatrix;
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent) {
+      final double zoomFactor = event.scrollDelta.dy < 0 ? 1.15 : 0.85;
+      _zoomBy(zoomFactor, focalPoint: event.localPosition);
+    }
   }
 
   void _showInfoSheet() {
@@ -215,6 +271,13 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
           ],
         ),
         actions: [
+          // Fit to Screen Button in Top Bar
+          IconButton(
+            icon: const Icon(Icons.fit_screen_outlined),
+            tooltip: 'Fit to Screen',
+            onPressed: _document != null ? _fitToScreen : null,
+          ),
+
           // Theme Menu
           PopupMenuButton<EpsCanvasTheme>(
             icon: const Icon(Icons.palette_outlined),
@@ -271,8 +334,12 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+
+          if (_isLoading) {
+            return const Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -281,82 +348,96 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
                   Text('Loading HPGL Plotter Drawing...', style: TextStyle(color: Colors.white70)),
                 ],
               ),
-            )
-          : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-                        const SizedBox(height: 16),
-                        Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _loadHpglFile,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : Stack(
-                  children: [
-                    // Interactive Canvas with Infinite Vector Zoom & Pan
-                    InteractiveViewer(
-                      transformationController: _transformController,
-                      minScale: 0.01,
-                      maxScale: 1000.0,
-                      boundaryMargin: const EdgeInsets.all(1500.0),
-                      child: Center(
-                        child: CustomPaint(
-                          size: Size(
-                            math.max(300.0, _document!.boundingBox.width * 0.05),
-                            math.max(300.0, _document!.boundingBox.height * 0.05),
-                          ),
-                          painter: _HpglPainter(
-                            document: _document!,
-                            theme: _canvasTheme,
-                            showGrid: _showGrid,
-                          ),
-                        ),
-                      ),
-                    ),
+            );
+          }
 
-                    // Floating Zoom Controls
-                    Positioned(
-                      bottom: 24,
-                      right: 20,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildFloatingButton(
-                            icon: Icons.add,
-                            tooltip: 'Zoom In (+)',
-                            onTap: _zoomIn,
-                            theme: theme,
-                          ),
-                          const SizedBox(height: 8),
-                          _buildFloatingButton(
-                            icon: Icons.remove,
-                            tooltip: 'Zoom Out (-)',
-                            onTap: _zoomOut,
-                            theme: theme,
-                          ),
-                          const SizedBox(height: 8),
-                          _buildFloatingButton(
-                            icon: Icons.fit_screen_outlined,
-                            tooltip: 'Fit to View',
-                            onTap: _resetView,
-                            theme: theme,
-                          ),
-                        ],
-                      ),
+          if (_errorMessage != null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                    const SizedBox(height: 16),
+                    Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _loadHpglFile,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
                     ),
                   ],
                 ),
+              ),
+            );
+          }
+
+          if (_document == null) {
+            return const SizedBox.shrink();
+          }
+
+          final bounds = _document!.boundingBox;
+          final double canvasW = math.max(300.0, bounds.width * 0.05 + 40.0);
+          final double canvasH = math.max(300.0, bounds.height * 0.05 + 40.0);
+
+          return Stack(
+            children: [
+              // Interactive Canvas with Infinite Vector Zoom & Pan + Mouse Wheel Support
+              Listener(
+                onPointerSignal: _handlePointerSignal,
+                child: InteractiveViewer(
+                  transformationController: _transformController,
+                  minScale: 0.002,
+                  maxScale: 2000.0,
+                  boundaryMargin: const EdgeInsets.all(2500.0),
+                  child: Center(
+                    child: CustomPaint(
+                      size: Size(canvasW, canvasH),
+                      painter: _HpglPainter(
+                        document: _document!,
+                        theme: _canvasTheme,
+                        showGrid: _showGrid,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Floating Zoom Controls
+              Positioned(
+                bottom: 24,
+                right: 20,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildFloatingButton(
+                      icon: Icons.add,
+                      tooltip: 'Zoom In (+)',
+                      onTap: _zoomIn,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFloatingButton(
+                      icon: Icons.remove,
+                      tooltip: 'Zoom Out (-)',
+                      onTap: _zoomOut,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFloatingButton(
+                      icon: Icons.fit_screen_outlined,
+                      tooltip: 'Fit to View (Center)',
+                      onTap: _fitToScreen,
+                      theme: theme,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 

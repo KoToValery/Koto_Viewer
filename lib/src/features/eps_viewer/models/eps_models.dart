@@ -30,6 +30,7 @@ class EpsMetadata {
   final String? title;
   final String? creator;
   final String? creationDate;
+  final String? orientation;
   final EpsBoundingBox boundingBox;
   final int pathCount;
 
@@ -37,6 +38,7 @@ class EpsMetadata {
     this.title,
     this.creator,
     this.creationDate,
+    this.orientation,
     required this.boundingBox,
     required this.pathCount,
   });

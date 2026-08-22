@@ -160,7 +160,6 @@ class FileSourceService {
         lower.endsWith('.md') ||
         lower.endsWith('.markdown') ||
         lower.endsWith('.docx') ||
-        lower.endsWith('.doc') ||
         lower.endsWith('.pptx') ||
         lower.endsWith('.ppt') ||
         lower.endsWith('.ppsx') ||

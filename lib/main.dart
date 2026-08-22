@@ -23,14 +23,19 @@ import 'src/features/eps_viewer/eps_viewer_screen.dart';
 import 'src/features/pcb_viewer/pcb_viewer_screen.dart';
 import 'src/features/hpgl_viewer/hpgl_viewer_screen.dart';
 
-void main() async {
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await CoordinateSystemService.init();
-  runApp(const KotoViewApp());
+  String? initialFile;
+  if (args.isNotEmpty && File(args.first).existsSync()) {
+    initialFile = args.first;
+  }
+  runApp(KotoViewApp(initialFilePath: initialFile));
 }
 
 class KotoViewApp extends StatefulWidget {
-  const KotoViewApp({super.key});
+  final String? initialFilePath;
+  const KotoViewApp({super.key, this.initialFilePath});
 
   @override
   State<KotoViewApp> createState() => _KotoViewAppState();
@@ -46,6 +51,13 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    if (widget.initialFilePath != null && widget.initialFilePath!.isNotEmpty) {
+      _pendingFilePath = widget.initialFilePath;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _processPendingFile();
+      });
+    }
 
     _intentService.listenForPdfIntents((filePath) {
       if (filePath.isNotEmpty) {
@@ -147,21 +159,9 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
 
       case KotoFileType.docx:
       case KotoFileType.rtf:
-        try {
-          final convertedPdf = await DocToPdfConverterService.convertToPdf(filePath);
-          navigator.push(
-            MaterialPageRoute(
-              builder: (_) => PdfViewerScreen(
-                filePath: convertedPdf,
-                title: filePath.split(Platform.pathSeparator).last,
-              ),
-            ),
-          );
-        } catch (_) {
-          navigator.push(
-            MaterialPageRoute(builder: (_) => DocxViewerScreen(filePath: filePath)),
-          );
-        }
+        navigator.push(
+          MaterialPageRoute(builder: (_) => DocxViewerScreen(filePath: filePath)),
+        );
         break;
 
       case KotoFileType.pptx:
@@ -188,6 +188,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.gbr:
       case KotoFileType.drl:
       case KotoFileType.kicad:
+      case KotoFileType.zip:
         navigator.push(
           MaterialPageRoute(builder: (_) => PcbViewerScreen(filePath: filePath)),
         );

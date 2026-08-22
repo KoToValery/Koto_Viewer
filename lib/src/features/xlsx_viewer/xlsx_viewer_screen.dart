@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:excel/excel.dart' as xl;
@@ -86,6 +87,15 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
     _verticalHeaderController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent && HardwareKeyboard.instance.isControlPressed) {
+      final delta = event.scrollDelta.dy < 0 ? 0.1 : -0.1;
+      setState(() {
+        _zoomScale = (_zoomScale + delta).clamp(0.4, 3.0);
+      });
+    }
   }
 
   Future<void> _loadExcelFile() async {
@@ -708,234 +718,237 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                           final totalWidth = _colWidths.fold<double>(0.0, (sum, w) => sum + w);
                           final scaledRowHeight = rowHeight * _zoomScale;
 
-                          return Stack(
-                            children: [
-                              Column(
-                                children: [
-                                  // Top Row: Corner + Sticky Column Headers
-                                  Row(
-                                    children: [
-                                      // Top-Left Corner Box
-                                      Container(
-                                        width: rowHeaderWidth,
-                                        height: scaledRowHeight,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: headerBg,
-                                          border: Border.all(color: gridLineColor, width: 0.5),
-                                        ),
-                                        child: const Icon(Icons.grid_4x4, size: 14, color: Colors.grey),
-                                      ),
-                                      // Sticky Column Headers (A, B, C...)
-                                      Expanded(
-                                        child: SingleChildScrollView(
-                                          controller: _horizontalHeaderController,
-                                          scrollDirection: Axis.horizontal,
-                                          physics: const ClampingScrollPhysics(),
-                                          child: SizedBox(
-                                            width: totalWidth * _zoomScale,
-                                            height: scaledRowHeight,
-                                            child: Row(
-                                              children: List.generate(_maxCols, (c) {
-                                                final colW = _colWidths[c] * _zoomScale;
-                                                final isColSelected = _selectedCol == c;
-                                                return Container(
-                                                  width: colW,
-                                                  height: scaledRowHeight,
-                                                  alignment: Alignment.center,
-                                                  decoration: BoxDecoration(
-                                                    color: isColSelected
-                                                        ? const Color(0xFF107C41).withValues(alpha: 0.25)
-                                                        : headerBg,
-                                                    border: Border.all(color: gridLineColor, width: 0.5),
-                                                  ),
-                                                  child: Text(
-                                                    _getColumnLetter(c),
-                                                    style: TextStyle(
-                                                      fontSize: 12 * _zoomScale.clamp(0.8, 1.2),
-                                                      fontWeight: FontWeight.bold,
-                                                      color: isColSelected
-                                                          ? const Color(0xFF107C41)
-                                                          : theme.textTheme.bodyMedium?.color,
-                                                    ),
-                                                  ),
-                                                );
-                                              }),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  // Body Area: Sticky Row Numbers + Data Grid
-                                  Expanded(
-                                    child: Row(
+                          return Listener(
+                            onPointerSignal: _handlePointerSignal,
+                            child: Stack(
+                              children: [
+                                Column(
+                                  children: [
+                                    // Top Row: Corner + Sticky Column Headers
+                                    Row(
                                       children: [
-                                        // Sticky Row Numbers (1, 2, 3...)
-                                        SizedBox(
+                                        // Top-Left Corner Box
+                                        Container(
                                           width: rowHeaderWidth,
-                                          child: SingleChildScrollView(
-                                            controller: _verticalHeaderController,
-                                            scrollDirection: Axis.vertical,
-                                            physics: const ClampingScrollPhysics(),
-                                            child: Column(
-                                              children: List.generate(_maxRows, (r) {
-                                                final isRowSelected = _selectedRow == r;
-                                                return Container(
-                                                  width: rowHeaderWidth,
-                                                  height: scaledRowHeight,
-                                                  alignment: Alignment.center,
-                                                  decoration: BoxDecoration(
-                                                    color: isRowSelected
-                                                        ? const Color(0xFF107C41).withValues(alpha: 0.25)
-                                                        : headerBg,
-                                                    border: Border.all(color: gridLineColor, width: 0.5),
-                                                  ),
-                                                  child: Text(
-                                                    '${r + 1}',
-                                                    style: TextStyle(
-                                                      fontSize: 11 * _zoomScale.clamp(0.8, 1.2),
-                                                      fontWeight: FontWeight.bold,
-                                                      color: isRowSelected
-                                                          ? const Color(0xFF107C41)
-                                                          : theme.textTheme.bodySmall?.color,
-                                                    ),
-                                                  ),
-                                                );
-                                              }),
-                                            ),
+                                          height: scaledRowHeight,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            color: headerBg,
+                                            border: Border.all(color: gridLineColor, width: 0.5),
                                           ),
+                                          child: const Icon(Icons.grid_4x4, size: 14, color: Colors.grey),
                                         ),
-
-                                        // Data Cells 2D Grid
+                                        // Sticky Column Headers (A, B, C...)
                                         Expanded(
                                           child: SingleChildScrollView(
-                                            controller: _horizontalDataController,
+                                            controller: _horizontalHeaderController,
                                             scrollDirection: Axis.horizontal,
                                             physics: const ClampingScrollPhysics(),
-                                            child: SingleChildScrollView(
-                                              controller: _verticalDataController,
-                                              scrollDirection: Axis.vertical,
-                                              physics: const ClampingScrollPhysics(),
-                                              child: SizedBox(
-                                                width: totalWidth * _zoomScale,
-                                                child: Column(
-                                                  children: List.generate(_maxRows, (r) {
-                                                    final rowBg = r % 2 == 0 ? cellBgEven : cellBgOdd;
-                                                    return SizedBox(
-                                                      height: scaledRowHeight,
-                                                      child: Row(
-                                                        children: List.generate(_maxCols, (c) {
-                                                          final colW = _colWidths[c] * _zoomScale;
-                                                          final cellText = (r < _sheetData.length &&
-                                                                  c < _sheetData[r].length)
-                                                              ? _sheetData[r][c]
-                                                              : '';
-                                                          final isSelected = _selectedRow == r && _selectedCol == c;
-                                                          final isSearchMatch = _searchQuery.trim().isNotEmpty &&
-                                                              cellText
-                                                                  .toLowerCase()
-                                                                  .contains(_searchQuery.toLowerCase());
-
-                                                          return InkWell(
-                                                            onTap: () => _onCellTapped(r, c),
-                                                            child: Container(
-                                                              width: colW,
-                                                              height: scaledRowHeight,
-                                                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                                                              alignment: Alignment.centerLeft,
-                                                              decoration: BoxDecoration(
-                                                                color: isSelected
-                                                                    ? const Color(0xFF107C41).withValues(alpha: 0.3)
-                                                                    : isSearchMatch
-                                                                        ? const Color(0xFFFFD54F).withValues(alpha: 0.6)
-                                                                        : rowBg,
-                                                                border: Border.all(
-                                                                  color: isSelected
-                                                                      ? const Color(0xFF107C41)
-                                                                      : gridLineColor,
-                                                                  width: isSelected ? 1.5 : 0.5,
-                                                                ),
-                                                              ),
-                                                              child: Text(
-                                                                cellText,
-                                                                overflow: TextOverflow.ellipsis,
-                                                                style: TextStyle(
-                                                                  fontSize: 12.5 * _zoomScale.clamp(0.8, 1.4),
-                                                                  color: isSearchMatch && !isDark
-                                                                      ? Colors.black87
-                                                                      : null,
-                                                                  fontWeight: isSearchMatch
-                                                                      ? FontWeight.bold
-                                                                      : FontWeight.normal,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          );
-                                                        }),
+                                            child: SizedBox(
+                                              width: totalWidth * _zoomScale,
+                                              height: scaledRowHeight,
+                                              child: Row(
+                                                children: List.generate(_maxCols, (c) {
+                                                  final colW = _colWidths[c] * _zoomScale;
+                                                  final isColSelected = _selectedCol == c;
+                                                  return Container(
+                                                    width: colW,
+                                                    height: scaledRowHeight,
+                                                    alignment: Alignment.center,
+                                                    decoration: BoxDecoration(
+                                                      color: isColSelected
+                                                          ? const Color(0xFF107C41).withValues(alpha: 0.25)
+                                                          : headerBg,
+                                                      border: Border.all(color: gridLineColor, width: 0.5),
+                                                    ),
+                                                    child: Text(
+                                                      _getColumnLetter(c),
+                                                      style: TextStyle(
+                                                        fontSize: 12 * _zoomScale.clamp(0.8, 1.2),
+                                                        fontWeight: FontWeight.bold,
+                                                        color: isColSelected
+                                                            ? const Color(0xFF107C41)
+                                                            : theme.textTheme.bodyMedium?.color,
                                                       ),
-                                                    );
-                                                  }),
-                                                ),
+                                                    ),
+                                                  );
+                                                }),
                                               ),
                                             ),
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
-                              ),
 
-                              // Floating Zoom Controls (+ / - / 100%)
-                              Positioned(
-                                bottom: 16,
-                                right: 16,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surface.withValues(alpha: 0.92),
-                                    borderRadius: BorderRadius.circular(24),
-                                    boxShadow: const [
-                                      BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove, size: 18),
-                                        tooltip: 'Zoom Out',
-                                        onPressed: () {
-                                          setState(() {
-                                            _zoomScale = (_zoomScale - 0.2).clamp(0.5, 2.5);
-                                          });
-                                        },
+                                    // Body Area: Sticky Row Numbers + Data Grid
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          // Sticky Row Numbers (1, 2, 3...)
+                                          SizedBox(
+                                            width: rowHeaderWidth,
+                                            child: SingleChildScrollView(
+                                              controller: _verticalHeaderController,
+                                              scrollDirection: Axis.vertical,
+                                              physics: const ClampingScrollPhysics(),
+                                              child: Column(
+                                                children: List.generate(_maxRows, (r) {
+                                                  final isRowSelected = _selectedRow == r;
+                                                  return Container(
+                                                    width: rowHeaderWidth,
+                                                    height: scaledRowHeight,
+                                                    alignment: Alignment.center,
+                                                    decoration: BoxDecoration(
+                                                      color: isRowSelected
+                                                          ? const Color(0xFF107C41).withValues(alpha: 0.25)
+                                                          : headerBg,
+                                                      border: Border.all(color: gridLineColor, width: 0.5),
+                                                    ),
+                                                    child: Text(
+                                                      '${r + 1}',
+                                                      style: TextStyle(
+                                                        fontSize: 11 * _zoomScale.clamp(0.8, 1.2),
+                                                        fontWeight: FontWeight.bold,
+                                                        color: isRowSelected
+                                                            ? const Color(0xFF107C41)
+                                                            : theme.textTheme.bodySmall?.color,
+                                                      ),
+                                                    ),
+                                                  );
+                                                }),
+                                              ),
+                                            ),
+                                          ),
+
+                                          // Data Cells 2D Grid
+                                          Expanded(
+                                            child: SingleChildScrollView(
+                                              controller: _horizontalDataController,
+                                              scrollDirection: Axis.horizontal,
+                                              physics: const ClampingScrollPhysics(),
+                                              child: SingleChildScrollView(
+                                                controller: _verticalDataController,
+                                                scrollDirection: Axis.vertical,
+                                                physics: const ClampingScrollPhysics(),
+                                                child: SizedBox(
+                                                  width: totalWidth * _zoomScale,
+                                                  child: Column(
+                                                    children: List.generate(_maxRows, (r) {
+                                                      final rowBg = r % 2 == 0 ? cellBgEven : cellBgOdd;
+                                                      return SizedBox(
+                                                        height: scaledRowHeight,
+                                                        child: Row(
+                                                          children: List.generate(_maxCols, (c) {
+                                                            final colW = _colWidths[c] * _zoomScale;
+                                                            final cellText = (r < _sheetData.length &&
+                                                                    c < _sheetData[r].length)
+                                                                ? _sheetData[r][c]
+                                                                : '';
+                                                            final isSelected = _selectedRow == r && _selectedCol == c;
+                                                            final isSearchMatch = _searchQuery.trim().isNotEmpty &&
+                                                                cellText
+                                                                    .toLowerCase()
+                                                                    .contains(_searchQuery.toLowerCase());
+
+                                                            return InkWell(
+                                                              onTap: () => _onCellTapped(r, c),
+                                                              child: Container(
+                                                                width: colW,
+                                                                height: scaledRowHeight,
+                                                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                                alignment: Alignment.centerLeft,
+                                                                decoration: BoxDecoration(
+                                                                  color: isSelected
+                                                                      ? const Color(0xFF107C41).withValues(alpha: 0.3)
+                                                                      : isSearchMatch
+                                                                          ? const Color(0xFFFFD54F).withValues(alpha: 0.6)
+                                                                          : rowBg,
+                                                                  border: Border.all(
+                                                                    color: isSelected
+                                                                        ? const Color(0xFF107C41)
+                                                                        : gridLineColor,
+                                                                    width: isSelected ? 1.5 : 0.5,
+                                                                  ),
+                                                                ),
+                                                                child: Text(
+                                                                  cellText,
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                  style: TextStyle(
+                                                                    fontSize: 12.5 * _zoomScale.clamp(0.8, 1.4),
+                                                                    color: isSearchMatch && !isDark
+                                                                        ? Colors.black87
+                                                                        : null,
+                                                                    fontWeight: isSearchMatch
+                                                                        ? FontWeight.bold
+                                                                        : FontWeight.normal,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            );
+                                                          }),
+                                                        ),
+                                                      );
+                                                    }),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      InkWell(
-                                        onTap: () => setState(() => _zoomScale = 1.0),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                          child: Text(
-                                            '${(_zoomScale * 100).toStringAsFixed(0)}%',
-                                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+
+                                // Floating Zoom Controls (+ / - / 100%)
+                                Positioned(
+                                  bottom: 16,
+                                  right: 16,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.surface.withValues(alpha: 0.92),
+                                      borderRadius: BorderRadius.circular(24),
+                                      boxShadow: const [
+                                        BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.remove, size: 18),
+                                          tooltip: 'Zoom Out',
+                                          onPressed: () {
+                                            setState(() {
+                                              _zoomScale = (_zoomScale - 0.2).clamp(0.5, 2.5);
+                                            });
+                                          },
+                                        ),
+                                        InkWell(
+                                          onTap: () => setState(() => _zoomScale = 1.0),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                            child: Text(
+                                              '${(_zoomScale * 100).toStringAsFixed(0)}%',
+                                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.add, size: 18),
-                                        tooltip: 'Zoom In',
-                                        onPressed: () {
-                                          setState(() {
-                                            _zoomScale = (_zoomScale + 0.2).clamp(0.5, 2.5);
-                                          });
-                                        },
-                                      ),
-                                    ],
+                                        IconButton(
+                                          icon: const Icon(Icons.add, size: 18),
+                                          tooltip: 'Zoom In',
+                                          onPressed: () {
+                                            setState(() {
+                                              _zoomScale = (_zoomScale + 0.2).clamp(0.5, 2.5);
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           );
                         },
                       ),

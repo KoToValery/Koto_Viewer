@@ -1,23 +1,34 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/eps_models.dart';
 
-/// CustomPainter that renders EPS Vector Paths with PostScript coordinate inversion.
+/// CustomPainter that renders EPS Vector Paths with PostScript coordinate inversion and rotation.
 class EpsPainter extends CustomPainter {
   final EpsDocument document;
   final EpsCanvasTheme theme;
   final bool showGrid;
+  final int rotationQuarterTurns; // 0, 1, 2, 3 (0°, 90°, 180°, 270°)
+  final bool flipHorizontal;
+  final bool flipVertical;
 
   const EpsPainter({
     required this.document,
     required this.theme,
     this.showGrid = true,
+    this.rotationQuarterTurns = 0,
+    this.flipHorizontal = false,
+    this.flipVertical = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final bounds = document.metadata.boundingBox;
-    final double docW = bounds.width > 0 ? bounds.width : size.width;
-    final double docH = bounds.height > 0 ? bounds.height : size.height;
+    final double rawW = bounds.width > 0 ? bounds.width : size.width;
+    final double rawH = bounds.height > 0 ? bounds.height : size.height;
+
+    final isRotated90or270 = rotationQuarterTurns % 2 != 0;
+    final double docW = isRotated90or270 ? rawH : rawW;
+    final double docH = isRotated90or270 ? rawW : rawH;
 
     // Draw Background
     canvas.drawRect(
@@ -28,6 +39,18 @@ class EpsPainter extends CustomPainter {
     // Draw CAD Grid
     if (showGrid) {
       _drawGrid(canvas, docW, docH);
+    }
+
+    canvas.save();
+    // Apply rotation & flip transformation around center if specified
+    if (rotationQuarterTurns != 0 || flipHorizontal || flipVertical) {
+      canvas.translate(docW / 2, docH / 2);
+      if (rotationQuarterTurns != 0) {
+        canvas.rotate(rotationQuarterTurns * math.pi / 2);
+      }
+      if (flipHorizontal) canvas.scale(-1, 1);
+      if (flipVertical) canvas.scale(1, -1);
+      canvas.translate(-rawW / 2, -rawH / 2);
     }
 
     // PostScript coordinate mapper:
@@ -91,13 +114,15 @@ class EpsPainter extends CustomPainter {
       if (epsPath.strokeColor != null) {
         final strokePaint = Paint()
           ..color = _adaptColorForTheme(epsPath.strokeColor!, theme)
-          ..strokeWidth = mathMax(0.75, epsPath.strokeWidth)
+          ..strokeWidth = math.max(0.75, epsPath.strokeWidth)
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round;
         canvas.drawPath(path, strokePaint);
       }
     }
+
+    canvas.restore();
   }
 
   void _drawGrid(Canvas canvas, double w, double h) {
@@ -116,23 +141,22 @@ class EpsPainter extends CustomPainter {
   }
 
   Color _adaptColorForTheme(Color color, EpsCanvasTheme theme) {
-    // If black on dark background, brighten to white/light-grey
     if (theme.isDark && color.computeLuminance() < 0.08) {
       return Colors.white70;
     }
-    // If white on light background, darken to dark-grey/black
     if (!theme.isDark && color.computeLuminance() > 0.92) {
       return Colors.black87;
     }
     return color;
   }
 
-  double mathMax(double a, double b) => a > b ? a : b;
-
   @override
   bool shouldRepaint(covariant EpsPainter oldDelegate) {
     return oldDelegate.document != document ||
         oldDelegate.theme != theme ||
-        oldDelegate.showGrid != showGrid;
+        oldDelegate.showGrid != showGrid ||
+        oldDelegate.rotationQuarterTurns != rotationQuarterTurns ||
+        oldDelegate.flipHorizontal != flipHorizontal ||
+        oldDelegate.flipVertical != flipVertical;
   }
 }

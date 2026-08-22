@@ -81,6 +81,8 @@ class FileTypeIcon extends StatelessWidget {
         return _buildStepIcon();
       case KotoFileType.iges:
         return _buildIgesIcon();
+      case KotoFileType.zip:
+        return _buildZipIcon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
@@ -785,6 +787,41 @@ class FileTypeIcon extends StatelessWidget {
     );
   }
 
+  Widget _buildZipIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF6EE7B7)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.folder_zip_rounded,
+              color: const Color(0xFF059669),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'ZIP',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF059669),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGenericIcon() {
     return Container(
       width: width,
@@ -1010,7 +1047,6 @@ class _HomeScreenState extends State<HomeScreen> {
             !lower.endsWith('.md') &&
             !lower.endsWith('.markdown') &&
             !lower.endsWith('.docx') &&
-            !lower.endsWith('.doc') &&
             !lower.endsWith('.eps') &&
             !lower.endsWith('.gbr') &&
             !lower.endsWith('.ger') &&
@@ -1292,24 +1328,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       case KotoFileType.docx:
       case KotoFileType.rtf:
-        String viewPath = filePath;
-        bool openedAsPdf = false;
-        try {
-          // Seamless mode: convert DOC/DOCX/RTF to PDF on the fly
-          viewPath = await DocToPdfConverterService.convertToPdf(filePath);
-          openedAsPdf = true;
-        } catch (e) {
-          debugPrint('Doc to PDF conversion fallback to docx viewer: $e');
-        }
-
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => openedAsPdf
-                ? PdfViewerScreen(
-                    filePath: viewPath,
-                    title: item.name,
-                  )
-                : DocxViewerScreen(filePath: filePath),
+            builder: (context) => DocxViewerScreen(filePath: filePath),
           ),
         );
         if (success != false) {
@@ -1362,6 +1383,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.gbr:
       case KotoFileType.drl:
       case KotoFileType.kicad:
+      case KotoFileType.zip:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => PcbViewerScreen(filePath: filePath),

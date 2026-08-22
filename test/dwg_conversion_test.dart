@@ -55,5 +55,9 @@ void main() {
         throwsA(isA<DwgConversionException>()),
       );
     });
+
+    test('DwgConverterService isNativeSupported returns true on Windows with bundled tool', () {
+      expect(DwgConverterService.isNativeSupported, isTrue);
+    });
   });
 }

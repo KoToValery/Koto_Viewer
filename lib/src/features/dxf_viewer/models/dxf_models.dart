@@ -445,7 +445,7 @@ class DxfText extends DxfEntity {
   @override
   Rect getBoundingBox(Map<String, DxfBlock> blocks) {
     final approxWidth = (text.length * height * 0.65).clamp(height, double.infinity);
-    final pos = alignPoint ?? insertPoint;
+    final pos = ((hAlign != 0 || vAlign != 0) && alignPoint != null) ? alignPoint! : insertPoint;
     return Rect.fromLTWH(pos.dx, pos.dy, approxWidth, height);
   }
 }

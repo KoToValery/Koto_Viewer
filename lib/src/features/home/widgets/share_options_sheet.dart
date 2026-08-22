@@ -20,7 +20,7 @@ _ShareFileType _detectFileType(String path) {
   if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return _ShareFileType.xlsx;
   if (lower.endsWith('.txt') || lower.endsWith('.log') || lower.endsWith('.csv')) return _ShareFileType.txt;
   if (lower.endsWith('.md') || lower.endsWith('.markdown')) return _ShareFileType.md;
-  if (lower.endsWith('.docx') || lower.endsWith('.doc')) return _ShareFileType.docx;
+  if (lower.endsWith('.docx')) return _ShareFileType.docx;
   if (lower.endsWith('.pptx') || lower.endsWith('.ppt') || lower.endsWith('.ppsx') || lower.endsWith('.pps')) return _ShareFileType.pptx;
   if (lower.endsWith('.rtf')) return _ShareFileType.rtf;
   if (lower.endsWith('.eps')) return _ShareFileType.eps;

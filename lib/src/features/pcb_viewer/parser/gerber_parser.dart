@@ -290,30 +290,131 @@ class GerberParser {
     final lower = fileName.toLowerCase();
     final lowerContent = content.substring(0, math.min(content.length, 500)).toLowerCase();
 
-    if (lower.contains('edge') || lower.contains('outline') || lower.endsWith('.gko') || lower.endsWith('.gm1') || lower.endsWith('.gm2')) {
+    // 1. Board Outline / Edge Cuts
+    if (lower.contains('edge') ||
+        lower.contains('outline') ||
+        lower.contains('contour') ||
+        lower.contains('border') ||
+        lower.contains('mechanical') ||
+        lower.contains('profile') ||
+        lower.endsWith('.gko') ||
+        lower.endsWith('.gm1') ||
+        lower.endsWith('.gm2') ||
+        lower.endsWith('.gm3') ||
+        lower.endsWith('.dim')) {
       return PcbLayerType.edgeCuts;
     }
-    if (lower.contains('f_cu') || lower.contains('top_copper') || lower.contains('front_cu') || lower.endsWith('.gtl')) {
-      return PcbLayerType.copperTop;
-    }
-    if (lower.contains('b_cu') || lower.contains('bottom_copper') || lower.contains('back_cu') || lower.endsWith('.gbl')) {
-      return PcbLayerType.copperBottom;
-    }
-    if (lower.contains('f_mask') || lower.contains('top_mask') || lower.endsWith('.gts')) {
-      return PcbLayerType.solderMaskTop;
-    }
-    if (lower.contains('b_mask') || lower.contains('bottom_mask') || lower.endsWith('.gbs')) {
-      return PcbLayerType.solderMaskBottom;
-    }
-    if (lower.contains('f_silk') || lower.contains('top_silk') || lower.endsWith('.gto')) {
+
+    // 2. Top Silkscreen / Legend
+    if (lower.contains('f_silk') ||
+        lower.contains('top_silk') ||
+        lower.contains('topsilk') ||
+        lower.contains('silk_top') ||
+        lower.contains('silktop') ||
+        lower.contains('top silk') ||
+        lower.contains('top legend') ||
+        lower.endsWith('.gto') ||
+        lower.endsWith('.sst') ||
+        lower.endsWith('.tsk') ||
+        lower.endsWith('.plc')) {
       return PcbLayerType.silkscreenTop;
     }
-    if (lower.contains('b_silk') || lower.contains('bottom_silk') || lower.endsWith('.gbo')) {
+
+    // 3. Bottom Silkscreen / Legend
+    if (lower.contains('b_silk') ||
+        lower.contains('bottom_silk') ||
+        lower.contains('bottomsilk') ||
+        lower.contains('silk_bot') ||
+        lower.contains('silkbot') ||
+        lower.contains('bottom silk') ||
+        lower.contains('bottom legend') ||
+        lower.endsWith('.gbo') ||
+        lower.endsWith('.ssb') ||
+        lower.endsWith('.bsk') ||
+        lower.endsWith('.pls')) {
       return PcbLayerType.silkscreenBottom;
     }
-    if (lowerContent.contains('copper')) {
+
+    // 4. Top Solder Mask / Solder Resist
+    if (lower.contains('f_mask') ||
+        lower.contains('top_mask') ||
+        lower.contains('topmask') ||
+        lower.contains('mask_top') ||
+        lower.contains('masktop') ||
+        lower.contains('top solder') ||
+        lower.contains('top resist') ||
+        lower.endsWith('.gts') ||
+        lower.endsWith('.smt') ||
+        lower.endsWith('.tsm') ||
+        lower.endsWith('.stc')) {
+      return PcbLayerType.solderMaskTop;
+    }
+
+    // 5. Bottom Solder Mask / Solder Resist
+    if (lower.contains('b_mask') ||
+        lower.contains('bottom_mask') ||
+        lower.contains('bottommask') ||
+        lower.contains('mask_bot') ||
+        lower.contains('maskbot') ||
+        lower.contains('bottom solder') ||
+        lower.contains('bottom resist') ||
+        lower.endsWith('.gbs') ||
+        lower.endsWith('.smb') ||
+        lower.endsWith('.bsm') ||
+        lower.endsWith('.sts')) {
+      return PcbLayerType.solderMaskBottom;
+    }
+
+    // 6. Top Copper / Signal (Component Side)
+    if (lower.contains('f_cu') ||
+        lower.contains('top_copper') ||
+        lower.contains('topcopper') ||
+        lower.contains('copper_top') ||
+        lower.contains('coppertop') ||
+        lower.contains('front_cu') ||
+        lower.contains('top copper') ||
+        lower.contains('component') ||
+        lower.endsWith('.gtl') ||
+        lower.endsWith('.top') ||
+        lower.endsWith('.cmp')) {
       return PcbLayerType.copperTop;
     }
+
+    // 7. Bottom Copper / Signal (Solder Side)
+    if (lower.contains('b_cu') ||
+        lower.contains('bottom_copper') ||
+        lower.contains('bottomcopper') ||
+        lower.contains('copper_bot') ||
+        lower.contains('copperbot') ||
+        lower.contains('back_cu') ||
+        lower.contains('bottom copper') ||
+        lower.contains('solder') ||
+        lower.endsWith('.gbl') ||
+        lower.endsWith('.bot') ||
+        lower.endsWith('.sol')) {
+      return PcbLayerType.copperBottom;
+    }
+
+    // Content-based fallback inspection
+    if (lowerContent.contains('top silk') || lowerContent.contains('top legend')) {
+      return PcbLayerType.silkscreenTop;
+    }
+    if (lowerContent.contains('bottom silk') || lowerContent.contains('bottom legend')) {
+      return PcbLayerType.silkscreenBottom;
+    }
+    if (lowerContent.contains('top mask') || lowerContent.contains('top solder')) {
+      return PcbLayerType.solderMaskTop;
+    }
+    if (lowerContent.contains('bottom mask') || lowerContent.contains('bottom solder')) {
+      return PcbLayerType.solderMaskBottom;
+    }
+    if (lowerContent.contains('bottom copper') || lowerContent.contains('bottom layer') || lowerContent.contains('solder side')) {
+      return PcbLayerType.copperBottom;
+    }
+    if (lowerContent.contains('top copper') || lowerContent.contains('top layer') || lowerContent.contains('component side') || lowerContent.contains('copper')) {
+      return PcbLayerType.copperTop;
+    }
+
     return PcbLayerType.generic;
   }
 }

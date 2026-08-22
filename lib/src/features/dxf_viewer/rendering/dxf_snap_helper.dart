@@ -418,6 +418,60 @@ class DxfSnapHelper {
         }
       } else if (entity is DxfInsert) {
         testLandmark(entity.insertPoint, DxfSnapType.point);
+        final block = document.blocks[entity.blockName];
+        if (block != null && block.entities.isNotEmpty) {
+          final rad = entity.rotationDeg * math.pi / 180.0;
+          final cosA = math.cos(rad);
+          final sinA = math.sin(rad);
+          final bx = block.basePoint.dx;
+          final by = block.basePoint.dy;
+
+          Offset transformPt(Offset pt) {
+            final lx = (pt.dx - bx) * entity.scaleX;
+            final ly = (pt.dy - by) * entity.scaleY;
+            final rx = lx * cosA - ly * sinA;
+            final ry = lx * sinA + ly * cosA;
+            return Offset(entity.insertPoint.dx + rx, entity.insertPoint.dy + ry);
+          }
+
+          for (final child in block.entities) {
+            final childLayer = document.layers[child.layer];
+            if (childLayer != null && !childLayer.isVisible) continue;
+
+            if (child is DxfLine) {
+              final p1 = transformPt(child.p1);
+              final p2 = transformPt(child.p2);
+              testLandmark(p1, DxfSnapType.endpoint);
+              testLandmark(p2, DxfSnapType.endpoint);
+              testLandmark(Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2), DxfSnapType.midpoint);
+              testSegment(p1, p2);
+            } else if (child is DxfLwPolyline) {
+              final vertices = child.vertices.map((v) => transformPt(v.offset)).toList();
+              final count = vertices.length;
+              for (int i = 0; i < count; i++) {
+                testLandmark(vertices[i], DxfSnapType.endpoint);
+                if (i + 1 < count || child.isClosed) {
+                  final v2 = vertices[(i + 1) % count];
+                  testLandmark(Offset((vertices[i].dx + v2.dx) / 2, (vertices[i].dy + v2.dy) / 2), DxfSnapType.midpoint);
+                  testSegment(vertices[i], v2);
+                }
+              }
+            } else if (child is DxfCircle) {
+              final c = transformPt(child.center);
+              testLandmark(c, DxfSnapType.center);
+              testCircleCurve(c, child.radius * entity.scaleX.abs());
+            } else if (child is DxfArc) {
+              final c = transformPt(child.center);
+              testLandmark(c, DxfSnapType.center);
+            }
+          }
+        }
+      } else if (entity is DxfDimension) {
+        testLandmark(entity.defPoint1, DxfSnapType.endpoint);
+        if (entity.defPoint2 != null) {
+          testLandmark(entity.defPoint2!, DxfSnapType.endpoint);
+        }
+        testLandmark(entity.textPoint, DxfSnapType.point);
       }
     }
 

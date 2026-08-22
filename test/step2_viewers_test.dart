@@ -10,7 +10,7 @@ import 'package:kotoview/src/features/eps_viewer/parser/eps_parser.dart';
 
 void main() {
   group('Step 2: File Type Identification Tests', () {
-    test('PdfItem correctly identifies .docx and .doc files', () {
+    test('PdfItem correctly identifies .docx files and rejects .doc', () {
       final docxItem = PdfItem(
         path: '/storage/emulated/0/Download/Обяснителна_записка.docx',
         name: 'Обяснителна_записка.docx',
@@ -27,8 +27,8 @@ void main() {
         sizeInBytes: 30000,
         lastOpened: DateTime.now(),
       );
-      expect(docItem.fileType, equals(KotoFileType.docx));
-      expect(docItem.isDocx, isTrue);
+      expect(docItem.fileType, equals(KotoFileType.other));
+      expect(docItem.isDocx, isFalse);
     });
 
     test('PdfItem correctly identifies .eps vector files', () {
@@ -220,6 +220,38 @@ stroke
       expect(doc.metadata.boundingBox.maxX, equals(210.0));
       expect(doc.metadata.boundingBox.maxY, equals(220.0));
       expect(doc.paths.length, equals(1));
+    });
+
+    test('Parses PostScript affine transformations (translate, scale, rotate) correctly', () {
+      const psContent = '''%!PS-Adobe-3.0 EPSF-3.0
+%%BoundingBox: 0 0 400 400
+%%Orientation: Landscape
+
+% Invert coordinates and translate
+0 400 translate
+1 -1 scale
+
+newpath
+50 50 moveto
+150 50 lineto
+stroke
+%%EOF
+''';
+
+      final bytes = Uint8List.fromList(utf8.encode(psContent));
+      final doc = EpsParser.parse(bytes);
+
+      expect(doc.metadata.orientation, equals('Landscape'));
+      expect(doc.paths.length, equals(1));
+      final path = doc.paths.first;
+
+      // Initial points (50, 50) and (150, 50) transformed through translate(0, 400) and scale(1, -1):
+      // pt1 = (50, 400 - 50) = (50, 350)
+      // pt2 = (150, 400 - 50) = (150, 350)
+      expect(path.commands[0].p1.dx, equals(50.0));
+      expect(path.commands[0].p1.dy, equals(350.0));
+      expect(path.commands[1].p1.dx, equals(150.0));
+      expect(path.commands[1].p1.dy, equals(350.0));
     });
   });
 }

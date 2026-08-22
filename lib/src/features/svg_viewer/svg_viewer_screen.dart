@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:share_plus/share_plus.dart';
@@ -41,6 +43,14 @@ class SvgMetadata {
   });
 
   int get totalElements => pathCount + shapeCount + textCount;
+
+  String get summary {
+    final List<String> parts = [];
+    if (pathCount > 0) parts.add('$pathCount paths');
+    if (shapeCount > 0) parts.add('$shapeCount shapes');
+    if (textCount > 0) parts.add('$textCount text');
+    return parts.isEmpty ? '$totalElements elements' : parts.join(', ');
+  }
 }
 
 /// Dedicated 2D Vector Viewer Screen for SVG files.
@@ -133,6 +143,10 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
           _metadata = metadata;
           _isLoading = false;
         });
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _fitToScreen();
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -149,7 +163,6 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
     double? height;
     Rect? viewBox;
 
-    // 1. Extract viewBox="minX minY width height"
     final vbMatch = RegExp(r'''viewBox\s*=\s*["']\s*([-\d.]+)[,\s]+([-\d.]+)[,\s]+([-\d.]+)[,\s]+([-\d.]+)''', caseSensitive: false).firstMatch(svg);
     if (vbMatch != null) {
       final minX = double.tryParse(vbMatch.group(1)!) ?? 0;
@@ -161,7 +174,6 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       height = vbH;
     }
 
-    // 2. Extract explicit width & height if available
     final widthMatch = RegExp(r'''<svg[^>]*\bwidth\s*=\s*["']([\d.]+)(?:px|pt|mm|cm)?["']''', caseSensitive: false).firstMatch(svg);
     if (widthMatch != null) {
       width = double.tryParse(widthMatch.group(1)!);
@@ -172,7 +184,6 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       height = double.tryParse(heightMatch.group(1)!);
     }
 
-    // 3. Count elements
     final pathCount = RegExp(r'<path\b', caseSensitive: false).allMatches(svg).length;
     final shapeCount = RegExp(r'<(?:rect|circle|ellipse|line|polyline|polygon)\b', caseSensitive: false).allMatches(svg).length;
     final textCount = RegExp(r'<text\b', caseSensitive: false).allMatches(svg).length;
@@ -187,18 +198,67 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
     );
   }
 
-  void _resetView() {
-    _transformController.value = Matrix4.identity();
+  Size _viewportSize = Size.zero;
+
+  void _fitToScreen() {
+    if (_viewportSize.isEmpty) {
+      _transformController.value = Matrix4.identity();
+      return;
+    }
+
+    final svgWidth = _metadata.width ?? _metadata.viewBox?.width ?? 600.0;
+    final svgHeight = _metadata.height ?? _metadata.viewBox?.height ?? 600.0;
+
+    const double padding = 40.0;
+    final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
+    final double availH = math.max(_viewportSize.height - padding * 2, 10.0);
+
+    final double scale = math.min(availW / svgWidth, availH / svgHeight);
+
+    final double dx = (_viewportSize.width - svgWidth * scale) / 2.0;
+    final double dy = (_viewportSize.height - svgHeight * scale) / 2.0;
+
+    final matrix = Matrix4.identity()
+      ..translate(dx, dy)
+      ..scale(scale, scale);
+
+    _transformController.value = matrix;
   }
 
   void _zoomIn() {
-    final matrix = _transformController.value.clone()..scale(1.25, 1.25);
-    _transformController.value = matrix;
+    _zoomBy(1.3);
   }
 
   void _zoomOut() {
-    final matrix = _transformController.value.clone()..scale(0.8, 0.8);
-    _transformController.value = matrix;
+    _zoomBy(1 / 1.3);
+  }
+
+  void _zoomBy(double factor, {Offset? focalPoint}) {
+    if (_viewportSize.isEmpty) return;
+
+    final targetPoint = focalPoint ?? Offset(_viewportSize.width / 2, _viewportSize.height / 2);
+    final currentMatrix = _transformController.value;
+
+    final translation = currentMatrix.getTranslation();
+    final scale = currentMatrix.getMaxScaleOnAxis();
+
+    final newScale = (scale * factor).clamp(0.002, 2000.0);
+
+    final dx = targetPoint.dx - (targetPoint.dx - translation.x) * (newScale / scale);
+    final dy = targetPoint.dy - (targetPoint.dy - translation.y) * (newScale / scale);
+
+    final newMatrix = Matrix4.identity()
+      ..translate(dx, dy)
+      ..scale(newScale);
+
+    _transformController.value = newMatrix;
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent) {
+      final double zoomFactor = event.scrollDelta.dy < 0 ? 1.15 : 0.85;
+      _zoomBy(zoomFactor, focalPoint: event.localPosition);
+    }
   }
 
   void _showInfoDialog() {
@@ -218,12 +278,12 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                 color: const Color(0xFFFF8C00).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.gesture, color: Color(0xFFFF8C00), size: 22),
+              child: const Icon(Icons.palette_rounded, color: Color(0xFFFF8C00)),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             const Expanded(
               child: Text(
-                'SVG Information',
+                'SVG Properties',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
@@ -233,17 +293,22 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow('File:', _fileName),
-            _buildInfoRow('Size:', formattedSize),
+            _buildInfoRow('File Name', _fileName),
+            _buildInfoRow('File Size', formattedSize),
             if (_metadata.width != null && _metadata.height != null)
-              _buildInfoRow('Dimensions:', '${_metadata.width!.toStringAsFixed(1)} × ${_metadata.height!.toStringAsFixed(1)} px'),
+              _buildInfoRow(
+                'Dimensions',
+                '${_metadata.width!.toStringAsFixed(0)} × ${_metadata.height!.toStringAsFixed(0)} px',
+              ),
             if (_metadata.viewBox != null)
-              _buildInfoRow('viewBox:', '${_metadata.viewBox!.width.toStringAsFixed(0)} × ${_metadata.viewBox!.height.toStringAsFixed(0)}'),
-            const Divider(height: 20),
-            _buildInfoRow('Vector Paths:', '${_metadata.pathCount}'),
-            _buildInfoRow('Geometric Shapes:', '${_metadata.shapeCount}'),
-            _buildInfoRow('Text Elements:', '${_metadata.textCount}'),
-            _buildInfoRow('Total Elements:', '${_metadata.totalElements}'),
+              _buildInfoRow(
+                'ViewBox',
+                '${_metadata.viewBox!.width.toStringAsFixed(0)} × ${_metadata.viewBox!.height.toStringAsFixed(0)}',
+              ),
+            _buildInfoRow('Paths', '${_metadata.pathCount}'),
+            _buildInfoRow('Basic Shapes', '${_metadata.shapeCount}'),
+            if (_metadata.textCount > 0)
+              _buildInfoRow('Text Elements', '${_metadata.textCount}'),
           ],
         ),
         actions: [
@@ -258,31 +323,19 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3.5),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 13, color: Colors.white70),
-            ),
-          ),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+          Text(value, style: const TextStyle(color: Colors.grey, fontSize: 13)),
         ],
       ),
     );
   }
 
   void _shareFile() {
-    Share.shareXFiles(
-      [XFile(widget.filePath)],
-      subject: _fileName,
-    );
+    Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
   @override
@@ -298,44 +351,46 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Text(
-              _fileName,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF8C00).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.image_outlined, color: Color(0xFFFF8C00), size: 20),
             ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF8C00).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _fileName,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: const Text(
-                    'SVG 2D Vector',
+                  Text(
+                    '${(_currentScale * 100).toStringAsFixed(0)}% • ${_metadata.summary}',
                     style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFFF8C00),
+                      fontSize: 11.5,
+                      color: theme.textTheme.bodySmall?.color,
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${(_currentScale * 100).toInt()}%',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme.textTheme.bodySmall?.color,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
         actions: [
+          // Fit to Screen Button
+          IconButton(
+            icon: const Icon(Icons.fit_screen_outlined),
+            tooltip: 'Fit to Screen',
+            onPressed: _svgContent.isNotEmpty ? _fitToScreen : null,
+          ),
+
           // Theme Switcher Menu
           PopupMenuButton<SvgCanvasTheme>(
             icon: const Icon(Icons.palette_outlined),
@@ -394,6 +449,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
+          _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+
           if (_isLoading) {
             return const Center(
               child: Column(
@@ -438,29 +495,32 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
 
           return Stack(
             children: [
-              // Interactive Canvas with Background Grid & SVG Rendering
-              InteractiveViewer(
-                transformationController: _transformController,
-                minScale: 0.01,
-                maxScale: 1000.0,
-                boundaryMargin: const EdgeInsets.all(1200.0),
-                child: CustomPaint(
-                  painter: _showGrid
-                      ? _SvgGridPainter(
-                          gridColor: _canvasTheme.gridColor,
-                          scale: _currentScale,
-                        )
-                      : null,
-                  child: Center(
-                    child: Container(
-                      width: svgWidth,
-                      height: svgHeight,
-                      alignment: Alignment.center,
-                      child: SvgPicture.string(
-                        _svgContent,
+              // Interactive Canvas with Background Grid & SVG Rendering + Mouse Wheel
+              Listener(
+                onPointerSignal: _handlePointerSignal,
+                child: InteractiveViewer(
+                  transformationController: _transformController,
+                  minScale: 0.002,
+                  maxScale: 2000.0,
+                  boundaryMargin: const EdgeInsets.all(2500.0),
+                  child: CustomPaint(
+                    painter: _showGrid
+                        ? _SvgGridPainter(
+                            gridColor: _canvasTheme.gridColor,
+                            scale: _currentScale,
+                          )
+                        : null,
+                    child: Center(
+                      child: Container(
                         width: svgWidth,
                         height: svgHeight,
-                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        child: SvgPicture.string(
+                          _svgContent,
+                          width: svgWidth,
+                          height: svgHeight,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                   ),
@@ -490,8 +550,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                     const SizedBox(height: 8),
                     _buildFloatingButton(
                       icon: Icons.fit_screen_outlined,
-                      tooltip: 'Fit to View',
-                      onTap: _resetView,
+                      tooltip: 'Fit to View (Center)',
+                      onTap: _fitToScreen,
                       theme: theme,
                     ),
                   ],

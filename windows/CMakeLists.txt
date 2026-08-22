@@ -87,6 +87,16 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# Install LibreDWG Windows binaries next to the executable if present
+set(LIBREDWG_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libredwg/bin")
+if(EXISTS "${LIBREDWG_BIN_DIR}/dwg2dxf.exe")
+  install(FILES
+    "${LIBREDWG_BIN_DIR}/dwg2dxf.exe"
+    "${LIBREDWG_BIN_DIR}/libredwg-0.dll"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
+endif()
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"

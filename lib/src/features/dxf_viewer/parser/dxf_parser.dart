@@ -363,6 +363,18 @@ class DxfParser {
         idx++;
       }
     }
+
+    // Safety check: If all layers ended up hidden (e.g. from LibreDWG converter negative color codes),
+    // enable all non-frozen layers so the user doesn't get a blank black screen.
+    final bool hasAnyVisible = layers.values.any((l) => l.isVisible);
+    if (!hasAnyVisible && layers.isNotEmpty) {
+      for (final layer in layers.values) {
+        if (!layer.isFrozen) {
+          layer.isVisible = true;
+        }
+      }
+    }
+
     return idx;
   }
 
@@ -893,10 +905,11 @@ class DxfParser {
         }
 
         final clean = _cleanCadText(text);
+        final bool hasAlign = (hAlign != 0 || vAlign != 0) && ax != null && ay != null;
         entity = DxfText(
           text: clean,
           insertPoint: Offset(ix, iy),
-          alignPoint: (ax != null && ay != null) ? Offset(ax, ay) : null,
+          alignPoint: hasAlign ? Offset(ax!, ay!) : null,
           height: height > 0 ? height : 2.5,
           rotationDeg: rotation,
           hAlign: hAlign,
@@ -1364,13 +1377,20 @@ class DxfParser {
   static String _stripMTextFormattingCodes(String text) {
     var result = text;
 
-    // 1. Simplify stacked fractions: \S1/2; or \S1^2; or \S1#2; -> 1/2 or 1^2
+    // 1. Replace paragraph breaks \P (or \p followed by non-letter), \N, ^J with real newlines FIRST.
+    // Notice: \px, \pi, \pt, \ps are paragraph style definitions, not paragraph breaks.
+    result = result.replaceAll(RegExp(r'\\P|\\p(?![a-zA-Z])'), '\n');
+    result = result.replaceAll(RegExp(r'\\N|\\n(?![a-zA-Z])'), '\n');
+    result = result.replaceAll(RegExp(r'\^J', caseSensitive: false), '\n');
+    result = result.replaceAll(RegExp(r'\\~'), ' ');
+
+    // 2. Simplify stacked fractions: \S1/2; or \S1^2; or \S1#2; -> 1/2 or 1^2
     result = result.replaceAllMapped(
       RegExp(r'\\[Ss]([^;]+);'),
       (match) => match.group(1)?.replaceAll('^', '') ?? '',
     );
 
-    // 2. Repeatedly strip all standard AutoCAD backslash formatting sequences ending with semicolon:
+    // 3. Repeatedly strip all standard AutoCAD backslash formatting sequences ending with semicolon:
     // e.g. \f...;, \F...;, \C...;, \c...;, \H...;, \W...;, \Q...;, \T...;, \A...;, \px...;, \pi...;, \pt...;, \ps...;
     // Repeat until fixed point to handle nested formatting blocks
     String prev;
@@ -1386,10 +1406,6 @@ class DxfParser {
       iterations++;
     } while (result != prev && iterations < 10);
 
-    // 3. Replace paragraph breaks \P with real newlines
-    result = result.replaceAll(RegExp(r'\\[Pp]'), '\n');
-    result = result.replaceAll(RegExp(r'\\~'), ' ');
-
     // 4. Strip leftover paragraph formatting tags from DWG/DXF converters
     // such as: -ql;, ql;, qc;, qr;, qj;, qd;, t0;, ,t0;, \pt0;, i0;, l0;, c0;, b0;, etc.
     // e.g. "-ql;,t0;Text" or ",t0;Text" or "Text -ql;,t0;"
@@ -1401,8 +1417,8 @@ class DxfParser {
       '',
     );
 
-    // Clean up any remaining leading/trailing commas or semicolons from stripped tags
-    result = result.replaceAll(RegExp(r'^[,\s;]+'), '');
+    // Clean up any remaining leading/trailing commas or semicolons from stripped tags on individual lines
+    result = result.split('\n').map((line) => line.replaceAll(RegExp(r'^[,\s;]+'), '')).join('\n');
 
     // Remove remaining escaped backslashes
     result = result.replaceAll(r'\\', r'\');

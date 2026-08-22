@@ -4,7 +4,62 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/eps_models.dart';
 
-/// Pure-Dart PostScript & Encapsulated PostScript (.eps) Parser.
+/// 2D Affine Transformation Matrix for PostScript CTM (Current Transformation Matrix).
+class _AffineMatrix {
+  final double a; // scale X / cos
+  final double b; // shear Y / sin
+  final double c; // shear X / -sin
+  final double d; // scale Y / cos
+  final double tx; // translation X
+  final double ty; // translation Y
+
+  const _AffineMatrix(this.a, this.b, this.c, this.d, this.tx, this.ty);
+
+  static const identity = _AffineMatrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+
+  Offset transform(Offset pt) {
+    return Offset(
+      a * pt.dx + c * pt.dy + tx,
+      b * pt.dx + d * pt.dy + ty,
+    );
+  }
+
+  // Multiplies this matrix by another (this * other)
+  _AffineMatrix multiply(_AffineMatrix o) {
+    return _AffineMatrix(
+      a * o.a + c * o.b,
+      b * o.a + d * o.b,
+      a * o.c + c * o.d,
+      b * o.c + d * o.d,
+      a * o.tx + c * o.ty + tx,
+      b * o.tx + d * o.ty + ty,
+    );
+  }
+
+  _AffineMatrix translate(double dx, double dy) {
+    return multiply(_AffineMatrix(1.0, 0.0, 0.0, 1.0, dx, dy));
+  }
+
+  _AffineMatrix scale(double sx, double sy) {
+    return multiply(_AffineMatrix(sx, 0.0, 0.0, sy, 0.0, 0.0));
+  }
+
+  _AffineMatrix rotate(double angleRad) {
+    final cosA = math.cos(angleRad);
+    final sinA = math.sin(angleRad);
+    return multiply(_AffineMatrix(cosA, sinA, -sinA, cosA, 0.0, 0.0));
+  }
+}
+
+class _GState {
+  final Color color;
+  final double lineWidth;
+  final _AffineMatrix ctm;
+
+  const _GState(this.color, this.lineWidth, this.ctm);
+}
+
+/// Pure-Dart PostScript & Encapsulated PostScript (.eps) Parser with full 2D CTM support.
 class EpsParser {
   /// Parses raw EPS bytes (Binary DOS EPS or ASCII EPS).
   static EpsDocument parse(Uint8List bytes) {
@@ -46,12 +101,13 @@ class EpsParser {
     String? title;
     String? creator;
     String? creationDate;
-    EpsBoundingBox boundingBox = EpsBoundingBox.defaultBox;
+    String? orientation;
+    EpsBoundingBox? dscBoundingBox;
 
     final lines = ps.split(RegExp(r'\r?\n'));
 
     // 1. Extract DSC Comments from header lines
-    for (int i = 0; i < math.min(lines.length, 120); i++) {
+    for (int i = 0; i < math.min(lines.length, 150); i++) {
       final line = lines[i].trim();
       if (line.startsWith('%%BoundingBox:')) {
         final parts = line.substring(14).trim().split(RegExp(r'\s+'));
@@ -61,7 +117,7 @@ class EpsParser {
           final x2 = double.tryParse(parts[2]);
           final y2 = double.tryParse(parts[3]);
           if (x1 != null && y1 != null && x2 != null && y2 != null) {
-            boundingBox = EpsBoundingBox(minX: x1, minY: y1, maxX: x2, maxY: y2);
+            dscBoundingBox = EpsBoundingBox(minX: x1, minY: y1, maxX: x2, maxY: y2);
           }
         }
       } else if (line.startsWith('%%HiResBoundingBox:')) {
@@ -72,9 +128,13 @@ class EpsParser {
           final x2 = double.tryParse(parts[2]);
           final y2 = double.tryParse(parts[3]);
           if (x1 != null && y1 != null && x2 != null && y2 != null) {
-            boundingBox = EpsBoundingBox(minX: x1, minY: y1, maxX: x2, maxY: y2);
+            dscBoundingBox = EpsBoundingBox(minX: x1, minY: y1, maxX: x2, maxY: y2);
           }
         }
+      } else if (line.startsWith('%%Orientation:')) {
+        orientation = line.substring(14).trim();
+      } else if (line.startsWith('%%PageOrientation:')) {
+        orientation = line.substring(18).trim();
       } else if (line.startsWith('%%Title:')) {
         title = line.substring(8).trim();
       } else if (line.startsWith('%%Creator:')) {
@@ -84,19 +144,19 @@ class EpsParser {
       }
     }
 
-    // 2. Tokenize & Interpret PostScript vector commands
+    // 2. Tokenize & Interpret PostScript vector commands with CTM
     final List<EpsPath> paths = [];
     final List<EpsPathCommand> currentCommands = [];
     final List<double> numStack = [];
 
     Color currentColor = Colors.black;
     double currentLineWidth = 1.0;
+    _AffineMatrix ctm = _AffineMatrix.identity;
     Offset currentPoint = Offset.zero;
 
     // Graphics state stack
     final List<_GState> stateStack = [];
 
-    // Clean comments and tokenize
     final tokens = _tokenizePostScript(ps);
 
     for (int i = 0; i < tokens.length; i++) {
@@ -115,7 +175,8 @@ class EpsParser {
           if (numStack.length >= 2) {
             final y = numStack.removeLast();
             final x = numStack.removeLast();
-            currentPoint = Offset(x, y);
+            final raw = Offset(x, y);
+            currentPoint = ctm.transform(raw);
             currentCommands.add(EpsPathCommand.moveTo(currentPoint));
           }
           break;
@@ -126,7 +187,8 @@ class EpsParser {
           if (numStack.length >= 2) {
             final y = numStack.removeLast();
             final x = numStack.removeLast();
-            currentPoint = Offset(x, y);
+            final raw = Offset(x, y);
+            currentPoint = ctm.transform(raw);
             currentCommands.add(EpsPathCommand.lineTo(currentPoint));
           }
           break;
@@ -136,7 +198,8 @@ class EpsParser {
           if (numStack.length >= 2) {
             final dy = numStack.removeLast();
             final dx = numStack.removeLast();
-            currentPoint = Offset(currentPoint.dx + dx, currentPoint.dy + dy);
+            final delta = ctm.transform(Offset(dx, dy)) - ctm.transform(Offset.zero);
+            currentPoint = Offset(currentPoint.dx + delta.dx, currentPoint.dy + delta.dy);
             currentCommands.add(EpsPathCommand.lineTo(currentPoint));
           }
           break;
@@ -146,7 +209,8 @@ class EpsParser {
           if (numStack.length >= 2) {
             final dy = numStack.removeLast();
             final dx = numStack.removeLast();
-            currentPoint = Offset(currentPoint.dx + dx, currentPoint.dy + dy);
+            final delta = ctm.transform(Offset(dx, dy)) - ctm.transform(Offset.zero);
+            currentPoint = Offset(currentPoint.dx + delta.dx, currentPoint.dy + delta.dy);
             currentCommands.add(EpsPathCommand.moveTo(currentPoint));
           }
           break;
@@ -161,14 +225,12 @@ class EpsParser {
             final x2 = numStack.removeLast();
             final y1 = numStack.removeLast();
             final x1 = numStack.removeLast();
-            currentPoint = Offset(x3, y3);
-            currentCommands.add(
-              EpsPathCommand.cubicCurveTo(
-                Offset(x1, y1),
-                Offset(x2, y2),
-                Offset(x3, y3),
-              ),
-            );
+
+            final p1 = ctm.transform(Offset(x1, y1));
+            final p2 = ctm.transform(Offset(x2, y2));
+            final p3 = ctm.transform(Offset(x3, y3));
+            currentPoint = p3;
+            currentCommands.add(EpsPathCommand.cubicCurveTo(p1, p2, p3));
           }
           break;
 
@@ -182,26 +244,138 @@ class EpsParser {
         case 'arc':
         case 'arcn':
           if (numStack.length >= 5) {
-            final ang2 = numStack.removeLast() * math.pi / 180.0;
-            final ang1 = numStack.removeLast() * math.pi / 180.0;
+            final isCcw = token == 'arc';
+            final ang2Deg = numStack.removeLast();
+            final ang1Deg = numStack.removeLast();
             final r = numStack.removeLast();
             final cy = numStack.removeLast();
             final cx = numStack.removeLast();
 
-            final startP = Offset(cx + r * math.cos(ang1), cy + r * math.sin(ang1));
+            final ang1 = ang1Deg * math.pi / 180.0;
+            final ang2 = ang2Deg * math.pi / 180.0;
+
+            final startRaw = Offset(cx + r * math.cos(ang1), cy + r * math.sin(ang1));
+            final startPt = ctm.transform(startRaw);
+
             if (currentCommands.isEmpty) {
-              currentCommands.add(EpsPathCommand.moveTo(startP));
+              currentCommands.add(EpsPathCommand.moveTo(startPt));
             } else {
-              currentCommands.add(EpsPathCommand.lineTo(startP));
+              currentCommands.add(EpsPathCommand.lineTo(startPt));
             }
 
-            // Approximate arc segment with line segments
-            final step = (ang2 - ang1) / 12.0;
-            for (int s = 1; s <= 12; s++) {
-              final a = ang1 + step * s;
-              currentCommands.add(EpsPathCommand.lineTo(Offset(cx + r * math.cos(a), cy + r * math.sin(a))));
+            // Approximate arc segment
+            double deltaAngle = ang2 - ang1;
+            if (isCcw && deltaAngle < 0) deltaAngle += 2 * math.pi;
+            if (!isCcw && deltaAngle > 0) deltaAngle -= 2 * math.pi;
+
+            const int steps = 16;
+            for (int s = 1; s <= steps; s++) {
+              final a = ang1 + (deltaAngle * s / steps);
+              final raw = Offset(cx + r * math.cos(a), cy + r * math.sin(a));
+              currentCommands.add(EpsPathCommand.lineTo(ctm.transform(raw)));
             }
-            currentPoint = Offset(cx + r * math.cos(ang2), cy + r * math.sin(ang2));
+            final endRaw = Offset(cx + r * math.cos(ang2), cy + r * math.sin(ang2));
+            currentPoint = ctm.transform(endRaw);
+          }
+          break;
+
+        // RectFill / RectStroke (x y w h rectfill / rectstroke)
+        case 'rectfill':
+        case 'rectstroke':
+          if (numStack.length >= 4) {
+            final h = numStack.removeLast();
+            final w = numStack.removeLast();
+            final y = numStack.removeLast();
+            final x = numStack.removeLast();
+
+            final p1 = ctm.transform(Offset(x, y));
+            final p2 = ctm.transform(Offset(x + w, y));
+            final p3 = ctm.transform(Offset(x + w, y + h));
+            final p4 = ctm.transform(Offset(x, y + h));
+
+            final rectCmds = [
+              EpsPathCommand.moveTo(p1),
+              EpsPathCommand.lineTo(p2),
+              EpsPathCommand.lineTo(p3),
+              EpsPathCommand.lineTo(p4),
+              const EpsPathCommand.closePath(),
+            ];
+
+            if (token == 'rectfill') {
+              paths.add(EpsPath(commands: rectCmds, fillColor: currentColor));
+            } else {
+              paths.add(EpsPath(commands: rectCmds, strokeColor: currentColor, strokeWidth: currentLineWidth));
+            }
+          }
+          break;
+
+        // 2D Transformations on CTM
+        case 'translate':
+          if (numStack.length >= 2) {
+            final dy = numStack.removeLast();
+            final dx = numStack.removeLast();
+            ctm = ctm.translate(dx, dy);
+          }
+          break;
+
+        case 'scale':
+          if (numStack.length >= 2) {
+            final sy = numStack.removeLast();
+            final sx = numStack.removeLast();
+            ctm = ctm.scale(sx, sy);
+          }
+          break;
+
+        case 'rotate':
+          if (numStack.isNotEmpty) {
+            final angleDeg = numStack.removeLast();
+            ctm = ctm.rotate(angleDeg * math.pi / 180.0);
+          }
+          break;
+
+        case 'concat':
+        case 'cm':
+          if (numStack.length >= 6) {
+            final ty = numStack.removeLast();
+            final tx = numStack.removeLast();
+            final d = numStack.removeLast();
+            final c = numStack.removeLast();
+            final b = numStack.removeLast();
+            final a = numStack.removeLast();
+            ctm = ctm.multiply(_AffineMatrix(a, b, c, d, tx, ty));
+          }
+          break;
+
+        case 'setmatrix':
+          if (numStack.length >= 6) {
+            final ty = numStack.removeLast();
+            final tx = numStack.removeLast();
+            final d = numStack.removeLast();
+            final c = numStack.removeLast();
+            final b = numStack.removeLast();
+            final a = numStack.removeLast();
+            ctm = _AffineMatrix(a, b, c, d, tx, ty);
+          }
+          break;
+
+        // Stack helpers
+        case 'pop':
+          if (numStack.isNotEmpty) numStack.removeLast();
+          break;
+        case 'dup':
+          if (numStack.isNotEmpty) numStack.add(numStack.last);
+          break;
+        case 'exch':
+          if (numStack.length >= 2) {
+            final top = numStack.removeLast();
+            final sec = numStack.removeLast();
+            numStack.add(top);
+            numStack.add(sec);
+          }
+          break;
+        case 'neg':
+          if (numStack.isNotEmpty) {
+            numStack.add(-numStack.removeLast());
           }
           break;
 
@@ -295,7 +469,7 @@ class EpsParser {
         // Save State
         case 'gsave':
         case 'q':
-          stateStack.add(_GState(currentColor, currentLineWidth));
+          stateStack.add(_GState(currentColor, currentLineWidth, ctm));
           break;
 
         // Restore State
@@ -305,6 +479,7 @@ class EpsParser {
             final st = stateStack.removeLast();
             currentColor = st.color;
             currentLineWidth = st.lineWidth;
+            ctm = st.ctm;
           }
           break;
 
@@ -313,11 +488,56 @@ class EpsParser {
       }
     }
 
+    // 3. Compute tight bounding box from parsed paths if DSC box is missing/invalid
+    EpsBoundingBox finalBoundingBox;
+    if (paths.isNotEmpty) {
+      double minX = double.infinity;
+      double minY = double.infinity;
+      double maxX = -double.infinity;
+      double maxY = -double.infinity;
+
+      for (final p in paths) {
+        for (final cmd in p.commands) {
+          if (cmd.type == EpsCommandType.closePath) continue;
+          final pts = [cmd.p1, if (cmd.p2 != null) cmd.p2!, if (cmd.p3 != null) cmd.p3!];
+          for (final pt in pts) {
+            if (pt.dx < minX) minX = pt.dx;
+            if (pt.dx > maxX) maxX = pt.dx;
+            if (pt.dy < minY) minY = pt.dy;
+            if (pt.dy > maxY) maxY = pt.dy;
+          }
+        }
+      }
+
+      if (minX.isFinite && minY.isFinite && maxX.isFinite && maxY.isFinite) {
+        if (dscBoundingBox == null || dscBoundingBox.width <= 0 || dscBoundingBox.height <= 0) {
+          finalBoundingBox = EpsBoundingBox(minX: minX, minY: minY, maxX: maxX, maxY: maxY);
+        } else {
+          // If paths extend outside DSC bounding box, union them
+          final unionMinX = math.min(minX, dscBoundingBox.minX);
+          final unionMinY = math.min(minY, dscBoundingBox.minY);
+          final unionMaxX = math.max(maxX, dscBoundingBox.maxX);
+          final unionMaxY = math.max(maxY, dscBoundingBox.maxY);
+          finalBoundingBox = EpsBoundingBox(
+            minX: unionMinX,
+            minY: unionMinY,
+            maxX: unionMaxX,
+            maxY: unionMaxY,
+          );
+        }
+      } else {
+        finalBoundingBox = dscBoundingBox ?? EpsBoundingBox.defaultBox;
+      }
+    } else {
+      finalBoundingBox = dscBoundingBox ?? EpsBoundingBox.defaultBox;
+    }
+
     final metadata = EpsMetadata(
       title: title,
       creator: creator,
       creationDate: creationDate,
-      boundingBox: boundingBox,
+      orientation: orientation,
+      boundingBox: finalBoundingBox,
       pathCount: paths.length,
     );
 
@@ -332,7 +552,14 @@ class EpsParser {
       final trimmed = line.trim();
       if (trimmed.startsWith('%')) continue; // Skip comments
 
-      final lineTokens = trimmed.split(RegExp(r'\s+'));
+      // Replace brackets/parentheses delimiters with spaces for easy tokenization
+      final cleanLine = trimmed
+          .replaceAll('[', ' ')
+          .replaceAll(']', ' ')
+          .replaceAll('{', ' ')
+          .replaceAll('}', ' ');
+
+      final lineTokens = cleanLine.split(RegExp(r'\s+'));
       for (final t in lineTokens) {
         if (t.isNotEmpty) {
           tokens.add(t);
@@ -342,11 +569,4 @@ class EpsParser {
 
     return tokens;
   }
-}
-
-class _GState {
-  final Color color;
-  final double lineWidth;
-
-  _GState(this.color, this.lineWidth);
 }
