@@ -5,7 +5,7 @@ import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_snap_helper.dart';
 
 void main() {
-  group('Coordinate System Detection Tests', () {
+  group('Coordinate System Detection & Country Coverage Tests', () {
     test('Detects BGS 2005 Cadastral bounding box', () {
       const bgsBounds = Rect.fromLTRB(4750000, 8550000, 4752000, 8553000);
       final crs = CoordinateSystem.detectFromBounds(bgsBounds);
@@ -24,10 +24,53 @@ void main() {
       expect(crs, CoordinateSystem.wgs84Geo);
     });
 
+    test('Detects Swiss Grid LV95 bounding box', () {
+      const swissBounds = Rect.fromLTRB(2600000, 1200000, 2610000, 1205000);
+      final crs = CoordinateSystem.detectFromBounds(swissBounds);
+      expect(crs, CoordinateSystem.swissLv95);
+    });
+
+    test('Detects Greek Grid GGRS87 bounding box', () {
+      const greekBounds = Rect.fromLTRB(470000, 4200000, 480000, 4210000);
+      final crs = CoordinateSystem.detectFromBounds(greekBounds);
+      expect(crs, CoordinateSystem.greeceGgrs87);
+    });
+
+    test('Detects Romanian Stereo 70 bounding box', () {
+      const stereoBounds = Rect.fromLTRB(500000, 500000, 505000, 505000);
+      final crs = CoordinateSystem.detectFromBounds(stereoBounds);
+      expect(crs, CoordinateSystem.romaniaStereo70);
+    });
+
     test('Detects Local / Non-projected coordinates', () {
       const localBounds = Rect.fromLTRB(0, 0, 150, 100);
       final crs = CoordinateSystem.detectFromBounds(localBounds);
       expect(crs, CoordinateSystem.localCartesian);
+    });
+
+    test('Contains official national systems across major countries with flags and EPSG', () {
+      expect(CoordinateSystem.fromId('bgs_2005_cadastral').epsg, 'EPSG:7801');
+      expect(CoordinateSystem.fromId('romania_stereo70').epsg, 'EPSG:31700');
+      expect(CoordinateSystem.fromId('greece_ggrs87').epsg, 'EPSG:2100');
+      expect(CoordinateSystem.fromId('germany_etrs89_utm32').epsg, 'EPSG:25832');
+      expect(CoordinateSystem.fromId('france_rgf93_lambert93').epsg, 'EPSG:2154');
+      expect(CoordinateSystem.fromId('uk_osgb36_bng').epsg, 'EPSG:27700');
+      expect(CoordinateSystem.fromId('swiss_lv95').epsg, 'EPSG:2056');
+      expect(CoordinateSystem.fromId('austria_mgi_gk').epsg, 'EPSG:31258');
+      expect(CoordinateSystem.fromId('italy_monte_mario_1').epsg, 'EPSG:3003');
+      expect(CoordinateSystem.fromId('spain_etrs89_utm30').epsg, 'EPSG:25830');
+      expect(CoordinateSystem.fromId('poland_etrf2000_cs2000').epsg, 'EPSG:2177');
+      expect(CoordinateSystem.fromId('czech_sjtsk_krovak').epsg, 'EPSG:5514');
+      expect(CoordinateSystem.fromId('hungary_hd72_eov').epsg, 'EPSG:23700');
+      expect(CoordinateSystem.fromId('netherlands_rd_new').epsg, 'EPSG:28992');
+      expect(CoordinateSystem.fromId('belgium_lambert2008').epsg, 'EPSG:3812');
+      expect(CoordinateSystem.fromId('serbia_mgi_zone7').epsg, 'EPSG:31277');
+      expect(CoordinateSystem.fromId('macedonia_mgi_zone7').epsg, 'EPSG:6316');
+      expect(CoordinateSystem.fromId('turkey_itrf96_tm30').epsg, 'EPSG:5256');
+      expect(CoordinateSystem.fromId('croatia_htrs96_tm').epsg, 'EPSG:3765');
+      expect(CoordinateSystem.fromId('slovenia_d96_tm').epsg, 'EPSG:3794');
+      expect(CoordinateSystem.fromId('usa_nad83_spcs').country, 'United States');
+      expect(CoordinateSystem.values.length, greaterThanOrEqualTo(20));
     });
   });
 

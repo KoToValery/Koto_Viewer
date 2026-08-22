@@ -2255,33 +2255,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFormatBadge(String label, IconData icon, Color borderColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor.withValues(alpha: 0.65)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -2363,24 +2336,24 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Open Documents, CAD & 3D',
+                          'Open Drawings, Models & Documents',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text(
-                          'Select PDF, CAD, 3D, Excel, Text, or Markdown files to view or share.',
+                          'Fast, lightweight viewer with geodetic coordinate support and vector precision.',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 14,
+                            color: Colors.white.withValues(alpha: 0.88),
+                            fontSize: 13.5,
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
                         Wrap(
-                          spacing: 8,
+                          spacing: 10,
                           runSpacing: 10,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
@@ -2390,7 +2363,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               label: const Text(
                                 'Browse Files',
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 15.5,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -2399,23 +2372,44 @@ class _HomeScreenState extends State<HomeScreen> {
                                 foregroundColor: theme.colorScheme.primary,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 20,
-                                  vertical: 13,
+                                  vertical: 12,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
                                 elevation: 0,
                               ),
                             ),
-                            _buildFormatBadge('PDF', Icons.picture_as_pdf_rounded, const Color(0xFFC7D2FE)),
-                            _buildFormatBadge('CAD', Icons.draw_rounded, const Color(0xFF6EE7B7)),
-                            _buildFormatBadge('3D', Icons.view_in_ar_rounded, const Color(0xFFA5F3FC)),
-                            _buildFormatBadge('STEP', Icons.layers_rounded, const Color(0xFFC7D2FE)),
-                            _buildFormatBadge('PCB', Icons.memory_rounded, const Color(0xFF6EE7B7)),
-                            _buildFormatBadge('PLT', Icons.architecture_rounded, const Color(0xFFFDE68A)),
-                            _buildFormatBadge('XLSX', Icons.table_chart_rounded, const Color(0xFF86EFAC)),
-                            _buildFormatBadge('DOCX', Icons.article_rounded, const Color(0xFF93C5FD)),
-                            _buildFormatBadge('EPS', Icons.gesture_rounded, const Color(0xFFD8B4FE)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome_mosaic_rounded,
+                                    size: 15,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'PDF • DXF • DWG • STEP • 3D • PCB • Office',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.95),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ],
