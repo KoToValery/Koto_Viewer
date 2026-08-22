@@ -1030,60 +1030,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
-        final lower = filePath.toLowerCase();
-        if (!lower.endsWith('.pdf') &&
-            !lower.endsWith('.dxf') &&
-            !lower.endsWith('.dwg') &&
-            !lower.endsWith('.svg') &&
-            !lower.endsWith('.stl') &&
-            !lower.endsWith('.obj') &&
-            !lower.endsWith('.gltf') &&
-            !lower.endsWith('.glb') &&
-            !lower.endsWith('.xlsx') &&
-            !lower.endsWith('.xls') &&
-            !lower.endsWith('.txt') &&
-            !lower.endsWith('.log') &&
-            !lower.endsWith('.csv') &&
-            !lower.endsWith('.md') &&
-            !lower.endsWith('.markdown') &&
-            !lower.endsWith('.docx') &&
-            !lower.endsWith('.eps') &&
-            !lower.endsWith('.gbr') &&
-            !lower.endsWith('.ger') &&
-            !lower.endsWith('.pho') &&
-            !lower.endsWith('.art') &&
-            !lower.endsWith('.gtl') &&
-            !lower.endsWith('.gbl') &&
-            !lower.endsWith('.gts') &&
-            !lower.endsWith('.gbs') &&
-            !lower.endsWith('.gto') &&
-            !lower.endsWith('.gbo') &&
-            !lower.endsWith('.gko') &&
-            !lower.endsWith('.gm1') &&
-            !lower.endsWith('.gm2') &&
-            !lower.endsWith('.drl') &&
-            !lower.endsWith('.xln') &&
-            !lower.endsWith('.exc') &&
-            !lower.endsWith('.drd') &&
-            !lower.endsWith('.kicad_pcb') &&
-            !lower.endsWith('.kicad_sch') &&
-            !lower.endsWith('.kicad_sym') &&
-            !lower.endsWith('.sch') &&
-            !lower.endsWith('.brd') &&
-            !lower.endsWith('.plt') &&
-            !lower.endsWith('.hpgl') &&
-            !lower.endsWith('.hpg') &&
-            !lower.endsWith('.prn') &&
-            !lower.endsWith('.step') &&
-            !lower.endsWith('.stp') &&
-            !lower.endsWith('.p21') &&
-            !lower.endsWith('.iges') &&
-            !lower.endsWith('.igs')) {
+        if (!FileSourceService.isSupportedFile(filePath)) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Please select a supported file (.pdf, .dxf, .dwg, .svg, .stl, .obj, .glb, .step, .iges, .xlsx, .docx, .eps, .gbr, .drl, .kicad_pcb, .plt).',
+                  'Please select a supported CAD, PCB, 3D, Vector, or Document file.',
                 ),
                 backgroundColor: Colors.orange,
               ),

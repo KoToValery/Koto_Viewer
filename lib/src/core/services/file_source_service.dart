@@ -142,7 +142,7 @@ class FileSourceService {
     await prefs.setString(_keySortOption, option.key);
   }
 
-  static bool _isSupportedFile(String path) {
+  static bool isSupportedFile(String path) {
     final lower = path.toLowerCase();
     return lower.endsWith('.pdf') ||
         lower.endsWith('.dxf') ||
@@ -281,7 +281,7 @@ class FileSourceService {
     try {
       final List<FileSystemEntity> entities = dir.listSync(recursive: false);
       for (final entity in entities) {
-        if (entity is File && _isSupportedFile(entity.path)) {
+        if (entity is File && isSupportedFile(entity.path)) {
           final stat = entity.statSync();
           final fileName = entity.path.split(Platform.pathSeparator).last;
           items.add(

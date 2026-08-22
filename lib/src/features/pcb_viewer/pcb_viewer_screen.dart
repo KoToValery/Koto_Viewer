@@ -143,10 +143,10 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
   }
 
   Size _viewportSize = Size.zero;
+  bool _hasInitialFitted = false;
 
   void _fitToScreen() {
     if (_project == null || _viewportSize.isEmpty) {
-      _transformController.value = Matrix4.identity();
       return;
     }
 
@@ -157,7 +157,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
     final double availH = math.max(_viewportSize.height - padding * 2, 10.0);
 
-    final double scale = math.min(availW / contentW, availH / contentH);
+    final double scale = math.min(availW / contentW, availH / contentH).clamp(0.01, 100.0);
 
     final double dx = (_viewportSize.width - contentW * scale) / 2.0;
     final double dy = (_viewportSize.height - contentH * scale) / 2.0;
@@ -167,6 +167,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
       ..scale(scale, scale);
 
     _transformController.value = matrix;
+    _hasInitialFitted = true;
   }
 
   void _zoomIn() {
@@ -721,6 +722,11 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+          if (!_hasInitialFitted && _project != null && !_viewportSize.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _fitToScreen();
+            });
+          }
 
           if (_isLoading) {
             return const Center(
