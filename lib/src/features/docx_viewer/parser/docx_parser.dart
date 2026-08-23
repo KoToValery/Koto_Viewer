@@ -404,13 +404,20 @@ class DocxParser {
     String? listPrefix;
     TextAlign align = TextAlign.start;
     double spaceBefore = 0.0;
-    double spaceAfter = 3.0;
+    double spaceAfter = 0.0;
     double? lineSpacing;
     double indentLeft = 0.0;
     double indentFirstLine = 0.0;
     final List<double> tabPositions = [];
     bool isPageBreak = false;
     DocxBorder? bottomBorder;
+
+    // Paragraph-level fallback formatting from <w:pPr><w:rPr>
+    double? pFontSize;
+    String? pFontFamily;
+    bool? pBold;
+    bool? pItalic;
+    Color? pColor;
 
     // Check Style Inheritance
     String? styleId;
@@ -427,9 +434,45 @@ class DocxParser {
       if (st.spaceBefore != null) spaceBefore = st.spaceBefore!;
       if (st.spaceAfter != null) spaceAfter = st.spaceAfter!;
       if (st.alignment != null) align = st.alignment!;
+      if (st.fontSize != null) pFontSize = st.fontSize;
+      if (st.isBold != null) pBold = st.isBold;
     }
 
     if (pPr != null) {
+      // 0. Paragraph-level run properties
+      final pRPr = pPr.findElements('w:rPr').firstOrNull;
+      if (pRPr != null) {
+        final szElem = pRPr.findElements('w:sz').firstOrNull;
+        if (szElem != null) {
+          final halfPts = double.tryParse(szElem.getAttribute('w:val') ?? '');
+          if (halfPts != null && halfPts > 0) pFontSize = halfPts / 2.0;
+        }
+        if (pRPr.findElements('w:b').isNotEmpty) {
+          final bVal = pRPr.findElements('w:b').first.getAttribute('w:val');
+          pBold = (bVal == null || bVal == '1' || bVal == 'true');
+        }
+        if (pRPr.findElements('w:i').isNotEmpty) {
+          final iVal = pRPr.findElements('w:i').first.getAttribute('w:val');
+          pItalic = (iVal == null || iVal == '1' || iVal == 'true');
+        }
+        final colorElem = pRPr.findElements('w:color').firstOrNull;
+        if (colorElem != null) {
+          final hex = colorElem.getAttribute('w:val');
+          if (hex != null && hex.length == 6 && hex.toLowerCase() != 'auto') {
+            final intVal = int.tryParse(hex, radix: 16);
+            if (intVal != null && intVal != 0x000000) {
+              pColor = Color(0xFF000000 | intVal);
+            }
+          }
+        }
+        final rFonts = pRPr.findElements('w:rFonts').firstOrNull;
+        if (rFonts != null) {
+          pFontFamily = rFonts.getAttribute('w:ascii') ??
+              rFonts.getAttribute('w:hAnsi') ??
+              rFonts.getAttribute('w:cs');
+        }
+      }
+
       // 1. Heading style name
       if (styleId != null) {
         final val = styleId.toLowerCase();
@@ -603,7 +646,14 @@ class DocxParser {
           isPageBreak = true;
         }
 
-        final parsedRuns = _parseRun(child);
+        final parsedRuns = _parseRun(
+          child,
+          fallbackFontSize: pFontSize,
+          fallbackFontFamily: pFontFamily,
+          fallbackBold: pBold,
+          fallbackItalic: pItalic,
+          fallbackColor: pColor,
+        );
         for (final run in parsedRuns) {
           if (run.text.isNotEmpty || run.isTab) {
             runs.add(run);
@@ -611,7 +661,15 @@ class DocxParser {
         }
       } else if (child.name.local == 'hyperlink') {
         for (final r in child.findElements('w:r')) {
-          final parsedRuns = _parseRun(r, overrideColor: const Color(0xFF2563EB), isUnderline: true);
+          final parsedRuns = _parseRun(
+            r,
+            overrideColor: const Color(0xFF2563EB),
+            isUnderline: true,
+            fallbackFontSize: pFontSize,
+            fallbackFontFamily: pFontFamily,
+            fallbackBold: pBold,
+            fallbackItalic: pItalic,
+          );
           for (final run in parsedRuns) {
             if (run.text.isNotEmpty || run.isTab) {
               runs.add(run);
@@ -623,7 +681,7 @@ class DocxParser {
 
     // Filter out completely empty paragraphs unless they have spacing or borders
     if (runs.isEmpty && headerBox == null && imageBlock == null && bottomBorder == null && !isPageBreak) {
-      if (spaceBefore == 0 && spaceAfter <= 3) {
+      if (spaceBefore == 0 && spaceAfter == 0) {
         return null;
       }
     }
@@ -651,17 +709,69 @@ class DocxParser {
     xml.XmlElement rElement, {
     Color? overrideColor,
     bool? isUnderline,
+    double? fallbackFontSize,
+    String? fallbackFontFamily,
+    bool? fallbackBold,
+    bool? fallbackItalic,
+    Color? fallbackColor,
   }) {
     final rPr = rElement.findElements('w:rPr').firstOrNull;
 
-    bool bold = false;
-    bool italic = false;
+    bool bold = fallbackBold ?? false;
+    bool italic = fallbackItalic ?? false;
     bool underline = isUnderline ?? false;
     bool strike = false;
-    Color? color = overrideColor;
-    double? fontSize;
-    String? fontFamily;
+    Color? color = overrideColor ?? fallbackColor;
+    double? fontSize = fallbackFontSize;
+    String? fontFamily = fallbackFontFamily;
     bool isTab = false;
+
+    if (rPr != null) {
+      if (rPr.findElements('w:b').isNotEmpty) {
+        final b = rPr.findElements('w:b').first;
+        final val = b.getAttribute('w:val');
+        bold = (val == null || val == '1' || val == 'true');
+      }
+      if (rPr.findElements('w:i').isNotEmpty) {
+        final i = rPr.findElements('w:i').first;
+        final val = i.getAttribute('w:val');
+        italic = (val == null || val == '1' || val == 'true');
+      }
+      if (rPr.findElements('w:u').isNotEmpty) {
+        final u = rPr.findElements('w:u').first;
+        final val = u.getAttribute('w:val');
+        underline = (val == null || val != 'none');
+      }
+      if (rPr.findElements('w:strike').isNotEmpty) {
+        strike = true;
+      }
+
+      final colorElem = rPr.findElements('w:color').firstOrNull;
+      if (colorElem != null && overrideColor == null) {
+        final hex = colorElem.getAttribute('w:val');
+        if (hex != null && hex.length == 6 && hex.toLowerCase() != 'auto') {
+          final intVal = int.tryParse(hex, radix: 16);
+          if (intVal != null && intVal != 0x000000) {
+            color = Color(0xFF000000 | intVal);
+          }
+        }
+      }
+
+      final szElem = rPr.findElements('w:sz').firstOrNull;
+      if (szElem != null) {
+        final halfPts = double.tryParse(szElem.getAttribute('w:val') ?? '');
+        if (halfPts != null && halfPts > 0) {
+          fontSize = halfPts / 2.0;
+        }
+      }
+
+      final rFonts = rPr.findElements('w:rFonts').firstOrNull;
+      if (rFonts != null) {
+        fontFamily = rFonts.getAttribute('w:ascii') ??
+            rFonts.getAttribute('w:hAnsi') ??
+            rFonts.getAttribute('w:cs');
+      }
+    }
 
     if (rPr != null) {
       if (rPr.findElements('w:b').isNotEmpty) {

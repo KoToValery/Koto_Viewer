@@ -194,6 +194,45 @@ void main() {
       expect(table.borders!.top?.hasBorder, isTrue);
       expect(table.borders!.top?.width, equals(1.0)); // 8 / 8 = 1.0 pt
     });
+
+    test('Parses paragraph-level formatting fallbacks and table row heights', () {
+      const xmlStr = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:rPr>
+          <w:sz w:val="48"/>
+          <w:rFonts w:ascii="Tahoma"/>
+        </w:rPr>
+      </w:pPr>
+      <w:r><w:t>ОБЕКТ:</w:t></w:r>
+    </w:p>
+    <w:tbl>
+      <w:tr>
+        <w:trPr><w:trHeight w:val="1094"/></w:trPr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="886" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>1.</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+  </w:body>
+</w:document>
+''';
+      final archive = Archive();
+      final xmlBytes = utf8.encode(xmlStr);
+      archive.addFile(ArchiveFile('word/document.xml', xmlBytes.length, xmlBytes));
+      final docxBytes = Uint8List.fromList(ZipEncoder().encode(archive)!);
+
+      final doc = DocxParser.parse(docxBytes);
+      final p = doc.blocks.whereType<DocxParagraph>().first;
+      expect(p.runs.first.fontSize, equals(24.0)); // 48 / 2 = 24 pt fallback
+      expect(p.runs.first.fontFamily, equals('Tahoma'));
+
+      final tbl = doc.blocks.whereType<DocxTable>().first;
+      expect(tbl.rows.first.heightPt, closeTo(54.7, 0.1)); // 1094 / 20 = 54.7 pt
+    });
   });
 
   group('Excel Parser & Cyrillic Handling Tests', () {

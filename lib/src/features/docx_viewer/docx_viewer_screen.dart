@@ -631,7 +631,12 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     );
   }
 
-  Widget _buildParagraphWidget(DocxParagraph paragraph, ThemeData theme, bool isDark) {
+  Widget _buildParagraphWidget(
+    DocxParagraph paragraph,
+    ThemeData theme,
+    bool isDark, {
+    bool isInsideCell = false,
+  }) {
     // If paragraph contains a HeaderBox (Logo + Company details)
     if (paragraph.headerBox != null) {
       return _buildHeaderBoxWidget(paragraph.headerBox!, theme, isDark);
@@ -671,16 +676,20 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                   ? Colors.black87
                   : run.color ?? (isDark ? Colors.white70 : Colors.black87),
               backgroundColor: isMatched ? const Color(0xFFFFD54F) : null,
-              height: paragraph.lineSpacing ?? 1.45,
+              height: paragraph.lineSpacing ?? (isInsideCell ? 1.15 : 1.25),
             ),
           ),
         );
       }
 
-      content = SelectableText.rich(
-        TextSpan(children: spans),
-        textAlign: paragraph.alignment,
-      );
+      if (paragraph.runs.isEmpty) {
+        content = SizedBox(height: (isInsideCell ? 0.0 : 12.0) * _zoomScale);
+      } else {
+        content = Text.rich(
+          TextSpan(children: spans),
+          textAlign: paragraph.alignment,
+        );
+      }
     }
 
     // Bullet / List Item
@@ -698,13 +707,18 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         ),
       ];
       
-      if (content is SelectableText) {
-        if (content.textSpan != null) {
-          spans.addAll(content.textSpan!.children ?? [TextSpan(text: content.textSpan!.text, style: content.textSpan!.style)]);
+      if (content is Text) {
+        final span = content.textSpan;
+        if (span is TextSpan) {
+          if (span.children != null) {
+            spans.addAll(span.children!);
+          } else if (span.text != null) {
+            spans.add(TextSpan(text: span.text, style: span.style));
+          }
         }
       }
       
-      content = SelectableText.rich(
+      content = Text.rich(
         TextSpan(children: spans),
         textAlign: paragraph.alignment,
       );
@@ -739,8 +753,17 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       );
     }
 
-    final topMargin = (paragraph.spaceBefore * _zoomScale).clamp(0.0, 40.0);
-    final bottomMargin = (paragraph.spaceAfter * _zoomScale).clamp(0.0, 40.0);
+    // Inside table cells, Word suppresses spaceBefore on first paragraphs and doesn't stack margins
+    final topMargin = isInsideCell
+        ? 0.0
+        : (paragraph.spaceBefore * _zoomScale).clamp(0.0, 40.0);
+    final bottomMargin = isInsideCell
+        ? 0.0
+        : (paragraph.spaceAfter * _zoomScale).clamp(0.0, 40.0);
+
+    if (topMargin == 0.0 && bottomMargin == 0.0) {
+      return content;
+    }
 
     return Padding(
       padding: EdgeInsets.only(top: topMargin, bottom: bottomMargin),
@@ -759,7 +782,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     }
 
     if (segments.length <= 1) {
-      return SelectableText(
+      return Text(
         paragraph.plainText,
         style: TextStyle(fontSize: 12.0 * _zoomScale),
       );
@@ -771,14 +794,14 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SelectableText.rich(
+        Text.rich(
           TextSpan(
             children: firstRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
           ),
         ),
         SizedBox(width: 24.0 * _zoomScale),
         Expanded(
-          child: SelectableText.rich(
+          child: Text.rich(
             TextSpan(
               children: secondRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
             ),
@@ -846,9 +869,21 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
             borderRadius: BorderRadius.circular(2),
           );
 
+    final maxContentWidth = settings.contentWidthPt * _zoomScale;
+    final double totalGrid = table.columnWidths.fold(0.0, (a, b) => a + b);
+
+    // Determine exact or proportional table width
+    double tableWidth;
+    if (table.totalWidthPt != null && table.totalWidthPt! > 0) {
+      tableWidth = (table.totalWidthPt! * _zoomScale).clamp(100.0, maxContentWidth);
+    } else if (totalGrid > 0) {
+      tableWidth = (totalGrid * _zoomScale).clamp(100.0, maxContentWidth);
+    } else {
+      tableWidth = maxContentWidth;
+    }
+
     Map<int, TableColumnWidth>? columnWidthsMap;
     if (table.columnWidths.isNotEmpty) {
-      final double totalGrid = table.columnWidths.fold(0.0, (a, b) => a + b);
       if (totalGrid > 0) {
         columnWidthsMap = {};
         for (int c = 0; c < table.columnWidths.length; c++) {
@@ -863,6 +898,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       defaultColumnWidth: const FlexColumnWidth(),
       border: tableBorder,
       children: table.rows.map((row) {
+        final rowMinHeight = row.heightPt != null ? (row.heightPt! * _zoomScale) : null;
+
         return TableRow(
           decoration: row.isHeader
               ? BoxDecoration(
@@ -872,17 +909,21 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 )
               : null,
           children: row.cells.map((cell) {
-            final cellPadding = (cell.padding ?? const EdgeInsets.symmetric(horizontal: 6, vertical: 4)) *
+            final cellPadding = (cell.padding ?? const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.5)) *
                 _zoomScale;
 
             return Container(
+              constraints: rowMinHeight != null
+                  ? BoxConstraints(minHeight: rowMinHeight)
+                  : null,
               color: cell.backgroundColor,
               padding: cellPadding,
               alignment: cell.verticalAlignment,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: cell.paragraphs
-                    .map((p) => _buildParagraphWidget(p, theme, isDark))
+                    .map((p) => _buildParagraphWidget(p, theme, isDark, isInsideCell: true))
                     .toList(),
               ),
             );
@@ -891,17 +932,21 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       }).toList(),
     );
 
-    final maxContentWidth = settings.contentWidthPt * _zoomScale;
-    final double tableWidth = (table.totalWidthPt != null && table.totalWidthPt! > 0)
-        ? (table.totalWidthPt! * _zoomScale).clamp(100.0, maxContentWidth)
-        : maxContentWidth;
+    Widget result = SizedBox(
+      width: tableWidth,
+      child: tableWidget,
+    );
+
+    // Table Alignment
+    if (table.alignment == TextAlign.center) {
+      result = Center(child: result);
+    } else if (table.alignment == TextAlign.right) {
+      result = Align(alignment: Alignment.centerRight, child: result);
+    }
 
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0 * _zoomScale),
-      child: SizedBox(
-        width: tableWidth,
-        child: tableWidget,
-      ),
+      padding: EdgeInsets.symmetric(vertical: 4.0 * _zoomScale),
+      child: result,
     );
   }
 
