@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:excel/excel.dart' as xl;
+import 'package:archive/archive.dart';
 import 'package:kotoview/src/core/models/pdf_item.dart';
+import 'package:kotoview/src/features/docx_viewer/models/docx_models.dart';
+import 'package:kotoview/src/features/docx_viewer/parser/docx_parser.dart';
 
 void main() {
   group('Document & Spreadsheet File Type Tests', () {
@@ -72,6 +76,123 @@ void main() {
         lastOpened: DateTime.now(),
       );
       expect(markdownItem.fileType, equals(KotoFileType.md));
+    });
+
+    test('PdfItem correctly identifies .docx Word documents', () {
+      final docxItem = PdfItem(
+        path: 'E:/OneDrive - Пирин Дизайн Студио/РАБОТНИ_облак/ТЕМПЛЕЙТ_ПАПКИ/ДОКУМЕНТИ/ЧЕЛЕН ЛИСТ.docx',
+        name: 'ЧЕЛЕН ЛИСТ.docx',
+        sizeInBytes: 15000,
+        lastOpened: DateTime.now(),
+      );
+      expect(docxItem.fileType, equals(KotoFileType.docx));
+      expect(docxItem.isDocx, isTrue);
+      expect(docxItem.isTextDoc, isTrue);
+    });
+  });
+
+  group('DOCX Parser & Page Geometry Tests', () {
+    test('DocxPageSettings correctly models standard A4 Portrait', () {
+      const a4 = DocxPageSettings(
+        widthPt: 595.3,
+        heightPt: 841.9,
+        isLandscape: false,
+        paperName: 'A4',
+      );
+      expect(a4.aspectRatio, closeTo(0.707, 0.01));
+      expect(a4.isLandscape, isFalse);
+      expect(a4.paperName, equals('A4'));
+      expect(a4.contentWidthPt, greaterThan(400));
+    });
+
+    test('Parses DOCX document XML with A4 Portrait and Tables with Borders', () {
+      const documentXmlContent = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:pStyle w:val="Title"/>
+        <w:jc w:val="center"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="32"/>
+        </w:rPr>
+        <w:t>ЧЕЛЕН ЛИСТ - ОБЕКТ</w:t>
+      </w:r>
+    </w:p>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="9000" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="8" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="8" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="8" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="8" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="3000"/>
+        <w:gridCol w:w="6000"/>
+      </w:tblGrid>
+      <w:tr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="3000" w:type="dxa"/>
+            <w:shd w:val="clear" w:color="auto" w:fill="F1F5F9"/>
+          </w:tcPr>
+          <w:p>
+            <w:r><w:rPr><w:b/></w:rPr><w:t>Проектант:</w:t></w:r>
+          </w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="6000" w:type="dxa"/>
+          </w:tcPr>
+          <w:p>
+            <w:r><w:t>инж. Иван Иванов</w:t></w:r>
+          </w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838" w:orient="portrait"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>
+''';
+
+      // Create a mock docx in memory (zip with word/document.xml)
+      final archive = Archive();
+      final xmlBytes = utf8.encode(documentXmlContent);
+      archive.addFile(ArchiveFile('word/document.xml', xmlBytes.length, xmlBytes));
+      final zipEncoder = ZipEncoder();
+      final docxBytes = Uint8List.fromList(zipEncoder.encode(archive)!);
+
+      final doc = DocxParser.parse(docxBytes);
+      expect(doc, isNotNull);
+      expect(doc.paragraphCount, equals(1));
+      expect(doc.tableCount, equals(1));
+
+      // Check page settings (A4 Portrait = 11906 / 20 = 595.3 pt, 16838 / 20 = 841.9 pt)
+      expect(doc.pageSettings.widthPt, closeTo(595.3, 0.5));
+      expect(doc.pageSettings.heightPt, closeTo(841.9, 0.5));
+      expect(doc.pageSettings.isLandscape, isFalse);
+      expect(doc.pageSettings.paperName, equals('A4'));
+      expect(doc.pageSettings.margins.left, equals(72.0)); // 1440 / 20 = 72 pt (1 inch)
+
+      // Check table properties
+      final table = doc.blocks.whereType<DocxTable>().first;
+      expect(table.columnWidths.length, equals(2));
+      expect(table.columnWidths[0], equals(150.0)); // 3000 / 20 = 150 pt
+      expect(table.columnWidths[1], equals(300.0)); // 6000 / 20 = 300 pt
+      expect(table.borders, isNotNull);
+      expect(table.borders!.top?.hasBorder, isTrue);
+      expect(table.borders!.top?.width, equals(1.0)); // 8 / 8 = 1.0 pt
     });
   });
 

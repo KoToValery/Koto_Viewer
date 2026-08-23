@@ -1,13 +1,13 @@
 import 'dart:io';
-import 'package:flutter/gestures.dart';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'models/docx_models.dart';
 import 'parser/docx_parser.dart';
 
-/// Microsoft Word Document (.docx) Viewer Screen.
+/// Microsoft Word Document (.docx) Viewer Screen with 1:1 A4 Page Formatting,
+/// Authentic Page Framing, Logo Header, Tab Stops, Exact Borders, and Zoom Slider.
 class DocxViewerScreen extends StatefulWidget {
   final String filePath;
 
@@ -23,7 +23,9 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   int _fileSizeBytes = 0;
 
   DocxDocument? _document;
-  double _fontScale = 1.0;
+  double _zoomScale = 1.0;
+  bool _hasCalculatedInitialFit = false;
+  bool _isZoomBarExpanded = true;
 
   // Search
   bool _isSearchOpen = false;
@@ -31,8 +33,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   String _searchQuery = '';
   int _searchMatchCount = 0;
 
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ScrollController _verticalScrollController = ScrollController();
+  final ScrollController _horizontalScrollController = ScrollController();
 
   String get _fileName => widget.filePath.split(Platform.pathSeparator).last;
 
@@ -44,7 +46,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _verticalScrollController.dispose();
+    _horizontalScrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -82,13 +85,48 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     }
   }
 
-  void _handlePointerSignal(PointerSignalEvent event) {
-    if (event is PointerScrollEvent && HardwareKeyboard.instance.isControlPressed) {
-      final delta = event.scrollDelta.dy < 0 ? 0.08 : -0.08;
-      setState(() {
-        _fontScale = (_fontScale + delta).clamp(0.6, 2.2);
-      });
-    }
+  void _calculateInitialFit(Size viewportSize) {
+    if (_hasCalculatedInitialFit || _document == null) return;
+    _hasCalculatedInitialFit = true;
+
+    final settings = _document!.pageSettings;
+    final double availW = math.max(200.0, viewportSize.width - 32.0);
+    final double availH = math.max(300.0, viewportSize.height - 120.0);
+
+    final double scaleW = availW / settings.widthPt;
+    final double scaleH = availH / settings.heightPt;
+
+    final double fitScale = math.min(scaleW, scaleH).clamp(0.35, 2.5);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _zoomScale = fitScale;
+        });
+      }
+    });
+  }
+
+  void _fitPage(Size viewportSize) {
+    if (_document == null) return;
+    final settings = _document!.pageSettings;
+    final double availW = math.max(200.0, viewportSize.width - 32.0);
+    final double availH = math.max(300.0, viewportSize.height - 120.0);
+
+    final double scaleW = availW / settings.widthPt;
+    final double scaleH = availH / settings.heightPt;
+    setState(() {
+      _zoomScale = math.min(scaleW, scaleH).clamp(0.3, 3.0);
+    });
+  }
+
+  void _fitWidth(Size viewportSize) {
+    if (_document == null) return;
+    final settings = _document!.pageSettings;
+    final double availW = math.max(200.0, viewportSize.width - 32.0);
+    setState(() {
+      _zoomScale = (availW / settings.widthPt).clamp(0.3, 3.0);
+    });
   }
 
   void _onSearchChanged(String query) {
@@ -129,6 +167,10 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     final formattedSize = _fileSizeBytes < 1024 * 1024
         ? '${(_fileSizeBytes / 1024).toStringAsFixed(1)} KB'
         : '${(_fileSizeBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+
+    final settings = _document!.pageSettings;
+    final orientationStr = settings.isLandscape ? 'Landscape' : 'Portrait';
+    final paperStr = '${settings.paperName} $orientationStr (${settings.widthPt.toStringAsFixed(0)} × ${settings.heightPt.toStringAsFixed(0)} pt)';
 
     showModalBottomSheet(
       context: context,
@@ -186,8 +228,9 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
               const Divider(height: 24),
               _buildInfoRow('File Name:', _fileName),
               _buildInfoRow('File Size:', formattedSize),
+              _buildInfoRow('Page Format:', paperStr),
+              _buildInfoRow('Pages / Sheets:', '${_document!.pages.length}'),
               _buildInfoRow('Paragraphs:', '${_document!.paragraphCount}'),
-              _buildInfoRow('Headings:', '${_document!.headingCount}'),
               _buildInfoRow('Tables:', '${_document!.tableCount}'),
               _buildInfoRow('Estimated Words:', '${_document!.wordCount} words'),
             ],
@@ -199,7 +242,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.5),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -237,12 +280,10 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final docBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final docBorderColor = isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0);
+    final viewerBg = isDark ? const Color(0xFF141414) : const Color(0xFFE2E8F0);
 
     return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF1F5F9),
+      backgroundColor: viewerBg,
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -278,7 +319,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                   ),
                   if (_document != null)
                     Text(
-                      '${_document!.paragraphCount} paragraphs • ${_document!.tableCount} tables',
+                      '${_document!.pageSettings.paperName} ${_document!.pageSettings.isLandscape ? "Landscape" : "Portrait"} • ${_document!.pages.length} ${_document!.pages.length == 1 ? "page" : "pages"}',
                       style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
                     ),
                 ],
@@ -352,244 +393,676 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                     ),
                   ),
                 )
-              : Column(
-                  children: [
-                    // Search Match Status Bar
-                    if (_searchQuery.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                        color: const Color(0xFFFFB74D).withValues(alpha: 0.2),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search, size: 16, color: Color(0xFFF57C00)),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Found $_searchMatchCount ${_searchMatchCount == 1 ? "match" : "matches"} for "$_searchQuery"',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFF57C00),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+                    _calculateInitialFit(viewportSize);
+
+                    return Stack(
+                      children: [
+                        // Main Document Scroll Area (Unified 2D Pan & Scroll)
+                        Scrollbar(
+                          controller: _verticalScrollController,
+                          thumbVisibility: true,
+                          child: Scrollbar(
+                            controller: _horizontalScrollController,
+                            thumbVisibility: true,
+                            notificationPredicate: (notif) => notif.depth == 1,
+                            child: SingleChildScrollView(
+                              controller: _verticalScrollController,
+                              scrollDirection: Axis.vertical,
+                              padding: const EdgeInsets.fromLTRB(16, 20, 16, 90),
+                              child: SingleChildScrollView(
+                                controller: _horizontalScrollController,
+                                scrollDirection: Axis.horizontal,
+                                child: Center(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: _buildPages(theme, isDark),
+                                  ),
+                                ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
 
-                    // Main Document Body (Simulated Document Sheet)
-                    Expanded(
-                      child: Listener(
-                        onPointerSignal: _handlePointerSignal,
-                        child: Stack(
-                          children: [
-                            SingleChildScrollView(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                            child: Center(
-                              child: Container(
-                                constraints: const BoxConstraints(maxWidth: 860),
-                                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-                                decoration: BoxDecoration(
-                                  color: docBg,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: docBorderColor, width: 1),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black12,
-                                      blurRadius: 10,
-                                      offset: Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: _buildDocumentBlocks(theme, isDark),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // Floating Font Zoom Controls
+                        // Search Match Bar
+                        if (_searchQuery.isNotEmpty)
                           Positioned(
-                            bottom: 20,
-                            right: 20,
+                            top: 0,
+                            left: 0,
+                            right: 0,
                             child: Container(
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.surface.withValues(alpha: 0.94),
-                                borderRadius: BorderRadius.circular(24),
-                                boxShadow: const [
-                                  BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
-                                ],
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              color: const Color(0xFFFFB74D).withValues(alpha: 0.2),
                               child: Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.text_decrease, size: 18),
-                                    tooltip: 'Smaller Font',
-                                    onPressed: () {
-                                      setState(() {
-                                        _fontScale = (_fontScale - 0.1).clamp(0.7, 1.8);
-                                      });
-                                    },
-                                  ),
-                                  InkWell(
-                                    onTap: () => setState(() => _fontScale = 1.0),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                      child: Text(
-                                        '${(_fontScale * 100).toStringAsFixed(0)}%',
-                                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                      ),
+                                  const Icon(Icons.search, size: 16, color: Color(0xFFF57C00)),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Found $_searchMatchCount ${_searchMatchCount == 1 ? "match" : "matches"} for "$_searchQuery"',
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFF57C00),
                                     ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.text_increase, size: 18),
-                                    tooltip: 'Larger Font',
-                                    onPressed: () {
-                                      setState(() {
-                                        _fontScale = (_fontScale + 0.1).clamp(0.7, 1.8);
-                                      });
-                                    },
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+
+                        // Floating Zoom Control Bar (with Slider & Fit-to-Screen)
+                        Positioned(
+                          bottom: 16,
+                          right: 16,
+                          child: _buildZoomControls(theme, viewportSize),
+                        ),
+                      ],
+                    );
+                  },
+                ),
     );
   }
 
-  List<Widget> _buildDocumentBlocks(ThemeData theme, bool isDark) {
-    if (_document == null || _document!.blocks.isEmpty) {
-      return [const Text('Document is empty.')];
-    }
+  /// Builds authentic 1:1 A4 Paper Sheet widgets for all document pages.
+  List<Widget> _buildPages(ThemeData theme, bool isDark) {
+    if (_document == null) return [];
 
-    final List<Widget> widgets = [];
+    final settings = _document!.pageSettings;
+    final sheetW = settings.widthPt * _zoomScale;
+    final sheetH = settings.heightPt * _zoomScale;
+    final sheetPadding = settings.margins * _zoomScale;
 
-    for (final block in _document!.blocks) {
-      if (block is DocxParagraph) {
-        widgets.add(_buildParagraphWidget(block, theme, isDark));
-      } else if (block is DocxTable) {
-        widgets.add(_buildTableWidget(block, theme, isDark));
-      }
-    }
+    final docBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final docBorderColor = isDark ? const Color(0xFF383838) : const Color(0xFFCBD5E1);
 
-    return widgets;
-  }
+    final List<Widget> pageWidgets = [];
 
-  Widget _buildParagraphWidget(DocxParagraph paragraph, ThemeData theme, bool isDark) {
-    final spans = <InlineSpan>[];
+    for (int i = 0; i < _document!.pages.length; i++) {
+      final page = _document!.pages[i];
 
-    for (final run in paragraph.runs) {
-      final baseSize = run.fontSize ?? _getBaseFontSizeForHeading(paragraph.headingLevel);
-      final isMatched = _searchQuery.isNotEmpty && run.text.toLowerCase().contains(_searchQuery.toLowerCase());
+      pageWidgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 24.0),
+          child: Column(
+            children: [
+              // 1:1 Paper Sheet Container with Page Framing Canvas
+              Container(
+                width: sheetW,
+                constraints: BoxConstraints(minHeight: sheetH),
+                decoration: BoxDecoration(
+                  color: docBg,
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: docBorderColor, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.4)
+                          : Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: CustomPaint(
+                  painter: _DocxPageShapePainter(
+                    shapes: settings.pageShapes,
+                    zoomScale: _zoomScale,
+                  ),
+                  child: Padding(
+                    padding: sheetPadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _buildPageBlocks(page.blocks, theme, isDark),
+                    ),
+                  ),
+                ),
+              ),
 
-      spans.add(
-        TextSpan(
-          text: run.text,
-          style: TextStyle(
-            fontSize: baseSize * _fontScale,
-            fontWeight: (run.isBold || paragraph.headingLevel != DocxHeadingLevel.none)
-                ? FontWeight.bold
-                : FontWeight.normal,
-            fontStyle: run.isItalic ? FontStyle.italic : FontStyle.normal,
-            decoration: run.isUnderline
-                ? TextDecoration.underline
-                : run.isStrike
-                    ? TextDecoration.lineThrough
-                    : null,
-            color: isMatched
-                ? Colors.black87
-                : run.color ?? (isDark ? Colors.white70 : Colors.black87),
-            backgroundColor: isMatched ? const Color(0xFFFFD54F) : null,
-            height: 1.5,
+              // Page footer tag
+              if (_document!.pages.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    'Page ${i + 1} of ${_document!.pages.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: theme.textTheme.bodySmall?.color,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       );
     }
 
-    Widget content = SelectableText.rich(
-      TextSpan(children: spans),
-      textAlign: paragraph.alignment,
-    );
+    return pageWidgets;
+  }
 
+  List<Widget> _buildPageBlocks(List<DocxBlock> blocks, ThemeData theme, bool isDark) {
+    if (blocks.isEmpty) {
+      return [const Text('Page is empty.')];
+    }
+
+    final List<Widget> widgets = [];
+    for (final block in blocks) {
+      if (block is DocxParagraph) {
+        widgets.add(_buildParagraphWidget(block, theme, isDark));
+      } else if (block is DocxTable) {
+        widgets.add(_buildTableWidget(block, theme, isDark));
+      } else if (block is DocxHeaderBox) {
+        widgets.add(_buildHeaderBoxWidget(block, theme, isDark));
+      } else if (block is DocxImageBlock) {
+        widgets.add(_buildImageBlockWidget(block));
+      }
+    }
+    return widgets;
+  }
+
+  Widget _buildHeaderBoxWidget(DocxHeaderBox headerBox, ThemeData theme, bool isDark) {
+    final textColor = isDark ? Colors.white70 : const Color(0xFF1E293B);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12.0 * _zoomScale),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Logo
+              if (headerBox.logoBytes != null)
+                Padding(
+                  padding: EdgeInsets.only(right: 14.0 * _zoomScale),
+                  child: Image.memory(
+                    headerBox.logoBytes!,
+                    width: (headerBox.logoWidthPt ?? 85.0) * _zoomScale,
+                    height: (headerBox.logoHeightPt ?? 65.0) * _zoomScale,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+
+              // Company Header Text
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: headerBox.headerLines.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final line = entry.value;
+                    final isMainTitle = index == 0;
+                    return Padding(
+                      padding: EdgeInsets.symmetric(vertical: 1.5 * _zoomScale),
+                      child: Text(
+                        line,
+                        style: TextStyle(
+                          fontSize: (isMainTitle ? 13.0 : 10.5) * _zoomScale,
+                          fontWeight: isMainTitle ? FontWeight.bold : FontWeight.w500,
+                          color: textColor,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageBlockWidget(DocxImageBlock block) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 6.0 * _zoomScale),
+      child: Align(
+        alignment: block.alignment,
+        child: Image.memory(
+          block.imageBytes,
+          width: block.widthPt != null ? block.widthPt! * _zoomScale : null,
+          height: block.heightPt != null ? block.heightPt! * _zoomScale : null,
+          fit: BoxFit.contain,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildParagraphWidget(DocxParagraph paragraph, ThemeData theme, bool isDark) {
+    // If paragraph contains a HeaderBox (Logo + Company details)
+    if (paragraph.headerBox != null) {
+      return _buildHeaderBoxWidget(paragraph.headerBox!, theme, isDark);
+    }
+
+    // Check if paragraph has tabs (e.g. "ЧАСТ:" -> <tab> -> "ФАЗА: технически проект")
+    final hasTabs = paragraph.runs.any((r) => r.isTab);
+
+    Widget content;
+    if (hasTabs) {
+      content = _buildTabbedParagraph(paragraph, theme, isDark);
+    } else {
+      final spans = <InlineSpan>[];
+      for (final run in paragraph.runs) {
+        if (run.isTab) continue;
+        final baseSize = run.fontSize ?? _getBaseFontSizeForHeading(paragraph.headingLevel);
+        final scaledSize = (baseSize * _zoomScale).clamp(6.0, 72.0);
+        final isMatched = _searchQuery.isNotEmpty &&
+            run.text.toLowerCase().contains(_searchQuery.toLowerCase());
+
+        spans.add(
+          TextSpan(
+            text: run.text,
+            style: TextStyle(
+              fontSize: scaledSize,
+              fontFamily: run.fontFamily,
+              fontWeight: (run.isBold || paragraph.headingLevel != DocxHeadingLevel.none)
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+              fontStyle: run.isItalic ? FontStyle.italic : FontStyle.normal,
+              decoration: run.isUnderline
+                  ? TextDecoration.underline
+                  : run.isStrike
+                      ? TextDecoration.lineThrough
+                      : null,
+              color: isMatched
+                  ? Colors.black87
+                  : run.color ?? (isDark ? Colors.white70 : Colors.black87),
+              backgroundColor: isMatched ? const Color(0xFFFFD54F) : null,
+              height: paragraph.lineSpacing ?? 1.45,
+            ),
+          ),
+        );
+      }
+
+      content = SelectableText.rich(
+        TextSpan(children: spans),
+        textAlign: paragraph.alignment,
+      );
+    }
+
+    // Bullet / List Item
     if (paragraph.isBullet) {
-      content = Row(
+      final prefixText = paragraph.listPrefix != null ? '${paragraph.listPrefix}\t' : '-\t';
+      
+      final spans = <InlineSpan>[
+        TextSpan(
+          text: prefixText,
+          style: TextStyle(
+            fontSize: 12.0 * _zoomScale,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white70 : Colors.black87,
+          ),
+        ),
+      ];
+      
+      if (content is SelectableText) {
+        if (content.textSpan != null) {
+          spans.addAll(content.textSpan!.children ?? [TextSpan(text: content.textSpan!.text, style: content.textSpan!.style)]);
+        }
+      }
+      
+      content = SelectableText.rich(
+        TextSpan(children: spans),
+        textAlign: paragraph.alignment,
+      );
+    }
+
+    // Left Indent (from paragraph or inherited style like Title style = 191.85 pt)
+    if (paragraph.indentLeft > 0 || paragraph.indentFirstLine > 0) {
+      double paddingLeft = paragraph.indentLeft;
+      if (paragraph.isBullet) {
+        paddingLeft -= 18.0; // Subtract hanging indent so bullet aligns correctly
+      }
+      content = Padding(
+        padding: EdgeInsets.only(
+          left: (paddingLeft * _zoomScale).clamp(0.0, 450.0),
+        ),
+        child: content,
+      );
+    }
+
+    // Divider line below paragraph
+    if (paragraph.bottomBorder != null && paragraph.bottomBorder!.hasBorder) {
+      content = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0, top: 4.0),
-            child: Icon(Icons.circle, size: 6.0 * _fontScale, color: theme.colorScheme.primary),
+          content,
+          SizedBox(height: 2.0 * _zoomScale),
+          Container(
+            height: (paragraph.bottomBorder!.width * _zoomScale).clamp(0.5, 4.0),
+            color: paragraph.bottomBorder!.color,
           ),
-          Expanded(child: content),
         ],
       );
     }
 
-    double bottomSpacing = 6.0;
-    if (paragraph.headingLevel == DocxHeadingLevel.title) {
-      bottomSpacing = 16.0;
-    } else if (paragraph.headingLevel == DocxHeadingLevel.h1) {
-      bottomSpacing = 12.0;
-    } else if (paragraph.headingLevel == DocxHeadingLevel.h2) {
-      bottomSpacing = 10.0;
-    }
+    final topMargin = (paragraph.spaceBefore * _zoomScale).clamp(0.0, 40.0);
+    final bottomMargin = (paragraph.spaceAfter * _zoomScale).clamp(0.0, 40.0);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: bottomSpacing),
+      padding: EdgeInsets.only(top: topMargin, bottom: bottomMargin),
       child: content,
+    );
+  }
+
+  Widget _buildTabbedParagraph(DocxParagraph paragraph, ThemeData theme, bool isDark) {
+    final List<List<DocxRun>> segments = [[]];
+    for (final run in paragraph.runs) {
+      if (run.isTab) {
+        segments.add([]);
+      } else {
+        segments.last.add(run);
+      }
+    }
+
+    if (segments.length <= 1) {
+      return SelectableText(
+        paragraph.plainText,
+        style: TextStyle(fontSize: 12.0 * _zoomScale),
+      );
+    }
+
+    final firstRuns = segments[0];
+    final secondRuns = segments.sublist(1).expand((s) => s).toList();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SelectableText.rich(
+          TextSpan(
+            children: firstRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
+          ),
+        ),
+        SizedBox(width: 24.0 * _zoomScale),
+        Expanded(
+          child: SelectableText.rich(
+            TextSpan(
+              children: secondRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  InlineSpan _buildSpan(DocxRun run, DocxParagraph paragraph, bool isDark) {
+    final baseSize = run.fontSize ?? _getBaseFontSizeForHeading(paragraph.headingLevel);
+    final scaledSize = (baseSize * _zoomScale).clamp(6.0, 72.0);
+    final isMatched = _searchQuery.isNotEmpty &&
+        run.text.toLowerCase().contains(_searchQuery.toLowerCase());
+
+    return TextSpan(
+      text: run.text,
+      style: TextStyle(
+        fontSize: scaledSize,
+        fontFamily: run.fontFamily,
+        fontWeight: (run.isBold || paragraph.headingLevel != DocxHeadingLevel.none)
+            ? FontWeight.bold
+            : FontWeight.normal,
+        fontStyle: run.isItalic ? FontStyle.italic : FontStyle.normal,
+        decoration: run.isUnderline
+            ? TextDecoration.underline
+            : run.isStrike
+                ? TextDecoration.lineThrough
+                : null,
+        color: isMatched
+            ? Colors.black87
+            : run.color ?? (isDark ? Colors.white70 : Colors.black87),
+        backgroundColor: isMatched ? const Color(0xFFFFD54F) : null,
+      ),
     );
   }
 
   double _getBaseFontSizeForHeading(DocxHeadingLevel level) {
     switch (level) {
       case DocxHeadingLevel.title:
-        return 22.0;
+        return 14.5;
       case DocxHeadingLevel.h1:
-        return 19.0;
+        return 16.0;
       case DocxHeadingLevel.h2:
-        return 16.5;
+        return 14.0;
       case DocxHeadingLevel.h3:
-        return 15.0;
+        return 13.0;
       case DocxHeadingLevel.h4:
       case DocxHeadingLevel.h5:
       case DocxHeadingLevel.h6:
       case DocxHeadingLevel.none:
-        return 13.5;
+        return 12.0;
     }
   }
 
   Widget _buildTableWidget(DocxTable table, ThemeData theme, bool isDark) {
-    final borderColor = isDark ? const Color(0xFF444444) : const Color(0xFFCBD5E1);
+    final settings = _document?.pageSettings ?? const DocxPageSettings();
+    final defaultBorderColor = isDark ? const Color(0xFF555555) : const Color(0xFF94A3B8);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Table(
-          defaultColumnWidth: const IntrinsicColumnWidth(),
-          border: TableBorder.all(color: borderColor, width: 0.8, borderRadius: BorderRadius.circular(4)),
-          children: table.rows.map((row) {
-            return TableRow(
-              children: row.cells.map((cell) {
-                return Container(
-                  color: cell.backgroundColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: cell.paragraphs.map((p) => _buildParagraphWidget(p, theme, isDark)).toList(),
-                  ),
-                );
-              }).toList(),
+    final tableBorder = table.borders != null
+        ? table.borders!.toTableBorder(defaultColor: defaultBorderColor)
+        : TableBorder.all(
+            color: defaultBorderColor,
+            width: (0.8 * _zoomScale).clamp(0.5, 3.0),
+            borderRadius: BorderRadius.circular(2),
+          );
+
+    Map<int, TableColumnWidth>? columnWidthsMap;
+    if (table.columnWidths.isNotEmpty) {
+      final double totalGrid = table.columnWidths.fold(0.0, (a, b) => a + b);
+      if (totalGrid > 0) {
+        columnWidthsMap = {};
+        for (int c = 0; c < table.columnWidths.length; c++) {
+          final fraction = table.columnWidths[c] / totalGrid;
+          columnWidthsMap[c] = FlexColumnWidth(fraction);
+        }
+      }
+    }
+
+    final tableWidget = Table(
+      columnWidths: columnWidthsMap,
+      defaultColumnWidth: const FlexColumnWidth(),
+      border: tableBorder,
+      children: table.rows.map((row) {
+        return TableRow(
+          decoration: row.isHeader
+              ? BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFF1F5F9),
+                )
+              : null,
+          children: row.cells.map((cell) {
+            final cellPadding = (cell.padding ?? const EdgeInsets.symmetric(horizontal: 6, vertical: 4)) *
+                _zoomScale;
+
+            return Container(
+              color: cell.backgroundColor,
+              padding: cellPadding,
+              alignment: cell.verticalAlignment,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: cell.paragraphs
+                    .map((p) => _buildParagraphWidget(p, theme, isDark))
+                    .toList(),
+              ),
             );
           }).toList(),
-        ),
+        );
+      }).toList(),
+    );
+
+    final maxContentWidth = settings.contentWidthPt * _zoomScale;
+    final double tableWidth = (table.totalWidthPt != null && table.totalWidthPt! > 0)
+        ? (table.totalWidthPt! * _zoomScale).clamp(100.0, maxContentWidth)
+        : maxContentWidth;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8.0 * _zoomScale),
+      child: SizedBox(
+        width: tableWidth,
+        child: tableWidget,
       ),
     );
+  }
+
+  /// Floating Zoom Control Bar with Slider, [-]/[+], % badge, Fit-Page and Fit-Width.
+  Widget _buildZoomControls(ThemeData theme, Size viewportSize) {
+    if (!_isZoomBarExpanded) {
+      return FloatingActionButton.small(
+        heroTag: 'docx_zoom_btn',
+        onPressed: () => setState(() => _isZoomBarExpanded = true),
+        backgroundColor: theme.colorScheme.surface,
+        child: Icon(Icons.zoom_in, color: theme.colorScheme.primary, size: 20),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3)),
+        ],
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Zoom Out
+          IconButton(
+            icon: const Icon(Icons.remove, size: 18),
+            tooltip: 'Zoom Out (-)',
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              setState(() {
+                _zoomScale = (_zoomScale - 0.15).clamp(0.3, 3.0);
+              });
+            },
+          ),
+
+          // Zoom Slider
+          SizedBox(
+            width: 110,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              ),
+              child: Slider(
+                value: _zoomScale.clamp(0.3, 3.0),
+                min: 0.3,
+                max: 3.0,
+                onChanged: (val) {
+                  setState(() {
+                    _zoomScale = val;
+                  });
+                },
+              ),
+            ),
+          ),
+
+          // Zoom In
+          IconButton(
+            icon: const Icon(Icons.add, size: 18),
+            tooltip: 'Zoom In (+)',
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              setState(() {
+                _zoomScale = (_zoomScale + 0.15).clamp(0.3, 3.0);
+              });
+            },
+          ),
+
+          const SizedBox(width: 4),
+
+          // Zoom Percentage Badge (Tap to reset 100%)
+          InkWell(
+            onTap: () => setState(() => _zoomScale = 1.0),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${(_zoomScale * 100).toStringAsFixed(0)}%',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 4),
+
+          // Fit to Screen (Fit Page)
+          IconButton(
+            icon: const Icon(Icons.fit_screen, size: 18),
+            tooltip: 'Fit Page to Screen',
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () => _fitPage(viewportSize),
+          ),
+
+          // Fit Width
+          IconButton(
+            icon: const Icon(Icons.swap_horiz, size: 18),
+            tooltip: 'Fit Width',
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () => _fitWidth(viewportSize),
+          ),
+
+          // Collapse Bar
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            tooltip: 'Minimize Controls',
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () => setState(() => _isZoomBarExpanded = false),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Custom painter for rendering VML/DrawingML page-level shapes (e.g. teal frame lines).
+class _DocxPageShapePainter extends CustomPainter {
+  final List<DocxDrawingShape> shapes;
+  final double zoomScale;
+
+  _DocxPageShapePainter({required this.shapes, required this.zoomScale});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (shapes.isEmpty) return;
+
+    for (final shape in shapes) {
+      if (shape.isLine) {
+        final paint = Paint()
+          ..color = shape.color
+          ..strokeWidth = (shape.strokeWidth * zoomScale).clamp(0.8, 3.0)
+          ..style = PaintingStyle.stroke;
+
+        final p1 = Offset(shape.from.dx * zoomScale, shape.from.dy * zoomScale);
+        final p2 = Offset(shape.to.dx * zoomScale, shape.to.dy * zoomScale);
+
+        canvas.drawLine(p1, p2, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DocxPageShapePainter oldDelegate) {
+    return oldDelegate.shapes != shapes || oldDelegate.zoomScale != zoomScale;
   }
 }

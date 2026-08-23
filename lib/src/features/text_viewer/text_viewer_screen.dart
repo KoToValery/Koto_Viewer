@@ -25,19 +25,21 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   List<String> _lines = [];
 
   // Options
-  bool _showLineNumbers = true;
+  final bool _showLineNumbers = true;
   bool _isMonospace = true;
   bool _isWordWrap = true;
   double _fontSize = 13.5;
+  bool _isZoomBarExpanded = true;
 
   // Search
   bool _isSearchOpen = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  List<int> _matchedLineIndices = [];
+  final List<int> _matchedLineIndices = [];
   int _currentMatchIndex = -1;
 
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _verticalScrollController = ScrollController();
+  final ScrollController _horizontalScrollController = ScrollController();
 
   String get _fileName => widget.filePath.split(Platform.pathSeparator).last;
 
@@ -49,7 +51,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _verticalScrollController.dispose();
+    _horizontalScrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -315,10 +318,10 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
             onPressed: () => setState(() => _isMonospace = !_isMonospace),
           ),
 
-          // Word Wrap Toggle
+          // Word Wrap Toggle (Fit to Screen)
           IconButton(
             icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left),
-            tooltip: _isWordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
+            tooltip: _isWordWrap ? 'Disable Word Wrap (Free Scroll)' : 'Enable Word Wrap (Fit Screen)',
             onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
           ),
 
@@ -416,118 +419,231 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                         ),
                       ),
 
-                    // Main Text Display Area
+                    // Main Text Display Area (Vertical & Horizontal Scrollable)
                     Expanded(
                       child: Stack(
                         children: [
-                          ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            itemCount: _lines.length,
-                            itemBuilder: (context, index) {
-                              final lineText = _lines[index];
-                              final isCurrentMatch = _matchedLineIndices.isNotEmpty &&
-                                  _currentMatchIndex >= 0 &&
-                                  _matchedLineIndices[_currentMatchIndex] == index;
-                              final isMatch = _matchedLineIndices.contains(index);
-
-                              return Container(
-                                color: isCurrentMatch
-                                    ? const Color(0xFFFFD54F).withValues(alpha: 0.45)
-                                    : isMatch
-                                        ? const Color(0xFFFFD54F).withValues(alpha: 0.2)
-                                        : null,
-                                padding: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 8),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (_showLineNumbers) ...[
-                                      Container(
-                                        width: 44,
-                                        alignment: Alignment.topRight,
-                                        padding: const EdgeInsets.only(right: 12),
-                                        child: Text(
-                                          '${index + 1}',
-                                          style: GoogleFonts.firaCode(
-                                            fontSize: _fontSize * 0.85,
-                                            color: lineGutterColor,
-                                            fontWeight: isCurrentMatch ? FontWeight.bold : FontWeight.normal,
-                                          ),
+                          _isWordWrap
+                              ? ListView.builder(
+                                  controller: _verticalScrollController,
+                                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
+                                  itemCount: _lines.length,
+                                  itemBuilder: (context, index) => _buildLineItem(
+                                    index,
+                                    fontStyle,
+                                    lineGutterColor,
+                                    gutterBg,
+                                  ),
+                                )
+                              : Scrollbar(
+                                  controller: _horizontalScrollController,
+                                  thumbVisibility: true,
+                                  child: SingleChildScrollView(
+                                    controller: _horizontalScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                      width: 2500, // Wide canvas for unified horizontal scroll
+                                      child: ListView.builder(
+                                        controller: _verticalScrollController,
+                                        padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
+                                        itemCount: _lines.length,
+                                        itemBuilder: (context, index) => _buildLineItem(
+                                          index,
+                                          fontStyle,
+                                          lineGutterColor,
+                                          gutterBg,
                                         ),
                                       ),
-                                      Container(
-                                        width: 1,
-                                        height: _fontSize * 1.5,
-                                        color: gutterBg,
-                                      ),
-                                      const SizedBox(width: 10),
-                                    ],
-                                    Expanded(
-                                      child: _isWordWrap
-                                          ? SelectableText(
-                                              lineText.isEmpty ? ' ' : lineText,
-                                              style: fontStyle,
-                                            )
-                                          : SingleChildScrollView(
-                                              scrollDirection: Axis.horizontal,
-                                              child: SelectableText(
-                                                lineText.isEmpty ? ' ' : lineText,
-                                                style: fontStyle,
-                                              ),
-                                            ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              );
-                            },
-                          ),
 
-                          // Floating Font Sizing Controls
+                          // Floating Zoom Slider Controls
                           Positioned(
                             bottom: 20,
                             right: 20,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.surface.withValues(alpha: 0.92),
-                                borderRadius: BorderRadius.circular(24),
-                                boxShadow: const [
-                                  BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.text_decrease, size: 18),
-                                    tooltip: 'Smaller Font',
-                                    onPressed: () {
-                                      setState(() {
-                                        _fontSize = (_fontSize - 1.5).clamp(10.0, 28.0);
-                                      });
-                                    },
-                                  ),
-                                  Text(
-                                    '${_fontSize.toStringAsFixed(0)}pt',
-                                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.text_increase, size: 18),
-                                    tooltip: 'Larger Font',
-                                    onPressed: () {
-                                      setState(() {
-                                        _fontSize = (_fontSize + 1.5).clamp(10.0, 28.0);
-                                      });
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
+                            child: _buildZoomControls(theme),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
+    );
+  }
+
+  Widget _buildLineItem(
+    int index,
+    TextStyle fontStyle,
+    Color lineGutterColor,
+    Color gutterBg,
+  ) {
+    final lineText = _lines[index];
+    final isCurrentMatch = _matchedLineIndices.isNotEmpty &&
+        _currentMatchIndex >= 0 &&
+        _matchedLineIndices[_currentMatchIndex] == index;
+    final isMatch = _matchedLineIndices.contains(index);
+
+    return Container(
+      color: isCurrentMatch
+          ? const Color(0xFFFFD54F).withValues(alpha: 0.45)
+          : isMatch
+              ? const Color(0xFFFFD54F).withValues(alpha: 0.2)
+              : null,
+      padding: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_showLineNumbers) ...[
+            Container(
+              width: 48,
+              alignment: Alignment.topRight,
+              padding: const EdgeInsets.only(right: 12),
+              child: Text(
+                '${index + 1}',
+                style: GoogleFonts.firaCode(
+                  fontSize: (_fontSize * 0.82).clamp(8.0, 24.0),
+                  color: lineGutterColor,
+                  fontWeight: isCurrentMatch ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ),
+            Container(
+              width: 1,
+              height: _fontSize * 1.5,
+              color: gutterBg,
+            ),
+            const SizedBox(width: 10),
+          ],
+          Expanded(
+            child: SelectableText(
+              lineText.isEmpty ? ' ' : lineText,
+              style: fontStyle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildZoomControls(ThemeData theme) {
+    if (!_isZoomBarExpanded) {
+      return FloatingActionButton.small(
+        heroTag: 'text_zoom_btn',
+        onPressed: () => setState(() => _isZoomBarExpanded = true),
+        backgroundColor: theme.colorScheme.surface,
+        child: Icon(Icons.text_increase, color: theme.colorScheme.primary, size: 20),
+      );
+    }
+
+    final double zoomPercent = (_fontSize / 13.5) * 100.0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3)),
+        ],
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Zoom Out (Decrease Font)
+          IconButton(
+            icon: const Icon(Icons.remove, size: 18),
+            tooltip: 'Smaller Font (-)',
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              setState(() {
+                _fontSize = (_fontSize - 1.5).clamp(8.0, 34.0);
+              });
+            },
+          ),
+
+          // Zoom Slider
+          SizedBox(
+            width: 110,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              ),
+              child: Slider(
+                value: _fontSize.clamp(8.0, 34.0),
+                min: 8.0,
+                max: 34.0,
+                onChanged: (val) {
+                  setState(() {
+                    _fontSize = val;
+                  });
+                },
+              ),
+            ),
+          ),
+
+          // Zoom In (Increase Font)
+          IconButton(
+            icon: const Icon(Icons.add, size: 18),
+            tooltip: 'Larger Font (+)',
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              setState(() {
+                _fontSize = (_fontSize + 1.5).clamp(8.0, 34.0);
+              });
+            },
+          ),
+
+          const SizedBox(width: 4),
+
+          // Percentage Badge (Tap to reset 100% / 13.5pt)
+          InkWell(
+            onTap: () => setState(() => _fontSize = 13.5),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${zoomPercent.toStringAsFixed(0)}%',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 4),
+
+          // Fit Screen / Word Wrap toggle
+          IconButton(
+            icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 18),
+            tooltip: _isWordWrap ? 'Word Wrap ON (Fit Screen)' : 'Word Wrap OFF',
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
+          ),
+
+          // Minimize
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            tooltip: 'Minimize Controls',
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(),
+            onPressed: () => setState(() => _isZoomBarExpanded = false),
+          ),
+        ],
+      ),
     );
   }
 }
