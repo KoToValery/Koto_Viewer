@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:archive/archive.dart';
@@ -232,6 +233,110 @@ void main() {
 
       final tbl = doc.blocks.whereType<DocxTable>().first;
       expect(tbl.rows.first.heightPt, closeTo(54.7, 0.1)); // 1094 / 20 = 54.7 pt
+    });
+
+    test('Parses paragraph alignments, indents, and style inheritance correctly', () {
+      const stylesXml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:pPr>
+      <w:jc w:val="both"/>
+    </w:pPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="CustomHeading">
+    <w:name w:val="CustomHeading"/>
+    <w:basedOn w:val="Normal"/>
+    <w:pPr>
+      <w:jc w:val="center"/>
+      <w:ind w:left="360" w:right="180"/>
+    </w:pPr>
+  </w:style>
+</w:styles>''';
+
+      const docXml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:pStyle w:val="CustomHeading"/>
+      </w:pPr>
+      <w:r><w:t>ДОГОВОР</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="right"/>
+        <w:ind w:firstLine="720"/>
+      </w:pPr>
+      <w:r><w:t>Десен текст</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:ind w:hanging="360"/>
+      </w:pPr>
+      <w:r><w:t>Окачен отстъп</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>''';
+
+      final archive = Archive();
+      final sBytes = utf8.encode(stylesXml);
+      final dBytes = utf8.encode(docXml);
+      archive.addFile(ArchiveFile('word/styles.xml', sBytes.length, sBytes));
+      archive.addFile(ArchiveFile('word/document.xml', dBytes.length, dBytes));
+      final zipEncoder = ZipEncoder();
+      final docxBytes = Uint8List.fromList(zipEncoder.encode(archive)!);
+
+      final doc = DocxParser.parse(docxBytes);
+      expect(doc.blocks.length, equals(3));
+
+      final p0 = doc.blocks[0] as DocxParagraph;
+      expect(p0.plainText, equals('ДОГОВОР'));
+      expect(p0.alignment, equals(TextAlign.center));
+      expect(p0.indentLeft, equals(18.0)); // 360 / 20
+      expect(p0.indentRight, equals(9.0)); // 180 / 20
+
+      final p1 = doc.blocks[1] as DocxParagraph;
+      expect(p1.plainText, equals('Десен текст'));
+      expect(p1.alignment, equals(TextAlign.right));
+      expect(p1.indentFirstLine, equals(36.0)); // 720 / 20
+
+      final p2 = doc.blocks[2] as DocxParagraph;
+      expect(p2.plainText, equals('Окачен отстъп'));
+      expect(p2.indentFirstLine, equals(-18.0)); // -360 / 20
+    });
+
+    test('Correctly identifies borderless tables for signature layout', () {
+      const borderlessTblXml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="0" w:type="auto"/>
+        <w:jc w:val="center"/>
+      </w:tblPr>
+      <w:tr>
+        <w:tc>
+          <w:p><w:r><w:t>ИЗПЪЛНИТЕЛ</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:p><w:r><w:t>ВЪЗЛОЖИТЕЛ</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+  </w:body>
+</w:document>''';
+
+      final archive = Archive();
+      final dBytes = utf8.encode(borderlessTblXml);
+      archive.addFile(ArchiveFile('word/document.xml', dBytes.length, dBytes));
+      final zipEncoder = ZipEncoder();
+      final docxBytes = Uint8List.fromList(zipEncoder.encode(archive)!);
+
+      final doc = DocxParser.parse(docxBytes);
+      final tbl = doc.blocks.whereType<DocxTable>().first;
+      expect(tbl.hasAnyBorder, isFalse);
+      expect(tbl.borders, isNull);
     });
   });
 

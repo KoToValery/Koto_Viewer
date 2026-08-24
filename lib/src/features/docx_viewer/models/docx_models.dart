@@ -38,13 +38,13 @@ class DocxBorder {
     this.style = DocxLineStyle.single,
   });
 
-  static const DocxBorder none = DocxBorder(hasBorder: false, width: 0);
+  static const DocxBorder none = DocxBorder(hasBorder: false, width: 0, style: DocxLineStyle.none);
 
-  BorderSide toBorderSide() {
-    if (!hasBorder || width <= 0) return BorderSide.none;
+  BorderSide toBorderSide({double zoomScale = 1.0}) {
+    if (!hasBorder || width <= 0 || style == DocxLineStyle.none) return BorderSide.none;
     return BorderSide(
       color: color,
-      width: width.clamp(0.5, 6.0),
+      width: (width * zoomScale).clamp(0.5, 6.0),
       style: BorderStyle.solid,
     );
   }
@@ -76,15 +76,14 @@ class DocxTableBorders {
       (insideH?.hasBorder ?? false) ||
       (insideV?.hasBorder ?? false);
 
-  TableBorder toTableBorder({Color defaultColor = const Color(0xFFCBD5E1)}) {
-    final defSide = BorderSide(color: defaultColor, width: 0.8);
+  TableBorder toTableBorder({Color defaultColor = const Color(0xFFCBD5E1), double zoomScale = 1.0}) {
     return TableBorder(
-      top: top != null ? top!.toBorderSide() : defSide,
-      bottom: bottom != null ? bottom!.toBorderSide() : defSide,
-      left: left != null ? left!.toBorderSide() : defSide,
-      right: right != null ? right!.toBorderSide() : defSide,
-      horizontalInside: insideH != null ? insideH!.toBorderSide() : defSide,
-      verticalInside: insideV != null ? insideV!.toBorderSide() : defSide,
+      top: top?.toBorderSide(zoomScale: zoomScale) ?? BorderSide.none,
+      bottom: bottom?.toBorderSide(zoomScale: zoomScale) ?? BorderSide.none,
+      left: left?.toBorderSide(zoomScale: zoomScale) ?? BorderSide.none,
+      right: right?.toBorderSide(zoomScale: zoomScale) ?? BorderSide.none,
+      horizontalInside: insideH?.toBorderSide(zoomScale: zoomScale) ?? BorderSide.none,
+      verticalInside: insideV?.toBorderSide(zoomScale: zoomScale) ?? BorderSide.none,
       borderRadius: BorderRadius.circular(2),
     );
   }
@@ -225,6 +224,7 @@ class DocxParagraph extends DocxBlock {
   final double spaceAfter;
   final double? lineSpacing;
   final double indentLeft;
+  final double indentRight;
   final double indentFirstLine;
   final List<double> tabPositions;
   final bool isPageBreak;
@@ -242,6 +242,7 @@ class DocxParagraph extends DocxBlock {
     this.spaceAfter = 3.0,
     this.lineSpacing,
     this.indentLeft = 0.0,
+    this.indentRight = 0.0,
     this.indentFirstLine = 0.0,
     this.tabPositions = const [],
     this.isPageBreak = false,
@@ -312,6 +313,23 @@ class DocxTable extends DocxBlock {
       columnWidths.isNotEmpty
           ? columnWidths.length
           : (rows.isEmpty ? 0 : rows.first.cells.length);
+
+  bool get hasAnyBorder {
+    if (borders != null && borders!.hasAnyBorder) return true;
+    for (final r in rows) {
+      for (final c in r.cells) {
+        if (c.borders != null) {
+          if ((c.borders!.top?.hasBorder ?? false) ||
+              (c.borders!.bottom?.hasBorder ?? false) ||
+              (c.borders!.left?.hasBorder ?? false) ||
+              (c.borders!.right?.hasBorder ?? false)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
 }
 
 /// A parsed document page containing its specific blocks and settings.

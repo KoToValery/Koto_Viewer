@@ -513,7 +513,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                   child: Padding(
                     padding: sheetPadding,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: _buildPageBlocks(page.blocks, theme, isDark),
                     ),
                   ),
@@ -685,9 +685,24 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       if (paragraph.runs.isEmpty) {
         content = SizedBox(height: (isInsideCell ? 0.0 : 12.0) * _zoomScale);
       } else {
-        content = Text.rich(
-          TextSpan(children: spans),
-          textAlign: paragraph.alignment,
+        // Prepend first-line indent if present
+        if (paragraph.indentFirstLine > 0 && !paragraph.isBullet && spans.isNotEmpty) {
+          spans.insert(
+            0,
+            WidgetSpan(
+              child: SizedBox(
+                width: (paragraph.indentFirstLine * _zoomScale).clamp(0.0, 200.0),
+              ),
+            ),
+          );
+        }
+
+        content = SizedBox(
+          width: double.infinity,
+          child: Text.rich(
+            TextSpan(children: spans),
+            textAlign: paragraph.alignment,
+          ),
         );
       }
     }
@@ -707,8 +722,20 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         ),
       ];
       
-      if (content is Text) {
-        final span = content.textSpan;
+      if (content is SizedBox) {
+        final inner = (content as SizedBox).child;
+        if (inner is Text) {
+          final span = inner.textSpan;
+          if (span is TextSpan) {
+            if (span.children != null) {
+              spans.addAll(span.children!);
+            } else if (span.text != null) {
+              spans.add(TextSpan(text: span.text, style: span.style));
+            }
+          }
+        }
+      } else if (content is Text) {
+        final span = (content as Text).textSpan;
         if (span is TextSpan) {
           if (span.children != null) {
             spans.addAll(span.children!);
@@ -718,21 +745,25 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         }
       }
       
-      content = Text.rich(
-        TextSpan(children: spans),
-        textAlign: paragraph.alignment,
+      content = SizedBox(
+        width: double.infinity,
+        child: Text.rich(
+          TextSpan(children: spans),
+          textAlign: paragraph.alignment,
+        ),
       );
     }
 
-    // Left Indent (from paragraph or inherited style like Title style = 191.85 pt)
-    if (paragraph.indentLeft > 0 || paragraph.indentFirstLine > 0) {
+    // Left & Right Indents
+    if (paragraph.indentLeft > 0 || paragraph.indentRight > 0) {
       double paddingLeft = paragraph.indentLeft;
       if (paragraph.isBullet) {
-        paddingLeft -= 18.0; // Subtract hanging indent so bullet aligns correctly
+        paddingLeft = math.max(0.0, paddingLeft - 18.0); // Subtract hanging indent so bullet aligns correctly
       }
       content = Padding(
         padding: EdgeInsets.only(
           left: (paddingLeft * _zoomScale).clamp(0.0, 450.0),
+          right: (paragraph.indentRight * _zoomScale).clamp(0.0, 450.0),
         ),
         child: content,
       );
@@ -741,7 +772,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     // Divider line below paragraph
     if (paragraph.bottomBorder != null && paragraph.bottomBorder!.hasBorder) {
       content = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           content,
           SizedBox(height: 2.0 * _zoomScale),
@@ -782,32 +813,70 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     }
 
     if (segments.length <= 1) {
-      return Text(
-        paragraph.plainText,
-        style: TextStyle(fontSize: 12.0 * _zoomScale),
+      return SizedBox(
+        width: double.infinity,
+        child: Text(
+          paragraph.plainText,
+          textAlign: paragraph.alignment,
+          style: TextStyle(fontSize: 12.0 * _zoomScale),
+        ),
       );
     }
 
     final firstRuns = segments[0];
     final secondRuns = segments.sublist(1).expand((s) => s).toList();
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text.rich(
-          TextSpan(
-            children: firstRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
-          ),
+    if (paragraph.tabPositions.isNotEmpty) {
+      final tabPos = (paragraph.tabPositions.first * _zoomScale).clamp(30.0, 400.0);
+      return SizedBox(
+        width: double.infinity,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: tabPos,
+              child: Text.rich(
+                TextSpan(
+                  children: firstRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
+                ),
+                textAlign: paragraph.alignment,
+              ),
+            ),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: secondRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
+                ),
+                textAlign: paragraph.alignment,
+              ),
+            ),
+          ],
         ),
-        SizedBox(width: 24.0 * _zoomScale),
-        Expanded(
-          child: Text.rich(
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text.rich(
             TextSpan(
-              children: secondRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
+              children: firstRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
+            ),
+            textAlign: paragraph.alignment,
+          ),
+          SizedBox(width: 24.0 * _zoomScale),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: secondRuns.map((r) => _buildSpan(r, paragraph, isDark)).toList(),
+              ),
+              textAlign: paragraph.alignment,
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -861,13 +930,9 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     final settings = _document?.pageSettings ?? const DocxPageSettings();
     final defaultBorderColor = isDark ? const Color(0xFF555555) : const Color(0xFF94A3B8);
 
-    final tableBorder = table.borders != null
-        ? table.borders!.toTableBorder(defaultColor: defaultBorderColor)
-        : TableBorder.all(
-            color: defaultBorderColor,
-            width: (0.8 * _zoomScale).clamp(0.5, 3.0),
-            borderRadius: BorderRadius.circular(2),
-          );
+    final TableBorder? tableBorder = (table.borders != null && table.borders!.hasAnyBorder)
+        ? table.borders!.toTableBorder(defaultColor: defaultBorderColor, zoomScale: _zoomScale)
+        : null;
 
     final maxContentWidth = settings.contentWidthPt * _zoomScale;
     final double totalGrid = table.columnWidths.fold(0.0, (a, b) => a + b);
@@ -912,15 +977,44 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
             final cellPadding = (cell.padding ?? const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.5)) *
                 _zoomScale;
 
+            BoxDecoration? cellDecoration;
+            Border? cellBorder;
+            if (cell.borders != null) {
+              final b = cell.borders!;
+              final tSide = b.top?.toBorderSide(zoomScale: _zoomScale);
+              final bSide = b.bottom?.toBorderSide(zoomScale: _zoomScale);
+              final lSide = b.left?.toBorderSide(zoomScale: _zoomScale);
+              final rSide = b.right?.toBorderSide(zoomScale: _zoomScale);
+
+              if ((tSide != null && tSide != BorderSide.none) ||
+                  (bSide != null && bSide != BorderSide.none) ||
+                  (lSide != null && lSide != BorderSide.none) ||
+                  (rSide != null && rSide != BorderSide.none)) {
+                cellBorder = Border(
+                  top: tSide ?? BorderSide.none,
+                  bottom: bSide ?? BorderSide.none,
+                  left: lSide ?? BorderSide.none,
+                  right: rSide ?? BorderSide.none,
+                );
+              }
+            }
+
+            if (cell.backgroundColor != null || cellBorder != null) {
+              cellDecoration = BoxDecoration(
+                color: cell.backgroundColor,
+                border: cellBorder,
+              );
+            }
+
             return Container(
               constraints: rowMinHeight != null
                   ? BoxConstraints(minHeight: rowMinHeight)
                   : null,
-              color: cell.backgroundColor,
+              decoration: cellDecoration,
               padding: cellPadding,
               alignment: cell.verticalAlignment,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: cell.paragraphs
                     .map((p) => _buildParagraphWidget(p, theme, isDark, isInsideCell: true))

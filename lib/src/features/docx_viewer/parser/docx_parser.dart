@@ -7,7 +7,9 @@ import '../models/docx_models.dart';
 
 /// Helper style representation parsed from word/styles.xml.
 class _DocxParsedStyle {
+  final String? basedOn;
   final double? indentLeft;
+  final double? indentRight;
   final double? spaceBefore;
   final double? spaceAfter;
   final double? fontSize;
@@ -15,7 +17,9 @@ class _DocxParsedStyle {
   final TextAlign? alignment;
 
   const _DocxParsedStyle({
+    this.basedOn,
     this.indentLeft,
+    this.indentRight,
     this.spaceBefore,
     this.spaceAfter,
     this.fontSize,
@@ -179,19 +183,28 @@ class DocxParser {
   }
 
   static _DocxParsedStyle _parseStyleElement(xml.XmlElement styleElem) {
+    String? basedOn;
     double? indentLeft;
+    double? indentRight;
     double? spaceBefore;
     double? spaceAfter;
     double? fontSize;
     bool? isBold;
     TextAlign? alignment;
 
+    final basedOnElem = styleElem.findElements('w:basedOn').firstOrNull;
+    if (basedOnElem != null) {
+      basedOn = basedOnElem.getAttribute('w:val');
+    }
+
     final pPr = styleElem.findElements('w:pPr').firstOrNull;
     if (pPr != null) {
       final ind = pPr.findElements('w:ind').firstOrNull;
       if (ind != null) {
-        final leftDxa = double.tryParse(ind.getAttribute('w:left') ?? '');
+        final leftDxa = double.tryParse(ind.getAttribute('w:left') ?? ind.getAttribute('w:start') ?? '');
+        final rightDxa = double.tryParse(ind.getAttribute('w:right') ?? ind.getAttribute('w:end') ?? '');
         if (leftDxa != null) indentLeft = leftDxa / 20.0;
+        if (rightDxa != null) indentRight = rightDxa / 20.0;
       }
       final spacing = pPr.findElements('w:spacing').firstOrNull;
       if (spacing != null) {
@@ -205,10 +218,12 @@ class DocxParser {
         final val = (jc.getAttribute('w:val') ?? '').toLowerCase();
         if (val == 'center') {
           alignment = TextAlign.center;
-        } else if (val == 'right') {
+        } else if (val == 'right' || val == 'end') {
           alignment = TextAlign.right;
-        } else if (val == 'both' || val == 'justify') {
+        } else if (val == 'both' || val == 'justify' || val == 'distribute' || val.contains('kashida') || val.contains('distribute')) {
           alignment = TextAlign.justify;
+        } else if (val == 'left' || val == 'start') {
+          alignment = TextAlign.start;
         }
       }
     }
@@ -227,12 +242,41 @@ class DocxParser {
     }
 
     return _DocxParsedStyle(
+      basedOn: basedOn,
       indentLeft: indentLeft,
+      indentRight: indentRight,
       spaceBefore: spaceBefore,
       spaceAfter: spaceAfter,
       fontSize: fontSize,
       isBold: isBold,
       alignment: alignment,
+    );
+  }
+
+  static _DocxParsedStyle _resolveStyle(
+    String styleId,
+    Map<String, _DocxParsedStyle> stylesMap, [
+    Set<String>? visited,
+  ]) {
+    final v = visited ?? <String>{};
+    if (v.contains(styleId)) return stylesMap[styleId] ?? const _DocxParsedStyle();
+    v.add(styleId);
+
+    final st = stylesMap[styleId];
+    if (st == null) return const _DocxParsedStyle();
+    if (st.basedOn == null || !stylesMap.containsKey(st.basedOn)) {
+      return st;
+    }
+
+    final base = _resolveStyle(st.basedOn!, stylesMap, v);
+    return _DocxParsedStyle(
+      indentLeft: st.indentLeft ?? base.indentLeft,
+      indentRight: st.indentRight ?? base.indentRight,
+      spaceBefore: st.spaceBefore ?? base.spaceBefore,
+      spaceAfter: st.spaceAfter ?? base.spaceAfter,
+      fontSize: st.fontSize ?? base.fontSize,
+      isBold: st.isBold ?? base.isBold,
+      alignment: st.alignment ?? base.alignment,
     );
   }
 
@@ -407,6 +451,7 @@ class DocxParser {
     double spaceAfter = 0.0;
     double? lineSpacing;
     double indentLeft = 0.0;
+    double indentRight = 0.0;
     double indentFirstLine = 0.0;
     final List<double> tabPositions = [];
     bool isPageBreak = false;
@@ -429,8 +474,9 @@ class DocxParser {
     }
 
     if (styleId != null && stylesMap.containsKey(styleId)) {
-      final st = stylesMap[styleId]!;
+      final st = _resolveStyle(styleId, stylesMap);
       if (st.indentLeft != null) indentLeft = st.indentLeft!;
+      if (st.indentRight != null) indentRight = st.indentRight!;
       if (st.spaceBefore != null) spaceBefore = st.spaceBefore!;
       if (st.spaceAfter != null) spaceAfter = st.spaceAfter!;
       if (st.alignment != null) align = st.alignment!;
@@ -513,10 +559,12 @@ class DocxParser {
         final val = (jc.getAttribute('w:val') ?? '').toLowerCase();
         if (val == 'center') {
           align = TextAlign.center;
-        } else if (val == 'right') {
+        } else if (val == 'right' || val == 'end') {
           align = TextAlign.right;
-        } else if (val == 'both' || val == 'justify') {
+        } else if (val == 'both' || val == 'justify' || val == 'distribute' || val.contains('kashida') || val.contains('distribute')) {
           align = TextAlign.justify;
+        } else if (val == 'left' || val == 'start') {
+          align = TextAlign.start;
         }
       }
 
@@ -535,11 +583,15 @@ class DocxParser {
       // 5. Indents (Explicit overrides style)
       final ind = pPr.findElements('w:ind').firstOrNull;
       if (ind != null) {
-        final leftDxa = double.tryParse(ind.getAttribute('w:left') ?? '');
+        final leftDxa = double.tryParse(ind.getAttribute('w:left') ?? ind.getAttribute('w:start') ?? '');
+        final rightDxa = double.tryParse(ind.getAttribute('w:right') ?? ind.getAttribute('w:end') ?? '');
         final firstLineDxa = double.tryParse(ind.getAttribute('w:firstLine') ?? '');
+        final hangingDxa = double.tryParse(ind.getAttribute('w:hanging') ?? '');
 
         if (leftDxa != null) indentLeft = (leftDxa / 20.0).clamp(0.0, 300.0);
-        if (firstLineDxa != null) indentFirstLine = (firstLineDxa / 20.0).clamp(-100.0, 100.0);
+        if (rightDxa != null) indentRight = (rightDxa / 20.0).clamp(0.0, 300.0);
+        if (firstLineDxa != null) indentFirstLine = (firstLineDxa / 20.0).clamp(0.0, 100.0);
+        if (hangingDxa != null) indentFirstLine = -(hangingDxa / 20.0).clamp(0.0, 100.0);
       }
 
       // 6. Tab stops (<w:tabs><w:tab w:val="left" w:pos="4299"/></w:tabs>)
@@ -696,6 +748,7 @@ class DocxParser {
       spaceAfter: spaceAfter,
       lineSpacing: lineSpacing,
       indentLeft: indentLeft,
+      indentRight: indentRight,
       indentFirstLine: indentFirstLine,
       tabPositions: tabPositions,
       isPageBreak: isPageBreak,

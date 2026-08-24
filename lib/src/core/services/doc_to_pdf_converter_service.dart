@@ -299,8 +299,14 @@ class DocToPdfConverterService {
       );
     }
 
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 6),
+    return pw.Container(
+      width: double.infinity,
+      padding: pw.EdgeInsets.only(
+        left: paragraph.indentLeft > 0 ? paragraph.indentLeft : 0.0,
+        right: paragraph.indentRight > 0 ? paragraph.indentRight : 0.0,
+        top: paragraph.spaceBefore > 0 ? paragraph.spaceBefore : 0.0,
+        bottom: paragraph.spaceAfter > 0 ? paragraph.spaceAfter : 6.0,
+      ),
       child: pw.RichText(
         textAlign: _convertTextAlign(paragraph.alignment),
         text: pw.TextSpan(children: spans),
@@ -320,10 +326,14 @@ class DocToPdfConverterService {
     }
     if (maxCols == 0) return null;
 
+    final pw.TableBorder? tableBorder = (table.borders != null && table.borders!.hasAnyBorder)
+        ? pw.TableBorder.all(color: PdfColors.grey400, width: 0.5)
+        : null;
+
     return pw.Container(
       margin: const pw.EdgeInsets.symmetric(vertical: 10),
       child: pw.Table(
-        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        border: tableBorder,
         children: table.rows.map((row) {
           final rowChildren = <pw.Widget>[];
 
