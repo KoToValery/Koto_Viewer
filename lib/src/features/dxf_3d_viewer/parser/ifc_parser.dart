@@ -329,12 +329,24 @@ class _IfcGeometrySolver {
       }
     }
 
+    // 2.7. Parse Window/Door Fills (IFCRELFILLSELEMENT -> Opening filled by Window/Door/Proxy)
+    final Set<int> fillElementIds = {};
+    for (final ent in entityMap.values) {
+      if (ent.type == 'IFCRELFILLSELEMENT') {
+        final params = ent.splitParams;
+        if (params.length >= 6) {
+          final elId = int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), ''));
+          if (elId != null) fillElementIds.add(elId);
+        }
+      }
+    }
+
     // 3. Find and generate building elements
     final List<IfcElement> elements = [];
     final Set<String> categories = {};
 
     for (final ent in entityMap.values) {
-      final category = _categorizeIfcType(ent.type);
+      var category = _categorizeIfcType(ent.type);
       if (category == null) continue; // Not a renderable building element
 
       final params = ent.splitParams;
@@ -345,6 +357,16 @@ class _IfcGeometrySolver {
       }
       if (params.length > 2 && params[2].startsWith("'") && params[2].length > 2) {
         name = IfcParser.decodeIfcString(params[2].replaceAll("'", ""));
+      }
+
+      // Re-categorize building element proxies that fill window/door openings
+      if (ent.type == 'IFCBUILDINGELEMENTPROXY' && fillElementIds.contains(ent.id)) {
+        final lowerName = name.toLowerCase();
+        if (lowerName.contains('door') || lowerName.contains('врата') || lowerName.contains('doo')) {
+          category = 'Door';
+        } else {
+          category = 'Window';
+        }
       }
 
       final placementId = params.length > 5 ? int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), '')) : null;
@@ -678,6 +700,51 @@ class _IfcGeometrySolver {
     );
   }
 
+  _Transform3D _resolveCartesianTransformationOperator(int opId) {
+    final ent = entityMap[opId];
+    if (ent == null) return _Transform3D.identity;
+
+    final params = ent.splitParams;
+    Vector3 axis1 = const Vector3(1, 0, 0);
+    Vector3 axis2 = const Vector3(0, 1, 0);
+    Vector3 axis3 = const Vector3(0, 0, 1);
+    Vector3 origin = Vector3.zero;
+    double scale = 1.0;
+
+    if (params.isNotEmpty && params[0].contains('#')) {
+      final a1Id = int.tryParse(params[0].replaceAll(RegExp(r'[#\s]'), ''));
+      if (a1Id != null) axis1 = _resolveDirection(a1Id);
+    }
+    if (params.length > 1 && params[1].contains('#')) {
+      final a2Id = int.tryParse(params[1].replaceAll(RegExp(r'[#\s]'), ''));
+      if (a2Id != null) axis2 = _resolveDirection(a2Id);
+    }
+    if (params.length > 2 && params[2].contains('#')) {
+      final ptId = int.tryParse(params[2].replaceAll(RegExp(r'[#\s]'), ''));
+      if (ptId != null) origin = _resolvePoint(ptId);
+    }
+    if (params.length > 3 && !params[3].contains('\$')) {
+      scale = double.tryParse(params[3].replaceAll(RegExp(r'[#\s]'), '')) ?? 1.0;
+    }
+    if (params.length > 4 && params[4].contains('#')) {
+      final a3Id = int.tryParse(params[4].replaceAll(RegExp(r'[#\s]'), ''));
+      if (a3Id != null) axis3 = _resolveDirection(a3Id);
+    } else {
+      axis3 = axis1.cross(axis2);
+      if (axis3.lengthSquared < 1e-6) axis3 = const Vector3(0, 0, 1);
+    }
+
+    axis1 = axis1.normalized() * scale;
+    axis2 = axis2.normalized() * scale;
+    axis3 = axis3.normalized() * scale;
+
+    return _Transform3D(
+      m00: axis1.x, m01: axis2.x, m02: axis3.x, tx: origin.x,
+      m10: axis1.y, m11: axis2.y, m12: axis3.y, ty: origin.y,
+      m20: axis1.z, m21: axis2.z, m22: axis3.z, tz: origin.z,
+    );
+  }
+
   Vector3 _resolvePoint(int ptId) {
     if (pointCache.containsKey(ptId)) return pointCache[ptId]!;
 
@@ -979,7 +1046,7 @@ class _IfcGeometrySolver {
         tris.addAll(_resolveGeometryItem(ent.referencedIds[0], transform, color));
       }
     }
-    // 6. IFCMAPPEDITEM
+    // 6. IFCMAPPEDITEM (Instances of shared Window / Door / Column geometry)
     else if (ent.type == 'IFCMAPPEDITEM') {
       final params = ent.splitParams;
       if (params.length >= 2) {
@@ -988,17 +1055,33 @@ class _IfcGeometrySolver {
         _Transform3D mapTransform = _Transform3D.identity;
         if (opId != null) {
           final opEnt = entityMap[opId];
-          if (opEnt != null && opEnt.type == 'IFCAXIS2PLACEMENT2D') {
-            mapTransform = _resolveAxis2Placement2D(opId);
-          } else {
-            mapTransform = _resolveAxis2Placement3D(opId);
+          if (opEnt != null) {
+            if (opEnt.type.contains('CARTESIANTRANSFORMATIONOPERATOR')) {
+              mapTransform = _resolveCartesianTransformationOperator(opId);
+            } else if (opEnt.type == 'IFCAXIS2PLACEMENT2D') {
+              mapTransform = _resolveAxis2Placement2D(opId);
+            } else {
+              mapTransform = _resolveAxis2Placement3D(opId);
+            }
           }
         }
         if (mapId != null) {
           final mapEnt = entityMap[mapId];
           if (mapEnt != null) {
-            for (final refId in mapEnt.referencedIds) {
-              tris.addAll(_resolveGeometryItem(refId, transform.multiply(mapTransform), color));
+            final composite = transform.multiply(mapTransform);
+            if (mapEnt.type == 'IFCREPRESENTATIONMAP') {
+              // #mapId = IFCREPRESENTATIONMAP(#MappingOrigin, #MappedRepresentation)
+              final mapParams = mapEnt.splitParams;
+              if (mapParams.length >= 2) {
+                final repId = int.tryParse(mapParams[1].replaceAll(RegExp(r'[#\s]'), ''));
+                if (repId != null) {
+                  tris.addAll(_resolveShapeRepresentation(repId, composite, color));
+                }
+              }
+            } else {
+              for (final refId in mapEnt.referencedIds) {
+                tris.addAll(_resolveShapeRepresentation(refId, composite, color));
+              }
             }
           }
         }
