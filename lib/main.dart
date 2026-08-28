@@ -23,6 +23,7 @@ import 'src/features/pcb_viewer/pcb_viewer_screen.dart';
 import 'src/features/hpgl_viewer/hpgl_viewer_screen.dart';
 import 'src/features/cdr_viewer/cdr_viewer_screen.dart';
 import 'src/features/comic_viewer/comic_viewer_screen.dart';
+import 'src/features/ebook_viewer/ebook_viewer_screen.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -214,6 +215,13 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.cbt:
         navigator.push(
           MaterialPageRoute(builder: (_) => ComicViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.epub:
+      case KotoFileType.fb2:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => EbookViewerScreen(filePath: filePath)),
         );
         break;
 

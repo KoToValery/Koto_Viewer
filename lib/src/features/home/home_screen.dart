@@ -23,6 +23,7 @@ import '../pcb_viewer/pcb_viewer_screen.dart';
 import '../hpgl_viewer/hpgl_viewer_screen.dart';
 import '../cdr_viewer/cdr_viewer_screen.dart';
 import '../comic_viewer/comic_viewer_screen.dart';
+import '../ebook_viewer/ebook_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 import 'widgets/app_info_dialog.dart';
 
@@ -93,9 +94,83 @@ class FileTypeIcon extends StatelessWidget {
       case KotoFileType.cbr:
       case KotoFileType.cbt:
         return _buildComicIcon();
+      case KotoFileType.epub:
+        return _buildEpubIcon();
+      case KotoFileType.fb2:
+        return _buildFb2Icon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
+  }
+
+  Widget _buildEpubIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.menu_book_rounded,
+              color: const Color(0xFFD97706),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'EPUB',
+              style: TextStyle(
+                fontSize: width * 0.16,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFD97706),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFb2Icon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF2F8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFBCFE8)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.library_books_rounded,
+              color: const Color(0xFFDB2777),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'FB2',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFDB2777),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildComicIcon() {
@@ -1496,6 +1571,20 @@ class _HomeScreenState extends State<HomeScreen> {
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => ComicViewerScreen(filePath: filePath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.epub:
+      case KotoFileType.fb2:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => EbookViewerScreen(filePath: filePath),
           ),
         );
         if (success != false) {
