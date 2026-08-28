@@ -389,7 +389,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    'Архивни Изображения (${images.length})',
+                    'Archive Images (${images.length})',
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -954,7 +954,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                       ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'Toggle Pad Numbers (Номерация на падове)',
+                      tooltip: 'Toggle Pad Numbers',
                       onPressed: () => setState(() => _showPadNumbers = !_showPadNumbers),
                     ),
 

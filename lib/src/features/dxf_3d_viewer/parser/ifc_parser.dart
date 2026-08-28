@@ -1556,7 +1556,7 @@ class _IfcGeometrySolver {
     final lower = name.toLowerCase().trim();
     if (lower.isEmpty) return null;
 
-    // Stone / Plinth / Цокъл / Камък / Granite
+    // Stone / Plinth / Granite
     if (lower.contains('stone') ||
         lower.contains('plinth') ||
         lower.contains('granite') ||
@@ -1573,7 +1573,7 @@ class _IfcGeometrySolver {
       return const Color(0xFF78726A); // Textured Natural Stone / Plinth Gray-Brown
     }
 
-    // Wood / Timber / Cladding / Siding / Дърво / Дъски / Обшивка
+    // Wood / Timber / Cladding / Siding
     if (lower.contains('wood') ||
         lower.contains('timber') ||
         lower.contains('cladding') ||
@@ -1595,7 +1595,7 @@ class _IfcGeometrySolver {
       return const Color(0xFFB57E4C); // Rich Natural Architectural Timber / Siding
     }
 
-    // Roof / Tiles / Shingles / Керемиди / Покрив
+    // Roof / Tiles / Shingles
     if (lower.contains('tile') ||
         lower.contains('shingle') ||
         lower.contains('roof') ||
@@ -1616,7 +1616,7 @@ class _IfcGeometrySolver {
       return const Color(0xFFA64032); // Terracotta Clay Roof Tile
     }
 
-    // Plaster / Stucco / White Render / Мазилка / Бял / Фасада
+    // Plaster / Stucco / White Render / Facade
     if (lower.contains('plaster') ||
         lower.contains('stucco') ||
         lower.contains('render') ||
@@ -1631,7 +1631,7 @@ class _IfcGeometrySolver {
       return const Color(0xFFF4F0E8); // Clean Crisp Architectural White/Sand Plaster
     }
 
-    // Brick / Тухла
+    // Brick
     if (lower.contains('brick') ||
         lower.contains('klinker') ||
         lower.contains('тухл') ||
@@ -1639,7 +1639,7 @@ class _IfcGeometrySolver {
       return const Color(0xFFA84838); // Red Fired Brick
     }
 
-    // Concrete / Screed / Бетон / Замазка
+    // Concrete / Screed
     if (lower.contains('concrete') ||
         lower.contains('screed') ||
         lower.contains('cement') ||
@@ -1650,9 +1650,11 @@ class _IfcGeometrySolver {
       return const Color(0xFFA2A7AC); // Structural Concrete
     }
 
-    // Glass / Glazing / Стъкло
+    // Glass / Glazing
     if (lower.contains('glass') ||
         lower.contains('glazing') ||
+        lower.contains('pane') ||
+        lower.contains('window') ||
         lower.contains('стъкло') ||
         lower.contains('остъклен') ||
         lower.contains('glas') ||
@@ -1660,13 +1662,14 @@ class _IfcGeometrySolver {
       return const Color(0x9964B5F6); // Translucent Sky Blue Glass
     }
 
-    // Metal / Steel / Aluminium / Метал / Стомана / Алуминий
+    // Metal / Steel / Aluminium
     if (lower.contains('metal') ||
         lower.contains('steel') ||
         lower.contains('alumin') ||
+        lower.contains('iron') ||
+        lower.contains('sheet') ||
         lower.contains('copper') ||
         lower.contains('zinc') ||
-        lower.contains('iron') ||
         lower.contains('метал') ||
         lower.contains('стомана') ||
         lower.contains('алуминий') ||
@@ -1674,8 +1677,9 @@ class _IfcGeometrySolver {
         lower.contains('мед') ||
         lower.contains('цинк') ||
         lower.contains('stahl') ||
+        lower.contains('blech') ||
         lower.contains('alu')) {
-      return const Color(0xFF55606B); // Metallic Gunmetal Steel
+      return const Color(0xFF64748B); // Architectural Slate/Steel Metal
     }
 
     return null;

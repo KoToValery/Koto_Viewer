@@ -121,7 +121,7 @@ class DxfSnapHelper {
   /// within [toleranceCad] distance of [cadPoint].
   ///
   /// When [basePoint] is provided (e.g. 1st measurement point P1), it searches for right-angle perpendicular
-  /// projection points (90° / прав ъгъл) onto all visible segments and curves.
+  /// projection points (90° perpendicular angle) onto all visible segments and curves.
   static DxfSnapResult? findSnapPoint({
     required DxfDocument document,
     required Offset cadPoint,

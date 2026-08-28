@@ -6,42 +6,34 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum DxfPointStyle {
   none(
     label: 'Hidden / Off',
-    labelBg: 'Скрити',
     symbol: '—',
   ),
   dot(
     label: 'Filled Dot',
-    labelBg: 'Плътна точка',
     symbol: '●',
   ),
   cross(
     label: 'Plus Cross',
-    labelBg: 'Кръстче (+)',
     symbol: '+',
   ),
   xCross(
     label: 'Diagonal Cross',
-    labelBg: 'Хикс (×)',
     symbol: '×',
   ),
   circle(
     label: 'Circle',
-    labelBg: 'Окръжност (○)',
     symbol: '○',
   ),
   circleDot(
     label: 'Target Dot',
-    labelBg: 'Точка в окръжност (⊙)',
     symbol: '⊙',
   );
 
   final String label;
-  final String labelBg;
   final String symbol;
 
   const DxfPointStyle({
     required this.label,
-    required this.labelBg,
     required this.symbol,
   });
 

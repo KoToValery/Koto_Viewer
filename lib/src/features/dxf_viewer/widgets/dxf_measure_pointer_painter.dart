@@ -97,7 +97,7 @@ class DxfMeasurePointerPainter extends CustomPainter {
     canvas.drawPath(stemPath, glowStemPaint);
     canvas.drawPath(stemPath, stemPaint);
 
-    // 3. Draw Sharp Pointer Apex (Остър ъгъл / Стрелка)
+    // 3. Draw Sharp Pointer Apex (Arrow Tip)
     final arrowPaint = Paint()
       ..color = baseColor
       ..style = PaintingStyle.fill

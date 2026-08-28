@@ -44,7 +44,7 @@ class DxfLinetypeHelper {
       }
     }
 
-    // 2. Dash-Dot-Dot / Divide (тире-точка-точка / двойна точка)
+    // 2. Dash-Dot-Dot / Divide pattern
     if (norm.contains('dashdotdot') ||
         norm.contains('dash2dot') ||
         norm.contains('dot2dash') ||
@@ -54,7 +54,7 @@ class DxfLinetypeHelper {
       return dashDotDotPattern;
     }
 
-    // 3. Dash-Dot / Dot & Dashed / Chain (тире-точка / точка и къса линия)
+    // 3. Dash-Dot / Dot & Dashed / Chain pattern
     if (norm.contains('dashdot') ||
         norm.contains('dotdash') ||
         norm.contains('dotdashed') ||
@@ -64,32 +64,32 @@ class DxfLinetypeHelper {
       return dashDotPattern;
     }
 
-    // 4. Centerline / Osova (осова линия - дълго тире и късо тире)
+    // 4. Centerline / Center pattern
     if (norm.contains('center') || norm.contains('osova') || norm.contains('acadiso08') || norm.contains('acadiso14')) {
       return centerPattern;
     }
 
-    // 5. Phantom (фантомна линия)
+    // 5. Phantom line pattern
     if (norm.contains('phantom') || norm.contains('acadiso10') || norm.contains('acadiso15')) {
       return phantomPattern;
     }
 
-    // 6. Hidden line (скрит контур - къси тирета)
+    // 6. Hidden line pattern
     if (norm.contains('hidden') || norm.contains('acadiso06')) {
       return hiddenPattern;
     }
 
-    // 7. Border line (гранична линия)
+    // 7. Border line pattern
     if (norm.contains('border') || norm.contains('acadiso09')) {
       return borderPattern;
     }
 
-    // 8. Dashed (прекъсната линия - стандартни тирета)
+    // 8. Dashed line pattern
     if (norm.contains('dash') || norm.contains('acadiso02') || norm.contains('acadiso03') || norm.contains('acadiso13')) {
       return dashedPattern;
     }
 
-    // 9. Dotted / Punktir (пунктир)
+    // 9. Dotted / Dot pattern
     if (norm.contains('dot') || norm.contains('punkt') || norm.contains('point') || norm.contains('acadiso07') || norm.contains('acadiso01')) {
       return dottedPattern;
     }

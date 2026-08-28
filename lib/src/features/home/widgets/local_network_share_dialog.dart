@@ -230,8 +230,7 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Взимаме само IP url-а, който LocalServerService.startServer е върнал.
-    // Той вече съдържа генерирания тоукън.
+    // Get the IP URL returned by LocalServerService.startServer containing the security token.
     final displayUrl = _serverUrl ?? '';
 
     final isDxf = widget.filePath.toLowerCase().endsWith('.dxf');
