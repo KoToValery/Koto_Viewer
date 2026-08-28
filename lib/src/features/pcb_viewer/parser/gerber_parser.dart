@@ -27,6 +27,8 @@ class GerberParser {
     int xDecimals = 4;
     int yDecimals = 4;
     double unitScale = 1.0; // 1.0 for mm, 25.4 for inches
+    double offsetX = 0.0;
+    double offsetY = 0.0;
 
     final Map<int, PcbAperture> apertureTable = {};
     final List<PcbCommand> commands = [];
@@ -102,6 +104,17 @@ class GerberParser {
           final yMatch = RegExp(r'Y(\d)(\d)').firstMatch(extBlock);
           if (yMatch != null) {
             yDecimals = int.tryParse(yMatch.group(2)!) ?? 4;
+          }
+        }
+        // %OFA...B...% -> Offset
+        else if (extBlock.startsWith('OF')) {
+          final aMatch = RegExp(r'A([+-]?[0-9.]+)').firstMatch(extBlock);
+          if (aMatch != null) {
+            offsetX = (double.tryParse(aMatch.group(1)!) ?? 0.0) * unitScale;
+          }
+          final bMatch = RegExp(r'B([+-]?[0-9.]+)').firstMatch(extBlock);
+          if (bMatch != null) {
+            offsetY = (double.tryParse(bMatch.group(1)!) ?? 0.0) * unitScale;
           }
         }
         // %MOIN% or %MOMM% -> Units
@@ -231,15 +244,16 @@ class GerberParser {
       final xMatch = RegExp(r'X([+-]?\d+)').firstMatch(token);
       if (xMatch != null) {
         final raw = int.tryParse(xMatch.group(1)!) ?? 0;
-        xVal = (raw / math.pow(10, xDecimals)) * unitScale;
+        xVal = (raw / math.pow(10, xDecimals)) * unitScale + offsetX;
       }
 
       final yMatch = RegExp(r'Y([+-]?\d+)').firstMatch(token);
       if (yMatch != null) {
         final raw = int.tryParse(yMatch.group(1)!) ?? 0;
-        yVal = (raw / math.pow(10, yDecimals)) * unitScale;
+        yVal = (raw / math.pow(10, yDecimals)) * unitScale + offsetY;
       }
 
+      // I and J are always incremental, so they don't get the absolute offset!
       final iMatch = RegExp(r'I([+-]?\d+)').firstMatch(token);
       if (iMatch != null) {
         final raw = int.tryParse(iMatch.group(1)!) ?? 0;

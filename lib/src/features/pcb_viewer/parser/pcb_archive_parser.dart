@@ -56,6 +56,7 @@ class PcbArchiveParser {
     final archive = ZipDecoder().decodeBytes(bytes, verify: false);
     final List<PcbLayerItem> layers = [];
     final List<PcbBomEntry> bomEntries = [];
+    final List<PcbImageItem> images = [];
 
     double minX = double.infinity;
     double minY = double.infinity;
@@ -84,6 +85,12 @@ class PcbArchiveParser {
           ? Uint8List.fromList(file.content as List<int>)
           : Uint8List(0);
       if (fileBytes.isEmpty) continue;
+
+      // 0. Preview Images (Proteus / Altium 3D exports)
+      if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.bmp')) {
+        images.add(PcbImageItem(fileName: baseName, bytes: fileBytes));
+        continue;
+      }
 
       // 1. Bill of Materials (BOM) & Pick and Place
       if (lower.contains('bom') ||
@@ -164,6 +171,7 @@ class PcbArchiveParser {
       sourcePath: filePath,
       layers: layers,
       bomEntries: bomEntries,
+      images: images,
       boundingBox: globalBoundingBox,
       viewSide: PcbViewSide.top,
     );

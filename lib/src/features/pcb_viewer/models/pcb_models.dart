@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 /// PCB Layer Classification.
@@ -243,12 +244,23 @@ class PcbBomEntry {
   });
 }
 
+class PcbImageItem {
+  final String fileName;
+  final Uint8List bytes;
+
+  const PcbImageItem({
+    required this.fileName,
+    required this.bytes,
+  });
+}
+
 /// Complete Multi-Layer PCB Project (e.g. from a Proteus / Altium / KiCad ZIP archive).
 class PcbProject {
   final String projectName;
   final String sourcePath;
   final List<PcbLayerItem> layers;
   final List<PcbBomEntry> bomEntries;
+  final List<PcbImageItem> images;
   final PcbBoundingBox boundingBox;
   PcbViewSide viewSide;
 
@@ -257,6 +269,7 @@ class PcbProject {
     required this.sourcePath,
     required this.layers,
     this.bomEntries = const [],
+    this.images = const [],
     required this.boundingBox,
     this.viewSide = PcbViewSide.top,
   });
@@ -264,6 +277,7 @@ class PcbProject {
   int get totalLayers => layers.length;
   int get visibleLayers => layers.where((l) => l.isVisible).length;
   int get totalComponents => bomEntries.fold(0, (sum, e) => sum + e.quantity);
+  int get totalImages => images.length;
 
   PcbLayerItem? get edgeCutsLayer =>
       layers.cast<PcbLayerItem?>().firstWhere((l) => l?.type == PcbLayerType.edgeCuts, orElse: () => null);

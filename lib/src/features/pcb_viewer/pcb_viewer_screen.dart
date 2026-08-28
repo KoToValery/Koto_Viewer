@@ -347,6 +347,93 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     );
   }
 
+  void _showImagesSheet() {
+    if (_project == null) return;
+    final theme = Theme.of(context);
+    final images = _project!.images;
+
+    if (images.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Архивни Изображения (${images.length})',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: images.length,
+                    itemBuilder: (context, index) {
+                      final img = images[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                              child: Text(
+                                img.fileName,
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
+                            ),
+                            Image.memory(
+                              img.bytes,
+                              fit: BoxFit.contain,
+                              errorBuilder: (ctx, err, stack) => const Padding(
+                                padding: EdgeInsets.all(32),
+                                child: Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showBomSheet() {
     if (_project == null) return;
     final theme = Theme.of(context);
@@ -662,6 +749,16 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                   tooltip: 'PCB Layers (${_project?.visibleLayers ?? 0}/${_project?.totalLayers ?? 0})',
                   onPressed: _showLayersSheet,
                 ),
+
+                // Images Button (if project has images)
+                if (_project != null && _project!.images.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.image_outlined, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Images (${_project!.images.length})',
+                    onPressed: _showImagesSheet,
+                  ),
 
                 // BOM Button (if project has BOM)
                 if (_project != null && _project!.bomEntries.isNotEmpty)
