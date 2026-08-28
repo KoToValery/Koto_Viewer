@@ -343,7 +343,8 @@ class _IfcGeometrySolver {
 
       final triangles = <Triangle3D>[];
       if (shapeRepId != null) {
-        triangles.addAll(_resolveShapeRepresentation(shapeRepId, transform, elementColor));
+        final rawTris = _resolveShapeRepresentation(shapeRepId, transform, elementColor);
+        triangles.addAll(_filterDegenerateTriangles(rawTris));
       }
 
       if (triangles.isNotEmpty) {
@@ -937,17 +938,20 @@ class _IfcGeometrySolver {
                   // AgreementFlag: .T. means the solid is on the positive-normal side of the plane
                   final agreementFlag = halfParams.length > 1 ? halfParams[1].toUpperCase() : '.T.';
                   if (planeId != null) {
-                    // CRITICAL: Resolve plane in world-space only, NOT with the parent element's transform.
-                    // In ArchiCAD IFC, IFCHALFSPACESOLID's BaseSurface is always in world coordinates.
-                    final planeDef = _resolvePlane(planeId, _Transform3D.identity);
+                    // The IFCHALFSPACESOLID's plane is defined in the LOCAL coordinate space
+                    // of the shape representation (same space as the swept solid).
+                    // We apply the element's world transform to bring it to world space,
+                    // because firstTris are already in world space.
+                    final planeDef = _resolvePlane(planeId, transform);
                     if (planeDef != null) {
-                      // DIFFERENCE removes the "solid" portion (the half-space where the solid exists).
-                      // AgreementFlag=.T. → solid is on positive side → DIFFERENCE keeps negative side
-                      // AgreementFlag=.F. → solid is on negative side → DIFFERENCE keeps positive side
+                      // DIFFERENCE removes the "solid" portion.
+                      // AgreementFlag=.T. → solid is on positive side → keep negative side
+                      // AgreementFlag=.F. → solid is on negative side → keep positive side
                       final bool isDiff = !op.contains('UNION');
                       final bool solidOnPositiveSide = agreementFlag.contains('.T.');
                       final bool keepPositiveSide = isDiff ? !solidOnPositiveSide : solidOnPositiveSide;
-                      return _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
+                      final clipped = _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
+                      return _filterDegenerateTriangles(clipped);
                     }
                   }
                 }
@@ -964,17 +968,18 @@ class _IfcGeometrySolver {
                       : null;
 
                   if (planeId != null) {
-                    // Resolve plane in world space
-                    final planeDef = _resolvePlane(planeId, _Transform3D.identity);
+                    // Resolve plane in LOCAL space, apply element world transform
+                    final planeDef = _resolvePlane(planeId, transform);
                     if (planeDef != null) {
                       final bool isDiff = !op.contains('UNION');
                       final bool solidOnPositiveSide = agreementFlag.contains('.T.');
                       final bool keepPositiveSide = isDiff ? !solidOnPositiveSide : solidOnPositiveSide;
 
-                      // For polygon-bounded: compute the boundary transform and polygon
-                      _Transform3D boundaryTransform = _Transform3D.identity;
+                      // Resolve polygon boundary transform (in world space)
+                      _Transform3D boundaryTransform = transform;
                       if (positionId != null) {
-                        boundaryTransform = _resolveAxis2Placement3D(positionId);
+                        final localBound = _resolveAxis2Placement3D(positionId);
+                        boundaryTransform = transform.multiply(localBound);
                       }
 
                       List<Vector3>? boundaryPoly;
@@ -994,8 +999,7 @@ class _IfcGeometrySolver {
                       }
 
                       if (boundaryPoly != null && boundaryPoly.length >= 3) {
-                        // Clip only triangles that fall within the polygon boundary projection
-                        return _clipTrianglesByBoundedHalfSpace(
+                        final clipped = _clipTrianglesByBoundedHalfSpace(
                           firstTris,
                           planeDef.origin,
                           planeDef.normal,
@@ -1003,9 +1007,11 @@ class _IfcGeometrySolver {
                           boundaryPoly,
                           boundaryTransform,
                         );
+                        return _filterDegenerateTriangles(clipped);
                       } else {
                         // Fallback: treat as infinite half-space
-                        return _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
+                        final clipped = _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
+                        return _filterDegenerateTriangles(clipped);
                       }
                     }
                   }
@@ -1252,6 +1258,30 @@ class _IfcGeometrySolver {
     final denom = dIn - dOut;
     final t = (denom.abs() > 1e-8) ? (dIn / denom).clamp(0.0, 1.0) : 0.5;
     return pIn + (pOut - pIn) * t;
+  }
+
+  /// Removes degenerate triangles (zero area or extreme coordinates) to prevent visual spikes.
+  /// Degenerate triangles can arise from numerical issues in plane clipping.
+  static List<Triangle3D> _filterDegenerateTriangles(List<Triangle3D> tris) {
+    if (tris.isEmpty) return tris;
+    const double minArea = 0.01;       // min 0.01 mm² (IFC uses mm as unit)
+    const double maxCoord = 1e6;       // max 1km from origin (reasonable for any building)
+    final List<Triangle3D> result = [];
+    for (final tri in tris) {
+      // Reject if any vertex coordinate is out of plausible range
+      if (tri.v0.x.abs() > maxCoord || tri.v0.y.abs() > maxCoord || tri.v0.z.abs() > maxCoord ||
+          tri.v1.x.abs() > maxCoord || tri.v1.y.abs() > maxCoord || tri.v1.z.abs() > maxCoord ||
+          tri.v2.x.abs() > maxCoord || tri.v2.y.abs() > maxCoord || tri.v2.z.abs() > maxCoord) {
+        continue;
+      }
+      // Reject if triangle has near-zero area (degenerate)
+      final e1 = tri.v1 - tri.v0;
+      final e2 = tri.v2 - tri.v0;
+      final cross = e1.cross(e2);
+      if (cross.lengthSquared < minArea * minArea) continue;
+      result.add(tri);
+    }
+    return result;
   }
 
   Color? _resolveStyleColorFromParam(String styleParam) {
@@ -1507,25 +1537,17 @@ class _IfcGeometrySolver {
     }
     final compositeTransform = transform.multiply(solidTransform);
 
-    // Extrusion direction — stored in the SOLID's local coordinate frame,
-    // so we must transform it through the solid's orientation to get world direction.
-    // We only apply the rotation (not translation) by transforming direction as a vector
-    // (subtract origin of transformed zero vector).
-    Vector3 localExtrudeDir = const Vector3(0, 0, 1); // default: along local Z
+    // Extrusion direction is in the SOLID's local coordinate frame (same space as polygon points).
+    // We keep it in local space and add it to local polygon points BEFORE applying compositeTransform.
+    // compositeTransform (= elementWorldTransform * solidLocalTransform) then correctly rotates
+    // and translates everything to world space in one step.
+    Vector3 extrudeDir = const Vector3(0, 0, 1); // default: along local Z axis
     if (dirId != null) {
-      localExtrudeDir = _resolveDirection(dirId);
+      extrudeDir = _resolveDirection(dirId);
     }
-    // Transform direction through compositeTransform rotation (no translation):
-    final dirOrigin = compositeTransform.transform(Vector3.zero);
-    final dirPoint = compositeTransform.transform(localExtrudeDir);
-    final worldExtrudeDir = (dirPoint - dirOrigin);
-    final extrudeDirLen = worldExtrudeDir.lengthSquared;
-    final normalizedDir = extrudeDirLen > 1e-10
-        ? worldExtrudeDir * (1.0 / math.sqrt(extrudeDirLen))
-        : const Vector3(0, 0, 1);
-    final extrudeVec = normalizedDir * depth;
+    final extrudeVec = extrudeDir * depth; // stays in local solid space
 
-    // Resolve 2D Profile into polygon points
+    // Resolve 2D Profile into polygon points (in solid local space)
     final List<Vector3> polygon = _resolveProfilePoints(profileId);
     if (polygon.length < 3) return tris;
 
@@ -1534,8 +1556,8 @@ class _IfcGeometrySolver {
     final List<Vector3> top = [];
 
     for (final p in polygon) {
-      bottom.add(compositeTransform.transform(p));
-      top.add(compositeTransform.transform(p + extrudeVec));
+      bottom.add(compositeTransform.transform(p));              // local → world
+      top.add(compositeTransform.transform(p + extrudeVec));   // local+extrude → world
     }
 
     // 1. Bottom Cap (fan triangulation)
