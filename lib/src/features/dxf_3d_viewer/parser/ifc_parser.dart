@@ -923,25 +923,90 @@ class _IfcGeometrySolver {
         final secondId = int.tryParse(params[2].replaceAll(RegExp(r'[#\s]'), ''));
 
         if (firstId != null) {
+          // Recursively resolve the first operand (may itself be a chained boolean)
           final firstTris = _resolveGeometryItem(firstId, transform, color);
 
           if (secondId != null) {
             final secondEnt = entityMap[secondId];
             if (secondEnt != null) {
-              // Case A: Clipping Half-Space Solid (Roof / Plane trimming)
-              if (secondEnt.type == 'IFCHALFSPACESOLID' ||
-                  secondEnt.type == 'IFCPOLYGONALBOUNDEDHALFSPACE') {
+              // IFCHALFSPACESOLID: infinite clipping plane
+              if (secondEnt.type == 'IFCHALFSPACESOLID') {
                 final halfParams = secondEnt.splitParams;
                 if (halfParams.isNotEmpty) {
                   final planeId = int.tryParse(halfParams[0].replaceAll(RegExp(r'[#\s]'), ''));
+                  // AgreementFlag: .T. means the solid is on the positive-normal side of the plane
                   final agreementFlag = halfParams.length > 1 ? halfParams[1].toUpperCase() : '.T.';
                   if (planeId != null) {
-                    final planeDef = _resolvePlane(planeId, transform);
+                    // CRITICAL: Resolve plane in world-space only, NOT with the parent element's transform.
+                    // In ArchiCAD IFC, IFCHALFSPACESOLID's BaseSurface is always in world coordinates.
+                    final planeDef = _resolvePlane(planeId, _Transform3D.identity);
                     if (planeDef != null) {
-                      final bool keepPositiveSide = op.contains('UNION')
-                          ? agreementFlag.contains('.T.')
-                          : !agreementFlag.contains('.T.');
+                      // DIFFERENCE removes the "solid" portion (the half-space where the solid exists).
+                      // AgreementFlag=.T. → solid is on positive side → DIFFERENCE keeps negative side
+                      // AgreementFlag=.F. → solid is on negative side → DIFFERENCE keeps positive side
+                      final bool isDiff = !op.contains('UNION');
+                      final bool solidOnPositiveSide = agreementFlag.contains('.T.');
+                      final bool keepPositiveSide = isDiff ? !solidOnPositiveSide : solidOnPositiveSide;
                       return _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
+                    }
+                  }
+                }
+              }
+              // IFCPOLYGONALBOUNDEDHALFSPACE: bounded clipping region (window/door openings)
+              else if (secondEnt.type == 'IFCPOLYGONALBOUNDEDHALFSPACE') {
+                final halfParams = secondEnt.splitParams;
+                if (halfParams.length >= 3) {
+                  final planeId = int.tryParse(halfParams[0].replaceAll(RegExp(r'[#\s]'), ''));
+                  final agreementFlag = halfParams.length > 1 ? halfParams[1].toUpperCase() : '.T.';
+                  final positionId = int.tryParse(halfParams[2].replaceAll(RegExp(r'[#\s]'), ''));
+                  final polygonId = halfParams.length > 3
+                      ? int.tryParse(halfParams[3].replaceAll(RegExp(r'[#\s]'), ''))
+                      : null;
+
+                  if (planeId != null) {
+                    // Resolve plane in world space
+                    final planeDef = _resolvePlane(planeId, _Transform3D.identity);
+                    if (planeDef != null) {
+                      final bool isDiff = !op.contains('UNION');
+                      final bool solidOnPositiveSide = agreementFlag.contains('.T.');
+                      final bool keepPositiveSide = isDiff ? !solidOnPositiveSide : solidOnPositiveSide;
+
+                      // For polygon-bounded: compute the boundary transform and polygon
+                      _Transform3D boundaryTransform = _Transform3D.identity;
+                      if (positionId != null) {
+                        boundaryTransform = _resolveAxis2Placement3D(positionId);
+                      }
+
+                      List<Vector3>? boundaryPoly;
+                      if (polygonId != null) {
+                        final polyEnt = entityMap[polygonId];
+                        if (polyEnt != null) {
+                          if (polyEnt.type == 'IFCPOLYLINE') {
+                            boundaryPoly = polyEnt.referencedIds
+                                .map((id) => boundaryTransform.transform(_resolvePoint(id)))
+                                .toList();
+                          } else if (polyEnt.type == 'IFCARBITRARYCLOSEDPROFILEDEF' ||
+                              polyEnt.type == 'IFCRECTANGLEPROFILEDEF') {
+                            final profilePts = _resolveProfilePoints(polygonId);
+                            boundaryPoly = profilePts.map((p) => boundaryTransform.transform(p)).toList();
+                          }
+                        }
+                      }
+
+                      if (boundaryPoly != null && boundaryPoly.length >= 3) {
+                        // Clip only triangles that fall within the polygon boundary projection
+                        return _clipTrianglesByBoundedHalfSpace(
+                          firstTris,
+                          planeDef.origin,
+                          planeDef.normal,
+                          keepPositiveSide,
+                          boundaryPoly,
+                          boundaryTransform,
+                        );
+                      } else {
+                        // Fallback: treat as infinite half-space
+                        return _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
+                      }
                     }
                   }
                 }
@@ -983,7 +1048,7 @@ class _IfcGeometrySolver {
     return tris;
   }
 
-  _Plane3D? _resolvePlane(int planeId, _Transform3D transform) {
+  _Plane3D? _resolvePlane(int planeId, _Transform3D parentTransform) {
     final ent = entityMap[planeId];
     if (ent == null) return null;
 
@@ -992,23 +1057,132 @@ class _IfcGeometrySolver {
       if (params.isNotEmpty) {
         final posId = int.tryParse(params[0].replaceAll(RegExp(r'[#\s]'), ''));
         if (posId != null) {
-          final posEnt = entityMap[posId];
-          if (posEnt != null) {
-            _Transform3D planePlacement = _Transform3D.identity;
-            if (posEnt.type == 'IFCAXIS2PLACEMENT3D') {
-              planePlacement = _resolveAxis2Placement3D(posId);
-            } else {
-              planePlacement = _resolveAxis2Placement2D(posId);
-            }
-            final composite = transform.multiply(planePlacement);
-            final origin = composite.transform(Vector3.zero);
-            final normal = (composite.transform(const Vector3(0, 0, 1)) - origin).normalized();
-            return _Plane3D(origin: origin, normal: normal);
-          }
+          // Resolve the plane's own axis placement in its own coordinate frame.
+          // parentTransform is identity when called from IFCHALFSPACESOLID (world-space plane).
+          // parentTransform may contain parent transform when needed for relative planes.
+          final planePlacement = _resolveAxis2Placement3D(posId);
+          final composite = parentTransform.multiply(planePlacement);
+          final origin = composite.transform(Vector3.zero);
+          // The plane's normal is the Z-axis of its coordinate frame
+          final normalRaw = composite.transform(const Vector3(0, 0, 1)) - origin;
+          final normalLen = normalRaw.lengthSquared;
+          if (normalLen < 1e-10) return null;
+          final normal = normalRaw * (1.0 / math.sqrt(normalLen));
+          return _Plane3D(origin: origin, normal: normal);
         }
       }
     }
     return null;
+  }
+
+  /// Clips triangles against a polygon-bounded half-space.
+  /// Only triangles (or parts of triangles) whose projection onto the clipping plane
+  /// falls inside the [boundaryPoly] polygon are affected by the clipping.
+  /// The rest of the geometry is preserved unchanged.
+  List<Triangle3D> _clipTrianglesByBoundedHalfSpace(
+    List<Triangle3D> inputTris,
+    Vector3 planePoint,
+    Vector3 planeNormal,
+    bool keepPositiveSide,
+    List<Vector3> boundaryPoly,
+    _Transform3D boundaryTransform,
+  ) {
+    if (inputTris.isEmpty) return inputTris;
+
+    final List<Triangle3D> result = [];
+    const double eps = 1e-4;
+
+    // Build an inverse transform for projecting world points into the boundary local 2D space
+    // We use the boundary plane's XY projection
+    final bOrigin = boundaryTransform.transform(Vector3.zero);
+    final bAxisX = (boundaryTransform.transform(const Vector3(1, 0, 0)) - bOrigin).normalized();
+    final bAxisY = (boundaryTransform.transform(const Vector3(0, 1, 0)) - bOrigin).normalized();
+
+    for (final tri in inputTris) {
+      final d0 = (tri.v0 - planePoint).dot(planeNormal);
+      final d1 = (tri.v1 - planePoint).dot(planeNormal);
+      final d2 = (tri.v2 - planePoint).dot(planeNormal);
+
+      // Classify vertices w.r.t. the infinite clipping plane
+      final in0 = keepPositiveSide ? (d0 >= -eps) : (d0 <= eps);
+      final in1 = keepPositiveSide ? (d1 >= -eps) : (d1 <= eps);
+      final in2 = keepPositiveSide ? (d2 >= -eps) : (d2 <= eps);
+      final inCount = (in0 ? 1 : 0) + (in1 ? 1 : 0) + (in2 ? 1 : 0);
+
+      // Check if the triangle centroid projects inside the polygon boundary
+      final centroid = (tri.v0 + tri.v1 + tri.v2) * (1.0 / 3.0);
+      final local = centroid - bOrigin;
+      final cx = local.dot(bAxisX);
+      final cy = local.dot(bAxisY);
+      final insideBoundary = _pointInPolygon2D(cx, cy, boundaryPoly, bOrigin, bAxisX, bAxisY);
+
+      if (!insideBoundary) {
+        // Triangle is outside the boundary polygon → leave it untouched
+        result.add(tri);
+        continue;
+      }
+
+      // Inside boundary → apply half-space clipping
+      if (inCount == 3) {
+        result.add(tri);
+      } else if (inCount == 0) {
+        continue;
+      } else if (inCount == 1) {
+        if (in0) {
+          final i1 = _intersectEdge(tri.v0, tri.v1, d0, d1);
+          final i2 = _intersectEdge(tri.v0, tri.v2, d0, d2);
+          result.add(Triangle3D(v0: tri.v0, v1: i1, v2: i2, color: tri.color));
+        } else if (in1) {
+          final i1 = _intersectEdge(tri.v1, tri.v2, d1, d2);
+          final i2 = _intersectEdge(tri.v1, tri.v0, d1, d0);
+          result.add(Triangle3D(v0: tri.v1, v1: i1, v2: i2, color: tri.color));
+        } else {
+          final i1 = _intersectEdge(tri.v2, tri.v0, d2, d0);
+          final i2 = _intersectEdge(tri.v2, tri.v1, d2, d1);
+          result.add(Triangle3D(v0: tri.v2, v1: i1, v2: i2, color: tri.color));
+        }
+      } else if (inCount == 2) {
+        if (!in0) {
+          final i1 = _intersectEdge(tri.v1, tri.v0, d1, d0);
+          final i2 = _intersectEdge(tri.v2, tri.v0, d2, d0);
+          result.add(Triangle3D(v0: tri.v1, v1: tri.v2, v2: i2, color: tri.color));
+          result.add(Triangle3D(v0: tri.v1, v1: i2, v2: i1, color: tri.color));
+        } else if (!in1) {
+          final i1 = _intersectEdge(tri.v2, tri.v1, d2, d1);
+          final i2 = _intersectEdge(tri.v0, tri.v1, d0, d1);
+          result.add(Triangle3D(v0: tri.v2, v1: tri.v0, v2: i2, color: tri.color));
+          result.add(Triangle3D(v0: tri.v2, v1: i2, v2: i1, color: tri.color));
+        } else {
+          final i1 = _intersectEdge(tri.v0, tri.v2, d0, d2);
+          final i2 = _intersectEdge(tri.v1, tri.v2, d1, d2);
+          result.add(Triangle3D(v0: tri.v0, v1: tri.v1, v2: i2, color: tri.color));
+          result.add(Triangle3D(v0: tri.v0, v1: i2, v2: i1, color: tri.color));
+        }
+      }
+    }
+    return result;
+  }
+
+  /// Point-in-polygon test in 2D projected space (ray casting).
+  bool _pointInPolygon2D(double px, double py, List<Vector3> worldPoly,
+      Vector3 bOrigin, Vector3 bAxisX, Vector3 bAxisY) {
+    bool inside = false;
+    int n = worldPoly.length;
+    int j = n - 1;
+
+    for (int i = 0; i < n; j = i++) {
+      final vi = worldPoly[i] - bOrigin;
+      final vj = worldPoly[j] - bOrigin;
+      final xi = vi.dot(bAxisX);
+      final yi = vi.dot(bAxisY);
+      final xj = vj.dot(bAxisX);
+      final yj = vj.dot(bAxisY);
+
+      if (((yi > py) != (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi + 1e-10) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
   }
 
   List<Triangle3D> _clipTrianglesByPlane(
@@ -1321,7 +1495,7 @@ class _IfcGeometrySolver {
 
     if (profileId == null) return tris;
 
-    // Local solid transform
+    // Local solid transform (orientation + position)
     _Transform3D solidTransform = _Transform3D.identity;
     if (positionId != null) {
       final posEnt = entityMap[positionId];
@@ -1333,12 +1507,23 @@ class _IfcGeometrySolver {
     }
     final compositeTransform = transform.multiply(solidTransform);
 
-    // Extrusion direction
-    Vector3 extrudeDir = const Vector3(0, 0, 1);
+    // Extrusion direction — stored in the SOLID's local coordinate frame,
+    // so we must transform it through the solid's orientation to get world direction.
+    // We only apply the rotation (not translation) by transforming direction as a vector
+    // (subtract origin of transformed zero vector).
+    Vector3 localExtrudeDir = const Vector3(0, 0, 1); // default: along local Z
     if (dirId != null) {
-      extrudeDir = _resolveDirection(dirId);
+      localExtrudeDir = _resolveDirection(dirId);
     }
-    final extrudeVec = extrudeDir * depth;
+    // Transform direction through compositeTransform rotation (no translation):
+    final dirOrigin = compositeTransform.transform(Vector3.zero);
+    final dirPoint = compositeTransform.transform(localExtrudeDir);
+    final worldExtrudeDir = (dirPoint - dirOrigin);
+    final extrudeDirLen = worldExtrudeDir.lengthSquared;
+    final normalizedDir = extrudeDirLen > 1e-10
+        ? worldExtrudeDir * (1.0 / math.sqrt(extrudeDirLen))
+        : const Vector3(0, 0, 1);
+    final extrudeVec = normalizedDir * depth;
 
     // Resolve 2D Profile into polygon points
     final List<Vector3> polygon = _resolveProfilePoints(profileId);
