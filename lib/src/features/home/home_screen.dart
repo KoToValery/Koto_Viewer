@@ -23,6 +23,7 @@ import '../pcb_viewer/pcb_viewer_screen.dart';
 import '../hpgl_viewer/hpgl_viewer_screen.dart';
 import '../cdr_viewer/cdr_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
+import 'widgets/app_info_dialog.dart';
 
 class FileTypeIcon extends StatelessWidget {
   final KotoFileType type;
@@ -1804,28 +1805,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showAboutDialog() {
-    showAboutDialog(
-      context: context,
-      applicationName: 'KotoView',
-      applicationVersion: '1.0.0',
-      applicationIcon: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.asset('assets/icons/app_icon.png', width: 44, height: 44),
-      ),
-      children: [
-        const SizedBox(height: 12),
-        const Text(
-          'A lightweight, fast, and 100% free open-source PDF and CAD (DXF/DWG) viewer with support for BGS 2005 and global coordinate systems.',
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          '• Licensed under GNU General Public License v3.0 (GPLv3)\n'
-          '• DWG conversion powered by GNU LibreDWG\n'
-          '• 100% free and open-source software (FOSS)',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-      ],
-    );
+    AppInfoDialog.show(context);
   }
 
   void _showCoordinateSettings() async {

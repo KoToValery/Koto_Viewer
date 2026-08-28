@@ -55,6 +55,7 @@ dependencies:
   flutter_markdown: ^0.7.6
   archive: ^3.6.1
   xml: ^6.5.0
+  package_info_plus: ^9.0.1
 
 dependency_overrides:
   archive: ^3.6.1
