@@ -22,6 +22,7 @@ import 'src/features/eps_viewer/eps_viewer_screen.dart';
 import 'src/features/pcb_viewer/pcb_viewer_screen.dart';
 import 'src/features/hpgl_viewer/hpgl_viewer_screen.dart';
 import 'src/features/cdr_viewer/cdr_viewer_screen.dart';
+import 'src/features/comic_viewer/comic_viewer_screen.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -205,6 +206,14 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.plt:
         navigator.push(
           MaterialPageRoute(builder: (_) => HpglViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.cbz:
+      case KotoFileType.cbr:
+      case KotoFileType.cbt:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => ComicViewerScreen(filePath: filePath)),
         );
         break;
 

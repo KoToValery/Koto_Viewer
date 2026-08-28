@@ -145,6 +145,9 @@ class FileSourceService {
   static bool isSupportedFile(String path) {
     final lower = path.toLowerCase();
     return lower.endsWith('.pdf') ||
+        lower.endsWith('.cbz') ||
+        lower.endsWith('.cbr') ||
+        lower.endsWith('.cbt') ||
         lower.endsWith('.dxf') ||
         lower.endsWith('.dwg') ||
         lower.endsWith('.svg') ||

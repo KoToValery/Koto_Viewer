@@ -40,7 +40,7 @@ extension FileCategoryExtension on FileCategory {
   }
 }
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, ppt, rtf, zip, cdr, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, ppt, rtf, zip, cdr, cbz, cbr, cbt, other }
 
 class PdfItem {
   final String path;
@@ -60,6 +60,9 @@ class PdfItem {
   KotoFileType get fileType {
     final lower = name.toLowerCase();
     if (lower.endsWith('.pdf')) return KotoFileType.pdf;
+    if (lower.endsWith('.cbz')) return KotoFileType.cbz;
+    if (lower.endsWith('.cbr')) return KotoFileType.cbr;
+    if (lower.endsWith('.cbt')) return KotoFileType.cbt;
     if (lower.endsWith('.dxf')) return KotoFileType.dxf;
     if (lower.endsWith('.dwg')) return KotoFileType.dwg;
     if (lower.endsWith('.svg')) return KotoFileType.svg;
@@ -126,6 +129,7 @@ class PdfItem {
 
   bool get isCad => fileType == KotoFileType.dxf || fileType == KotoFileType.dwg;
   bool get isSvg => fileType == KotoFileType.svg;
+  bool get isComic => fileType == KotoFileType.cbz || fileType == KotoFileType.cbr || fileType == KotoFileType.cbt;
   bool get is3d =>
       fileType == KotoFileType.stl ||
       fileType == KotoFileType.obj ||
@@ -154,7 +158,7 @@ class PdfItem {
   bool get isPlotter => fileType == KotoFileType.plt;
   bool get isPcb => isGerber || isDrill || isKicad || isZip;
   bool get isVector => isSvg || isEps || isCdr || isPcb || isPlotter;
-  bool get isTextDoc => isTxt || isMd || isDocx || isRtf || isPresentation;
+  bool get isTextDoc => isTxt || isMd || isDocx || isRtf || isPresentation || isComic;
 
   FileCategory get category {
     if (is3d) return FileCategory.cad3d;

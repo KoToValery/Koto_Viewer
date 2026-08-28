@@ -22,6 +22,7 @@ import '../eps_viewer/eps_viewer_screen.dart';
 import '../pcb_viewer/pcb_viewer_screen.dart';
 import '../hpgl_viewer/hpgl_viewer_screen.dart';
 import '../cdr_viewer/cdr_viewer_screen.dart';
+import '../comic_viewer/comic_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 import 'widgets/app_info_dialog.dart';
 
@@ -88,9 +89,48 @@ class FileTypeIcon extends StatelessWidget {
         return _buildIfcIcon();
       case KotoFileType.zip:
         return _buildZipIcon();
+      case KotoFileType.cbz:
+      case KotoFileType.cbr:
+      case KotoFileType.cbt:
+        return _buildComicIcon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
+  }
+
+  Widget _buildComicIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFDA4AF)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.auto_stories_rounded,
+              color: const Color(0xFFE11D48),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'CBZ',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFE11D48),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildPdfIcon() {
@@ -1441,6 +1481,21 @@ class _HomeScreenState extends State<HomeScreen> {
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => HpglViewerScreen(filePath: filePath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.cbz:
+      case KotoFileType.cbr:
+      case KotoFileType.cbt:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => ComicViewerScreen(filePath: filePath),
           ),
         );
         if (success != false) {
