@@ -126,12 +126,7 @@ class Cad3DMeshPainter extends CustomPainter {
       final edge1 = tv1 - tv0;
       final edge2 = tv2 - tv0;
       final viewNormal = edge1.cross(edge2);
-
-      // Early Backface Culling: camera looks down +Y.
-      // If viewNormal.y >= 0, face points away from camera
-      if (cullBackfaces && viewNormal.y >= 0) {
-        continue;
-      }
+      final bool isBackface = viewNormal.y >= 0;
 
       // Centroid depth in view space (larger Y is further away)
       final avgDepth = (tv0.y + tv1.y + tv2.y) / 3.0;
@@ -151,10 +146,13 @@ class Cad3DMeshPainter extends CustomPainter {
       final maxY = math.max(p0.dy, math.max(p1.dy, p2.dy));
       if (maxY < -margin) continue;
 
-      // Lighting calculation (Lambertian + Ambient)
-      final transformedNorm = camera.transformPoint(tri.normal).normalized();
-      final double diffuse = math.max(0.15, -transformedNorm.dot(lightDir));
-      final double intensity = (diffuse * 0.75 + 0.25).clamp(0.15, 1.0);
+      // Two-sided lighting calculation (Lambertian + Ambient):
+      // In BIM / architectural models, roof tiles, eaves, and thin elements have single-sided geometry.
+      // Flip normal for backfaces so both sides receive smooth architectural lighting without holes or stripes.
+      final normalToUse = isBackface ? -tri.normal : tri.normal;
+      final transformedNorm = camera.transformPoint(normalToUse).normalized();
+      final double diffuse = math.max(0.18, -transformedNorm.dot(lightDir));
+      final double intensity = (diffuse * 0.72 + 0.28).clamp(0.18, 1.0);
 
       final effectiveColor = customModelColor ?? tri.color ?? baseColor;
       Color faceColor;
@@ -176,7 +174,7 @@ class Cad3DMeshPainter extends CustomPainter {
         p2: p2,
         depth: avgDepth,
         color: faceColor,
-        isBackface: false,
+        isBackface: isBackface,
       ));
     }
 

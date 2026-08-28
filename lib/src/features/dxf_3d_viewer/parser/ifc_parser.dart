@@ -178,10 +178,18 @@ class _Transform3D {
   }
 }
 
+class _Plane3D {
+  final Vector3 origin;
+  final Vector3 normal;
+  const _Plane3D({required this.origin, required this.normal});
+}
+
 class _IfcGeometrySolver {
   final Map<int, _RawIfcEntity> entityMap;
   final Map<int, Vector3> pointCache = {};
   final Map<int, _Transform3D> placementCache = {};
+  final Map<int, Color> itemToStyledColor = {};
+  final Map<int, Color> elementToMaterialColor = {};
 
   _IfcGeometrySolver({required this.entityMap});
 
@@ -232,6 +240,40 @@ class _IfcGeometrySolver {
             final relIds = RegExp(r'#(\d+)').allMatches(elementsParam).map((m) => int.parse(m.group(1)!)).toList();
             for (final elId in relIds) {
               elementToStoreyName[elId] = storey.name;
+            }
+          }
+        }
+      }
+    }
+
+    // 2.2. Parse Surface Styles (IFCSTYLEDITEM -> IFCSURFACESTYLE -> IFCCOLOURRGB)
+    for (final ent in entityMap.values) {
+      if (ent.type == 'IFCSTYLEDITEM') {
+        final params = ent.splitParams;
+        if (params.isNotEmpty) {
+          final itemId = int.tryParse(params[0].replaceAll(RegExp(r'[#\s]'), ''));
+          if (itemId != null && params.length > 1) {
+            final color = _resolveStyleColorFromParam(params[1]);
+            if (color != null) {
+              itemToStyledColor[itemId] = color;
+            }
+          }
+        }
+      }
+    }
+
+    // 2.3. Parse Material Associations (IFCRELASSOCIATESMATERIAL -> IFCMATERIAL / LAYERSET / LIST)
+    for (final ent in entityMap.values) {
+      if (ent.type == 'IFCRELASSOCIATESMATERIAL') {
+        final params = ent.splitParams;
+        if (params.length >= 6) {
+          final elementsParam = params[4];
+          final matParam = params[5];
+          final matColor = _resolveMaterialColorFromParam(matParam);
+          if (matColor != null) {
+            final relIds = RegExp(r'#(\d+)').allMatches(elementsParam).map((m) => int.parse(m.group(1)!)).toList();
+            for (final elId in relIds) {
+              elementToMaterialColor[elId] = matColor;
             }
           }
         }
@@ -294,11 +336,14 @@ class _IfcGeometrySolver {
       final shapeRepId = params.length > 6 ? int.tryParse(params[6].replaceAll(RegExp(r'[#\s]'), '')) : null;
 
       final transform = placementId != null ? _resolvePlacement(placementId) : _Transform3D.identity;
-      final color = _getArchitecturalColor(category);
+      
+      // Determine element material color from styled item, material layer set, or default category color
+      final defaultColor = _getArchitecturalColor(category);
+      final elementColor = itemToStyledColor[ent.id] ?? elementToMaterialColor[ent.id] ?? defaultColor;
 
       final triangles = <Triangle3D>[];
       if (shapeRepId != null) {
-        triangles.addAll(_resolveShapeRepresentation(shapeRepId, transform, color));
+        triangles.addAll(_resolveShapeRepresentation(shapeRepId, transform, elementColor));
       }
 
       if (triangles.isNotEmpty) {
@@ -314,7 +359,7 @@ class _IfcGeometrySolver {
           category: category,
           storeyName: storeyName,
           layer: layer,
-          color: color,
+          color: elementColor,
           triangles: triangles,
         ));
       }
@@ -841,17 +886,22 @@ class _IfcGeometrySolver {
     return tris;
   }
 
-  List<Triangle3D> _resolveGeometryItem(int itemId, _Transform3D transform, Color color) {
+  List<Triangle3D> _resolveGeometryItem(int itemId, _Transform3D transform, Color defaultColor) {
     final List<Triangle3D> tris = [];
     final ent = entityMap[itemId];
     if (ent == null) return tris;
+
+    final color = itemToStyledColor[itemId] ?? defaultColor;
 
     // 1. IFCEXTRUDEDAREASOLID (Walls, Slabs, Beams, Columns)
     if (ent.type == 'IFCEXTRUDEDAREASOLID') {
       tris.addAll(_generateExtrudedSolid(ent, transform, color));
     }
     // 2. IFCFACETEDBREP & IFCSHELLBASEDSURFACEMODEL
-    else if (ent.type == 'IFCFACETEDBREP' || ent.type == 'IFCSHELLBASEDSURFACEMODEL' || ent.type == 'IFCFACETEDBREPWITHVOIDS' || ent.type == 'IFCSURFACEMODEL') {
+    else if (ent.type == 'IFCFACETEDBREP' ||
+        ent.type == 'IFCSHELLBASEDSURFACEMODEL' ||
+        ent.type == 'IFCFACETEDBREPWITHVOIDS' ||
+        ent.type == 'IFCSURFACEMODEL') {
       for (final id in ent.referencedIds) {
         tris.addAll(_generateFacetedBrep(id, transform, color));
       }
@@ -864,9 +914,43 @@ class _IfcGeometrySolver {
     else if (ent.type == 'IFCPOLYGONALFACESET') {
       tris.addAll(_generatePolygonalFaceSet(ent, transform, color));
     }
-    // 5. IFCBOOLEANCLIPPINGRESULT / IFCBOOLEANRESULT
+    // 5. IFCBOOLEANCLIPPINGRESULT & IFCBOOLEANRESULT
     else if (ent.type.contains('BOOLEAN')) {
-      if (ent.referencedIds.isNotEmpty) {
+      final params = ent.splitParams;
+      if (params.length >= 3) {
+        final op = params[0].toUpperCase();
+        final firstId = int.tryParse(params[1].replaceAll(RegExp(r'[#\s]'), ''));
+        final secondId = int.tryParse(params[2].replaceAll(RegExp(r'[#\s]'), ''));
+
+        if (firstId != null) {
+          final firstTris = _resolveGeometryItem(firstId, transform, color);
+
+          if (secondId != null) {
+            final secondEnt = entityMap[secondId];
+            if (secondEnt != null) {
+              // Case A: Clipping Half-Space Solid (Roof / Plane trimming)
+              if (secondEnt.type == 'IFCHALFSPACESOLID' ||
+                  secondEnt.type == 'IFCPOLYGONALBOUNDEDHALFSPACE') {
+                final halfParams = secondEnt.splitParams;
+                if (halfParams.isNotEmpty) {
+                  final planeId = int.tryParse(halfParams[0].replaceAll(RegExp(r'[#\s]'), ''));
+                  final agreementFlag = halfParams.length > 1 ? halfParams[1].toUpperCase() : '.T.';
+                  if (planeId != null) {
+                    final planeDef = _resolvePlane(planeId, transform);
+                    if (planeDef != null) {
+                      final bool keepPositiveSide = op.contains('UNION')
+                          ? agreementFlag.contains('.T.')
+                          : !agreementFlag.contains('.T.');
+                      return _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          return firstTris;
+        }
+      } else if (ent.referencedIds.isNotEmpty) {
         tris.addAll(_resolveGeometryItem(ent.referencedIds[0], transform, color));
       }
     }
@@ -897,6 +981,332 @@ class _IfcGeometrySolver {
     }
 
     return tris;
+  }
+
+  _Plane3D? _resolvePlane(int planeId, _Transform3D transform) {
+    final ent = entityMap[planeId];
+    if (ent == null) return null;
+
+    if (ent.type == 'IFCPLANE') {
+      final params = ent.splitParams;
+      if (params.isNotEmpty) {
+        final posId = int.tryParse(params[0].replaceAll(RegExp(r'[#\s]'), ''));
+        if (posId != null) {
+          final posEnt = entityMap[posId];
+          if (posEnt != null) {
+            _Transform3D planePlacement = _Transform3D.identity;
+            if (posEnt.type == 'IFCAXIS2PLACEMENT3D') {
+              planePlacement = _resolveAxis2Placement3D(posId);
+            } else {
+              planePlacement = _resolveAxis2Placement2D(posId);
+            }
+            final composite = transform.multiply(planePlacement);
+            final origin = composite.transform(Vector3.zero);
+            final normal = (composite.transform(const Vector3(0, 0, 1)) - origin).normalized();
+            return _Plane3D(origin: origin, normal: normal);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  List<Triangle3D> _clipTrianglesByPlane(
+    List<Triangle3D> inputTris,
+    Vector3 planePoint,
+    Vector3 planeNormal,
+    bool keepPositiveSide,
+  ) {
+    if (inputTris.isEmpty || planeNormal.lengthSquared < 1e-6) return inputTris;
+
+    final List<Triangle3D> result = [];
+    const double eps = 1e-5;
+
+    for (final tri in inputTris) {
+      final d0 = (tri.v0 - planePoint).dot(planeNormal);
+      final d1 = (tri.v1 - planePoint).dot(planeNormal);
+      final d2 = (tri.v2 - planePoint).dot(planeNormal);
+
+      final in0 = keepPositiveSide ? (d0 >= -eps) : (d0 <= eps);
+      final in1 = keepPositiveSide ? (d1 >= -eps) : (d1 <= eps);
+      final in2 = keepPositiveSide ? (d2 >= -eps) : (d2 <= eps);
+
+      final inCount = (in0 ? 1 : 0) + (in1 ? 1 : 0) + (in2 ? 1 : 0);
+
+      if (inCount == 3) {
+        result.add(tri);
+      } else if (inCount == 0) {
+        continue;
+      } else if (inCount == 1) {
+        if (in0) {
+          final i1 = _intersectEdge(tri.v0, tri.v1, d0, d1);
+          final i2 = _intersectEdge(tri.v0, tri.v2, d0, d2);
+          result.add(Triangle3D(v0: tri.v0, v1: i1, v2: i2, color: tri.color));
+        } else if (in1) {
+          final i1 = _intersectEdge(tri.v1, tri.v2, d1, d2);
+          final i2 = _intersectEdge(tri.v1, tri.v0, d1, d0);
+          result.add(Triangle3D(v0: tri.v1, v1: i1, v2: i2, color: tri.color));
+        } else {
+          final i1 = _intersectEdge(tri.v2, tri.v0, d2, d0);
+          final i2 = _intersectEdge(tri.v2, tri.v1, d2, d1);
+          result.add(Triangle3D(v0: tri.v2, v1: i1, v2: i2, color: tri.color));
+        }
+      } else if (inCount == 2) {
+        if (!in0) {
+          final i1 = _intersectEdge(tri.v1, tri.v0, d1, d0);
+          final i2 = _intersectEdge(tri.v2, tri.v0, d2, d0);
+          result.add(Triangle3D(v0: tri.v1, v1: tri.v2, v2: i2, color: tri.color));
+          result.add(Triangle3D(v0: tri.v1, v1: i2, v2: i1, color: tri.color));
+        } else if (!in1) {
+          final i1 = _intersectEdge(tri.v2, tri.v1, d2, d1);
+          final i2 = _intersectEdge(tri.v0, tri.v1, d0, d1);
+          result.add(Triangle3D(v0: tri.v2, v1: tri.v0, v2: i2, color: tri.color));
+          result.add(Triangle3D(v0: tri.v2, v1: i2, v2: i1, color: tri.color));
+        } else {
+          final i1 = _intersectEdge(tri.v0, tri.v2, d0, d2);
+          final i2 = _intersectEdge(tri.v1, tri.v2, d1, d2);
+          result.add(Triangle3D(v0: tri.v0, v1: tri.v1, v2: i2, color: tri.color));
+          result.add(Triangle3D(v0: tri.v0, v1: i2, v2: i1, color: tri.color));
+        }
+      }
+    }
+
+    return result;
+  }
+
+  static Vector3 _intersectEdge(Vector3 pIn, Vector3 pOut, double dIn, double dOut) {
+    final denom = dIn - dOut;
+    final t = (denom.abs() > 1e-8) ? (dIn / denom).clamp(0.0, 1.0) : 0.5;
+    return pIn + (pOut - pIn) * t;
+  }
+
+  Color? _resolveStyleColorFromParam(String styleParam) {
+    final styleIds = RegExp(r'#(\d+)').allMatches(styleParam).map((m) => int.parse(m.group(1)!)).toList();
+    for (final sId in styleIds) {
+      final styleEnt = entityMap[sId];
+      if (styleEnt == null) continue;
+      if (styleEnt.type == 'IFCSURFACESTYLESHADING' || styleEnt.type == 'IFCSURFACESTYLERENDERING') {
+        final c = _extractColourRgbFromParams(styleEnt.params);
+        if (c != null) return c;
+      }
+      for (final refId in styleEnt.referencedIds) {
+        final sub = entityMap[refId];
+        if (sub != null) {
+          if (sub.type == 'IFCSURFACESTYLESHADING' || sub.type == 'IFCSURFACESTYLERENDERING') {
+            final c = _extractColourRgbFromParams(sub.params);
+            if (c != null) return c;
+          }
+          if (sub.type == 'IFCCOLOURRGB') {
+            final c = _extractColourRgbDirect(sub.params);
+            if (c != null) return c;
+          }
+          for (final subRef in sub.referencedIds) {
+            final deep = entityMap[subRef];
+            if (deep != null) {
+              if (deep.type == 'IFCSURFACESTYLESHADING' || deep.type == 'IFCSURFACESTYLERENDERING') {
+                final c = _extractColourRgbFromParams(deep.params);
+                if (c != null) return c;
+              }
+              if (deep.type == 'IFCCOLOURRGB') {
+                final c = _extractColourRgbDirect(deep.params);
+                if (c != null) return c;
+              }
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  Color? _extractColourRgbFromParams(String params) {
+    for (final m in RegExp(r'#(\d+)').allMatches(params)) {
+      final id = int.tryParse(m.group(1)!);
+      if (id != null) {
+        final rgbEnt = entityMap[id];
+        if (rgbEnt != null && rgbEnt.type == 'IFCCOLOURRGB') {
+          return _extractColourRgbDirect(rgbEnt.params);
+        }
+      }
+    }
+    return null;
+  }
+
+  Color? _extractColourRgbDirect(String params) {
+    final parts = params.split(',');
+    if (parts.length >= 3) {
+      int start = 0;
+      if (parts.length > 3 && (parts[0].trim().startsWith("'") || parts[0].trim() == r'$')) {
+        start = 1;
+      }
+      final r = double.tryParse(parts[start].trim()) ?? 0.8;
+      final g = double.tryParse(parts[start + 1].trim()) ?? 0.8;
+      final b = double.tryParse(parts[start + 2].trim()) ?? 0.8;
+      return Color.fromARGB(
+        255,
+        (r * 255).round().clamp(0, 255),
+        (g * 255).round().clamp(0, 255),
+        (b * 255).round().clamp(0, 255),
+      );
+    }
+    return null;
+  }
+
+  Color? _resolveMaterialColorFromParam(String matParam) {
+    final matIds = RegExp(r'#(\d+)').allMatches(matParam).map((m) => int.parse(m.group(1)!)).toList();
+    for (final mId in matIds) {
+      final matEnt = entityMap[mId];
+      if (matEnt == null) continue;
+
+      final rawNames = <String>[];
+      for (final m in RegExp(r"'([^']*)'").allMatches(matEnt.params)) {
+        rawNames.add(IfcParser.decodeIfcString(m.group(1)!));
+      }
+
+      for (final refId in matEnt.referencedIds) {
+        final sub = entityMap[refId];
+        if (sub != null) {
+          for (final m in RegExp(r"'([^']*)'").allMatches(sub.params)) {
+            rawNames.add(IfcParser.decodeIfcString(m.group(1)!));
+          }
+        }
+      }
+
+      for (final name in rawNames) {
+        final col = _mapMaterialNameToColor(name);
+        if (col != null) return col;
+      }
+    }
+    return null;
+  }
+
+  Color? _mapMaterialNameToColor(String name) {
+    final lower = name.toLowerCase().trim();
+    if (lower.isEmpty) return null;
+
+    // Stone / Plinth / Цокъл / Камък / Granite
+    if (lower.contains('stone') ||
+        lower.contains('plinth') ||
+        lower.contains('granite') ||
+        lower.contains('marble') ||
+        lower.contains('limestone') ||
+        lower.contains('masonry') ||
+        lower.contains('цокъл') ||
+        lower.contains('камък') ||
+        lower.contains('гранит') ||
+        lower.contains('мрамор') ||
+        lower.contains('варовик') ||
+        lower.contains('зидария') ||
+        lower.contains('buntsteinputz')) {
+      return const Color(0xFF78726A); // Textured Natural Stone / Plinth Gray-Brown
+    }
+
+    // Wood / Timber / Cladding / Siding / Дърво / Дъски / Обшивка
+    if (lower.contains('wood') ||
+        lower.contains('timber') ||
+        lower.contains('cladding') ||
+        lower.contains('siding') ||
+        lower.contains('cedar') ||
+        lower.contains('oak') ||
+        lower.contains('pine') ||
+        lower.contains('larch') ||
+        lower.contains('board') ||
+        lower.contains('дърво') ||
+        lower.contains('дървен') ||
+        lower.contains('дъск') ||
+        lower.contains('обшивк') ||
+        lower.contains('чам') ||
+        lower.contains('дъб') ||
+        lower.contains('ламперия') ||
+        lower.contains('holz') ||
+        lower.contains('bois')) {
+      return const Color(0xFFB57E4C); // Rich Natural Architectural Timber / Siding
+    }
+
+    // Roof / Tiles / Shingles / Керемиди / Покрив
+    if (lower.contains('tile') ||
+        lower.contains('shingle') ||
+        lower.contains('roof') ||
+        lower.contains('terracotta') ||
+        lower.contains('slate') ||
+        lower.contains('керемид') ||
+        lower.contains('покрив') ||
+        lower.contains('битум') ||
+        lower.contains('dach') ||
+        lower.contains('tuile')) {
+      if (lower.contains('slate') ||
+          lower.contains('dark') ||
+          lower.contains('черн') ||
+          lower.contains('сив') ||
+          lower.contains('anthracite')) {
+        return const Color(0xFF3B424D); // Slate Dark Tile
+      }
+      return const Color(0xFFA64032); // Terracotta Clay Roof Tile
+    }
+
+    // Plaster / Stucco / White Render / Мазилка / Бял / Фасада
+    if (lower.contains('plaster') ||
+        lower.contains('stucco') ||
+        lower.contains('render') ||
+        lower.contains('gypsum') ||
+        lower.contains('white') ||
+        lower.contains('мазилка') ||
+        lower.contains('фасада') ||
+        lower.contains('шпакловка') ||
+        lower.contains('бял') ||
+        lower.contains('putz') ||
+        lower.contains('crepi')) {
+      return const Color(0xFFF4F0E8); // Clean Crisp Architectural White/Sand Plaster
+    }
+
+    // Brick / Тухла
+    if (lower.contains('brick') ||
+        lower.contains('klinker') ||
+        lower.contains('тухл') ||
+        lower.contains('ziegel')) {
+      return const Color(0xFFA84838); // Red Fired Brick
+    }
+
+    // Concrete / Screed / Бетон / Замазка
+    if (lower.contains('concrete') ||
+        lower.contains('screed') ||
+        lower.contains('cement') ||
+        lower.contains('бетон') ||
+        lower.contains('замазка') ||
+        lower.contains('цимент') ||
+        lower.contains('beton')) {
+      return const Color(0xFFA2A7AC); // Structural Concrete
+    }
+
+    // Glass / Glazing / Стъкло
+    if (lower.contains('glass') ||
+        lower.contains('glazing') ||
+        lower.contains('стъкло') ||
+        lower.contains('остъклен') ||
+        lower.contains('glas') ||
+        lower.contains('verre')) {
+      return const Color(0x9964B5F6); // Translucent Sky Blue Glass
+    }
+
+    // Metal / Steel / Aluminium / Метал / Стомана / Алуминий
+    if (lower.contains('metal') ||
+        lower.contains('steel') ||
+        lower.contains('alumin') ||
+        lower.contains('copper') ||
+        lower.contains('zinc') ||
+        lower.contains('iron') ||
+        lower.contains('метал') ||
+        lower.contains('стомана') ||
+        lower.contains('алуминий') ||
+        lower.contains('ламарина') ||
+        lower.contains('мед') ||
+        lower.contains('цинк') ||
+        lower.contains('stahl') ||
+        lower.contains('alu')) {
+      return const Color(0xFF55606B); // Metallic Gunmetal Steel
+    }
+
+    return null;
   }
 
   List<Triangle3D> _generateExtrudedSolid(_RawIfcEntity ent, _Transform3D transform, Color color) {

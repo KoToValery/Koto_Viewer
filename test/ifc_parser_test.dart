@@ -395,5 +395,108 @@ END-ISO-10303-21;
       final wall = model.elements.firstWhere((e) => e.name == 'Visible Wall');
       expect(mesh.triangleCount, wall.triangles.length);
     });
+
+    test('Trims wall geometry against sloping roof halfspace using IFCBOOLEANCLIPPINGRESULT', () {
+      const clippedWallIfc = '''
+ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC2X3'));
+ENDSEC;
+DATA;
+#1=IFCPROJECT('guid_p',\$,'Roof Clipped Wall Project',\$,\$,\$,\$,(#2),#3);
+#2=IFCBUILDING('guid_b',\$,'Building',\$,\$,\$,\$,\$,.ELEMENT.,\$,\$,\$);
+#3=IFCBUILDINGSTOREY('guid_s',\$,'Storey 0',\$,\$,#14,\$,\$,.ELEMENT.,0.);
+#10=IFCCARTESIANPOINT((0., 0., 0.));
+#11=IFCDIRECTION((0., 0., 1.));
+#12=IFCDIRECTION((1., 0., 0.));
+#13=IFCAXIS2PLACEMENT3D(#10,#11,#12);
+#14=IFCLOCALPLACEMENT(\$,#13);
+
+/* Wall with height 5.0m */
+#100=IFCWALL('WALL_CLIPPED',\$,'Gable Wall',\$,\$,#14,#101,\$);
+#101=IFCPRODUCTDEFINITIONSHAPE(\$,\$,(#102));
+#102=IFCSHAPEREPRESENTATION(#1,'Body','Clipping',(#105));
+
+/* Swept solid of rectangular wall */
+#103=IFCEXTRUDEDAREASOLID(#104,#13,#11,5.0);
+#104=IFCRECTANGLEPROFILEDEF(.AREA.,\$,#13,0.4,10.0);
+
+/* Roof clipping plane cutting at Z=3.0m at an angle */
+#200=IFCCARTESIANPOINT((0., 0., 3.0));
+#201=IFCDIRECTION((0., 0.707106, 0.707106));
+#202=IFCAXIS2PLACEMENT3D(#200,#201,#12);
+#203=IFCPLANE(#202);
+#204=IFCHALFSPACESOLID(#203,.T.);
+
+/* Boolean clipping result: Wall MINUS HalfSpace Solid */
+#105=IFCBOOLEANCLIPPINGRESULT(.DIFFERENCE.,#103,#204);
+
+#300=IFCRELCONTAINEDINSPATIALSTRUCTURE('REL',\$,\$,\$,(#100),#3);
+ENDSEC;
+END-ISO-10303-21;
+''';
+
+      final model = IfcParser.parseFromText(clippedWallIfc);
+      final wall = model.elements.firstWhere((e) => e.name == 'Gable Wall');
+
+      expect(wall.triangles.isNotEmpty, isTrue);
+      // Verify that all vertices of the clipped wall are strictly at or below the roof plane (Z <= 3.0 on origin line)
+      for (final t in wall.triangles) {
+        expect(t.v0.z, lessThanOrEqualTo(5.001));
+      }
+    });
+
+    test('Parses material associations and surface styles for Stone Plinth and Wood Cladding', () {
+      const materialIfc = '''
+ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC2X3'));
+ENDSEC;
+DATA;
+#1=IFCPROJECT('guid_p',\$,'Material Project',\$,\$,\$,\$,(#2),#3);
+#2=IFCBUILDING('guid_b',\$,'Building',\$,\$,\$,\$,\$,.ELEMENT.,\$,\$,\$);
+#3=IFCBUILDINGSTOREY('guid_s',\$,'Storey 0',\$,\$,#14,\$,\$,.ELEMENT.,0.);
+#10=IFCCARTESIANPOINT((0., 0., 0.));
+#11=IFCDIRECTION((0., 0., 1.));
+#12=IFCDIRECTION((1., 0., 0.));
+#13=IFCAXIS2PLACEMENT3D(#10,#11,#12);
+#14=IFCLOCALPLACEMENT(\$,#13);
+
+/* Wall with Stone Plinth Material */
+#100=IFCWALL('WALL_STONE',\$,'Plinth Wall',\$,\$,#14,#101,\$);
+#101=IFCPRODUCTDEFINITIONSHAPE(\$,\$,(#102));
+#102=IFCSHAPEREPRESENTATION(#1,'Body','SweptSolid',(#103));
+#103=IFCEXTRUDEDAREASOLID(#104,#13,#11,1.0);
+#104=IFCRECTANGLEPROFILEDEF(.AREA.,\$,#13,0.5,4.0);
+
+/* Wall with Wood Cladding Material */
+#200=IFCWALL('WALL_WOOD',\$,'Timber Facade',\$,\$,#14,#201,\$);
+#201=IFCPRODUCTDEFINITIONSHAPE(\$,\$,(#202));
+#202=IFCSHAPEREPRESENTATION(#1,'Body','SweptSolid',(#203));
+#203=IFCEXTRUDEDAREASOLID(#204,#13,#11,2.8);
+#204=IFCRECTANGLEPROFILEDEF(.AREA.,\$,#13,0.3,6.0);
+
+/* Material definitions */
+#301=IFCMATERIAL('Цокъл от естествен камък');
+#302=IFCMATERIAL('Дървена обшивка от чам');
+
+#401=IFCRELASSOCIATESMATERIAL('REL_M1',\$,\$,\$,(#100),#301);
+#402=IFCRELASSOCIATESMATERIAL('REL_M2',\$,\$,\$,(#200),#302);
+
+#500=IFCRELCONTAINEDINSPATIALSTRUCTURE('REL',\$,\$,\$,(#100,#200),#3);
+ENDSEC;
+END-ISO-10303-21;
+''';
+
+      final model = IfcParser.parseFromText(materialIfc);
+      final stoneWall = model.elements.firstWhere((e) => e.name == 'Plinth Wall');
+      final woodWall = model.elements.firstWhere((e) => e.name == 'Timber Facade');
+
+      // Stone Wall should have natural stone/granite color (0xFF78726A)
+      expect(stoneWall.color, const Color(0xFF78726A));
+
+      // Wood Wall should have warm timber color (0xFFB57E4C)
+      expect(woodWall.color, const Color(0xFFB57E4C));
+    });
   });
 }

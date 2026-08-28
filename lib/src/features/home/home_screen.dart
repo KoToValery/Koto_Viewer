@@ -2601,7 +2601,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       );
-                    }, childCount: _pdfFiles.length),
+                    }, childCount: _filteredFiles.length),
                   ),
                 ),
             ],
