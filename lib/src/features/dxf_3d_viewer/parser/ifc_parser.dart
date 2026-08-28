@@ -1028,10 +1028,13 @@ class _IfcGeometrySolver {
                   if (planeId != null) {
                     final planeDef = _resolvePlane(planeId, transform);
                     if (planeDef != null) {
-                      // In architectural BIM (ArchiCAD/Revit), roof clipping planes trim off the top of walls.
-                      // If the plane normal points downwards (normal.z < 0), the region under the roof has (X-P).N >= 0.
-                      // If the plane normal points upwards (normal.z > 0), the region under the roof has (X-P).N <= 0.
-                      final bool keepPositiveSide = planeDef.normal.z < 0;
+                      final agreementFlagStr = halfParams[1].trim();
+                      final bool agreementFlag = agreementFlagStr == '.T.';
+                      bool keepPositiveSide = agreementFlag;
+                      if (op == '.DIFFERENCE.') {
+                        keepPositiveSide = !agreementFlag;
+                      }
+                      
                       final clipped = _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
                       return _filterDegenerateTriangles(clipped);
                     }
@@ -1482,23 +1485,31 @@ class _IfcGeometrySolver {
   Color? _resolveMaterialColorFromParam(String matParam) {
     final matIds = RegExp(r'#(\d+)').allMatches(matParam).map((m) => int.parse(m.group(1)!)).toList();
     for (final mId in matIds) {
-      final matEnt = entityMap[mId];
-      if (matEnt == null) continue;
-
+      final queue = <int>[mId];
+      final visited = <int>{mId};
       final rawNames = <String>[];
-      for (final m in RegExp(r"'([^']*)'").allMatches(matEnt.params)) {
-        rawNames.add(IfcParser.decodeIfcString(m.group(1)!));
-      }
 
-      for (final refId in matEnt.referencedIds) {
-        final sub = entityMap[refId];
-        if (sub != null) {
-          for (final m in RegExp(r"'([^']*)'").allMatches(sub.params)) {
-            rawNames.add(IfcParser.decodeIfcString(m.group(1)!));
+      while (queue.isNotEmpty) {
+        final currId = queue.removeAt(0);
+        final matEnt = entityMap[currId];
+        if (matEnt == null) continue;
+
+        for (final m in RegExp(r"'([^']*)'").allMatches(matEnt.params)) {
+          final decoded = IfcParser.decodeIfcString(m.group(1)!);
+          if (decoded.isNotEmpty && decoded != r'$') {
+            rawNames.add(decoded);
+          }
+        }
+
+        for (final refId in matEnt.referencedIds) {
+          if (!visited.contains(refId)) {
+            visited.add(refId);
+            queue.add(refId);
           }
         }
       }
 
+      // Check materials from outside-in (usually first layer is exterior)
       for (final name in rawNames) {
         final col = _mapMaterialNameToColor(name);
         if (col != null) return col;
@@ -1809,7 +1820,30 @@ class _IfcGeometrySolver {
   /// Robust 3D Ear-Clipping Polygon Triangulator.
   /// Handles arbitrary convex, concave, L-shaped, U-shaped, and stepped planar polygons.
   /// Prevents false triangles from shooting across concave indentations or flying outside buildings.
-  static List<Triangle3D> _triangulatePolygon3D(List<Vector3> pts, {Color? color}) {
+  static List<Triangle3D> _triangulatePolygon3D(List<Vector3> rawPts, {Color? color}) {
+    // 0. Filter coincident points to prevent degenerate triangles and infinite loops
+    final List<Vector3> pts = [];
+    for (int i = 0; i < rawPts.length; i++) {
+      if (pts.isEmpty) {
+        pts.add(rawPts[i]);
+      } else {
+        final dX = rawPts[i].x - pts.last.x;
+        final dY = rawPts[i].y - pts.last.y;
+        final dZ = rawPts[i].z - pts.last.z;
+        if ((dX * dX + dY * dY + dZ * dZ) > 1e-6) {
+          pts.add(rawPts[i]);
+        }
+      }
+    }
+    if (pts.length > 1) {
+      final dX = pts.last.x - pts.first.x;
+      final dY = pts.last.y - pts.first.y;
+      final dZ = pts.last.z - pts.first.z;
+      if ((dX * dX + dY * dY + dZ * dZ) < 1e-6) {
+        pts.removeLast();
+      }
+    }
+
     final n = pts.length;
     if (n < 3) return [];
     if (n == 3) {
@@ -1885,10 +1919,13 @@ class _IfcGeometrySolver {
         final cp2 = (c.x - b.x) * (p.y - b.y) - (c.y - b.y) * (p.x - b.x);
         final cp3 = (a.x - c.x) * (p.y - c.y) - (a.y - c.y) * (p.x - c.x);
 
+        // Use a strict inequality with a small epsilon so that points exactly ON 
+        // the edge (like a seam for a cut-out hole) do not invalidate the ear.
+        final eps = 1e-6;
         if (ccw) {
-          if (cp1 >= -1e-12 && cp2 >= -1e-12 && cp3 >= -1e-12) return false;
+          if (cp1 > eps && cp2 > eps && cp3 > eps) return false;
         } else {
-          if (cp1 <= 1e-12 && cp2 <= 1e-12 && cp3 <= 1e-12) return false;
+          if (cp1 < -eps && cp2 < -eps && cp3 < -eps) return false;
         }
       }
 
@@ -1916,12 +1953,31 @@ class _IfcGeometrySolver {
       }
 
       if (!earFound) {
-        // Fallback: clip first vertex to prevent infinite loop on imperfect CAD polygons
-        final prev = indices[0];
-        final ear = indices[1];
-        final next = indices[2];
+        // Fallback: clip the vertex that forms the shortest internal edge
+        // to minimize degenerate visual spikes across the model.
+        int bestIdx = 0;
+        double minScore = double.infinity;
+        
+        for (int i = 0; i < count; i++) {
+          final pIdx = indices[(i - 1 + count) % count];
+          final nIdx = indices[(i + 1) % count];
+          
+          final a = poly2d[pIdx];
+          final c = poly2d[nIdx];
+          final distSq = (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y);
+          
+          if (distSq < minScore) {
+            minScore = distSq;
+            bestIdx = i;
+          }
+        }
+        
+        final prev = indices[(bestIdx - 1 + count) % count];
+        final ear = indices[bestIdx];
+        final next = indices[(bestIdx + 1) % count];
+        
         result.add(Triangle3D(v0: pts[prev], v1: pts[ear], v2: pts[next], color: color));
-        indices.removeAt(1);
+        indices.removeAt(bestIdx);
         count--;
       }
     }
