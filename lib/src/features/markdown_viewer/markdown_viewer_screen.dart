@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 
 /// Markdown Viewer Screen (.md / .markdown)
 class MarkdownViewerScreen extends StatefulWidget {
@@ -48,14 +48,7 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
       _fileSizeBytes = await file.length();
       final bytes = await file.readAsBytes();
 
-      String content;
-      try {
-        content = utf8.decode(bytes);
-      } catch (_) {
-        content = latin1.decode(bytes);
-      }
-
-      _markdownContent = content;
+      _markdownContent = UniversalEncodingService.decodeBytes(bytes);
 
       if (mounted) {
         setState(() {
@@ -201,37 +194,64 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
         title: Text(
           _fileName,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        actions: [
-          // Raw Source Toggle
-          IconButton(
-            icon: Icon(_showRawSource ? Icons.visibility : Icons.code),
-            tooltip: _showRawSource ? 'Formatted View' : 'Raw Markdown Source',
-            onPressed: () => setState(() => _showRawSource = !_showRawSource),
-          ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.black12,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Spacer(),
 
-          // Copy Content
-          IconButton(
-            icon: const Icon(Icons.copy_outlined),
-            tooltip: 'Copy Markdown',
-            onPressed: _copyContent,
-          ),
+                // Raw Source Toggle
+                IconButton(
+                  icon: Icon(_showRawSource ? Icons.visibility : Icons.code, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: _showRawSource ? 'Formatted View' : 'Raw Markdown Source',
+                  onPressed: () => setState(() => _showRawSource = !_showRawSource),
+                ),
 
-          // Info / Properties
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Markdown Properties',
-            onPressed: _showInfoSheet,
-          ),
+                // Copy Content
+                IconButton(
+                  icon: const Icon(Icons.copy_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Copy Markdown',
+                  onPressed: _copyContent,
+                ),
 
-          // Share
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share',
-            onPressed: _shareFile,
+                // Info / Properties
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Markdown Properties',
+                  onPressed: _showInfoSheet,
+                ),
+
+                // Share
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Share',
+                  onPressed: _shareFile,
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: _isLoading
           ? const Center(

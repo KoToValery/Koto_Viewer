@@ -167,33 +167,68 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: _pageCount > 0
-            ? Text(
-                'Page $_currentPage of $_pageCount',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              )
-            : null,
-        actions: [
-          IconButton(
-            icon: Icon(_isDarkModeView ? Icons.light_mode : Icons.dark_mode),
-            tooltip: 'Toggle Invert Colors',
-            onPressed: () {
-              setState(() {
-                _isDarkModeView = !_isDarkModeView;
-              });
-            },
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+        title: Text(
+          _fileName,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Spacer(),
+
+                // Invert mode
+                IconButton(
+                  icon: Icon(_isDarkModeView ? Icons.light_mode : Icons.dark_mode, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Toggle Invert Colors',
+                  onPressed: () {
+                    setState(() {
+                      _isDarkModeView = !_isDarkModeView;
+                    });
+                  },
+                ),
+
+                // Share
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Share PDF',
+                  onPressed: _sharePdf,
+                ),
+
+                // Print
+                IconButton(
+                  icon: const Icon(Icons.print_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Print PDF',
+                  onPressed: _printPdf,
+                ),
+              ],
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share PDF',
-            onPressed: _sharePdf,
-          ),
-          IconButton(
-            icon: const Icon(Icons.print_outlined),
-            tooltip: 'Print PDF',
-            onPressed: _printPdf,
-          ),
-        ],
+        ),
       ),
       body: Stack(
         children: [
@@ -248,6 +283,53 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       _currentPage = pageNumber;
                     });
                   }
+                },
+                errorBannerBuilder: (context, error, stackTrace, documentRef) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 48,
+                              color: Colors.amber,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Failed to load document',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'The file is damaged, incomplete (0 bytes), or not in a valid PDF format.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          FilledButton.icon(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.arrow_back),
+                            label: const Text('Go Back'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 },
               ),
             ),

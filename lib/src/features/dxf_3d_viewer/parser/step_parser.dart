@@ -1,13 +1,18 @@
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import '../models/mesh_3d.dart';
+import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 
 /// Pure-Dart ISO 10303-21 STEP (.step, .stp, .p21) 3D Mechanical CAD Parser.
 class StepParser {
+  /// Parse STEP file in background isolate.
   static Future<Mesh3D> parseFromFile(String filePath) async {
+    return compute(_parseStepFileCompute, filePath);
+  }
+
+  static Mesh3D _parseStepFileCompute(String filePath) {
     final file = File(filePath);
-    final bytes = await file.readAsBytes();
+    final bytes = file.readAsBytesSync();
     final name = filePath.split(Platform.pathSeparator).last;
     return parseFromBytes(bytes, name: name);
   }
@@ -18,11 +23,7 @@ class StepParser {
   }
 
   static String _decodeText(Uint8List bytes) {
-    try {
-      return utf8.decode(bytes, allowMalformed: true);
-    } catch (_) {
-      return latin1.decode(bytes);
-    }
+    return UniversalEncodingService.decodeBytes(bytes);
   }
 
   static Mesh3D _parseStepText(String rawText, {String name = 'Model.step'}) {
@@ -52,6 +53,14 @@ class StepParser {
       final id = int.tryParse(match.group(1)!) ?? 0;
       final type = match.group(2)!.toUpperCase();
       final params = match.group(3)!.trim();
+
+      if (type == 'PRODUCT') {
+        final nameMatch = RegExp(r"'(.*?)'").allMatches(params).toList();
+        if (nameMatch.isNotEmpty) {
+          final prodName = UniversalEncodingService.decodeIso10303String(nameMatch[0].group(1)!);
+          if (prodName.isNotEmpty) name = prodName;
+        }
+      }
 
       // A. CARTESIAN_POINT
       if (type == 'CARTESIAN_POINT') {

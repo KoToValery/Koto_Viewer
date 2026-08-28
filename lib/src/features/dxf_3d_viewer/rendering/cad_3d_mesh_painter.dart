@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/mesh_3d.dart';
 import 'cad_3d_camera.dart';
@@ -63,15 +64,17 @@ class Cad3DMeshPainter extends CustomPainter {
   final bool showBoundingBox;
   final bool showGrid;
   final Color? customModelColor;
+  final bool isInteracting;
 
   const Cad3DMeshPainter({
     required this.mesh,
     required this.camera,
-    this.shadingMode = Cad3DShadingMode.cadShadedEdges,
+    this.shadingMode = Cad3DShadingMode.smoothShaded,
     this.theme = Cad3DTheme.darkCad,
-    this.showBoundingBox = true,
+    this.showBoundingBox = false,
     this.showGrid = true,
     this.customModelColor,
+    this.isInteracting = false,
   });
 
   @override
@@ -93,7 +96,22 @@ class Cad3DMeshPainter extends CustomPainter {
     final lightDir = Vector3(0.577, -0.577, 0.577).normalized(); // Directional light from top-right-front
     final List<_RenderTriangle> renderList = [];
 
-    for (final tri in mesh.triangles) {
+    // Interactive adaptive LOD: when rotating/panning large models, stride for 60 FPS responsiveness
+    final int totalTris = mesh.triangles.length;
+    final int stride = (isInteracting && totalTris > 40000)
+        ? (totalTris / 25000).ceil()
+        : 1;
+
+    final bool cullBackfaces = shadingMode != Cad3DShadingMode.xray &&
+        shadingMode != Cad3DShadingMode.wireframe;
+
+    final double screenW = size.width;
+    final double screenH = size.height;
+    const double margin = 50.0;
+
+    for (int i = 0; i < totalTris; i += stride) {
+      final tri = mesh.triangles[i];
+
       // Offset by model center so model rotates around its geometric centroid
       final v0Local = tri.v0 - center;
       final v1Local = tri.v1 - center;
@@ -104,37 +122,53 @@ class Cad3DMeshPainter extends CustomPainter {
       final tv1 = camera.transformPoint(v1Local);
       final tv2 = camera.transformPoint(v2Local);
 
+      // Fast view-space normal calculation
+      final edge1 = tv1 - tv0;
+      final edge2 = tv2 - tv0;
+      final viewNormal = edge1.cross(edge2);
+
+      // Early Backface Culling: camera looks down +Y.
+      // If viewNormal.y >= 0, face points away from camera
+      if (cullBackfaces && viewNormal.y >= 0) {
+        continue;
+      }
+
       // Centroid depth in view space (larger Y is further away)
       final avgDepth = (tv0.y + tv1.y + tv2.y) / 3.0;
 
-      // Calculate view-space normal for lighting and backface detection
-      final edge1 = tv1 - tv0;
-      final edge2 = tv2 - tv0;
-      final viewNormal = edge1.cross(edge2).normalized();
+      // Project vertices to 2D screen coordinates
+      final p0 = camera.projectToScreen(tv0, size, modelScale);
+      final p1 = camera.projectToScreen(tv1, size, modelScale);
+      final p2 = camera.projectToScreen(tv2, size, modelScale);
 
-      // In our view coordinate system, camera looks down +Y axis.
-      // A face is facing the camera if viewNormal.y < 0
-      final isBackface = viewNormal.y >= 0;
+      // Viewport Frustum Culling: discard triangles completely outside the screen
+      final minX = math.min(p0.dx, math.min(p1.dx, p2.dx));
+      if (minX > screenW + margin) continue;
+      final maxX = math.max(p0.dx, math.max(p1.dx, p2.dx));
+      if (maxX < -margin) continue;
+      final minY = math.min(p0.dy, math.min(p1.dy, p2.dy));
+      if (minY > screenH + margin) continue;
+      final maxY = math.max(p0.dy, math.max(p1.dy, p2.dy));
+      if (maxY < -margin) continue;
 
       // Lighting calculation (Lambertian + Ambient)
       final transformedNorm = camera.transformPoint(tri.normal).normalized();
       final double diffuse = math.max(0.15, -transformedNorm.dot(lightDir));
       final double intensity = (diffuse * 0.75 + 0.25).clamp(0.15, 1.0);
 
+      final effectiveColor = customModelColor ?? tri.color ?? baseColor;
       Color faceColor;
       if (shadingMode == Cad3DShadingMode.xray) {
-        faceColor = baseColor.withValues(alpha: 0.25);
+        faceColor = effectiveColor.withValues(alpha: 0.25);
       } else if (shadingMode == Cad3DShadingMode.wireframe) {
         faceColor = Colors.transparent;
       } else {
-        final hsl = HSLColor.fromColor(baseColor);
+        final hsl = HSLColor.fromColor(effectiveColor);
         faceColor = hsl.withLightness((hsl.lightness * intensity).clamp(0.08, 0.95)).toColor();
+        if (effectiveColor.a < 1.0) {
+          faceColor = faceColor.withValues(alpha: effectiveColor.a);
+        }
       }
-
-      // Project vertices to 2D screen coordinates
-      final p0 = camera.projectToScreen(tv0, size, modelScale);
-      final p1 = camera.projectToScreen(tv1, size, modelScale);
-      final p2 = camera.projectToScreen(tv2, size, modelScale);
 
       renderList.add(_RenderTriangle(
         p0: p0,
@@ -142,14 +176,14 @@ class Cad3DMeshPainter extends CustomPainter {
         p2: p2,
         depth: avgDepth,
         color: faceColor,
-        isBackface: isBackface,
+        isBackface: false,
       ));
     }
 
     // Depth Sorting (Back to Front: largest depth first)
     renderList.sort((a, b) => b.depth.compareTo(a.depth));
 
-    // 3. Render Triangles
+    // 3. Render Triangles (GPU Batched drawVertices or Path)
     final fillPaint = Paint()..style = PaintingStyle.fill;
     final edgePaint = Paint()
       ..style = PaintingStyle.stroke
@@ -168,27 +202,49 @@ class Cad3DMeshPainter extends CustomPainter {
       edgePaint.color = Colors.black.withValues(alpha: 0.25);
     }
 
-    for (final tri in renderList) {
-      if (shadingMode != Cad3DShadingMode.xray &&
-          shadingMode != Cad3DShadingMode.wireframe &&
-          tri.isBackface) {
-        // Backface culling for solid opaque modes
-        continue;
+    if (!drawEdges && shadingMode != Cad3DShadingMode.wireframe) {
+      // GPU Batched Rendering via Canvas.drawVertices in chunks of up to 10,000 triangles
+      const int batchSize = 10000;
+      final positions = <Offset>[];
+      final colors = <Color>[];
+
+      for (int i = 0; i < renderList.length; i++) {
+        final tri = renderList[i];
+        positions.add(tri.p0);
+        positions.add(tri.p1);
+        positions.add(tri.p2);
+        colors.add(tri.color);
+        colors.add(tri.color);
+        colors.add(tri.color);
+
+        if ((i + 1) % batchSize == 0 || i == renderList.length - 1) {
+          final vertices = ui.Vertices(
+            ui.VertexMode.triangles,
+            positions,
+            colors: colors,
+          );
+          canvas.drawVertices(vertices, BlendMode.srcOver, fillPaint);
+          positions.clear();
+          colors.clear();
+        }
       }
+    } else {
+      // Fallback for modes requiring edge outlines, wireframe, or x-ray
+      for (final tri in renderList) {
+        final path = Path()
+          ..moveTo(tri.p0.dx, tri.p0.dy)
+          ..lineTo(tri.p1.dx, tri.p1.dy)
+          ..lineTo(tri.p2.dx, tri.p2.dy)
+          ..close();
 
-      final path = Path()
-        ..moveTo(tri.p0.dx, tri.p0.dy)
-        ..lineTo(tri.p1.dx, tri.p1.dy)
-        ..lineTo(tri.p2.dx, tri.p2.dy)
-        ..close();
+        if (shadingMode != Cad3DShadingMode.wireframe) {
+          fillPaint.color = tri.color;
+          canvas.drawPath(path, fillPaint);
+        }
 
-      if (shadingMode != Cad3DShadingMode.wireframe) {
-        fillPaint.color = tri.color;
-        canvas.drawPath(path, fillPaint);
-      }
-
-      if (drawEdges) {
-        canvas.drawPath(path, edgePaint);
+        if (drawEdges) {
+          canvas.drawPath(path, edgePaint);
+        }
       }
     }
 
@@ -281,7 +337,6 @@ class Cad3DMeshPainter extends CustomPainter {
     final gizmoCenter = Offset(48.0, size.height - 48.0);
 
     // Coordinate unit vectors
-    final origin = Vector3.zero;
     final xAxis = camera.transformPoint(const Vector3(1.0, 0.0, 0.0));
     final yAxis = camera.transformPoint(const Vector3(0.0, 1.0, 0.0));
     final zAxis = camera.transformPoint(const Vector3(0.0, 0.0, 1.0));

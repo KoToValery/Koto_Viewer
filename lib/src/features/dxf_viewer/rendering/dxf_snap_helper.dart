@@ -275,8 +275,21 @@ class DxfSnapHelper {
       }
     }
 
-    // Iterate through all visible entities
-    for (final entity in document.entities) {
+    // Determine entities to test (using Quadtree Spatial Index if available)
+    final Iterable<DxfEntity> candidates;
+    if (document.spatialIndex != null) {
+      final searchBox = Rect.fromCenter(
+        center: cadPoint,
+        width: toleranceCad * 3.0,
+        height: toleranceCad * 3.0,
+      );
+      candidates = document.spatialIndex!.query(searchBox);
+    } else {
+      candidates = document.entities;
+    }
+
+    // Iterate through visible entities
+    for (final entity in candidates) {
       final layer = document.layers[entity.layer];
       if (layer != null && !layer.isVisible) continue;
 
@@ -515,4 +528,251 @@ class DxfSnapHelper {
 
     return bestLandmarkSnap ?? bestPerpendicularSnap;
   }
+
+  /// Searches for the closest DxfCircle or DxfArc entity within [toleranceCad] of [cadPoint].
+  /// Used for 1-tap Radius & Diameter measurement.
+  static DxfCircleArcResult? findClosestCircleOrArc({
+    required DxfDocument document,
+    required Offset cadPoint,
+    required double toleranceCad,
+  }) {
+    if (toleranceCad <= 0) return null;
+
+    DxfCircleArcResult? bestResult;
+    double minDistance = toleranceCad;
+
+    void checkCircle(Offset center, double radius) {
+      final double distToCenter = (cadPoint - center).distance;
+      final double distToCircumference = (distToCenter - radius).abs();
+      if (distToCircumference <= minDistance) {
+        minDistance = distToCircumference;
+        final closestPoint = closestPointOnCircle(cadPoint, center, radius);
+        bestResult = DxfCircleArcResult(
+          center: center,
+          radius: radius,
+          isArc: false,
+          arcLength: 2.0 * math.pi * radius,
+          samplePoint: closestPoint,
+          distance: distToCircumference,
+        );
+      }
+    }
+
+    void checkArc(Offset center, double radius, double startAngleDeg, double endAngleDeg) {
+      final closestPoint = closestPointOnArc(cadPoint, center, radius, startAngleDeg, endAngleDeg);
+      final double dist = (cadPoint - closestPoint).distance;
+      if (dist <= minDistance) {
+        minDistance = dist;
+        double sweep = endAngleDeg - startAngleDeg;
+        if (sweep <= 0) sweep += 360.0;
+        final double arcLen = radius * (sweep * math.pi / 180.0);
+        bestResult = DxfCircleArcResult(
+          center: center,
+          radius: radius,
+          isArc: true,
+          arcLength: arcLen,
+          startAngleDeg: startAngleDeg,
+          endAngleDeg: endAngleDeg,
+          samplePoint: closestPoint,
+          distance: dist,
+        );
+      }
+    }
+
+    // Determine entities to test (using Quadtree Spatial Index if available)
+    final Iterable<DxfEntity> candidates;
+    if (document.spatialIndex != null) {
+      final searchBox = Rect.fromCenter(
+        center: cadPoint,
+        width: toleranceCad * 3.0,
+        height: toleranceCad * 3.0,
+      );
+      candidates = document.spatialIndex!.query(searchBox);
+    } else {
+      candidates = document.entities;
+    }
+
+    for (final entity in candidates) {
+      final layer = document.layers[entity.layer];
+      if (layer != null && !layer.isVisible) continue;
+
+      if (entity is DxfCircle) {
+        checkCircle(entity.center, entity.radius);
+      } else if (entity is DxfArc) {
+        checkArc(entity.center, entity.radius, entity.startAngleDeg, entity.endAngleDeg);
+      } else if (entity is DxfInsert) {
+        final block = document.blocks[entity.blockName];
+        if (block != null && block.entities.isNotEmpty) {
+          final rad = entity.rotationDeg * math.pi / 180.0;
+          final cosA = math.cos(rad);
+          final sinA = math.sin(rad);
+          final bx = block.basePoint.dx;
+          final by = block.basePoint.dy;
+
+          Offset transformPt(Offset pt) {
+            final lx = (pt.dx - bx) * entity.scaleX;
+            final ly = (pt.dy - by) * entity.scaleY;
+            final rx = lx * cosA - ly * sinA;
+            final ry = lx * sinA + ly * cosA;
+            return Offset(entity.insertPoint.dx + rx, entity.insertPoint.dy + ry);
+          }
+
+          for (final child in block.entities) {
+            final childLayer = document.layers[child.layer];
+            if (childLayer != null && !childLayer.isVisible) continue;
+
+            if (child is DxfCircle) {
+              final c = transformPt(child.center);
+              checkCircle(c, child.radius * entity.scaleX.abs());
+            } else if (child is DxfArc) {
+              final c = transformPt(child.center);
+              checkArc(c, child.radius * entity.scaleX.abs(), child.startAngleDeg, child.endAngleDeg);
+            }
+          }
+        }
+      }
+    }
+
+    return bestResult;
+  }
+
+  /// Hit-tests the closest visible CAD entity near [cadPoint] within [toleranceCad].
+  static DxfEntity? hitTestEntity({
+    required DxfDocument document,
+    required Offset cadPoint,
+    required double toleranceCad,
+  }) {
+    if (toleranceCad <= 0) return null;
+
+    final Iterable<DxfEntity> candidates;
+    if (document.spatialIndex != null) {
+      final searchBox = Rect.fromCenter(
+        center: cadPoint,
+        width: toleranceCad * 3.0,
+        height: toleranceCad * 3.0,
+      );
+      candidates = document.spatialIndex!.query(searchBox);
+    } else {
+      candidates = document.entities;
+    }
+
+    DxfEntity? bestEntity;
+    double minDistance = toleranceCad;
+
+    for (final entity in candidates) {
+      final layer = document.layers[entity.layer];
+      if (layer != null && !layer.isVisible) continue;
+
+      double? dist;
+
+      if (entity is DxfLine) {
+        final p = closestPointOnSegment(cadPoint, entity.p1, entity.p2);
+        dist = (cadPoint - p).distance;
+      } else if (entity is DxfCircle) {
+        final distCenter = (cadPoint - entity.center).distance;
+        dist = (distCenter - entity.radius).abs();
+      } else if (entity is DxfArc) {
+        final p = closestPointOnArc(cadPoint, entity.center, entity.radius, entity.startAngleDeg, entity.endAngleDeg);
+        dist = (cadPoint - p).distance;
+      } else if (entity is DxfLwPolyline) {
+        final pts = entity.vertices.map((v) => Offset(v.x, v.y)).toList();
+        if (pts.length >= 2) {
+          double minDistSeg = double.infinity;
+          for (int i = 0; i < pts.length - 1; i++) {
+            final p = closestPointOnSegment(cadPoint, pts[i], pts[i + 1]);
+            final d = (cadPoint - p).distance;
+            if (d < minDistSeg) minDistSeg = d;
+          }
+          if (entity.isClosed && pts.length > 2) {
+            final p = closestPointOnSegment(cadPoint, pts.last, pts.first);
+            final d = (cadPoint - p).distance;
+            if (d < minDistSeg) minDistSeg = d;
+          }
+          dist = minDistSeg;
+        }
+      } else if (entity is DxfPolyline) {
+        final pts = entity.vertices.map((v) => Offset(v.x, v.y)).toList();
+        if (pts.length >= 2) {
+          double minDistSeg = double.infinity;
+          for (int i = 0; i < pts.length - 1; i++) {
+            final p = closestPointOnSegment(cadPoint, pts[i], pts[i + 1]);
+            final d = (cadPoint - p).distance;
+            if (d < minDistSeg) minDistSeg = d;
+          }
+          if (entity.isClosed && pts.length > 2) {
+            final p = closestPointOnSegment(cadPoint, pts.last, pts.first);
+            final d = (cadPoint - p).distance;
+            if (d < minDistSeg) minDistSeg = d;
+          }
+          dist = minDistSeg;
+        }
+      } else if (entity is DxfText) {
+        final box = entity.getBoundingBox(document.blocks);
+        if (box.inflate(toleranceCad * 0.5).contains(cadPoint)) {
+          dist = 0.0;
+        } else {
+          dist = (cadPoint - entity.insertPoint).distance;
+        }
+      } else if (entity is DxfMText) {
+        final box = entity.getBoundingBox(document.blocks);
+        if (box.inflate(toleranceCad * 0.5).contains(cadPoint)) {
+          dist = 0.0;
+        } else {
+          dist = (cadPoint - entity.insertPoint).distance;
+        }
+      } else if (entity is DxfLeader) {
+        if (entity.vertices.length >= 2) {
+          double minL = double.infinity;
+          for (int i = 0; i < entity.vertices.length - 1; i++) {
+            final p = closestPointOnSegment(cadPoint, entity.vertices[i], entity.vertices[i + 1]);
+            final d = (cadPoint - p).distance;
+            if (d < minL) minL = d;
+          }
+          dist = minL;
+        }
+      } else {
+        final box = entity.getBoundingBox(document.blocks);
+        if (box != null) {
+          if (box.contains(cadPoint)) {
+            dist = 0.0;
+          } else {
+            final dx = math.max(0.0, math.max(box.left - cadPoint.dx, cadPoint.dx - box.right));
+            final dy = math.max(0.0, math.max(box.top - cadPoint.dy, cadPoint.dy - box.bottom));
+            dist = math.sqrt(dx * dx + dy * dy);
+          }
+        }
+      }
+
+      if (dist != null && dist <= minDistance) {
+        minDistance = dist;
+        bestEntity = entity;
+      }
+    }
+
+    return bestEntity;
+  }
 }
+
+/// Result of querying closest Circle or Arc entity.
+class DxfCircleArcResult {
+  final Offset center;
+  final double radius;
+  final bool isArc;
+  final double? arcLength;
+  final double? startAngleDeg;
+  final double? endAngleDeg;
+  final Offset samplePoint;
+  final double distance;
+
+  const DxfCircleArcResult({
+    required this.center,
+    required this.radius,
+    required this.isArc,
+    this.arcLength,
+    this.startAngleDeg,
+    this.endAngleDeg,
+    required this.samplePoint,
+    required this.distance,
+  });
+}
+

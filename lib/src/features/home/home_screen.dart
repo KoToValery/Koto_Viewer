@@ -8,7 +8,6 @@ import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/file_source_service.dart';
 import '../../core/services/dwg_converter_service.dart';
-import '../../core/services/doc_to_pdf_converter_service.dart';
 import '../../core/services/ppt_to_pdf_converter_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
@@ -22,6 +21,7 @@ import '../docx_viewer/docx_viewer_screen.dart';
 import '../eps_viewer/eps_viewer_screen.dart';
 import '../pcb_viewer/pcb_viewer_screen.dart';
 import '../hpgl_viewer/hpgl_viewer_screen.dart';
+import '../cdr_viewer/cdr_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 
 class FileTypeIcon extends StatelessWidget {
@@ -69,6 +69,8 @@ class FileTypeIcon extends StatelessWidget {
         return _buildRtfIcon();
       case KotoFileType.eps:
         return _buildEpsIcon();
+      case KotoFileType.cdr:
+        return _buildCdrIcon();
       case KotoFileType.gbr:
         return _buildPcbIcon();
       case KotoFileType.drl:
@@ -81,6 +83,8 @@ class FileTypeIcon extends StatelessWidget {
         return _buildStepIcon();
       case KotoFileType.iges:
         return _buildIgesIcon();
+      case KotoFileType.ifc:
+        return _buildIfcIcon();
       case KotoFileType.zip:
         return _buildZipIcon();
       case KotoFileType.other:
@@ -577,6 +581,41 @@ class FileTypeIcon extends StatelessWidget {
     );
   }
 
+  Widget _buildCdrIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF86EFAC)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.palette_rounded,
+              color: const Color(0xFF16A34A),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'CDR',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF16A34A),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPcbIcon() {
     return Container(
       width: width,
@@ -777,6 +816,41 @@ class FileTypeIcon extends StatelessWidget {
                 fontSize: width * 0.18,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFF7C3AED),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIfcIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.domain_rounded,
+              color: const Color(0xFF16A34A),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'IFC',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF16A34A),
                 letterSpacing: 0.5,
                 height: 1,
               ),
@@ -1227,6 +1301,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.glb:
       case KotoFileType.step:
       case KotoFileType.iges:
+      case KotoFileType.ifc:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => Dxf3DViewerScreen(filePath: filePath),
@@ -1323,6 +1398,19 @@ class _HomeScreenState extends State<HomeScreen> {
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => EpsViewerScreen(filePath: filePath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.cdr:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => CdrViewerScreen(filePath: filePath),
           ),
         );
         if (success != false) {
@@ -2295,15 +2383,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Fast, lightweight viewer with geodetic coordinate support and vector precision.',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.88),
-                            fontSize: 13.5,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
                         Wrap(
                           spacing: 10,
                           runSpacing: 10,
@@ -2351,7 +2431,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'PDF • DXF • DWG • STEP • 3D • PCB • Office',
+                                    'PDF • DWG • 3D • PCB • Office',
                                     style: TextStyle(
                                       color: Colors.white.withValues(alpha: 0.95),
                                       fontSize: 12,

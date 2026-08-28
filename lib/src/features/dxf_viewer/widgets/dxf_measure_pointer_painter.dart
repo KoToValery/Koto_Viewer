@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../models/dxf_models.dart';
 import '../rendering/dxf_math.dart';
 import '../rendering/dxf_snap_helper.dart';
 
@@ -12,6 +13,9 @@ class DxfMeasurePointerPainter extends CustomPainter {
   final Offset currentCadCoord;
   final Offset? p1CadCoord;
   final bool isSettingSecondPoint;
+  final DxfMeasureTool tool;
+  final String? customTitle;
+  final String? customSubText;
 
   const DxfMeasurePointerPainter({
     required this.touchPos,
@@ -21,14 +25,33 @@ class DxfMeasurePointerPainter extends CustomPainter {
     required this.currentCadCoord,
     this.p1CadCoord,
     this.isSettingSecondPoint = false,
+    this.tool = DxfMeasureTool.distance,
+    this.customTitle,
+    this.customSubText,
   });
+
+  Color _getToolColor() {
+    switch (tool) {
+      case DxfMeasureTool.distance:
+        return const Color(0xFFFF5252);
+      case DxfMeasureTool.area:
+        return const Color(0xFF00E5FF);
+      case DxfMeasureTool.angle:
+        return const Color(0xFFFFB300);
+      case DxfMeasureTool.radius:
+        return const Color(0xFF00E676);
+      case DxfMeasureTool.annotation:
+        return const Color(0xFFFF4081);
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final effectiveTip = snappedPos ?? targetPos;
     final bool isSnapped = snappedPos != null;
 
-    final baseColor = isSnapped ? const Color(0xFF00E5FF) : const Color(0xFFFF5252);
+    final toolColor = _getToolColor();
+    final baseColor = isSnapped ? const Color(0xFF00E5FF) : toolColor;
     final glowColor = baseColor.withValues(alpha: 0.35);
 
     // 1. Draw Touch Anchor (under the user's finger)
@@ -188,7 +211,7 @@ class DxfMeasurePointerPainter extends CustomPainter {
   }
 
   void _drawHudBadge(Canvas canvas, Offset tipPos, bool isSnapped) {
-    String titleText = isSettingSecondPoint ? '2nd point' : '1st point';
+    String titleText = customTitle ?? (isSettingSecondPoint ? '2nd point' : '1st point');
     if (isSnapped && snapType != null) {
       switch (snapType!) {
         case DxfSnapType.endpoint:
@@ -204,7 +227,7 @@ class DxfMeasurePointerPainter extends CustomPainter {
           titleText += ' • Node';
           break;
         case DxfSnapType.nearest:
-          titleText += ' • Segment';
+          titleText += ' • On Edge';
           break;
         case DxfSnapType.perpendicular:
           titleText += ' • Perpendicular (90°)';
@@ -212,8 +235,9 @@ class DxfMeasurePointerPainter extends CustomPainter {
       }
     }
 
-    String subText = 'X: ${DxfMath.formatDistance(currentCadCoord.dx)}  Y: ${DxfMath.formatDistance(currentCadCoord.dy)}';
-    if (isSettingSecondPoint && p1CadCoord != null) {
+    String subText = customSubText ??
+        'X: ${DxfMath.formatDistance(currentCadCoord.dx)}  Y: ${DxfMath.formatDistance(currentCadCoord.dy)}';
+    if (customSubText == null && isSettingSecondPoint && p1CadCoord != null) {
       final double liveDist = (currentCadCoord - p1CadCoord!).distance;
       final dx = currentCadCoord.dx - p1CadCoord!.dx;
       final dy = currentCadCoord.dy - p1CadCoord!.dy;
@@ -265,11 +289,12 @@ class DxfMeasurePointerPainter extends CustomPainter {
     );
 
     final bgPaint = Paint()
-      ..color = const Color(0xEE141C2B)
+      ..color = const Color(0xF2141C2B)
       ..style = PaintingStyle.fill;
 
+    final toolColor = _getToolColor();
     final borderPaint = Paint()
-      ..color = (isSnapped ? const Color(0xFF00E5FF) : const Color(0xFFFF5252)).withValues(alpha: 0.6)
+      ..color = (isSnapped ? const Color(0xFF00E5FF) : toolColor).withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
@@ -288,6 +313,9 @@ class DxfMeasurePointerPainter extends CustomPainter {
         oldDelegate.snapType != snapType ||
         oldDelegate.currentCadCoord != currentCadCoord ||
         oldDelegate.p1CadCoord != p1CadCoord ||
-        oldDelegate.isSettingSecondPoint != isSettingSecondPoint;
+        oldDelegate.isSettingSecondPoint != isSettingSecondPoint ||
+        oldDelegate.tool != tool ||
+        oldDelegate.customTitle != customTitle ||
+        oldDelegate.customSubText != customSubText;
   }
 }

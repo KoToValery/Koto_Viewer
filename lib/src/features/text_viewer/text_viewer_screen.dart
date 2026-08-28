@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 
 /// Text Viewer Screen for .txt, .log, .csv, and coordinate files.
 class TextViewerScreen extends StatefulWidget {
@@ -72,22 +72,10 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
       _fileSizeBytes = await file.length();
       final bytes = await file.readAsBytes();
 
-      String decodedText;
-      try {
-        decodedText = utf8.decode(bytes);
-        _encodingName = 'UTF-8';
-      } catch (_) {
-        try {
-          decodedText = latin1.decode(bytes);
-          _encodingName = 'Latin-1 / ANSI';
-        } catch (e) {
-          decodedText = String.fromCharCodes(bytes);
-          _encodingName = 'ASCII / Binary';
-        }
-      }
-
-      _fullText = decodedText;
-      _lines = decodedText.split(RegExp(r'\r?\n'));
+      final result = UniversalEncodingService.decodeBytesWithEncoding(bytes);
+      _fullText = result.text;
+      _encodingName = result.encodingName;
+      _lines = result.text.split(RegExp(r'\r?\n'));
 
       if (mounted) {
         setState(() {
@@ -281,71 +269,93 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                 ),
                 onChanged: _onSearchChanged,
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _fileName,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    '${_lines.length} lines • $_encodingName',
-                    style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
-                  ),
-                ],
+            : Text(
+                _fileName,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-        actions: [
-          // Search Action
-          IconButton(
-            icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
-            tooltip: _isSearchOpen ? 'Close Search' : 'Find in Text',
-            onPressed: () {
-              setState(() {
-                _isSearchOpen = !_isSearchOpen;
-                if (!_isSearchOpen) {
-                  _searchController.clear();
-                  _onSearchChanged('');
-                }
-              });
-            },
-          ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.black12,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Spacer(),
 
-          // Monospace Toggle
-          IconButton(
-            icon: Icon(_isMonospace ? Icons.font_download : Icons.font_download_outlined),
-            tooltip: _isMonospace ? 'Switch to Proportional Font' : 'Switch to Monospace Font',
-            onPressed: () => setState(() => _isMonospace = !_isMonospace),
-          ),
+                // Search Action
+                IconButton(
+                  icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: _isSearchOpen ? 'Close Search' : 'Find in Text',
+                  onPressed: () {
+                    setState(() {
+                      _isSearchOpen = !_isSearchOpen;
+                      if (!_isSearchOpen) {
+                        _searchController.clear();
+                        _onSearchChanged('');
+                      }
+                    });
+                  },
+                ),
 
-          // Word Wrap Toggle (Fit to Screen)
-          IconButton(
-            icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left),
-            tooltip: _isWordWrap ? 'Disable Word Wrap (Free Scroll)' : 'Enable Word Wrap (Fit Screen)',
-            onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
-          ),
+                // Monospace Toggle
+                IconButton(
+                  icon: Icon(_isMonospace ? Icons.font_download : Icons.font_download_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: _isMonospace ? 'Switch to Proportional Font' : 'Switch to Monospace Font',
+                  onPressed: () => setState(() => _isMonospace = !_isMonospace),
+                ),
 
-          // Copy All
-          IconButton(
-            icon: const Icon(Icons.copy_all_outlined),
-            tooltip: 'Copy All',
-            onPressed: _copyAllText,
-          ),
+                // Word Wrap Toggle (Fit to Screen)
+                IconButton(
+                  icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: _isWordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
+                  onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
+                ),
 
-          // Info / Properties
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Text Properties',
-            onPressed: _showInfoSheet,
-          ),
+                // Copy All
+                IconButton(
+                  icon: const Icon(Icons.copy_all_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Copy All',
+                  onPressed: _copyAllText,
+                ),
 
-          // Share
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share',
-            onPressed: _shareFile,
+                // Info / Properties
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Text Properties',
+                  onPressed: _showInfoSheet,
+                ),
+
+                // Share
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Share',
+                  onPressed: _shareFile,
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: _isLoading
           ? const Center(

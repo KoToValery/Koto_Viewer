@@ -105,12 +105,21 @@ class PcbArchiveParser {
           if (doc.commands.isNotEmpty || doc.drillHoles.isNotEmpty) {
             updateGlobalBounds(doc.boundingBox);
             final order = _getLayerZOrder(doc.layerType);
+            final isAuxiliaryLayer = lower.contains('assembly') ||
+                lower.contains('assy') ||
+                lower.contains('paste') ||
+                lower.contains('pos') ||
+                lower.contains('placement') ||
+                lower.contains('centroid') ||
+                lower.contains('mask') ||
+                lower.contains('soldermask');
             layers.add(
               PcbLayerItem(
                 fileName: baseName,
                 type: doc.layerType,
                 document: doc,
                 order: order,
+                isVisible: !isAuxiliaryLayer,
               ),
             );
           }

@@ -309,58 +309,75 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 ),
                 onChanged: _onSearchChanged,
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _fileName,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (_document != null)
-                    Text(
-                      '${_document!.pageSettings.paperName} ${_document!.pageSettings.isLandscape ? "Landscape" : "Portrait"} • ${_document!.pages.length} ${_document!.pages.length == 1 ? "page" : "pages"}',
-                      style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
-                    ),
-                ],
+            : Text(
+                _fileName,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-        actions: [
-          // Search Action
-          IconButton(
-            icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
-            tooltip: _isSearchOpen ? 'Close Search' : 'Search in Document',
-            onPressed: () {
-              setState(() {
-                _isSearchOpen = !_isSearchOpen;
-                if (!_isSearchOpen) {
-                  _searchController.clear();
-                  _onSearchChanged('');
-                }
-              });
-            },
-          ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.black12,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Spacer(),
 
-          // Copy All
-          IconButton(
-            icon: const Icon(Icons.copy_all_outlined),
-            tooltip: 'Copy Document Text',
-            onPressed: _copyAllText,
-          ),
+                // Search Action
+                IconButton(
+                  icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: _isSearchOpen ? 'Close Search' : 'Search in Document',
+                  onPressed: () {
+                    setState(() {
+                      _isSearchOpen = !_isSearchOpen;
+                      if (!_isSearchOpen) {
+                        _searchController.clear();
+                        _onSearchChanged('');
+                      }
+                    });
+                  },
+                ),
 
-          // Info / Properties
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Document Properties',
-            onPressed: _showInfoSheet,
-          ),
+                // Copy All
+                IconButton(
+                  icon: const Icon(Icons.copy_all_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Copy Document Text',
+                  onPressed: _copyAllText,
+                ),
 
-          // Share
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share',
-            onPressed: _shareFile,
+                // Info / Properties
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Document Properties',
+                  onPressed: _showInfoSheet,
+                ),
+
+                // Share
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Share',
+                  onPressed: _shareFile,
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: _isLoading
           ? const Center(

@@ -35,6 +35,7 @@ class GerberParser {
     bool isDarkPolarity = true;
     bool inRegion = false;
     List<Offset> currentRegionPoints = [];
+    List<List<Offset>> currentRegionContours = [];
 
     Offset currentPoint = Offset.zero;
     int interpMode = 1; // 1 = G01 linear, 2 = G02 CW arc, 3 = G03 CCW arc
@@ -153,6 +154,17 @@ class GerberParser {
               type = macro.type;
               dimX = macro.dimX * unitScale;
               dimY = macro.dimY * unitScale;
+              final pts = macro.polygonPoints
+                  ?.map((p) => Offset(p.dx * unitScale, p.dy * unitScale))
+                  .toList();
+              apertureTable[id] = PcbAperture(
+                id: id,
+                type: type,
+                dimX: dimX,
+                dimY: dimY,
+                polygonPoints: pts,
+              );
+              continue;
             } else {
               // Fallback for custom macro names (e.g. PPAD011)
               type = PcbApertureType.obround;
@@ -175,17 +187,21 @@ class GerberParser {
       if (token.contains('G36')) {
         inRegion = true;
         currentRegionPoints = [];
+        currentRegionContours = [[]];
       } else if (token.contains('G37')) {
         inRegion = false;
-        if (currentRegionPoints.length >= 3) {
+        final validContours = currentRegionContours.where((c) => c.length >= 3).toList();
+        if (validContours.isNotEmpty || currentRegionPoints.length >= 3) {
           commands.add(
             PcbCommand.region(
               regionPoints: List.from(currentRegionPoints),
+              regionContours: validContours.isNotEmpty ? validContours : [List.from(currentRegionPoints)],
               isDark: isDarkPolarity,
             ),
           );
         }
         currentRegionPoints.clear();
+        currentRegionContours.clear();
       }
 
       if (token.contains('G01') || token.contains('G1')) {
@@ -250,9 +266,13 @@ class GerberParser {
       if (opDCode == 1) {
         // Draw Track or Arc
         if (inRegion) {
-          if (currentRegionPoints.isEmpty) {
-            currentRegionPoints.add(currentPoint);
+          if (currentRegionContours.isEmpty) {
+            currentRegionContours.add([]);
           }
+          if (currentRegionContours.last.isEmpty) {
+            currentRegionContours.last.add(currentPoint);
+          }
+          currentRegionContours.last.add(targetPoint);
           currentRegionPoints.add(targetPoint);
           updateBounds(targetPoint);
         } else {
@@ -296,6 +316,10 @@ class GerberParser {
         // Pen Up / Move
         currentPoint = targetPoint;
         if (inRegion) {
+          if (currentRegionContours.isNotEmpty && currentRegionContours.last.isNotEmpty) {
+            currentRegionContours.add([]);
+          }
+          currentRegionContours.last.add(currentPoint);
           currentRegionPoints.add(currentPoint);
         }
       } else if (opDCode == 3) {
@@ -353,13 +377,26 @@ class GerberParser {
 
         if (primCode == 4 && nums.length >= 3) {
           // 4, exposure, numVertices, x1, y1, x2, y2, ...
+          final pts = <Offset>[];
           for (int k = 3; k < nums.length - 1; k += 2) {
             final x = nums[k];
             final y = nums[k + 1];
+            pts.add(Offset(x, y));
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
+          }
+          if (minX.isFinite && maxX.isFinite && minY.isFinite && maxY.isFinite) {
+            final w = (maxX - minX).abs();
+            final h = (maxY - minY).abs();
+            macroDefs[name] = _MacroDef(
+              type: PcbApertureType.polygon,
+              dimX: w > 0 ? w : 1.0,
+              dimY: h > 0 ? h : 1.0,
+              polygonPoints: pts,
+            );
+            return;
           }
         } else if (primCode == 1 && nums.length >= 2) {
           // Circle: 1, exposure, diameter, [cx, cy]
@@ -380,8 +417,8 @@ class GerberParser {
         final h = (maxY - minY).abs();
         macroDefs[name] = _MacroDef(
           type: PcbApertureType.obround,
-          dimX: math.max(0.2, w > 0 ? w : 1.0),
-          dimY: math.max(0.2, h > 0 ? h : 1.0),
+          dimX: w > 0 ? w : 1.0,
+          dimY: h > 0 ? h : 1.0,
         );
       }
     } catch (_) {}
@@ -569,11 +606,13 @@ class _MacroDef {
   final PcbApertureType type;
   final double dimX;
   final double dimY;
+  final List<Offset>? polygonPoints;
 
   const _MacroDef({
     required this.type,
     required this.dimX,
     required this.dimY,
+    this.polygonPoints,
   });
 }
 

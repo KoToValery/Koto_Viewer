@@ -6,7 +6,6 @@ import 'src/core/services/intent_service.dart';
 import 'src/core/services/local_server_service.dart';
 import 'src/core/services/recent_files_service.dart';
 import 'src/core/services/dwg_converter_service.dart';
-import 'src/core/services/doc_to_pdf_converter_service.dart';
 import 'src/core/services/ppt_to_pdf_converter_service.dart';
 import 'src/core/services/coordinate_system_service.dart';
 
@@ -22,6 +21,7 @@ import 'src/features/docx_viewer/docx_viewer_screen.dart';
 import 'src/features/eps_viewer/eps_viewer_screen.dart';
 import 'src/features/pcb_viewer/pcb_viewer_screen.dart';
 import 'src/features/hpgl_viewer/hpgl_viewer_screen.dart';
+import 'src/features/cdr_viewer/cdr_viewer_screen.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +43,7 @@ class KotoViewApp extends StatefulWidget {
 
 class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<ScaffoldMessengerState> _messengerKey = GlobalKey<ScaffoldMessengerState>();
   final IntentService _intentService = IntentService();
   bool _isDarkMode = false;
   String? _pendingFilePath;
@@ -114,7 +115,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.dwg:
         try {
           final convertedDxf = await DwgConverterService.convertDwgToDxf(filePath);
-          if (convertedDxf != null) {
+          if (convertedDxf.isNotEmpty) {
             navigator.push(
               MaterialPageRoute(builder: (_) => DxfViewerScreen(filePath: convertedDxf)),
             );
@@ -134,6 +135,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.glb:
       case KotoFileType.step:
       case KotoFileType.iges:
+      case KotoFileType.ifc:
         navigator.push(
           MaterialPageRoute(builder: (_) => Dxf3DViewerScreen(filePath: filePath)),
         );
@@ -185,6 +187,12 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
         );
         break;
 
+      case KotoFileType.cdr:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => CdrViewerScreen(filePath: filePath)),
+        );
+        break;
+
       case KotoFileType.gbr:
       case KotoFileType.drl:
       case KotoFileType.kicad:
@@ -201,9 +209,30 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
         break;
 
       case KotoFileType.other:
-        navigator.push(
-          MaterialPageRoute(builder: (_) => PdfViewerScreen(filePath: filePath)),
-        );
+        bool isRealPdf = false;
+        try {
+          final bytes = File(filePath).openSync().readSync(5);
+          if (bytes.length >= 4 &&
+              bytes[0] == 0x25 && // '%'
+              bytes[1] == 0x50 && // 'P'
+              bytes[2] == 0x44 && // 'D'
+              bytes[3] == 0x46) { // 'F'
+            isRealPdf = true;
+          }
+        } catch (_) {}
+
+        if (isRealPdf) {
+          navigator.push(
+            MaterialPageRoute(builder: (_) => PdfViewerScreen(filePath: filePath)),
+          );
+        } else {
+          _messengerKey.currentState?.showSnackBar(
+            SnackBar(
+              content: Text('Unsupported file format: ${filePath.split(Platform.pathSeparator).last}'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
         break;
     }
   }
@@ -242,6 +271,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigatorKey,
+      scaffoldMessengerKey: _messengerKey,
       title: 'KotoView',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightThemeData(),

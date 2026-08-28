@@ -5,7 +5,7 @@ import '../../../core/services/native_share_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
-enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, pptx, rtf, eps, pcb, kicad, plt, step, iges, other }
+enum _ShareFileType { pdf, dxf, svg, stl, obj, glb, xlsx, txt, md, docx, pptx, rtf, eps, cdr, pcb, kicad, plt, step, iges, ifc, other }
 
 _ShareFileType _detectFileType(String path) {
   final lower = path.toLowerCase();
@@ -17,6 +17,7 @@ _ShareFileType _detectFileType(String path) {
   if (lower.endsWith('.glb') || lower.endsWith('.gltf')) return _ShareFileType.glb;
   if (lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.p21')) return _ShareFileType.step;
   if (lower.endsWith('.iges') || lower.endsWith('.igs')) return _ShareFileType.iges;
+  if (lower.endsWith('.ifc')) return _ShareFileType.ifc;
   if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return _ShareFileType.xlsx;
   if (lower.endsWith('.txt') || lower.endsWith('.log') || lower.endsWith('.csv')) return _ShareFileType.txt;
   if (lower.endsWith('.md') || lower.endsWith('.markdown')) return _ShareFileType.md;
@@ -24,6 +25,7 @@ _ShareFileType _detectFileType(String path) {
   if (lower.endsWith('.pptx') || lower.endsWith('.ppt') || lower.endsWith('.ppsx') || lower.endsWith('.pps')) return _ShareFileType.pptx;
   if (lower.endsWith('.rtf')) return _ShareFileType.rtf;
   if (lower.endsWith('.eps')) return _ShareFileType.eps;
+  if (lower.endsWith('.cdr')) return _ShareFileType.cdr;
   if (lower.endsWith('.kicad_pcb') ||
       lower.endsWith('.kicad_sch') ||
       lower.endsWith('.kicad_sym') ||
@@ -155,28 +157,35 @@ class ShareOptionsSheet extends StatelessWidget {
         fileType == _ShareFileType.obj ||
         fileType == _ShareFileType.glb ||
         fileType == _ShareFileType.step ||
-        fileType == _ShareFileType.iges;
+        fileType == _ShareFileType.iges ||
+        fileType == _ShareFileType.ifc;
     final bool isXlsx = fileType == _ShareFileType.xlsx;
     final bool isTxt = fileType == _ShareFileType.txt;
     final bool isMd = fileType == _ShareFileType.md;
     final bool isDocx = fileType == _ShareFileType.docx;
     final bool isEps = fileType == _ShareFileType.eps;
+    final bool isCdr = fileType == _ShareFileType.cdr;
     final bool isPcb = fileType == _ShareFileType.pcb;
     final bool isKicad = fileType == _ShareFileType.kicad;
     final bool isPlt = fileType == _ShareFileType.plt;
     final bool isStep = fileType == _ShareFileType.step;
     final bool isIges = fileType == _ShareFileType.iges;
+    final bool isIfc = fileType == _ShareFileType.ifc;
 
     final Color cardColorStart = isDxf
         ? const Color(0xFF059669)
         : isSvg
             ? const Color(0xFFEA580C)
-            : isStep
+            : isCdr
+                ? const Color(0xFF16A34A)
+                : isStep
                 ? const Color(0xFF4F46E5)
                 : isIges
                     ? const Color(0xFF7C3AED)
-                    : is3d
-                        ? const Color(0xFF0891B2)
+                    : isIfc
+                        ? const Color(0xFF16A34A)
+                        : is3d
+                            ? const Color(0xFF0891B2)
                         : isXlsx
                             ? const Color(0xFF107C41)
                             : isPcb
@@ -198,7 +207,9 @@ class ShareOptionsSheet extends StatelessWidget {
         ? const Color(0xFF10B981)
         : isSvg
             ? const Color(0xFFFB923C)
-            : isStep
+            : isCdr
+                ? const Color(0xFF22C55E)
+                : isStep
                 ? const Color(0xFF6366F1)
                 : isIges
                     ? const Color(0xFF8B5CF6)
@@ -225,7 +236,9 @@ class ShareOptionsSheet extends StatelessWidget {
         ? Icons.draw_rounded
         : isSvg
             ? Icons.gesture_rounded
-            : isStep || isIges
+            : isCdr
+                ? Icons.palette_rounded
+                : isStep || isIges
                 ? Icons.view_in_ar_rounded
                 : is3d
                     ? Icons.view_in_ar_rounded
@@ -250,7 +263,9 @@ class ShareOptionsSheet extends StatelessWidget {
         ? 'Send DXF Drawing'
         : isSvg
             ? 'Send SVG Vector'
-            : isStep
+            : isCdr
+                ? 'Send CorelDRAW Design'
+                : isStep
                 ? 'Send STEP 3D Model'
                 : isIges
                     ? 'Send IGES 3D Model'

@@ -112,19 +112,26 @@ class PcbMultiLayerPainter extends CustomPainter {
     required double scaleFactor,
   }) {
     final isDrillLayer = document.layerType == PcbLayerType.drill;
+    final hasClearPolarity = document.commands.any((c) => !c.isDark);
+    if (hasClearPolarity) {
+      canvas.saveLayer(null, Paint());
+    }
 
     // 1. Draw Gerber Commands (Tracks, Arcs, Pads, Regions)
     for (final cmd in document.commands) {
-      if (!cmd.isDark) continue;
+      final isClear = !cmd.isDark;
+      final cmdColor = isClear ? const Color(0xFF000000) : color;
+      final blend = isClear ? BlendMode.clear : BlendMode.srcOver;
 
       switch (cmd.type) {
         case PcbCommandType.line:
           final p1 = mapPoint(cmd.p1);
           final p2 = mapPoint(cmd.p2!);
-          final widthPx = math.max(1.0, (cmd.aperture?.dimX ?? 0.25) * scaleFactor);
+          final widthPx = math.max(0.5, (cmd.aperture?.dimX ?? 0.25) * scaleFactor);
 
           final trackPaint = Paint()
-            ..color = color
+            ..color = cmdColor
+            ..blendMode = blend
             ..strokeWidth = widthPx
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round
@@ -135,10 +142,11 @@ class PcbMultiLayerPainter extends CustomPainter {
         case PcbCommandType.arc:
           final center = mapPoint(cmd.center!);
           final radPx = (cmd.radius ?? 1.0) * scaleFactor;
-          final widthPx = math.max(1.0, (cmd.aperture?.dimX ?? 0.25) * scaleFactor);
+          final widthPx = math.max(0.5, (cmd.aperture?.dimX ?? 0.25) * scaleFactor);
 
           final arcPaint = Paint()
-            ..color = color
+            ..color = cmdColor
+            ..blendMode = blend
             ..strokeWidth = widthPx
             ..style = PaintingStyle.stroke;
 
@@ -171,12 +179,23 @@ class PcbMultiLayerPainter extends CustomPainter {
             canvas.drawCircle(pos, radiusPx, holePaint);
           } else {
             final padPaint = Paint()
-              ..color = color
+              ..color = cmdColor
+              ..blendMode = blend
               ..style = PaintingStyle.fill;
 
-            if (apType == PcbApertureType.circle) {
+            if (ap?.polygonPoints != null && ap!.polygonPoints!.isNotEmpty) {
+              final path = Path();
+              final first = ap.polygonPoints!.first;
+              path.moveTo(pos.dx + first.dx * scaleFactor, pos.dy - first.dy * scaleFactor);
+              for (int i = 1; i < ap.polygonPoints!.length; i++) {
+                final pt = ap.polygonPoints![i];
+                path.lineTo(pos.dx + pt.dx * scaleFactor, pos.dy - pt.dy * scaleFactor);
+              }
+              path.close();
+              canvas.drawPath(path, padPaint);
+            } else if (apType == PcbApertureType.circle) {
               final radiusPx = ((ap?.dimX ?? 1.0) / 2.0) * scaleFactor;
-              canvas.drawCircle(pos, math.max(1.5, radiusPx), padPaint);
+              canvas.drawCircle(pos, math.max(0.8, radiusPx), padPaint);
             } else if (apType == PcbApertureType.rectangle) {
               final wPx = (ap?.dimX ?? 1.0) * scaleFactor;
               final hPx = (ap?.dimY ?? 1.0) * scaleFactor;
@@ -197,14 +216,31 @@ class PcbMultiLayerPainter extends CustomPainter {
               );
             } else {
               final radiusPx = ((ap?.dimX ?? 1.0) / 2.0) * scaleFactor;
-              canvas.drawCircle(pos, math.max(1.5, radiusPx), padPaint);
+              canvas.drawCircle(pos, math.max(0.8, radiusPx), padPaint);
             }
           }
           break;
 
         case PcbCommandType.region:
-          if (cmd.regionPoints != null && cmd.regionPoints!.length >= 3) {
-            final path = Path();
+          final regionPaint = Paint()
+            ..color = cmdColor
+            ..blendMode = blend
+            ..style = PaintingStyle.fill;
+
+          final path = Path()..fillType = PathFillType.evenOdd;
+          if (cmd.regionContours != null && cmd.regionContours!.isNotEmpty) {
+            for (final contour in cmd.regionContours!) {
+              if (contour.length < 2) continue;
+              final first = mapPoint(contour.first);
+              path.moveTo(first.dx, first.dy);
+              for (int i = 1; i < contour.length; i++) {
+                final pt = mapPoint(contour[i]);
+                path.lineTo(pt.dx, pt.dy);
+              }
+              path.close();
+            }
+            canvas.drawPath(path, regionPaint);
+          } else if (cmd.regionPoints != null && cmd.regionPoints!.length >= 3) {
             final first = mapPoint(cmd.regionPoints!.first);
             path.moveTo(first.dx, first.dy);
             for (int i = 1; i < cmd.regionPoints!.length; i++) {
@@ -212,14 +248,14 @@ class PcbMultiLayerPainter extends CustomPainter {
               path.lineTo(pt.dx, pt.dy);
             }
             path.close();
-
-            final regionPaint = Paint()
-              ..color = color
-              ..style = PaintingStyle.fill;
             canvas.drawPath(path, regionPaint);
           }
           break;
       }
+    }
+
+    if (hasClearPolarity) {
+      canvas.restore();
     }
 
     // 2. Draw Drill Holes with annular copper ring & dark through-hole
@@ -227,9 +263,9 @@ class PcbMultiLayerPainter extends CustomPainter {
       final pos = mapPoint(hole.position);
       final radiusPx = (hole.diameterMm / 2.0) * scaleFactor;
 
-      // Annular copper ring
+      // Annular gold copper ring
       final ringPaint = Paint()
-        ..color = theme.copper.withValues(alpha: 0.9)
+        ..color = const Color(0xFFFFA000).withValues(alpha: 0.95)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(pos, math.max(radiusPx + 1.8, 2.5), ringPaint);
 
@@ -276,23 +312,22 @@ class PcbMultiLayerPainter extends CustomPainter {
   Color _resolveLayerColor(PcbLayerType type, PcbTheme theme, PcbViewSide viewSide) {
     switch (type) {
       case PcbLayerType.copperTop:
-        return theme.copper;
+        return const Color(0xFFD32F2F); // Standard Red for Top Copper (tracks, pads, pours)
       case PcbLayerType.copperBottom:
-        return viewSide == PcbViewSide.composite
-            ? const Color(0xFF38BDF8).withValues(alpha: 0.75) // Cyan/Blue for bottom in composite
-            : theme.copper;
+        return const Color(0xFF1976D2); // Standard Blue for Bottom Copper (tracks, pads, pours)
       case PcbLayerType.solderMaskTop:
       case PcbLayerType.solderMaskBottom:
-        return theme.mask.withValues(alpha: 0.35);
+        return const Color(0xFF8B5CF6).withValues(alpha: 0.35); // Translucent mask
       case PcbLayerType.silkscreenTop:
+        return Colors.white;
       case PcbLayerType.silkscreenBottom:
-        return theme.silk;
+        return const Color(0xFF90CAF9);
       case PcbLayerType.edgeCuts:
-        return theme.outline;
+        return const Color(0xFFFACC15); // Yellow outline
       case PcbLayerType.drill:
-        return const Color(0xFF00E5FF);
+        return const Color(0xFFFFA000); // Gold annular ring
       case PcbLayerType.generic:
-        return theme.copper;
+        return const Color(0xFFD32F2F);
     }
   }
 

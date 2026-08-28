@@ -632,92 +632,114 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _project?.projectName ?? _fileName,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (_project != null)
-              Text(
-                '${_project!.totalLayers > 1 ? "${_project!.totalLayers} Layers" : _project!.layers.first.type.displayName} • ${_project!.boundingBox.widthMm.toStringAsFixed(1)} × ${_project!.boundingBox.heightMm.toStringAsFixed(1)} mm',
-                style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
-              ),
-          ],
+        title: Text(
+          _project?.projectName ?? _fileName,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        actions: [
-          // Layers Drawer Button
-          IconButton(
-            icon: const Icon(Icons.layers_outlined),
-            tooltip: 'PCB Layers (${_project?.visibleLayers ?? 0}/${_project?.totalLayers ?? 0})',
-            onPressed: _showLayersSheet,
-          ),
-
-          // BOM Button (if project has BOM)
-          if (_project != null && _project!.bomEntries.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.list_alt_rounded),
-              tooltip: 'Bill of Materials (${_project!.bomEntries.length})',
-              onPressed: _showBomSheet,
-            ),
-
-          // Theme Menu
-          PopupMenuButton<PcbTheme>(
-            icon: const Icon(Icons.palette_outlined),
-            tooltip: 'PCB Canvas Theme',
-            onSelected: (t) => setState(() => _pcbTheme = t),
-            itemBuilder: (context) => PcbTheme.values.map((t) {
-              return PopupMenuItem<PcbTheme>(
-                value: t,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: t.substrate,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: t.copper, width: 1.5),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(t.label),
-                    if (_pcbTheme == t) ...[
-                      const Spacer(),
-                      Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                    ],
-                  ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.black12,
                 ),
-              );
-            }).toList(),
-          ),
-
-          // Grid Toggle
-          IconButton(
-            icon: Icon(
-              _showGrid ? Icons.grid_on : Icons.grid_off,
-              color: _showGrid ? theme.colorScheme.primary : null,
+              ),
             ),
-            tooltip: '1mm PCB Measurement Grid',
-            onPressed: () => setState(() => _showGrid = !_showGrid),
-          ),
+            child: Row(
+              children: [
+                const Spacer(),
 
-          // Information Sheet
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Board Properties',
-            onPressed: _showInfoSheet,
-          ),
+                // Layers Drawer Button
+                IconButton(
+                  icon: const Icon(Icons.layers_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'PCB Layers (${_project?.visibleLayers ?? 0}/${_project?.totalLayers ?? 0})',
+                  onPressed: _showLayersSheet,
+                ),
 
-          // Share
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share',
-            onPressed: _shareFile,
+                // BOM Button (if project has BOM)
+                if (_project != null && _project!.bomEntries.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.list_alt_rounded, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Bill of Materials (${_project!.bomEntries.length})',
+                    onPressed: _showBomSheet,
+                  ),
+
+                // Theme Menu
+                PopupMenuButton<PcbTheme>(
+                  icon: const Icon(Icons.palette_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'PCB Canvas Theme',
+                  onSelected: (t) => setState(() => _pcbTheme = t),
+                  itemBuilder: (context) => PcbTheme.values.map((t) {
+                    return PopupMenuItem<PcbTheme>(
+                      value: t,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: t.substrate,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: t.copper, width: 1.5),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(t.label),
+                          if (_pcbTheme == t) ...[
+                            const Spacer(),
+                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                // Grid Toggle
+                IconButton(
+                  icon: Icon(
+                    _showGrid ? Icons.grid_on : Icons.grid_off,
+                    size: 20,
+                    color: _showGrid ? theme.colorScheme.primary : null,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: '1mm PCB Measurement Grid',
+                  onPressed: () => setState(() => _showGrid = !_showGrid),
+                ),
+
+                // Information Sheet
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Board Properties',
+                  onPressed: _showInfoSheet,
+                ),
+
+                // Share
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Share',
+                  onPressed: _shareFile,
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {

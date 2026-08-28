@@ -228,4 +228,132 @@ class DxfMath {
     if (a < 0) a += 360.0;
     return '${a.toStringAsFixed(1)}°';
   }
+
+  /// Calculates polygon area using the Shoelace (Gauss) formula.
+  static double calculatePolygonArea(List<Offset> points) {
+    if (points.length < 3) return 0.0;
+    double area = 0.0;
+    final int n = points.length;
+    for (int i = 0; i < n; i++) {
+      final j = (i + 1) % n;
+      area += points[i].dx * points[j].dy;
+      area -= points[j].dx * points[i].dy;
+    }
+    return (area / 2.0).abs();
+  }
+
+  /// Calculates polygon perimeter.
+  static double calculatePolygonPerimeter(List<Offset> points, {bool isClosed = true}) {
+    if (points.length < 2) return 0.0;
+    double perim = 0.0;
+    final int end = isClosed ? points.length : points.length - 1;
+    for (int i = 0; i < end; i++) {
+      final j = (i + 1) % points.length;
+      perim += (points[j] - points[i]).distance;
+    }
+    return perim;
+  }
+
+  /// Calculates the geometric centroid (center of mass) of a polygon.
+  static Offset calculatePolygonCentroid(List<Offset> points) {
+    if (points.isEmpty) return Offset.zero;
+    if (points.length == 1) return points.first;
+    if (points.length == 2) {
+      return Offset(
+        (points[0].dx + points[1].dx) / 2.0,
+        (points[0].dy + points[1].dy) / 2.0,
+      );
+    }
+
+    double cx = 0.0;
+    double cy = 0.0;
+    double signedArea = 0.0;
+    final int n = points.length;
+
+    for (int i = 0; i < n; i++) {
+      final j = (i + 1) % n;
+      final double a = points[i].dx * points[j].dy - points[j].dx * points[i].dy;
+      signedArea += a;
+      cx += (points[i].dx + points[j].dx) * a;
+      cy += (points[i].dy + points[j].dy) * a;
+    }
+
+    signedArea *= 0.5;
+    if (signedArea.abs() < 1e-7) {
+      // Fallback to simple average if points are collinear or self-cancelling
+      double avgX = 0.0;
+      double avgY = 0.0;
+      for (final p in points) {
+        avgX += p.dx;
+        avgY += p.dy;
+      }
+      return Offset(avgX / n, avgY / n);
+    }
+
+    cx /= (6.0 * signedArea);
+    cy /= (6.0 * signedArea);
+    return Offset(cx, cy);
+  }
+
+  /// Calculates the included angle in degrees between two rays: vertex -> p1 and vertex -> p2.
+  /// Returns value in range [0.0, 180.0].
+  static double calculateAngleBetweenVectors(Offset vertex, Offset p1, Offset p2) {
+    final double v1x = p1.dx - vertex.dx;
+    final double v1y = p1.dy - vertex.dy;
+    final double v2x = p2.dx - vertex.dx;
+    final double v2y = p2.dy - vertex.dy;
+
+    final double len1 = math.sqrt(v1x * v1x + v1y * v1y);
+    final double len2 = math.sqrt(v2x * v2x + v2y * v2y);
+
+    if (len1 < 1e-9 || len2 < 1e-9) return 0.0;
+
+    final double dot = v1x * v2x + v1y * v2y;
+    final double cosTheta = (dot / (len1 * len2)).clamp(-1.0, 1.0);
+    return math.acos(cosTheta) * 180.0 / math.pi;
+  }
+
+  /// Calculates center and radius of a circle passing through 3 points (circumcircle).
+  /// Returns null if points are collinear or invalid.
+  static ({Offset center, double radius})? circleFrom3Points(Offset p1, Offset p2, Offset p3) {
+    final double d = 2.0 *
+        (p1.dx * (p2.dy - p3.dy) +
+            p2.dx * (p3.dy - p1.dy) +
+            p3.dx * (p1.dy - p2.dy));
+
+    if (d.abs() < 1e-7) {
+      return null; // Collinear
+    }
+
+    final double p1Sq = p1.dx * p1.dx + p1.dy * p1.dy;
+    final double p2Sq = p2.dx * p2.dx + p2.dy * p2.dy;
+    final double p3Sq = p3.dx * p3.dx + p3.dy * p3.dy;
+
+    final double cx = (p1Sq * (p2.dy - p3.dy) +
+            p2Sq * (p3.dy - p1.dy) +
+            p3Sq * (p1.dy - p2.dy)) /
+        d;
+
+    final double cy = (p1Sq * (p3.dx - p2.dx) +
+            p2Sq * (p1.dx - p3.dx) +
+            p3Sq * (p2.dx - p1.dx)) /
+        d;
+
+    final center = Offset(cx, cy);
+    final radius = (p1 - center).distance;
+    return (center: center, radius: radius);
+  }
+
+  /// Formats area for human display.
+  static String formatArea(double area) {
+    if (area.abs() < 1e-4) return '0.00 m²';
+    if (area >= 10000) {
+      final double ha = area / 10000.0;
+      return '${area.toStringAsFixed(1)} m² (${ha.toStringAsFixed(2)} ha)';
+    } else if (area >= 100) {
+      return '${area.toStringAsFixed(2)} m²';
+    } else {
+      return '${area.toStringAsFixed(3)} m²';
+    }
+  }
 }

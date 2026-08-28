@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui';
 
 /// 3D Vector representation with mathematical operations.
 class Vector3 {
@@ -90,12 +91,14 @@ class Triangle3D {
   final Vector3 v1;
   final Vector3 v2;
   final Vector3 normal;
+  final Color? color;
 
   Triangle3D({
     required this.v0,
     required this.v1,
     required this.v2,
     Vector3? normal,
+    this.color,
   }) : normal = normal ?? _calculateNormal(v0, v1, v2);
 
   static Vector3 _calculateNormal(Vector3 a, Vector3 b, Vector3 c) {

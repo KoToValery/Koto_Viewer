@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
@@ -5,8 +6,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/coordinate_system_service.dart';
+import '../../core/services/dxf_exporter_service.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../home/widgets/share_options_sheet.dart';
@@ -16,6 +20,8 @@ import 'parser/dxf_parser.dart';
 import 'rendering/dxf_math.dart';
 import 'rendering/dxf_painter.dart';
 import 'rendering/dxf_snap_helper.dart';
+import 'widgets/dxf_annotation_dialog.dart';
+import 'widgets/dxf_entity_context_sheet.dart';
 import 'widgets/dxf_import_dialog.dart';
 import 'widgets/dxf_info_sheet.dart';
 import 'widgets/dxf_layer_sheet.dart';
@@ -55,8 +61,13 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   // Measurement & Snap tool
   bool _isMeasureMode = false;
   bool _snapEnabled = true;
+  DxfMeasureTool _currentMeasureTool = DxfMeasureTool.distance;
   DxfMeasurement? _measurement;
   DxfSnapResult? _hoveredSnap;
+  String? _pointerCustomTitle;
+  String? _pointerCustomSubText;
+  List<DxfAnnotation> _annotations = [];
+  DxfEntity? _selectedEntity;
 
   // Offset Snapping Pointer State (Aiming reticle & sharp tip)
   Offset? _touchScreenPos;
@@ -82,9 +93,35 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     DxfDisplaySettingsService.settingsNotifier.addListener(_onDisplaySettingsChanged);
     _initDisplaySettings();
     _loadDxfFile();
+    _loadSavedAnnotations();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
+  }
+
+  Future<void> _saveAnnotationsToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = _annotations.map((a) => a.toJson()).toList();
+      await prefs.setString('dxf_annotations_${widget.filePath}', jsonEncode(jsonList));
+    } catch (_) {}
+  }
+
+  Future<void> _loadSavedAnnotations() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('dxf_annotations_${widget.filePath}');
+      if (raw != null) {
+        final list = (jsonDecode(raw) as List<dynamic>)
+            .map((e) => DxfAnnotation.fromJson(e as Map<String, dynamic>))
+            .toList();
+        if (mounted) {
+          setState(() {
+            _annotations = list;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -258,6 +295,37 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     return MatrixUtils.transformPoint(_transformController.value, scenePos);
   }
 
+  Rect? _getVisibleCadRect() {
+    if (_document == null || _viewportSize.isEmpty) return null;
+    try {
+      final pTopLeft = _transformController.toScene(Offset.zero);
+      final pBottomRight = _transformController.toScene(
+        Offset(_viewportSize.width, _viewportSize.height),
+      );
+
+      final cadTopLeft = _sceneToCad(pTopLeft);
+      final cadBottomRight = _sceneToCad(pBottomRight);
+
+      final left = math.min(cadTopLeft.dx, cadBottomRight.dx);
+      final right = math.max(cadTopLeft.dx, cadBottomRight.dx);
+      final bottom = math.min(cadTopLeft.dy, cadBottomRight.dy);
+      final top = math.max(cadTopLeft.dy, cadBottomRight.dy);
+
+      // Add 10% safety margin around viewport for ultra-smooth panning
+      final marginX = (right - left) * 0.1;
+      final marginY = (top - bottom) * 0.1;
+
+      return Rect.fromLTRB(
+        left - marginX,
+        bottom - marginY,
+        right + marginX,
+        top + marginY,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   double _getCadFitScale() {
     if (_document == null || _viewportSize.isEmpty) return 1.0;
     final double docW = math.max(_document!.width, 1.0);
@@ -312,9 +380,27 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if (_snapEnabled && _document != null) {
       final fitScale = _getCadFitScale();
       final toleranceCad = 22.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
-      final basePoint = (_measurement != null && _measurement!.p2Cad == null)
-          ? _measurement!.p1Cad
-          : null;
+      Offset? basePoint;
+      if (_currentMeasureTool == DxfMeasureTool.distance) {
+        basePoint = (_measurement != null && _measurement!.tool == DxfMeasureTool.distance && _measurement!.p2Cad == null)
+            ? _measurement!.p1Cad
+            : null;
+      } else if (_currentMeasureTool == DxfMeasureTool.area) {
+        basePoint = null; // Do NOT use perpendicular (right-angle) snap for area measurement!
+      } else if (_currentMeasureTool == DxfMeasureTool.angle) {
+        basePoint = (_measurement != null && _measurement!.tool == DxfMeasureTool.angle)
+            ? _measurement!.angleVertex
+            : null;
+      } else if (_currentMeasureTool == DxfMeasureTool.radius) {
+        basePoint = (_measurement != null && _measurement!.tool == DxfMeasureTool.radius)
+            ? _measurement!.circleCenter
+            : null;
+      } else if (_currentMeasureTool == DxfMeasureTool.annotation) {
+        basePoint = (_measurement != null && _measurement!.tool == DxfMeasureTool.annotation)
+            ? _measurement!.annotationTip
+            : null;
+      }
+
       snap = DxfSnapHelper.findSnapPoint(
         document: _document!,
         cadPoint: rawCadPt,
@@ -330,13 +416,316 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       }
     }
 
+    final effectiveCad = snap != null ? snap.point : rawCadPt;
+    String? title;
+    String? subText;
+
+    switch (_currentMeasureTool) {
+      case DxfMeasureTool.distance:
+        title = (_measurement != null && _measurement!.tool == DxfMeasureTool.distance && _measurement!.p2Cad == null)
+            ? '2nd Point'
+            : '1st Point';
+        break;
+
+      case DxfMeasureTool.area:
+        final count = (_measurement?.tool == DxfMeasureTool.area) ? (_measurement?.areaPoints.length ?? 0) : 0;
+        title = 'Vertex ${count + 1}';
+        if (count > 0 && _measurement!.areaPoints.isNotEmpty) {
+          final lastPt = _measurement!.areaPoints.last;
+          final segDist = (effectiveCad - lastPt).distance;
+          subText = 'Segment: ${DxfMath.formatDistance(segDist)} m';
+        }
+        break;
+
+      case DxfMeasureTool.angle:
+        if (_measurement == null || _measurement!.tool != DxfMeasureTool.angle || _measurement!.angleVertex == null) {
+          title = 'Vertex';
+        } else if (_measurement!.angleP1 == null) {
+          title = 'Arm 1';
+        } else {
+          title = 'Arm 2';
+          if (_measurement!.angleVertex != null && _measurement!.angleP1 != null) {
+            final angle = DxfMath.calculateAngleBetweenVectors(
+              _measurement!.angleVertex!,
+              _measurement!.angleP1!,
+              effectiveCad,
+            );
+            subText = '∠ ~ ${angle.toStringAsFixed(1)}°';
+          }
+        }
+        break;
+
+      case DxfMeasureTool.radius:
+        title = 'Radius / Diameter';
+        if (_document != null) {
+          final fitScale = _getCadFitScale();
+          final toleranceCad = 26.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
+          final circleArc = DxfSnapHelper.findClosestCircleOrArc(
+            document: _document!,
+            cadPoint: effectiveCad,
+            toleranceCad: toleranceCad,
+          );
+          if (circleArc != null) {
+            subText = 'R = ${DxfMath.formatDistance(circleArc.radius)} • Ø = ${DxfMath.formatDistance(circleArc.radius * 2.0)}';
+          }
+        }
+        break;
+
+      case DxfMeasureTool.annotation:
+        if (_measurement == null || _measurement!.tool != DxfMeasureTool.annotation || _measurement!.annotationTip == null) {
+          title = 'Arrow Tip';
+          subText = 'Snap to feature';
+        } else {
+          title = 'Text Note Position';
+          final dist = (effectiveCad - _measurement!.annotationTip!).distance;
+          subText = 'Leader: ${DxfMath.formatDistance(dist)} m';
+        }
+        break;
+    }
+
     setState(() {
       _touchScreenPos = touchPos;
       _targetScreenPos = targetPos;
       _snappedScreenPos = snappedScreen;
       _activeMeasureSnap = snap;
-      _currentCadCoord = snap != null ? snap.point : rawCadPt;
+      _currentCadCoord = effectiveCad;
+      _pointerCustomTitle = title;
+      _pointerCustomSubText = subText;
     });
+  }
+
+  void _applyMeasurementPoint(Offset cadPt) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      switch (_currentMeasureTool) {
+        case DxfMeasureTool.distance:
+          if (_measurement == null ||
+              _measurement!.tool != DxfMeasureTool.distance ||
+              _measurement!.p2Cad != null) {
+            _measurement = DxfMeasurement(
+              tool: DxfMeasureTool.distance,
+              p1Cad: cadPt,
+            );
+          } else {
+            _measurement = DxfMeasurement(
+              tool: DxfMeasureTool.distance,
+              p1Cad: _measurement!.p1Cad,
+              p2Cad: cadPt,
+            );
+          }
+          break;
+
+        case DxfMeasureTool.area:
+          List<Offset> pts = [];
+          if (_measurement != null &&
+              _measurement!.tool == DxfMeasureTool.area &&
+              !_measurement!.isAreaClosed) {
+            pts = List<Offset>.from(_measurement!.areaPoints);
+          }
+          pts.add(cadPt);
+          _measurement = DxfMeasurement(
+            tool: DxfMeasureTool.area,
+            areaPoints: pts,
+            isAreaClosed: false,
+          );
+          break;
+
+        case DxfMeasureTool.angle:
+          if (_measurement == null ||
+              _measurement!.tool != DxfMeasureTool.angle ||
+              _measurement!.angleVertex == null ||
+              (_measurement!.angleP1 != null && _measurement!.angleP2 != null)) {
+            _measurement = DxfMeasurement(
+              tool: DxfMeasureTool.angle,
+              angleVertex: cadPt,
+            );
+          } else if (_measurement!.angleP1 == null) {
+            _measurement = _measurement!.copyWith(angleP1: cadPt);
+          } else {
+            _measurement = _measurement!.copyWith(angleP2: cadPt);
+          }
+          break;
+
+        case DxfMeasureTool.radius:
+          // Check for direct click on circle/arc
+          if (_document != null) {
+            final fitScale = _getCadFitScale();
+            final toleranceCad = 26.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
+            final circleArc = DxfSnapHelper.findClosestCircleOrArc(
+              document: _document!,
+              cadPoint: cadPt,
+              toleranceCad: toleranceCad,
+            );
+
+            if (circleArc != null) {
+              _measurement = DxfMeasurement(
+                tool: DxfMeasureTool.radius,
+                circleCenter: circleArc.center,
+                radius: circleArc.radius,
+                isArc: circleArc.isArc,
+                arcLength: circleArc.arcLength,
+                circlePoints: [circleArc.samplePoint],
+              );
+              break;
+            }
+          }
+
+          // Fallback: 3-point circle
+          List<Offset> cPts = [];
+          if (_measurement != null &&
+              _measurement!.tool == DxfMeasureTool.radius &&
+              _measurement!.circleCenter == null &&
+              _measurement!.circlePoints.length < 3) {
+            cPts = List<Offset>.from(_measurement!.circlePoints);
+          }
+          cPts.add(cadPt);
+
+          if (cPts.length == 3) {
+            final solved = DxfMath.circleFrom3Points(cPts[0], cPts[1], cPts[2]);
+            if (solved != null) {
+              _measurement = DxfMeasurement(
+                tool: DxfMeasureTool.radius,
+                circleCenter: solved.center,
+                radius: solved.radius,
+                circlePoints: cPts,
+              );
+            } else {
+              _measurement = DxfMeasurement(
+                tool: DxfMeasureTool.radius,
+                circlePoints: cPts,
+              );
+            }
+          } else {
+            _measurement = DxfMeasurement(
+              tool: DxfMeasureTool.radius,
+              circlePoints: cPts,
+            );
+          }
+          break;
+
+        case DxfMeasureTool.annotation:
+          if (_measurement == null ||
+              _measurement!.tool != DxfMeasureTool.annotation ||
+              _measurement!.annotationTip == null) {
+            _measurement = DxfMeasurement(
+              tool: DxfMeasureTool.annotation,
+              annotationTip: cadPt,
+            );
+          } else {
+            final tip = _measurement!.annotationTip!;
+            final textPos = cadPt;
+            _measurement = DxfMeasurement(tool: DxfMeasureTool.annotation);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _openAnnotationDialog(arrowTip: tip, textPos: textPos);
+            });
+          }
+          break;
+      }
+    });
+  }
+
+  Future<void> _openAnnotationDialog({
+    DxfAnnotation? annotation,
+    required Offset arrowTip,
+    required Offset textPos,
+  }) async {
+    final result = await showDialog<DxfAnnotation>(
+      context: context,
+      builder: (ctx) => DxfAnnotationDialog(
+        initialAnnotation: annotation,
+        arrowTipCad: arrowTip,
+        textPosCad: textPos,
+        onDelete: annotation != null
+            ? () {
+                setState(() {
+                  _annotations.removeWhere((a) => a.id == annotation.id);
+                });
+                _saveAnnotationsToPrefs();
+              }
+            : null,
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        if (annotation != null) {
+          final idx = _annotations.indexWhere((a) => a.id == annotation.id);
+          if (idx != -1) {
+            _annotations[idx] = result;
+          } else {
+            _annotations.add(result);
+          }
+        } else {
+          _annotations.add(result);
+        }
+      });
+      _saveAnnotationsToPrefs();
+    }
+  }
+
+  Future<void> _saveAsAnnotatedDxf() async {
+    if (_document == null) return;
+    try {
+      final originalFile = File(widget.filePath);
+      final dir = originalFile.parent;
+      final originalName = originalFile.uri.pathSegments.last;
+      final baseName = originalName.replaceAll(RegExp(r'\.dxf$', caseSensitive: false), '');
+      final outputFileName = '${baseName}_annotated.dxf';
+      final outputFile = File('${dir.path}/$outputFileName');
+
+      await DxfExporterService.saveDxfWithAnnotations(
+        originalFile: originalFile,
+        annotations: _annotations,
+        outputFile: outputFile,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved DXF: $outputFileName'),
+            backgroundColor: const Color(0xFF1B2433),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Share',
+              textColor: const Color(0xFF00E5FF),
+              onPressed: () {
+                Share.shareXFiles([XFile(outputFile.path)], subject: outputFileName);
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save DXF: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleUndoAreaPoint() {
+    if (_measurement != null && _measurement!.areaPoints.isNotEmpty) {
+      final pts = List<Offset>.from(_measurement!.areaPoints)..removeLast();
+      setState(() {
+        _measurement = _measurement!.copyWith(
+          areaPoints: pts,
+          isAreaClosed: false,
+        );
+      });
+    }
+  }
+
+  void _handleCloseAreaPolygon() {
+    if (_measurement != null && _measurement!.areaPoints.length >= 3) {
+      setState(() {
+        _measurement = _measurement!.copyWith(isAreaClosed: true);
+      });
+    }
   }
 
   void _handleMeasurePointerUp(PointerUpEvent event) {
@@ -350,6 +739,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         _targetScreenPos = null;
         _snappedScreenPos = null;
         _activeMeasureSnap = null;
+        _pointerCustomTitle = null;
+        _pointerCustomSubText = null;
       });
       if (_activePointersCount == 0) {
         _isMultiTouchGesture = false; // Reset only when all fingers are lifted
@@ -359,21 +750,15 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     if (_touchScreenPos != null) {
       final finalCadPt = _activeMeasureSnap?.point ?? _currentCadCoord;
-      HapticFeedback.mediumImpact();
+      _applyMeasurementPoint(finalCadPt);
 
       setState(() {
-        if (_measurement == null || _measurement!.p2Cad != null) {
-          _measurement = DxfMeasurement(p1Cad: finalCadPt);
-        } else {
-          _measurement = DxfMeasurement(
-            p1Cad: _measurement!.p1Cad,
-            p2Cad: finalCadPt,
-          );
-        }
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
         _activeMeasureSnap = null;
+        _pointerCustomTitle = null;
+        _pointerCustomSubText = null;
       });
     }
   }
@@ -386,6 +771,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       _targetScreenPos = null;
       _snappedScreenPos = null;
       _activeMeasureSnap = null;
+      _pointerCustomTitle = null;
+      _pointerCustomSubText = null;
     });
   }
 
@@ -499,16 +886,122 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     });
 
     if (_isMeasureMode) {
-      setState(() {
-        if (_measurement == null || _measurement!.p2Cad != null) {
-          _measurement = DxfMeasurement(p1Cad: cadPoint);
-        } else {
-          _measurement = DxfMeasurement(
-            p1Cad: _measurement!.p1Cad,
-            p2Cad: cadPoint,
+      _applyMeasurementPoint(cadPoint);
+    } else if (_annotations.isNotEmpty) {
+      final fitScale = _getCadFitScale();
+      final hitToleranceCad = 24.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
+      for (final anno in _annotations) {
+        if ((cadPoint - anno.arrowTipCad).distance <= hitToleranceCad ||
+            (cadPoint - anno.textPosCad).distance <= hitToleranceCad * 2.5) {
+          _openAnnotationDialog(
+            annotation: anno,
+            arrowTip: anno.arrowTipCad,
+            textPos: anno.textPosCad,
           );
+          return;
+        }
+      }
+    }
+  }
+
+  void _handleCanvasContextTap(Offset localPos) {
+    if (_document == null) return;
+    final scenePoint = _transformController.toScene(localPos);
+    final cadPoint = _sceneToCad(scenePoint);
+
+    final fitScale = _getCadFitScale();
+    final toleranceCad = 26.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
+
+    final entity = DxfSnapHelper.hitTestEntity(
+      document: _document!,
+      cadPoint: cadPoint,
+      toleranceCad: toleranceCad,
+    );
+
+    if (entity != null) {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _selectedEntity = entity;
+      });
+
+      final layerName = entity.layer;
+      final layer = _document!.layers[layerName];
+
+      DxfEntityContextSheet.show(
+        context: context,
+        entity: entity,
+        document: _document!,
+        isDark: _canvasTheme.isDark,
+        onHideLayer: () {
+          if (layer != null) {
+            setState(() {
+              layer.isVisible = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Layer "$layerName" hidden'),
+                behavior: SnackBarBehavior.floating,
+                action: SnackBarAction(
+                  label: 'Undo',
+                  textColor: const Color(0xFF00E5FF),
+                  onPressed: () {
+                    setState(() {
+                      layer.isVisible = true;
+                    });
+                  },
+                ),
+              ),
+            );
+          }
+        },
+        onIsolateLayer: () {
+          setState(() {
+            for (final l in _document!.layers.values) {
+              l.isVisible = (l.name == layerName);
+            }
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Isolated layer "$layerName"'),
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: 'Show All',
+                textColor: const Color(0xFF00E5FF),
+                onPressed: () {
+                  setState(() {
+                    for (final l in _document!.layers.values) {
+                      l.isVisible = true;
+                    }
+                  });
+                },
+              ),
+            ),
+          );
+        },
+        onShowAllLayers: () {
+          setState(() {
+            for (final l in _document!.layers.values) {
+              l.isVisible = true;
+            }
+          });
+        },
+        onOpenLayerManager: _showLayersSheet,
+      ).whenComplete(() {
+        if (mounted) {
+          setState(() {
+            _selectedEntity = null;
+          });
         }
       });
+    } else {
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No CAD entity found at cursor position'),
+          duration: Duration(milliseconds: 1500),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -522,9 +1015,27 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final fitScale = _getCadFitScale();
       // 18 screen pixels tolerance converted to CAD coordinates
       final toleranceCad = 18.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
-      final basePoint = (_measurement != null && _measurement!.p2Cad == null)
-          ? _measurement!.p1Cad
-          : null;
+      Offset? basePoint;
+      if (_currentMeasureTool == DxfMeasureTool.distance) {
+        basePoint = (_measurement != null && _measurement!.tool == DxfMeasureTool.distance && _measurement!.p2Cad == null)
+            ? _measurement!.p1Cad
+            : null;
+      } else if (_currentMeasureTool == DxfMeasureTool.area) {
+        basePoint = null; // Do NOT use perpendicular snap for area measurement!
+      } else if (_currentMeasureTool == DxfMeasureTool.angle) {
+        basePoint = (_measurement != null && _measurement!.tool == DxfMeasureTool.angle)
+            ? _measurement!.angleVertex
+            : null;
+      } else if (_currentMeasureTool == DxfMeasureTool.radius) {
+        basePoint = (_measurement != null && _measurement!.tool == DxfMeasureTool.radius)
+            ? _measurement!.circleCenter
+            : null;
+      } else if (_currentMeasureTool == DxfMeasureTool.annotation) {
+        basePoint = (_measurement != null && _measurement!.tool == DxfMeasureTool.annotation)
+            ? _measurement!.annotationTip
+            : null;
+      }
+
       snap = DxfSnapHelper.findSnapPoint(
         document: _document!,
         cadPoint: cadPoint,
@@ -697,180 +1208,228 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     return Scaffold(
       backgroundColor: _canvasTheme.bgColor,
       appBar: AppBar(
-        title: null,
-        actions: [
-          // Fit to screen (Zoom Extents)
-          IconButton(
-            icon: const Icon(Icons.fit_screen_outlined),
-            tooltip: 'Fit to Screen (Zoom Extents)',
-            onPressed: _document != null ? _fitToScreen : null,
-          ),
-
-          // Import DXF
-          IconButton(
-            icon: const Icon(Icons.add_to_photos_outlined),
-            tooltip: 'Import DXF into Drawing',
-            onPressed: _document != null ? _importDxfFile : null,
-          ),
-
-          // Layer Manager (where thin/thick lines are chosen per layer)
-          IconButton(
-            icon: const Icon(Icons.layers_outlined),
-            tooltip: 'CAD Layers',
-            onPressed: _document != null ? _showLayersSheet : null,
-          ),
-
-          // Measurement Tool
-          IconButton(
-            icon: Icon(
-              Icons.straighten,
-              color: _isMeasureMode ? const Color(0xFFFF5252) : null,
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+        title: Text(
+          _fileName,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+                ),
+              ),
             ),
-            tooltip: _isMeasureMode ? 'Exit Measure Mode' : 'Measure Distance',
-            onPressed: _document != null
-                ? () {
-                    setState(() {
-                      _isMeasureMode = !_isMeasureMode;
-                      if (!_isMeasureMode) {
-                        _measurement = null;
-                        _hoveredSnap = null;
-                        _touchScreenPos = null;
-                        _targetScreenPos = null;
-                        _snappedScreenPos = null;
-                        _activeMeasureSnap = null;
-                      }
-                    });
-                  }
-                : null,
-          ),
+            child: Row(
+              children: [
+                const Spacer(),
 
-          // Theme / Background Popup
-          PopupMenuButton<DxfCanvasTheme>(
-            icon: const Icon(Icons.palette_outlined),
-            tooltip: 'Canvas Background Theme',
-            initialValue: _canvasTheme,
-            onSelected: (t) {
-              setState(() {
-                _canvasTheme = t;
-              });
-            },
-            itemBuilder: (context) => DxfCanvasTheme.values.map((t) {
-              return PopupMenuItem(
-                value: t,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: t.bgColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey),
+                // Fit to screen (Zoom Extents)
+                IconButton(
+                  icon: const Icon(Icons.fit_screen_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Fit to Screen',
+                  onPressed: _document != null ? _fitToScreen : null,
+                ),
+
+                // Import DXF
+                IconButton(
+                  icon: const Icon(Icons.add_to_photos_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Import DXF',
+                  onPressed: _document != null ? _importDxfFile : null,
+                ),
+
+                // Layer Manager
+                IconButton(
+                  icon: const Icon(Icons.layers_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'CAD Layers',
+                  onPressed: _document != null ? _showLayersSheet : null,
+                ),
+
+                // Measurement & Markup Tool
+                IconButton(
+                  icon: Icon(
+                    Icons.straighten,
+                    size: 20,
+                    color: _isMeasureMode ? const Color(0xFFFF5252) : null,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: _isMeasureMode
+                      ? 'Exit Measure & Markup'
+                      : 'Measure Tools',
+                  onPressed: _document != null
+                      ? () {
+                          setState(() {
+                            _isMeasureMode = !_isMeasureMode;
+                            if (!_isMeasureMode) {
+                              _measurement = null;
+                              _hoveredSnap = null;
+                              _touchScreenPos = null;
+                              _targetScreenPos = null;
+                              _snappedScreenPos = null;
+                              _activeMeasureSnap = null;
+                              _pointerCustomTitle = null;
+                              _pointerCustomSubText = null;
+                            } else {
+                              _measurement = DxfMeasurement(tool: _currentMeasureTool);
+                            }
+                          });
+                        }
+                      : null,
+                ),
+
+                // Save Annotated DXF
+                if (_annotations.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.save_as_outlined, size: 20, color: Color(0xFF00E5FF)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Save Annotated DXF',
+                    onPressed: _saveAsAnnotatedDxf,
+                  ),
+
+                // Theme / Background Popup
+                PopupMenuButton<DxfCanvasTheme>(
+                  icon: const Icon(Icons.palette_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Canvas Theme',
+                  initialValue: _canvasTheme,
+                  onSelected: (t) {
+                    setState(() {
+                      _canvasTheme = t;
+                    });
+                  },
+                  itemBuilder: (context) => DxfCanvasTheme.values.map((t) {
+                    return PopupMenuItem(
+                      value: t,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: t.bgColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(t.name),
+                          if (t == _canvasTheme) ...[
+                            const Spacer(),
+                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                // More Options
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'import':
+                        _importDxfFile();
+                        break;
+                      case 'crs':
+                        _showCoordinateSettings();
+                        break;
+                      case 'info':
+                        _showInfoSheet();
+                        break;
+                      case 'grid':
+                        setState(() {
+                          _showGrid = !_showGrid;
+                        });
+                        break;
+                      case 'share':
+                        _shareDxf();
+                        break;
+                      case 'print':
+                        _printDxf();
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'crs',
+                      child: Row(
+                        children: [
+                          Icon(Icons.public_rounded, size: 20),
+                          SizedBox(width: 12),
+                          Text('Coordinate System'),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Text(t.name),
-                    if (t == _canvasTheme) ...[
-                      const Spacer(),
-                      Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                    ],
+                    PopupMenuItem(
+                      value: 'grid',
+                      child: Row(
+                        children: [
+                          Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
+                          const SizedBox(width: 12),
+                          Text(_showGrid ? 'Hide CAD Grid' : 'Show CAD Grid'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'info',
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 20),
+                          SizedBox(width: 12),
+                          Text('Drawing Properties'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'share',
+                      child: Row(
+                        children: [
+                          Icon(Icons.share_outlined, size: 20),
+                          SizedBox(width: 12),
+                          Text('Share File'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'print',
+                      child: Row(
+                        children: [
+                          Icon(Icons.print_outlined, size: 20),
+                          SizedBox(width: 12),
+                          Text('Print / Export'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              );
-            }).toList(),
+              ],
+            ),
           ),
-
-          // More Options
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              switch (value) {
-                case 'import':
-                  _importDxfFile();
-                  break;
-                case 'crs':
-                  _showCoordinateSettings();
-                  break;
-                case 'info':
-                  _showInfoSheet();
-                  break;
-                case 'grid':
-                  setState(() {
-                    _showGrid = !_showGrid;
-                  });
-                  break;
-                case 'share':
-                  _shareDxf();
-                  break;
-                case 'print':
-                  _printDxf();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'import',
-                child: Row(
-                  children: [
-                    Icon(Icons.add_to_photos_outlined, size: 20),
-                    SizedBox(width: 12),
-                    Text('Import DXF File'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'crs',
-                child: Row(
-                  children: [
-                    Icon(Icons.public_rounded, size: 20),
-                    SizedBox(width: 12),
-                    Text('Coordinate System'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'grid',
-                child: Row(
-                  children: [
-                    Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
-                    const SizedBox(width: 12),
-                    Text(_showGrid ? 'Hide CAD Grid' : 'Show CAD Grid'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'info',
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 20),
-                    SizedBox(width: 12),
-                    Text('Drawing Properties'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'share',
-                child: Row(
-                  children: [
-                    Icon(Icons.share_outlined, size: 20),
-                    SizedBox(width: 12),
-                    Text('Share File'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'print',
-                child: Row(
-                  children: [
-                    Icon(Icons.print_outlined, size: 20),
-                    SizedBox(width: 12),
-                    Text('Print / Export'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
       body: KeyboardListener(
         focusNode: _focusNode,
@@ -946,9 +1505,15 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                       onHover: _handlePointerHover,
                       child: GestureDetector(
                         onTapUp: _isMeasureMode ? null : _handleCanvasTap,
+                        onLongPressStart: _isMeasureMode
+                            ? null
+                            : (details) => _handleCanvasContextTap(details.localPosition),
+                        onSecondaryTapUp: _isMeasureMode
+                            ? null
+                            : (details) => _handleCanvasContextTap(details.localPosition),
                         child: InteractiveViewer(
                           transformationController: _transformController,
-                          panEnabled: !_isMeasureMode,
+                          panEnabled: !_isMeasureMode || _isMultiTouchGesture,
                           scaleEnabled: true,
                           minScale: 0.001,
                           maxScale: 1000.0,
@@ -960,6 +1525,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                               theme: _canvasTheme,
                               currentScale: _currentScale,
                               measurement: _measurement,
+                              annotations: _annotations,
+                              visibleCadRect: _getVisibleCadRect(),
+                              highlightedEntity: _selectedEntity,
                               snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
                               showGrid: _showGrid,
                               settings: _displaySettings,
@@ -982,7 +1550,12 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                             snapType: _activeMeasureSnap?.type,
                             currentCadCoord: _currentCadCoord,
                             p1CadCoord: _measurement?.p1Cad,
-                            isSettingSecondPoint: _measurement != null && _measurement!.p2Cad == null,
+                            isSettingSecondPoint: _measurement != null &&
+                                _measurement!.tool == DxfMeasureTool.distance &&
+                                _measurement!.p2Cad == null,
+                            tool: _currentMeasureTool,
+                            customTitle: _pointerCustomTitle,
+                            customSubText: _pointerCustomSubText,
                           ),
                         ),
                       ),
@@ -996,6 +1569,20 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                       right: 16,
                       child: Center(
                         child: DxfMeasurementOverlay(
+                          currentTool: _currentMeasureTool,
+                          onSelectTool: (tool) {
+                            setState(() {
+                              _currentMeasureTool = tool;
+                              _measurement = DxfMeasurement(tool: tool);
+                              _hoveredSnap = null;
+                              _touchScreenPos = null;
+                              _targetScreenPos = null;
+                              _snappedScreenPos = null;
+                              _activeMeasureSnap = null;
+                              _pointerCustomTitle = null;
+                              _pointerCustomSubText = null;
+                            });
+                          },
                           measurement: _measurement,
                           snapEnabled: _snapEnabled,
                           onToggleSnap: () {
@@ -1008,13 +1595,17 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                               }
                             });
                           },
+                          onUndoPoint: _handleUndoAreaPoint,
+                          onClosePolygon: _handleCloseAreaPolygon,
                           onClear: () {
                             setState(() {
-                              _measurement = null;
+                              _measurement = DxfMeasurement(tool: _currentMeasureTool);
                               _touchScreenPos = null;
                               _targetScreenPos = null;
                               _snappedScreenPos = null;
                               _activeMeasureSnap = null;
+                              _pointerCustomTitle = null;
+                              _pointerCustomSubText = null;
                             });
                           },
                           onExit: () {
@@ -1026,6 +1617,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                               _targetScreenPos = null;
                               _snappedScreenPos = null;
                               _activeMeasureSnap = null;
+                              _pointerCustomTitle = null;
+                              _pointerCustomSubText = null;
                             });
                           },
                         ),

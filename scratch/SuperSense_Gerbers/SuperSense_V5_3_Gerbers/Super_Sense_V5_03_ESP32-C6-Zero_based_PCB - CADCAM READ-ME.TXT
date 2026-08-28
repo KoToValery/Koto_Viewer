@@ -1,0 +1,170 @@
+LABCENTER PROTEUS TOOL INFORMATION FILE
+=======================================
+
+In case of difficulty, please e-mail support@labcenter.co.uk
+
+Tool set up for Proteus layout 'Super_Sense_V5_03_ESP32-C6-Zero_based_PCB.pdsprj'.
+CADCAM generated at 8:25:27 AM on Monday, August 3, 2026 by Proteus 9.01.
+
+File List
+---------
+Top Copper              : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Top Copper.GBR
+Bottom Copper           : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Bottom Copper.GBR
+Top Silk Screen         : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Top Silk Screen.GBR
+Bottom Silk Screen      : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Bottom Silk Screen.GBR
+Top Solder Resist       : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Top Solder Resist.GBR
+Bottom Solder Resist    : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Bottom Solder Resist.GBR
+Top SMT Paste           : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Top SMT Paste.GBR
+Top Assembly            : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Top Assembly.GBR
+Bottom Assembly         : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Bottom Assembly.GBR
+Profile                 : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Profile.GBR
+Drill, Plated, 1-16     : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Drill TOP-BOT Plated.GBR
+Drill, Filled, 1-16     : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Drill TOP-BOT Filled and Plated.GBR
+Netlist                 : Super_Sense_V5_03_ESP32-C6-Zero_based_PCB - CADCAM Netlist.IPC
+
+Photoplotter Setup
+------------------
+Format: X2, ASCII, 2.4, imperial, absolute, eob=*, LZO
+Bounds: -6180.1th 2318th -4440.1th 4085.3th
+Notes:  D=Diameter, S=Side, W=Width, H=Height, C=Chamfer, I=Index
+
+D10	CIRCLE  D=10th                                                            DRAW  Conductor
+D11	CIRCLE  D=12th                                                            DRAW  Conductor
+D12	CIRCLE  D=14th                                                            DRAW  Conductor
+D13	CIRCLE  D=25th                                                            DRAW  Conductor
+D14	CIRCLE  D=20th                                                            DRAW  Conductor
+D15	CIRCLE  D=28th                                                            DRAW  Conductor
+D16	CIRCLE  D=15th                                                            DRAW  Conductor
+D17	CIRCLE  D=18th                                                            DRAW  Conductor
+D18	CIRCLE  D=40th                                                            DRAW  Conductor
+D19	CIRCLE  D=30th                                                            DRAW  Conductor
+D70	CIRCLE  D=35th                                                            FLASH ViaPad
+D71	PPAD    W=59.4th              H=118.9th             I=0                   FLASH ComponentPad
+D20	CIRCLE  D=40th                                                            FLASH ComponentPad
+D21	RECT    W=39.4th              H=110.2th                                   FLASH SMDPad,CuDef
+D22	RECT    W=40th                H=50th                                      FLASH SMDPad,CuDef
+D23	RECT    W=50th                H=40th                                      FLASH SMDPad,CuDef
+D24	RECT    W=59.1th              H=25.6th                                    FLASH SMDPad,CuDef
+D25	RECT    W=25th                H=20th                                      FLASH SMDPad,CuDef
+D26	RECT    W=16th                H=35th                                      FLASH SMDPad,CuDef
+D27	RECT    W=35th                H=40th                                      FLASH SMDPad,CuDef
+D28	RECT    W=40th                H=35th                                      FLASH SMDPad,CuDef
+D29	RECT    W=40th                H=100th                                     FLASH SMDPad,CuDef
+D72	RECT    W=35th                H=26th                                      FLASH SMDPad,CuDef
+D73	CIRCLE  D=137.8th                                                         FLASH OtherPad,Unknown
+D30	CIRCLE  D=42.1th                                                          FLASH ComponentPad
+D31	CIRCLE  D=60th                                                            FLASH ComponentPad
+D32	PPAD    W=78th                H=78th                I=1                   FLASH WasherPad
+D33	CIRCLE  D=59.1th                                                          FLASH ComponentPad
+D34	CIRCLE  D=116.1th                                                         FLASH ComponentPad
+D35	CIRCLE  D=39.4th                                                          FLASH ComponentPad
+D36	RECT    W=23.6th              H=61th                                      FLASH SMDPad,CuDef
+D37	RECT    W=11.8th              H=61th                                      FLASH SMDPad,CuDef
+D38	CIRCLE  D=78.7th                                                          FLASH ComponentPad
+D39	CIRCLE  D=81.9th                                                          FLASH ComponentPad
+D40	RECT    W=23.6th              H=33.5th                                    FLASH SMDPad,CuDef
+D41	RECT    W=55th                H=30th                                      FLASH SMDPad,CuDef
+D42	SQUARE  S=53.2th                                                          FLASH ComponentPad
+D43	CIRCLE  D=49.2th                                                          FLASH ComponentPad
+D44	CIRCLE  D=4th                                                             DRAW  Profile
+D45	CIRCLE  D=3.9th                                                           DRAW  Material
+D46	CIRCLE  D=7.9th                                                           DRAW  Material
+D47	CIRCLE  D=4th                                                             DRAW  Material
+D48	CIRCLE  D=9.8th                                                           DRAW  Material
+D49	CIRCLE  D=4th                                                             DRAW  NonMaterial
+D50	CIRCLE  D=5th                                                             DRAW  Material
+D51	PPAD    W=63.4th              H=122.9th             I=2                   FLASH Material
+D52	CIRCLE  D=50th                                                            FLASH Material
+D53	PPAD    W=49.4th              H=120.2th             I=3                   FLASH Material
+D54	PPAD    W=50th                H=60th                I=4                   FLASH Material
+D55	PPAD    W=60th                H=50th                I=5                   FLASH Material
+D56	PPAD    W=71.1th              H=37.6th              I=6                   FLASH Material
+D57	PPAD    W=37th                H=32th                I=7                   FLASH Material
+D58	PPAD    W=16th                H=35th                I=8                   FLASH Material
+D59	PPAD    W=45th                H=50th                I=9                   FLASH Material
+D60	PPAD    W=50th                H=45th                I=10                  FLASH Material
+D61	PPAD    W=50th                H=110th               I=11                  FLASH Material
+D62	PPAD    W=35th                H=26th                I=12                  FLASH Material
+D63	CIRCLE  D=147.8th                                                         FLASH Material
+D64	CIRCLE  D=42.1th                                                          FLASH Material
+D65	CIRCLE  D=70th                                                            FLASH Material
+D66	PPAD    W=88th                H=88th                I=13                  FLASH Material
+D67	CIRCLE  D=69.1th                                                          FLASH Material
+D68	CIRCLE  D=132.1th                                                         FLASH Material
+D69	CIRCLE  D=39.4th                                                          FLASH Material
+D74	PPAD    W=23.6th              H=61th                I=14                  FLASH Material
+D75	PPAD    W=11.8th              H=61th                I=15                  FLASH Material
+D76	CIRCLE  D=78.7th                                                          FLASH Material
+D77	CIRCLE  D=81.9th                                                          FLASH Material
+D78	PPAD    W=23.6th              H=33.5th              I=16                  FLASH Material
+D79	PPAD    W=75th                H=50th                I=17                  FLASH Material
+D80	PPAD    W=59.2th              H=59.2th              I=18                  FLASH Material
+D81	CIRCLE  D=55.2th                                                          FLASH Material
+D82	RECT    W=39.4th              H=110.2th                                   FLASH Material
+D83	RECT    W=40th                H=50th                                      FLASH Material
+D84	RECT    W=50th                H=40th                                      FLASH Material
+D85	RECT    W=59.1th              H=25.6th                                    FLASH Material
+D86	RECT    W=25th                H=20th                                      FLASH Material
+D87	RECT    W=16th                H=35th                                      FLASH Material
+D88	RECT    W=35th                H=40th                                      FLASH Material
+D89	RECT    W=40th                H=35th                                      FLASH Material
+D90	RECT    W=40th                H=100th                                     FLASH Material
+D91	RECT    W=35th                H=26th                                      FLASH Material
+D92	RECT    W=23.6th              H=61th                                      FLASH Material
+D93	RECT    W=11.8th              H=61th                                      FLASH Material
+D94	RECT    W=23.6th              H=33.5th                                    FLASH Material
+D95	RECT    W=55th                H=30th                                      FLASH Material
+D96	CIRCLE  D=47.6th                                                          DRAW  Material
+D97	CIRCLE  D=19.3th                                                          DRAW  Material
+D98	CIRCLE  D=35.4th                                                          DRAW  Material
+D99	CIRCLE  D=7.2th                                                           DRAW  Material
+D100	CIRCLE  D=20th                                                            DRAW  Material
+D101	CIRCLE  D=3th                                                             DRAW  Material
+D102	CIRCLE  D=2th                                                             DRAW  Material
+D103	CIRCLE  D=23th                                                            DRAW  Material
+D104	CIRCLE  D=6.4th                                                           DRAW  Material
+D105	CIRCLE  D=10th                                                            DRAW  Material
+D106	CIRCLE  D=3.7th                                                           DRAW  Material
+D107	CIRCLE  D=14th                                                            DRAW  Material
+D108	CIRCLE  D=3.6th                                                           DRAW  Material
+D109	CIRCLE  D=36th                                                            DRAW  Material
+D110	CIRCLE  D=3.5th                                                           DRAW  Material
+D111	CIRCLE  D=4.5th                                                           DRAW  Material
+D112	CIRCLE  D=16.9th                                                          DRAW  Material
+D113	CIRCLE  D=1.9th                                                           DRAW  Material
+D114	CIRCLE  D=1.4th                                                           DRAW  Material
+D115	CIRCLE  D=31.2th                                                          DRAW  Material
+D116	CIRCLE  D=14.4th                                                          DRAW  Material
+D117	CIRCLE  D=21.3th                                                          DRAW  Material
+D118	CIRCLE  D=15.4th                                                          DRAW  Material
+D119	CIRCLE  D=13.4th                                                          DRAW  Material
+D120	CIRCLE  D=22th                                                            DRAW  Material
+D121	CIRCLE  D=2.6th                                                           DRAW  Material
+D122	CIRCLE  D=20th                                                            FLASH ViaDrill
+D123	CIRCLE  D=39th                                                            FLASH ComponentDrill
+D124	CIRCLE  D=23th                                                            FLASH ComponentDrill
+D125	CIRCLE  D=118.1th                                                         FLASH OtherDrill,Unknown
+D126	CIRCLE  D=27.6th                                                          FLASH ComponentDrill
+D127	CIRCLE  D=40th                                                            FLASH ComponentDrill
+D128	CIRCLE  D=39.4th                                                          FLASH ComponentDrill
+D129	CIRCLE  D=51.2th                                                          FLASH ComponentDrill
+D130	CIRCLE  D=32.3th                                                          FLASH ComponentDrill
+D131	CIRCLE  D=49.6th                                                          FLASH ComponentDrill
+D132	CIRCLE  D=55.9th                                                          FLASH ComponentDrill
+D133	CIRCLE  D=35.4th                                                          FLASH ComponentDrill
+D134	CIRCLE  D=35th                                                            FLASH ComponentDrill
+
+Layer Stackup
+-------------
+Top Solder Resist        : 0.4th      Resist
+Top Copper               : 0.7th      Copper
+Core                     : 61th       FR4
+Bottom Copper            : 0.7th      Copper
+Bottom Solder Resist     : 0.4th      Resist
+
+PPC Results
+-----------
+Date: Monday, August 3, 2026, 8:24:57 AM
+0 errors, 0 warnings, 0 failed, 0 skipped, 23 passed.
+
+[END OF FILE]

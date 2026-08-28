@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../rendering/dxf_math.dart';
+import '../rendering/dxf_quadtree.dart';
 
 /// Vertex in lightweight polyline or 2D polyline.
 class DxfPolylineVertex {
@@ -742,6 +744,7 @@ class DxfDocument {
   final Rect bounds;
   final Map<String, int> entityStats;
   final Map<String, List<double>> lineTypes;
+  DxfQuadTree? spatialIndex;
 
   DxfDocument({
     required this.layers,
@@ -751,7 +754,12 @@ class DxfDocument {
     required this.bounds,
     required this.entityStats,
     this.lineTypes = const {},
+    this.spatialIndex,
   });
+
+  /// Returns existing spatial index or builds a Quadtree on demand.
+  DxfQuadTree get orBuildSpatialIndex =>
+      spatialIndex ??= DxfQuadTree.build(entities, blocks, bounds);
 
   int get totalEntities => entities.length;
   int get totalLayers => layers.length;
@@ -759,4 +767,188 @@ class DxfDocument {
 
   double get width => bounds.width.abs();
   double get height => bounds.height.abs();
+}
+
+/// CAD Measurement and Markup tool types.
+enum DxfMeasureTool {
+  distance(label: 'Distance', icon: Icons.straighten),
+  area(label: 'Area', icon: Icons.polyline),
+  angle(label: 'Angle', icon: Icons.architecture),
+  radius(label: 'Radius / Ø', icon: Icons.radio_button_unchecked),
+  annotation(label: 'Leader Note', icon: Icons.arrow_outward);
+
+  final String label;
+  final IconData icon;
+  const DxfMeasureTool({required this.label, required this.icon});
+}
+
+/// Represents a user-drawn CAD Annotation (Leader arrow pointing to a feature with an attached text note).
+class DxfAnnotation {
+  final String id;
+  final Offset arrowTipCad;
+  final Offset textPosCad;
+  final String text;
+  final int colorValue;
+  final double? textHeight;
+  final DateTime createdAt;
+
+  const DxfAnnotation({
+    required this.id,
+    required this.arrowTipCad,
+    required this.textPosCad,
+    required this.text,
+    this.colorValue = 0xFFFF5252,
+    this.textHeight,
+    required this.createdAt,
+  });
+
+  Color get color => Color(colorValue);
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'tipX': arrowTipCad.dx,
+    'tipY': arrowTipCad.dy,
+    'textX': textPosCad.dx,
+    'textY': textPosCad.dy,
+    'text': text,
+    'color': colorValue,
+    'textHeight': textHeight,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory DxfAnnotation.fromJson(Map<String, dynamic> json) => DxfAnnotation(
+    id: json['id'] as String,
+    arrowTipCad: Offset((json['tipX'] as num).toDouble(), (json['tipY'] as num).toDouble()),
+    textPosCad: Offset((json['textX'] as num).toDouble(), (json['textY'] as num).toDouble()),
+    text: json['text'] as String,
+    colorValue: json['color'] as int? ?? 0xFFFF5252,
+    textHeight: (json['textHeight'] as num?)?.toDouble(),
+    createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+  );
+
+  DxfAnnotation copyWith({
+    String? id,
+    Offset? arrowTipCad,
+    Offset? textPosCad,
+    String? text,
+    int? colorValue,
+    double? textHeight,
+    DateTime? createdAt,
+  }) => DxfAnnotation(
+    id: id ?? this.id,
+    arrowTipCad: arrowTipCad ?? this.arrowTipCad,
+    textPosCad: textPosCad ?? this.textPosCad,
+    text: text ?? this.text,
+    colorValue: colorValue ?? this.colorValue,
+    textHeight: textHeight ?? this.textHeight,
+    createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+/// Rich measurement and annotation state model.
+class DxfMeasurement {
+  final DxfMeasureTool tool;
+
+  // 1. Distance Tool
+  final Offset? p1Cad;
+  final Offset? p2Cad;
+
+  // 2. Area Tool
+  final List<Offset> areaPoints;
+  final bool isAreaClosed;
+
+  // 3. Angle Tool
+  final Offset? angleVertex;
+  final Offset? angleP1;
+  final Offset? angleP2;
+
+  // 4. Radius / Diameter Tool
+  final Offset? circleCenter;
+  final double? radius;
+  final bool isArc;
+  final double? arcLength;
+  final List<Offset> circlePoints;
+
+  // 5. Annotation / Leader Tool
+  final Offset? annotationTip;
+  final Offset? annotationTextPos;
+  final String? annotationText;
+
+  const DxfMeasurement({
+    this.tool = DxfMeasureTool.distance,
+    this.p1Cad,
+    this.p2Cad,
+    this.areaPoints = const [],
+    this.isAreaClosed = false,
+    this.angleVertex,
+    this.angleP1,
+    this.angleP2,
+    this.circleCenter,
+    this.radius,
+    this.isArc = false,
+    this.arcLength,
+    this.circlePoints = const [],
+    this.annotationTip,
+    this.annotationTextPos,
+    this.annotationText,
+  });
+
+  // Distance Helpers (backward compatible)
+  double? get distance => (p1Cad != null && p2Cad != null) ? (p2Cad! - p1Cad!).distance : null;
+  double? get deltaX => (p1Cad != null && p2Cad != null) ? (p2Cad!.dx - p1Cad!.dx).abs() : null;
+  double? get deltaY => (p1Cad != null && p2Cad != null) ? (p2Cad!.dy - p1Cad!.dy).abs() : null;
+
+  // Area Helpers
+  double get area => DxfMath.calculatePolygonArea(areaPoints);
+  double get perimeter => DxfMath.calculatePolygonPerimeter(areaPoints, isClosed: isAreaClosed || areaPoints.length >= 3);
+  Offset get centroid => DxfMath.calculatePolygonCentroid(areaPoints);
+
+  // Angle Helpers
+  double? get angleDegrees {
+    if (angleVertex != null && angleP1 != null && angleP2 != null) {
+      return DxfMath.calculateAngleBetweenVectors(angleVertex!, angleP1!, angleP2!);
+    }
+    return null;
+  }
+
+  // Radius Helpers
+  double? get diameter => radius != null ? radius! * 2.0 : null;
+
+  DxfMeasurement copyWith({
+    DxfMeasureTool? tool,
+    Offset? p1Cad,
+    Offset? p2Cad,
+    List<Offset>? areaPoints,
+    bool? isAreaClosed,
+    Offset? angleVertex,
+    Offset? angleP1,
+    Offset? angleP2,
+    Offset? circleCenter,
+    double? radius,
+    bool? isArc,
+    double? arcLength,
+    List<Offset>? circlePoints,
+    Offset? annotationTip,
+    Offset? annotationTextPos,
+    String? annotationText,
+  }) {
+    return DxfMeasurement(
+      tool: tool ?? this.tool,
+      p1Cad: p1Cad ?? this.p1Cad,
+      p2Cad: p2Cad ?? this.p2Cad,
+      areaPoints: areaPoints ?? this.areaPoints,
+      isAreaClosed: isAreaClosed ?? this.isAreaClosed,
+      angleVertex: angleVertex ?? this.angleVertex,
+      angleP1: angleP1 ?? this.angleP1,
+      angleP2: angleP2 ?? this.angleP2,
+      circleCenter: circleCenter ?? this.circleCenter,
+      radius: radius ?? this.radius,
+      isArc: isArc ?? this.isArc,
+      arcLength: arcLength ?? this.arcLength,
+      circlePoints: circlePoints ?? this.circlePoints,
+      annotationTip: annotationTip ?? this.annotationTip,
+      annotationTextPos: annotationTextPos ?? this.annotationTextPos,
+      annotationText: annotationText ?? this.annotationText,
+    );
+  }
 }

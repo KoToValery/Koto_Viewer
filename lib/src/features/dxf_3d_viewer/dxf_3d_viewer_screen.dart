@@ -4,12 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
+import 'models/ifc_model.dart';
 import 'models/mesh_3d.dart';
 import 'parser/stl_parser.dart';
 import 'parser/obj_parser.dart';
 import 'parser/glb_gltf_parser.dart';
 import 'parser/step_parser.dart';
 import 'parser/iges_parser.dart';
+import 'parser/ifc_parser.dart';
+import 'widgets/ifc_bim_sheet.dart';
 import 'rendering/cad_3d_camera.dart';
 import 'rendering/cad_3d_mesh_painter.dart';
 
@@ -32,14 +35,15 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   final Cad3DCamera _camera = Cad3DCamera();
 
   Mesh3D? _mesh;
+  IfcModel? _ifcModel;
   bool _isLoading = true;
   String? _errorMessage;
   late String _fileName;
   int _fileSizeBytes = 0;
 
-  Cad3DShadingMode _shadingMode = Cad3DShadingMode.cadShadedEdges;
+  Cad3DShadingMode _shadingMode = Cad3DShadingMode.smoothShaded;
   Cad3DTheme _theme = Cad3DTheme.darkCad;
-  bool _showBoundingBox = true;
+  bool _showBoundingBox = false;
   bool _showGrid = true;
 
   Offset? _lastPanPos;
@@ -74,7 +78,11 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       final lower = widget.filePath.toLowerCase();
       Mesh3D mesh;
 
-      if (lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.p21')) {
+      if (lower.endsWith('.ifc')) {
+        final ifc = await IfcParser.parseFromFile(widget.filePath);
+        _ifcModel = ifc;
+        mesh = ifc.toMesh3D();
+      } else if (lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.p21')) {
         mesh = await StepParser.parseFromFile(widget.filePath);
       } else if (lower.endsWith('.iges') || lower.endsWith('.igs')) {
         mesh = await IgesParser.parseFromFile(widget.filePath);
@@ -122,9 +130,12 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     }
   }
 
+  bool _isInteracting = false;
+
   void _onScaleStart(ScaleStartDetails details) {
     _lastPanPos = details.localFocalPoint;
     _baseScale = _camera.zoom;
+    _isInteracting = true;
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
@@ -134,6 +145,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     _lastPanPos = details.localFocalPoint;
 
     setState(() {
+      _isInteracting = true;
       if (details.pointerCount == 1) {
         // 1 finger: Orbit Rotation
         _camera.orbit(delta.dx, delta.dy);
@@ -147,6 +159,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
   void _onScaleEnd(ScaleEndDetails details) {
     _lastPanPos = null;
+    setState(() {
+      _isInteracting = false;
+    });
   }
 
   void _resetView() {
@@ -312,6 +327,20 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     );
   }
 
+  void _openBimSheet() {
+    if (_ifcModel == null) return;
+    IfcBimSheet.show(
+      context: context,
+      ifcModel: _ifcModel!,
+      isDark: _theme.isDark,
+      onFiltersChanged: () {
+        setState(() {
+          _mesh = _ifcModel!.toMesh3D();
+        });
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -328,106 +357,149 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         title: Text(
           _fileName,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        actions: [
-          // Quick Views Menu
-          PopupMenuButton<Cad3DViewPreset>(
-            icon: const Icon(Icons.videocam_outlined),
-            tooltip: 'Camera View',
-            onSelected: _setViewPreset,
-            itemBuilder: (context) => Cad3DViewPreset.values.map((v) {
-              return PopupMenuItem<Cad3DViewPreset>(
-                value: v,
-                child: Row(
-                  children: [
-                    Icon(v.icon, size: 18, color: theme.colorScheme.primary),
-                    const SizedBox(width: 10),
-                    Text(v.label),
-                  ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
                 ),
-              );
-            }).toList(),
-          ),
-
-          // Shading Mode Menu
-          PopupMenuButton<Cad3DShadingMode>(
-            icon: Icon(_shadingMode.icon),
-            tooltip: 'Rendering Mode',
-            onSelected: (m) => setState(() => _shadingMode = m),
-            itemBuilder: (context) => Cad3DShadingMode.values.map((m) {
-              return PopupMenuItem<Cad3DShadingMode>(
-                value: m,
-                child: Row(
-                  children: [
-                    Icon(m.icon, size: 18, color: theme.colorScheme.primary),
-                    const SizedBox(width: 10),
-                    Text(m.label),
-                    if (_shadingMode == m) ...[
-                      const Spacer(),
-                      Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                    ],
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-
-          // Canvas Theme Menu
-          PopupMenuButton<Cad3DTheme>(
-            icon: const Icon(Icons.palette_outlined),
-            tooltip: 'Theme',
-            onSelected: (t) => setState(() => _theme = t),
-            itemBuilder: (context) => Cad3DTheme.values.map((t) {
-              return PopupMenuItem<Cad3DTheme>(
-                value: t,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: t.background,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey, width: 1),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(t.label),
-                    if (_theme == t) ...[
-                      const Spacer(),
-                      Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                    ],
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-
-          // Bounding Box Toggle
-          IconButton(
-            icon: Icon(
-              _showBoundingBox ? Icons.crop_free : Icons.crop_square,
-              color: _showBoundingBox ? theme.colorScheme.primary : null,
+              ),
             ),
-            tooltip: 'Bounding Box',
-            onPressed: () => setState(() => _showBoundingBox = !_showBoundingBox),
-          ),
+            child: Row(
+              children: [
+                const Spacer(),
 
-          // 3D Model Info & Metrics
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: '3D Properties',
-            onPressed: _showMetricsSheet,
-          ),
+                // Quick Views Menu
+                PopupMenuButton<Cad3DViewPreset>(
+                  icon: const Icon(Icons.videocam_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Camera View',
+                  onSelected: _setViewPreset,
+                  itemBuilder: (context) => Cad3DViewPreset.values.map((v) {
+                    return PopupMenuItem<Cad3DViewPreset>(
+                      value: v,
+                      child: Row(
+                        children: [
+                          Icon(v.icon, size: 18, color: theme.colorScheme.primary),
+                          const SizedBox(width: 10),
+                          Text(v.label),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
 
-          // Share
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share',
-            onPressed: _shareFile,
+                // Shading Mode Menu
+                PopupMenuButton<Cad3DShadingMode>(
+                  icon: Icon(_shadingMode.icon, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Rendering Mode',
+                  onSelected: (m) => setState(() => _shadingMode = m),
+                  itemBuilder: (context) => Cad3DShadingMode.values.map((m) {
+                    return PopupMenuItem<Cad3DShadingMode>(
+                      value: m,
+                      child: Row(
+                        children: [
+                          Icon(m.icon, size: 18, color: theme.colorScheme.primary),
+                          const SizedBox(width: 10),
+                          Text(m.label),
+                          if (_shadingMode == m) ...[
+                            const Spacer(),
+                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                // Canvas Theme Menu
+                PopupMenuButton<Cad3DTheme>(
+                  icon: const Icon(Icons.palette_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Theme',
+                  onSelected: (t) => setState(() => _theme = t),
+                  itemBuilder: (context) => Cad3DTheme.values.map((t) {
+                    return PopupMenuItem<Cad3DTheme>(
+                      value: t,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: t.background,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey, width: 1),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(t.label),
+                          if (_theme == t) ...[
+                            const Spacer(),
+                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                // Bounding Box Toggle
+                IconButton(
+                  icon: Icon(
+                    _showBoundingBox ? Icons.crop_free : Icons.crop_square,
+                    size: 20,
+                    color: _showBoundingBox ? theme.colorScheme.primary : null,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Bounding Box',
+                  onPressed: () => setState(() => _showBoundingBox = !_showBoundingBox),
+                ),
+
+                // BIM Storeys & Categories (when IFC model is loaded)
+                if (_ifcModel != null)
+                  IconButton(
+                    icon: const Icon(Icons.apartment_rounded, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    color: const Color(0xFF00E5FF),
+                    tooltip: 'BIM Storeys & Categories',
+                    onPressed: _openBimSheet,
+                  ),
+
+                // 3D Model Info & Metrics
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: '3D Properties',
+                  onPressed: _showMetricsSheet,
+                ),
+
+                // Share
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Share',
+                  onPressed: _shareFile,
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -487,6 +559,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     theme: _theme,
                     showBoundingBox: _showBoundingBox,
                     showGrid: _showGrid,
+                    isInteracting: _isInteracting,
                   ),
                 ),
               ),

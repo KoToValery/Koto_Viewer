@@ -53,19 +53,27 @@ class PcbPainter extends CustomPainter {
 
     final activeColor = _resolveLayerColor(document.layerType, theme);
 
+    final hasClearPolarity = document.commands.any((c) => !c.isDark);
+    if (hasClearPolarity) {
+      canvas.saveLayer(null, Paint());
+    }
+
     // 3. Draw Gerber Elements (Tracks, Arcs, Pads, Regions)
     for (final cmd in document.commands) {
-      if (!cmd.isDark) continue;
+      final isClear = !cmd.isDark;
+      final cmdColor = isClear ? const Color(0xFF000000) : activeColor;
+      final blend = isClear ? BlendMode.clear : BlendMode.srcOver;
 
       switch (cmd.type) {
         // Line Track
         case PcbCommandType.line:
           final p1 = mapPoint(cmd.p1);
           final p2 = mapPoint(cmd.p2!);
-          final widthPx = math.max(1.0, (cmd.aperture?.dimX ?? 0.2) * scaleFactor);
+          final widthPx = math.max(0.5, (cmd.aperture?.dimX ?? 0.2) * scaleFactor);
 
           final trackPaint = Paint()
-            ..color = activeColor
+            ..color = cmdColor
+            ..blendMode = blend
             ..strokeWidth = widthPx
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round
@@ -77,10 +85,11 @@ class PcbPainter extends CustomPainter {
         case PcbCommandType.arc:
           final center = mapPoint(cmd.center!);
           final radPx = (cmd.radius ?? 1.0) * scaleFactor;
-          final widthPx = math.max(1.0, (cmd.aperture?.dimX ?? 0.2) * scaleFactor);
+          final widthPx = math.max(0.5, (cmd.aperture?.dimX ?? 0.2) * scaleFactor);
 
           final arcPaint = Paint()
-            ..color = activeColor
+            ..color = cmdColor
+            ..blendMode = blend
             ..strokeWidth = widthPx
             ..style = PaintingStyle.stroke;
 
@@ -101,12 +110,23 @@ class PcbPainter extends CustomPainter {
           final apType = ap?.type ?? PcbApertureType.circle;
 
           final padPaint = Paint()
-            ..color = activeColor
+            ..color = cmdColor
+            ..blendMode = blend
             ..style = PaintingStyle.fill;
 
-          if (apType == PcbApertureType.circle) {
+          if (ap?.polygonPoints != null && ap!.polygonPoints!.isNotEmpty) {
+            final path = Path();
+            final first = ap.polygonPoints!.first;
+            path.moveTo(pos.dx + first.dx * scaleFactor, pos.dy - first.dy * scaleFactor);
+            for (int i = 1; i < ap.polygonPoints!.length; i++) {
+              final pt = ap.polygonPoints![i];
+              path.lineTo(pos.dx + pt.dx * scaleFactor, pos.dy - pt.dy * scaleFactor);
+            }
+            path.close();
+            canvas.drawPath(path, padPaint);
+          } else if (apType == PcbApertureType.circle) {
             final radiusPx = ((ap?.dimX ?? 1.0) / 2.0) * scaleFactor;
-            canvas.drawCircle(pos, math.max(1.5, radiusPx), padPaint);
+            canvas.drawCircle(pos, math.max(0.8, radiusPx), padPaint);
           } else if (apType == PcbApertureType.rectangle) {
             final wPx = (ap?.dimX ?? 1.0) * scaleFactor;
             final hPx = (ap?.dimY ?? 1.0) * scaleFactor;
@@ -127,14 +147,31 @@ class PcbPainter extends CustomPainter {
             );
           } else {
             final radiusPx = ((ap?.dimX ?? 1.0) / 2.0) * scaleFactor;
-            canvas.drawCircle(pos, math.max(1.5, radiusPx), padPaint);
+            canvas.drawCircle(pos, math.max(0.8, radiusPx), padPaint);
           }
           break;
 
         // Copper Pour / Polygon Region
         case PcbCommandType.region:
-          if (cmd.regionPoints != null && cmd.regionPoints!.length >= 3) {
-            final path = Path();
+          final regionPaint = Paint()
+            ..color = cmdColor
+            ..blendMode = blend
+            ..style = PaintingStyle.fill;
+
+          final path = Path()..fillType = PathFillType.evenOdd;
+          if (cmd.regionContours != null && cmd.regionContours!.isNotEmpty) {
+            for (final contour in cmd.regionContours!) {
+              if (contour.length < 2) continue;
+              final first = mapPoint(contour.first);
+              path.moveTo(first.dx, first.dy);
+              for (int i = 1; i < contour.length; i++) {
+                final pt = mapPoint(contour[i]);
+                path.lineTo(pt.dx, pt.dy);
+              }
+              path.close();
+            }
+            canvas.drawPath(path, regionPaint);
+          } else if (cmd.regionPoints != null && cmd.regionPoints!.length >= 3) {
             final first = mapPoint(cmd.regionPoints!.first);
             path.moveTo(first.dx, first.dy);
             for (int i = 1; i < cmd.regionPoints!.length; i++) {
@@ -142,14 +179,14 @@ class PcbPainter extends CustomPainter {
               path.lineTo(pt.dx, pt.dy);
             }
             path.close();
-
-            final regionPaint = Paint()
-              ..color = activeColor.withValues(alpha: 0.88)
-              ..style = PaintingStyle.fill;
             canvas.drawPath(path, regionPaint);
           }
           break;
       }
+    }
+
+    if (hasClearPolarity) {
+      canvas.restore();
     }
 
     // 4. Draw Drill Holes
@@ -204,20 +241,21 @@ class PcbPainter extends CustomPainter {
   Color _resolveLayerColor(PcbLayerType layerType, PcbTheme theme) {
     switch (layerType) {
       case PcbLayerType.copperTop:
+        return const Color(0xFFD32F2F); // Red
       case PcbLayerType.copperBottom:
-        return theme.copper;
+        return const Color(0xFF1976D2); // Blue
       case PcbLayerType.solderMaskTop:
       case PcbLayerType.solderMaskBottom:
-        return theme.mask;
+        return const Color(0xFF8B5CF6);
       case PcbLayerType.silkscreenTop:
       case PcbLayerType.silkscreenBottom:
         return theme.silk;
       case PcbLayerType.edgeCuts:
-        return theme.outline;
+        return const Color(0xFFFACC15);
       case PcbLayerType.drill:
-        return theme.copper;
+        return const Color(0xFFFFA000);
       case PcbLayerType.generic:
-        return theme.copper;
+        return const Color(0xFFD32F2F);
     }
   }
 

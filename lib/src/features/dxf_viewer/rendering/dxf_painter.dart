@@ -35,38 +35,30 @@ enum DxfCanvasTheme {
   });
 }
 
-/// Measurement state model.
-class DxfMeasurement {
-  final Offset p1Cad;
-  final Offset? p2Cad;
-
-  const DxfMeasurement({required this.p1Cad, this.p2Cad});
-
-  double? get distance => p2Cad != null ? (p2Cad! - p1Cad).distance : null;
-  double? get deltaX => p2Cad != null ? (p2Cad!.dx - p1Cad.dx).abs() : null;
-  double? get deltaY => p2Cad != null ? (p2Cad!.dy - p1Cad.dy).abs() : null;
-}
-
 /// CustomPainter for rendering entire DXF drawing.
 class DxfPainter extends CustomPainter {
   final DxfDocument document;
   final DxfCanvasTheme theme;
   final double currentScale;
   final DxfMeasurement? measurement;
+  final List<DxfAnnotation> annotations;
   final DxfEntity? highlightedEntity;
   final DxfSnapResult? snapResult;
   final bool showGrid;
   final DxfDisplaySettings settings;
+  final Rect? visibleCadRect;
 
   DxfPainter({
     required this.document,
     required this.theme,
     this.currentScale = 1.0,
     this.measurement,
+    this.annotations = const [],
     this.highlightedEntity,
     this.snapResult,
     this.showGrid = true,
     this.settings = const DxfDisplaySettings(),
+    this.visibleCadRect,
   });
 
   @override
@@ -106,66 +98,87 @@ class DxfPainter extends CustomPainter {
       _drawGrid(canvas, size);
     }
 
-    // 2. Draw Entities
-    for (final entity in document.entities) {
-      final layer = document.layers[entity.layer];
-      if (layer != null && !layer.isVisible) {
-        continue;
+    // 2. Draw Entities (Render all document entities directly so no lines or text ever disappear upon zooming in)
+    final Iterable<DxfEntity> entitiesToDraw = (document.entities.length > 30000 && visibleCadRect != null && document.spatialIndex != null)
+        ? document.spatialIndex!.query(visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.5))
+        : document.entities;
+
+    for (final entity in entitiesToDraw) {
+      try {
+        final layer = document.layers[entity.layer];
+        if (layer != null && !layer.isVisible) {
+          continue;
+        }
+
+        final color = DxfColorTable.resolveColor(
+          colorIndex: entity.colorIndex,
+          trueColor: entity.trueColor,
+          layerColor: layer != null
+              ? DxfColorTable.resolveColor(
+                  colorIndex: layer.colorIndex,
+                  trueColor: layer.trueColor,
+                  isDarkBackground: theme.isDark,
+                )
+              : null,
+          isDarkBackground: theme.isDark,
+        );
+
+        final strokeWidth = _calcStrokeWidth(entity.lineWeight, layer: layer);
+
+        final strokePaint = Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..isAntiAlias = true;
+
+        final fillPaint = Paint()
+          ..color = color.withValues(alpha: 0.35)
+          ..style = PaintingStyle.fill
+          ..isAntiAlias = true;
+
+        _renderEntity(
+          canvas: canvas,
+          entity: entity,
+          strokePaint: strokePaint,
+          fillPaint: fillPaint,
+          toCanvas: toCanvas,
+          fitScale: fitScale,
+          blocks: document.blocks,
+          layers: document.layers,
+        );
+      } catch (_) {
+        // Individual entity rendering failure must never break the frame
       }
-
-      final color = DxfColorTable.resolveColor(
-        colorIndex: entity.colorIndex,
-        trueColor: entity.trueColor,
-        layerColor: layer != null
-            ? DxfColorTable.resolveColor(
-                colorIndex: layer.colorIndex,
-                trueColor: layer.trueColor,
-                isDarkBackground: theme.isDark,
-              )
-            : null,
-        isDarkBackground: theme.isDark,
-      );
-
-      final strokeWidth = _calcStrokeWidth(entity.lineWeight, layer: layer);
-
-      final strokePaint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..isAntiAlias = true;
-
-      final fillPaint = Paint()
-        ..color = color.withValues(alpha: 0.35)
-        ..style = PaintingStyle.fill
-        ..isAntiAlias = true;
-
-      _renderEntity(
-        canvas: canvas,
-        entity: entity,
-        strokePaint: strokePaint,
-        fillPaint: fillPaint,
-        toCanvas: toCanvas,
-        fitScale: fitScale,
-        blocks: document.blocks,
-        layers: document.layers,
-      );
     }
 
     // 3. Draw Highlighted Entity
     if (highlightedEntity != null) {
-      _drawEntityHighlight(canvas, highlightedEntity!, toCanvas);
+      try {
+        _drawEntityHighlight(canvas, highlightedEntity!, toCanvas);
+      } catch (_) {}
     }
 
     // 4. Draw Active Snap Marker
     if (snapResult != null) {
-      _drawSnapMarker(canvas, snapResult!, toCanvas);
+      try {
+        _drawSnapMarker(canvas, snapResult!, toCanvas);
+      } catch (_) {}
     }
 
-    // 5. Draw Active Measurement Overlay
+    // 5. Draw Saved Annotations (Leader notes)
+    if (annotations.isNotEmpty) {
+      try {
+        _drawAnnotations(canvas, toCanvas, fitScale);
+      } catch (_) {}
+    }
+
+    // 6. Draw Active Measurement Overlay
     if (measurement != null) {
-      _drawMeasurement(canvas, measurement!, toCanvas);
+      try {
+        _drawMeasurement(canvas, measurement!, toCanvas, fitScale);
+      } catch (_) {}
     }
   }
 
@@ -343,7 +356,7 @@ class DxfPainter extends CustomPainter {
       final center = toCanvas(entity.center);
       final r = entity.radius * fitScale;
       final path = Path()..addOval(Rect.fromCircle(center: center, radius: r));
-      final double effectiveStroke = math.min(strokePaint.strokeWidth, r * 0.45).clamp(0.2, strokePaint.strokeWidth);
+      final double effectiveStroke = math.min(strokePaint.strokeWidth, math.max(0.0001, r * 0.45));
       final circlePaint = Paint()
         ..color = strokePaint.color
         ..style = PaintingStyle.stroke
@@ -424,7 +437,7 @@ class DxfPainter extends CustomPainter {
     }
 
     final double rCanvas = arc.radius * fitScale;
-    final double effectiveStroke = math.min(paint.strokeWidth, rCanvas * 0.45).clamp(0.2, paint.strokeWidth);
+    final double effectiveStroke = math.min(paint.strokeWidth, math.max(0.0001, rCanvas * 0.45));
     final arcPaint = Paint()
       ..color = paint.color
       ..style = PaintingStyle.stroke
@@ -641,49 +654,52 @@ class DxfPainter extends CustomPainter {
     );
 
     canvas.save();
-    canvas.translate(pos.dx, pos.dy);
+    try {
+      canvas.translate(pos.dx, pos.dy);
 
-    // Rotate (CAD rotation is CCW, so on canvas with Y down, rotation is -angle)
-    final double rad = -entity.rotationDeg * math.pi / 180.0;
-    canvas.rotate(rad);
+      // Rotate (CAD rotation is CCW, so on canvas with Y down, rotation is -angle)
+      final double rad = -entity.rotationDeg * math.pi / 180.0;
+      canvas.rotate(rad);
 
-    // Horizontal alignment offset
-    double ox = 0.0;
-    switch (entity.hAlign) {
-      case 1: // Center
-      case 4: // Middle
-        ox = -textPainter.width / 2.0;
-        break;
-      case 2: // Right
-        ox = -textPainter.width;
-        break;
-      default:
-        ox = 0.0;
-    }
+      // Horizontal alignment offset
+      double ox = 0.0;
+      switch (entity.hAlign) {
+        case 1: // Center
+        case 4: // Middle
+          ox = -textPainter.width / 2.0;
+          break;
+        case 2: // Right
+          ox = -textPainter.width;
+          break;
+        default:
+          ox = 0.0;
+      }
 
-    // Vertical alignment offset (0=Baseline, 1=Bottom, 2=Middle, 3=Top)
-    double oy = -textPainter.height * 0.85; // Default baseline offset
-    switch (entity.vAlign) {
-      case 1: // Bottom
-        oy = -textPainter.height;
-        break;
-      case 2: // Middle
-        oy = -textPainter.height / 2.0;
-        break;
-      case 3: // Top
-        oy = 0.0;
-        break;
-      default:
-        if (entity.hAlign == 4) {
-          // Special case: AutoCAD "Middle" horizontal alignment (hAlign=4, vAlign=0) is centered vertically as well
+      // Vertical alignment offset (0=Baseline, 1=Bottom, 2=Middle, 3=Top)
+      double oy = -textPainter.height * 0.85; // Default baseline offset
+      switch (entity.vAlign) {
+        case 1: // Bottom
+          oy = -textPainter.height;
+          break;
+        case 2: // Middle
           oy = -textPainter.height / 2.0;
-        } else {
-          oy = -textPainter.height * 0.85;
-        }
-    }
+          break;
+        case 3: // Top
+          oy = 0.0;
+          break;
+        default:
+          if (entity.hAlign == 4) {
+            // Special case: AutoCAD "Middle" horizontal alignment (hAlign=4, vAlign=0) is centered vertically as well
+            oy = -textPainter.height / 2.0;
+          } else {
+            oy = -textPainter.height * 0.85;
+          }
+      }
 
-    textPainter.paint(canvas, Offset(ox, oy));
-    canvas.restore();
+      textPainter.paint(canvas, Offset(ox, oy));
+    } finally {
+      canvas.restore();
+    }
   }
 
   void _renderMText(
@@ -719,56 +735,59 @@ class DxfPainter extends CustomPainter {
     final pos = toCanvas(entity.insertPoint);
 
     canvas.save();
-    canvas.translate(pos.dx, pos.dy);
+    try {
+      canvas.translate(pos.dx, pos.dy);
 
-    final double rad = -entity.rotationDeg * math.pi / 180.0;
-    canvas.rotate(rad);
+      final double rad = -entity.rotationDeg * math.pi / 180.0;
+      canvas.rotate(rad);
 
-    // Attachment Point offsets (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
-    double ox = 0.0;
-    double oy = 0.0;
+      // Attachment Point offsets (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
+      double ox = 0.0;
+      double oy = 0.0;
 
-    switch (entity.attachmentPoint) {
-      case 1: // Top Left
-        ox = 0;
-        oy = 0;
-        break;
-      case 2: // Top Center
-        ox = -textPainter.width / 2.0;
-        oy = 0;
-        break;
-      case 3: // Top Right
-        ox = -textPainter.width;
-        oy = 0;
-        break;
-      case 4: // Middle Left
-        ox = 0;
-        oy = -textPainter.height / 2.0;
-        break;
-      case 5: // Middle Center
-        ox = -textPainter.width / 2.0;
-        oy = -textPainter.height / 2.0;
-        break;
-      case 6: // Middle Right
-        ox = -textPainter.width;
-        oy = -textPainter.height / 2.0;
-        break;
-      case 7: // Bottom Left
-        ox = 0;
-        oy = -textPainter.height;
-        break;
-      case 8: // Bottom Center
-        ox = -textPainter.width / 2.0;
-        oy = -textPainter.height;
-        break;
-      case 9: // Bottom Right
-        ox = -textPainter.width;
-        oy = -textPainter.height;
-        break;
+      switch (entity.attachmentPoint) {
+        case 1: // Top Left
+          ox = 0;
+          oy = 0;
+          break;
+        case 2: // Top Center
+          ox = -textPainter.width / 2.0;
+          oy = 0;
+          break;
+        case 3: // Top Right
+          ox = -textPainter.width;
+          oy = 0;
+          break;
+        case 4: // Middle Left
+          ox = 0;
+          oy = -textPainter.height / 2.0;
+          break;
+        case 5: // Middle Center
+          ox = -textPainter.width / 2.0;
+          oy = -textPainter.height / 2.0;
+          break;
+        case 6: // Middle Right
+          ox = -textPainter.width;
+          oy = -textPainter.height / 2.0;
+          break;
+        case 7: // Bottom Left
+          ox = 0;
+          oy = -textPainter.height;
+          break;
+        case 8: // Bottom Center
+          ox = -textPainter.width / 2.0;
+          oy = -textPainter.height;
+          break;
+        case 9: // Bottom Right
+          ox = -textPainter.width;
+          oy = -textPainter.height;
+          break;
+      }
+
+      textPainter.paint(canvas, Offset(ox, oy));
+    } finally {
+      canvas.restore();
     }
-
-    textPainter.paint(canvas, Offset(ox, oy));
-    canvas.restore();
   }
 
   void _renderSolid(
@@ -1257,9 +1276,185 @@ class DxfPainter extends CustomPainter {
     Canvas canvas,
     DxfMeasurement m,
     Offset Function(Offset) toCanvas,
+    double fitScale,
+  ) {
+    switch (m.tool) {
+      case DxfMeasureTool.distance:
+        _drawDistanceMeasurement(canvas, m, toCanvas);
+        break;
+      case DxfMeasureTool.area:
+        _drawAreaMeasurement(canvas, m, toCanvas);
+        break;
+      case DxfMeasureTool.angle:
+        _drawAngleMeasurement(canvas, m, toCanvas);
+        break;
+      case DxfMeasureTool.radius:
+        _drawRadiusMeasurement(canvas, m, toCanvas, fitScale);
+        break;
+      case DxfMeasureTool.annotation:
+        _drawAnnotationPreview(canvas, m, toCanvas);
+        break;
+    }
+  }
+
+  void _drawAnnotations(
+    Canvas canvas,
+    Offset Function(Offset) toCanvas,
+    double fitScale,
   ) {
     final scale = currentScale.clamp(0.001, 10000.0);
-    final p1 = toCanvas(m.p1Cad);
+    final double mScale = settings.measurementScale;
+
+    for (final anno in annotations) {
+      final tip = toCanvas(anno.arrowTipCad);
+      final textPos = toCanvas(anno.textPosCad);
+
+      _drawSingleLeaderAnnotation(
+        canvas: canvas,
+        tip: tip,
+        textPos: textPos,
+        text: anno.text,
+        color: anno.color,
+        scale: scale,
+        mScale: mScale,
+      );
+    }
+  }
+
+  void _drawAnnotationPreview(
+    Canvas canvas,
+    DxfMeasurement m,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (m.annotationTip == null) return;
+    final scale = currentScale.clamp(0.001, 10000.0);
+    final double mScale = settings.measurementScale;
+    final tip = toCanvas(m.annotationTip!);
+
+    final markerPaint = Paint()
+      ..color = const Color(0xFFFF4081)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(tip, (5.0 * mScale) / scale, markerPaint);
+
+    if (m.annotationTextPos != null) {
+      final textPos = toCanvas(m.annotationTextPos!);
+      _drawSingleLeaderAnnotation(
+        canvas: canvas,
+        tip: tip,
+        textPos: textPos,
+        text: m.annotationText ?? 'Tap to place note',
+        color: const Color(0xFFFF4081),
+        scale: scale,
+        mScale: mScale,
+      );
+    }
+  }
+
+  void _drawSingleLeaderAnnotation({
+    required Canvas canvas,
+    required Offset tip,
+    required Offset textPos,
+    required String text,
+    required Color color,
+    required double scale,
+    required double mScale,
+  }) {
+    final leaderPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (1.8 * settings.lineThicknessScale) / scale
+      ..strokeCap = StrokeCap.round
+      ..isAntiAlias = true;
+
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+
+    final delta = textPos - tip;
+    final dist = delta.distance;
+
+    // 1. Draw Arrowhead at tip
+    final double arrowLen = (14.0 * mScale) / scale;
+    final double arrowWidth = (6.5 * mScale) / scale;
+
+    if (dist > 1e-3) {
+      final u = delta / dist;
+      final normal = Offset(-u.dy, u.dx);
+
+      final pLeft = tip + u * arrowLen + normal * (arrowWidth / 2.0);
+      final pRight = tip + u * arrowLen - normal * (arrowWidth / 2.0);
+
+      final arrowPath = Path()
+        ..moveTo(tip.dx, tip.dy)
+        ..lineTo(pLeft.dx, pLeft.dy)
+        ..lineTo(pRight.dx, pRight.dy)
+        ..close();
+
+      canvas.drawPath(arrowPath, fillPaint);
+
+      // Leader stem line from base of arrowhead to text position
+      canvas.drawLine(tip + u * (arrowLen * 0.85), textPos, leaderPaint);
+    } else {
+      canvas.drawCircle(tip, (4.0 * mScale) / scale, fillPaint);
+    }
+
+    // 2. Horizontal Landing Shoulder Line under text
+    final bool isRight = textPos.dx >= tip.dx;
+    final double shoulderLen = (24.0 * mScale) / scale;
+    final shoulderEnd = textPos + Offset(isRight ? shoulderLen : -shoulderLen, 0);
+    canvas.drawLine(textPos, shoulderEnd, leaderPaint);
+
+    // 3. Text Badge Layout
+    try {
+      final double fontSize = math.max(0.001, (12.0 * mScale) / scale);
+      final tp = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.2,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 4,
+      )..layout();
+
+      final padH = (7.0 * mScale) / scale;
+      final padV = (4.0 * mScale) / scale;
+      final badgeW = tp.width + padH * 2;
+      final badgeH = tp.height + padV * 2;
+
+      final double badgeLeft = isRight ? textPos.dx + (4.0 / scale) : textPos.dx - badgeW - (4.0 / scale);
+      final double badgeTop = textPos.dy - badgeH - (2.0 / scale);
+      final badgeRect = Rect.fromLTWH(badgeLeft, badgeTop, badgeW, badgeH);
+
+      final bgPaint = Paint()
+        ..color = const Color(0xFF141C2B).withValues(alpha: 0.94)
+        ..style = PaintingStyle.fill;
+      final borderPaint = Paint()
+        ..color = color.withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (1.2 * settings.lineThicknessScale) / scale;
+
+      final rrect = RRect.fromRectAndRadius(badgeRect, Radius.circular((4.0 * mScale) / scale));
+      canvas.drawRRect(rrect, bgPaint);
+      canvas.drawRRect(rrect, borderPaint);
+
+      tp.paint(canvas, Offset(badgeLeft + padH, badgeTop + padV));
+    } catch (_) {}
+  }
+
+  void _drawDistanceMeasurement(
+    Canvas canvas,
+    DxfMeasurement m,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (m.p1Cad == null) return;
+    final scale = currentScale.clamp(0.001, 10000.0);
+    final p1 = toCanvas(m.p1Cad!);
 
     final double dotRadius = (settings.pointSize * 0.85) / scale;
     final double lineStroke = (1.5 * settings.lineThicknessScale) / scale;
@@ -1287,11 +1482,365 @@ class DxfPainter extends CustomPainter {
       canvas.drawCircle(p2, dotRadius, dotBorderPaint);
       canvas.drawLine(p1, p2, linePaint);
 
-      // Compact L-Only Measurement Callout Bubble
       final double dist = m.distance!;
-      final String text = 'L: ${DxfMath.formatDistance(dist)}';
+      final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
+      _drawBadge(
+        canvas: canvas,
+        center: mid + Offset(0, (-14.0 * mScale) / scale),
+        text: 'L: ${DxfMath.formatDistance(dist)}',
+        accentColor: const Color(0xFFFF5252),
+        mScale: mScale,
+        scale: scale,
+      );
+    }
+  }
 
-      final double fontSize = (9.5 * mScale) / scale;
+  void _drawAreaMeasurement(
+    Canvas canvas,
+    DxfMeasurement m,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (m.areaPoints.isEmpty) return;
+    final scale = currentScale.clamp(0.001, 10000.0);
+    final double dotRadius = (6.0 * settings.lineThicknessScale) / scale;
+    final double lineStroke = (3.2 * settings.lineThicknessScale) / scale;
+    final double mScale = settings.measurementScale;
+    const accentColor = Color(0xFF00E5FF);
+
+    final pts = m.areaPoints.map(toCanvas).toList();
+
+    // Include candidate snap point for live real-time polygon preview while measuring
+    final candidatePt = (snapResult != null && !m.isAreaClosed) ? toCanvas(snapResult!.point) : null;
+    final fillPts = List<Offset>.from(pts);
+    if (candidatePt != null && (pts.isEmpty || (candidatePt - pts.last).distanceSquared > 0.000001)) {
+      fillPts.add(candidatePt);
+    }
+
+    // 1. Shaded polygon fill if >= 3 points (including candidate point!)
+    if (fillPts.length >= 3) {
+      final fillPath = Path()..moveTo(fillPts.first.dx, fillPts.first.dy);
+      for (int i = 1; i < fillPts.length; i++) {
+        fillPath.lineTo(fillPts[i].dx, fillPts[i].dy);
+      }
+      fillPath.close();
+
+      // High-visibility vivid shaded polygon fill (38% cyan)
+      final fillPaint = Paint()
+        ..color = accentColor.withValues(alpha: 0.38)
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(fillPath, fillPaint);
+
+      // Subtle diagonal hatch lines inside the polygon for unmistakable CAD visual clarity
+      final bounds = fillPath.getBounds();
+      final hatchPaint = Paint()
+        ..color = accentColor.withValues(alpha: 0.22)
+        ..strokeWidth = 1.2 / scale
+        ..style = PaintingStyle.stroke;
+      final double rawStep = 24.0 / scale;
+      final double hatchStep = math.max(rawStep, (bounds.width + bounds.height) / 80.0);
+      if (bounds.width > 0 && bounds.height > 0) {
+        canvas.save();
+        canvas.clipPath(fillPath);
+        for (double x = bounds.left - bounds.height; x <= bounds.right; x += hatchStep) {
+          canvas.drawLine(
+            Offset(x, bounds.bottom),
+            Offset(x + bounds.height, bounds.top),
+            hatchPaint,
+          );
+        }
+        canvas.restore();
+      }
+    }
+
+    // 2. Confirmed Outline path (Bold 3.2px neon cyan line)
+    if (pts.length >= 2) {
+      final outlinePath = Path()..moveTo(pts.first.dx, pts.first.dy);
+      for (int i = 1; i < pts.length; i++) {
+        outlinePath.lineTo(pts[i].dx, pts[i].dy);
+      }
+
+      final outlinePaint = Paint()
+        ..color = accentColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = lineStroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(outlinePath, outlinePaint);
+    }
+
+    // 2b. Rubber-band line to candidate point while finger moves
+    if (candidatePt != null && pts.isNotEmpty) {
+      final candidateLinePaint = Paint()
+        ..color = accentColor.withValues(alpha: 0.9)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = lineStroke;
+      canvas.drawLine(pts.last, candidatePt, candidateLinePaint);
+
+      // Closing rubber-band preview line back to start
+      if (fillPts.length >= 3) {
+        final closePreviewPaint = Paint()
+          ..color = accentColor.withValues(alpha: 0.65)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = (2.0 * settings.lineThicknessScale) / scale;
+        canvas.drawLine(candidatePt, pts.first, closePreviewPaint);
+      }
+    }
+
+    // Closing outline back to start for confirmed points (always closed visually when >= 3 points!)
+    if (pts.length >= 3) {
+      final isFinal = m.isAreaClosed;
+      final closeLinePaint = Paint()
+        ..color = isFinal ? accentColor : accentColor.withValues(alpha: 0.75)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = isFinal ? lineStroke : (2.0 * settings.lineThicknessScale) / scale;
+      canvas.drawLine(pts.last, pts.first, closeLinePaint);
+    }
+
+    // 3. Numbered Vertex Pins (1, 2, 3...)
+    final dotPaint = Paint()..color = accentColor..style = PaintingStyle.fill;
+    final dotBorderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8 / scale;
+
+    for (int i = 0; i < pts.length; i++) {
+      canvas.drawCircle(pts[i], dotRadius, dotPaint);
+      canvas.drawCircle(pts[i], dotRadius, dotBorderPaint);
+
+      try {
+        // Draw vertex index number
+        final textSpan = TextSpan(
+          text: '${i + 1}',
+          style: TextStyle(
+            color: const Color(0xFF0A0A0A),
+            fontSize: math.max(0.001, (7.5 * mScale) / scale),
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+        tp.paint(canvas, pts[i] - Offset(tp.width / 2, tp.height / 2));
+      } catch (_) {}
+    }
+
+    // 4. Centroid Result Badge (real-time live area & perimeter!)
+    final calcCadPts = (fillPts.length >= 3 && candidatePt != null && snapResult != null)
+        ? [...m.areaPoints, snapResult!.point]
+        : m.areaPoints;
+
+    if (calcCadPts.length >= 3) {
+      final double area = DxfMath.calculatePolygonArea(calcCadPts);
+      final double perim = DxfMath.calculatePolygonPerimeter(calcCadPts, isClosed: true);
+      final Offset centroidCad = DxfMath.calculatePolygonCentroid(calcCadPts);
+      final Offset centroidCanvas = toCanvas(centroidCad);
+
+      _drawBadge(
+        canvas: canvas,
+        center: centroidCanvas,
+        text: 'S = ${DxfMath.formatArea(area)}',
+        subText: 'P = ${DxfMath.formatDistance(perim)} m',
+        accentColor: accentColor,
+        mScale: mScale,
+        scale: scale,
+      );
+    }
+  }
+
+  void _drawAngleMeasurement(
+    Canvas canvas,
+    DxfMeasurement m,
+    Offset Function(Offset) toCanvas,
+  ) {
+    if (m.angleVertex == null) return;
+    final scale = currentScale.clamp(0.001, 10000.0);
+    final double dotRadius = (settings.pointSize * 0.85) / scale;
+    final double lineStroke = (1.5 * settings.lineThicknessScale) / scale;
+    final double mScale = settings.measurementScale;
+    const accentColor = Color(0xFFFFB300);
+
+    final v = toCanvas(m.angleVertex!);
+
+    // Draw vertex marker
+    final vDotPaint = Paint()..color = accentColor..style = PaintingStyle.fill;
+    final dotBorderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0 / scale;
+    canvas.drawCircle(v, dotRadius * 1.2, vDotPaint);
+    canvas.drawCircle(v, dotRadius * 1.2, dotBorderPaint);
+
+    final rayPaint = Paint()
+      ..color = accentColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = lineStroke;
+
+    Offset? p1;
+    Offset? p2;
+
+    if (m.angleP1 != null) {
+      p1 = toCanvas(m.angleP1!);
+      canvas.drawLine(v, p1, rayPaint);
+      canvas.drawCircle(p1, dotRadius, vDotPaint);
+      canvas.drawCircle(p1, dotRadius, dotBorderPaint);
+    }
+
+    if (m.angleP2 != null) {
+      p2 = toCanvas(m.angleP2!);
+      canvas.drawLine(v, p2, rayPaint);
+      canvas.drawCircle(p2, dotRadius, vDotPaint);
+      canvas.drawCircle(p2, dotRadius, dotBorderPaint);
+    }
+
+    if (p1 != null && p2 != null) {
+      final double angleDeg = DxfMath.calculateAngleBetweenVectors(
+        m.angleVertex!,
+        m.angleP1!,
+        m.angleP2!,
+      );
+
+      final double dx1 = p1.dx - v.dx;
+        final double dy1 = p1.dy - v.dy;
+        final double dx2 = p2.dx - v.dx;
+        final double dy2 = p2.dy - v.dy;
+
+        final double a1 = math.atan2(dy1, dx1);
+        final double a2 = math.atan2(dy2, dx2);
+        double sweep = a2 - a1;
+        while (sweep <= -math.pi) {
+          sweep += 2 * math.pi;
+        }
+        while (sweep > math.pi) {
+          sweep -= 2 * math.pi;
+        }
+
+        final double arcRadius = (32.0 * mScale) / scale;
+        final arcRect = Rect.fromCircle(center: v, radius: arcRadius);
+
+        final arcPaint = Paint()
+          ..color = accentColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = lineStroke;
+
+        final sectorPaint = Paint()
+          ..color = accentColor.withValues(alpha: 0.18)
+          ..style = PaintingStyle.fill;
+
+        final sectorPath = Path()
+          ..moveTo(v.dx, v.dy)
+          ..arcTo(arcRect, a1, sweep, false)
+          ..close();
+
+        canvas.drawPath(sectorPath, sectorPaint);
+        canvas.drawArc(arcRect, a1, sweep, false, arcPaint);
+
+        final double midAngle = a1 + sweep / 2.0;
+        final Offset badgePos = v +
+            Offset(math.cos(midAngle), math.sin(midAngle)) *
+                (arcRadius + (18.0 * mScale) / scale);
+
+        _drawBadge(
+          canvas: canvas,
+          center: badgePos,
+          text: '∠ = ${angleDeg.toStringAsFixed(1)}°',
+          accentColor: accentColor,
+          mScale: mScale,
+          scale: scale,
+        );
+      }
+    }
+
+  void _drawRadiusMeasurement(
+    Canvas canvas,
+    DxfMeasurement m,
+    Offset Function(Offset) toCanvas,
+    double fitScale,
+  ) {
+    final scale = currentScale.clamp(0.001, 10000.0);
+    final double mScale = settings.measurementScale;
+    const accentColor = Color(0xFF00E676);
+
+    // If points collected prior to 3-point solve
+    if (m.circleCenter == null) {
+      final dotPaint = Paint()..color = accentColor..style = PaintingStyle.fill;
+      final borderPaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0 / scale;
+      final dotRadius = (settings.pointSize * 0.85) / scale;
+      for (final pt in m.circlePoints) {
+        final cPt = toCanvas(pt);
+        canvas.drawCircle(cPt, dotRadius, dotPaint);
+        canvas.drawCircle(cPt, dotRadius, borderPaint);
+      }
+      return;
+    }
+
+    final c = toCanvas(m.circleCenter!);
+    final double canvasRadius = m.radius! * fitScale;
+
+    // 1. Highlight circle contour
+    final circleHighlightPaint = Paint()
+      ..color = accentColor.withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (2.0 * settings.lineThicknessScale) / scale;
+    canvas.drawCircle(c, canvasRadius, circleHighlightPaint);
+
+    // 2. Center Crosshairs (+)
+    final crossLen = (8.0 * mScale) / scale;
+    final crossPaint = Paint()
+      ..color = accentColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (1.4 * settings.lineThicknessScale) / scale;
+    canvas.drawLine(c - Offset(crossLen, 0), c + Offset(crossLen, 0), crossPaint);
+    canvas.drawLine(c - Offset(0, crossLen), c + Offset(0, crossLen), crossPaint);
+
+    // 3. Radial leader line from center to edge
+    Offset dir = const Offset(0.7071, -0.7071); // Default 45 deg
+    if (m.circlePoints.isNotEmpty) {
+      final sampleC = toCanvas(m.circlePoints.first);
+      final delta = sampleC - c;
+      if (delta.distance > 1e-4) {
+        dir = delta / delta.distance;
+      }
+    }
+
+    final edgePt = c + dir * canvasRadius;
+    final leaderPaint = Paint()
+      ..color = accentColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (1.5 * settings.lineThicknessScale) / scale;
+    canvas.drawLine(c, edgePt, leaderPaint);
+
+    // Circle point on circumference
+    canvas.drawCircle(edgePt, (settings.pointSize * 0.6) / scale, Paint()..color = accentColor);
+
+    // 4. Dimension Badge
+    final mid = Offset((c.dx + edgePt.dx) / 2, (c.dy + edgePt.dy) / 2);
+    final String sub = 'Ø = ${DxfMath.formatDistance(m.radius! * 2.0)}${m.isArc && m.arcLength != null ? ' • Arc: ${DxfMath.formatDistance(m.arcLength!)}' : ''}';
+
+    _drawBadge(
+      canvas: canvas,
+      center: mid + Offset(0, (-14.0 * mScale) / scale),
+      text: 'R = ${DxfMath.formatDistance(m.radius!)}',
+      subText: sub,
+      accentColor: accentColor,
+      mScale: mScale,
+      scale: scale,
+    );
+  }
+
+  void _drawBadge({
+    required Canvas canvas,
+    required Offset center,
+    required String text,
+    String? subText,
+    required Color accentColor,
+    required double mScale,
+    required double scale,
+  }) {
+    try {
+      final double fontSize = math.max(0.001, (9.5 * mScale) / scale);
+      final double subFontSize = math.max(0.001, (8.5 * mScale) / scale);
+
       final textPainter = TextPainter(
         text: TextSpan(
           text: text,
@@ -1303,26 +1852,42 @@ class DxfPainter extends CustomPainter {
           ),
         ),
         textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
+      )..layout();
 
-      final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
-      final double padH = (6.0 * mScale) / scale;
-      final double padV = (3.0 * mScale) / scale;
-      final double offsetY = (-14.0 * mScale) / scale;
-      final double cornerRadius = (4.0 * mScale) / scale;
+      TextPainter? subPainter;
+      if (subText != null && subText.isNotEmpty) {
+        subPainter = TextPainter(
+          text: TextSpan(
+            text: subText,
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: subFontSize,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'monospace',
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+      }
+
+      final double contentW = math.max(textPainter.width, subPainter?.width ?? 0.0);
+      final double contentH = textPainter.height + (subPainter != null ? subPainter.height + (2.0 / scale) : 0.0);
+
+      final double padH = (7.0 * mScale) / scale;
+      final double padV = (4.0 * mScale) / scale;
+      final double cornerRadius = (5.0 * mScale) / scale;
 
       final bubbleRect = Rect.fromCenter(
-        center: mid + Offset(0, offsetY),
-        width: textPainter.width + padH * 2,
-        height: textPainter.height + padV * 2,
+        center: center,
+        width: contentW + padH * 2,
+        height: contentH + padV * 2,
       );
 
       final bgPaint = Paint()
-        ..color = const Color(0xF01E293B)
+        ..color = const Color(0xF2141C2B)
         ..style = PaintingStyle.fill;
       final borderBubble = Paint()
-        ..color = const Color(0xFFFF5252)
+        ..color = accentColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = (1.0 * settings.lineThicknessScale) / scale;
 
@@ -1330,11 +1895,17 @@ class DxfPainter extends CustomPainter {
       canvas.drawRRect(rrect, bgPaint);
       canvas.drawRRect(rrect, borderBubble);
 
-      textPainter.paint(
-        canvas,
-        Offset(bubbleRect.left + padH, bubbleRect.top + padV),
-      );
-    }
+      final double textLeft = bubbleRect.left + padH;
+      final double textTop = bubbleRect.top + padV;
+      textPainter.paint(canvas, Offset(textLeft, textTop));
+
+      if (subPainter != null) {
+        subPainter.paint(
+          canvas,
+          Offset(textLeft, textTop + textPainter.height + (2.0 / scale)),
+        );
+      }
+    } catch (_) {}
   }
 
   @override
@@ -1343,6 +1914,8 @@ class DxfPainter extends CustomPainter {
         oldDelegate.theme != theme ||
         oldDelegate.currentScale != currentScale ||
         oldDelegate.measurement != measurement ||
+        oldDelegate.annotations != annotations ||
+        oldDelegate.visibleCadRect != visibleCadRect ||
         oldDelegate.highlightedEntity != highlightedEntity ||
         oldDelegate.snapResult != snapResult ||
         oldDelegate.showGrid != showGrid ||

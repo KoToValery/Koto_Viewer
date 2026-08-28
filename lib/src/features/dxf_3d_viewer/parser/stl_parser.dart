@@ -1,14 +1,18 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import '../models/mesh_3d.dart';
 
 /// High-performance parser for both Binary and ASCII STL files.
 class StlParser {
-  /// Parse STL from file path
+  /// Parse STL from file path in background isolate
   static Future<Mesh3D> parseFromFile(String filePath) async {
+    return compute(_parseStlFileCompute, filePath);
+  }
+
+  static Mesh3D _parseStlFileCompute(String filePath) {
     final file = File(filePath);
-    final bytes = await file.readAsBytes();
+    final bytes = file.readAsBytesSync();
     final name = filePath.split(Platform.pathSeparator).last;
     return parseFromBytes(bytes, name: name);
   }

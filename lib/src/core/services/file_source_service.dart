@@ -166,6 +166,7 @@ class FileSourceService {
         lower.endsWith('.pps') ||
         lower.endsWith('.rtf') ||
         lower.endsWith('.eps') ||
+        lower.endsWith('.cdr') ||
         lower.endsWith('.gbr') ||
         lower.endsWith('.ger') ||
         lower.endsWith('.pho') ||
@@ -197,6 +198,7 @@ class FileSourceService {
         lower.endsWith('.p21') ||
         lower.endsWith('.iges') ||
         lower.endsWith('.igs') ||
+        lower.endsWith('.ifc') ||
         lower.endsWith('.zip') ||
         lower.endsWith('.top') ||
         lower.endsWith('.bot') ||

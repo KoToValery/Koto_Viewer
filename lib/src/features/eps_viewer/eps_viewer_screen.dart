@@ -280,92 +280,113 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _fileName,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (_document != null)
-              Text(
-                '${_document!.paths.length} paths • ${_document!.metadata.boundingBox.width.toStringAsFixed(0)} × ${_document!.metadata.boundingBox.height.toStringAsFixed(0)} pt'
-                '${_rotationQuarterTurns > 0 ? " • ${_rotationQuarterTurns * 90}°" : ""}',
-                style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
-              ),
-          ],
+        title: Text(
+          _fileName,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        actions: [
-          // Fit to Screen Button in Top Bar
-          IconButton(
-            icon: const Icon(Icons.fit_screen_outlined),
-            tooltip: 'Fit to Screen',
-            onPressed: _document != null ? _fitToScreen : null,
-          ),
-
-          // Rotate 90°
-          IconButton(
-            icon: const Icon(Icons.rotate_right_rounded),
-            tooltip: 'Rotate 90° Clockwise',
-            onPressed: _document != null ? _rotateClockwise : null,
-          ),
-
-          // Canvas Theme Menu
-          PopupMenuButton<EpsCanvasTheme>(
-            icon: const Icon(Icons.palette_outlined),
-            tooltip: 'Canvas Theme',
-            onSelected: (t) => setState(() => _canvasTheme = t),
-            itemBuilder: (context) => EpsCanvasTheme.values.map((t) {
-              return PopupMenuItem<EpsCanvasTheme>(
-                value: t,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: t.background,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey, width: 1),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(t.label),
-                    if (_canvasTheme == t) ...[
-                      const Spacer(),
-                      Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                    ],
-                  ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
                 ),
-              );
-            }).toList(),
-          ),
-
-          // Grid Toggle Button
-          IconButton(
-            icon: Icon(
-              _showGrid ? Icons.grid_on : Icons.grid_off,
-              color: _showGrid ? theme.colorScheme.primary : null,
+              ),
             ),
-            tooltip: 'Grid',
-            onPressed: () => setState(() => _showGrid = !_showGrid),
-          ),
+            child: Row(
+              children: [
+                const Spacer(),
 
-          // Info Dialog
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Information',
-            onPressed: _showInfoSheet,
-          ),
+                // Fit to Screen Button in Top Bar
+                IconButton(
+                  icon: const Icon(Icons.fit_screen_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Fit to Screen',
+                  onPressed: _document != null ? _fitToScreen : null,
+                ),
 
-          // Share Button
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share',
-            onPressed: _shareFile,
+                // Rotate 90°
+                IconButton(
+                  icon: const Icon(Icons.rotate_right_rounded, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Rotate 90° Clockwise',
+                  onPressed: _document != null ? _rotateClockwise : null,
+                ),
+
+                // Canvas Theme Menu
+                PopupMenuButton<EpsCanvasTheme>(
+                  icon: const Icon(Icons.palette_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Canvas Theme',
+                  onSelected: (t) => setState(() => _canvasTheme = t),
+                  itemBuilder: (context) => EpsCanvasTheme.values.map((t) {
+                    return PopupMenuItem<EpsCanvasTheme>(
+                      value: t,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: t.background,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey, width: 1),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(t.label),
+                          if (_canvasTheme == t) ...[
+                            const Spacer(),
+                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                // Grid Toggle Button
+                IconButton(
+                  icon: Icon(
+                    _showGrid ? Icons.grid_on : Icons.grid_off,
+                    size: 20,
+                    color: _showGrid ? theme.colorScheme.primary : null,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Grid',
+                  onPressed: () => setState(() => _showGrid = !_showGrid),
+                ),
+
+                // Info Dialog
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Information',
+                  onPressed: _showInfoSheet,
+                ),
+
+                // Share Button
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Share',
+                  onPressed: _shareFile,
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {

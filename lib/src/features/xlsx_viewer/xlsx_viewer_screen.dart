@@ -492,58 +492,76 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                   });
                 },
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _fileName,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    '$_activeSheetName • ${_sheetNames.length} ${_sheetNames.length == 1 ? "sheet" : "sheets"}',
-                    style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
-                  ),
-                ],
+            : Text(
+                _fileName,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-        actions: [
-          // Search Toggle
-          IconButton(
-            icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
-            tooltip: _isSearchOpen ? 'Close Search' : 'Search in Sheet',
-            onPressed: () {
-              setState(() {
-                _isSearchOpen = !_isSearchOpen;
-                if (!_isSearchOpen) {
-                  _searchQuery = '';
-                  _searchController.clear();
-                  _searchMatchCount = 0;
-                }
-              });
-            },
-          ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.black12,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Spacer(),
 
-          // Sheets List Quick Button
-          IconButton(
-            icon: const Icon(Icons.table_chart_outlined),
-            tooltip: 'All Sheets',
-            onPressed: _showSheetsMenu,
-          ),
+                // Search Toggle
+                IconButton(
+                  icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: _isSearchOpen ? 'Close Search' : 'Search in Sheet',
+                  onPressed: () {
+                    setState(() {
+                      _isSearchOpen = !_isSearchOpen;
+                      if (!_isSearchOpen) {
+                        _searchQuery = '';
+                        _searchController.clear();
+                        _searchMatchCount = 0;
+                      }
+                    });
+                  },
+                ),
 
-          // Info / Properties
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Spreadsheet Properties',
-            onPressed: _showInfoSheet,
-          ),
+                // Sheets List Quick Button
+                IconButton(
+                  icon: const Icon(Icons.table_chart_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'All Sheets',
+                  onPressed: _showSheetsMenu,
+                ),
 
-          // Share
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share',
-            onPressed: _shareFile,
+                // Info / Properties
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Spreadsheet Properties',
+                  onPressed: _showInfoSheet,
+                ),
+
+                // Share
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Share',
+                  onPressed: _shareFile,
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: _isLoading
           ? const Center(

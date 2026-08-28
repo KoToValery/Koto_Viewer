@@ -40,7 +40,7 @@ extension FileCategoryExtension on FileCategory {
   }
 }
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, pptx, ppt, rtf, zip, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, ppt, rtf, zip, cdr, other }
 
 class PdfItem {
   final String path;
@@ -69,6 +69,7 @@ class PdfItem {
     if (lower.endsWith('.glb')) return KotoFileType.glb;
     if (lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.p21')) return KotoFileType.step;
     if (lower.endsWith('.iges') || lower.endsWith('.igs')) return KotoFileType.iges;
+    if (lower.endsWith('.ifc')) return KotoFileType.ifc;
     if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return KotoFileType.xlsx;
     if (lower.endsWith('.txt') || lower.endsWith('.log') || lower.endsWith('.csv')) return KotoFileType.txt;
     if (lower.endsWith('.md') || lower.endsWith('.markdown')) return KotoFileType.md;
@@ -77,6 +78,7 @@ class PdfItem {
     if (lower.endsWith('.ppt') || lower.endsWith('.pps')) return KotoFileType.ppt;
     if (lower.endsWith('.rtf')) return KotoFileType.rtf;
     if (lower.endsWith('.eps')) return KotoFileType.eps;
+    if (lower.endsWith('.cdr')) return KotoFileType.cdr;
     if (lower.endsWith('.zip')) return KotoFileType.zip;
     if (lower.endsWith('.kicad_pcb') ||
         lower.endsWith('.kicad_sch') ||
@@ -130,9 +132,11 @@ class PdfItem {
       fileType == KotoFileType.gltf ||
       fileType == KotoFileType.glb ||
       fileType == KotoFileType.step ||
-      fileType == KotoFileType.iges;
+      fileType == KotoFileType.iges ||
+      fileType == KotoFileType.ifc;
   bool get isStep => fileType == KotoFileType.step;
   bool get isIges => fileType == KotoFileType.iges;
+  bool get isIfc => fileType == KotoFileType.ifc;
   bool get isXlsx => fileType == KotoFileType.xlsx;
   bool get isTxt => fileType == KotoFileType.txt;
   bool get isMd => fileType == KotoFileType.md;
@@ -142,18 +146,19 @@ class PdfItem {
   bool get isPresentation => isPptx || isPpt;
   bool get isRtf => fileType == KotoFileType.rtf;
   bool get isEps => fileType == KotoFileType.eps;
+  bool get isCdr => fileType == KotoFileType.cdr;
   bool get isGerber => fileType == KotoFileType.gbr;
   bool get isDrill => fileType == KotoFileType.drl;
   bool get isKicad => fileType == KotoFileType.kicad;
   bool get isZip => fileType == KotoFileType.zip;
   bool get isPlotter => fileType == KotoFileType.plt;
   bool get isPcb => isGerber || isDrill || isKicad || isZip;
-  bool get isVector => isSvg || isEps || isPcb || isPlotter;
+  bool get isVector => isSvg || isEps || isCdr || isPcb || isPlotter;
   bool get isTextDoc => isTxt || isMd || isDocx || isRtf || isPresentation;
 
   FileCategory get category {
     if (is3d) return FileCategory.cad3d;
-    if (isCad || isPlotter || isSvg || isEps) return FileCategory.cad2d;
+    if (isCad || isPlotter || isSvg || isEps || isCdr) return FileCategory.cad2d;
     if (isPcb) return FileCategory.pcb;
     return FileCategory.documents;
   }

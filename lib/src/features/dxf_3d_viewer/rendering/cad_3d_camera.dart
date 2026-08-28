@@ -106,12 +106,20 @@ class Cad3DCamera {
     final centerX = viewport.width / 2.0 + panOffset.dx;
     final centerY = viewport.height / 2.0 + panOffset.dy;
 
-    // Perspective projection depth factor
-    const cameraDist = 800.0;
-    final scaleFactor = (modelScale * zoom) * (cameraDist / (cameraDist + p.y));
+    // Scale point to screen units so perspective behaves consistently across all CAD model sizes
+    final sx = p.x * modelScale;
+    final sy = p.y * modelScale;
+    final sz = p.z * modelScale;
 
-    final screenX = centerX + p.x * scaleFactor;
-    final screenY = centerY - p.z * scaleFactor;
+    // Perspective projection depth factor in screen pixel space
+    // cameraDist is the nominal camera distance from the model centroid in screen pixels
+    const cameraDist = 1200.0;
+    final depth = math.max(cameraDist + sy, 40.0);
+    final perspective = cameraDist / depth;
+    final scaleFactor = zoom * perspective;
+
+    final screenX = centerX + sx * scaleFactor;
+    final screenY = centerY - sz * scaleFactor;
 
     return Offset(screenX, screenY);
   }

@@ -1,13 +1,18 @@
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import '../models/mesh_3d.dart';
+import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 
 /// Pure-Dart ANSI IGES 5.3 (.iges, .igs) 3D CAD Parser.
 class IgesParser {
+  /// Parse IGES from file path in background isolate
   static Future<Mesh3D> parseFromFile(String filePath) async {
+    return compute(_parseIgesFileCompute, filePath);
+  }
+
+  static Mesh3D _parseIgesFileCompute(String filePath) {
     final file = File(filePath);
-    final bytes = await file.readAsBytes();
+    final bytes = file.readAsBytesSync();
     final name = filePath.split(Platform.pathSeparator).last;
     return parseFromBytes(bytes, name: name);
   }
@@ -18,11 +23,7 @@ class IgesParser {
   }
 
   static String _decodeText(Uint8List bytes) {
-    try {
-      return utf8.decode(bytes, allowMalformed: true);
-    } catch (_) {
-      return latin1.decode(bytes);
-    }
+    return UniversalEncodingService.decodeBytes(bytes);
   }
 
   static Mesh3D _parseIgesText(String rawText, {String name = 'Model.iges'}) {

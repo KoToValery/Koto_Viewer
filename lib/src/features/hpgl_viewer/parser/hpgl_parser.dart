@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/hpgl_models.dart';
+import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 
 /// Pure-Dart HP-GL Plotter (.plt, .hpgl) Parser.
 class HpglParser {
@@ -13,11 +13,7 @@ class HpglParser {
   }
 
   static String _decodeText(Uint8List bytes) {
-    try {
-      return utf8.decode(bytes, allowMalformed: true);
-    } catch (_) {
-      return latin1.decode(bytes);
-    }
+    return UniversalEncodingService.decodeBytes(bytes);
   }
 
   static HpglDocument parseText(String text, {String fileName = 'drawing.plt'}) {

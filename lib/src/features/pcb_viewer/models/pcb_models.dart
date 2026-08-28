@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 /// PCB Layer Classification.
 enum PcbLayerType {
-  copperTop('Top Copper Layer', Color(0xFFE65100)),
-  copperBottom('Bottom Copper Layer', Color(0xFF1565C0)),
-  solderMaskTop('Top Solder Mask', Color(0xFF2E7D32)),
-  solderMaskBottom('Bottom Solder Mask', Color(0xFF00695C)),
-  silkscreenTop('Top Silkscreen', Color(0xFFFDD835)),
+  copperTop('Top Copper Layer', Color(0xFFD32F2F)),
+  copperBottom('Bottom Copper Layer', Color(0xFF1976D2)),
+  solderMaskTop('Top Solder Mask (Openings)', Color(0xFF8B5CF6)),
+  solderMaskBottom('Bottom Solder Mask (Openings)', Color(0xFF7C3AED)),
+  silkscreenTop('Top Silkscreen', Color(0xFFFFFFFF)),
   silkscreenBottom('Bottom Silkscreen', Color(0xFFFFF9C4)),
   edgeCuts('Board Outline / Edge Cuts', Color(0xFFD81B60)),
   drill('CNC Drill Holes', Color(0xFF00ACC1)),
@@ -33,6 +33,7 @@ class PcbAperture {
   final double dimX;
   final double dimY;
   final double? holeDiameter;
+  final List<Offset>? polygonPoints;
 
   const PcbAperture({
     required this.id,
@@ -40,6 +41,7 @@ class PcbAperture {
     required this.dimX,
     this.dimY = 0.0,
     this.holeDiameter,
+    this.polygonPoints,
   });
 
   double get diameter => dimX;
@@ -64,6 +66,7 @@ class PcbCommand {
   final double? endAngle;
   final PcbAperture? aperture;
   final List<Offset>? regionPoints;
+  final List<List<Offset>>? regionContours;
   final bool isDark;
 
   const PcbCommand.line({
@@ -76,7 +79,8 @@ class PcbCommand {
         radius = null,
         startAngle = null,
         endAngle = null,
-        regionPoints = null;
+        regionPoints = null,
+        regionContours = null;
 
   const PcbCommand.arc({
     required this.p1,
@@ -88,7 +92,8 @@ class PcbCommand {
     this.aperture,
     this.isDark = true,
   })  : type = PcbCommandType.arc,
-        regionPoints = null;
+        regionPoints = null,
+        regionContours = null;
 
   const PcbCommand.flash({
     required this.p1,
@@ -100,10 +105,12 @@ class PcbCommand {
         radius = null,
         startAngle = null,
         endAngle = null,
-        regionPoints = null;
+        regionPoints = null,
+        regionContours = null;
 
   const PcbCommand.region({
-    required this.regionPoints,
+    this.regionPoints,
+    this.regionContours,
     this.isDark = true,
   })  : type = PcbCommandType.region,
         p1 = Offset.zero,
