@@ -1560,15 +1560,12 @@ class _IfcGeometrySolver {
       top.add(compositeTransform.transform(p + extrudeVec));   // local+extrude → world
     }
 
-    // 1. Bottom Cap (fan triangulation)
-    for (int i = 1; i < n - 1; i++) {
-      tris.add(Triangle3D(v0: bottom[0], v1: bottom[i + 1], v2: bottom[i], color: color));
-    }
+    // 1. Bottom Cap: robust ear-clipping triangulation (reversed winding for downward face normal)
+    final bottomReversed = bottom.reversed.toList();
+    tris.addAll(_triangulatePolygon3D(bottomReversed, color: color));
 
-    // 2. Top Cap (fan triangulation with reversed winding)
-    for (int i = 1; i < n - 1; i++) {
-      tris.add(Triangle3D(v0: top[0], v1: top[i], v2: top[i + 1], color: color));
-    }
+    // 2. Top Cap: robust ear-clipping triangulation (upward face normal)
+    tris.addAll(_triangulatePolygon3D(top, color: color));
 
     // 3. Side Walls
     for (int i = 0; i < n; i++) {
@@ -1603,9 +1600,7 @@ class _IfcGeometrySolver {
             if (loopEnt != null && loopEnt.type == 'IFCPOLYLOOP') {
               final pts = loopEnt.referencedIds.map((id) => transform.transform(_resolvePoint(id))).toList();
               if (pts.length >= 3) {
-                for (int i = 1; i < pts.length - 1; i++) {
-                  tris.add(Triangle3D(v0: pts[0], v1: pts[i], v2: pts[i + 1], color: color));
-                }
+                tris.addAll(_triangulatePolygon3D(pts, color: color));
               }
             }
           }
@@ -1671,15 +1666,14 @@ class _IfcGeometrySolver {
         if (faceEnt != null) {
           final idxMatches = RegExp(r'(\d+)').allMatches(faceEnt.params).map((m) => int.parse(m.group(1)!) - 1).toList();
           if (idxMatches.length >= 3) {
-            for (int i = 1; i < idxMatches.length - 1; i++) {
-              final i0 = idxMatches[0];
-              final i1 = idxMatches[i];
-              final i2 = idxMatches[i + 1];
-              if (i0 >= 0 && i0 < points.length &&
-                  i1 >= 0 && i1 < points.length &&
-                  i2 >= 0 && i2 < points.length) {
-                tris.add(Triangle3D(v0: points[i0], v1: points[i1], v2: points[i2], color: color));
+            final facePts = <Vector3>[];
+            for (final idx in idxMatches) {
+              if (idx >= 0 && idx < points.length) {
+                facePts.add(points[idx]);
               }
+            }
+            if (facePts.length >= 3) {
+              tris.addAll(_triangulatePolygon3D(facePts, color: color));
             }
           }
         }
@@ -1688,4 +1682,137 @@ class _IfcGeometrySolver {
 
     return tris;
   }
+
+  /// Robust 3D Ear-Clipping Polygon Triangulator.
+  /// Handles arbitrary convex, concave, L-shaped, U-shaped, and stepped planar polygons.
+  /// Prevents false triangles from shooting across concave indentations or flying outside buildings.
+  static List<Triangle3D> _triangulatePolygon3D(List<Vector3> pts, {Color? color}) {
+    final n = pts.length;
+    if (n < 3) return [];
+    if (n == 3) {
+      return [Triangle3D(v0: pts[0], v1: pts[1], v2: pts[2], color: color)];
+    }
+
+    // 1. Calculate polygon normal via Newell's method
+    double nx = 0, ny = 0, nz = 0;
+    for (int i = 0; i < n; i++) {
+      final cur = pts[i];
+      final next = pts[(i + 1) % n];
+      nx += (cur.y - next.y) * (cur.z + next.z);
+      ny += (cur.z - next.z) * (cur.x + next.x);
+      nz += (cur.x - next.x) * (cur.y + next.y);
+    }
+
+    final len = math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (len < 1e-9) {
+      return []; // Collinear or degenerate polygon
+    }
+
+    // 2. Choose the best 2D projection plane (drop the axis with largest normal component)
+    final ax = nx.abs(), ay = ny.abs(), az = nz.abs();
+    int dropAxis = 2; // drop Z (project to XY)
+    if (ax >= ay && ax >= az) {
+      dropAxis = 0; // drop X (project to YZ)
+    } else if (ay >= ax && ay >= az) {
+      dropAxis = 1; // drop Y (project to XZ)
+    }
+
+    // 3. Project to 2D
+    final poly2d = <math.Point<double>>[];
+    for (final p in pts) {
+      if (dropAxis == 0) {
+        poly2d.add(math.Point(p.y, p.z));
+      } else if (dropAxis == 1) {
+        poly2d.add(math.Point(p.x, p.z));
+      } else {
+        poly2d.add(math.Point(p.x, p.y));
+      }
+    }
+
+    // 4. Compute 2D signed area to determine winding order
+    double area2d = 0.0;
+    for (int i = 0; i < n; i++) {
+      final p1 = poly2d[i];
+      final p2 = poly2d[(i + 1) % n];
+      area2d += (p1.x * p2.y - p2.x * p1.y);
+    }
+    final bool ccw = area2d > 0;
+
+    // 5. Ear clipping loop
+    final indices = List<int>.generate(n, (i) => i);
+    final List<Triangle3D> result = [];
+
+    bool isEar(int prevIdx, int earIdx, int nextIdx, List<int> curIndices) {
+      final a = poly2d[prevIdx];
+      final b = poly2d[earIdx];
+      final c = poly2d[nextIdx];
+
+      // Check convexity
+      final cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+      if (ccw ? (cross <= 1e-12) : (cross >= -1e-12)) {
+        return false; // Reflex or collinear
+      }
+
+      // Check if any other remaining vertex lies inside triangle ABC
+      for (final idx in curIndices) {
+        if (idx == prevIdx || idx == earIdx || idx == nextIdx) continue;
+        final p = poly2d[idx];
+
+        final cp1 = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+        final cp2 = (c.x - b.x) * (p.y - b.y) - (c.y - b.y) * (p.x - b.x);
+        final cp3 = (a.x - c.x) * (p.y - c.y) - (a.y - c.y) * (p.x - c.x);
+
+        if (ccw) {
+          if (cp1 >= -1e-12 && cp2 >= -1e-12 && cp3 >= -1e-12) return false;
+        } else {
+          if (cp1 <= 1e-12 && cp2 <= 1e-12 && cp3 <= 1e-12) return false;
+        }
+      }
+
+      return true;
+    }
+
+    int count = indices.length;
+    int watchdog = count * 3;
+
+    while (count > 3 && watchdog-- > 0) {
+      bool earFound = false;
+
+      for (int i = 0; i < count; i++) {
+        final prev = indices[(i - 1 + count) % count];
+        final ear = indices[i];
+        final next = indices[(i + 1) % count];
+
+        if (isEar(prev, ear, next, indices)) {
+          result.add(Triangle3D(v0: pts[prev], v1: pts[ear], v2: pts[next], color: color));
+          indices.removeAt(i);
+          count--;
+          earFound = true;
+          break;
+        }
+      }
+
+      if (!earFound) {
+        // Fallback: clip first vertex to prevent infinite loop on imperfect CAD polygons
+        final prev = indices[0];
+        final ear = indices[1];
+        final next = indices[2];
+        result.add(Triangle3D(v0: pts[prev], v1: pts[ear], v2: pts[next], color: color));
+        indices.removeAt(1);
+        count--;
+      }
+    }
+
+    if (indices.length == 3) {
+      result.add(Triangle3D(
+        v0: pts[indices[0]],
+        v1: pts[indices[1]],
+        v2: pts[indices[2]],
+        color: color,
+      ));
+    }
+
+    return result;
+  }
 }
+
