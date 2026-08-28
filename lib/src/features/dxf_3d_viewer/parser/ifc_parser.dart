@@ -184,6 +184,15 @@ class _Plane3D {
   const _Plane3D({required this.origin, required this.normal});
 }
 
+class _Obb {
+  final Vector3 pMin;
+  final Vector3 pMax;
+  final Vector3 nX;
+  final Vector3 nY;
+  final Vector3 nZ;
+  _Obb(this.pMin, this.pMax, this.nX, this.nY, this.nZ);
+}
+
 class _IfcGeometrySolver {
   final Map<int, _RawIfcEntity> entityMap;
   final Map<int, Vector3> pointCache = {};
@@ -966,6 +975,14 @@ class _IfcGeometrySolver {
         tris.addAll(_resolveShapeRepresentation(id, parentTransform, color));
       }
     } else if (ent.type == 'IFCSHAPEREPRESENTATION') {
+      final params = ent.splitParams;
+      if (params.length > 2) {
+        final identifier = params[1].replaceAll("'", "").trim().toLowerCase();
+        // Skip 2D lines, footprints, clearances, and bounding boxes which cause rendering artifacts
+        if (identifier == 'axis' || identifier == 'footprint' || identifier == 'box' || identifier == 'clearance') {
+          return tris;
+        }
+      }
       for (final id in ent.referencedIds) {
         tris.addAll(_resolveGeometryItem(id, parentTransform, color));
       }
@@ -1099,7 +1116,7 @@ class _IfcGeometrySolver {
   List<Triangle3D> _applyOpeningVoids(List<Triangle3D> wallTris, List<int> openingIds) {
     if (wallTris.isEmpty || openingIds.isEmpty) return wallTris;
 
-    final List<BoundingBox3D> openingBoxes = [];
+    final List<_Obb> openingOBBs = [];
 
     for (final opId in openingIds) {
       final opEnt = entityMap[opId];
@@ -1110,54 +1127,71 @@ class _IfcGeometrySolver {
       final shapeRepId = params.length > 6 ? int.tryParse(params[6].replaceAll(RegExp(r'[#\s]'), '')) : null;
 
       if (shapeRepId != null) {
-        final opTransform = placementId != null ? _resolvePlacement(placementId) : _Transform3D.identity;
-        final opTris = _resolveShapeRepresentation(shapeRepId, opTransform, Colors.transparent);
-        if (opTris.isNotEmpty) {
-          final pts = opTris.expand((t) => [t.v0, t.v1, t.v2]).toList();
-          final box = BoundingBox3D.fromPoints(pts);
-          if (box.sizeX > 1.0 && box.sizeY > 1.0 && box.sizeZ > 1.0) {
-            openingBoxes.add(box);
+        // Resolve in LOCAL space to get the accurate unrotated bounding box
+        final opTrisLocal = _resolveShapeRepresentation(shapeRepId, _Transform3D.identity, Colors.transparent);
+        if (opTrisLocal.isNotEmpty) {
+          final ptsLocal = opTrisLocal.expand((t) => [t.v0, t.v1, t.v2]).toList();
+          final localBox = BoundingBox3D.fromPoints(ptsLocal);
+          
+          if (localBox.sizeX > 1.0 && localBox.sizeY > 1.0 && localBox.sizeZ > 1.0) {
+            final opTransform = placementId != null ? _resolvePlacement(placementId) : _Transform3D.identity;
+            
+            final origin = opTransform.transform(Vector3.zero);
+            final nX = opTransform.transform(const Vector3(1, 0, 0)) - origin;
+            final nY = opTransform.transform(const Vector3(0, 1, 0)) - origin;
+            final nZ = opTransform.transform(const Vector3(0, 0, 1)) - origin;
+            
+            final pMin = opTransform.transform(localBox.min);
+            final pMax = opTransform.transform(localBox.max);
+            
+            // Normalize axes in case of scaling
+            final nXNorm = nX * (1.0 / (math.sqrt(nX.lengthSquared) + 1e-12));
+            final nYNorm = nY * (1.0 / (math.sqrt(nY.lengthSquared) + 1e-12));
+            final nZNorm = nZ * (1.0 / (math.sqrt(nZ.lengthSquared) + 1e-12));
+            
+            openingOBBs.add(_Obb(pMin, pMax, nXNorm, nYNorm, nZNorm));
           }
         }
       }
     }
 
-    if (openingBoxes.isEmpty) return wallTris;
+    if (openingOBBs.isEmpty) return wallTris;
 
     var currentTris = wallTris;
 
-    for (final box in openingBoxes) {
-      // 1. Slice wall triangles along opening box planes
-      // Slicing planes: Z_bottom, Z_top, Y_left, Y_right, X_front, X_back
+    for (final obb in openingOBBs) {
       var sliced = currentTris;
 
       // Slice along Z (sill and lintel)
-      sliced = _sliceByPlane(sliced, box.min, const Vector3(0, 0, 1));
-      sliced = _sliceByPlane(sliced, box.max, const Vector3(0, 0, 1));
+      sliced = _sliceByPlane(sliced, obb.pMin, obb.nZ);
+      sliced = _sliceByPlane(sliced, obb.pMax, obb.nZ);
 
       // Slice along Y (jambs)
-      sliced = _sliceByPlane(sliced, box.min, const Vector3(0, 1, 0));
-      sliced = _sliceByPlane(sliced, box.max, const Vector3(0, 1, 0));
+      sliced = _sliceByPlane(sliced, obb.pMin, obb.nY);
+      sliced = _sliceByPlane(sliced, obb.pMax, obb.nY);
 
       // Slice along X (wall faces)
-      sliced = _sliceByPlane(sliced, box.min, const Vector3(1, 0, 0));
-      sliced = _sliceByPlane(sliced, box.max, const Vector3(1, 0, 0));
+      sliced = _sliceByPlane(sliced, obb.pMin, obb.nX);
+      sliced = _sliceByPlane(sliced, obb.pMax, obb.nX);
 
-      // 2. Discard all sub-triangles whose centroid lies inside the opening box
+      // 2. Discard all sub-triangles whose centroid lies inside the oriented box
       const double eps = 0.5; // 0.5mm tolerance
-      final minX = box.min.x - eps;
-      final maxX = box.max.x + eps;
-      final minY = box.min.y - eps;
-      final maxY = box.max.y + eps;
-      final minZ = box.min.z - eps;
-      final maxZ = box.max.z + eps;
-
       final filtered = <Triangle3D>[];
       for (final tri in sliced) {
         final c = (tri.v0 + tri.v1 + tri.v2) * (1.0 / 3.0);
-        final bool inside = (c.x >= minX && c.x <= maxX &&
-                             c.y >= minY && c.y <= maxY &&
-                             c.z >= minZ && c.z <= maxZ);
+        
+        final dxMin = (c - obb.pMin).dot(obb.nX);
+        final dxMax = (c - obb.pMax).dot(obb.nX);
+        
+        final dyMin = (c - obb.pMin).dot(obb.nY);
+        final dyMax = (c - obb.pMax).dot(obb.nY);
+        
+        final dzMin = (c - obb.pMin).dot(obb.nZ);
+        final dzMax = (c - obb.pMax).dot(obb.nZ);
+        
+        final bool inside = (dxMin >= -eps && dxMax <= eps &&
+                             dyMin >= -eps && dyMax <= eps &&
+                             dzMin >= -eps && dzMax <= eps);
         if (!inside) {
           filtered.add(tri);
         }
@@ -1875,28 +1909,82 @@ class _IfcGeometrySolver {
     }
 
     // 3. Project to 2D
-    final poly2d = <math.Point<double>>[];
+    final rawPoly2d = <math.Point<double>>[];
     for (final p in pts) {
       if (dropAxis == 0) {
-        poly2d.add(math.Point(p.y, p.z));
+        rawPoly2d.add(math.Point(p.y, p.z));
       } else if (dropAxis == 1) {
-        poly2d.add(math.Point(p.x, p.z));
+        rawPoly2d.add(math.Point(p.x, p.z));
       } else {
-        poly2d.add(math.Point(p.x, p.y));
+        rawPoly2d.add(math.Point(p.x, p.y));
       }
     }
 
+    // 3.5 Filter collinear points in 2D
+    final poly2d = <math.Point<double>>[];
+    final cleanPts = <Vector3>[];
+    for (int i = 0; i < rawPoly2d.length; i++) {
+      if (poly2d.length < 2) {
+        poly2d.add(rawPoly2d[i]);
+        cleanPts.add(pts[i]);
+      } else {
+        final prev = poly2d[poly2d.length - 2];
+        final curr = poly2d.last;
+        final next = rawPoly2d[i];
+        final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
+        if (cross.abs() < 1e-4) {
+          // curr is collinear, replace it with next
+          poly2d[poly2d.length - 1] = next;
+          cleanPts[cleanPts.length - 1] = pts[i];
+        } else {
+          poly2d.add(next);
+          cleanPts.add(pts[i]);
+        }
+      }
+    }
+    
+    // Check if the first point is collinear with last and second
+    while (poly2d.length > 2) {
+      final prev = poly2d.last;
+      final curr = poly2d.first;
+      final next = poly2d[1];
+      final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
+      if (cross.abs() < 1e-4) {
+        poly2d.removeAt(0);
+        cleanPts.removeAt(0);
+      } else {
+        break;
+      }
+    }
+    
+    // Also check if the last point is collinear with second to last and first
+    while (poly2d.length > 2) {
+      final prev = poly2d[poly2d.length - 2];
+      final curr = poly2d.last;
+      final next = poly2d.first;
+      final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
+      if (cross.abs() < 1e-4) {
+        poly2d.removeLast();
+        cleanPts.removeLast();
+      } else {
+        break;
+      }
+    }
+
+    if (poly2d.length < 3) return [];
+    final nClean = poly2d.length;
+
     // 4. Compute 2D signed area to determine winding order
     double area2d = 0.0;
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < nClean; i++) {
       final p1 = poly2d[i];
-      final p2 = poly2d[(i + 1) % n];
+      final p2 = poly2d[(i + 1) % nClean];
       area2d += (p1.x * p2.y - p2.x * p1.y);
     }
     final bool ccw = area2d > 0;
 
     // 5. Ear clipping loop
-    final indices = List<int>.generate(n, (i) => i);
+    final indices = List<int>.generate(nClean, (i) => i);
     final List<Triangle3D> result = [];
 
     bool isEar(int prevIdx, int earIdx, int nextIdx, List<int> curIndices) {
@@ -1944,7 +2032,7 @@ class _IfcGeometrySolver {
         final next = indices[(i + 1) % count];
 
         if (isEar(prev, ear, next, indices)) {
-          result.add(Triangle3D(v0: pts[prev], v1: pts[ear], v2: pts[next], color: color));
+          result.add(Triangle3D(v0: cleanPts[prev], v1: cleanPts[ear], v2: cleanPts[next], color: color));
           indices.removeAt(i);
           count--;
           earFound = true;
@@ -1976,7 +2064,7 @@ class _IfcGeometrySolver {
         final ear = indices[bestIdx];
         final next = indices[(bestIdx + 1) % count];
         
-        result.add(Triangle3D(v0: pts[prev], v1: pts[ear], v2: pts[next], color: color));
+        result.add(Triangle3D(v0: cleanPts[prev], v1: cleanPts[ear], v2: cleanPts[next], color: color));
         indices.removeAt(bestIdx);
         count--;
       }
@@ -1984,9 +2072,9 @@ class _IfcGeometrySolver {
 
     if (indices.length == 3) {
       result.add(Triangle3D(
-        v0: pts[indices[0]],
-        v1: pts[indices[1]],
-        v2: pts[indices[2]],
+        v0: cleanPts[indices[0]],
+        v1: cleanPts[indices[1]],
+        v2: cleanPts[indices[2]],
         color: color,
       ));
     }
