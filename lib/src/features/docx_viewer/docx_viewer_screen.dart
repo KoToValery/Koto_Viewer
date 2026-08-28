@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/services/recent_files_service.dart';
 import 'models/docx_models.dart';
 import 'parser/docx_parser.dart';
 
@@ -76,6 +77,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         });
       }
     } catch (e) {
+      await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
           _errorMessage = 'Error reading Word document: $e';

@@ -10,44 +10,17 @@ import 'drill_parser.dart';
 class PcbArchiveParser {
   const PcbArchiveParser._();
 
-  /// Quick heuristic to check if a ZIP archive contains PCB Gerber, Drill, or KiCad files.
+  /// Quick heuristic to check if a byte stream is a valid ZIP archive.
   static bool isPcbZip(Uint8List bytes, {String fileName = ''}) {
     try {
       final archive = ZipDecoder().decodeBytes(bytes, verify: false);
-      for (final file in archive) {
-        if (!file.isFile) continue;
-        final name = file.name.toLowerCase();
-        if (name.startsWith('__macosx') || name.startsWith('.')) continue;
-
-        if (_isPcbFileExtension(name)) {
-          return true;
-        }
-
-        // Check content header for Gerber/Drill signatures if size is reasonable
-        if (file.size > 10 && file.size < 5000000) {
-          final sampleBytes = file.content is List<int>
-              ? Uint8List.fromList((file.content as List<int>).take(500).toList())
-              : Uint8List(0);
-          if (sampleBytes.isNotEmpty) {
-            final sampleStr = String.fromCharCodes(sampleBytes);
-            if (sampleStr.contains('%FS') ||
-                sampleStr.contains('%MO') ||
-                sampleStr.contains('G04') ||
-                sampleStr.contains('M48') ||
-                sampleStr.contains('INCH,') ||
-                sampleStr.contains('METRIC,')) {
-              return true;
-            }
-          }
-        }
-      }
+      return archive.isNotEmpty;
     } catch (_) {
       return false;
     }
-    return false;
   }
 
-  /// Parses a complete PCB project ZIP archive into a unified [PcbProject].
+  /// Parses a complete PCB project or multi-file ZIP archive into a unified [PcbProject].
   static PcbProject parseZip(
     Uint8List bytes, {
     required String archiveName,
@@ -57,6 +30,7 @@ class PcbArchiveParser {
     final List<PcbLayerItem> layers = [];
     final List<PcbBomEntry> bomEntries = [];
     final List<PcbImageItem> images = [];
+    final List<PcbArchiveFileItem> archiveFiles = [];
 
     double minX = double.infinity;
     double minY = double.infinity;
@@ -86,7 +60,13 @@ class PcbArchiveParser {
           : Uint8List(0);
       if (fileBytes.isEmpty) continue;
 
-      // 0. Preview Images (Proteus / Altium 3D exports)
+      archiveFiles.add(PcbArchiveFileItem(
+        fileName: rawName,
+        sizeInBytes: fileBytes.length,
+        bytes: fileBytes,
+      ));
+
+      // 0. Preview Images (Proteus / Altium 3D exports or standalone photo/renders)
       if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.bmp')) {
         images.add(PcbImageItem(fileName: baseName, bytes: fileBytes));
         continue;
@@ -172,6 +152,7 @@ class PcbArchiveParser {
       layers: layers,
       bomEntries: bomEntries,
       images: images,
+      archiveFiles: archiveFiles,
       boundingBox: globalBoundingBox,
       viewSide: PcbViewSide.top,
     );

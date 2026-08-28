@@ -121,6 +121,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         });
       }
     } catch (e) {
+      await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading 3D Model: $e';

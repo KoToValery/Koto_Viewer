@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/services/recent_files_service.dart';
 import 'models/eps_models.dart';
 import 'parser/eps_parser.dart';
 import 'rendering/eps_painter.dart';
@@ -75,6 +76,7 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
         });
       }
     } catch (e) {
+      await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
           _errorMessage = 'Error reading EPS file: $e';

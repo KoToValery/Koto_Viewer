@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/services/recent_files_service.dart';
 import '../eps_viewer/models/eps_models.dart';
 import 'models/hpgl_models.dart';
 import 'parser/hpgl_parser.dart';
@@ -72,6 +73,7 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
         });
       }
     } catch (e) {
+      await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
           _errorMessage = 'Error reading HPGL plotter file: $e';

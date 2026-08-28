@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:kotoview/src/core/services/recent_files_service.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 
 /// Markdown Viewer Screen (.md / .markdown)
@@ -56,6 +57,7 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
         });
       }
     } catch (e) {
+      await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading markdown: $e';

@@ -1,10 +1,15 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'package:archive/archive.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:share_plus/share_plus.dart';
+import 'package:xml/xml.dart' as xml;
+import '../../core/services/recent_files_service.dart';
 import 'excel_formula_evaluator.dart';
 
 /// Interactive Excel Spreadsheet Viewer (.xlsx / .xls)
@@ -98,6 +103,84 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
     }
   }
 
+  static Uint8List _sanitizeXlsxBytes(Uint8List bytes) {
+    const knownStandardIds = {
+      0, 1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+      37, 38, 39, 40, 45, 46, 47, 48, 49
+    };
+
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+      final newArchive = Archive();
+      bool modified = false;
+
+      for (final file in archive) {
+        final name = file.name.toLowerCase();
+        if (name == 'xl/styles.xml' || name == 'styles.xml') {
+          final content = file.content is List<int>
+              ? utf8.decode(file.content as List<int>, allowMalformed: true)
+              : file.content.toString();
+
+          try {
+            final doc = xml.XmlDocument.parse(content);
+            final remappedIds = <int, int>{};
+
+            // 1. Remap any custom numFmt with ID < 164 to >= 1000
+            for (final numFmt in doc.findAllElements('numFmt')) {
+              final idStr = numFmt.getAttribute('numFmtId');
+              final id = int.tryParse(idStr ?? '');
+              if (id != null && id < 164) {
+                final newId = 1000 + id;
+                numFmt.setAttribute('numFmtId', newId.toString());
+                remappedIds[id] = newId;
+              }
+            }
+
+            // 2. Update all <xf> nodes in cellXfs and cellStyleXfs
+            for (final xf in doc.findAllElements('xf')) {
+              final idStr = xf.getAttribute('numFmtId');
+              final id = int.tryParse(idStr ?? '');
+              if (id != null) {
+                if (remappedIds.containsKey(id)) {
+                  xf.setAttribute('numFmtId', remappedIds[id]!.toString());
+                } else if (id < 164 && !knownStandardIds.contains(id)) {
+                  // Unknown standard ID not supported by excel package -> default to 0 (General)
+                  xf.setAttribute('numFmtId', '0');
+                }
+              }
+            }
+
+            final newXml = doc.toXmlString();
+            final newBytes = utf8.encode(newXml);
+            newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes));
+            modified = true;
+            continue;
+          } catch (_) {
+            // Regex fallback: strip numFmts completely
+            final cleanContent = content.replaceAll(RegExp(r'<numFmts[\s\S]*?</numFmts>'), '');
+            final newBytes = utf8.encode(cleanContent);
+            newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes));
+            modified = true;
+            continue;
+          }
+        }
+
+        final contentBytes = file.content is List<int>
+            ? (file.content as List<int>)
+            : utf8.encode(file.content.toString());
+        newArchive.addFile(ArchiveFile(file.name, contentBytes.length, contentBytes));
+      }
+
+      if (modified) {
+        final encoded = ZipEncoder().encode(newArchive);
+        if (encoded != null) {
+          return Uint8List.fromList(encoded);
+        }
+      }
+    } catch (_) {}
+    return bytes;
+  }
+
   Future<void> _loadExcelFile() async {
     setState(() {
       _isLoading = true;
@@ -113,7 +196,15 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
       _fileSizeBytes = await file.length();
       final bytes = await file.readAsBytes();
 
-      final excel = xl.Excel.decodeBytes(bytes);
+      xl.Excel? excel;
+      try {
+        excel = xl.Excel.decodeBytes(bytes);
+      } catch (_) {
+        // Retry with sanitized OpenXML styles
+        final sanitized = _sanitizeXlsxBytes(bytes);
+        excel = xl.Excel.decodeBytes(sanitized);
+      }
+
       final sheets = excel.tables.keys.toList();
 
       if (sheets.isEmpty) {
@@ -132,6 +223,31 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
         });
       }
     } catch (e) {
+      // If it fails to load as Excel, try CSV / text fallback table
+      try {
+        final file = File(widget.filePath);
+        final bytes = await file.readAsBytes();
+        String text;
+        try {
+          text = utf8.decode(bytes, allowMalformed: true);
+        } catch (_) {
+          text = latin1.decode(bytes);
+        }
+
+        if (text.isNotEmpty && (text.contains(',') || text.contains(';') || text.contains('\t') || text.contains('\n'))) {
+          _parseTextFallback(text);
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+      } catch (_) {}
+
+      // If opening failed completely, remove from Recent Files
+      await RecentFilesService.removeRecentFile(widget.filePath);
+
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading Excel file: $e';
@@ -139,6 +255,69 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
         });
       }
     }
+  }
+
+  void _parseTextFallback(String text) {
+    final lines = LineSplitter.split(text).map((l) => l.trimRight()).where((l) => l.isNotEmpty).toList();
+    if (lines.isEmpty) throw Exception('File is empty.');
+
+    String delimiter = ',';
+    if (lines.first.contains(';') && lines.first.split(';').length > lines.first.split(',').length) {
+      delimiter = ';';
+    } else if (lines.first.contains('\t')) {
+      delimiter = '\t';
+    }
+
+    final parsedRows = <List<String>>[];
+    int maxCols = 0;
+    for (final line in lines) {
+      final cols = _splitCsvLine(line, delimiter);
+      parsedRows.add(cols);
+      if (cols.length > maxCols) maxCols = cols.length;
+    }
+
+    for (final row in parsedRows) {
+      while (row.length < maxCols) {
+        row.add('');
+      }
+    }
+
+    _sheetNames = ['Sheet1'];
+    _activeSheetName = 'Sheet1';
+    _maxRows = parsedRows.length;
+    _maxCols = maxCols;
+    _sheetData = parsedRows;
+    _sheetFormulas = List.generate(_maxRows, (_) => List.filled(_maxCols, null));
+
+    final widths = List.filled(_maxCols, 80.0);
+    for (int r = 0; r < _maxRows; r++) {
+      for (int c = 0; c < _maxCols; c++) {
+        final val = _sheetData[r][c];
+        final w = math.max(80.0, math.min(380.0, val.length * 9.5 + 24.0));
+        if (w > widths[c]) widths[c] = w;
+      }
+    }
+    _colWidths = widths;
+  }
+
+  static List<String> _splitCsvLine(String line, String delimiter) {
+    final List<String> result = [];
+    final buffer = StringBuffer();
+    bool inQuotes = false;
+
+    for (int i = 0; i < line.length; i++) {
+      final char = line[i];
+      if (char == '"') {
+        inQuotes = !inQuotes;
+      } else if (char == delimiter && !inQuotes) {
+        result.add(buffer.toString().trim().replaceAll('"', ''));
+        buffer.clear();
+      } else {
+        buffer.write(char);
+      }
+    }
+    result.add(buffer.toString().trim().replaceAll('"', ''));
+    return result;
   }
 
   void _extractActiveSheetData() {
@@ -457,15 +636,27 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
     const double rowHeight = 34.0;
     const double rowHeaderWidth = 46.0;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(true),
-        ),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (_errorMessage != null) {
+          RecentFilesService.removeRecentFile(widget.filePath);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: theme.colorScheme.surface,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (_errorMessage != null) {
+                RecentFilesService.removeRecentFile(widget.filePath);
+              }
+              Navigator.of(context).pop(_errorMessage == null);
+            },
+          ),
         title: _isSearchOpen
             ? TextField(
                 controller: _searchController,
@@ -1049,6 +1240,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                     ),
                   ],
                 ),
+      ),
     );
   }
 }

@@ -285,6 +285,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   }
                 },
                 errorBannerBuilder: (context, error, stackTrace, documentRef) {
+                  RecentFilesService.removeRecentFile(widget.filePath);
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),

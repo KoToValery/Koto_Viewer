@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/services/recent_files_service.dart';
 import 'models/cdr_document.dart';
 import 'parser/cdr_parser.dart';
 
@@ -69,6 +70,7 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
         });
       }
     } catch (e) {
+      await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
           _errorMessage = 'Error reading CorelDRAW file:\n$e';

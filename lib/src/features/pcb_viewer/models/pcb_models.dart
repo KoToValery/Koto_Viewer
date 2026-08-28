@@ -254,6 +254,26 @@ class PcbImageItem {
   });
 }
 
+class PcbArchiveFileItem {
+  final String fileName;
+  final int sizeInBytes;
+  final Uint8List bytes;
+
+  const PcbArchiveFileItem({
+    required this.fileName,
+    required this.sizeInBytes,
+    required this.bytes,
+  });
+
+  String get formattedSize {
+    if (sizeInBytes < 1024) return '$sizeInBytes B';
+    if (sizeInBytes < 1024 * 1024) {
+      return '${(sizeInBytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(sizeInBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
 /// Complete Multi-Layer PCB Project (e.g. from a Proteus / Altium / KiCad ZIP archive).
 class PcbProject {
   final String projectName;
@@ -261,6 +281,7 @@ class PcbProject {
   final List<PcbLayerItem> layers;
   final List<PcbBomEntry> bomEntries;
   final List<PcbImageItem> images;
+  final List<PcbArchiveFileItem> archiveFiles;
   final PcbBoundingBox boundingBox;
   PcbViewSide viewSide;
 
@@ -270,6 +291,7 @@ class PcbProject {
     required this.layers,
     this.bomEntries = const [],
     this.images = const [],
+    this.archiveFiles = const [],
     required this.boundingBox,
     this.viewSide = PcbViewSide.top,
   });
@@ -278,6 +300,7 @@ class PcbProject {
   int get visibleLayers => layers.where((l) => l.isVisible).length;
   int get totalComponents => bomEntries.fold(0, (sum, e) => sum + e.quantity);
   int get totalImages => images.length;
+  int get totalArchiveFiles => archiveFiles.length;
 
   PcbLayerItem? get edgeCutsLayer =>
       layers.cast<PcbLayerItem?>().firstWhere((l) => l?.type == PcbLayerType.edgeCuts, orElse: () => null);

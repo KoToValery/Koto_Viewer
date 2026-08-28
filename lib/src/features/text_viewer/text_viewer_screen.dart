@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:kotoview/src/core/services/recent_files_service.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 
 /// Text Viewer Screen for .txt, .log, .csv, and coordinate files.
@@ -83,6 +84,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         });
       }
     } catch (e) {
+      await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
           _errorMessage = 'Error reading text file: $e';

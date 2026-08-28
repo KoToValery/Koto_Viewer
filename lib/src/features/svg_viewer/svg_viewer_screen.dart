@@ -149,6 +149,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
         });
       }
     } catch (e) {
+      await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
           _errorMessage = 'Error loading SVG: $e';
