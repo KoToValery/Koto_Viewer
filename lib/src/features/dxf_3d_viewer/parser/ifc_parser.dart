@@ -314,6 +314,21 @@ class _IfcGeometrySolver {
       }
     }
 
+    // 2.6. Parse Wall Openings & Voids (IFCRELVOIDSELEMENT -> IFCOPENINGELEMENT)
+    final Map<int, List<int>> elementToVoidOpeningIds = {};
+    for (final ent in entityMap.values) {
+      if (ent.type == 'IFCRELVOIDSELEMENT') {
+        final params = ent.splitParams;
+        if (params.length >= 6) {
+          final relElId = int.tryParse(params[4].replaceAll(RegExp(r'[#\s]'), ''));
+          final openingId = int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), ''));
+          if (relElId != null && openingId != null) {
+            elementToVoidOpeningIds.putIfAbsent(relElId, () => []).add(openingId);
+          }
+        }
+      }
+    }
+
     // 3. Find and generate building elements
     final List<IfcElement> elements = [];
     final Set<String> categories = {};
@@ -343,7 +358,14 @@ class _IfcGeometrySolver {
 
       final triangles = <Triangle3D>[];
       if (shapeRepId != null) {
-        final rawTris = _resolveShapeRepresentation(shapeRepId, transform, elementColor);
+        var rawTris = _resolveShapeRepresentation(shapeRepId, transform, elementColor);
+
+        // Apply Opening Voids (Windows and Doors cut into Walls)
+        final openingIds = elementToVoidOpeningIds[ent.id];
+        if (openingIds != null && openingIds.isNotEmpty) {
+          rawTris = _applyOpeningVoids(rawTris, openingIds);
+        }
+
         triangles.addAll(_filterDegenerateTriangles(rawTris));
       }
 
@@ -930,89 +952,21 @@ class _IfcGeometrySolver {
           if (secondId != null) {
             final secondEnt = entityMap[secondId];
             if (secondEnt != null) {
-              // IFCHALFSPACESOLID: infinite clipping plane
-              if (secondEnt.type == 'IFCHALFSPACESOLID') {
+              // IFCHALFSPACESOLID & IFCPOLYGONALBOUNDEDHALFSPACE: roof / plane trimming
+              if (secondEnt.type == 'IFCHALFSPACESOLID' ||
+                  secondEnt.type == 'IFCPOLYGONALBOUNDEDHALFSPACE') {
                 final halfParams = secondEnt.splitParams;
                 if (halfParams.isNotEmpty) {
                   final planeId = int.tryParse(halfParams[0].replaceAll(RegExp(r'[#\s]'), ''));
-                  // AgreementFlag: .T. means the solid is on the positive-normal side of the plane
-                  final agreementFlag = halfParams.length > 1 ? halfParams[1].toUpperCase() : '.T.';
                   if (planeId != null) {
-                    // The IFCHALFSPACESOLID's plane is defined in the LOCAL coordinate space
-                    // of the shape representation (same space as the swept solid).
-                    // We apply the element's world transform to bring it to world space,
-                    // because firstTris are already in world space.
                     final planeDef = _resolvePlane(planeId, transform);
                     if (planeDef != null) {
-                      // DIFFERENCE removes the "solid" portion.
-                      // AgreementFlag=.T. → solid is on positive side → keep negative side
-                      // AgreementFlag=.F. → solid is on negative side → keep positive side
-                      final bool isDiff = !op.contains('UNION');
-                      final bool solidOnPositiveSide = agreementFlag.contains('.T.');
-                      final bool keepPositiveSide = isDiff ? !solidOnPositiveSide : solidOnPositiveSide;
+                      // In architectural BIM (ArchiCAD/Revit), roof clipping planes trim off the top of walls.
+                      // If the plane normal points downwards (normal.z < 0), the region under the roof has (X-P).N >= 0.
+                      // If the plane normal points upwards (normal.z > 0), the region under the roof has (X-P).N <= 0.
+                      final bool keepPositiveSide = planeDef.normal.z < 0;
                       final clipped = _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
                       return _filterDegenerateTriangles(clipped);
-                    }
-                  }
-                }
-              }
-              // IFCPOLYGONALBOUNDEDHALFSPACE: bounded clipping region (window/door openings)
-              else if (secondEnt.type == 'IFCPOLYGONALBOUNDEDHALFSPACE') {
-                final halfParams = secondEnt.splitParams;
-                if (halfParams.length >= 3) {
-                  final planeId = int.tryParse(halfParams[0].replaceAll(RegExp(r'[#\s]'), ''));
-                  final agreementFlag = halfParams.length > 1 ? halfParams[1].toUpperCase() : '.T.';
-                  final positionId = int.tryParse(halfParams[2].replaceAll(RegExp(r'[#\s]'), ''));
-                  final polygonId = halfParams.length > 3
-                      ? int.tryParse(halfParams[3].replaceAll(RegExp(r'[#\s]'), ''))
-                      : null;
-
-                  if (planeId != null) {
-                    // Resolve plane in LOCAL space, apply element world transform
-                    final planeDef = _resolvePlane(planeId, transform);
-                    if (planeDef != null) {
-                      final bool isDiff = !op.contains('UNION');
-                      final bool solidOnPositiveSide = agreementFlag.contains('.T.');
-                      final bool keepPositiveSide = isDiff ? !solidOnPositiveSide : solidOnPositiveSide;
-
-                      // Resolve polygon boundary transform (in world space)
-                      _Transform3D boundaryTransform = transform;
-                      if (positionId != null) {
-                        final localBound = _resolveAxis2Placement3D(positionId);
-                        boundaryTransform = transform.multiply(localBound);
-                      }
-
-                      List<Vector3>? boundaryPoly;
-                      if (polygonId != null) {
-                        final polyEnt = entityMap[polygonId];
-                        if (polyEnt != null) {
-                          if (polyEnt.type == 'IFCPOLYLINE') {
-                            boundaryPoly = polyEnt.referencedIds
-                                .map((id) => boundaryTransform.transform(_resolvePoint(id)))
-                                .toList();
-                          } else if (polyEnt.type == 'IFCARBITRARYCLOSEDPROFILEDEF' ||
-                              polyEnt.type == 'IFCRECTANGLEPROFILEDEF') {
-                            final profilePts = _resolveProfilePoints(polygonId);
-                            boundaryPoly = profilePts.map((p) => boundaryTransform.transform(p)).toList();
-                          }
-                        }
-                      }
-
-                      if (boundaryPoly != null && boundaryPoly.length >= 3) {
-                        final clipped = _clipTrianglesByBoundedHalfSpace(
-                          firstTris,
-                          planeDef.origin,
-                          planeDef.normal,
-                          keepPositiveSide,
-                          boundaryPoly,
-                          boundaryTransform,
-                        );
-                        return _filterDegenerateTriangles(clipped);
-                      } else {
-                        // Fallback: treat as infinite half-space
-                        final clipped = _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
-                        return _filterDegenerateTriangles(clipped);
-                      }
                     }
                   }
                 }
@@ -1052,6 +1006,92 @@ class _IfcGeometrySolver {
     }
 
     return tris;
+  }
+
+  /// Subtracts window and door opening voids (IFCRELVOIDSELEMENT) from wall geometry.
+  /// Slices wall faces against opening void boundaries and removes geometry inside the opening hole.
+  List<Triangle3D> _applyOpeningVoids(List<Triangle3D> wallTris, List<int> openingIds) {
+    if (wallTris.isEmpty || openingIds.isEmpty) return wallTris;
+
+    final List<BoundingBox3D> openingBoxes = [];
+
+    for (final opId in openingIds) {
+      final opEnt = entityMap[opId];
+      if (opEnt == null) continue;
+
+      final params = opEnt.splitParams;
+      final placementId = params.length > 5 ? int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), '')) : null;
+      final shapeRepId = params.length > 6 ? int.tryParse(params[6].replaceAll(RegExp(r'[#\s]'), '')) : null;
+
+      if (shapeRepId != null) {
+        final opTransform = placementId != null ? _resolvePlacement(placementId) : _Transform3D.identity;
+        final opTris = _resolveShapeRepresentation(shapeRepId, opTransform, Colors.transparent);
+        if (opTris.isNotEmpty) {
+          final pts = opTris.expand((t) => [t.v0, t.v1, t.v2]).toList();
+          final box = BoundingBox3D.fromPoints(pts);
+          if (box.sizeX > 1.0 && box.sizeY > 1.0 && box.sizeZ > 1.0) {
+            openingBoxes.add(box);
+          }
+        }
+      }
+    }
+
+    if (openingBoxes.isEmpty) return wallTris;
+
+    var currentTris = wallTris;
+
+    for (final box in openingBoxes) {
+      // 1. Slice wall triangles along opening box planes
+      // Slicing planes: Z_bottom, Z_top, Y_left, Y_right, X_front, X_back
+      var sliced = currentTris;
+
+      // Slice along Z (sill and lintel)
+      sliced = _sliceByPlane(sliced, box.min, const Vector3(0, 0, 1));
+      sliced = _sliceByPlane(sliced, box.max, const Vector3(0, 0, 1));
+
+      // Slice along Y (jambs)
+      sliced = _sliceByPlane(sliced, box.min, const Vector3(0, 1, 0));
+      sliced = _sliceByPlane(sliced, box.max, const Vector3(0, 1, 0));
+
+      // Slice along X (wall faces)
+      sliced = _sliceByPlane(sliced, box.min, const Vector3(1, 0, 0));
+      sliced = _sliceByPlane(sliced, box.max, const Vector3(1, 0, 0));
+
+      // 2. Discard all sub-triangles whose centroid lies inside the opening box
+      const double eps = 0.5; // 0.5mm tolerance
+      final minX = box.min.x - eps;
+      final maxX = box.max.x + eps;
+      final minY = box.min.y - eps;
+      final maxY = box.max.y + eps;
+      final minZ = box.min.z - eps;
+      final maxZ = box.max.z + eps;
+
+      final filtered = <Triangle3D>[];
+      for (final tri in sliced) {
+        final c = (tri.v0 + tri.v1 + tri.v2) * (1.0 / 3.0);
+        final bool inside = (c.x >= minX && c.x <= maxX &&
+                             c.y >= minY && c.y <= maxY &&
+                             c.z >= minZ && c.z <= maxZ);
+        if (!inside) {
+          filtered.add(tri);
+        }
+      }
+
+      currentTris = filtered;
+    }
+
+    return currentTris;
+  }
+
+  /// Slices a set of triangles across a plane, keeping BOTH the positive and negative sides.
+  List<Triangle3D> _sliceByPlane(List<Triangle3D> inputTris, Vector3 planePoint, Vector3 planeNormal) {
+    if (inputTris.isEmpty) return inputTris;
+    final List<Triangle3D> result = [];
+    final pos = _clipTrianglesByPlane(inputTris, planePoint, planeNormal, true);
+    final neg = _clipTrianglesByPlane(inputTris, planePoint, planeNormal, false);
+    result.addAll(pos);
+    result.addAll(neg);
+    return result;
   }
 
   _Plane3D? _resolvePlane(int planeId, _Transform3D parentTransform) {
