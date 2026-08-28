@@ -39,6 +39,10 @@ class GerberParser {
     List<Offset> currentRegionPoints = [];
     List<List<Offset>> currentRegionContours = [];
 
+    String? activePinNumber;
+    String? activeNetName;
+    String? activeComponentRef;
+
     Offset currentPoint = Offset.zero;
     int interpMode = 1; // 1 = G01 linear, 2 = G02 CW arc, 3 = G03 CCW arc
 
@@ -128,6 +132,44 @@ class GerberParser {
         // %LPD% / %LPC% -> Polarity
         else if (extBlock.startsWith('LP')) {
           isDarkPolarity = extBlock.contains('D');
+        }
+        // %TO.P...% / %TA.PinNumber...% -> Pin Number
+        else if (extBlock.startsWith('TO.P') || extBlock.startsWith('TA.PinNumber')) {
+          final parts = extBlock.split(',');
+          if (parts.length > 1) {
+            activePinNumber = parts[1].replaceAll('*', '').trim();
+          }
+        }
+        // %TO.N...% / %TA.Net...% -> Net Name
+        else if (extBlock.startsWith('TO.N') || extBlock.startsWith('TA.Net')) {
+          final parts = extBlock.split(',');
+          if (parts.length > 1) {
+            activeNetName = parts[1].replaceAll('*', '').trim();
+          }
+        }
+        // %TO.C...% / %TA.Component...% -> Component RefDes
+        else if (extBlock.startsWith('TO.C') || extBlock.startsWith('TA.Component')) {
+          final parts = extBlock.split(',');
+          if (parts.length > 1) {
+            activeComponentRef = parts[1].replaceAll('*', '').trim();
+          }
+        }
+        // %TD...% -> Delete Attribute / Clear active attributes
+        else if (extBlock.startsWith('TD')) {
+          if (extBlock.contains('P') || extBlock.contains('PinNumber')) {
+            activePinNumber = null;
+          }
+          if (extBlock.contains('N') || extBlock.contains('Net')) {
+            activeNetName = null;
+          }
+          if (extBlock.contains('C') || extBlock.contains('Component')) {
+            activeComponentRef = null;
+          }
+          if (extBlock == 'TD' || extBlock == 'TD*') {
+            activePinNumber = null;
+            activeNetName = null;
+            activeComponentRef = null;
+          }
         }
         // %AM<name>*...*% -> Aperture Macro Definition
         else if (extBlock.startsWith('AM')) {
@@ -347,6 +389,9 @@ class GerberParser {
             p1: flashPoint,
             aperture: activeAperture ?? const PcbAperture(id: 0, type: PcbApertureType.circle, dimX: 1.0),
             isDark: isDarkPolarity,
+            pinNumber: activePinNumber,
+            netName: activeNetName,
+            componentRef: activeComponentRef,
           ),
         );
         currentPoint = flashPoint;

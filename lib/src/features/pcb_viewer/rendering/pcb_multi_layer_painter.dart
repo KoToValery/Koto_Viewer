@@ -7,12 +7,14 @@ class PcbMultiLayerPainter extends CustomPainter {
   final PcbProject project;
   final PcbTheme theme;
   final bool showGrid;
+  final bool showPadNumbers;
   final double scaleFactor;
 
   const PcbMultiLayerPainter({
     required this.project,
     required this.theme,
     this.showGrid = true,
+    this.showPadNumbers = true,
     this.scaleFactor = 10.0, // 1 mm = 10 canvas pixels
   });
 
@@ -218,6 +220,16 @@ class PcbMultiLayerPainter extends CustomPainter {
               final radiusPx = ((ap?.dimX ?? 1.0) / 2.0) * scaleFactor;
               canvas.drawCircle(pos, math.max(0.8, radiusPx), padPaint);
             }
+
+            // Draw Pad Number in center of pad (Proteus / Altium style)
+            if (showPadNumbers && cmd.pinNumber != null && !isClear) {
+              final padDim = math.min(ap?.dimX ?? 1.0, (ap?.dimY ?? 0.0) > 0 ? ap!.dimY : (ap?.dimX ?? 1.0));
+              final sizePx = padDim * scaleFactor;
+              if (sizePx >= 3.5) {
+                final textColor = _getPadNumberColor(cmdColor);
+                _drawCenteredText(canvas, pos, cmd.pinNumber!, sizePx * 0.72, textColor);
+              }
+            }
           }
           break;
 
@@ -274,6 +286,48 @@ class PcbMultiLayerPainter extends CustomPainter {
         ..color = const Color(0xFF0A0A0A)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(pos, math.max(radiusPx, 1.2), holePaint);
+
+      // Draw Drill/Through-hole Pin Number
+      if (showPadNumbers && hole.pinNumber != null && radiusPx >= 1.8) {
+        _drawCenteredText(canvas, pos, hole.pinNumber!, radiusPx * 1.6, const Color(0xFF4ADE80));
+      }
+    }
+  }
+
+  void _drawCenteredText(Canvas canvas, Offset center, String text, double maxDimPx, Color color) {
+    final fontSize = math.min(13.0, math.max(3.8, maxDimPx * 0.75));
+    if (fontSize < 3.2) return;
+
+    final textSpan = TextSpan(
+      text: text,
+      style: TextStyle(
+        color: color,
+        fontSize: fontSize,
+        fontWeight: FontWeight.w900,
+        fontFamily: 'monospace',
+      ),
+    );
+
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    )..layout();
+
+    final textOffset = Offset(
+      center.dx - (textPainter.width / 2.0),
+      center.dy - (textPainter.height / 2.0),
+    );
+
+    textPainter.paint(canvas, textOffset);
+  }
+
+  Color _getPadNumberColor(Color padColor) {
+    final lum = padColor.computeLuminance();
+    if (lum > 0.45) {
+      return const Color(0xFF0F172A); // Dark slate on bright pads
+    } else {
+      return const Color(0xFFFFFFFF); // White on dark/red/blue pads
     }
   }
 
@@ -336,6 +390,7 @@ class PcbMultiLayerPainter extends CustomPainter {
     return oldDelegate.project != project ||
         oldDelegate.theme != theme ||
         oldDelegate.showGrid != showGrid ||
+        oldDelegate.showPadNumbers != showPadNumbers ||
         oldDelegate.scaleFactor != scaleFactor ||
         oldDelegate.project.viewSide != project.viewSide;
   }

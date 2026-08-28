@@ -69,6 +69,9 @@ class PcbCommand {
   final List<Offset>? regionPoints;
   final List<List<Offset>>? regionContours;
   final bool isDark;
+  final String? pinNumber;
+  final String? netName;
+  final String? componentRef;
 
   const PcbCommand.line({
     required this.p1,
@@ -81,7 +84,10 @@ class PcbCommand {
         startAngle = null,
         endAngle = null,
         regionPoints = null,
-        regionContours = null;
+        regionContours = null,
+        pinNumber = null,
+        netName = null,
+        componentRef = null;
 
   const PcbCommand.arc({
     required this.p1,
@@ -94,12 +100,18 @@ class PcbCommand {
     this.isDark = true,
   })  : type = PcbCommandType.arc,
         regionPoints = null,
-        regionContours = null;
+        regionContours = null,
+        pinNumber = null,
+        netName = null,
+        componentRef = null;
 
   const PcbCommand.flash({
     required this.p1,
     required this.aperture,
     this.isDark = true,
+    this.pinNumber,
+    this.netName,
+    this.componentRef,
   })  : type = PcbCommandType.flash,
         p2 = null,
         center = null,
@@ -120,7 +132,24 @@ class PcbCommand {
         radius = null,
         startAngle = null,
         endAngle = null,
-        aperture = null;
+        aperture = null,
+        pinNumber = null,
+        netName = null,
+        componentRef = null;
+
+  PcbCommand copyWithPinNumber(String? newPin, {String? newNet, String? newComp}) {
+    if (type == PcbCommandType.flash) {
+      return PcbCommand.flash(
+        p1: p1,
+        aperture: aperture,
+        isDark: isDark,
+        pinNumber: newPin ?? pinNumber,
+        netName: newNet ?? netName,
+        componentRef: newComp ?? componentRef,
+      );
+    }
+    return this;
+  }
 }
 
 /// Single Excellon CNC drill hole.
@@ -128,12 +157,26 @@ class PcbDrillHole {
   final Offset position;
   final double diameterMm;
   final int toolId;
+  final String? pinNumber;
+  final String? netName;
 
   const PcbDrillHole({
     required this.position,
     required this.diameterMm,
     required this.toolId,
+    this.pinNumber,
+    this.netName,
   });
+
+  PcbDrillHole copyWith({String? pinNumber, String? netName}) {
+    return PcbDrillHole(
+      position: position,
+      diameterMm: diameterMm,
+      toolId: toolId,
+      pinNumber: pinNumber ?? this.pinNumber,
+      netName: netName ?? this.netName,
+    );
+  }
 }
 
 /// Bounding Box in mm for the PCB.

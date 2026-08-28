@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
+import '../../../core/services/universal_encoding_service.dart';
 import '../models/pcb_models.dart';
+import '../services/pcb_pad_numbering_service.dart';
 import 'gerber_parser.dart';
 import 'drill_parser.dart';
 
@@ -146,7 +148,7 @@ class PcbArchiveParser {
         ? archiveName.substring(0, archiveName.length - 4)
         : archiveName;
 
-    return PcbProject(
+    final project = PcbProject(
       projectName: projectName,
       sourcePath: filePath,
       layers: layers,
@@ -156,6 +158,8 @@ class PcbArchiveParser {
       boundingBox: globalBoundingBox,
       viewSide: PcbViewSide.top,
     );
+
+    return PcbPadNumberingService.assignPadNumbers(project);
   }
 
   static bool _isPcbFileExtension(String name) {

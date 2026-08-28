@@ -11,6 +11,7 @@ import 'parser/pcb_archive_parser.dart';
 import '../kicad_viewer/parser/kicad_pcb_parser.dart';
 import '../kicad_viewer/parser/kicad_sch_parser.dart';
 import 'rendering/pcb_multi_layer_painter.dart';
+import 'services/pcb_pad_numbering_service.dart';
 
 /// PCB Multi-Layer Project & Gerber/Drill Viewer Screen.
 /// Supports Proteus ARES ZIP archives, Altium, KiCad, Eagle, EasyEDA, and individual Gerber/Drill files.
@@ -31,6 +32,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
   PcbProject? _project;
   PcbTheme _pcbTheme = PcbTheme.fr4Green;
   bool _showGrid = true;
+  bool _showPadNumbers = true;
   int _selectedImageIndex = 0;
   String _bomSearchQuery = '';
 
@@ -126,7 +128,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
   }
 
   PcbProject _wrapSingleDocument(PcbDocument doc) {
-    return PcbProject(
+    final proj = PcbProject(
       projectName: _fileName,
       sourcePath: widget.filePath,
       layers: [
@@ -144,6 +146,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
           ? PcbViewSide.bottom
           : PcbViewSide.top,
     );
+    return PcbPadNumberingService.assignPadNumbers(proj);
   }
 
   Size _viewportSize = Size.zero;
@@ -941,6 +944,20 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                       onPressed: () => setState(() => _showGrid = !_showGrid),
                     ),
 
+                  // Pad Numbers Toggle (only if layers exist)
+                  if (_project != null && _project!.layers.isNotEmpty)
+                    IconButton(
+                      icon: Icon(
+                        _showPadNumbers ? Icons.tag : Icons.tag_outlined,
+                        size: 20,
+                        color: _showPadNumbers ? theme.colorScheme.primary : null,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: 'Toggle Pad Numbers (Номерация на падове)',
+                      onPressed: () => setState(() => _showPadNumbers = !_showPadNumbers),
+                    ),
+
                   // Information Sheet
                   IconButton(
                     icon: const Icon(Icons.info_outline, size: 20),
@@ -1043,6 +1060,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                           project: _project!,
                           theme: _pcbTheme,
                           showGrid: _showGrid,
+                          showPadNumbers: _showPadNumbers,
                           scaleFactor: 10.0,
                         ),
                       ),
