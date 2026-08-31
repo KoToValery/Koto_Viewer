@@ -26,11 +26,12 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   List<String> _lines = [];
 
   // Options
-  final bool _showLineNumbers = true;
+  bool _showLineNumbers = false; // User requested to default off
   bool _isMonospace = true;
   bool _isWordWrap = true;
   double _fontSize = 13.5;
   bool _isZoomBarExpanded = true;
+  bool _isFullscreen = false;
 
   // Search
   bool _isSearchOpen = false;
@@ -52,6 +53,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _verticalScrollController.dispose();
     _horizontalScrollController.dispose();
     _searchController.dispose();
@@ -232,6 +234,17 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     );
   }
 
+  void _toggleFullscreen() {
+    setState(() {
+      _isFullscreen = !_isFullscreen;
+      if (_isFullscreen) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -246,7 +259,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
+      appBar: _isFullscreen ? null : AppBar(
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
@@ -335,6 +348,24 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                   constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                   tooltip: 'Copy All',
                   onPressed: _copyAllText,
+                ),
+
+                // Line Numbers Toggle
+                IconButton(
+                  icon: Icon(_showLineNumbers ? Icons.format_list_numbered : Icons.format_list_numbered_rtl, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: _showLineNumbers ? 'Hide Line Numbers' : 'Show Line Numbers',
+                  onPressed: () => setState(() => _showLineNumbers = !_showLineNumbers),
+                ),
+
+                // Fullscreen
+                IconButton(
+                  icon: const Icon(Icons.fullscreen, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Fullscreen',
+                  onPressed: _toggleFullscreen,
                 ),
 
                 // Info / Properties
@@ -476,6 +507,18 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                             right: 20,
                             child: _buildZoomControls(theme),
                           ),
+
+                          if (_isFullscreen)
+                            Positioned(
+                              top: 20,
+                              right: 20,
+                              child: FloatingActionButton.small(
+                                heroTag: 'exit_fullscreen',
+                                onPressed: _toggleFullscreen,
+                                backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+                                child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+                              ),
+                            ),
                         ],
                       ),
                     ),

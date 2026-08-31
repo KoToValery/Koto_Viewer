@@ -100,7 +100,24 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         final doc = DrillParser.parse(bytes, fileName: _fileName);
         project = _wrapSingleDocument(doc);
       }
-      // 5. Single Gerber Layer
+      // 5. Standalone BOM or CSV File
+      else if (lower.endsWith('.bom') || lower.endsWith('.csv')) {
+        final bomEntries = PcbArchiveParser.parseBom(bytes, _fileName);
+        if (bomEntries.isEmpty) {
+          throw Exception('The BOM file is empty or unsupported format.');
+        }
+        project = PcbProject(
+          projectName: _fileName.replaceAll(RegExp(r'\.(bom|csv)$', caseSensitive: false), ''),
+          sourcePath: widget.filePath,
+          layers: [],
+          boundingBox: PcbBoundingBox.defaultBox,
+          bomEntries: bomEntries,
+          images: [],
+          archiveFiles: [],
+          viewSide: PcbViewSide.top,
+        );
+      }
+      // 6. Single Gerber Layer
       else {
         final doc = GerberParser.parse(bytes, fileName: _fileName);
         project = _wrapSingleDocument(doc);
@@ -114,6 +131,11 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _fitToScreen();
+          if (_project?.layers.isEmpty == true && _project?.bomEntries.isNotEmpty == true) {
+            _showBomSheet();
+          } else if (_project?.layers.isEmpty == true && _project?.images.isNotEmpty == true) {
+            _showImagesSheet();
+          }
         });
       }
     } catch (e) {

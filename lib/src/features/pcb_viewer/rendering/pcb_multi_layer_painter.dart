@@ -89,6 +89,8 @@ class PcbMultiLayerPainter extends CustomPainter {
       return Offset(x, y);
     }
 
+    final Set<String> drawnTexts = {};
+
     // 3. Render all active layers
     for (final layer in activeLayers) {
       final layerColor = layer.customColor ?? _resolveLayerColor(layer.type, theme, project.viewSide);
@@ -100,6 +102,7 @@ class PcbMultiLayerPainter extends CustomPainter {
         color: effectiveColor,
         mapPoint: mapPoint,
         scaleFactor: scaleFactor,
+        drawnTexts: drawnTexts,
       );
     }
 
@@ -112,6 +115,7 @@ class PcbMultiLayerPainter extends CustomPainter {
     required Color color,
     required Offset Function(Offset) mapPoint,
     required double scaleFactor,
+    required Set<String> drawnTexts,
   }) {
     final isDrillLayer = document.layerType == PcbLayerType.drill;
     final hasClearPolarity = document.commands.any((c) => !c.isDark);
@@ -226,8 +230,12 @@ class PcbMultiLayerPainter extends CustomPainter {
               final padDim = math.min(ap?.dimX ?? 1.0, (ap?.dimY ?? 0.0) > 0 ? ap!.dimY : (ap?.dimX ?? 1.0));
               final sizePx = padDim * scaleFactor;
               if (sizePx >= 3.5) {
-                final textColor = _getPadNumberColor(cmdColor);
-                _drawCenteredText(canvas, pos, cmd.pinNumber!, sizePx * 0.72, textColor);
+                final posKey = '${pos.dx.toStringAsFixed(1)}_${pos.dy.toStringAsFixed(1)}';
+                if (!drawnTexts.contains(posKey)) {
+                  drawnTexts.add(posKey);
+                  final textColor = _getPadNumberColor(cmdColor);
+                  _drawCenteredText(canvas, pos, cmd.pinNumber!, sizePx * 0.72, textColor);
+                }
               }
             }
           }
@@ -289,7 +297,11 @@ class PcbMultiLayerPainter extends CustomPainter {
 
       // Draw Drill/Through-hole Pin Number
       if (showPadNumbers && hole.pinNumber != null && radiusPx >= 1.8) {
-        _drawCenteredText(canvas, pos, hole.pinNumber!, radiusPx * 1.6, const Color(0xFF4ADE80));
+        final posKey = '${pos.dx.toStringAsFixed(1)}_${pos.dy.toStringAsFixed(1)}';
+        if (!drawnTexts.contains(posKey)) {
+          drawnTexts.add(posKey);
+          _drawCenteredText(canvas, pos, hole.pinNumber!, radiusPx * 1.6, const Color(0xFF4ADE80));
+        }
       }
     }
   }

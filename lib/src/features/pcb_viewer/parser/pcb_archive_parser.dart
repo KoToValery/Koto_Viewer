@@ -80,7 +80,7 @@ class PcbArchiveParser {
           lower.contains('parts') ||
           lower.endsWith('.bom') ||
           (lower.endsWith('.csv') && !lower.contains('gerber'))) {
-        final parsedBom = _parseBom(fileBytes, baseName);
+        final parsedBom = parseBom(fileBytes, baseName);
         if (parsedBom.isNotEmpty) {
           bomEntries.addAll(parsedBom);
         }
@@ -274,7 +274,7 @@ class PcbArchiveParser {
   }
 
   /// Parses CSV or text Bill of Materials (BOM).
-  static List<PcbBomEntry> _parseBom(Uint8List bytes, String fileName) {
+  static List<PcbBomEntry> parseBom(Uint8List bytes, String fileName) {
     final List<PcbBomEntry> entries = [];
     String text;
     try {

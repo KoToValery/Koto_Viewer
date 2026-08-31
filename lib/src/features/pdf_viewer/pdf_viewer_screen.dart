@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:printing/printing.dart';
 import '../../core/models/pdf_item.dart';
@@ -26,6 +27,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   double _currentZoom = 1.0;
   bool _isZoomBarExpanded = true;
+  bool _isFullscreen = false;
 
   @override
   void initState() {
@@ -38,6 +40,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _pdfController.removeListener(_onControllerChanged);
     super.dispose();
   }
@@ -161,12 +164,23 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
+  void _toggleFullscreen() {
+    setState(() {
+      _isFullscreen = !_isFullscreen;
+      if (_isFullscreen) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: _isFullscreen ? null : AppBar(
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
@@ -206,6 +220,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       _isDarkModeView = !_isDarkModeView;
                     });
                   },
+                ),
+
+                // Fullscreen
+                IconButton(
+                  icon: const Icon(Icons.fullscreen, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Fullscreen',
+                  onPressed: _toggleFullscreen,
                 ),
 
                 // Share
@@ -344,9 +367,21 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               right: 16,
               child: _buildZoomControls(theme),
             ),
+
+          if (_isFullscreen)
+            Positioned(
+              top: 20,
+              right: 20,
+              child: FloatingActionButton.small(
+                heroTag: 'exit_fullscreen_pdf',
+                onPressed: _toggleFullscreen,
+                backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+                child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+              ),
+            ),
         ],
       ),
-      bottomNavigationBar: BottomAppBar(
+      bottomNavigationBar: _isFullscreen ? null : BottomAppBar(
         height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(

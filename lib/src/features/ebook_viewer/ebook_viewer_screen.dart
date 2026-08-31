@@ -40,6 +40,7 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -66,7 +67,14 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
   }
 
   void _toggleControls() {
-    setState(() { _showControls = !_showControls; });
+    setState(() {
+      _showControls = !_showControls;
+      if (!_showControls) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      }
+    });
   }
 
   void _onSearchChanged(String query) {

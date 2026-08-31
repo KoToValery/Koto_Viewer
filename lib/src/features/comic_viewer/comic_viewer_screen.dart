@@ -44,6 +44,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _pageController.dispose();
     _webtoonScrollController.dispose();
     _thumbnailScrollController.dispose();
@@ -132,6 +133,11 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   void _toggleControls() {
     setState(() {
       _showControls = !_showControls;
+      if (!_showControls) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      }
     });
   }
 
