@@ -1,4 +1,4 @@
-# koto_pdf_viewer
+# koto_viewer
 
 A new Flutter project.
 

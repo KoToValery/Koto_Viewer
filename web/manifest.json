@@ -1,6 +1,6 @@
 {
-    "name": "koto_pdf_viewer",
-    "short_name": "koto_pdf_viewer",
+    "name": "koto_viewer",
+    "short_name": "koto_viewer",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#2563EB",
