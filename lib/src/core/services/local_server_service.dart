@@ -24,7 +24,7 @@ class LocalServerService {
 
   static final Random _random = Random.secure();
 
-  static const String _baseName = 'KotoView';
+  static const String _baseName = 'KoTo Viewer';
   static const int _preferredPort = 8080;
   static const Duration defaultShutdownTimeout = Duration(minutes: 15);
 

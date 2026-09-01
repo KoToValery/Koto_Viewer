@@ -1686,7 +1686,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'KotoView is a 100% free app with no ads.',
+                    'KoTo Viewer is a 100% free app with no ads.',
                     style: TextStyle(fontSize: 13, color: Colors.black87),
                   ),
                   const SizedBox(height: 12),

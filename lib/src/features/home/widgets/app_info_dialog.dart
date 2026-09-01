@@ -117,7 +117,7 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                           runSpacing: 4,
                           children: [
                             const Text(
-                              'KotoView',
+                              'KoToViewer',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -276,7 +276,7 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     onPressed: () {
                       showLicensePage(
                         context: context,
-                        applicationName: 'KotoView',
+                        applicationName: 'KoToViewer',
                         applicationVersion: versionText,
                         applicationIcon: ClipRRect(
                           borderRadius: BorderRadius.circular(8),

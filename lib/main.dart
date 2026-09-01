@@ -289,7 +289,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
     return MaterialApp(
       navigatorKey: _navigatorKey,
       scaffoldMessengerKey: _messengerKey,
-      title: 'KotoView',
+      title: 'KoToViewer',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightThemeData(),
       darkTheme: AppTheme.darkThemeData(),

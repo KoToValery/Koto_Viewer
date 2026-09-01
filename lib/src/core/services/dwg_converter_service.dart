@@ -38,6 +38,23 @@ class DwgConverterService {
     return null;
   }
 
+  /// Returns a temporary directory guaranteed to use an ASCII path on Windows,
+  /// avoiding issues with native C runtimes opening non-ASCII / Cyrillic paths.
+  static Directory _getSafeTempDir() {
+    if (Platform.isWindows) {
+      final publicDir = Platform.environment['PUBLIC'] ??
+          Platform.environment['ALLUSERSPROFILE'];
+      if (publicDir != null && !RegExp(r'[^\x00-\x7F]').hasMatch(publicDir)) {
+        final dir = Directory('$publicDir${Platform.pathSeparator}KotoTemp');
+        if (!dir.existsSync()) {
+          dir.createSync(recursive: true);
+        }
+        return dir;
+      }
+    }
+    return Directory.systemTemp;
+  }
+
   /// Returns true if native LibreDWG converter library or CLI tool is loaded and ready.
   static bool get isNativeSupported {
     if (Platform.isWindows) {
@@ -89,17 +106,51 @@ class DwgConverterService {
     // 1. On Windows: Try using bundled dwg2dxf CLI tool
     final winExe = _findWindowsDwg2DxfExe();
     if (winExe != null) {
+      File? tempInputFile;
+      File? tempOutputFile;
       try {
+        String effectiveInputPath = dwgPath;
+        String effectiveOutputPath = targetDxfPath;
+
+        // dwg2dxf.exe (MinGW C runtime) fails with READ ERROR 0x1000 on non-ASCII/Cyrillic paths.
+        // Stage through a safe ASCII path if any path contains non-ASCII characters or spaces.
+        final bool needsStaging =
+            RegExp(r'[^\x00-\x7F]').hasMatch(dwgPath) ||
+            RegExp(r'[^\x00-\x7F]').hasMatch(targetDxfPath) ||
+            dwgPath.contains(' ') ||
+            targetDxfPath.contains(' ');
+
+        if (needsStaging) {
+          final safeDir = _getSafeTempDir();
+          final uniqueId = DateTime.now().microsecondsSinceEpoch;
+          final safeInPath =
+              '${safeDir.path}${Platform.pathSeparator}dwg_in_$uniqueId.dwg';
+          final safeOutPath =
+              '${safeDir.path}${Platform.pathSeparator}dwg_out_$uniqueId.dxf';
+
+          await dwgFile.copy(safeInPath);
+          tempInputFile = File(safeInPath);
+          tempOutputFile = File(safeOutPath);
+
+          effectiveInputPath = safeInPath;
+          effectiveOutputPath = safeOutPath;
+        }
+
         final processResult = await Process.run(winExe, [
           '-v0',
           '-y',
           '-o',
-          targetDxfPath,
-          dwgPath,
+          effectiveOutputPath,
+          effectiveInputPath,
         ]);
+
+        final outResultFile = File(effectiveOutputPath);
         if (processResult.exitCode == 0 &&
-            await targetDxfFile.exists() &&
-            await targetDxfFile.length() > 0) {
+            await outResultFile.exists() &&
+            await outResultFile.length() > 0) {
+          if (needsStaging) {
+            await outResultFile.copy(targetDxfPath);
+          }
           result = 0;
         } else {
           debugPrint(
@@ -110,6 +161,17 @@ class DwgConverterService {
       } catch (e) {
         debugPrint('DwgConverterService: Windows CLI conversion error: $e');
         result = -1;
+      } finally {
+        if (tempInputFile != null && await tempInputFile.exists()) {
+          try {
+            await tempInputFile.delete();
+          } catch (_) {}
+        }
+        if (tempOutputFile != null && await tempOutputFile.exists()) {
+          try {
+            await tempOutputFile.delete();
+          } catch (_) {}
+        }
       }
     }
 

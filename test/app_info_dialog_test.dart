@@ -9,8 +9,8 @@ void main() {
   group('AppInfoDialog Tests', () {
     testWidgets('AppInfoDialog renders KotoView title, capabilities and license', (tester) async {
       PackageInfo.setMockInitialValues(
-        appName: 'KotoView',
-        packageName: 'com.koto.pdfviewer',
+        appName: 'KoTo Viewer',
+        packageName: 'com.koto.viewer',
         version: '1.2.0',
         buildNumber: '2',
         buildSignature: '',
