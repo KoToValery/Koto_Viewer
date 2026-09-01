@@ -746,6 +746,11 @@ class DxfPainter extends CustomPainter {
       double oy = 0.0;
 
       switch (entity.attachmentPoint) {
+        case 0: // Unspecified (Default to Middle Center)
+        case 5: // Middle Center
+          ox = -textPainter.width / 2.0;
+          oy = -textPainter.height / 2.0;
+          break;
         case 1: // Top Left
           ox = 0;
           oy = 0;
@@ -760,10 +765,6 @@ class DxfPainter extends CustomPainter {
           break;
         case 4: // Middle Left
           ox = 0;
-          oy = -textPainter.height / 2.0;
-          break;
-        case 5: // Middle Center
-          ox = -textPainter.width / 2.0;
           oy = -textPainter.height / 2.0;
           break;
         case 6: // Middle Right
@@ -1106,9 +1107,29 @@ class DxfPainter extends CustomPainter {
     if (dim.blockName != null && blocks.containsKey(dim.blockName)) {
       final block = blocks[dim.blockName]!;
       for (final e in block.entities) {
+        DxfEntity entityToDraw = e;
+        if (e is DxfMText && e.height <= 3.5) {
+          // In AutoCAD / LibreDWG export, dimension MText is exported with paper height 2.5 mm.
+          // Scale it to model-space text height (12.5) with middle-center alignment.
+          entityToDraw = DxfMText(
+            rawText: e.rawText,
+            cleanText: e.cleanText,
+            insertPoint: e.insertPoint,
+            height: 12.5,
+            refWidth: e.refWidth,
+            rotationDeg: e.rotationDeg,
+            attachmentPoint: e.attachmentPoint == 0 ? 5 : e.attachmentPoint,
+            directionVector: e.directionVector,
+            layer: e.layer,
+            colorIndex: e.colorIndex,
+            trueColor: e.trueColor,
+            lineType: e.lineType,
+            lineWeight: e.lineWeight,
+          );
+        }
         _renderEntity(
           canvas: canvas,
-          entity: e,
+          entity: entityToDraw,
           strokePaint: paint,
           fillPaint: Paint()..color = paint.color.withValues(alpha: 0.3),
           toCanvas: toCanvas,

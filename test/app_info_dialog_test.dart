@@ -28,7 +28,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Title and Dynamic Version
-      expect(find.text('KotoView'), findsOneWidget);
+      expect(find.text('KoToViewer'), findsOneWidget);
       expect(find.text('v1.2.0 (Build 2)'), findsOneWidget);
 
       // Verify Capabilities

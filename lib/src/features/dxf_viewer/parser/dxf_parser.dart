@@ -510,9 +510,17 @@ class DxfParser {
     int idx = startIdx + 1;
     final int total = pairs.length;
 
-    // Collect properties until next entity code 0
+    // Collect properties until next entity code 0, ignoring 101 Embedded Object sub-records
     final entityPairs = <_DxfPair>[];
     while (idx < total && pairs[idx].code != 0) {
+      if (pairs[idx].code == 101 &&
+          pairs[idx].value.trim().toUpperCase() == 'EMBEDDED OBJECT') {
+        // Skip embedded object sub-records to avoid overwriting parent entity attributes (e.g. height, coordinates)
+        while (idx < total && pairs[idx].code != 0) {
+          idx++;
+        }
+        break;
+      }
       entityPairs.add(pairs[idx]);
       idx++;
     }
