@@ -21,6 +21,7 @@ import 'rendering/dxf_math.dart';
 import 'rendering/dxf_painter.dart';
 import 'rendering/dxf_snap_helper.dart';
 import 'widgets/dxf_annotation_dialog.dart';
+import 'widgets/dxf_display_settings_sheet.dart';
 import 'widgets/dxf_entity_context_sheet.dart';
 import 'widgets/dxf_import_dialog.dart';
 import 'widgets/dxf_info_sheet.dart';
@@ -57,6 +58,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   double _currentScale = 1.0;
   Offset _currentCadCoord = Offset.zero;
   DxfDisplaySettings _displaySettings = DxfDisplaySettingsService.settingsNotifier.value;
+  DxfUnit get _effectiveUnit => _displaySettings.unitOverride ?? _document?.unit ?? DxfUnit.meters;
 
   // Measurement & Snap tool
   bool _isMeasureMode = false;
@@ -433,7 +435,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         if (count > 0 && _measurement!.areaPoints.isNotEmpty) {
           final lastPt = _measurement!.areaPoints.last;
           final segDist = (effectiveCad - lastPt).distance;
-          subText = 'Segment: ${DxfMath.formatDistance(segDist)} m';
+          subText = 'Segment: ${DxfMath.formatDistance(segDist, unit: _effectiveUnit)} m';
         }
         break;
 
@@ -466,7 +468,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             toleranceCad: toleranceCad,
           );
           if (circleArc != null) {
-            subText = 'R = ${DxfMath.formatDistance(circleArc.radius)} • Ø = ${DxfMath.formatDistance(circleArc.radius * 2.0)}';
+            subText = 'R = ${DxfMath.formatDistance(circleArc.radius, unit: _effectiveUnit)} m • Ø = ${DxfMath.formatDistance(circleArc.radius * 2.0, unit: _effectiveUnit)} m';
           }
         }
         break;
@@ -478,7 +480,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         } else {
           title = 'Text Note Position';
           final dist = (effectiveCad - _measurement!.annotationTip!).distance;
-          subText = 'Leader: ${DxfMath.formatDistance(dist)} m';
+          subText = 'Leader: ${DxfMath.formatDistance(dist, unit: _effectiveUnit)} m';
         }
         break;
     }
@@ -1556,6 +1558,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                             tool: _currentMeasureTool,
                             customTitle: _pointerCustomTitle,
                             customSubText: _pointerCustomSubText,
+                            unit: _effectiveUnit,
                           ),
                         ),
                       ),
@@ -1570,6 +1573,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                       child: Center(
                         child: DxfMeasurementOverlay(
                           currentTool: _currentMeasureTool,
+                          unit: _effectiveUnit,
                           onSelectTool: (tool) {
                             setState(() {
                               _currentMeasureTool = tool;
@@ -1636,14 +1640,58 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.white12),
                       ),
-                      child: Text(
-                        'X: ${DxfMath.formatDistance(_currentCadCoord.dx)}  Y: ${DxfMath.formatDistance(_currentCadCoord.dy)}  |  Zoom: ${(_currentScale * 100).toStringAsFixed(0)}%  |  ${activeCrs.name}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10.5,
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'X: ${DxfMath.formatCadNumber(_currentCadCoord.dx)}  Y: ${DxfMath.formatCadNumber(_currentCadCoord.dy)}  |  Zoom: ${(_currentScale * 100).toStringAsFixed(0)}%  |  ',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10.5,
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              DxfDisplaySettingsSheet.show(
+                                context: context,
+                                initialSettings: _displaySettings,
+                                onSettingsChanged: (s) {
+                                  setState(() {
+                                    _displaySettings = s;
+                                  });
+                                },
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.cyanAccent.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.4), width: 0.8),
+                              ),
+                              child: Text(
+                                _effectiveUnit.symbol.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Color(0xFF00E5FF),
+                                  fontSize: 10.5,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '  |  ${activeCrs.name}',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10.5,
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

@@ -259,7 +259,7 @@ class DxfPainter extends CustomPainter {
       final dashedPath = DxfLinetypeHelper.createDashedPath(
         path,
         pattern,
-        scale: (1.5 * settings.lineThicknessScale) / scale,
+        scale: (0.75 * settings.lineThicknessScale) / scale,
       );
       canvas.drawPath(dashedPath, paint);
     }
@@ -286,7 +286,7 @@ class DxfPainter extends CustomPainter {
         p1,
         p2,
         pattern,
-        scale: (1.5 * settings.lineThicknessScale) / scale,
+        scale: (0.75 * settings.lineThicknessScale) / scale,
       );
       canvas.drawPath(dashedPath, paint);
     }
@@ -623,6 +623,66 @@ class DxfPainter extends CustomPainter {
     _drawStrokePath(canvas, path, paint, lineType, layerLineType);
   }
 
+  /// The active drawing unit for measurements (user override or document header unit).
+  DxfUnit get effectiveUnit => settings.unitOverride ?? document.unit;
+
+  /// Calculates the effective text height for rendering, applying text style
+  /// scale factors if specified in the style definition.
+  ///
+  /// Text heights are rendered 1:1 with CAD drawing units.
+  double _getEffectiveTextHeight(
+    double entityHeight,
+    String? styleName,
+    DxfDocument document,
+  ) {
+    double effectiveHeight = entityHeight;
+
+    // Apply text style scale factor if style exists and has explicit custom scaling
+    if (styleName != null && document.textStyles.containsKey(styleName)) {
+      final style = document.textStyles[styleName]!;
+      if ((style.heightScale - 1.0).abs() > 0.05 && style.heightScale > 0) {
+        effectiveHeight *= style.heightScale;
+      }
+    }
+
+    return effectiveHeight;
+  }
+
+  /// Resolves the most appropriate font family from the CAD text style definition.
+  String _resolveFontFamily(String? styleName) {
+    if (styleName == null) return 'Arial';
+    final ts = document.textStyles[styleName];
+    if (ts == null || ts.fontFile == null || ts.fontFile!.trim().isEmpty) return 'Arial';
+
+    final f = ts.fontFile!.trim().toLowerCase();
+    if (f.contains('isocpeur')) return 'ISOCPEUR';
+    if (f.contains('simplex') || f.contains('txt') || f.contains('romans') || f.contains('monotxt')) {
+      return 'Consolas';
+    }
+    if (f.contains('cour')) return 'Courier New';
+    if (f.contains('times')) return 'Times New Roman';
+    if (f.contains('segoe')) return 'Segoe UI';
+    if (f.contains('tahoma')) return 'Tahoma';
+    if (f.contains('arial')) return 'Arial';
+
+    final dotIdx = ts.fontFile!.lastIndexOf('.');
+    if (dotIdx > 0) {
+      return ts.fontFile!.substring(0, dotIdx);
+    }
+    return ts.fontFile!;
+  }
+
+  /// Resolves font fallbacks with standard CAD, Windows, and system fallbacks.
+  List<String> _resolveFontFallbacks(String primaryFont) {
+    return [
+      if (primaryFont != 'Arial') 'Arial',
+      'ISOCPEUR',
+      'Segoe UI',
+      'Roboto',
+      'sans-serif',
+    ];
+  }
+
   void _renderText(
     Canvas canvas,
     DxfText entity,
@@ -632,18 +692,38 @@ class DxfPainter extends CustomPainter {
   ) {
     if (entity.text.trim().isEmpty) return;
 
-    final fontSize = math.max(entity.height * fitScale, 0.1);
+    // Apply effective text height calculation (includes text style scale)
+    final effectiveHeight = _getEffectiveTextHeight(
+      entity.height,
+      entity.style,
+      document,
+    );
+
+    // CAD Text Height specifies the Cap-Height (capital letter height).
+    // In Flutter, TextStyle fontSize is the full font EM-box (~1.39x of cap-height for Arial/Roboto).
+    // Scaling by 1 / 0.72 ensures capital letters render at EXACTLY entity.height drawing units.
+    const double capHeightRatio = 0.72;
+    final double fontSize = math.max((effectiveHeight / capHeightRatio) * fitScale, 0.1);
+
+    final String fontFamily = _resolveFontFamily(entity.style);
+    final List<String> fontFallbacks = _resolveFontFallbacks(fontFamily);
+
     final textPainter = TextPainter(
       text: TextSpan(
         text: entity.text,
         style: TextStyle(
           color: color,
           fontSize: fontSize,
-          fontFamily: 'Roboto',
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
           height: 1.0,
         ),
       ),
       textDirection: TextDirection.ltr,
+      textHeightBehavior: const TextHeightBehavior(
+        applyHeightToFirstAscent: false,
+        applyHeightToLastDescent: false,
+      ),
     );
     textPainter.layout();
 
@@ -675,24 +755,29 @@ class DxfPainter extends CustomPainter {
           ox = 0.0;
       }
 
-      // Vertical alignment offset (0=Baseline, 1=Bottom, 2=Middle, 3=Top)
-      double oy = -textPainter.height * 0.85; // Default baseline offset
+      // Vertical alignment offset:
+      // The alphabetic baseline of textPainter is located at distance 'baseline' from top.
+      final double baseline = textPainter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
+      final double capHeightPx = effectiveHeight * fitScale;
+
+      double oy;
       switch (entity.vAlign) {
-        case 1: // Bottom
+        case 1: // Bottom (bottom of font bounding box)
           oy = -textPainter.height;
           break;
-        case 2: // Middle
-          oy = -textPainter.height / 2.0;
+        case 2: // Middle (middle of uppercase characters)
+          oy = -baseline + (capHeightPx / 2.0);
           break;
-        case 3: // Top
-          oy = 0.0;
+        case 3: // Top (top of uppercase characters)
+          oy = -baseline + capHeightPx;
           break;
-        default:
+        default: // 0 = Baseline
           if (entity.hAlign == 4) {
-            // Special case: AutoCAD "Middle" horizontal alignment (hAlign=4, vAlign=0) is centered vertically as well
-            oy = -textPainter.height / 2.0;
+            // Special case: AutoCAD "Middle" (hAlign=4, vAlign=0) centers vertically as well
+            oy = -baseline + (capHeightPx / 2.0);
           } else {
-            oy = -textPainter.height * 0.85;
+            // Places font alphabetic baseline precisely at pos.dy
+            oy = -baseline;
           }
       }
 
@@ -711,19 +796,55 @@ class DxfPainter extends CustomPainter {
   ) {
     if (entity.cleanText.trim().isEmpty) return;
 
-    final fontSize = math.max(entity.height * fitScale, 0.1);
+    // Apply effective text height calculation (includes text style scale)
+    final effectiveHeight = _getEffectiveTextHeight(
+      entity.height,
+      entity.style,
+      document,
+    );
+
+    // CAD Text Height specifies the Cap-Height (capital letter height).
+    // Scaling by 1 / 0.72 ensures capital letters render at EXACTLY entity.height drawing units.
+    const double capHeightRatio = 0.72;
+    final double fontSize = math.max((effectiveHeight / capHeightRatio) * fitScale, 0.5);
+
+    // Determine horizontal text alignment from MTEXT paragraph style codes or attachment point
+    TextAlign align = TextAlign.left;
+    final rawLower = entity.rawText.toLowerCase();
+    if (rawLower.contains(r'\pqc;') || rawLower.contains(r'\qc;')) {
+      align = TextAlign.center;
+    } else if (rawLower.contains(r'\pqr;') || rawLower.contains(r'\qr;')) {
+      align = TextAlign.right;
+    } else if (entity.attachmentPoint == 2 ||
+        entity.attachmentPoint == 5 ||
+        entity.attachmentPoint == 8) {
+      align = TextAlign.center;
+    } else if (entity.attachmentPoint == 3 ||
+        entity.attachmentPoint == 6 ||
+        entity.attachmentPoint == 9) {
+      align = TextAlign.right;
+    }
+
+    final String fontFamily = _resolveFontFamily(entity.style);
+    final List<String> fontFallbacks = _resolveFontFallbacks(fontFamily);
+
     final textPainter = TextPainter(
       text: TextSpan(
         text: entity.cleanText,
         style: TextStyle(
           color: color,
           fontSize: fontSize,
-          fontFamily: 'Roboto',
-          height: 1.25,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
+          height: 1.0,
         ),
       ),
       textDirection: TextDirection.ltr,
-      textAlign: TextAlign.left,
+      textAlign: align,
+      textHeightBehavior: const TextHeightBehavior(
+        applyHeightToFirstAscent: false,
+        applyHeightToLastDescent: false,
+      ),
     );
 
     if (entity.refWidth != null && entity.refWidth! > 0) {
@@ -745,43 +866,58 @@ class DxfPainter extends CustomPainter {
       double ox = 0.0;
       double oy = 0.0;
 
+      // In Flutter, the first line's baseline is at 'firstBaseline'.
+      // The top of the uppercase letters is at 'firstBaseline - capHeightPx'.
+      final double firstBaseline = textPainter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
+      final double capHeightPx = effectiveHeight * fitScale;
+      final double topLeading = math.max(0.0, firstBaseline - capHeightPx);
+
+      final lineMetrics = textPainter.computeLineMetrics();
+      final double lastBaseline = lineMetrics.isNotEmpty ? lineMetrics.last.baseline : firstBaseline;
+
       switch (entity.attachmentPoint) {
         case 0: // Unspecified (Default to Middle Center)
         case 5: // Middle Center
           ox = -textPainter.width / 2.0;
-          oy = -textPainter.height / 2.0;
+          oy = lineMetrics.length > 1
+              ? -textPainter.height / 2.0
+              : -firstBaseline + (capHeightPx / 2.0);
           break;
         case 1: // Top Left
           ox = 0;
-          oy = 0;
+          oy = -topLeading;
           break;
         case 2: // Top Center
           ox = -textPainter.width / 2.0;
-          oy = 0;
+          oy = -topLeading;
           break;
         case 3: // Top Right
           ox = -textPainter.width;
-          oy = 0;
+          oy = -topLeading;
           break;
         case 4: // Middle Left
           ox = 0;
-          oy = -textPainter.height / 2.0;
+          oy = lineMetrics.length > 1
+              ? -textPainter.height / 2.0
+              : -firstBaseline + (capHeightPx / 2.0);
           break;
         case 6: // Middle Right
           ox = -textPainter.width;
-          oy = -textPainter.height / 2.0;
+          oy = lineMetrics.length > 1
+              ? -textPainter.height / 2.0
+              : -firstBaseline + (capHeightPx / 2.0);
           break;
         case 7: // Bottom Left
           ox = 0;
-          oy = -textPainter.height;
+          oy = -lastBaseline;
           break;
         case 8: // Bottom Center
           ox = -textPainter.width / 2.0;
-          oy = -textPainter.height;
+          oy = -lastBaseline;
           break;
         case 9: // Bottom Right
           ox = -textPainter.width;
-          oy = -textPainter.height;
+          oy = -lastBaseline;
           break;
       }
 
@@ -1127,11 +1263,42 @@ class DxfPainter extends CustomPainter {
             lineWeight: e.lineWeight,
           );
         }
+        
+        // For dimension ticks/lines (non-MTEXT entities), use the dimension's color
+        // For MTEXT (dimension text), keep its own color (usually white/byblock)
+        Paint entityPaint = paint;
+        if (entityToDraw is! DxfMText) {
+          // Lines, solids, etc. should use dimension line color
+          entityPaint = paint;
+        } else {
+          // Text keeps its own color from the block definition
+          final entityLayer = layers[entityToDraw.layer];
+          final textColor = DxfColorTable.resolveColor(
+            colorIndex: entityToDraw.colorIndex,
+            trueColor: entityToDraw.trueColor,
+            layerColor: entityLayer != null
+                ? DxfColorTable.resolveColor(
+                    colorIndex: entityLayer.colorIndex,
+                    trueColor: entityLayer.trueColor,
+                    isDarkBackground: theme.isDark,
+                  )
+                : null,
+            isDarkBackground: theme.isDark,
+          );
+          entityPaint = Paint()
+            ..color = textColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = paint.strokeWidth
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round
+            ..isAntiAlias = true;
+        }
+        
         _renderEntity(
           canvas: canvas,
           entity: entityToDraw,
-          strokePaint: paint,
-          fillPaint: Paint()..color = paint.color.withValues(alpha: 0.3),
+          strokePaint: entityPaint,
+          fillPaint: Paint()..color = entityPaint.color.withValues(alpha: 0.3),
           toCanvas: toCanvas,
           fitScale: fitScale,
           blocks: blocks,
@@ -1508,7 +1675,7 @@ class DxfPainter extends CustomPainter {
       _drawBadge(
         canvas: canvas,
         center: mid + Offset(0, (-14.0 * mScale) / scale),
-        text: 'L: ${DxfMath.formatDistance(dist)}',
+        text: 'L: ${DxfMath.formatDistance(dist, unit: effectiveUnit)} m',
         accentColor: const Color(0xFFFF5252),
         mScale: mScale,
         scale: scale,
@@ -1657,8 +1824,8 @@ class DxfPainter extends CustomPainter {
       _drawBadge(
         canvas: canvas,
         center: centroidCanvas,
-        text: 'S = ${DxfMath.formatArea(area)}',
-        subText: 'P = ${DxfMath.formatDistance(perim)} m',
+        text: 'S = ${DxfMath.formatArea(area, unit: effectiveUnit)}',
+        subText: 'P = ${DxfMath.formatDistance(perim, unit: effectiveUnit)} m',
         accentColor: accentColor,
         mScale: mScale,
         scale: scale,
@@ -1836,12 +2003,12 @@ class DxfPainter extends CustomPainter {
 
     // 4. Dimension Badge
     final mid = Offset((c.dx + edgePt.dx) / 2, (c.dy + edgePt.dy) / 2);
-    final String sub = 'Ø = ${DxfMath.formatDistance(m.radius! * 2.0)}${m.isArc && m.arcLength != null ? ' • Arc: ${DxfMath.formatDistance(m.arcLength!)}' : ''}';
+    final String sub = 'Ø = ${DxfMath.formatDistance(m.radius! * 2.0, unit: effectiveUnit)} m${m.isArc && m.arcLength != null ? ' • Arc: ${DxfMath.formatDistance(m.arcLength!, unit: effectiveUnit)} m' : ''}';
 
     _drawBadge(
       canvas: canvas,
       center: mid + Offset(0, (-14.0 * mScale) / scale),
-      text: 'R = ${DxfMath.formatDistance(m.radius!)}',
+      text: 'R = ${DxfMath.formatDistance(m.radius!, unit: effectiveUnit)} m',
       subText: sub,
       accentColor: accentColor,
       mScale: mScale,

@@ -79,6 +79,7 @@ class DxfParser {
     final List<DxfEntity> entities = [];
     final Map<String, String> headerVars = {};
     final Map<String, int> entityStats = {};
+    final Map<String, DxfTextStyle> textStyles = {};
 
     // Ensure default layer "0" exists
     layers['0'] = DxfLayer(name: '0', colorIndex: 7);
@@ -101,7 +102,7 @@ class DxfParser {
         if (secName == 'HEADER') {
           idx = _parseHeaderSection(pairs, idx, headerVars);
         } else if (secName == 'TABLES') {
-          idx = _parseTablesSection(pairs, idx, layers, lineTypes);
+          idx = _parseTablesSection(pairs, idx, layers, lineTypes, textStyles);
         } else if (secName == 'BLOCKS') {
           idx = _parseBlocksSection(pairs, idx, blocks);
         } else if (secName == 'ENTITIES') {
@@ -180,6 +181,7 @@ class DxfParser {
       blocks: blocks,
       entities: entities,
       headerVars: headerVars,
+      textStyles: textStyles,
       bounds: bounds,
       entityStats: entityStats,
       lineTypes: lineTypes,
@@ -219,6 +221,7 @@ class DxfParser {
     int startIdx,
     Map<String, DxfLayer> layers,
     Map<String, List<double>> lineTypes,
+    Map<String, DxfTextStyle> textStyles,
   ) {
     int idx = startIdx;
     final int total = pairs.length;
@@ -244,6 +247,8 @@ class DxfParser {
           idx = _parseLayerTable(pairs, idx, layers);
         } else if (tabName == 'LTYPE') {
           idx = _parseLtypeTable(pairs, idx, lineTypes);
+        } else if (tabName == 'STYLE') {
+          idx = _parseStyleTable(pairs, idx, textStyles);
         } else {
           // Skip other tables
           while (idx < total) {
@@ -397,6 +402,66 @@ class DxfParser {
         if (!layer.isFrozen) {
           layer.isVisible = true;
         }
+      }
+    }
+
+    return idx;
+  }
+
+  /// Parses STYLE table entries.
+  static int _parseStyleTable(
+    List<_DxfPair> pairs,
+    int startIdx,
+    Map<String, DxfTextStyle> textStyles,
+  ) {
+    int idx = startIdx;
+    final int total = pairs.length;
+
+    while (idx < total) {
+      final pair = pairs[idx];
+      if (pair.code == 0 && pair.value.trim().toUpperCase() == 'ENDTAB') {
+        idx++;
+        break;
+      }
+
+      if (pair.code == 0 && pair.value.trim().toUpperCase() == 'STYLE') {
+        idx++;
+        String styleName = 'STANDARD';
+        double heightScale = 1.0;
+        String? fontFile;
+        bool isVertical = false;
+
+        while (idx < total && pairs[idx].code != 0) {
+          final p = pairs[idx];
+          switch (p.code) {
+            case 2:
+              styleName = _cleanCadText(p.value.trim());
+              break;
+            case 40:
+              heightScale = p.doubleValue;
+              if (heightScale == 0.0) heightScale = 1.0; // Avoid zero scale
+              break;
+            case 3:
+              fontFile = p.value.trim();
+              break;
+            case 70:
+              final flags = p.intValue;
+              if ((flags & 4) != 0) isVertical = true;
+              break;
+          }
+          idx++;
+        }
+
+        if (styleName.isNotEmpty) {
+          textStyles[styleName] = DxfTextStyle(
+            name: styleName,
+            heightScale: heightScale,
+            fontFile: fontFile,
+            isVertical: isVertical,
+          );
+        }
+      } else {
+        idx++;
       }
     }
 
@@ -964,6 +1029,7 @@ class DxfParser {
         double rotation = 0;
         int attachPoint = 1;
         double? dirX, dirY;
+        String? style;
 
         for (final p in entityPairs) {
           switch (p.code) {
@@ -995,6 +1061,9 @@ class DxfParser {
             case 21:
               dirY = p.doubleValue;
               break;
+            case 7:
+              style = p.value.trim();
+              break;
           }
         }
 
@@ -1015,6 +1084,7 @@ class DxfParser {
           rotationDeg: rotation,
           attachmentPoint: attachPoint,
           directionVector: (dirX != null && dirY != null) ? Offset(dirX, dirY) : null,
+          style: style,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,

@@ -14,6 +14,7 @@ class DxfMeasurementOverlay extends StatelessWidget {
   final VoidCallback? onClosePolygon;
   final VoidCallback onClear;
   final VoidCallback onExit;
+  final DxfUnit unit;
 
   const DxfMeasurementOverlay({
     super.key,
@@ -26,6 +27,7 @@ class DxfMeasurementOverlay extends StatelessWidget {
     this.onClosePolygon,
     required this.onClear,
     required this.onExit,
+    this.unit = DxfUnit.meters,
   });
 
   Color _getToolColor(DxfMeasureTool tool) {
@@ -56,7 +58,7 @@ class DxfMeasurementOverlay extends StatelessWidget {
         } else if (measurement!.p2Cad == null) {
           statusText = '2. Tap 2nd point';
         } else {
-          final dist = DxfMath.formatDistance(measurement!.distance!);
+          final dist = DxfMath.formatDistance(measurement!.distance!, unit: unit);
           statusText = 'Distance: $dist m';
         }
         break;
@@ -72,7 +74,7 @@ class DxfMeasurementOverlay extends StatelessWidget {
         } else {
           final area = DxfMath.calculatePolygonArea(measurement!.areaPoints);
           final perim = DxfMath.calculatePolygonPerimeter(measurement!.areaPoints, isClosed: true);
-          statusText = 'Area: ${DxfMath.formatArea(area)} • Perim: ${DxfMath.formatDistance(perim)} m';
+          statusText = 'Area: ${DxfMath.formatArea(area, unit: unit)} • Perim: ${DxfMath.formatDistance(perim, unit: unit)} m';
         }
         break;
 
@@ -100,9 +102,9 @@ class DxfMeasurementOverlay extends StatelessWidget {
               ? 'Point $ptsCount/3 for curve'
               : 'Tap circle/arc or 3 points';
         } else {
-          final rStr = DxfMath.formatDistance(measurement!.radius!);
-          final dStr = DxfMath.formatDistance(measurement!.radius! * 2.0);
-          statusText = 'R: $rStr • Ø: $dStr m';
+          final rStr = DxfMath.formatDistance(measurement!.radius!, unit: unit);
+          final dStr = DxfMath.formatDistance(measurement!.radius! * 2.0, unit: unit);
+          statusText = 'R: $rStr m • Ø: $dStr m';
         }
         break;
 

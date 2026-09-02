@@ -22,6 +22,21 @@ class DxfPolylineVertex {
   Offset get offset => Offset(x, y);
 }
 
+/// Representation of a CAD Text Style.
+class DxfTextStyle {
+  final String name;
+  final double heightScale;
+  final String? fontFile;
+  final bool isVertical;
+
+  const DxfTextStyle({
+    required this.name,
+    this.heightScale = 1.0,
+    this.fontFile,
+    this.isVertical = false,
+  });
+}
+
 /// Representation of a CAD Layer.
 class DxfLayer {
   final String name;
@@ -466,6 +481,7 @@ class DxfMText extends DxfEntity {
   final double rotationDeg;
   final int attachmentPoint; // 1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR
   final Offset? directionVector;
+  final String? style;
 
   const DxfMText({
     required this.rawText,
@@ -476,6 +492,7 @@ class DxfMText extends DxfEntity {
     this.rotationDeg = 0.0,
     this.attachmentPoint = 1,
     this.directionVector,
+    this.style,
     super.layer,
     super.colorIndex,
     super.trueColor,
@@ -741,6 +758,7 @@ class DxfDocument {
   final Map<String, DxfBlock> blocks;
   final List<DxfEntity> entities;
   final Map<String, String> headerVars;
+  final Map<String, DxfTextStyle> textStyles;
   final Rect bounds;
   final Map<String, int> entityStats;
   final Map<String, List<double>> lineTypes;
@@ -751,6 +769,7 @@ class DxfDocument {
     required this.blocks,
     required this.entities,
     required this.headerVars,
+    this.textStyles = const {},
     required this.bounds,
     required this.entityStats,
     this.lineTypes = const {},
@@ -767,6 +786,189 @@ class DxfDocument {
 
   double get width => bounds.width.abs();
   double get height => bounds.height.abs();
+
+  /// Returns dimension scale factor from header variables.
+  /// Default is 1.0 if not specified.
+  double getDimensionScale() {
+    final value = headerVars['\$DIMSCALE'];
+    if (value == null) return 1.0;
+    return double.tryParse(value) ?? 1.0;
+  }
+
+  /// Returns line type scale factor from header variables.
+  /// Default is 1.0 if not specified.
+  double getLineTypeScale() {
+    final value = headerVars['\$LTSCALE'];
+    if (value == null) return 1.0;
+    return double.tryParse(value) ?? 1.0;
+  }
+
+  /// Returns measurement system from header variables.
+  /// 0 = Imperial, 1 = Metric
+  /// Default is 1 (Metric) if not specified.
+  int getMeasurementSystem() {
+    final value = headerVars['\$MEASUREMENT'];
+    if (value == null) return 1;
+    return int.tryParse(value) ?? 1;
+  }
+
+  /// Returns insertion units from header variables.
+  /// Values: 0=Unitless, 1=Inches, 2=Feet, 3=Miles, 4=Millimeters, 5=Centimeters,
+  /// 6=Meters, 7=Kilometers, 8=Microinches, 9=Mils, 10=Yards, 11=Angstroms,
+  /// 12=Nanometers, 13=Microns, 14=Decimeters, 15=Decameters, 16=Hectometers,
+  /// 17=Gigameters, 18=Astronomical units, 19=Light years, 20=Parsecs
+  /// Default is 0 (Unitless) if not specified.
+  int getInsertionUnits() {
+    final value = headerVars['\$INSUNITS'];
+    if (value == null) return 0;
+    return int.tryParse(value) ?? 0;
+  }
+
+  /// Returns the resolved CAD drawing unit for this document based on $INSUNITS and $MEASUREMENT.
+  DxfUnit get unit {
+    final insunits = getInsertionUnits();
+    if (insunits > 0) {
+      return DxfUnit.fromCode(insunits);
+    }
+    final measurement = getMeasurementSystem();
+    if (measurement == 0) {
+      return DxfUnit.inches;
+    }
+    return DxfUnit.unitless;
+  }
+
+  /// Detects if this DXF file originated from Archicad.
+  /// Uses multiple heuristics to identify Archicad-originated files.
+  /// Returns true if Archicad origin is detected, false otherwise.
+  /// 
+  /// Detection is conservative - prefers false negatives over false positives
+  /// to protect preservation requirements for pure AutoCAD and other CAD files.
+  bool get isArchicadOrigin {
+    // Heuristic 1: Check layer names for characteristic Archicad patterns.
+    // Archicad exports DWG/DXF drawings with layer names containing pen designations
+    // (e.g., 'стени_Pen_No__1', 'Квадратура_Pen_No__5', 'плочи_Pen_No__41', 'fill_Pen_No__21', 'Pen_No__')
+    // or AC_, GS_, Graphisoft markers. Pure AutoCAD NEVER creates layers with Pen_No.
+    for (final layerName in layers.keys) {
+      final nameUpper = layerName.toUpperCase();
+      if (nameUpper.contains('PEN_NO') ||
+          nameUpper.contains('_PEN_') ||
+          nameUpper.contains('ARCHICAD') ||
+          nameUpper.contains('GRAPHISOFT') ||
+          nameUpper.contains('GSPROP') ||
+          nameUpper.startsWith('AC_') ||
+          nameUpper.startsWith('AC-') ||
+          nameUpper.startsWith('GS_')) {
+        return true;
+      }
+    }
+
+    // Heuristic 2: Check block names for Archicad identifiers
+    for (final blockName in blocks.keys) {
+      final nameUpper = blockName.toUpperCase();
+      if (nameUpper.contains('ARCHICAD') ||
+          nameUpper.contains('GRAPHISOFT') ||
+          nameUpper.contains('GSPROP') ||
+          nameUpper.startsWith('AC_') ||
+          nameUpper.startsWith('GS_')) {
+        return true;
+      }
+    }
+
+    // Heuristic 3: Check for explicit Archicad markers in header variables or comments
+    final acadVer = headerVars['\$ACADVER']?.toUpperCase() ?? '';
+    final dwgCodePage = headerVars['\$DWGCODEPAGE']?.toUpperCase() ?? '';
+    if (acadVer.contains('ARCHICAD') || dwgCodePage.contains('ARCHICAD')) {
+      return true;
+    }
+    for (final entry in headerVars.entries) {
+      final k = entry.key.toUpperCase();
+      final v = entry.value.toUpperCase();
+      if (k.contains('ARCHICAD') ||
+          v.contains('ARCHICAD') ||
+          v.contains('GRAPHISOFT')) {
+        return true;
+      }
+    }
+
+    // Heuristic 4: Check text styles for characteristic 2.0 scale factors
+    int stylesWithTwoXScale = 0;
+    int totalStyles = 0;
+    for (final style in textStyles.values) {
+      totalStyles++;
+      if (style.heightScale >= 1.95 && style.heightScale <= 2.05) {
+        stylesWithTwoXScale++;
+      }
+    }
+    if (totalStyles >= 2 && stylesWithTwoXScale >= (totalStyles * 0.5)) {
+      return true;
+    }
+
+    // Heuristic 5: Check for specific text style naming patterns
+    for (final styleName in textStyles.keys) {
+      final nameUpper = styleName.toUpperCase();
+      if (nameUpper.contains('ARCHICAD') ||
+          nameUpper.startsWith('AC_') ||
+          nameUpper.startsWith('AC-') ||
+          nameUpper.startsWith('GS_')) {
+        return true;
+      }
+    }
+
+    // Heuristic 6: Combination check - specific header variable patterns
+    final dimScale = getDimensionScale();
+    final ltScale = getLineTypeScale();
+    if ((dimScale >= 1.95 && dimScale <= 2.05) ||
+        (ltScale >= 1.95 && ltScale <= 2.05)) {
+      if (stylesWithTwoXScale > 0) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+}
+
+/// Standard CAD Insertion Units (AutoCAD $INSUNITS).
+enum DxfUnit {
+  unitless(code: 0, label: 'Unitless (Auto)', symbol: 'm', toMeters: 1.0),
+  inches(code: 1, label: 'Inches', symbol: 'in', toMeters: 0.0254),
+  feet(code: 2, label: 'Feet', symbol: 'ft', toMeters: 0.3048),
+  miles(code: 3, label: 'Miles', symbol: 'mi', toMeters: 1609.344),
+  millimeters(code: 4, label: 'Millimeters', symbol: 'mm', toMeters: 0.001),
+  centimeters(code: 5, label: 'Centimeters', symbol: 'cm', toMeters: 0.01),
+  meters(code: 6, label: 'Meters', symbol: 'm', toMeters: 1.0),
+  kilometers(code: 7, label: 'Kilometers', symbol: 'km', toMeters: 1000.0),
+  microinches(code: 8, label: 'Microinches', symbol: 'μin', toMeters: 2.54e-8),
+  mils(code: 9, label: 'Mils', symbol: 'mil', toMeters: 2.54e-5),
+  yards(code: 10, label: 'Yards', symbol: 'yd', toMeters: 0.9144),
+  decimeters(code: 14, label: 'Decimeters', symbol: 'dm', toMeters: 0.1);
+
+  final int code;
+  final String label;
+  final String symbol;
+  final double toMeters;
+
+  const DxfUnit({
+    required this.code,
+    required this.label,
+    required this.symbol,
+    required this.toMeters,
+  });
+
+  static DxfUnit fromCode(int code) {
+    for (final u in DxfUnit.values) {
+      if (u.code == code) return u;
+    }
+    return DxfUnit.unitless;
+  }
+
+  static DxfUnit fromName(String? name) {
+    if (name == null) return DxfUnit.unitless;
+    for (final u in DxfUnit.values) {
+      if (u.name == name) return u;
+    }
+    return DxfUnit.unitless;
+  }
 }
 
 /// CAD Measurement and Markup tool types.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/dxf_display_settings.dart';
+import '../models/dxf_models.dart';
 
 /// Modal bottom sheet for customizing CAD display settings (line thickness, measurement size, point size & style).
 class DxfDisplaySettingsSheet extends StatefulWidget {
@@ -415,12 +416,132 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                     }).toList(),
                   ),
 
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 12),
+
+                  // 5. Drawing Units Section
+                  _buildSectionHeader(
+                    icon: Icons.straighten_rounded,
+                    title: 'Drawing Units (Мерни единици)',
+                    valueLabel: _current.unitOverride != null
+                        ? '${_current.unitOverride!.label} (Manual)'
+                        : 'Auto (from DXF \$INSUNITS)',
+                    theme: theme,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      // Auto
+                      _buildUnitChip(
+                        label: 'Auto (File)',
+                        symbol: '⚙️',
+                        isSelected: _current.unitOverride == null,
+                        onTap: () => _update(_current.copyWith(clearUnitOverride: true)),
+                        theme: theme,
+                      ),
+                      // Meters
+                      _buildUnitChip(
+                        label: 'Meters (m)',
+                        symbol: 'm',
+                        isSelected: _current.unitOverride == DxfUnit.meters,
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.meters)),
+                        theme: theme,
+                      ),
+                      // Centimeters
+                      _buildUnitChip(
+                        label: 'Centimeters (cm)',
+                        symbol: 'cm',
+                        isSelected: _current.unitOverride == DxfUnit.centimeters,
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.centimeters)),
+                        theme: theme,
+                      ),
+                      // Millimeters
+                      _buildUnitChip(
+                        label: 'Millimeters (mm)',
+                        symbol: 'mm',
+                        isSelected: _current.unitOverride == DxfUnit.millimeters,
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.millimeters)),
+                        theme: theme,
+                      ),
+                      // Feet
+                      _buildUnitChip(
+                        label: 'Feet (ft)',
+                        symbol: 'ft',
+                        isSelected: _current.unitOverride == DxfUnit.feet,
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.feet)),
+                        theme: theme,
+                      ),
+                      // Inches
+                      _buildUnitChip(
+                        label: 'Inches (in)',
+                        symbol: 'in',
+                        isSelected: _current.unitOverride == DxfUnit.inches,
+                        onTap: () => _update(_current.copyWith(unitOverride: DxfUnit.inches)),
+                        theme: theme,
+                      ),
+                    ],
+                  ),
+
                   const SizedBox(height: 24),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildUnitChip({
+    required String label,
+    required String symbol,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required ThemeData theme,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary.withValues(alpha: 0.15)
+              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.dividerColor.withValues(alpha: 0.3),
+            width: isSelected ? 1.6 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              symbol,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? theme.colorScheme.primary : null,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? theme.colorScheme.primary : null,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

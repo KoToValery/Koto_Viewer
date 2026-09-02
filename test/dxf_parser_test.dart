@@ -628,5 +628,127 @@ EOF
       final t3 = doc.entities[2] as DxfText;
       expect(t3.text, 'Архитектура');
     });
+
+    test('Parses STYLE table with text style definitions', () {
+      const dxfContent = '''
+0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+STYLE
+0
+STYLE
+2
+STANDARD
+70
+0
+40
+0.0
+3
+Arial.ttf
+0
+STYLE
+2
+ARCHICAD
+70
+0
+40
+2.0
+3
+Times.ttf
+0
+STYLE
+2
+VERTICAL_STYLE
+70
+4
+40
+1.0
+3
+Gothic.shx
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+TEXT
+8
+Layer1
+1
+Test Text
+7
+ARCHICAD
+10
+0.0
+20
+0.0
+40
+5.0
+0
+MTEXT
+8
+Layer2
+1
+Multi-line Text
+7
+STANDARD
+10
+10.0
+20
+10.0
+40
+3.0
+0
+ENDSEC
+0
+EOF
+''';
+
+      final doc = DxfParser.parseString(dxfContent);
+
+      // Verify text styles were parsed
+      expect(doc.textStyles.length, 3);
+      expect(doc.textStyles.containsKey('STANDARD'), isTrue);
+      expect(doc.textStyles.containsKey('ARCHICAD'), isTrue);
+      expect(doc.textStyles.containsKey('VERTICAL_STYLE'), isTrue);
+
+      // Verify STANDARD style
+      final standardStyle = doc.textStyles['STANDARD']!;
+      expect(standardStyle.name, 'STANDARD');
+      expect(standardStyle.heightScale, 1.0); // 0.0 should be converted to 1.0
+      expect(standardStyle.fontFile, 'Arial.ttf');
+      expect(standardStyle.isVertical, false);
+
+      // Verify ARCHICAD style with 2.0 scale factor
+      final archicadStyle = doc.textStyles['ARCHICAD']!;
+      expect(archicadStyle.name, 'ARCHICAD');
+      expect(archicadStyle.heightScale, 2.0);
+      expect(archicadStyle.fontFile, 'Times.ttf');
+      expect(archicadStyle.isVertical, false);
+
+      // Verify VERTICAL_STYLE
+      final verticalStyle = doc.textStyles['VERTICAL_STYLE']!;
+      expect(verticalStyle.name, 'VERTICAL_STYLE');
+      expect(verticalStyle.heightScale, 1.0);
+      expect(verticalStyle.fontFile, 'Gothic.shx');
+      expect(verticalStyle.isVertical, true);
+
+      // Verify TEXT entity has style reference
+      final text = doc.entities[0] as DxfText;
+      expect(text.style, 'ARCHICAD');
+      expect(text.height, 5.0);
+
+      // Verify MTEXT entity has style reference
+      final mtext = doc.entities[1] as DxfMText;
+      expect(mtext.style, 'STANDARD');
+      expect(mtext.height, 3.0);
+    });
   });
 }

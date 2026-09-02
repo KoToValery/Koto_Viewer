@@ -16,6 +16,7 @@ class DxfMeasurePointerPainter extends CustomPainter {
   final DxfMeasureTool tool;
   final String? customTitle;
   final String? customSubText;
+  final DxfUnit unit;
 
   const DxfMeasurePointerPainter({
     required this.touchPos,
@@ -28,6 +29,7 @@ class DxfMeasurePointerPainter extends CustomPainter {
     this.tool = DxfMeasureTool.distance,
     this.customTitle,
     this.customSubText,
+    this.unit = DxfUnit.meters,
   });
 
   Color _getToolColor() {
@@ -236,7 +238,7 @@ class DxfMeasurePointerPainter extends CustomPainter {
     }
 
     String subText = customSubText ??
-        'X: ${DxfMath.formatDistance(currentCadCoord.dx)}  Y: ${DxfMath.formatDistance(currentCadCoord.dy)}';
+        'X: ${DxfMath.formatCadNumber(currentCadCoord.dx)}  Y: ${DxfMath.formatCadNumber(currentCadCoord.dy)}';
     if (customSubText == null && isSettingSecondPoint && p1CadCoord != null) {
       final double liveDist = (currentCadCoord - p1CadCoord!).distance;
       final dx = currentCadCoord.dx - p1CadCoord!.dx;
@@ -245,7 +247,7 @@ class DxfMeasurePointerPainter extends CustomPainter {
       if (angleDeg < 0) angleDeg += 360.0;
       final isPerp = snapType == DxfSnapType.perpendicular;
       final angleStr = isPerp ? ' • 90.0° ⟂' : ' • ${angleDeg.toStringAsFixed(1)}°';
-      subText = 'L = ${DxfMath.formatDistance(liveDist)} m$angleStr  |  $subText';
+      subText = 'L = ${DxfMath.formatDistance(liveDist, unit: unit)} m$angleStr  |  $subText';
     }
 
     final titlePainter = TextPainter(

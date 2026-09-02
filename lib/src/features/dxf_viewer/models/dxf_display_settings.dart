@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dxf_models.dart';
 
 /// Style options for displaying CAD point entities (DxfPoint).
 enum DxfPointStyle {
@@ -52,12 +53,14 @@ class DxfDisplaySettings {
   final double measurementScale; // 0.5 to 2.5 (default 1.0)
   final double pointSize; // 1.0 to 12.0 in screen pixels (default 2.0)
   final DxfPointStyle pointStyle; // point marker style
+  final DxfUnit? unitOverride; // null = Auto from DXF $INSUNITS
 
   const DxfDisplaySettings({
     this.lineThicknessScale = 1.0,
     this.measurementScale = 1.4,
     this.pointSize = 2.0,
     this.pointStyle = DxfPointStyle.none,
+    this.unitOverride,
   });
 
   DxfDisplaySettings copyWith({
@@ -65,12 +68,15 @@ class DxfDisplaySettings {
     double? measurementScale,
     double? pointSize,
     DxfPointStyle? pointStyle,
+    DxfUnit? unitOverride,
+    bool clearUnitOverride = false,
   }) {
     return DxfDisplaySettings(
       lineThicknessScale: lineThicknessScale ?? this.lineThicknessScale,
       measurementScale: measurementScale ?? this.measurementScale,
       pointSize: pointSize ?? this.pointSize,
       pointStyle: pointStyle ?? this.pointStyle,
+      unitOverride: clearUnitOverride ? null : (unitOverride ?? this.unitOverride),
     );
   }
 
@@ -80,6 +86,7 @@ class DxfDisplaySettings {
       'measurementScale': measurementScale,
       'pointSize': pointSize,
       'pointStyle': pointStyle.name,
+      if (unitOverride != null) 'unitOverride': unitOverride!.name,
     };
   }
 
@@ -89,6 +96,7 @@ class DxfDisplaySettings {
       measurementScale: (map['measurementScale'] as num?)?.toDouble() ?? 1.4,
       pointSize: (map['pointSize'] as num?)?.toDouble() ?? 4.0,
       pointStyle: DxfPointStyle.fromName(map['pointStyle'] as String?),
+      unitOverride: map['unitOverride'] != null ? DxfUnit.fromName(map['unitOverride'] as String?) : null,
     );
   }
 

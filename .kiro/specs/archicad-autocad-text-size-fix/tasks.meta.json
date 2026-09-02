@@ -1,0 +1,222 @@
+{
+  "pbtResults": {
+    "1. Write bug condition exploration test": {
+      "status": "passed",
+      "failingExample": "TEXT Entity Counterexamples:\n- \"Стая 105\": DXF height=3.5, Current rendered=3.5, Expected=7.0 (50% of expected!)\n- \"Кота +3.50\": DXF height=2.5, Current rendered=2.5, Expected=5.0 (50% of expected!)\n\nMTEXT Entity Counterexamples:\n- \"Room 102\": DXF height=4.0, Current rendered=4.0, Expected=8.0 (50% of expected!)\n- \"Вход А\": DXF height=5.0, Current rendered=5.0, Expected=10.0 (50% of expected!)\n\nRoot Cause Confirmed:\n- Archicad DXF files contain STYLE table with scale factors of 2.0\n- Header contains Archicad markers: \"Exported from Archicad\" in $INSUNITS\n- Current rendering code: fontSize = entity.height * fitScale\n- Missing: Text style scale factor application\n- Required fix: fontSize = entity.height * textStyleScaleFactor * fitScale\n\nThe test failures confirm the bug exists - text renders at 50% size because text style scaling is not applied.",
+      "lastRunTimestamp": 1788346547368
+    }
+  },
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346324637
+      },
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346333075
+      },
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346567783
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346324890
+      },
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346571536
+      },
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788347083832
+      }
+    ],
+    "3.1 Parse text style definitions from STYLE table": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346324964
+      },
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788347091425
+      },
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788347714044
+      }
+    ],
+    "3.2 Enhance header variable extraction": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346325010
+      },
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788347717810
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788350944560
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788351384140
+      }
+    ],
+    "3.3 Implement Archicad origin detection heuristic": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346325063
+      },
+      {
+        "executionId": "c8446f48-c586-4a78-b3d8-e29a2f82a14b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788349742439
+      },
+      {
+        "executionId": "c8446f48-c586-4a78-b3d8-e29a2f82a14b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788349931234
+      }
+    ],
+    "3.4 Create effective text height calculation helper": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346325133
+      },
+      {
+        "executionId": "c8446f48-c586-4a78-b3d8-e29a2f82a14b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788349940131
+      },
+      {
+        "executionId": "c8446f48-c586-4a78-b3d8-e29a2f82a14b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788350350817
+      }
+    ],
+    "3.5 Apply corrected text height in TEXT rendering": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346325215
+      },
+      {
+        "executionId": "c8446f48-c586-4a78-b3d8-e29a2f82a14b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788350358372
+      },
+      {
+        "executionId": "c8446f48-c586-4a78-b3d8-e29a2f82a14b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788350475117
+      }
+    ],
+    "3.6 Apply corrected text height in MTEXT rendering": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346325271
+      },
+      {
+        "executionId": "c8446f48-c586-4a78-b3d8-e29a2f82a14b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788350482894
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788350935680
+      }
+    ],
+    "3.7 Update TEXT/MTEXT entity parsing to capture style references": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346325329
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788351395113
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788351465429
+      }
+    ],
+    "3.8 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346325388
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788351473825
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788351972304
+      }
+    ],
+    "3.9 Verify preservation tests still pass": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346325445
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788351981059
+      }
+    ],
+    "4. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "d993ceaa-83e0-4842-89c1-a9b2a9eface7",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788346325500
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788351990940
+      },
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788353477892
+      }
+    ],
+    "3. Fix for Archicad-AutoCAD text scaling": [
+      {
+        "executionId": "77cc7a47-18ba-4611-8a35-1053bcbd239b",
+        "chatSessionId": "sess_b2f6c2ce-3725-4d09-996b-f2c059e71f3e",
+        "timestamp": 1788351981111
+      }
+    ]
+  }
+}

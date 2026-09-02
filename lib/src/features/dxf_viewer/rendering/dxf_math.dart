@@ -210,15 +210,28 @@ class DxfMath {
     return result;
   }
 
-  /// Formats real CAD distance for human display.
-  static String formatDistance(double distance) {
-    if (distance.abs() < 1e-4) return '0.00';
-    if (distance >= 10000) {
-      return distance.toStringAsFixed(1);
-    } else if (distance >= 100) {
-      return distance.toStringAsFixed(2);
+  /// Formats raw CAD coordinate/drawing-unit value without unit conversion.
+  static String formatCadNumber(double value) {
+    if (value.abs() < 1e-4) return '0.00';
+    if (value.abs() >= 10000) {
+      return value.toStringAsFixed(1);
+    } else if (value.abs() >= 100) {
+      return value.toStringAsFixed(2);
     } else {
-      return distance.toStringAsFixed(3);
+      return value.toStringAsFixed(3);
+    }
+  }
+
+  /// Formats real CAD distance converted from drawing units to meters (or display units).
+  static String formatDistance(double distance, {DxfUnit unit = DxfUnit.meters}) {
+    final double distInMeters = distance * unit.toMeters;
+    if (distInMeters.abs() < 1e-4) return '0.00';
+    if (distInMeters >= 10000) {
+      return distInMeters.toStringAsFixed(1);
+    } else if (distInMeters >= 100) {
+      return distInMeters.toStringAsFixed(2);
+    } else {
+      return distInMeters.toStringAsFixed(2);
     }
   }
 
@@ -344,16 +357,22 @@ class DxfMath {
     return (center: center, radius: radius);
   }
 
-  /// Formats area for human display.
-  static String formatArea(double area) {
-    if (area.abs() < 1e-4) return '0.00 m²';
-    if (area >= 10000) {
-      final double ha = area / 10000.0;
-      return '${area.toStringAsFixed(1)} m² (${ha.toStringAsFixed(2)} ha)';
-    } else if (area >= 100) {
-      return '${area.toStringAsFixed(2)} m²';
+  /// Formats area for human display, converting from drawing units to square meters (m²).
+  ///
+  /// For instance, if drawing units are centimeters (INSUNITS=5):
+  /// 1 cm² = 0.0001 m² (area / 10000.0).
+  /// A closet of 69,878 cm² -> 6.99 m².
+  static String formatArea(double areaCad, {DxfUnit unit = DxfUnit.meters, int? decimals}) {
+    final double areaM2 = areaCad * (unit.toMeters * unit.toMeters);
+    if (areaM2.abs() < 1e-4) return '0.00 m²';
+    if (areaM2 >= 10000.0) {
+      final double ha = areaM2 / 10000.0;
+      return '${areaM2.toStringAsFixed(decimals ?? 1)} m² (${ha.toStringAsFixed(2)} ha)';
+    } else if (areaM2 >= 100.0) {
+      return '${areaM2.toStringAsFixed(decimals ?? 2)} m²';
     } else {
-      return '${area.toStringAsFixed(3)} m²';
+      final int d = decimals ?? (unit != DxfUnit.meters ? 2 : 3);
+      return '${areaM2.toStringAsFixed(d)} m²';
     }
   }
 }
