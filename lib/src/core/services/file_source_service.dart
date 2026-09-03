@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pdf_item.dart';
 import 'recent_files_service.dart';
+import 'android_saf_service.dart';
 
 enum FileSourceMode { recent, custom }
 
@@ -64,6 +65,7 @@ class FileSourceService {
   static const String _keyCustomPath = 'koto_custom_folder_path';
   static const String _keyCustomFolders = 'koto_custom_folder_list';
   static const String _keySortOption = 'koto_sort_option';
+  static const String _keyIncludeSubfolders = 'koto_include_subfolders';
 
   static Future<FileSourceMode> getSourceMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -142,6 +144,16 @@ class FileSourceService {
     await prefs.setString(_keySortOption, option.key);
   }
 
+  static Future<bool> getIncludeSubfolders() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyIncludeSubfolders) ?? false;
+  }
+
+  static Future<void> setIncludeSubfolders(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyIncludeSubfolders, value);
+  }
+
   static bool isSupportedFile(String path) {
     final lower = path.toLowerCase();
     return lower.endsWith('.pdf') ||
@@ -166,9 +178,7 @@ class FileSourceService {
         lower.endsWith('.markdown') ||
         lower.endsWith('.docx') ||
         lower.endsWith('.pptx') ||
-        lower.endsWith('.ppt') ||
         lower.endsWith('.ppsx') ||
-        lower.endsWith('.pps') ||
         lower.endsWith('.rtf') ||
         lower.endsWith('.eps') ||
         lower.endsWith('.cdr') ||
@@ -249,13 +259,19 @@ class FileSourceService {
 
       case FileSourceMode.custom:
         final customPath = await getCustomFolderPath();
+        final includeSubfolders = await getIncludeSubfolders();
         if (customPath != null && customPath.isNotEmpty) {
-          final customDir = Directory(customPath);
-          files = await _scanDirectoryForFiles(customDir);
+          // On Android, FilePicker.getDirectoryPath() returns a SAF content URI.
+          // Dart's Directory cannot access content:// URIs — use the native SAF API.
+          if (Platform.isAndroid && customPath.startsWith('content://')) {
+            files = await _scanSafFolderForFiles(customPath, recursive: includeSubfolders);
+          } else {
+            files = await _scanDirectoryForFiles(Directory(customPath), recursive: includeSubfolders);
+          }
         } else {
           final publicPaths = getSafePublicDirectoryPaths();
           for (final p in publicPaths) {
-            final dirFiles = await _scanDirectoryForFiles(Directory(p));
+            final dirFiles = await _scanDirectoryForFiles(Directory(p), recursive: includeSubfolders);
             files.addAll(dirFiles);
           }
         }
@@ -271,6 +287,47 @@ class FileSourceService {
     return await _sortFiles(unique.values.toList());
   }
 
+  /// Lists supported files inside an Android SAF folder (content:// tree URI).
+  ///
+  /// Uses [AndroidSafService] which calls the native DocumentFile API.
+  /// No extra Android permissions are needed — the user already granted access
+  /// to the specific folder via the system folder picker.
+  ///
+  /// Each returned [PdfItem.path] is the content URI of the individual file.
+  /// When the user opens a file, [MainActivity.resolveUriToFilePath] copies it
+  /// to the app cache directory and returns a real path for the viewer.
+  static Future<List<PdfItem>> _scanSafFolderForFiles(
+    String safTreeUri, {
+    bool recursive = false,
+  }) async {
+    try {
+      final entries = await AndroidSafService.listFilesInFolder(
+        safTreeUri,
+        recursive: recursive,
+      );
+      final List<PdfItem> items = [];
+      for (final entry in entries) {
+        final name = entry['name'] as String? ?? '';
+        final uri  = entry['uri']  as String? ?? '';
+        final size = entry['size'] as int? ?? 0;
+        final lastModifiedMs = entry['lastModified'] as int? ?? 0;
+        if (uri.isEmpty || !isSupportedFile(name)) continue;
+        items.add(PdfItem(
+          path: uri,
+          name: name,
+          sizeInBytes: size,
+          lastOpened: lastModifiedMs > 0
+              ? DateTime.fromMillisecondsSinceEpoch(lastModifiedMs)
+              : DateTime.now(),
+        ));
+      }
+      return items;
+    } catch (e) {
+      debugPrint('_scanSafFolderForFiles error for "$safTreeUri": $e');
+      return [];
+    }
+  }
+
   static Future<List<PdfItem>> _sortFiles(List<PdfItem> files) async {
     final sortOption = await getSortOption();
     if (sortOption == SortOption.name) {
@@ -281,12 +338,17 @@ class FileSourceService {
     return files;
   }
 
-  static Future<List<PdfItem>> _scanDirectoryForFiles(Directory dir) async {
+  static Future<List<PdfItem>> _scanDirectoryForFiles(
+    Directory dir, {
+    bool recursive = false,
+  }) async {
+    // Safety guard: never attempt to scan the filesystem root
+    if (dir.path == '/' || dir.path.isEmpty) return [];
     if (!dir.existsSync()) return [];
 
     final List<PdfItem> items = [];
     try {
-      final List<FileSystemEntity> entities = dir.listSync(recursive: false);
+      final List<FileSystemEntity> entities = dir.listSync(recursive: recursive);
       for (final entity in entities) {
         if (entity is File && isSupportedFile(entity.path)) {
           final stat = entity.statSync();

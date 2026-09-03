@@ -32,16 +32,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
-            <!-- PDF File Intent Filters -->
-            <intent-filter>
+            <!-- PDF File Intent Filters — primary (any URI, any scheme) -->
+            <intent-filter android:priority="100">
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.QUICK_VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/x-pdf" />
             </intent-filter>
 
-            <intent-filter>
+            <!-- PDF via explicit file:// or content:// scheme -->
+            <intent-filter android:priority="90">
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.QUICK_VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -49,9 +51,11 @@
                 <data android:scheme="file" />
                 <data android:scheme="content" />
                 <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/x-pdf" />
             </intent-filter>
 
-            <intent-filter>
+            <!-- PDF via pathPattern for file managers that send */* or octet-stream -->
+            <intent-filter android:priority="80">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -59,6 +63,7 @@
                 <data android:scheme="content" />
                 <data android:host="*" />
                 <data android:pathPattern=".*\\.pdf" />
+                <data android:pathPattern=".*\\.PDF" />
             </intent-filter>
 
             <!-- CAD DXF/DWG File Intent Filters -->
@@ -79,15 +84,6 @@
                 <data android:mimeType="image/x-dwg" />
             </intent-filter>
 
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <action android:name="android.intent.action.QUICK_VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="file" />
-                <data android:scheme="content" />
-                <data android:mimeType="*/*" />
-            </intent-filter>
 
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

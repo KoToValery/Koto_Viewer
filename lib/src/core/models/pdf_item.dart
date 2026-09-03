@@ -40,7 +40,7 @@ extension FileCategoryExtension on FileCategory {
   }
 }
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, ppt, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, other }
 
 class PdfItem {
   final String path;
@@ -80,7 +80,6 @@ class PdfItem {
     if (lower.endsWith('.md') || lower.endsWith('.markdown')) return KotoFileType.md;
     if (lower.endsWith('.docx')) return KotoFileType.docx;
     if (lower.endsWith('.pptx') || lower.endsWith('.ppsx')) return KotoFileType.pptx;
-    if (lower.endsWith('.ppt') || lower.endsWith('.pps')) return KotoFileType.ppt;
     if (lower.endsWith('.rtf')) return KotoFileType.rtf;
     if (lower.endsWith('.eps')) return KotoFileType.eps;
     if (lower.endsWith('.cdr')) return KotoFileType.cdr;
@@ -149,8 +148,7 @@ class PdfItem {
   bool get isMd => fileType == KotoFileType.md;
   bool get isDocx => fileType == KotoFileType.docx;
   bool get isPptx => fileType == KotoFileType.pptx;
-  bool get isPpt => fileType == KotoFileType.ppt;
-  bool get isPresentation => isPptx || isPpt;
+  bool get isPresentation => isPptx;
   bool get isRtf => fileType == KotoFileType.rtf;
   bool get isEps => fileType == KotoFileType.eps;
   bool get isCdr => fileType == KotoFileType.cdr;

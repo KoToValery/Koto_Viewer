@@ -11,6 +11,12 @@ class PptxParser {
   static PptxPresentation parse(Uint8List bytes) {
     final archive = ZipDecoder().decodeBytes(bytes);
 
+    // Build a lookup map of all archive files by normalized name
+    final fileMap = <String, ArchiveFile>{};
+    for (final f in archive.files) {
+      fileMap[f.name.toLowerCase()] = f;
+    }
+
     // Find all slide XML files
     final slideFiles = archive.files.where((f) {
       final name = f.name.toLowerCase();
@@ -35,11 +41,46 @@ class PptxParser {
       final xmlString = utf8.decode(file.content as List<int>);
       final slideDoc = xml.XmlDocument.parse(xmlString);
 
-      final slide = _parseSlide(slideDoc, i + 1);
+      // Load relationship map for this slide's embedded media
+      final relsMap = _loadSlideRelationships(file.name, fileMap);
+
+      final slide = _parseSlide(slideDoc, i + 1, relsMap, fileMap);
       slides.add(slide);
     }
 
     return PptxPresentation(slides: slides);
+  }
+
+  /// Parses the relationship XML for a slide and returns a map of rId → target path.
+  static Map<String, String> _loadSlideRelationships(
+    String slidePath,
+    Map<String, ArchiveFile> fileMap,
+  ) {
+    // slidePath e.g.: "ppt/slides/slide1.xml"
+    // rels file:      "ppt/slides/_rels/slide1.xml.rels"
+    final parts = slidePath.split('/');
+    final fileName = parts.last;
+    parts.removeLast();
+    final relsPath = '${parts.join('/')}/_rels/$fileName.rels';
+
+    final relsFile = fileMap[relsPath.toLowerCase()];
+    if (relsFile == null) return {};
+
+    try {
+      final relsXml = utf8.decode(relsFile.content as List<int>);
+      final doc = xml.XmlDocument.parse(relsXml);
+      final map = <String, String>{};
+      for (final rel in doc.findAllElements('Relationship')) {
+        final id     = rel.getAttribute('Id') ?? '';
+        final target = rel.getAttribute('Target') ?? '';
+        if (id.isNotEmpty && target.isNotEmpty) {
+          map[id] = target;
+        }
+      }
+      return map;
+    } catch (_) {
+      return {};
+    }
   }
 
   static int _extractSlideNumber(String path) {
@@ -50,10 +91,16 @@ class PptxParser {
     return 0;
   }
 
-  static PptxSlide _parseSlide(xml.XmlDocument doc, int slideNumber) {
+  static PptxSlide _parseSlide(
+    xml.XmlDocument doc,
+    int slideNumber,
+    Map<String, String> relsMap,
+    Map<String, ArchiveFile> fileMap,
+  ) {
     String? title;
     final List<PptxShape> shapes = [];
     final List<PptxTable> tables = [];
+    final List<PptxImage> images = [];
 
     // Find spTree
     final spTree = doc.findAllElements('p:spTree').firstOrNull;
@@ -83,6 +130,10 @@ class PptxParser {
             tables.add(table);
           }
         }
+      } else if (localName == 'pic') {
+        // Embedded picture — extract via relationship
+        final image = _extractImage(child, relsMap, fileMap);
+        if (image != null) images.add(image);
       }
     }
 
@@ -91,7 +142,64 @@ class PptxParser {
       title: title,
       shapes: shapes,
       tables: tables,
+      images: images,
     );
+  }
+
+  /// Supported image MIME types / extensions in PPTX media.
+  static const _imageExtensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.tiff', '.tif'};
+
+  /// Extracts embedded image bytes from a `<p:pic>` element.
+  static PptxImage? _extractImage(
+    xml.XmlElement picElement,
+    Map<String, String> relsMap,
+    Map<String, ArchiveFile> fileMap,
+  ) {
+    try {
+      // <p:pic><p:blipFill><a:blip r:embed="rId2"/></p:blipFill></p:pic>
+      final blip = picElement.findAllElements('a:blip').firstOrNull;
+      if (blip == null) return null;
+
+      // r:embed attribute holds the relationship ID
+      final rId = blip.getAttribute('r:embed') ??
+          blip.getAttribute('embed') ??
+          blip.attributes
+              .where((a) => a.name.local == 'embed')
+              .map((a) => a.value)
+              .firstOrNull;
+      if (rId == null || rId.isEmpty) return null;
+
+      // Resolve rId to target path via relationships
+      final target = relsMap[rId];
+      if (target == null || target.isEmpty) return null;
+
+      // Target is relative to ppt/slides/ → resolve to ppt/media/...
+      // Common forms: "../media/image1.png" or "media/image1.png"
+      String mediaPath;
+      if (target.startsWith('../')) {
+        mediaPath = 'ppt/${target.substring(3)}';
+      } else if (target.startsWith('/')) {
+        mediaPath = target.substring(1);
+      } else {
+        mediaPath = 'ppt/slides/$target';
+      }
+
+      final ext = _imageExtensions.firstWhere(
+        (e) => mediaPath.toLowerCase().endsWith(e),
+        orElse: () => '',
+      );
+      if (ext.isEmpty) return null; // not a supported image type
+
+      final archiveFile = fileMap[mediaPath.toLowerCase()];
+      if (archiveFile == null) return null;
+
+      final bytes = archiveFile.content;
+      if (bytes == null || (bytes as List).isEmpty) return null;
+
+      return PptxImage(bytes: Uint8List.fromList(bytes as List<int>));
+    } catch (_) {
+      return null;
+    }
   }
 
   static PptxShape _parseShape(xml.XmlElement spElement) {

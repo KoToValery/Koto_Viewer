@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/file_source_service.dart';
+import '../../core/services/android_saf_service.dart';
 import '../../core/services/dwg_converter_service.dart';
 import '../../core/services/ppt_to_pdf_converter_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
@@ -65,9 +66,7 @@ class FileTypeIcon extends StatelessWidget {
         return _buildMdIcon();
       case KotoFileType.docx:
         return _buildDocxIcon();
-      case KotoFileType.pptx:
-      case KotoFileType.ppt:
-        return _buildPptIcon();
+      case KotoFileType.pptx:        return _buildPptIcon();
       case KotoFileType.rtf:
         return _buildRtfIcon();
       case KotoFileType.eps:
@@ -1053,6 +1052,7 @@ class _HomeScreenState extends State<HomeScreen> {
   SortOption _currentSort = SortOption.date;
   String? _customFolderPath;
   List<String> _customFolderList = [];
+  bool _includeSubfolders = false;
   FileCategory _selectedCategory = FileCategory.all;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -1091,6 +1091,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final sort = await FileSourceService.getSortOption();
     final customPath = await FileSourceService.getCustomFolderPath();
     final customFolders = await FileSourceService.getCustomFolderList();
+    final includeSubfolders = await FileSourceService.getIncludeSubfolders();
     final files = await FileSourceService.getPdfFilesForCurrentSource();
 
     if (mounted) {
@@ -1099,6 +1100,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentSort = sort;
         _customFolderPath = customPath;
         _customFolderList = customFolders;
+        _includeSubfolders = includeSubfolders;
         _pdfFiles = files;
         _isLoading = false;
       });
@@ -1187,12 +1189,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<bool> _pickCustomFolder() async {
     try {
-      final initialDir = await _getDownloadDirectoryPath();
-      final String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
-        initialDirectory: initialDir,
-      );
+      final String? selectedDirectory;
+
+      if (Platform.isAndroid) {
+        // On Android, file_picker's getDirectoryPath() internally converts the
+        // SAF tree URI to a real filesystem path via StorageManager reflection.
+        // For cloud providers (Google Drive, etc.) this conversion fails and
+        // returns "/" — which then causes a Permission Denied error when scanned.
+        //
+        // We bypass file_picker entirely and launch ACTION_OPEN_DOCUMENT_TREE
+        // directly, always receiving the raw SAF tree URI (content://...).
+        selectedDirectory = await AndroidSafService.pickDirectory();
+      } else {
+        final initialDir = await _getDownloadDirectoryPath();
+        selectedDirectory = await FilePicker.platform.getDirectoryPath(
+          initialDirectory: initialDir,
+        );
+      }
 
       if (selectedDirectory != null && selectedDirectory.isNotEmpty) {
+        // Safeguard: reject paths that look invalid (e.g. "/" or single-char paths)
+        // which can happen if a picker fails silently.
+        if (selectedDirectory == '/' || selectedDirectory == '\\') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Could not access the selected folder. Please try again.'),
+              ),
+            );
+          }
+          return false;
+        }
+
         await FileSourceService.addCustomFolder(selectedDirectory);
         await _loadFiles();
         return true;
@@ -1245,7 +1273,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openFileScreen(String filePath) async {
-    final file = File(filePath);
+    // On Android, files from SAF custom folders have content:// URIs.
+    // Dart's File class cannot read content URIs directly, so we copy the
+    // file to the app cache directory first and use the cached real path.
+    String resolvedPath = filePath;
+    if (AndroidSafService.isSafUri(filePath)) {
+      if (mounted) {
+        // Show brief loading indicator while copying to cache
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opening file…'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+      final cached = await AndroidSafService.resolveContentUri(filePath);
+      if (cached == null || cached.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open file. It may have been moved or deleted.')),
+        );
+        return;
+      }
+      resolvedPath = cached;
+    }
+
+    final file = File(resolvedPath);
 
     if (!await file.exists()) {
       if (!mounted) return;
@@ -1264,7 +1317,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final stat = await file.stat();
-    final name = filePath.split(Platform.pathSeparator).last;
+    // Use original filePath as the item identity (SAF URI or real path),
+    // but resolvedPath for actual file access.
+    final name = filePath.contains('/')
+        ? filePath.split('/').where((s) => s.isNotEmpty).last
+        : filePath.split(Platform.pathSeparator).last;
 
     final item = PdfItem(
       path: filePath,
@@ -1279,7 +1336,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.pdf:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => PdfViewerScreen(filePath: filePath),
+            builder: (context) => PdfViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1292,7 +1349,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.dxf:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => DxfViewerScreen(filePath: filePath),
+            builder: (context) => DxfViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1358,7 +1415,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         try {
           convertedDxfPath = await DwgConverterService.convertDwgToDxf(
-            filePath,
+            resolvedPath,
           );
         } catch (e) {
           conversionError = e.toString();
@@ -1401,7 +1458,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.svg:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => SvgViewerScreen(filePath: filePath),
+            builder: (context) => SvgViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1420,7 +1477,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.ifc:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => Dxf3DViewerScreen(filePath: filePath),
+            builder: (context) => Dxf3DViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1433,7 +1490,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.xlsx:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => XlsxViewerScreen(filePath: filePath),
+            builder: (context) => XlsxViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1446,7 +1503,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.txt:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => TextViewerScreen(filePath: filePath),
+            builder: (context) => TextViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1459,7 +1516,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.md:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => MarkdownViewerScreen(filePath: filePath),
+            builder: (context) => MarkdownViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1473,7 +1530,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.rtf:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => DocxViewerScreen(filePath: filePath),
+            builder: (context) => DocxViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1483,11 +1540,9 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         break;
 
-      case KotoFileType.pptx:
-      case KotoFileType.ppt:
-        try {
+      case KotoFileType.pptx:        try {
           // Seamless mode: convert PPT/PPTX to Landscape PDF on the fly
-          final viewPath = await PptToPdfConverterService.convertToPdf(filePath);
+          final viewPath = await PptToPdfConverterService.convertToPdf(resolvedPath);
           final bool? success = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
               builder: (context) => PdfViewerScreen(
@@ -1513,7 +1568,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.eps:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => EpsViewerScreen(filePath: filePath),
+            builder: (context) => EpsViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1526,7 +1581,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.cdr:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => CdrViewerScreen(filePath: filePath),
+            builder: (context) => CdrViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1542,7 +1597,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.zip:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => PcbViewerScreen(filePath: filePath),
+            builder: (context) => PcbViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1555,7 +1610,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.plt:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => HpglViewerScreen(filePath: filePath),
+            builder: (context) => HpglViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1570,7 +1625,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.cbt:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => ComicViewerScreen(filePath: filePath),
+            builder: (context) => ComicViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -1584,7 +1639,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.fb2:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => EbookViewerScreen(filePath: filePath),
+            builder: (context) => EbookViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
@@ -2104,12 +2159,18 @@ class _HomeScreenState extends State<HomeScreen> {
       subtitleText = 'Recently opened files (PDF, DXF, DWG)';
     } else if (_currentMode == FileSourceMode.custom) {
       if (_customFolderPath != null && _customFolderPath!.isNotEmpty) {
-        final parts = _customFolderPath!
-            .split(Platform.pathSeparator)
-            .where((s) => s.isNotEmpty)
-            .toList();
-        titleText = parts.isNotEmpty ? parts.last : 'Custom Folder';
-        subtitleText = _customFolderPath!;
+        // SAF content URI on Android — extract human-readable folder name
+        if (AndroidSafService.isSafUri(_customFolderPath!)) {
+          titleText = AndroidSafService.folderNameFromSafUri(_customFolderPath!);
+          subtitleText = titleText; // no real path to show
+        } else {
+          final parts = _customFolderPath!
+              .split(Platform.pathSeparator)
+              .where((s) => s.isNotEmpty)
+              .toList();
+          titleText = parts.isNotEmpty ? parts.last : 'Custom Folder';
+          subtitleText = _customFolderPath!;
+        }
       } else {
         titleText = 'Custom Folder';
         subtitleText = 'No folder selected';
@@ -2212,12 +2273,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 2. Saved Custom Folders
                   if (_customFolderList.isNotEmpty) {
                     for (final folderPath in _customFolderList) {
-                      final parts = folderPath
-                          .split(Platform.pathSeparator)
-                          .where((s) => s.isNotEmpty)
-                          .toList();
-                      final folderName =
-                          parts.isNotEmpty ? parts.last : folderPath;
+                      // For Android SAF URIs, extract human-readable name instead
+                      // of splitting by path separator (which doesn't work for content://)
+                      final String folderName;
+                      final String folderSubtitle;
+                      if (AndroidSafService.isSafUri(folderPath)) {
+                        folderName = AndroidSafService.folderNameFromSafUri(folderPath);
+                        folderSubtitle = 'Android Folder';
+                      } else {
+                        final parts = folderPath
+                            .split(Platform.pathSeparator)
+                            .where((s) => s.isNotEmpty)
+                            .toList();
+                        folderName = parts.isNotEmpty ? parts.last : folderPath;
+                        folderSubtitle = folderPath;
+                      }
                       final isSelected =
                           _currentMode == FileSourceMode.custom &&
                           _customFolderPath == folderPath;
@@ -2250,7 +2320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     Text(
-                                      folderPath,
+                                      folderSubtitle,
                                       style: TextStyle(
                                         fontSize: 10,
                                         color: Colors.grey.shade500,
@@ -2356,6 +2426,26 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             if (_currentMode == FileSourceMode.custom) ...[
+              // Toggle subfolders
+              IconButton(
+                icon: Icon(
+                  _includeSubfolders
+                      ? Icons.account_tree_rounded
+                      : Icons.account_tree_outlined,
+                  color: _includeSubfolders
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                tooltip: _includeSubfolders
+                    ? 'Include subfolders: ON'
+                    : 'Include subfolders: OFF',
+                onPressed: () async {
+                  final next = !_includeSubfolders;
+                  await FileSourceService.setIncludeSubfolders(next);
+                  setState(() => _includeSubfolders = next);
+                  await _loadFiles();
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.create_new_folder_outlined),
                 tooltip: 'Add Folder',
@@ -2363,7 +2453,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               if (_customFolderPath != null && _customFolderPath!.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.grey),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                   tooltip: 'Remove Folder from list',
                   onPressed: () =>
                       _confirmRemoveCustomFolder(_customFolderPath!),
@@ -2641,7 +2734,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
                       final item = _filteredFiles[index];
-                      final fileExists = File(item.path).existsSync();
+                      // For Android SAF content URIs, File.existsSync() always
+                      // returns false. Treat them as existing — opening will
+                      // copy via ContentResolver and fail gracefully if needed.
+                      final fileExists = AndroidSafService.isSafUri(item.path)
+                          ? true
+                          : File(item.path).existsSync();
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),

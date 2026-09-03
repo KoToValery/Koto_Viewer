@@ -48,7 +48,7 @@ class PptToPdfConverterService {
         ? fileName.substring(0, fileName.lastIndexOf('.'))
         : fileName;
 
-    final cachedFileName = '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}_v1.pdf';
+    final cachedFileName = '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}_v2.pdf';
     final targetPdfPath = '${cacheDir.path}${Platform.pathSeparator}$cachedFileName';
     final targetPdfFile = File(targetPdfPath);
 
@@ -143,6 +143,37 @@ class PptToPdfConverterService {
           pageFormat: PdfPageFormat.a4.landscape,
           margin: const pw.EdgeInsets.all(28),
           build: (context) {
+            // Build image widgets from extracted bytes
+            final imageWidgets = <pw.Widget>[];
+            for (final img in slide.images) {
+              try {
+                final pdfImage = pw.MemoryImage(img.bytes);
+                imageWidgets.add(
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(bottom: 8),
+                    child: pw.Image(pdfImage, fit: pw.BoxFit.contain),
+                  ),
+                );
+              } catch (_) {
+                // Skip images that can't be decoded
+              }
+            }
+
+            // Slide has ONLY images (no text, no tables) → full-page image layout
+            final hasText = slide.title != null ||
+                slide.shapes.isNotEmpty ||
+                slide.tables.isNotEmpty;
+
+            if (!hasText && imageWidgets.isNotEmpty) {
+              // Center all images on the page
+              return pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  for (final w in imageWidgets) pw.Expanded(child: w),
+                ],
+              );
+            }
+
             return pw.Container(
               decoration: pw.BoxDecoration(
                 color: PdfColors.white,
@@ -162,7 +193,7 @@ class PptToPdfConverterService {
                           width: 4,
                           height: 24,
                           decoration: pw.BoxDecoration(
-                            color: const PdfColor.fromInt(0xFFD24726), // PPT Accent Coral
+                            color: const PdfColor.fromInt(0xFFD24726),
                             borderRadius: pw.BorderRadius.circular(2),
                           ),
                         ),
@@ -186,10 +217,12 @@ class PptToPdfConverterService {
                     pw.SizedBox(height: 10),
                   ],
 
-                  // Slide Content Area (Shapes, Text, Tables)
+                  // Slide Content Area (Images, Shapes, Tables)
                   pw.Expanded(
                     child: pw.ListView(
                       children: [
+                        // Images first (if any alongside text)
+                        for (final w in imageWidgets) w,
                         for (final shape in slide.shapes) ...[
                           for (final para in shape.paragraphs) ...[
                             _buildSlideParagraph(para),

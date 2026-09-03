@@ -47,3 +47,8 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // DocumentFile API for SAF folder listing (no extra permissions needed)
+    implementation("androidx.documentfile:documentfile:1.0.1")
+}

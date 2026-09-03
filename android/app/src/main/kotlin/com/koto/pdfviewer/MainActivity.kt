@@ -1,21 +1,29 @@
 package com.koto.pdfviewer
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.core.content.FileProvider
+import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
 
+
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.koto.pdfviewer/intent"
     private val SHARE_CHANNEL = "com.koto.pdf_viewer/share"
+    private val SAF_CHANNEL = "koto/saf"
+    private val DIRECTORY_PICKER_REQUEST = 2001
     private var initialPdfPath: String? = null
     private var methodChannel: MethodChannel? = null
     private var shareMethodChannel: MethodChannel? = null
+    private var safMethodChannel: MethodChannel? = null
+    /** Holds the pending Dart result for a native directory-picker request. */
+    private var directoryPickerResult: MethodChannel.Result? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,6 +97,146 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 else -> result.notImplemented()
+            }
+        }
+
+        // SAF channel — lists files in an Android folder without extra permissions
+        safMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SAF_CHANNEL)
+        safMethodChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "listFilesInFolder" -> {
+                    val uriString = call.argument<String>("uri")
+                    if (uriString == null) {
+                        result.error("INVALID_ARGUMENT", "uri is required", null)
+                        return@setMethodCallHandler
+                    }
+                    val recursive = call.argument<Boolean>("recursive") ?: false
+                    try {
+                        val files = listFilesInSafFolder(uriString, recursive = recursive)
+                        result.success(files)
+                    } catch (e: Exception) {
+                        android.util.Log.e("SAFChannel", "listFilesInFolder error", e)
+                        result.error("SAF_ERROR", e.message, null)
+                    }
+                }
+                "resolveContentUri" -> {
+                    val uriString = call.argument<String>("uri")
+                    if (uriString == null) {
+                        result.error("INVALID_ARGUMENT", "uri is required", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val resolved = resolveUriToFilePath(Uri.parse(uriString))
+                        result.success(resolved)
+                    } catch (e: Exception) {
+                        android.util.Log.e("SAFChannel", "resolveContentUri error", e)
+                        result.error("SAF_ERROR", e.message, null)
+                    }
+                }
+                "pickDirectory" -> {
+                    // Launch ACTION_OPEN_DOCUMENT_TREE directly so we always get
+                    // the raw SAF tree URI — bypassing file_picker's internal
+                    // getFullPathFromTreeUri() which returns "/" for cloud providers.
+                    if (directoryPickerResult != null) {
+                        result.error("ALREADY_ACTIVE", "A directory picker is already open", null)
+                        return@setMethodCallHandler
+                    }
+                    directoryPickerResult = result
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                    }
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(intent, DIRECTORY_PICKER_REQUEST)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == DIRECTORY_PICKER_REQUEST) {
+            val pending = directoryPickerResult
+            directoryPickerResult = null
+            if (resultCode == Activity.RESULT_OK && data?.data != null) {
+                val uri = data.data!!
+                // Take persistable permission so the access survives app restarts
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (e: SecurityException) {
+                    android.util.Log.w("SAFChannel", "Could not persist permission: ${e.message}")
+                }
+                pending?.success(uri.toString())
+            } else {
+                // User cancelled or no data
+                pending?.success(null)
+            }
+        }
+    }
+
+    /**
+     * Lists files inside a SAF tree URI folder using [DocumentFile].
+     *
+     * @param uriString  SAF tree URI string
+     * @param recursive  If true, recursively includes files from sub-directories.
+     *
+     * Takes persistable read permission so the access survives app restarts.
+     * Each entry map has:
+     *   "uri"          — the document content URI (String)
+     *   "name"         — display name (String)
+     *   "size"         — file size in bytes (Long)
+     *   "lastModified" — last-modified timestamp in ms since epoch (Long)
+     */
+    private fun listFilesInSafFolder(
+        uriString: String,
+        recursive: Boolean = false
+    ): List<Map<String, Any>> {
+        val treeUri = Uri.parse(uriString)
+
+        // Persist the permission so it survives app restarts.
+        try {
+            contentResolver.takePersistableUriPermission(
+                treeUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (e: SecurityException) {
+            android.util.Log.w("SAFChannel", "Could not take persistable permission: ${e.message}")
+        }
+
+        val docFolder = DocumentFile.fromTreeUri(this, treeUri)
+            ?: return emptyList()
+
+        val result = mutableListOf<Map<String, Any>>()
+        collectFiles(docFolder, result, recursive)
+        return result
+    }
+
+    /** Recursively (or not) collects file entries from a [DocumentFile] directory. */
+    private fun collectFiles(
+        folder: DocumentFile,
+        result: MutableList<Map<String, Any>>,
+        recursive: Boolean
+    ) {
+        for (child in folder.listFiles()) {
+            when {
+                child.isFile -> {
+                    val name = child.name ?: return
+                    result.add(
+                        mapOf(
+                            "uri"          to child.uri.toString(),
+                            "name"         to name,
+                            "size"         to child.length(),
+                            "lastModified" to child.lastModified()
+                        )
+                    )
+                }
+                child.isDirectory && recursive -> {
+                    collectFiles(child, result, recursive = true)
+                }
             }
         }
     }

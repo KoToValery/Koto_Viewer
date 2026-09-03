@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 
 /// Styled text run in a presentation slide.
@@ -51,6 +52,14 @@ class PptxShape {
   String get plainText => paragraphs.map((p) => p.plainText).join('\n');
 }
 
+/// Embedded image on a slide.
+class PptxImage {
+  /// Raw bytes of the image (PNG / JPEG / etc.)
+  final Uint8List bytes;
+
+  const PptxImage({required this.bytes});
+}
+
 /// Table cell in a presentation slide.
 class PptxTableCell {
   final List<PptxParagraph> paragraphs;
@@ -87,15 +96,21 @@ class PptxSlide {
   final String? title;
   final List<PptxShape> shapes;
   final List<PptxTable> tables;
+  final List<PptxImage> images;
 
   const PptxSlide({
     required this.slideNumber,
     this.title,
     required this.shapes,
     this.tables = const [],
+    this.images = const [],
   });
 
-  bool get isEmpty => shapes.isEmpty && tables.isEmpty && (title == null || title!.isEmpty);
+  bool get isEmpty =>
+      shapes.isEmpty &&
+      tables.isEmpty &&
+      images.isEmpty &&
+      (title == null || title!.isEmpty);
 }
 
 /// Complete presentation representation.

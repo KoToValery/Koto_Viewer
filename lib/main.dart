@@ -169,7 +169,6 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
         break;
 
       case KotoFileType.pptx:
-      case KotoFileType.ppt:
         try {
           final convertedPdf = await PptToPdfConverterService.convertToPdf(filePath);
           navigator.push(
