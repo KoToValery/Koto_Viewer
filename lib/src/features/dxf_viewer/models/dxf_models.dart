@@ -546,6 +546,32 @@ class DxfSolid extends DxfEntity {
   }
 }
 
+/// A single hatch pattern definition line from DXF group 78 / 53 / 43 / 44 / 45 / 46 / 79 / 49.
+class DxfHatchPatternLine {
+  /// Pattern line angle in degrees (counterclockwise from positive X-axis in CAD space).
+  final double angle;
+
+  /// Base point (X, Y) in CAD coordinates from which the line family and dash cycle originates.
+  final Offset basePoint;
+
+  /// Offset vector (dx, dy) in CAD coordinates.
+  /// The perpendicular component defines the spacing between successive lines in the family,
+  /// and the parallel component defines the longitudinal shift between consecutive lines (e.g. for brick patterns).
+  final Offset offset;
+
+  /// Dash length items in CAD units.
+  /// Values > 0 indicate line dashes, values < 0 indicate spaces (gaps), and values == 0 indicate dots.
+  /// An empty list represents a continuous solid line.
+  final List<double> dashes;
+
+  const DxfHatchPatternLine({
+    required this.angle,
+    required this.basePoint,
+    required this.offset,
+    this.dashes = const [],
+  });
+}
+
 /// HATCH Entity.
 class DxfHatch extends DxfEntity {
   final List<List<Offset>> boundaryPaths;
@@ -554,6 +580,7 @@ class DxfHatch extends DxfEntity {
   final double patternAngle;
   final double patternScale;
   final double? transparency; // 0.0 (transparent) to 1.0 (opaque), e.g. 0.10 for ArchiCAD 10% shadow fills
+  final List<DxfHatchPatternLine>? patternLines;
 
   const DxfHatch({
     required this.boundaryPaths,
@@ -562,6 +589,7 @@ class DxfHatch extends DxfEntity {
     this.patternAngle = 0.0,
     this.patternScale = 1.0,
     this.transparency,
+    this.patternLines,
     super.layer,
     super.colorIndex,
     super.trueColor,

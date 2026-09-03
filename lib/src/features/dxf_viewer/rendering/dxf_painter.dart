@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/dxf_color_table.dart';
 import '../models/dxf_display_settings.dart';
 import '../models/dxf_models.dart';
+import 'dxf_hatch_pattern_helper.dart';
 import 'dxf_linetype_helper.dart';
 import 'dxf_math.dart';
 import 'dxf_snap_helper.dart';
@@ -380,7 +381,7 @@ class DxfPainter extends CustomPainter {
     } else if (entity is DxfSolid) {
       _renderSolid(canvas, entity, fillPaint, strokePaint, toCanvas);
     } else if (entity is DxfHatch) {
-      _renderHatch(canvas, entity, fillPaint, strokePaint, toCanvas);
+      _renderHatch(canvas, entity, fillPaint, strokePaint, toCanvas, fitScale);
     } else if (entity is DxfInsert) {
       _renderInsert(
         canvas: canvas,
@@ -956,6 +957,7 @@ class DxfPainter extends CustomPainter {
     Paint fillPaint,
     Paint strokePaint,
     Offset Function(Offset) toCanvas,
+    double fitScale,
   ) {
     if (hatch.boundaryPaths.isEmpty) return;
 
@@ -971,56 +973,55 @@ class DxfPainter extends CustomPainter {
       path.close();
     }
 
+    final nameUpper = hatch.patternName.toUpperCase();
+    final layerUpper = hatch.layer.toUpperCase();
+
     // 1. Determine effective transparency / fill opacity
-    double effectiveOpacity = 0.35; // standard default fill opacity
+    double? effectiveOpacity;
     if (hatch.transparency != null) {
       effectiveOpacity = hatch.transparency!.clamp(0.02, 1.0);
-    } else {
-      final nameUpper = hatch.patternName.toUpperCase();
-      final layerUpper = hatch.layer.toUpperCase();
-      if (nameUpper.contains('10%') ||
-          nameUpper.contains('SHADOW') ||
-          nameUpper.contains('СЕНКИ') ||
-          nameUpper.contains('SENKA') ||
-          nameUpper.contains('СЯНКА') ||
-          layerUpper.contains('SHADOW') ||
-          layerUpper.contains('СЕНКИ') ||
-          layerUpper.contains('СЯНКА') ||
-          layerUpper.contains('SENKA') ||
-          layerUpper.contains('TRANSP')) {
-        effectiveOpacity = 0.10; // ArchiCAD shadow fill (~10% opacity)
-      } else if (nameUpper.contains('25%') || nameUpper.contains('SOLID_25')) {
-        effectiveOpacity = 0.25;
-      } else if (nameUpper.contains('50%') || nameUpper.contains('SOLID_50')) {
-        effectiveOpacity = 0.50;
-      } else if (nameUpper.contains('75%') || nameUpper.contains('SOLID_75')) {
-        effectiveOpacity = 0.75;
-      } else if (hatch.isSolid) {
-        effectiveOpacity = 0.40;
-      }
+    } else if (nameUpper.contains('10%') ||
+        nameUpper.contains('SHADOW') ||
+        nameUpper.contains('СЕНКИ') ||
+        nameUpper.contains('SENKA') ||
+        nameUpper.contains('СЯНКА') ||
+        layerUpper.contains('SHADOW') ||
+        layerUpper.contains('СЕНКИ') ||
+        layerUpper.contains('СЯНКА') ||
+        layerUpper.contains('SENKA') ||
+        layerUpper.contains('TRANSP')) {
+      effectiveOpacity = 0.10; // ArchiCAD shadow fill (~10% opacity)
+    } else if (nameUpper.contains('25%') || nameUpper.contains('SOLID_25')) {
+      effectiveOpacity = 0.25;
+    } else if (nameUpper.contains('50%') || nameUpper.contains('SOLID_50')) {
+      effectiveOpacity = 0.50;
+    } else if (nameUpper.contains('75%') || nameUpper.contains('SOLID_75')) {
+      effectiveOpacity = 0.75;
+    } else if (hatch.isSolid) {
+      effectiveOpacity = 0.60;
     }
 
-    final effectiveFillPaint = Paint()
-      ..color = strokePaint.color.withValues(alpha: effectiveOpacity)
-      ..style = PaintingStyle.fill;
-
-    // Draw background translucent / solid fill
-    canvas.drawPath(path, effectiveFillPaint);
+    // Draw solid/translucent fill only when the hatch is solid or has an explicit/shadow transparency
+    if (effectiveOpacity != null && (hatch.isSolid || hatch.transparency != null || effectiveOpacity <= 0.75)) {
+      final effectiveFillPaint = Paint()
+        ..color = strokePaint.color.withValues(alpha: effectiveOpacity)
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(path, effectiveFillPaint);
+    }
 
     // 2. Draw geometric pattern lines for non-pure-solid hatches
-    final name = hatch.patternName.toUpperCase();
     final bool isPureSolid = hatch.isSolid &&
-        (name == 'SOLID' ||
-            name == '_SOLID' ||
-            name.contains('%') ||
-            name.contains('SHADOW') ||
-            name.contains('СЕНКИ') ||
-            name.contains('SENKA') ||
-            name.contains('СЯНКА') ||
-            name.contains('TRANSP'));
+        (nameUpper == 'SOLID' ||
+            nameUpper == '_SOLID' ||
+            nameUpper.contains('%') ||
+            nameUpper.contains('SHADOW') ||
+            nameUpper.contains('СЕНКИ') ||
+            nameUpper.contains('SENKA') ||
+            nameUpper.contains('СЯНКА') ||
+            nameUpper.contains('TRANSP'));
 
     if (!isPureSolid) {
-      _renderHatchPatternLines(canvas, path, hatch, strokePaint);
+      _renderHatchPatternLines(canvas, path, hatch, strokePaint, toCanvas, fitScale);
     }
   }
 
@@ -1029,131 +1030,210 @@ class DxfPainter extends CustomPainter {
     Path clipPath,
     DxfHatch hatch,
     Paint strokePaint,
+    Offset Function(Offset) toCanvas,
+    double fitScale,
   ) {
     final bounds = clipPath.getBounds();
     if (bounds.isEmpty || bounds.width <= 0 || bounds.height <= 0) return;
 
-    final name = hatch.patternName.toUpperCase();
-    final double scale = currentScale.clamp(0.001, 10000.0);
-    final double rawSpacing = (hatch.patternScale > 0 ? hatch.patternScale : 1.0) * 14.0;
-    final double spacing = (rawSpacing / scale).clamp(3.5, 400.0);
+    final fallbackOrigin = hatch.boundaryPaths.isNotEmpty && hatch.boundaryPaths.first.isNotEmpty
+        ? hatch.boundaryPaths.first.first
+        : Offset.zero;
 
+    final patternLines = DxfHatchPatternHelper.resolvePatternLines(
+      hatch,
+      fallbackOrigin: fallbackOrigin,
+    );
+    if (patternLines.isEmpty) return;
+
+    final double scale = currentScale.clamp(0.001, 10000.0);
+    // Crisp CAD line thickness for hatch lines
+    final double lineThickness = math.min(
+      strokePaint.strokeWidth,
+      (0.85 * settings.lineThicknessScale) / scale,
+    );
     final patternStrokePaint = Paint()
-      ..color = strokePaint.color.withValues(alpha: 0.65)
+      ..color = strokePaint.color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (0.85 * settings.lineThicknessScale) / scale
+      ..strokeWidth = math.max(0.15, lineThickness)
+      ..strokeCap = StrokeCap.round
       ..isAntiAlias = true;
+
+    final center = bounds.center;
+    final double radius = math.sqrt(bounds.width * bounds.width + bounds.height * bounds.height) / 2.0 + 2.0;
 
     canvas.save();
     canvas.clipPath(clipPath);
 
-    final double rad = hatch.patternAngle * math.pi / 180.0;
-
-    if (name.contains('ANSI31') || name.contains('LINE') || name.contains('HATCH') || name.contains('DIAGONAL')) {
-      _drawParallelLines(canvas, bounds, rad + math.pi / 4, spacing, patternStrokePaint);
-    } else if (name.contains('ANSI32') || name.contains('ANSI37') || name.contains('CROSS') || name.contains('GRID') || name.contains('NET')) {
-      _drawParallelLines(canvas, bounds, rad + math.pi / 4, spacing, patternStrokePaint);
-      _drawParallelLines(canvas, bounds, rad - math.pi / 4, spacing, patternStrokePaint);
-    } else if (name.contains('PLANK') || name.contains('FLOOR') || name.contains('HORIZ')) {
-      _drawParallelLines(canvas, bounds, rad, spacing * 1.5, patternStrokePaint);
-    } else if (name.contains('VERT')) {
-      _drawParallelLines(canvas, bounds, rad + math.pi / 2, spacing * 1.5, patternStrokePaint);
-    } else if (name.contains('INSULAT') || name.contains('STYROFOAM') || name.contains('SOLID___DASHED')) {
-      _drawParallelLines(canvas, bounds, rad + math.pi / 4, spacing * 0.8, patternStrokePaint);
-    } else if (name.contains('BRICK') || name.contains('AR-B')) {
-      _drawBrickPattern(canvas, bounds, rad, spacing, patternStrokePaint);
-    } else if (name.contains('CONC') || name.contains('GRAVEL')) {
-      _drawConcretePattern(canvas, bounds, spacing, patternStrokePaint);
-    } else if (name.contains('EARTH') || name.contains('SOIL')) {
-      _drawEarthPattern(canvas, bounds, rad + math.pi / 4, spacing, patternStrokePaint);
-    } else {
-      _drawParallelLines(canvas, bounds, rad + math.pi / 4, spacing, patternStrokePaint);
+    for (final line in patternLines) {
+      _renderSinglePatternLineFamily(
+        canvas: canvas,
+        line: line,
+        bounds: bounds,
+        center: center,
+        radius: radius,
+        paint: patternStrokePaint,
+        toCanvas: toCanvas,
+        fitScale: fitScale,
+      );
     }
 
     canvas.restore();
   }
 
-  void _drawParallelLines(
-    Canvas canvas,
-    Rect bounds,
-    double angleRad,
-    double spacing,
-    Paint paint, {
-    double offsetShift = 0.0,
+  void _renderSinglePatternLineFamily({
+    required Canvas canvas,
+    required DxfHatchPatternLine line,
+    required Rect bounds,
+    required Offset center,
+    required double radius,
+    required Paint paint,
+    required Offset Function(Offset) toCanvas,
+    required double fitScale,
   }) {
-    if (spacing <= 0) return;
-    final center = bounds.center;
-    final radius = math.sqrt(bounds.width * bounds.width + bounds.height * bounds.height) / 2 + 10;
+    // 1. Line angle and unit direction in Canvas
+    final double radCad = line.angle * math.pi / 180.0;
+    // Canvas coordinate system has Y inverted relative to CAD (Y down vs Y up)
+    final double dirX = math.cos(radCad);
+    final double dirY = -math.sin(radCad);
+    final dirCanvas = Offset(dirX, dirY);
 
-    final cosA = math.cos(angleRad);
-    final sinA = math.sin(angleRad);
-    final normX = -sinA;
-    final normY = cosA;
+    // Normal vector perpendicular to dirCanvas in Canvas coords (-dirY, dirX)
+    final normalCanvas = Offset(-dirY, dirX);
 
-    final count = (radius * 2 / spacing).ceil().clamp(1, 600);
-    for (int i = -count; i <= count; i++) {
-      final double offset = i * spacing + offsetShift;
-      final pMid = Offset(center.dx + normX * offset, center.dy + normY * offset);
-      final p1 = Offset(pMid.dx - cosA * radius, pMid.dy - sinA * radius);
-      final p2 = Offset(pMid.dx + cosA * radius, pMid.dy + sinA * radius);
-      canvas.drawLine(p1, p2, paint);
+    // 2. Base point in Canvas coords
+    final baseCanvas = toCanvas(line.basePoint);
+
+    // 3. Offset vector in Canvas coords (dx * fitScale, -dy * fitScale)
+    final offsetCanvas = Offset(
+      line.offset.dx * fitScale,
+      -line.offset.dy * fitScale,
+    );
+
+    // 4. Perpendicular step between successive lines in the family
+    final double step = offsetCanvas.dx * normalCanvas.dx + offsetCanvas.dy * normalCanvas.dy;
+    final double absStep = step.abs();
+
+    // Dense line safeguard: if spacing on screen is less than 1.2 pixels,
+    // lines blend into a solid tint. Avoid lagging by rendering a representative tint.
+    if (absStep > 0 && absStep < 1.2) {
+      final denseFillPaint = Paint()
+        ..color = paint.color.withValues(alpha: 0.25)
+        ..style = PaintingStyle.fill;
+      canvas.drawRect(bounds, denseFillPaint);
+      return;
     }
-  }
 
-  void _drawBrickPattern(
-    Canvas canvas,
-    Rect bounds,
-    double angleRad,
-    double spacing,
-    Paint paint,
-  ) {
-    _drawParallelLines(canvas, bounds, angleRad, spacing, paint);
-    _drawParallelLines(canvas, bounds, angleRad + math.pi / 2, spacing * 2.5, paint);
-  }
+    // 5. Calculate range of line indices [kMin, kMax] touching the bounding box
+    int kMin = 0;
+    int kMax = 0;
 
-  void _drawConcretePattern(
-    Canvas canvas,
-    Rect bounds,
-    double spacing,
-    Paint paint,
-  ) {
-    final double step = math.max(spacing * 0.8, 12.0);
-    final dotPaint = Paint()
-      ..color = paint.color
-      ..style = PaintingStyle.fill;
+    if (absStep < 1e-6) {
+      // Single line family (no offset perpendicular)
+      kMin = 0;
+      kMax = 0;
+    } else {
+      // Project the 4 corners of bounds onto normalCanvas
+      final c1 = bounds.topLeft;
+      final c2 = bounds.topRight;
+      final c3 = bounds.bottomRight;
+      final c4 = bounds.bottomLeft;
 
-    for (double x = bounds.left; x < bounds.right; x += step) {
-      for (double y = bounds.top; y < bounds.bottom; y += step) {
-        final double jitterX = (math.sin(x * 12.9898 + y * 78.233) * 43758.5453 % 1.0) * step * 0.6;
-        final double jitterY = (math.cos(x * 39.346 + y * 11.135) * 43758.5453 % 1.0) * step * 0.6;
-        final pt = Offset(x + jitterX, y + jitterY);
+      double dist(Offset p) =>
+          (p.dx - baseCanvas.dx) * normalCanvas.dx + (p.dy - baseCanvas.dy) * normalCanvas.dy;
 
-        if ((x.toInt() + y.toInt()) % 3 == 0) {
-          final s = step * 0.25;
-          final tri = Path()
-            ..moveTo(pt.dx, pt.dy - s)
-            ..lineTo(pt.dx - s, pt.dy + s)
-            ..lineTo(pt.dx + s, pt.dy + s)
-            ..close();
-          canvas.drawPath(tri, paint);
-        } else {
-          canvas.drawCircle(pt, 1.0, dotPaint);
+      final k1 = dist(c1) / step;
+      final k2 = dist(c2) / step;
+      final k3 = dist(c3) / step;
+      final k4 = dist(c4) / step;
+
+      final double rawMin = math.min(math.min(k1, k2), math.min(k3, k4));
+      final double rawMax = math.max(math.max(k1, k2), math.max(k3, k4));
+
+      kMin = rawMin.floor();
+      kMax = rawMax.ceil();
+    }
+
+    final int totalLines = kMax - kMin + 1;
+    if (totalLines <= 0) return;
+
+    // Safety stride to prevent locking UI if total lines exceeds 1500
+    final int stride = totalLines > 1500 ? (totalLines / 1000).ceil() : 1;
+
+    // Check dashes
+    final bool hasDashes = line.dashes.isNotEmpty;
+    double dashPeriod = 0.0;
+    if (hasDashes) {
+      for (final d in line.dashes) {
+        dashPeriod += d.abs() * fitScale;
+      }
+    }
+    final bool useDashes = hasDashes && dashPeriod >= 1.5;
+
+    // 6. Draw lines
+    for (int k = kMin; k <= kMax; k += stride) {
+      final lineBase = Offset(
+        baseCanvas.dx + offsetCanvas.dx * k,
+        baseCanvas.dy + offsetCanvas.dy * k,
+      );
+
+      // Project center onto this line
+      final double tCenter = (center.dx - lineBase.dx) * dirCanvas.dx +
+          (center.dy - lineBase.dy) * dirCanvas.dy;
+
+      final double tStart = tCenter - radius;
+      final double tEnd = tCenter + radius;
+
+      if (!useDashes) {
+        // Continuous line
+        final pStart = Offset(
+          lineBase.dx + dirCanvas.dx * tStart,
+          lineBase.dy + dirCanvas.dy * tStart,
+        );
+        final pEnd = Offset(
+          lineBase.dx + dirCanvas.dx * tEnd,
+          lineBase.dy + dirCanvas.dy * tEnd,
+        );
+        canvas.drawLine(pStart, pEnd, paint);
+      } else {
+        // Dashed / dotted line
+        final int startCycle = (tStart / dashPeriod).floor();
+        double tCurr = startCycle * dashPeriod;
+
+        while (tCurr < tEnd) {
+          for (final d in line.dashes) {
+            final double itemLen = d.abs() * fitScale;
+            if (d > 0) {
+              // Dash
+              final double segStart = math.max(tCurr, tStart);
+              final double segEnd = math.min(tCurr + itemLen, tEnd);
+              if (segEnd > segStart) {
+                final pStart = Offset(
+                  lineBase.dx + dirCanvas.dx * segStart,
+                  lineBase.dy + dirCanvas.dy * segStart,
+                );
+                final pEnd = Offset(
+                  lineBase.dx + dirCanvas.dx * segEnd,
+                  lineBase.dy + dirCanvas.dy * segEnd,
+                );
+                canvas.drawLine(pStart, pEnd, paint);
+              }
+            } else if (d == 0) {
+              // Dot
+              if (tCurr >= tStart && tCurr <= tEnd) {
+                final pDot = Offset(
+                  lineBase.dx + dirCanvas.dx * tCurr,
+                  lineBase.dy + dirCanvas.dy * tCurr,
+                );
+                canvas.drawCircle(pDot, paint.strokeWidth * 0.7, paint);
+              }
+            }
+            // If d < 0, it's a space (gap), do nothing
+            tCurr += itemLen;
+          }
         }
       }
     }
-  }
-
-  void _drawEarthPattern(
-    Canvas canvas,
-    Rect bounds,
-    double angleRad,
-    double spacing,
-    Paint paint,
-  ) {
-    final double groupSpacing = spacing * 2.2;
-    _drawParallelLines(canvas, bounds, angleRad, groupSpacing, paint);
-    _drawParallelLines(canvas, bounds, angleRad, groupSpacing, paint, offsetShift: spacing * 0.28);
-    _drawParallelLines(canvas, bounds, angleRad, groupSpacing, paint, offsetShift: spacing * 0.56);
   }
 
   void _renderInsert({

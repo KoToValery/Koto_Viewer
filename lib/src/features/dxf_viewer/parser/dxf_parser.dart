@@ -1151,6 +1151,7 @@ class DxfParser {
         double patternScale = 1;
         double? transparency;
         final boundaryPaths = _parseHatchBoundaryPaths(entityPairs);
+        final patternLines = _parseHatchPatternLines(entityPairs);
 
         for (final p in entityPairs) {
           switch (p.code) {
@@ -1217,6 +1218,7 @@ class DxfParser {
           patternAngle: patternAngle,
           patternScale: patternScale,
           transparency: transparency,
+          patternLines: patternLines,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
@@ -1668,5 +1670,74 @@ class DxfParser {
       }
     }
     return paths;
+  }
+
+  /// Parses HATCH pattern definition lines (DXF group codes 78, 53, 43, 44, 45, 46, 79, 49).
+  static List<DxfHatchPatternLine>? _parseHatchPatternLines(List<_DxfPair> pairs) {
+    final int len = pairs.length;
+    int i = 0;
+    while (i < len && pairs[i].code != 78) {
+      i++;
+    }
+    if (i >= len) return null;
+
+    final int numDefLines = pairs[i].intValue;
+    i++;
+    if (numDefLines <= 0) return const [];
+
+    final List<DxfHatchPatternLine> lines = [];
+    while (i < len && lines.length < numDefLines) {
+      // Find start of next pattern line definition (code 53)
+      while (i < len &&
+          pairs[i].code != 53 &&
+          pairs[i].code != 98 &&
+          pairs[i].code != 0) {
+        i++;
+      }
+      if (i >= len || pairs[i].code == 98 || pairs[i].code == 0) break;
+
+      final double angle = pairs[i].doubleValue;
+      i++;
+
+      double baseX = 0.0;
+      double baseY = 0.0;
+      double offsetX = 0.0;
+      double offsetY = 0.0;
+      final List<double> dashes = [];
+
+      while (i < len &&
+          pairs[i].code != 53 &&
+          pairs[i].code != 98 &&
+          pairs[i].code != 0) {
+        final p = pairs[i];
+        switch (p.code) {
+          case 43:
+            baseX = p.doubleValue;
+            break;
+          case 44:
+            baseY = p.doubleValue;
+            break;
+          case 45:
+            offsetX = p.doubleValue;
+            break;
+          case 46:
+            offsetY = p.doubleValue;
+            break;
+          case 49:
+            dashes.add(p.doubleValue);
+            break;
+        }
+        i++;
+      }
+
+      lines.add(DxfHatchPatternLine(
+        angle: angle,
+        basePoint: Offset(baseX, baseY),
+        offset: Offset(offsetX, offsetY),
+        dashes: dashes,
+      ));
+    }
+
+    return lines.isNotEmpty ? lines : null;
   }
 }
