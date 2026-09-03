@@ -136,22 +136,31 @@ class GerberParser {
         // %TO.P...% / %TA.PinNumber...% -> Pin Number
         else if (extBlock.startsWith('TO.P') || extBlock.startsWith('TA.PinNumber')) {
           final parts = extBlock.split(',');
-          if (parts.length > 1) {
-            activePinNumber = parts[1].replaceAll('*', '').trim();
+          if (parts.length > 2) {
+            // Standard Gerber X2: %TO.P,<refdes>,<pin_number>[,<function>]%
+            final ref = parts[1].replaceAll('*', '').replaceAll('"', '').trim();
+            if (ref.isNotEmpty) activeComponentRef ??= ref;
+            final pin = parts[2].replaceAll('*', '').replaceAll('"', '').trim();
+            if (pin.isNotEmpty) activePinNumber = pin;
+          } else if (parts.length > 1) {
+            final pin = parts[1].replaceAll('*', '').replaceAll('"', '').trim();
+            if (pin.isNotEmpty) activePinNumber = pin;
           }
         }
         // %TO.N...% / %TA.Net...% -> Net Name
         else if (extBlock.startsWith('TO.N') || extBlock.startsWith('TA.Net')) {
           final parts = extBlock.split(',');
           if (parts.length > 1) {
-            activeNetName = parts[1].replaceAll('*', '').trim();
+            final net = parts[1].replaceAll('*', '').replaceAll('"', '').trim();
+            if (net.isNotEmpty) activeNetName = net;
           }
         }
         // %TO.C...% / %TA.Component...% -> Component RefDes
         else if (extBlock.startsWith('TO.C') || extBlock.startsWith('TA.Component')) {
           final parts = extBlock.split(',');
           if (parts.length > 1) {
-            activeComponentRef = parts[1].replaceAll('*', '').trim();
+            final comp = parts[1].replaceAll('*', '').replaceAll('"', '').trim();
+            if (comp.isNotEmpty) activeComponentRef = comp;
           }
         }
         // %TD...% -> Delete Attribute / Clear active attributes

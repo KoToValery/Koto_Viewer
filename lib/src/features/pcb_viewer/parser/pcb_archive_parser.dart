@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
-import '../../../core/services/universal_encoding_service.dart';
 import '../models/pcb_models.dart';
 import '../services/pcb_pad_numbering_service.dart';
 import 'gerber_parser.dart';
@@ -162,37 +161,6 @@ class PcbArchiveParser {
     return PcbPadNumberingService.assignPadNumbers(project);
   }
 
-  static bool _isPcbFileExtension(String name) {
-    final lower = name.toLowerCase();
-    return lower.endsWith('.gbr') ||
-        lower.endsWith('.ger') ||
-        lower.endsWith('.gtl') ||
-        lower.endsWith('.gbl') ||
-        lower.endsWith('.gts') ||
-        lower.endsWith('.gbs') ||
-        lower.endsWith('.gto') ||
-        lower.endsWith('.gbo') ||
-        lower.endsWith('.gko') ||
-        lower.endsWith('.gm1') ||
-        lower.endsWith('.gm2') ||
-        lower.endsWith('.gm3') ||
-        lower.endsWith('.top') ||
-        lower.endsWith('.bot') ||
-        lower.endsWith('.smt') ||
-        lower.endsWith('.smb') ||
-        lower.endsWith('.sst') ||
-        lower.endsWith('.ssb') ||
-        lower.endsWith('.edge') ||
-        lower.endsWith('.drl') ||
-        lower.endsWith('.xln') ||
-        lower.endsWith('.exc') ||
-        lower.endsWith('.drd') ||
-        lower.endsWith('.kicad_pcb') ||
-        lower.endsWith('.kicad_sch') ||
-        lower.endsWith('.kicad_sym') ||
-        lower.endsWith('.sch') ||
-        lower.endsWith('.brd');
-  }
 
   static bool _isDrillFileName(String name) {
     final lower = name.toLowerCase();

@@ -228,6 +228,9 @@ class PcbDocument {
   int get padCount => commands.where((c) => c.type == PcbCommandType.flash).length;
   int get regionCount => commands.where((c) => c.type == PcbCommandType.region).length;
   int get holeCount => drillHoles.length;
+  bool get hasPadNumbers =>
+      commands.any((c) => c.pinNumber != null && c.pinNumber!.isNotEmpty) ||
+      drillHoles.any((d) => d.pinNumber != null && d.pinNumber!.isNotEmpty);
 }
 
 /// Side of the PCB to view.
@@ -344,6 +347,7 @@ class PcbProject {
   int get totalComponents => bomEntries.fold(0, (sum, e) => sum + e.quantity);
   int get totalImages => images.length;
   int get totalArchiveFiles => archiveFiles.length;
+  bool get hasPadNumbers => layers.any((l) => l.document.hasPadNumbers);
 
   PcbLayerItem? get edgeCutsLayer =>
       layers.cast<PcbLayerItem?>().firstWhere((l) => l?.type == PcbLayerType.edgeCuts, orElse: () => null);

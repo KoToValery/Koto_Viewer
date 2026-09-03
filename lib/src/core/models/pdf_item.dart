@@ -79,7 +79,7 @@ class PdfItem {
     if (lower.endsWith('.txt') || lower.endsWith('.log') || lower.endsWith('.csv')) return KotoFileType.txt;
     if (lower.endsWith('.md') || lower.endsWith('.markdown')) return KotoFileType.md;
     if (lower.endsWith('.docx')) return KotoFileType.docx;
-    if (lower.endsWith('.pptx') || lower.endsWith('.ppsx')) return KotoFileType.pptx;
+    if (lower.endsWith('.pptx') || lower.endsWith('.ppsx') || lower.endsWith('.ppt') || lower.endsWith('.pps')) return KotoFileType.pptx;
     if (lower.endsWith('.rtf')) return KotoFileType.rtf;
     if (lower.endsWith('.eps')) return KotoFileType.eps;
     if (lower.endsWith('.cdr')) return KotoFileType.cdr;

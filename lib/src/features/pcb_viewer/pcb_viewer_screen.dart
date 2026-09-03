@@ -12,6 +12,7 @@ import '../kicad_viewer/parser/kicad_pcb_parser.dart';
 import '../kicad_viewer/parser/kicad_sch_parser.dart';
 import 'rendering/pcb_multi_layer_painter.dart';
 import 'services/pcb_pad_numbering_service.dart';
+import 'widgets/pcb_image_zoom_dialog.dart';
 
 /// PCB Multi-Layer Project & Gerber/Drill Viewer Screen.
 /// Supports Proteus ARES ZIP archives, Altium, KiCad, Eagle, EasyEDA, and individual Gerber/Drill files.
@@ -409,10 +410,27 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'Archive Images (${images.length})',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Archive Images (${images.length})',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      FilledButton.tonalIcon(
+                        icon: const Icon(Icons.zoom_in, size: 18),
+                        label: const Text('Interactive Zoom'),
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          PcbImageZoomDialog.show(context, images: images, initialIndex: 0);
+                        },
+                      ),
+                    ],
                   ),
                 ),
                 const Divider(height: 1),
@@ -434,19 +452,64 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
                               color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                              child: Text(
-                                img.fileName,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      img.fileName,
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.zoom_in, size: 20),
+                                    tooltip: 'Zoom in (Приближаване)',
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      PcbImageZoomDialog.show(context, images: images, initialIndex: index);
+                                    },
+                                  ),
+                                ],
                               ),
                             ),
-                            Image.memory(
-                              img.bytes,
-                              fit: BoxFit.contain,
-                              errorBuilder: (ctx, err, stack) => const Padding(
-                                padding: EdgeInsets.all(32),
-                                child: Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
+                            InkWell(
+                              onTap: () {
+                                Navigator.pop(context);
+                                PcbImageZoomDialog.show(context, images: images, initialIndex: index);
+                              },
+                              child: Stack(
+                                alignment: Alignment.bottomRight,
+                                children: [
+                                  Image.memory(
+                                    img.bytes,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (ctx, err, stack) => const Padding(
+                                      padding: EdgeInsets.all(32),
+                                      child: Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
+                                    ),
+                                  ),
+                                  Container(
+                                    margin: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.zoom_in, size: 14, color: Colors.white),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Tap to zoom',
+                                          style: TextStyle(color: Colors.white, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -966,8 +1029,8 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                       onPressed: () => setState(() => _showGrid = !_showGrid),
                     ),
 
-                  // Pad Numbers Toggle (only if layers exist)
-                  if (_project != null && _project!.layers.isNotEmpty)
+                  // Pad Numbers Toggle (only if authentic pad numbers exist from standard)
+                  if (_project != null && _project!.layers.isNotEmpty && _project!.hasPadNumbers)
                     IconButton(
                       icon: Icon(
                         _showPadNumbers ? Icons.tag : Icons.tag_outlined,
@@ -1207,6 +1270,18 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onPrimaryContainer,
                   ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.fullscreen, size: 22),
+                tooltip: 'Interactive Zoom Viewer',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                onPressed: () => PcbImageZoomDialog.show(
+                  context,
+                  images: _project!.images,
+                  initialIndex: _selectedImageIndex,
                 ),
               ),
             ],
