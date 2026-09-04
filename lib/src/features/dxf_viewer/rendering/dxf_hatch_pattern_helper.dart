@@ -148,9 +148,11 @@ class DxfHatchPatternHelper {
       );
     }
 
-    // Standard fallback: 45° parallel lines
+    // Universal geometric fallback for any custom, user, or localized pattern:
+    // Respects the entity's explicit CAD angle and scale.
+    final double effectiveAngle = angleDeg != 0.0 ? angleDeg : 45.0;
     return _createParallelPattern(
-      angleDeg: 45.0 + angleDeg,
+      angleDeg: effectiveAngle,
       spacing: 8.0 * scale,
       origin: origin,
     );

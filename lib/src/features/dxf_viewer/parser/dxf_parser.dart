@@ -1280,31 +1280,41 @@ class DxfParser {
         final nameUpper = patternName.toUpperCase();
         final layerUpper = layer.toUpperCase();
 
-        // Automatic inference for ArchiCAD shadow fills and percentage fills if not explicitly set in 440
-        if (transparency == null) {
-          if (nameUpper.contains('10%') ||
-              nameUpper.contains('10_PERCENT') ||
-              nameUpper.contains('PERCENT_10') ||
-              nameUpper.contains('SHADOW') ||
-              nameUpper.contains('СЕНКИ') ||
-              nameUpper.contains('СЯНКА') ||
-              nameUpper.contains('SENKA') ||
-              layerUpper.contains('SHADOW') ||
-              layerUpper.contains('СЕНКИ') ||
-              layerUpper.contains('СЯНКА') ||
-              layerUpper.contains('SENKA') ||
-              layerUpper.contains('TRANSP')) {
-            transparency = 0.10; // ArchiCAD shadow fill (~10% opacity)
-            isSolid = true;
-          } else if (nameUpper.contains('25%') || nameUpper.contains('SOLID_25')) {
-            transparency = 0.25;
-            isSolid = true;
-          } else if (nameUpper.contains('50%') || nameUpper.contains('SOLID_50')) {
-            transparency = 0.50;
-            isSolid = true;
-          } else if (nameUpper.contains('75%') || nameUpper.contains('SOLID_75')) {
-            transparency = 0.75;
-            isSolid = true;
+        // Universal mathematical percentage extraction:
+        // Matches patterns like "25%", "50 %", "10_PERCENT", "SOLID_25", "SOLID_50", "75PCT", etc.
+        // Works universally across all languages because digits + % / PERCENT / PCT are international.
+        if (transparency == null && (patternLines == null || patternLines.isEmpty)) {
+          final pctMatch = RegExp(r'(?:^|[_\s-])(\d{1,2})[_\s]*(?:%|PERCENT|PCT)(?:[_\s-]|$)').firstMatch(nameUpper) ??
+              RegExp(r'(?:^|[_\s-])(?:SOLID|PERCENT|PCT)[_\s-]+(\d{1,2})(?:[_\s-]|$)').firstMatch(nameUpper);
+          if (pctMatch != null) {
+            final val = int.tryParse(pctMatch.group(1)!);
+            if (val != null && val > 0 && val < 100) {
+              transparency = val / 100.0;
+              isSolid = true;
+            }
+          } else {
+            // International architectural shadow / screening conventions (across EN, DE, FR, ES, RU, BG):
+            final isShadowConvention =
+                nameUpper.contains('SHADOW') ||
+                nameUpper.contains('SCHATTEN') ||
+                nameUpper.contains('OMBRE') ||
+                nameUpper.contains('SOMBRA') ||
+                nameUpper.contains('СЕНКИ') ||
+                nameUpper.contains('СЯНКА') ||
+                nameUpper.contains('ТЕНЬ') ||
+                layerUpper.contains('SHADOW') ||
+                layerUpper.contains('SCHATTEN') ||
+                layerUpper.contains('OMBRE') ||
+                layerUpper.contains('SOMBRA') ||
+                layerUpper.contains('СЕНКИ') ||
+                layerUpper.contains('СЯНКА') ||
+                layerUpper.contains('ТЕНЬ') ||
+                layerUpper.contains('TRANSP');
+
+            if (isShadowConvention) {
+              transparency = 0.10;
+              isSolid = true;
+            }
           }
         }
 

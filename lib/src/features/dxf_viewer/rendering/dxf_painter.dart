@@ -1117,52 +1117,23 @@ class DxfPainter extends CustomPainter {
       path.close();
     }
 
-    final nameUpper = hatch.patternName.toUpperCase();
-    final layerUpper = hatch.layer.toUpperCase();
+    final bool hasExplicitPatternLines =
+        hatch.patternLines != null && hatch.patternLines!.isNotEmpty;
 
-    // 1. Determine effective transparency / fill opacity
-    double? effectiveOpacity;
-    if (hatch.transparency != null) {
-      effectiveOpacity = hatch.transparency!.clamp(0.02, 1.0);
-    } else if (nameUpper.contains('10%') ||
-        nameUpper.contains('SHADOW') ||
-        nameUpper.contains('СЕНКИ') ||
-        nameUpper.contains('SENKA') ||
-        nameUpper.contains('СЯНКА') ||
-        layerUpper.contains('SHADOW') ||
-        layerUpper.contains('СЕНКИ') ||
-        layerUpper.contains('СЯНКА') ||
-        layerUpper.contains('SENKA') ||
-        layerUpper.contains('TRANSP')) {
-      effectiveOpacity = 0.10; // ArchiCAD shadow fill (~10% opacity)
-    } else if (nameUpper.contains('25%') || nameUpper.contains('SOLID_25')) {
-      effectiveOpacity = 0.25;
-    } else if (nameUpper.contains('50%') || nameUpper.contains('SOLID_50')) {
-      effectiveOpacity = 0.50;
-    } else if (nameUpper.contains('75%') || nameUpper.contains('SOLID_75')) {
-      effectiveOpacity = 0.75;
-    } else if (hatch.isSolid) {
-      effectiveOpacity = 0.60;
-    }
+    // 1. Draw solid or translucent background fill.
+    // Driven directly by hatch.transparency (from group 440 or percentage) or hatch.isSolid.
+    // Non-solid pattern fills have a transparent background in CAD.
+    final double? fillOpacity = hatch.transparency ?? (hatch.isSolid ? 0.60 : null);
 
-    // Draw solid/translucent fill only when the hatch is solid or has an explicit/shadow transparency
-    if (effectiveOpacity != null && (hatch.isSolid || hatch.transparency != null || effectiveOpacity <= 0.75)) {
+    if (fillOpacity != null && (hatch.isSolid || hatch.transparency != null)) {
       final effectiveFillPaint = Paint()
-        ..color = strokePaint.color.withValues(alpha: effectiveOpacity)
+        ..color = strokePaint.color.withValues(alpha: fillOpacity.clamp(0.02, 1.0))
         ..style = PaintingStyle.fill;
       canvas.drawPath(path, effectiveFillPaint);
     }
 
     // 2. Draw geometric pattern lines for non-pure-solid hatches
-    final bool isPureSolid = hatch.isSolid &&
-        (nameUpper == 'SOLID' ||
-            nameUpper == '_SOLID' ||
-            nameUpper.contains('%') ||
-            nameUpper.contains('SHADOW') ||
-            nameUpper.contains('СЕНКИ') ||
-            nameUpper.contains('SENKA') ||
-            nameUpper.contains('СЯНКА') ||
-            nameUpper.contains('TRANSP'));
+    final bool isPureSolid = hatch.isSolid && !hasExplicitPatternLines;
 
     if (!isPureSolid) {
       _renderHatchPatternLines(canvas, path, hatch, strokePaint, toCanvas, fitScale);
@@ -1301,18 +1272,38 @@ class DxfPainter extends CustomPainter {
     final int totalLines = kMax - kMin + 1;
     if (totalLines <= 0) return;
 
-    // Safety stride to prevent locking UI if total lines exceeds 1500
-    final int stride = totalLines > 1500 ? (totalLines / 1000).ceil() : 1;
+    // Safety stride to prevent locking UI if total lines exceeds 2000
+    final int stride = totalLines > 2000 ? (totalLines / 1500).ceil() : 1;
 
     // Check dashes
     final bool hasDashes = line.dashes.isNotEmpty;
+    final bool hasDrawnDashes = line.dashes.any((d) => d > 0);
+    final bool hasDots = line.dashes.any((d) => d == 0);
+    final bool isDottedOnly = hasDashes && !hasDrawnDashes && hasDots;
+
     double dashPeriod = 0.0;
     if (hasDashes) {
       for (final d in line.dashes) {
         dashPeriod += d.abs() * fitScale;
       }
     }
-    final bool useDashes = hasDashes && dashPeriod >= 1.5;
+    // Avoid divide-by-zero or infinite loops
+    if (hasDashes && dashPeriod < 1e-4) {
+      dashPeriod = math.max(1.0, 10.0 * fitScale);
+    }
+
+    final bool useDashes = hasDashes &&
+        ((hasDrawnDashes && dashPeriod >= 1.5) || (isDottedOnly && dashPeriod >= 0.8));
+
+    // Dedicated paint for solid CAD dots (filled circles)
+    final dotPaint = Paint()
+      ..color = paint.color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    // CAD dots (d == 0) are dimensionless points — render as crisp ~1 screen-pixel circles.
+    // Do NOT scale with strokeWidth; use currentScale so dots stay visually consistent at any zoom.
+    final double scale = currentScale.clamp(0.001, 10000.0);
+    final double dotRadius = (1.0 * settings.lineThicknessScale) / scale;
 
     // 6. Draw lines
     for (int k = kMin; k <= kMax; k += stride) {
@@ -1329,16 +1320,18 @@ class DxfPainter extends CustomPainter {
       final double tEnd = tCenter + radius;
 
       if (!useDashes) {
-        // Continuous line
-        final pStart = Offset(
-          lineBase.dx + dirCanvas.dx * tStart,
-          lineBase.dy + dirCanvas.dy * tStart,
-        );
-        final pEnd = Offset(
-          lineBase.dx + dirCanvas.dx * tEnd,
-          lineBase.dy + dirCanvas.dy * tEnd,
-        );
-        canvas.drawLine(pStart, pEnd, paint);
+        if (!isDottedOnly) {
+          // Continuous line (or dashed line zoomed far out where dashes blend together)
+          final pStart = Offset(
+            lineBase.dx + dirCanvas.dx * tStart,
+            lineBase.dy + dirCanvas.dy * tStart,
+          );
+          final pEnd = Offset(
+            lineBase.dx + dirCanvas.dx * tEnd,
+            lineBase.dy + dirCanvas.dy * tEnd,
+          );
+          canvas.drawLine(pStart, pEnd, paint);
+        }
       } else {
         // Dashed / dotted line
         final int startCycle = (tStart / dashPeriod).floor();
@@ -1363,13 +1356,13 @@ class DxfPainter extends CustomPainter {
                 canvas.drawLine(pStart, pEnd, paint);
               }
             } else if (d == 0) {
-              // Dot
+              // Dot (rendered as crisp filled circle)
               if (tCurr >= tStart && tCurr <= tEnd) {
                 final pDot = Offset(
                   lineBase.dx + dirCanvas.dx * tCurr,
                   lineBase.dy + dirCanvas.dy * tCurr,
                 );
-                canvas.drawCircle(pDot, paint.strokeWidth * 0.7, paint);
+                canvas.drawCircle(pDot, dotRadius, dotPaint);
               }
             }
             // If d < 0, it's a space (gap), do nothing

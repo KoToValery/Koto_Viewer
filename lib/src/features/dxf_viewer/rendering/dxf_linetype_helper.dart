@@ -117,7 +117,12 @@ class DxfLinetypeHelper {
         norm == 'solid' ||
         norm == 'bylayer' ||
         norm == 'byblock' ||
+        norm == 'continu' ||
+        norm == 'continua' ||
+        norm == 'durchgehend' ||
+        norm == 'volllinie' ||
         norm == 'непрекъсната' ||
+        norm == 'сплошная' ||
         norm == 'плътна') {
       return null;
     }
@@ -160,6 +165,7 @@ class DxfLinetypeHelper {
     if (norm.contains('dashdot') ||
         norm.contains('dotdash') ||
         norm.contains('dotdashed') ||
+        norm.contains('strichpunkt') ||
         norm.contains('chain') ||
         norm.contains('штрихпункт') ||
         norm.contains('тиреточка') ||
@@ -172,6 +178,10 @@ class DxfLinetypeHelper {
 
     // 4. Centerline / Center pattern (including Archicad LTYPE006, LTYPE008)
     if (norm.contains('center') ||
+        norm.contains('mittellinie') ||
+        norm.contains('achse') ||
+        norm.contains('axe') ||
+        norm.contains('eje') ||
         norm.contains('osova') ||
         norm.contains('осов') ||
         norm.contains('осев') ||
@@ -185,6 +195,7 @@ class DxfLinetypeHelper {
 
     // 5. Long Dashed pattern (including Archicad LTYPE005)
     if (norm.contains('longdash') ||
+        norm.contains('langgestrichelt') ||
         norm.contains('дългапрекъснат') ||
         norm.contains('дългичерти') ||
         norm == 'ltype005') {
@@ -199,6 +210,7 @@ class DxfLinetypeHelper {
     // 7. Hidden / Short Dashed line pattern (including Archicad LTYPE004, LTYPE010)
     if (norm.contains('hidden') ||
         norm.contains('shortdash') ||
+        norm.contains('kurzgestrichelt') ||
         norm.contains('късапрекъснат') ||
         norm.contains('скрит') ||
         norm.contains('acadiso06') ||
@@ -214,6 +226,9 @@ class DxfLinetypeHelper {
 
     // 9. Dashed line pattern (including Archicad LTYPE003)
     if (norm.contains('dash') ||
+        norm.contains('gestrichelt') ||
+        norm.contains('tirete') ||
+        norm.contains('trazos') ||
         norm.contains('прекъснат') ||
         norm.contains('штрих') ||
         norm.contains('чертичк') ||
@@ -227,6 +242,9 @@ class DxfLinetypeHelper {
     // 10. Dotted / Dot / Punktir pattern (including Archicad LTYPE002, LTYPE007)
     if (norm.contains('dot') ||
         norm.contains('punkt') ||
+        norm.contains('gepunktet') ||
+        norm.contains('pointille') ||
+        norm.contains('puntos') ||
         norm.contains('пункт') ||
         norm.contains('точк') ||
         norm.contains('point') ||

@@ -778,6 +778,63 @@ EOF''';
       }
     });
 
+    test('Loads and verifies real hatch.dwg converted DXF file', () async {
+      final file = File('test_files/hatch_converted.dxf');
+      if (!file.existsSync()) return;
+
+      final doc = await DxfParser.parseFromFile(file);
+      final hatches = doc.entities.whereType<DxfHatch>().toList();
+      expect(hatches.length, 26);
+
+      // Verify solid fills
+      final solidHatches = hatches.where((h) => h.isSolid).toList();
+      expect(solidHatches.length, 2);
+      expect(solidHatches.every((h) => h.patternName == 'SOLID'), isTrue);
+
+      // Verify non-solid drafting fills (all 24 must have embedded pattern lines)
+      final patternHatches = hatches.where((h) => !h.isSolid).toList();
+      expect(patternHatches.length, 24);
+      expect(patternHatches.every((h) => h.patternLines != null && h.patternLines!.isNotEmpty), isTrue);
+
+      // 1. Common_Brick: 1 line at 45 deg, step 4.0 CAD units
+      final brick = hatches.firstWhere((h) => h.patternName == 'Common_Brick');
+      expect(brick.patternLines!.length, 1);
+      expect(brick.patternLines!.first.angle, closeTo(45.0, 0.01));
+
+      // 2. Batt_Insulation: 2 lines at 60 and 120 deg
+      final insul = hatches.firstWhere((h) => h.patternName == 'Batt_Insulation');
+      expect(insul.patternLines!.length, 2);
+      expect(insul.patternLines![0].angle, closeTo(60.0, 0.01));
+      expect(insul.patternLines![1].angle, closeTo(120.0, 0.01));
+
+      // 3. Grass: 6 lines forming tufts
+      final grass = hatches.firstWhere((h) => h.patternName == 'Grass');
+      expect(grass.patternLines!.length, 6);
+
+      // 4. Structural_Concrete: 8 lines with aggregate facets and dots
+      final concrete = hatches.firstWhere((h) => h.patternName == 'Structural_Concrete');
+      expect(concrete.patternLines!.length, 8);
+
+      // 5. Cyrillic СЕНКИ: 2 lines with stipple dots, isSolid is FALSE
+      final senki = hatches.firstWhere((h) => h.patternName == 'СЕНКИ');
+      expect(senki.isSolid, isFalse);
+      expect(senki.patternLines!.length, 2);
+      expect(senki.patternLines!.every((l) => l.dashes.any((d) => d == 0)), isTrue);
+
+      // 6. Plaster: 2 lines with stipple dots
+      final plaster = hatches.firstWhere((h) => h.patternName == 'Plaster');
+      expect(plaster.patternLines!.length, 2);
+      expect(plaster.patternLines!.every((l) => l.dashes.any((d) => d == 0)), isTrue);
+
+      // 7. Paint entire hatch.dwg drawing onto canvas without throwing
+      final painter = DxfPainter(document: doc, theme: DxfCanvasTheme.darkCad);
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+      expect(() => painter.paint(canvas, const Size(1920, 1080)), returnsNormally);
+      final picture = recorder.endRecording();
+      expect(picture, isNotNull);
+    });
+
     test('Renders Common_Brick DxfHatch with DxfPainter without throwing', () {
       const hatch = DxfHatch(
         boundaryPaths: [
@@ -860,6 +917,164 @@ EOF''';
       expect(() => painter.paint(canvas, const Size(800, 600)), returnsNormally);
       final picture = recorder.endRecording();
       expect(picture, isNotNull);
+    });
+  });
+
+  group('Universal International CAD Standards Tests', () {
+    test('Universally parses arbitrary percentage fills without hardcoded values', () {
+      final percentages = [
+        ('15%', 0.15),
+        ('35%', 0.35),
+        ('70%', 0.70),
+        ('5%', 0.05),
+        ('SOLID_20', 0.20),
+        ('SOLID_65', 0.65),
+        ('80_PERCENT', 0.80),
+        ('40PCT', 0.40),
+      ];
+
+      for (final (name, expected) in percentages) {
+        final dxf = '''0
+SECTION
+2
+ENTITIES
+0
+HATCH
+8
+fill
+2
+$name
+70
+0
+91
+1
+92
+1
+93
+4
+10
+0.0
+20
+0.0
+10
+10.0
+20
+0.0
+10
+10.0
+20
+10.0
+10
+0.0
+20
+10.0
+0
+ENDSEC
+0
+EOF''';
+        final doc = DxfParser.parseString(dxf);
+        final hatch = doc.entities.first as DxfHatch;
+        expect(hatch.transparency, closeTo(expected, 0.001), reason: 'Failed for $name');
+        expect(hatch.isSolid, isTrue, reason: 'Failed isSolid for $name');
+      }
+    });
+
+    test('Parses international architectural shadow conventions across multiple languages', () {
+      final shadowNames = [
+        ('SCHATTEN', 'fill'),     // German
+        ('OMBRE', 'fill'),        // French
+        ('SOMBRA', 'fill'),       // Spanish
+        ('СЯНКА', 'fill'),        // Bulgarian
+        ('ТЕНЬ', 'fill'),         // Russian
+        ('WALL', 'A-SHADOW-PATT'),// English layer
+        ('WAND', 'SCHATTEN_01'),  // German layer
+      ];
+
+      for (final (patName, layerName) in shadowNames) {
+        final dxf = '''0
+SECTION
+2
+ENTITIES
+0
+HATCH
+8
+$layerName
+2
+$patName
+70
+0
+91
+1
+92
+1
+93
+4
+10
+0.0
+20
+0.0
+10
+10.0
+20
+0.0
+10
+10.0
+20
+10.0
+10
+0.0
+20
+10.0
+0
+ENDSEC
+0
+EOF''';
+        final doc = DxfParser.parseString(dxf);
+        final hatch = doc.entities.first as DxfHatch;
+        expect(hatch.transparency, closeTo(0.10, 0.001), reason: 'Failed for $patName on $layerName');
+        expect(hatch.isSolid, isTrue);
+      }
+    });
+
+    test('Universal geometric fallback uses entity CAD angle and scale for foreign custom patterns', () {
+      const customHatch = DxfHatch(
+        boundaryPaths: [],
+        patternName: 'MEIN_CUSTOM_MUSTER',
+        isSolid: false,
+        patternAngle: 30.0,
+        patternScale: 2.0,
+      );
+
+      final lines = DxfHatchPatternHelper.resolvePatternLines(customHatch);
+      expect(lines.length, 1);
+      expect(lines.first.angle, 30.0);
+      // Spacing is 8.0 * scale = 16.0
+      expect(lines.first.offset.distance, closeTo(16.0, 0.01));
+    });
+
+    test('Resolves international CAD linetypes across German, French, Spanish, Russian', () {
+      // German
+      expect(DxfLinetypeHelper.resolvePattern('gestrichelt'), DxfLinetypeHelper.dashedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('gepunktet'), DxfLinetypeHelper.dottedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('strichpunkt'), DxfLinetypeHelper.dashDotPattern);
+      expect(DxfLinetypeHelper.resolvePattern('mittellinie'), DxfLinetypeHelper.centerPattern);
+      expect(DxfLinetypeHelper.resolvePattern('durchgehend'), isNull);
+
+      // French
+      expect(DxfLinetypeHelper.resolvePattern('tirete'), DxfLinetypeHelper.dashedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('pointille'), DxfLinetypeHelper.dottedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('axe'), DxfLinetypeHelper.centerPattern);
+      expect(DxfLinetypeHelper.resolvePattern('continu'), isNull);
+
+      // Spanish
+      expect(DxfLinetypeHelper.resolvePattern('trazos'), DxfLinetypeHelper.dashedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('puntos'), DxfLinetypeHelper.dottedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('eje'), DxfLinetypeHelper.centerPattern);
+      expect(DxfLinetypeHelper.resolvePattern('continua'), isNull);
+
+      // Russian
+      expect(DxfLinetypeHelper.resolvePattern('штриховая'), DxfLinetypeHelper.dashedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('сплошная'), isNull);
     });
   });
 }
