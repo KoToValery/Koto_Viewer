@@ -1231,11 +1231,7 @@ class DxfPainter extends CustomPainter {
 
     // Dense line safeguard: if spacing on screen is less than 1.2 pixels,
     // lines blend into a solid tint. Avoid lagging by rendering a representative tint.
-    // Exception: pure dot families (isDottedOnly) are naturally sparse — never replace them
-    // with a solid fill, since that would make Cut_Stone / Plaster / etc. look almost solid.
-    final bool hasDrawnDashesEarly = line.dashes.any((d) => d > 0);
-    final bool isDottedOnlyEarly = line.dashes.isNotEmpty && !hasDrawnDashesEarly && line.dashes.any((d) => d == 0);
-    if (!isDottedOnlyEarly && absStep > 0 && absStep < 1.2) {
+    if (absStep > 0 && absStep < 1.2) {
       final denseFillPaint = Paint()
         ..color = paint.color.withValues(alpha: 0.25)
         ..style = PaintingStyle.fill;
@@ -1277,14 +1273,7 @@ class DxfPainter extends CustomPainter {
     if (totalLines <= 0) return;
 
     // Safety stride to prevent locking UI if total lines exceeds 2000
-    int stride = totalLines > 2000 ? (totalLines / 1500).ceil() : 1;
-
-    // For pure dot families with very tight perpendicular spacing, skip rows so dots
-    // don't pile into a solid band. Target: at least ~3px between drawn rows.
-    if (isDottedOnlyEarly && absStep > 0 && absStep < 3.0) {
-      final int dotStride = (3.0 / absStep).ceil();
-      if (dotStride > stride) stride = dotStride;
-    }
+    final int stride = totalLines > 2000 ? (totalLines / 1500).ceil() : 1;
 
     // Check dashes
     final bool hasDashes = line.dashes.isNotEmpty;
@@ -1305,6 +1294,25 @@ class DxfPainter extends CustomPainter {
 
     final bool useDashes = hasDashes &&
         ((hasDrawnDashes && dashPeriod >= 1.5) || (isDottedOnly && dashPeriod >= 0.8));
+
+    // When zoomed out too far to draw individual dashes, render a proportional tint
+    // instead of solid continuous lines. This preserves the fill ratio of the pattern
+    // (e.g. Styrofoam [1.5,-3.0] = 33% fill → alpha≈0.33 tint, not a solid stroke).
+    if (!useDashes && hasDrawnDashes) {
+      // Compute fill ratio: sum(positive dashes) / sum(all dashes)
+      double positiveSum = 0.0;
+      double totalSum = 0.0;
+      for (final d in line.dashes) {
+        if (d > 0) positiveSum += d;
+        totalSum += d.abs();
+      }
+      final double fillRatio = totalSum > 0 ? (positiveSum / totalSum).clamp(0.05, 0.6) : 0.3;
+      final tintPaint = Paint()
+        ..color = paint.color.withValues(alpha: fillRatio * 0.6)
+        ..style = PaintingStyle.fill;
+      canvas.drawRect(bounds, tintPaint);
+      return;
+    }
 
     // Dedicated paint for solid CAD dots (filled circles)
     final dotPaint = Paint()
