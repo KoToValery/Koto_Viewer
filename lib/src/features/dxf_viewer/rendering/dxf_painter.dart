@@ -986,7 +986,9 @@ class DxfPainter extends CustomPainter {
           fontSize: fontSize,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks,
-          height: 1.0,
+          height: (entity.lineSpacingFactor != null && entity.lineSpacingFactor! > 0.5 && entity.lineSpacingFactor! < 3.0)
+              ? entity.lineSpacingFactor!
+              : 1.0,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -1011,6 +1013,11 @@ class DxfPainter extends CustomPainter {
 
       final double rad = -entity.rotationDeg * math.pi / 180.0;
       canvas.rotate(rad);
+
+      // Apply CAD MTEXT character width factor (\W<factor>;)
+      if (entity.widthFactor > 0 && (entity.widthFactor - 1.0).abs() > 0.001) {
+        canvas.scale(entity.widthFactor, 1.0);
+      }
 
       // Attachment Point offsets (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
       // In AutoCAD, MTEXT attachment points:

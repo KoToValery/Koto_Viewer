@@ -1125,6 +1125,7 @@ class DxfParser {
         int attachPoint = 1;
         double? dirX, dirY;
         String? style;
+        double? lineSpacingFactor;
 
         for (final p in entityPairs) {
           switch (p.code) {
@@ -1143,6 +1144,9 @@ class DxfParser {
               break;
             case 41:
               refWidth = p.doubleValue;
+              break;
+            case 44:
+              lineSpacingFactor = p.doubleValue;
               break;
             case 50:
               rotation = p.doubleValue;
@@ -1170,6 +1174,16 @@ class DxfParser {
         final rawText = textBuffer.toString();
         final cleanText = _cleanMText(rawText);
 
+        // Extract CAD MTEXT character width factor \W<factor>; (e.g. \W0.900000;)
+        double widthFactor = 1.0;
+        final wMatch = RegExp(r'\\W([0-9.]+);', caseSensitive: false).firstMatch(rawText);
+        if (wMatch != null) {
+          final wf = double.tryParse(wMatch.group(1)!);
+          if (wf != null && wf > 0 && wf <= 10.0) {
+            widthFactor = wf;
+          }
+        }
+
         entity = DxfMText(
           rawText: rawText,
           cleanText: cleanText,
@@ -1180,6 +1194,8 @@ class DxfParser {
           attachmentPoint: attachPoint,
           directionVector: (dirX != null && dirY != null) ? Offset(dirX, dirY) : null,
           style: style,
+          widthFactor: widthFactor,
+          lineSpacingFactor: lineSpacingFactor,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
@@ -1561,8 +1577,12 @@ class DxfParser {
       '',
     );
 
-    // Clean up any remaining leading/trailing commas or semicolons from stripped tags on individual lines
-    result = result.split('\n').map((line) => line.replaceAll(RegExp(r'^[,\s;]+'), '')).join('\n');
+    // Clean up any remaining leading/trailing commas or semicolons from stripped tags on individual lines,
+    // and strip excessive trailing whitespace (e.g. 48-space padding in CAD blocks)
+    result = result
+        .split('\n')
+        .map((line) => line.replaceAll(RegExp(r'^[,\s;]+'), '').replaceAll(RegExp(r'[ \t]{2,}$'), ''))
+        .join('\n');
 
     // Remove remaining escaped backslashes
     result = result.replaceAll(r'\\', r'\');

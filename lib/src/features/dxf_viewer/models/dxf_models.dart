@@ -494,6 +494,9 @@ class DxfMText extends DxfEntity {
   final Offset? directionVector;
   final String? style;
 
+  final double widthFactor;
+  final double? lineSpacingFactor;
+
   const DxfMText({
     required this.rawText,
     required this.cleanText,
@@ -504,6 +507,8 @@ class DxfMText extends DxfEntity {
     this.attachmentPoint = 1,
     this.directionVector,
     this.style,
+    this.widthFactor = 1.0,
+    this.lineSpacingFactor,
     super.layer,
     super.colorIndex,
     super.trueColor,
@@ -527,10 +532,10 @@ class DxfMText extends DxfEntity {
         maxLineLength = line.length;
       }
     }
-    final double width = refWidth != null && refWidth! > 0
+    final double width = (refWidth != null && refWidth! > 0
         ? refWidth!
-        : (maxLineLength * height * 0.65).clamp(height * 2, double.infinity);
-    final totalHeight = height * linesList.length * 1.35;
+        : (maxLineLength * height * 0.65).clamp(height * 2, double.infinity)) * widthFactor;
+    final totalHeight = height * linesList.length * (lineSpacingFactor != null ? lineSpacingFactor! * 1.35 : 1.35);
 
     // Adjust origin by attachment point (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
     double ox = 0.0;

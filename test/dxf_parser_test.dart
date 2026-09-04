@@ -1151,6 +1151,42 @@ EOF''';
         expect(visibleCount, doc.layers.length);
       }
     });
+
+    test('MText parses widthFactor, lineSpacingFactor, and removes excessive trailing spaces', () {
+      const dxfContent = '''
+0
+SECTION
+2
+ENTITIES
+0
+MTEXT
+8
+TextLayer
+1
+{\\W0.900000;Line with many spaces                                                \\PSecond line}
+10
+100.0
+20
+200.0
+40
+2.5
+41
+50.0
+44
+0.93326365
+0
+ENDSEC
+0
+EOF
+''';
+      final doc = DxfParser.parseString(dxfContent);
+      expect(doc.entities.length, 1);
+      final mtext = doc.entities[0] as DxfMText;
+      expect(mtext.widthFactor, closeTo(0.9, 0.001));
+      expect(mtext.lineSpacingFactor, closeTo(0.933, 0.001));
+      expect(mtext.cleanText, 'Line with many spaces\nSecond line');
+      expect(mtext.cleanText.contains('  '), isFalse);
+    });
   });
 }
 
