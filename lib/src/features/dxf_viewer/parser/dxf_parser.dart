@@ -596,6 +596,7 @@ class DxfParser {
     int? trueColor;
     String? lineType;
     double? lineWeight;
+    double? lineTypeScale;
 
     for (final p in entityPairs) {
       switch (p.code) {
@@ -610,6 +611,9 @@ class DxfParser {
           break;
         case 6:
           lineType = p.value.trim();
+          break;
+        case 48:
+          lineTypeScale = p.doubleValue > 0 ? p.doubleValue : null;
           break;
         case 370:
           lineWeight = p.doubleValue / 100.0;
@@ -646,6 +650,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -668,6 +673,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -694,6 +700,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -728,6 +735,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -769,6 +777,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -836,6 +845,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -896,6 +906,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -954,6 +965,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -1018,6 +1030,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -1090,6 +1103,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -1141,6 +1155,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -1224,6 +1239,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -1289,6 +1305,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -1343,6 +1360,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
 
@@ -1373,6 +1391,7 @@ class DxfParser {
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
         );
         break;
     }

@@ -120,6 +120,7 @@ abstract class DxfEntity {
   final int? trueColor;
   final String? lineType;
   final double? lineWeight;
+  final double? lineTypeScale;
 
   const DxfEntity({
     this.layer = '0',
@@ -127,6 +128,7 @@ abstract class DxfEntity {
     this.trueColor,
     this.lineType,
     this.lineWeight,
+    this.lineTypeScale,
   });
 
   /// Compute axis-aligned bounding box of this entity in CAD coordinate space.
@@ -149,6 +151,7 @@ class DxfLine extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -173,6 +176,7 @@ class DxfPoint extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -197,6 +201,7 @@ class DxfCircle extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -225,6 +230,7 @@ class DxfArc extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -294,6 +300,7 @@ class DxfEllipse extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -323,6 +330,7 @@ class DxfLwPolyline extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -363,6 +371,7 @@ class DxfPolyline extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -409,6 +418,7 @@ class DxfSpline extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -458,6 +468,7 @@ class DxfText extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -498,6 +509,7 @@ class DxfMText extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -531,6 +543,7 @@ class DxfSolid extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -595,6 +608,7 @@ class DxfHatch extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -650,6 +664,7 @@ class DxfInsert extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -712,6 +727,7 @@ class DxfDimension extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override
@@ -757,6 +773,7 @@ class DxfLeader extends DxfEntity {
     super.trueColor,
     super.lineType,
     super.lineWeight,
+    super.lineTypeScale,
   });
 
   @override

@@ -246,10 +246,19 @@ class DxfPainter extends CustomPainter {
     Path path,
     Paint paint,
     String? lineType,
-    String? layerLineType,
-  ) {
+    String? layerLineType, {
+    double? entityLineTypeScale,
+    String? blockLineType,
+  }) {
+    String? effectiveLineType = lineType;
+    if (effectiveLineType == null ||
+        effectiveLineType.trim().toUpperCase() == 'BYBLOCK') {
+      if (blockLineType != null && blockLineType.trim().isNotEmpty) {
+        effectiveLineType = blockLineType;
+      }
+    }
     final pattern = DxfLinetypeHelper.resolvePattern(
-      lineType,
+      effectiveLineType,
       layerLineType: layerLineType,
       customLineTypes: document.lineTypes,
     );
@@ -257,10 +266,13 @@ class DxfPainter extends CustomPainter {
       canvas.drawPath(path, paint);
     } else {
       final scale = currentScale.clamp(0.001, 10000.0);
+      final double ltScale = (entityLineTypeScale != null && entityLineTypeScale > 0)
+          ? entityLineTypeScale
+          : 1.0;
       final dashedPath = DxfLinetypeHelper.createDashedPath(
         path,
         pattern,
-        scale: (0.75 * settings.lineThicknessScale) / scale,
+        scale: (1.0 * settings.lineThicknessScale * settings.linetypeScale * ltScale) / scale,
       );
       canvas.drawPath(dashedPath, paint);
     }
@@ -272,10 +284,19 @@ class DxfPainter extends CustomPainter {
     Offset p2,
     Paint paint,
     String? lineType,
-    String? layerLineType,
-  ) {
+    String? layerLineType, {
+    double? entityLineTypeScale,
+    String? blockLineType,
+  }) {
+    String? effectiveLineType = lineType;
+    if (effectiveLineType == null ||
+        effectiveLineType.trim().toUpperCase() == 'BYBLOCK') {
+      if (blockLineType != null && blockLineType.trim().isNotEmpty) {
+        effectiveLineType = blockLineType;
+      }
+    }
     final pattern = DxfLinetypeHelper.resolvePattern(
-      lineType,
+      effectiveLineType,
       layerLineType: layerLineType,
       customLineTypes: document.lineTypes,
     );
@@ -283,11 +304,14 @@ class DxfPainter extends CustomPainter {
       canvas.drawLine(p1, p2, paint);
     } else {
       final scale = currentScale.clamp(0.001, 10000.0);
+      final double ltScale = (entityLineTypeScale != null && entityLineTypeScale > 0)
+          ? entityLineTypeScale
+          : 1.0;
       final dashedPath = DxfLinetypeHelper.createDashedLine(
         p1,
         p2,
         pattern,
-        scale: (0.75 * settings.lineThicknessScale) / scale,
+        scale: (1.0 * settings.lineThicknessScale * settings.linetypeScale * ltScale) / scale,
       );
       canvas.drawPath(dashedPath, paint);
     }
@@ -302,15 +326,26 @@ class DxfPainter extends CustomPainter {
     required double fitScale,
     required Map<String, DxfBlock> blocks,
     required Map<String, DxfLayer> layers,
+    String? blockLineType,
   }) {
     final scale = currentScale.clamp(0.001, 10000.0);
     final layer = layers[entity.layer];
     final String? layerLineType = layer?.lineType;
+    final double? entityLtScale = entity.lineTypeScale;
 
     if (entity is DxfLine) {
       final p1 = toCanvas(entity.p1);
       final p2 = toCanvas(entity.p2);
-      _drawStrokeLine(canvas, p1, p2, strokePaint, entity.lineType, layerLineType);
+      _drawStrokeLine(
+        canvas,
+        p1,
+        p2,
+        strokePaint,
+        entity.lineType,
+        layerLineType,
+        entityLineTypeScale: entityLtScale,
+        blockLineType: blockLineType,
+      );
     } else if (entity is DxfPoint) {
       if (settings.pointStyle == DxfPointStyle.none || settings.pointSize <= 0) {
         return;
@@ -362,18 +397,74 @@ class DxfPainter extends CustomPainter {
         ..color = strokePaint.color
         ..style = PaintingStyle.stroke
         ..strokeWidth = effectiveStroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
         ..isAntiAlias = true;
-      _drawStrokePath(canvas, path, circlePaint, entity.lineType, layerLineType);
+      _drawStrokePath(
+        canvas,
+        path,
+        circlePaint,
+        entity.lineType,
+        layerLineType,
+        entityLineTypeScale: entityLtScale,
+        blockLineType: blockLineType,
+      );
     } else if (entity is DxfArc) {
-      _renderArc(canvas, entity, strokePaint, toCanvas, fitScale, entity.lineType, layerLineType);
+      _renderArc(
+        canvas,
+        entity,
+        strokePaint,
+        toCanvas,
+        fitScale,
+        entity.lineType,
+        layerLineType,
+        entityLineTypeScale: entityLtScale,
+        blockLineType: blockLineType,
+      );
     } else if (entity is DxfEllipse) {
-      _renderEllipse(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
+      _renderEllipse(
+        canvas,
+        entity,
+        strokePaint,
+        toCanvas,
+        entity.lineType,
+        layerLineType,
+        entityLineTypeScale: entityLtScale,
+        blockLineType: blockLineType,
+      );
     } else if (entity is DxfLwPolyline) {
-      _renderLwPolyline(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
+      _renderLwPolyline(
+        canvas,
+        entity,
+        strokePaint,
+        toCanvas,
+        entity.lineType,
+        layerLineType,
+        entityLineTypeScale: entityLtScale,
+        blockLineType: blockLineType,
+      );
     } else if (entity is DxfPolyline) {
-      _renderPolyline(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
+      _renderPolyline(
+        canvas,
+        entity,
+        strokePaint,
+        toCanvas,
+        entity.lineType,
+        layerLineType,
+        entityLineTypeScale: entityLtScale,
+        blockLineType: blockLineType,
+      );
     } else if (entity is DxfSpline) {
-      _renderSpline(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
+      _renderSpline(
+        canvas,
+        entity,
+        strokePaint,
+        toCanvas,
+        entity.lineType,
+        layerLineType,
+        entityLineTypeScale: entityLtScale,
+        blockLineType: blockLineType,
+      );
     } else if (entity is DxfText) {
       _renderText(canvas, entity, strokePaint.color, toCanvas, fitScale);
     } else if (entity is DxfMText) {
@@ -394,7 +485,16 @@ class DxfPainter extends CustomPainter {
     } else if (entity is DxfDimension) {
       _renderDimension(canvas, entity, strokePaint, toCanvas, fitScale, blocks, layers);
     } else if (entity is DxfLeader) {
-      _renderLeader(canvas, entity, strokePaint, toCanvas, entity.lineType, layerLineType);
+      _renderLeader(
+        canvas,
+        entity,
+        strokePaint,
+        toCanvas,
+        entity.lineType,
+        layerLineType,
+        entityLineTypeScale: entityLtScale,
+        blockLineType: blockLineType,
+      );
     }
   }
 
@@ -405,8 +505,10 @@ class DxfPainter extends CustomPainter {
     Offset Function(Offset) toCanvas,
     double fitScale,
     String? lineType,
-    String? layerLineType,
-  ) {
+    String? layerLineType, {
+    double? entityLineTypeScale,
+    String? blockLineType,
+  }) {
     final double cx = arc.center.dx;
     final double cy = arc.center.dy;
     final double r = arc.radius;
@@ -443,9 +545,19 @@ class DxfPainter extends CustomPainter {
       ..color = paint.color
       ..style = PaintingStyle.stroke
       ..strokeWidth = effectiveStroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
       ..isAntiAlias = true;
 
-    _drawStrokePath(canvas, path, arcPaint, lineType, layerLineType);
+    _drawStrokePath(
+      canvas,
+      path,
+      arcPaint,
+      lineType,
+      layerLineType,
+      entityLineTypeScale: entityLineTypeScale,
+      blockLineType: blockLineType,
+    );
   }
 
   void _renderEllipse(
@@ -454,8 +566,10 @@ class DxfPainter extends CustomPainter {
     Paint paint,
     Offset Function(Offset) toCanvas,
     String? lineType,
-    String? layerLineType,
-  ) {
+    String? layerLineType, {
+    double? entityLineTypeScale,
+    String? blockLineType,
+  }) {
     final points = DxfMath.generateEllipsePoints(
       ellipse.center,
       ellipse.majorAxisEndOffset,
@@ -474,7 +588,15 @@ class DxfPainter extends CustomPainter {
       path.lineTo(p.dx, p.dy);
     }
 
-    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
+    _drawStrokePath(
+      canvas,
+      path,
+      paint,
+      lineType,
+      layerLineType,
+      entityLineTypeScale: entityLineTypeScale,
+      blockLineType: blockLineType,
+    );
   }
 
   void _renderLwPolyline(
@@ -483,8 +605,10 @@ class DxfPainter extends CustomPainter {
     Paint paint,
     Offset Function(Offset) toCanvas,
     String? lineType,
-    String? layerLineType,
-  ) {
+    String? layerLineType, {
+    double? entityLineTypeScale,
+    String? blockLineType,
+  }) {
     if (poly.vertices.isEmpty) return;
 
     final path = Path();
@@ -530,7 +654,15 @@ class DxfPainter extends CustomPainter {
       path.close();
     }
 
-    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
+    _drawStrokePath(
+      canvas,
+      path,
+      paint,
+      lineType,
+      layerLineType,
+      entityLineTypeScale: entityLineTypeScale,
+      blockLineType: blockLineType,
+    );
   }
 
   void _renderPolyline(
@@ -539,8 +671,10 @@ class DxfPainter extends CustomPainter {
     Paint paint,
     Offset Function(Offset) toCanvas,
     String? lineType,
-    String? layerLineType,
-  ) {
+    String? layerLineType, {
+    double? entityLineTypeScale,
+    String? blockLineType,
+  }) {
     if (poly.vertices.isEmpty) return;
 
     final path = Path();
@@ -586,7 +720,15 @@ class DxfPainter extends CustomPainter {
       path.close();
     }
 
-    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
+    _drawStrokePath(
+      canvas,
+      path,
+      paint,
+      lineType,
+      layerLineType,
+      entityLineTypeScale: entityLineTypeScale,
+      blockLineType: blockLineType,
+    );
   }
 
   void _renderSpline(
@@ -595,8 +737,10 @@ class DxfPainter extends CustomPainter {
     Paint paint,
     Offset Function(Offset) toCanvas,
     String? lineType,
-    String? layerLineType,
-  ) {
+    String? layerLineType, {
+    double? entityLineTypeScale,
+    String? blockLineType,
+  }) {
     final points = spline.controlPoints.isNotEmpty
         ? DxfMath.evaluateSpline(
             spline.degree,
@@ -621,7 +765,15 @@ class DxfPainter extends CustomPainter {
       path.close();
     }
 
-    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
+    _drawStrokePath(
+      canvas,
+      path,
+      paint,
+      lineType,
+      layerLineType,
+      entityLineTypeScale: entityLineTypeScale,
+      blockLineType: blockLineType,
+    );
   }
 
   /// The active drawing unit for measurements (user override or document header unit).
@@ -1304,6 +1456,7 @@ class DxfPainter extends CustomPainter {
             fitScale: fitScale,
             blocks: blocks,
             layers: layers,
+            blockLineType: insert.lineType,
           );
         }
       }
@@ -1418,8 +1571,10 @@ class DxfPainter extends CustomPainter {
     Paint paint,
     Offset Function(Offset) toCanvas,
     String? lineType,
-    String? layerLineType,
-  ) {
+    String? layerLineType, {
+    double? entityLineTypeScale,
+    String? blockLineType,
+  }) {
     if (leader.vertices.length < 2) return;
 
     final path = Path();
@@ -1430,7 +1585,15 @@ class DxfPainter extends CustomPainter {
       final p = toCanvas(leader.vertices[i]);
       path.lineTo(p.dx, p.dy);
     }
-    _drawStrokePath(canvas, path, paint, lineType, layerLineType);
+    _drawStrokePath(
+      canvas,
+      path,
+      paint,
+      lineType,
+      layerLineType,
+      entityLineTypeScale: entityLineTypeScale,
+      blockLineType: blockLineType,
+    );
   }
 
   void _drawSnapMarker(

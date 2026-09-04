@@ -85,6 +85,102 @@ void main() {
       expect(bounds.left, closeTo(0, 0.1));
       expect(bounds.right, greaterThan(80));
     });
+
+    test('Resolves Cyrillic linetype names accurately without stripping letters', () {
+      expect(DxfLinetypeHelper.resolvePattern('Пунктир'), DxfLinetypeHelper.dottedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('Точкова'), DxfLinetypeHelper.dottedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('Осова линия'), DxfLinetypeHelper.centerPattern);
+      expect(DxfLinetypeHelper.resolvePattern('Прекъсната'), DxfLinetypeHelper.dashedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('Скрита'), DxfLinetypeHelper.hiddenPattern);
+      expect(DxfLinetypeHelper.resolvePattern('Двойна точка'), DxfLinetypeHelper.dashDotDotPattern);
+      expect(DxfLinetypeHelper.resolvePattern('Граница'), DxfLinetypeHelper.borderPattern);
+      expect(DxfLinetypeHelper.resolvePattern('Непрекъсната'), isNull);
+    });
+
+    test('Resolves ArchiCAD LTYPE numeric identifiers', () {
+      expect(DxfLinetypeHelper.resolvePattern('LTYPE002'), DxfLinetypeHelper.dottedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('LTYPE007'), DxfLinetypeHelper.dottedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('LTYPE003'), DxfLinetypeHelper.dashedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('LTYPE004'), DxfLinetypeHelper.hiddenPattern);
+      expect(DxfLinetypeHelper.resolvePattern('LTYPE005'), DxfLinetypeHelper.longDashedPattern);
+      expect(DxfLinetypeHelper.resolvePattern('LTYPE006'), DxfLinetypeHelper.centerPattern);
+      expect(DxfLinetypeHelper.resolvePattern('LTYPE008'), DxfLinetypeHelper.centerPattern);
+      expect(DxfLinetypeHelper.resolvePattern('LTYPE009'), DxfLinetypeHelper.dashDotDotPattern);
+    });
+
+    test('Normalizes oversized ArchiCAD export linetype patterns', () {
+      // ArchiCAD dotted export with 50.0m gaps
+      final archicadDotted = [1.8, 50.0, 1.8, 50.0];
+      final normDotted = DxfLinetypeHelper.normalizePattern(archicadDotted);
+      expect(normDotted[0], closeTo(2.2, 0.01));
+      expect(normDotted[1], closeTo(4.5, 0.01));
+
+      // ArchiCAD large dashed export (e.g. 500m on ski slope)
+      final archicadDashed = [500.0, 500.0];
+      final normDashed = DxfLinetypeHelper.normalizePattern(archicadDashed);
+      expect(normDashed[0], closeTo(10.0, 0.1));
+      expect(normDashed[1], closeTo(10.0, 0.1));
+
+      // Custom line types passed to resolvePattern are normalized
+      final resolved = DxfLinetypeHelper.resolvePattern(
+        'Dense Dotted',
+        customLineTypes: {'Dense Dotted': [1.8, 88.19]},
+      );
+      expect(resolved, isNotNull);
+      expect(resolved![0], closeTo(2.2, 0.01));
+      expect(resolved[1], closeTo(4.5, 0.01));
+    });
+
+    test('Parses entity-level lineTypeScale (group 48)', () {
+      const dxfContent = '''0
+SECTION
+2
+ENTITIES
+0
+LINE
+8
+0
+10
+0.0
+20
+0.0
+11
+100.0
+21
+0.0
+6
+DOTTED
+48
+2.5
+0
+LWPOLYLINE
+8
+0
+48
+0.75
+90
+2
+10
+0.0
+20
+0.0
+10
+50.0
+20
+50.0
+0
+ENDSEC
+0
+EOF''';
+      final doc = DxfParser.parseString(dxfContent);
+      expect(doc.entities.length, 2);
+      final line = doc.entities[0] as DxfLine;
+      expect(line.lineTypeScale, 2.5);
+      expect(line.lineType, 'DOTTED');
+
+      final poly = doc.entities[1] as DxfLwPolyline;
+      expect(poly.lineTypeScale, 0.75);
+    });
   });
 
   group('ArchiCAD Hatch & Shadow Transparency Tests', () {

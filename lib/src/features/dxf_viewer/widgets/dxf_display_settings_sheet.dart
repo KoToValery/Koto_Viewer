@@ -202,7 +202,71 @@ class _DxfDisplaySettingsSheetState extends State<DxfDisplaySettingsSheet> {
                   const Divider(),
                   const SizedBox(height: 12),
 
-                  // 2. Measurement Size Section
+                  // 2. Linetype Pattern Scale Section
+                  _buildSectionHeader(
+                    icon: Icons.border_style,
+                    title: 'Linetype Pattern Scale',
+                    valueLabel: '${(_current.linetypeScale * 100).toStringAsFixed(0)}%',
+                    theme: theme,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.density_small, size: 16, color: Colors.grey),
+                      Expanded(
+                        child: Slider(
+                          value: _current.linetypeScale,
+                          min: 0.3,
+                          max: 3.0,
+                          divisions: 27,
+                          label: '${(_current.linetypeScale * 100).toStringAsFixed(0)}%',
+                          onChanged: (val) {
+                            _update(_current.copyWith(linetypeScale: val));
+                          },
+                        ),
+                      ),
+                      const Icon(Icons.density_medium, size: 16, color: Colors.grey),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildPresetChip(
+                        label: 'Dense',
+                        scale: 0.6,
+                        current: _current.linetypeScale,
+                        onTap: () => _update(_current.copyWith(linetypeScale: 0.6)),
+                        theme: theme,
+                      ),
+                      _buildPresetChip(
+                        label: 'Normal',
+                        scale: 1.0,
+                        current: _current.linetypeScale,
+                        onTap: () => _update(_current.copyWith(linetypeScale: 1.0)),
+                        theme: theme,
+                      ),
+                      _buildPresetChip(
+                        label: 'Medium',
+                        scale: 1.5,
+                        current: _current.linetypeScale,
+                        onTap: () => _update(_current.copyWith(linetypeScale: 1.5)),
+                        theme: theme,
+                      ),
+                      _buildPresetChip(
+                        label: 'Spaced',
+                        scale: 2.0,
+                        current: _current.linetypeScale,
+                        onTap: () => _update(_current.copyWith(linetypeScale: 2.0)),
+                        theme: theme,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 12),
+
+                  // 3. Measurement Size Section
                   _buildSectionHeader(
                     icon: Icons.straighten,
                     title: 'Dimension Size (L: ...)',

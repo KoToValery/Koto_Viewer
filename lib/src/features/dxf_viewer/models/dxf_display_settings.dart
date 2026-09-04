@@ -50,6 +50,7 @@ enum DxfPointStyle {
 /// User configurable visual settings for the CAD/DXF viewer.
 class DxfDisplaySettings {
   final double lineThicknessScale; // 0.3 to 3.5 (default 1.0)
+  final double linetypeScale; // 0.3 to 3.0 (default 1.0)
   final double measurementScale; // 0.5 to 2.5 (default 1.0)
   final double pointSize; // 1.0 to 12.0 in screen pixels (default 2.0)
   final DxfPointStyle pointStyle; // point marker style
@@ -57,6 +58,7 @@ class DxfDisplaySettings {
 
   const DxfDisplaySettings({
     this.lineThicknessScale = 1.0,
+    this.linetypeScale = 1.0,
     this.measurementScale = 1.4,
     this.pointSize = 2.0,
     this.pointStyle = DxfPointStyle.none,
@@ -65,6 +67,7 @@ class DxfDisplaySettings {
 
   DxfDisplaySettings copyWith({
     double? lineThicknessScale,
+    double? linetypeScale,
     double? measurementScale,
     double? pointSize,
     DxfPointStyle? pointStyle,
@@ -73,6 +76,7 @@ class DxfDisplaySettings {
   }) {
     return DxfDisplaySettings(
       lineThicknessScale: lineThicknessScale ?? this.lineThicknessScale,
+      linetypeScale: linetypeScale ?? this.linetypeScale,
       measurementScale: measurementScale ?? this.measurementScale,
       pointSize: pointSize ?? this.pointSize,
       pointStyle: pointStyle ?? this.pointStyle,
@@ -83,6 +87,7 @@ class DxfDisplaySettings {
   Map<String, dynamic> toMap() {
     return {
       'lineThicknessScale': lineThicknessScale,
+      'linetypeScale': linetypeScale,
       'measurementScale': measurementScale,
       'pointSize': pointSize,
       'pointStyle': pointStyle.name,
@@ -93,6 +98,7 @@ class DxfDisplaySettings {
   factory DxfDisplaySettings.fromMap(Map<String, dynamic> map) {
     return DxfDisplaySettings(
       lineThicknessScale: (map['lineThicknessScale'] as num?)?.toDouble() ?? 1.0,
+      linetypeScale: (map['linetypeScale'] as num?)?.toDouble() ?? 1.0,
       measurementScale: (map['measurementScale'] as num?)?.toDouble() ?? 1.4,
       pointSize: (map['pointSize'] as num?)?.toDouble() ?? 4.0,
       pointStyle: DxfPointStyle.fromName(map['pointStyle'] as String?),
