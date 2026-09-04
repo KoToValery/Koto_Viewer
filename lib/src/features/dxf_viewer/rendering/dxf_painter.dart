@@ -1231,7 +1231,11 @@ class DxfPainter extends CustomPainter {
 
     // Dense line safeguard: if spacing on screen is less than 1.2 pixels,
     // lines blend into a solid tint. Avoid lagging by rendering a representative tint.
-    if (absStep > 0 && absStep < 1.2) {
+    // Exception: pure dot families (isDottedOnly) are naturally sparse — never replace them
+    // with a solid fill, since that would make Cut_Stone / Plaster / etc. look almost solid.
+    final bool hasDrawnDashesEarly = line.dashes.any((d) => d > 0);
+    final bool isDottedOnlyEarly = line.dashes.isNotEmpty && !hasDrawnDashesEarly && line.dashes.any((d) => d == 0);
+    if (!isDottedOnlyEarly && absStep > 0 && absStep < 1.2) {
       final denseFillPaint = Paint()
         ..color = paint.color.withValues(alpha: 0.25)
         ..style = PaintingStyle.fill;
@@ -1273,7 +1277,14 @@ class DxfPainter extends CustomPainter {
     if (totalLines <= 0) return;
 
     // Safety stride to prevent locking UI if total lines exceeds 2000
-    final int stride = totalLines > 2000 ? (totalLines / 1500).ceil() : 1;
+    int stride = totalLines > 2000 ? (totalLines / 1500).ceil() : 1;
+
+    // For pure dot families with very tight perpendicular spacing, skip rows so dots
+    // don't pile into a solid band. Target: at least ~3px between drawn rows.
+    if (isDottedOnlyEarly && absStep > 0 && absStep < 3.0) {
+      final int dotStride = (3.0 / absStep).ceil();
+      if (dotStride > stride) stride = dotStride;
+    }
 
     // Check dashes
     final bool hasDashes = line.dashes.isNotEmpty;
