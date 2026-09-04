@@ -278,6 +278,34 @@ class DwgConverterService {
       debugPrint('DwgConverterService: Error clearing cache: $e');
     }
   }
+
+  /// Deletes any cached DXF files that were derived from [dwgPath].
+  /// Safe to call even if no cache entry exists.
+  static Future<void> clearCacheForFile(String dwgPath) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final cacheDir = Directory('${tempDir.path}${Platform.pathSeparator}$_cacheFolder');
+      if (!await cacheDir.exists()) return;
+
+      final fileName = dwgPath.split(Platform.pathSeparator).last;
+      final baseName = fileName.contains('.')
+          ? fileName.substring(0, fileName.lastIndexOf('.'))
+          : fileName;
+
+      // Delete all cache entries whose name starts with this base name
+      // (they encode size + timestamp in the filename, so there may be stale versions).
+      await for (final entity in cacheDir.list()) {
+        if (entity is File && entity.uri.pathSegments.last.startsWith('${baseName}_')) {
+          try {
+            await entity.delete();
+            debugPrint('DwgConverterService: Deleted cache for $baseName');
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('DwgConverterService: Error clearing cache for $dwgPath: $e');
+    }
+  }
 }
 
 class _ConversionParams {

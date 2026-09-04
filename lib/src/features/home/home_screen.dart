@@ -1661,6 +1661,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _removeRecentFile(String path) async {
     await RecentFilesService.removeRecentFile(path);
+    // Also delete the converted DXF cache so the file is re-converted on next open.
+    final ext = path.contains('.') ? path.split('.').last.toLowerCase() : '';
+    if (ext == 'dwg' || ext == 'dxf') {
+      await DwgConverterService.clearCacheForFile(path);
+    }
     await _loadFiles();
   }
 
@@ -1691,6 +1696,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirmed == true) {
       await RecentFilesService.clearAll();
+      // Clear the entire DWG conversion cache so nothing stale remains.
+      await DwgConverterService.clearCache();
       await _loadFiles();
     }
   }
