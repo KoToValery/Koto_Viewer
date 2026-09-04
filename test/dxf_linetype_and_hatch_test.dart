@@ -918,6 +918,32 @@ EOF''';
       final picture = recorder.endRecording();
       expect(picture, isNotNull);
     });
+
+    test('Renders Archicad export Common_Brick and Solid___Dashed accurately across zoom levels', () async {
+      final file = File('test_files/Archicad_export_converted.dxf');
+      if (!file.existsSync()) return;
+
+      final doc = await DxfParser.parseFromFile(file);
+      final brickHatches = doc.entities.whereType<DxfHatch>().where((h) => h.patternName == 'Common_Brick').toList();
+      final dashedHatches = doc.entities.whereType<DxfHatch>().where((h) => h.patternName == 'Solid___Dashed').toList();
+
+      expect(brickHatches.isNotEmpty, isTrue);
+      expect(dashedHatches.isNotEmpty, isTrue);
+
+      // Verify at normal zoom (1.0) and zoomed in (10.0)
+      for (final scale in [1.0, 5.0, 10.0, 20.0]) {
+        final painter = DxfPainter(
+          document: doc,
+          theme: DxfCanvasTheme.darkCad,
+          currentScale: scale,
+        );
+        final recorder = PictureRecorder();
+        final canvas = Canvas(recorder);
+        expect(() => painter.paint(canvas, const Size(1920, 1080)), returnsNormally);
+        final pic = recorder.endRecording();
+        expect(pic, isNotNull);
+      }
+    });
   });
 
   group('Universal International CAD Standards Tests', () {

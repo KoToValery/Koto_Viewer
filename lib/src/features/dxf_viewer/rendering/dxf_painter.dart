@@ -1171,7 +1171,7 @@ class DxfPainter extends CustomPainter {
       ..color = strokePaint.color
       ..style = PaintingStyle.stroke
       ..strokeWidth = math.max(0.15, lineThickness)
-      ..strokeCap = StrokeCap.round
+      ..strokeCap = StrokeCap.butt
       ..isAntiAlias = true;
 
     final center = bounds.center;
@@ -1225,15 +1225,19 @@ class DxfPainter extends CustomPainter {
       -line.offset.dy * fitScale,
     );
 
+    final double scale = currentScale.clamp(0.001, 10000.0);
+
     // 4. Perpendicular step between successive lines in the family
     final double step = offsetCanvas.dx * normalCanvas.dx + offsetCanvas.dy * normalCanvas.dy;
     final double absStep = step.abs();
+    final double screenStep = absStep * scale;
 
-    // Dense line safeguard: if spacing on screen is less than 1.2 pixels,
-    // lines blend into a solid tint. Avoid lagging by rendering a representative tint.
-    if (absStep > 0 && absStep < 1.2) {
+    // Dense line safeguard: if spacing on physical screen is less than 1.2 pixels,
+    // parallel lines visually merge into a tint. Avoid drawing thousands of overlapping
+    // sub-pixel lines by rendering a representative subtle tint.
+    if (screenStep > 0 && screenStep < 1.2) {
       final denseFillPaint = Paint()
-        ..color = paint.color.withValues(alpha: 0.25)
+        ..color = paint.color.withValues(alpha: 0.15)
         ..style = PaintingStyle.fill;
       canvas.drawRect(bounds, denseFillPaint);
       return;
@@ -1292,27 +1296,10 @@ class DxfPainter extends CustomPainter {
       dashPeriod = math.max(1.0, 10.0 * fitScale);
     }
 
-    final bool useDashes = hasDashes &&
-        ((hasDrawnDashes && dashPeriod >= 1.5) || (isDottedOnly && dashPeriod >= 0.8));
+    final double screenDashPeriod = dashPeriod * scale;
 
-    // When zoomed out too far to draw individual dashes, render a proportional tint
-    // instead of solid continuous lines. This preserves the fill ratio of the pattern
-    // (e.g. Styrofoam [1.5,-3.0] = 33% fill → alpha≈0.33 tint, not a solid stroke).
-    if (!useDashes && hasDrawnDashes) {
-      // Compute fill ratio: sum(positive dashes) / sum(all dashes)
-      double positiveSum = 0.0;
-      double totalSum = 0.0;
-      for (final d in line.dashes) {
-        if (d > 0) positiveSum += d;
-        totalSum += d.abs();
-      }
-      final double fillRatio = totalSum > 0 ? (positiveSum / totalSum).clamp(0.05, 0.6) : 0.3;
-      final tintPaint = Paint()
-        ..color = paint.color.withValues(alpha: fillRatio * 0.6)
-        ..style = PaintingStyle.fill;
-      canvas.drawRect(bounds, tintPaint);
-      return;
-    }
+    final bool useDashes = hasDashes &&
+        ((hasDrawnDashes && screenDashPeriod >= 1.5) || (isDottedOnly && screenDashPeriod >= 0.8));
 
     // Dedicated paint for solid CAD dots (filled circles)
     final dotPaint = Paint()
@@ -1321,7 +1308,6 @@ class DxfPainter extends CustomPainter {
       ..isAntiAlias = true;
     // CAD dots (d == 0) are dimensionless points — render as crisp ~1 screen-pixel circles.
     // Do NOT scale with strokeWidth; use currentScale so dots stay visually consistent at any zoom.
-    final double scale = currentScale.clamp(0.001, 10000.0);
     final double dotRadius = (1.0 * settings.lineThicknessScale) / scale;
 
     // 6. Draw lines
@@ -1349,7 +1335,24 @@ class DxfPainter extends CustomPainter {
             lineBase.dx + dirCanvas.dx * tEnd,
             lineBase.dy + dirCanvas.dy * tEnd,
           );
-          canvas.drawLine(pStart, pEnd, paint);
+          if (hasDrawnDashes) {
+            // Draw with opacity proportional to dash fill ratio so dashes at distance look lighter, not solid
+            double posSum = 0.0;
+            double totSum = 0.0;
+            for (final d in line.dashes) {
+              if (d > 0) posSum += d;
+              totSum += d.abs();
+            }
+            final double fillRatio = totSum > 0 ? (posSum / totSum).clamp(0.1, 0.8) : 0.5;
+            final dashLinePaint = Paint()
+              ..color = paint.color.withValues(alpha: (paint.color.a * fillRatio).clamp(0.05, 1.0))
+              ..strokeWidth = paint.strokeWidth
+              ..strokeCap = StrokeCap.butt
+              ..isAntiAlias = true;
+            canvas.drawLine(pStart, pEnd, dashLinePaint);
+          } else {
+            canvas.drawLine(pStart, pEnd, paint);
+          }
         }
       } else {
         // Dashed / dotted line
