@@ -517,12 +517,74 @@ class DxfMText extends DxfEntity {
 
   @override
   Rect getBoundingBox(Map<String, DxfBlock> blocks) {
+    if (cleanText.isEmpty) {
+      return Rect.fromLTWH(insertPoint.dx, insertPoint.dy, height, height);
+    }
+    int maxLineLength = 0;
+    final linesList = cleanText.split('\n');
+    for (final line in linesList) {
+      if (line.length > maxLineLength) {
+        maxLineLength = line.length;
+      }
+    }
     final double width = refWidth != null && refWidth! > 0
         ? refWidth!
-        : (cleanText.length * height * 0.6).clamp(height * 2, double.infinity);
-    final lines = cleanText.split('\n').length;
-    final totalHeight = height * lines * 1.35;
-    return Rect.fromLTWH(insertPoint.dx, insertPoint.dy, width, totalHeight);
+        : (maxLineLength * height * 0.65).clamp(height * 2, double.infinity);
+    final totalHeight = height * linesList.length * 1.35;
+
+    // Adjust origin by attachment point (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
+    double ox = 0.0;
+    double oy = 0.0;
+    switch (attachmentPoint) {
+      case 2:
+      case 5:
+      case 8:
+        ox = -width / 2.0;
+        break;
+      case 3:
+      case 6:
+      case 9:
+        ox = -width;
+        break;
+    }
+    switch (attachmentPoint) {
+      case 4:
+      case 5:
+      case 6:
+        oy = -totalHeight / 2.0;
+        break;
+      case 7:
+      case 8:
+      case 9:
+        oy = -totalHeight;
+        break;
+    }
+
+    final localRect = Rect.fromLTWH(insertPoint.dx + ox, insertPoint.dy + oy, width, totalHeight);
+    if (rotationDeg == 0.0) {
+      return localRect;
+    }
+    final rad = rotationDeg * math.pi / 180.0;
+    final cosR = math.cos(rad);
+    final sinR = math.sin(rad);
+    Offset rot(Offset p) {
+      final dx = p.dx - insertPoint.dx;
+      final dy = p.dy - insertPoint.dy;
+      return Offset(
+        insertPoint.dx + dx * cosR - dy * sinR,
+        insertPoint.dy + dx * sinR + dy * cosR,
+      );
+    }
+    final p1 = rot(localRect.topLeft);
+    final p2 = rot(localRect.topRight);
+    final p3 = rot(localRect.bottomRight);
+    final p4 = rot(localRect.bottomLeft);
+
+    final minX = math.min(math.min(p1.dx, p2.dx), math.min(p3.dx, p4.dx));
+    final maxX = math.max(math.max(p1.dx, p2.dx), math.max(p3.dx, p4.dx));
+    final minY = math.min(math.min(p1.dy, p2.dy), math.min(p3.dy, p4.dy));
+    final maxY = math.max(math.max(p1.dy, p2.dy), math.max(p3.dy, p4.dy));
+    return Rect.fromLTRB(minX, minY, maxX, maxY);
   }
 }
 

@@ -929,6 +929,9 @@ EOF''';
 
       expect(brickHatches.isNotEmpty, isTrue);
       expect(dashedHatches.isNotEmpty, isTrue);
+      // Realistic document width (was 15781 due to multi-line MText length bug, now ~3077)
+      expect(doc.width, lessThan(4000.0));
+      expect(doc.width, greaterThan(2500.0));
 
       // Verify at normal zoom (1.0) and zoomed in (10.0)
       for (final scale in [1.0, 5.0, 10.0, 20.0]) {
