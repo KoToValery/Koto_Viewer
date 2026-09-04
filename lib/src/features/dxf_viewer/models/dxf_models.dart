@@ -43,7 +43,7 @@ class DxfLayer {
   final int colorIndex;
   final int? trueColor;
   bool isVisible;
-  final bool isFrozen;
+  bool isFrozen;
   final double? lineweight;
   double? customLineweight; // null = Original (from DXF), or 0.12, 0.25, 0.35, 0.70 mm override
   final String? lineType;

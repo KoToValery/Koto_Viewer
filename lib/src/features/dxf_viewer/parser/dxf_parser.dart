@@ -87,6 +87,36 @@ class DxfParser {
     int idx = 0;
     final int total = pairs.length;
 
+    // Check for authentic DWG layer states metadata injected during conversion
+    Map<String, ({bool isFrozen, bool isOff})>? authenticDwgLayerStates;
+    bool isLibreDwgGenerated = false;
+    for (int i = 0; i < total && i < 100; i++) {
+      final p = pairs[i];
+      if (p.code == 999 && p.value.contains('LibreDWG')) {
+        isLibreDwgGenerated = true;
+      }
+      if (p.code == 999 && p.value.startsWith('KOTO_DWG_LAYERS:')) {
+        final raw = p.value.substring('KOTO_DWG_LAYERS:'.length);
+        authenticDwgLayerStates = {};
+        final parts = raw.split(';');
+        for (final part in parts) {
+          final eqIdx = part.indexOf('=');
+          if (eqIdx > 0) {
+            final name = part.substring(0, eqIdx).trim();
+            final flag = part.substring(eqIdx + 1).trim();
+            final isFrozen = flag.startsWith('f');
+            final isOff = flag.endsWith('-');
+            authenticDwgLayerStates[name] = (isFrozen: isFrozen, isOff: isOff);
+            final decoded = _cleanCadText(name);
+            if (decoded != name) {
+              authenticDwgLayerStates[decoded] = (isFrozen: isFrozen, isOff: isOff);
+            }
+          }
+        }
+        break;
+      }
+    }
+
     final Map<String, List<double>> lineTypes = {};
 
     while (idx < total) {
@@ -131,7 +161,24 @@ class DxfParser {
       }
     }
 
-    // Auto-register layers referenced by entities or blocks
+    // Collect all layer names actually referenced by entities or blocks
+    final Set<String> usedLayers = {};
+    for (final entity in entities) {
+      final name = entity.layer.trim();
+      if (name.isNotEmpty) {
+        usedLayers.add(name);
+      }
+    }
+    for (final block in blocks.values) {
+      for (final entity in block.entities) {
+        final name = entity.layer.trim();
+        if (name.isNotEmpty) {
+          usedLayers.add(name);
+        }
+      }
+    }
+
+    // Auto-register layers referenced by entities or blocks that were not in TABLES
     void ensureLayer(String layerName) {
       final name = layerName.trim();
       if (name.isNotEmpty && !layers.containsKey(name)) {
@@ -140,12 +187,51 @@ class DxfParser {
       }
     }
 
-    for (final entity in entities) {
-      ensureLayer(entity.layer);
+    for (final name in usedLayers) {
+      ensureLayer(name);
     }
-    for (final block in blocks.values) {
-      for (final entity in block.entities) {
-        ensureLayer(entity.layer);
+
+    // 1. Requirement: Do not load layers without objects in them
+    if (usedLayers.isNotEmpty) {
+      layers.removeWhere((name, _) => !usedLayers.contains(name));
+    } else {
+      // Fallback for completely empty drawings with zero entities
+      layers.removeWhere((name, _) => name != '0');
+      if (!layers.containsKey('0')) {
+        layers['0'] = DxfLayer(name: '0', colorIndex: 7);
+      }
+    }
+
+    // 2. Requirement: Correct visibility for layers (visible stay visible, hidden stay hidden)
+    if (authenticDwgLayerStates != null && authenticDwgLayerStates.isNotEmpty) {
+      // Apply authentic layer visibility from the original DWG file
+      for (final entry in layers.entries) {
+        final state = authenticDwgLayerStates[entry.key];
+        if (state != null) {
+          if (state.isFrozen) {
+            entry.value.isFrozen = true;
+            entry.value.isVisible = false;
+          } else if (state.isOff) {
+            entry.value.isVisible = false;
+          } else {
+            entry.value.isVisible = true;
+          }
+        }
+      }
+    } else {
+      // Fallback for DXF files converted by LibreDWG or corrupted where all or nearly all used layers ended up hidden
+      final int visibleUsedCount = layers.values.where((l) => l.isVisible).length;
+      final bool isCorruptedLibreDwg = (visibleUsedCount == 0) ||
+          (isLibreDwgGenerated &&
+              layers.length > 5 &&
+              (visibleUsedCount <= 2 || visibleUsedCount / layers.length < 0.15));
+
+      if (isCorruptedLibreDwg) {
+        for (final layer in layers.values) {
+          if (!layer.isFrozen) {
+            layer.isVisible = true;
+          }
+        }
       }
     }
 
@@ -362,8 +448,11 @@ class DxfParser {
               if (c < 0) {
                 isVisible = false;
                 colorIndex = c.abs();
-              } else {
+              } else if (c > 0) {
+                isVisible = true;
                 colorIndex = c;
+              } else {
+                colorIndex = 0;
               }
               break;
             case 420:
@@ -371,7 +460,10 @@ class DxfParser {
               break;
             case 70:
               final flags = p.intValue;
-              if ((flags & 1) != 0) isFrozen = true;
+              if ((flags & 1) != 0) {
+                isFrozen = true;
+                isVisible = false;
+              }
               break;
             case 370:
               lineweight = p.doubleValue / 100.0; // In mm
@@ -380,28 +472,18 @@ class DxfParser {
           idx++;
         }
 
+        final bool finalVisible = isFrozen ? false : isVisible;
         layers[layerName] = DxfLayer(
           name: layerName,
           colorIndex: colorIndex,
           trueColor: trueColor,
-          isVisible: isVisible,
+          isVisible: finalVisible,
           isFrozen: isFrozen,
           lineweight: lineweight,
           lineType: lineType,
         );
       } else {
         idx++;
-      }
-    }
-
-    // Safety check: If all layers ended up hidden (e.g. from LibreDWG converter negative color codes),
-    // enable all non-frozen layers so the user doesn't get a blank black screen.
-    final bool hasAnyVisible = layers.values.any((l) => l.isVisible);
-    if (!hasAnyVisible && layers.isNotEmpty) {
-      for (final layer in layers.values) {
-        if (!layer.isFrozen) {
-          layer.isVisible = true;
-        }
       }
     }
 

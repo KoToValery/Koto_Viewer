@@ -107,7 +107,7 @@ class DxfPainter extends CustomPainter {
     for (final entity in entitiesToDraw) {
       try {
         final layer = document.layers[entity.layer];
-        if (layer != null && !layer.isVisible) {
+        if (layer != null && (!layer.isVisible || layer.isFrozen)) {
           continue;
         }
 
@@ -909,27 +909,24 @@ class DxfPainter extends CustomPainter {
       }
 
       // Vertical alignment offset:
-      // The alphabetic baseline of textPainter is located at distance 'baseline' from top.
       final double baseline = textPainter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
       final double capHeightPx = effectiveHeight * fitScale;
 
       double oy;
       switch (entity.vAlign) {
-        case 1: // Bottom (bottom of font bounding box)
-          oy = -textPainter.height;
+        case 1: // Bottom
+          oy = -baseline;
           break;
-        case 2: // Middle (middle of uppercase characters)
-          oy = -baseline + (capHeightPx / 2.0);
+        case 2: // Middle
+          oy = -textPainter.height / 2.0;
           break;
-        case 3: // Top (top of uppercase characters)
+        case 3: // Top
           oy = -baseline + capHeightPx;
           break;
         default: // 0 = Baseline
           if (entity.hAlign == 4) {
-            // Special case: AutoCAD "Middle" (hAlign=4, vAlign=0) centers vertically as well
-            oy = -baseline + (capHeightPx / 2.0);
+            oy = -textPainter.height / 2.0;
           } else {
-            // Places font alphabetic baseline precisely at pos.dy
             oy = -baseline;
           }
       }
@@ -1016,14 +1013,15 @@ class DxfPainter extends CustomPainter {
       canvas.rotate(rad);
 
       // Attachment Point offsets (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
+      // In AutoCAD, MTEXT attachment points:
+      // Top (1,2,3): Top of capital letters is at pos.dy
+      // Middle (4,5,6): Center of text is at pos.dy
+      // Bottom (7,8,9): Alphabetic baseline of last line is at pos.dy
       double ox = 0.0;
       double oy = 0.0;
 
-      // In Flutter, the first line's baseline is at 'firstBaseline'.
-      // The top of the uppercase letters is at 'firstBaseline - capHeightPx'.
       final double firstBaseline = textPainter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
       final double capHeightPx = effectiveHeight * fitScale;
-      final double topLeading = math.max(0.0, firstBaseline - capHeightPx);
 
       final lineMetrics = textPainter.computeLineMetrics();
       final double lastBaseline = lineMetrics.isNotEmpty ? lineMetrics.last.baseline : firstBaseline;
@@ -1032,33 +1030,27 @@ class DxfPainter extends CustomPainter {
         case 0: // Unspecified (Default to Middle Center)
         case 5: // Middle Center
           ox = -textPainter.width / 2.0;
-          oy = lineMetrics.length > 1
-              ? -textPainter.height / 2.0
-              : -firstBaseline + (capHeightPx / 2.0);
+          oy = -textPainter.height / 2.0;
           break;
         case 1: // Top Left
           ox = 0;
-          oy = -topLeading;
+          oy = -firstBaseline + capHeightPx;
           break;
         case 2: // Top Center
           ox = -textPainter.width / 2.0;
-          oy = -topLeading;
+          oy = -firstBaseline + capHeightPx;
           break;
         case 3: // Top Right
           ox = -textPainter.width;
-          oy = -topLeading;
+          oy = -firstBaseline + capHeightPx;
           break;
         case 4: // Middle Left
           ox = 0;
-          oy = lineMetrics.length > 1
-              ? -textPainter.height / 2.0
-              : -firstBaseline + (capHeightPx / 2.0);
+          oy = -textPainter.height / 2.0;
           break;
         case 6: // Middle Right
           ox = -textPainter.width;
-          oy = lineMetrics.length > 1
-              ? -textPainter.height / 2.0
-              : -firstBaseline + (capHeightPx / 2.0);
+          oy = -textPainter.height / 2.0;
           break;
         case 7: // Bottom Left
           ox = 0;
@@ -1421,7 +1413,7 @@ class DxfPainter extends CustomPainter {
 
         for (final child in block.entities) {
           final childLayer = layers[child.layer];
-          if (childLayer != null && !childLayer.isVisible) continue;
+          if (childLayer != null && (!childLayer.isVisible || childLayer.isFrozen)) continue;
 
           final childColor = DxfColorTable.resolveColor(
             colorIndex: child.colorIndex ?? insert.colorIndex,
@@ -1477,25 +1469,7 @@ class DxfPainter extends CustomPainter {
       final block = blocks[dim.blockName]!;
       for (final e in block.entities) {
         DxfEntity entityToDraw = e;
-        if (e is DxfMText && e.height <= 3.5) {
-          // In AutoCAD / LibreDWG export, dimension MText is exported with paper height 2.5 mm.
-          // Scale it to model-space text height (12.5) with middle-center alignment.
-          entityToDraw = DxfMText(
-            rawText: e.rawText,
-            cleanText: e.cleanText,
-            insertPoint: e.insertPoint,
-            height: 12.5,
-            refWidth: e.refWidth,
-            rotationDeg: e.rotationDeg,
-            attachmentPoint: e.attachmentPoint == 0 ? 5 : e.attachmentPoint,
-            directionVector: e.directionVector,
-            layer: e.layer,
-            colorIndex: e.colorIndex,
-            trueColor: e.trueColor,
-            lineType: e.lineType,
-            lineWeight: e.lineWeight,
-          );
-        }
+        // Dimension MText is drawn as defined in the block.
         
         // For dimension ticks/lines (non-MTEXT entities), use the dimension's color
         // For MTEXT (dimension text), keep its own color (usually white/byblock)

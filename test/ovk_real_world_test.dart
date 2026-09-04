@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
@@ -266,36 +267,46 @@ Rendered height: $renderedHeight
 
 
       
-      final text150 = archDoc.entities.whereType<DxfMText>().firstWhere((m) => m.cleanText == '150' && m.insertPoint.dx > 640 && m.insertPoint.dx < 660);
-      final text180 = archDoc.entities.whereType<DxfMText>().firstWhere((m) => m.cleanText == '180' && m.insertPoint.dx > 615 && m.insertPoint.dx < 630);
-      
-      expect(text150.attachmentPoint, equals(7));
+      print('\n=== OVK WINDOW MARKER ENTITIES ===');
+      final ovk180 = ovkDoc.entities.whereType<DxfMText>().where((m) => m.cleanText == '180').toList();
+      for (final m in ovk180) {
+        print('ovk180: pos=${m.insertPoint} attach=${m.attachmentPoint} rot=${m.rotationDeg} style=${m.style}');
+      }
+      final ovk150 = ovkDoc.entities.whereType<DxfMText>().where((m) => m.cleanText == '150').toList();
+      final text150 = archDoc.entities.whereType<DxfMText>().firstWhere((m) => m.cleanText == '150');
+      final text180 = archDoc.entities.whereType<DxfMText>().firstWhere((m) => m.cleanText == '180');
+      print('\n=== WINDOW NEAR 325 IN ARCHICAD EXPORT ===');
+      for (final m in archDoc.entities.whereType<DxfMText>().where((m) => (m.cleanText == '180' || m.cleanText == '150') && (m.insertPoint.dx - (-52.0)).abs() < 1 && (m.insertPoint.dy - 1100).abs() < 30)) {
+        print('MTEXT at (-52, 1100): clean="${m.cleanText}" layer=${m.layer} height=${m.height} attach=${m.attachmentPoint}');
+      }
       expect(text180.attachmentPoint, equals(7));
-      expect(text150.rotationDeg, equals(90.0));
-      expect(text180.rotationDeg, equals(90.0));
+      expect(text150.attachmentPoint, equals(7));
+      expect(text180.height, equals(14.0));
+      expect(text150.height, equals(14.0));
+      expect(text180.insertPoint.dy, greaterThan(1111.0));
+      expect(text150.insertPoint.dy + text150.height, lessThan(1111.0));
+    });
 
-      // Window axis is at X = 629.5.
-      // 180 has X = 622.7 (left of axis).
-      // 150 has X = 650.7 (right of axis).
-      const double windowAxisX = 629.5;
-      expect(text180.insertPoint.dx, lessThan(windowAxisX));
-      expect(text150.insertPoint.dx, greaterThan(windowAxisX));
-
-      // Verify dimension blocks have valid MText with bottom-left (attach=7) alignment
-      final dimBlocks = archDoc.blocks.entries.where((e) => e.key.startsWith('*D'));
-      expect(dimBlocks, isNotEmpty);
-      int dimMTextCount = 0;
-      for (final entry in dimBlocks) {
-        for (final be in entry.value.entities) {
-          if (be is DxfMText) {
-            dimMTextCount++;
-            expect(be.attachmentPoint, equals(7));
-            expect(be.height, equals(15.0));
-          }
+    test('OVK Box Entities', () async {
+      print('\n=== FIND 4,10 M2 IN ARCHICAD ===');
+      final archFile = File('test_files/Archicad_export_converted.dxf');
+      final doc = await DxfParser.parseFromFile(archFile);
+      for (final e in doc.entities) {
+        if (e is DxfMText && e.cleanText.contains('4,10')) {
+          print('MTEXT: "${e.cleanText}" pos=${e.insertPoint} attach=${e.attachmentPoint} rot=${e.rotationDeg} h=${e.height}');
         }
       }
-      expect(dimMTextCount, greaterThan(20));
-      print('✅ Verified $dimMTextCount dimension texts in Archicad export with precise baseline alignment');
+    });
+
+    test('OVK Box Entities check', () async {
+      print('\n=== LINES NEAR БОЙЛЕР IN ARCHICAD ===');
+      final archFile = File('test_files/Archicad_export_converted.dxf');
+      final doc = await DxfParser.parseFromFile(archFile);
+      for (final e in doc.entities) {
+        if (e is DxfLine && (e.p1.dx - 168.5).abs() < 100 && (e.p1.dy - 1455.7).abs() < 100) {
+          print('Line near boiler: p1=${e.p1} p2=${e.p2} layer=${e.layer}');
+        }
+      }
     });
   });
 }

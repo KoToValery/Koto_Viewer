@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'libredwg_ffi.dart';
@@ -36,6 +38,32 @@ class DwgConverterService {
       }
     }
     return null;
+  }
+
+  /// Locates the bundled or installed dwglayers executable on Windows.
+  static String? _findWindowsDwgLayersExe() {
+    final dwg2dxf = _findWindowsDwg2DxfExe();
+    if (dwg2dxf == null) return null;
+    final dwglayers = dwg2dxf.replaceAll('dwg2dxf.exe', 'dwglayers.exe');
+    if (File(dwglayers).existsSync()) {
+      return dwglayers;
+    }
+    return null;
+  }
+
+  /// Injects authentic DWG layer state metadata into DXF header comment (group code 999).
+  static Future<void> _injectLayerStatesIntoDxf(File dxfFile, String layerStatesString) async {
+    try {
+      final headerComment = '999\nKOTO_DWG_LAYERS:$layerStatesString\n';
+      final bytes = await dxfFile.readAsBytes();
+      final headerBytes = utf8.encode(headerComment);
+      final combined = Uint8List(headerBytes.length + bytes.length);
+      combined.setRange(0, headerBytes.length, headerBytes);
+      combined.setRange(headerBytes.length, combined.length, bytes);
+      await dxfFile.writeAsBytes(combined, flush: true);
+    } catch (e) {
+      debugPrint('DwgConverterService: Failed to inject layer states: $e');
+    }
   }
 
   /// Returns a temporary directory guaranteed to use an ASCII path on Windows,
@@ -148,6 +176,37 @@ class DwgConverterService {
         if (processResult.exitCode == 0 &&
             await outResultFile.exists() &&
             await outResultFile.length() > 0) {
+          // Extract authentic layer states directly from the DWG file
+          final layersExe = _findWindowsDwgLayersExe();
+          if (layersExe != null) {
+            try {
+              final layersRes = await Process.run(layersExe, ['-f', effectiveInputPath]);
+              if (layersRes.exitCode == 0 && layersRes.stdout is String) {
+                final lines = LineSplitter.split(layersRes.stdout as String);
+                final List<String> encodedStates = [];
+                for (final line in lines) {
+                  final match = RegExp(r'^([ f])([+\-])([ l])\s+(.+)$').firstMatch(line.trimRight());
+                  if (match != null) {
+                    final isFrozen = match.group(1) == 'f';
+                    final isOff = match.group(2) == '-';
+                    final layerName = match.group(4)!.trim();
+                    if (layerName.isNotEmpty) {
+                      final flag = isFrozen
+                          ? (isOff ? 'f-' : 'f+')
+                          : (isOff ? '-' : '+');
+                      encodedStates.add('$layerName=$flag');
+                    }
+                  }
+                }
+                if (encodedStates.isNotEmpty) {
+                  await _injectLayerStatesIntoDxf(outResultFile, encodedStates.join(';'));
+                }
+              }
+            } catch (e) {
+              debugPrint('DwgConverterService: dwglayers extraction error: $e');
+            }
+          }
+
           if (needsStaging) {
             await outResultFile.copy(targetDxfPath);
           }

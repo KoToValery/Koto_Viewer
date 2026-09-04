@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_color_table.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_display_settings.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
@@ -420,8 +422,20 @@ Electrical
 0.0
 11
 5.0
-20
+21
 5.0
+0
+LINE
+8
+Plumbing
+10
+10.0
+20
+10.0
+11
+15.0
+21
+15.0
 0
 ENDSEC
 0
@@ -750,5 +764,393 @@ EOF
       expect(mtext.style, 'STANDARD');
       expect(mtext.height, 3.0);
     });
+
+    test('Does not load layers without objects in them (empty layers)', () {
+      const dxfContent = '''0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+LAYER
+0
+LAYER
+2
+ActiveLayer
+62
+1
+0
+LAYER
+2
+EmptyLayer1
+62
+2
+0
+LAYER
+2
+EmptyLayer2
+62
+3
+0
+LAYER
+2
+BlockOnlyLayer
+62
+4
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+BLOCKS
+0
+BLOCK
+2
+TEST_BLOCK
+0
+LINE
+8
+BlockOnlyLayer
+10
+0.0
+20
+0.0
+11
+10.0
+21
+10.0
+0
+ENDBLK
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+LINE
+8
+ActiveLayer
+10
+0.0
+20
+0.0
+11
+20.0
+21
+20.0
+0
+INSERT
+2
+TEST_BLOCK
+8
+ActiveLayer
+10
+50.0
+20
+50.0
+0
+ENDSEC
+0
+EOF''';
+
+      final doc = DxfParser.parseString(dxfContent);
+
+      // Only layers with objects should be loaded
+      expect(doc.layers.containsKey('ActiveLayer'), isTrue);
+      expect(doc.layers.containsKey('BlockOnlyLayer'), isTrue);
+
+      // Empty layers must NOT be loaded
+      expect(doc.layers.containsKey('EmptyLayer1'), isFalse);
+      expect(doc.layers.containsKey('EmptyLayer2'), isFalse);
+
+      expect(doc.layers.length, 2);
+    });
+
+    test('Accurately parses layer visibility according to AutoCAD standards (visible, hidden, frozen)', () {
+      const dxfContent = '''0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+LAYER
+0
+LAYER
+2
+VisibleLayer
+62
+3
+70
+0
+0
+LAYER
+2
+HiddenLayer
+62
+-5
+70
+0
+0
+LAYER
+2
+FrozenLayer
+62
+2
+70
+1
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+LINE
+8
+VisibleLayer
+10
+0.0
+20
+0.0
+11
+1.0
+21
+1.0
+0
+LINE
+8
+HiddenLayer
+10
+2.0
+20
+2.0
+11
+3.0
+21
+3.0
+0
+LINE
+8
+FrozenLayer
+10
+4.0
+20
+4.0
+11
+5.0
+21
+5.0
+0
+ENDSEC
+0
+EOF''';
+
+      final doc = DxfParser.parseString(dxfContent);
+
+      expect(doc.layers['VisibleLayer']?.isVisible, isTrue);
+      expect(doc.layers['VisibleLayer']?.isFrozen, isFalse);
+
+      expect(doc.layers['HiddenLayer']?.isVisible, isFalse);
+      expect(doc.layers['HiddenLayer']?.isFrozen, isFalse);
+
+      expect(doc.layers['FrozenLayer']?.isVisible, isFalse);
+      expect(doc.layers['FrozenLayer']?.isFrozen, isTrue);
+    });
+
+    test('Applies authentic DWG layer state metadata (KOTO_DWG_LAYERS)', () {
+      const dxfContent = '''999
+KOTO_DWG_LAYERS:Active1=+;Hidden1=-;Frozen1=f+;FrozenHidden1=f-
+0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+LAYER
+0
+LAYER
+2
+Active1
+62
+-7
+0
+LAYER
+2
+Hidden1
+62
+-7
+0
+LAYER
+2
+Frozen1
+62
+-7
+0
+LAYER
+2
+FrozenHidden1
+62
+-7
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+LINE
+8
+Active1
+10
+0.0
+20
+0.0
+11
+1.0
+21
+1.0
+0
+LINE
+8
+Hidden1
+10
+0.0
+20
+0.0
+11
+1.0
+21
+1.0
+0
+LINE
+8
+Frozen1
+10
+0.0
+20
+0.0
+11
+1.0
+21
+1.0
+0
+LINE
+8
+FrozenHidden1
+10
+0.0
+20
+0.0
+11
+1.0
+21
+1.0
+0
+ENDSEC
+0
+EOF''';
+
+      final doc = DxfParser.parseString(dxfContent);
+
+      expect(doc.layers['Active1']?.isVisible, isTrue);
+      expect(doc.layers['Active1']?.isFrozen, isFalse);
+
+      expect(doc.layers['Hidden1']?.isVisible, isFalse);
+      expect(doc.layers['Hidden1']?.isFrozen, isFalse);
+
+      expect(doc.layers['Frozen1']?.isVisible, isFalse);
+      expect(doc.layers['Frozen1']?.isFrozen, isTrue);
+
+      expect(doc.layers['FrozenHidden1']?.isVisible, isFalse);
+      expect(doc.layers['FrozenHidden1']?.isFrozen, isTrue);
+    });
+
+    test('Preserves default layer 0 when drawing is completely empty', () {
+      const dxfContent = '''0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+LAYER
+0
+LAYER
+2
+0
+62
+7
+0
+LAYER
+2
+EmptyLayer
+62
+1
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+ENDSEC
+0
+EOF''';
+
+      final doc = DxfParser.parseString(dxfContent);
+      expect(doc.layers.length, 1);
+      expect(doc.layers.containsKey('0'), isTrue);
+      expect(doc.layers.containsKey('EmptyLayer'), isFalse);
+    });
+
+    test('Real converted AutoCAD file (OVK_converted.dxf) excludes empty layers and keeps active layers visible', () {
+      final file = File('test_files/OVK_converted.dxf');
+      if (file.existsSync()) {
+        final content = UniversalEncodingService.decodeBytes(file.readAsBytesSync());
+        final doc = DxfParser.parseString(content);
+        // Empty layers must not be loaded: original has 332 layers, only ~150 have entities
+        expect(doc.layers.length, lessThan(200));
+        expect(doc.layers.length, greaterThan(50));
+
+        final visible = doc.layers.values.where((l) => l.isVisible).toList();
+        print('OVK visible layers (${visible.length}): ${visible.map((l) => l.name).toList()}');
+
+        // Active layers must be visible, NOT hidden by default
+        final visibleCount = visible.length;
+        expect(visibleCount, greaterThan(50));
+
+        // Specific empty layer from templates must not be loaded
+        expect(doc.layers.containsKey('zasnemane_Pen_No__7'), isFalse);
+        expect(doc.layers.containsKey('Fills_Pen_No__252'), isFalse);
+
+        // Specific active layer with entities must be loaded and visible
+        expect(doc.layers.containsKey('стени_Pen_No__1'), isTrue);
+        expect(doc.layers['стени_Pen_No__1']!.isVisible, isTrue);
+      }
+    });
+
+    test('Real converted file (Archicad_export_converted.dxf) has visible layers and excludes empty layers', () {
+      final file = File('test_files/Archicad_export_converted.dxf');
+      if (file.existsSync()) {
+        final content = UniversalEncodingService.decodeBytes(file.readAsBytesSync());
+        final doc = DxfParser.parseString(content);
+        expect(doc.layers.isNotEmpty, isTrue);
+        final visibleCount = doc.layers.values.where((l) => l.isVisible).length;
+        expect(visibleCount, doc.layers.length);
+      }
+    });
   });
 }
+

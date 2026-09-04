@@ -419,6 +419,13 @@ class _IfcGeometrySolver {
       }
     }
 
+    // Filter out layers that do not contain any elements
+    final usedLayers = elements.map((e) => e.layer.trim()).where((l) => l.isNotEmpty).toSet();
+    if (usedLayers.isNotEmpty) {
+      layers.removeWhere((l) => !usedLayers.contains(l));
+      initialHiddenLayers.removeWhere((l) => !usedLayers.contains(l));
+    }
+
     return IfcModel(
       projectName: projectName,
       schema: schema,

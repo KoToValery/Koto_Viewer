@@ -498,5 +498,53 @@ END-ISO-10303-21;
       // Wood Wall should have warm timber color (0xFFB57E4C)
       expect(woodWall.color, const Color(0xFFB57E4C));
     });
+
+    test('Does not load IFC presentation layers without elements', () {
+      const ifcWithEmptyLayer = r'''ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
+FILE_NAME('empty_layer_test.ifc','2026-09-04',('Architect'),('Office'),'','Archicad 25','');
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#1=IFCPROJECT('0000000000000000000001',#2,'Empty Layer Test',$,$,$,$,(#3),#4);
+#2=IFCOWNERHISTORY(#5,#6,$,.ADDED.,$,$,$,$);
+#3=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,#7,#8);
+#4=IFCUNITASSIGNMENT((#9));
+#5=IFCPERSONANDORGANIZATION(#10,#11,$);
+#6=IFCAPPLICATION(#11,'25.0','Archicad','Archicad');
+#7=IFCAXIS2PLACEMENT3D(#12,#13,#14);
+#8=IFCDIRECTION((0.,1.,0.));
+#9=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);
+#10=IFCPERSON($,'Architect',$,$,$,$,$,$);
+#11=IFCORGANIZATION($,'Graphisoft',$,$,$);
+#12=IFCCARTESIANPOINT((0.,0.,0.));
+#13=IFCDIRECTION((0.,0.,1.));
+#14=IFCDIRECTION((1.,0.,0.));
+#15=IFCSITE('0000000000000000000002',#2,'Site',$,$,#7,$,$,.ELEMENT.,$,$,$,$,$);
+#16=IFCBUILDING('0000000000000000000003',#2,'Building',$,$,#7,$,$,.ELEMENT.,$,$,$);
+#17=IFCBUILDINGSTOREY('0000000000000000000004',#2,'Ground Floor',$,$,#7,$,$,.ELEMENT.,0.0);
+#18=IFCRELCONTAINEDINSPATIALSTRUCTURE('0000000000000000000005',#2,$,$,(#20),#17);
+#19=IFCSHAPEREPRESENTATION(#3,'Body','SweptSolid',(#22));
+#20=IFCWALL('0000000000000000000006',#2,'Active Wall',$,$,#7,#21,$);
+#21=IFCPRODUCTDEFINITIONSHAPE($,$,(#19));
+#22=IFCEXTRUDEDAREASOLID(#23,#7,#13,3.0);
+#23=IFCRECTANGLEPROFILEDEF(.AREA.,$,#7,0.3,5.0);
+
+/* Presentation layer WITH element */
+#30=IFCPRESENTATIONLAYERASSIGNMENT('Used_Layer',$,(#19),$);
+
+/* Presentation layer WITHOUT elements (empty) */
+#31=IFCPRESENTATIONLAYERASSIGNMENT('Empty_Layer_Unused',$,(#999),$);
+
+ENDSEC;
+END-ISO-10303-21;
+''';
+
+      final model = IfcParser.parseFromText(ifcWithEmptyLayer);
+      expect(model.layers.contains('Used_Layer'), isTrue);
+      expect(model.layers.contains('Empty_Layer_Unused'), isFalse);
+    });
   });
 }
+

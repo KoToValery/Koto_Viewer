@@ -49,7 +49,14 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
       _layerCounts[layerName] = 0;
     }
     for (final entity in widget.document.entities) {
-      _layerCounts[entity.layer] = (_layerCounts[entity.layer] ?? 0) + 1;
+      final name = entity.layer.trim();
+      _layerCounts[name] = (_layerCounts[name] ?? 0) + 1;
+    }
+    for (final block in widget.document.blocks.values) {
+      for (final entity in block.entities) {
+        final name = entity.layer.trim();
+        _layerCounts[name] = (_layerCounts[name] ?? 0) + 1;
+      }
     }
   }
 
@@ -57,6 +64,9 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
     setState(() {
       for (final layer in widget.document.layers.values) {
         layer.isVisible = visible;
+        if (visible && layer.isFrozen) {
+          layer.isFrozen = false;
+        }
       }
     });
     widget.onLayersChanged();
@@ -65,7 +75,9 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sortedLayers = widget.document.layers.values.toList()
+    final sortedLayers = widget.document.layers.values
+        .where((l) => (_layerCounts[l.name] ?? 0) > 0 || widget.document.layers.length == 1)
+        .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
 
     final totalVisible = sortedLayers.where((l) => l.isVisible).length;
@@ -373,6 +385,9 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                         onChanged: (val) {
                           setState(() {
                             layer.isVisible = val;
+                            if (val && layer.isFrozen) {
+                              layer.isFrozen = false;
+                            }
                           });
                           widget.onLayersChanged();
                         },
