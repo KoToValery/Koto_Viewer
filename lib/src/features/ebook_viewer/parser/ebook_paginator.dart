@@ -175,7 +175,6 @@ class EbookPaginator {
 
     if (blockIndex != null) {
       for (int i = 0; i < pages.length; i++) {
-        final current = pages[i];
         final next = (i + 1 < pages.length) ? pages[i + 1] : null;
 
         if (next != null) {

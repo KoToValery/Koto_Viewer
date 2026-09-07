@@ -23,13 +23,13 @@ class PdfViewerScreen extends StatefulWidget {
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfController = PdfViewerController();
+  late final PdfDocumentRef _documentRef;
   late PageController _singlePageController;
 
   bool _isSinglePageMode = true;
   bool _isDarkModeView = false;
   int _pageCount = 0;
   int _currentPage = 1;
-  bool _isLoading = true;
   String _fileName = '';
 
   double _currentZoom = 1.0;
@@ -46,6 +46,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   void initState() {
     super.initState();
     _fileName = widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
+    _documentRef = PdfDocumentRefFile(widget.filePath);
     _singlePageController = PageController(initialPage: _currentPage - 1);
     _pdfController.addListener(_onControllerChanged);
     _loadProgressAndSaveRecent();
@@ -396,6 +397,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     if (_isSinglePageMode) {
       if (_singlePageController.hasClients) {
         _singlePageController.jumpToPage(page - 1);
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _singlePageController.hasClients) {
+            _singlePageController.jumpToPage(page - 1);
+          }
+        });
       }
     } else {
       if (_pdfController.isReady) {
@@ -754,8 +761,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   /// Single Page Mode: Exactly 1 page on screen with swipe page-turning and pinch-to-zoom
   Widget _buildSinglePageView() {
-    return PdfDocumentViewBuilder.file(
-      widget.filePath,
+    return PdfDocumentViewBuilder(
+      documentRef: _documentRef,
       builder: (context, document) {
         if (document == null) {
           return const Center(child: CircularProgressIndicator());
@@ -766,7 +773,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             if (mounted) {
               setState(() {
                 _pageCount = document.pages.length;
-                _isLoading = false;
               });
 
               // Restore saved page
@@ -799,18 +805,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             _checkBookmarkStatus();
           },
           itemBuilder: (context, index) {
-            return InteractiveViewer(
-              panEnabled: true,
-              scaleEnabled: true,
-              minScale: 1.0,
-              maxScale: 4.0,
-              child: Center(
-                child: PdfPageView(
-                  document: document,
-                  pageNumber: index + 1,
-                  alignment: Alignment.center,
-                ),
-              ),
+            return _PdfSinglePageItem(
+              key: ValueKey('pdf_page_${index + 1}'),
+              document: document,
+              pageNumber: index + 1,
             );
           },
         );
@@ -831,7 +829,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         onViewerReady: (document, controller) {
           setState(() {
             _pageCount = document.pages.length;
-            _isLoading = false;
           });
 
           // Restore saved page
@@ -976,3 +973,77 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 }
+
+/// Single PDF page widget that manages zoom and allows horizontal swiping when unzoomed
+class _PdfSinglePageItem extends StatefulWidget {
+  final PdfDocument document;
+  final int pageNumber;
+
+  const _PdfSinglePageItem({
+    super.key,
+    required this.document,
+    required this.pageNumber,
+  });
+
+  @override
+  State<_PdfSinglePageItem> createState() => _PdfSinglePageItemState();
+}
+
+class _PdfSinglePageItemState extends State<_PdfSinglePageItem> {
+  final TransformationController _transformController = TransformationController();
+  bool _panEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _transformController.addListener(_onTransformChanged);
+  }
+
+  @override
+  void dispose() {
+    _transformController.removeListener(_onTransformChanged);
+    _transformController.dispose();
+    super.dispose();
+  }
+
+  void _onTransformChanged() {
+    final scale = _transformController.value.getMaxScaleOnAxis();
+    final shouldEnablePan = scale > 1.05;
+    if (shouldEnablePan != _panEnabled) {
+      setState(() {
+        _panEnabled = shouldEnablePan;
+      });
+    }
+  }
+
+  void _onDoubleTap() {
+    if (_transformController.value != Matrix4.identity()) {
+      _transformController.value = Matrix4.identity();
+    } else {
+      _transformController.value = Matrix4.diagonal3Values(2.0, 2.0, 1.0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onDoubleTap: _onDoubleTap,
+      child: InteractiveViewer(
+        transformationController: _transformController,
+        panEnabled: _panEnabled,
+        scaleEnabled: true,
+        minScale: 1.0,
+        maxScale: 4.0,
+        child: Center(
+          child: PdfPageView(
+            key: ValueKey('pdf_pv_${widget.pageNumber}'),
+            document: widget.document,
+            pageNumber: widget.pageNumber,
+            alignment: Alignment.center,
+          ),
+        ),
+      ),
+    );
+  }
+}
+

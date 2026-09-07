@@ -29,6 +29,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   bool _hasCalculatedInitialFit = false;
   bool _isZoomBarExpanded = true;
   bool _isSinglePageMode = false;
+  bool _isFullscreen = false;
   int _currentPageIndex = 0;
   late PageController _docxPageController;
 
@@ -44,6 +45,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
   final ScrollController _verticalScrollController = ScrollController();
   final ScrollController _horizontalScrollController = ScrollController();
+  final TransformationController _continuousTransformationController = TransformationController();
 
   String get _fileName => widget.filePath.split(Platform.pathSeparator).last;
 
@@ -56,12 +58,25 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _saveReadingProgress();
     _docxPageController.dispose();
     _verticalScrollController.dispose();
     _horizontalScrollController.dispose();
+    _continuousTransformationController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _toggleFullscreen() {
+    setState(() {
+      _isFullscreen = !_isFullscreen;
+      if (_isFullscreen) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      }
+    });
   }
 
   Future<void> _loadDocxFile() async {
@@ -345,6 +360,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
   void _fitPage(Size viewportSize) {
     if (_document == null) return;
+    _continuousTransformationController.value = Matrix4.identity();
     final settings = _document!.pageSettings;
     final double availW = math.max(200.0, viewportSize.width - 32.0);
     final double availH = math.max(300.0, viewportSize.height - 120.0);
@@ -358,6 +374,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
   void _fitWidth(Size viewportSize) {
     if (_document == null) return;
+    _continuousTransformationController.value = Matrix4.identity();
     final settings = _document!.pageSettings;
     final double availW = math.max(200.0, viewportSize.width - 32.0);
     setState(() {
@@ -525,164 +542,175 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
     return Scaffold(
       backgroundColor: viewerBg,
-      appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
-        elevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            _saveReadingProgress();
-            Navigator.of(context).pop(true);
-          },
-        ),
-        // Row 1: Document Title & Page subtitle
-        title: _isSearchOpen
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                style: const TextStyle(fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: 'Search in document...',
-                  border: InputBorder.none,
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear, size: 18),
-                    onPressed: () {
-                      _searchController.clear();
-                      _onSearchChanged('');
-                    },
-                  ),
-                ),
-                onChanged: _onSearchChanged,
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _fileName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (_document != null && _document!.pages.isNotEmpty)
-                    Text(
-                      'Page ${_currentPageIndex + 1} of ${_document!.pages.length} • ${_isSinglePageMode ? "Single Page" : "Continuous"}',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: theme.textTheme.bodySmall?.color,
+      appBar: _isFullscreen
+          ? null
+          : AppBar(
+              backgroundColor: theme.colorScheme.surface,
+              elevation: 0.5,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  _saveReadingProgress();
+                  Navigator.of(context).pop(true);
+                },
+              ),
+              // Row 1: Document Title & Page subtitle
+              title: _isSearchOpen
+                  ? TextField(
+                      controller: _searchController,
+                      autofocus: true,
+                      style: const TextStyle(fontSize: 15),
+                      decoration: InputDecoration(
+                        hintText: 'Search in document...',
+                        border: InputBorder.none,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                          },
+                        ),
+                      ),
+                      onChanged: _onSearchChanged,
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _fileName,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (_document != null && _document!.pages.isNotEmpty)
+                          Text(
+                            'Page ${_currentPageIndex + 1} of ${_document!.pages.length} • ${_isSinglePageMode ? "Single Page" : "Continuous"}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: theme.textTheme.bodySmall?.color,
+                            ),
+                          ),
+                      ],
+                    ),
+              actions: const [],
+              // Row 2: Action commands (horizontally scrollable, no overflow)
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(44),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark ? Colors.white10 : Colors.black12,
                       ),
                     ),
-                ],
-              ),
-        actions: const [],
-        // Row 2: Action commands (horizontally scrollable, no overflow)
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? Colors.white10 : Colors.black12,
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // View Mode Toggle (Single Page vs Continuous Scroll)
+                        IconButton(
+                          icon: Icon(
+                            _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
+                            size: 20,
+                          ),
+                          tooltip: _isSinglePageMode
+                              ? 'Single Page Mode (Tap for Continuous)'
+                              : 'Continuous Mode (Tap for Single Page)',
+                          onPressed: () {
+                            setState(() {
+                              _isSinglePageMode = !_isSinglePageMode;
+                            });
+                            if (_isSinglePageMode) {
+                              _docxPageController.dispose();
+                              _docxPageController = PageController(initialPage: _currentPageIndex);
+                            }
+                          },
+                        ),
+
+                        // Search Action
+                        IconButton(
+                          icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                          tooltip: _isSearchOpen ? 'Close Search' : 'Search in Document',
+                          onPressed: () {
+                            setState(() {
+                              _isSearchOpen = !_isSearchOpen;
+                              if (!_isSearchOpen) {
+                                _searchController.clear();
+                                _onSearchChanged('');
+                              }
+                            });
+                          },
+                        ),
+
+                        // Bookmark Toggle
+                        IconButton(
+                          icon: Icon(
+                            _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                            size: 20,
+                            color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                          tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+                          onPressed: _toggleBookmark,
+                        ),
+
+                        // Bookmarks List
+                        IconButton(
+                          icon: const Icon(Icons.bookmarks_outlined, size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                          tooltip: 'Saved Bookmarks',
+                          onPressed: _showBookmarksSheet,
+                        ),
+
+                        // Fullscreen Toggle
+                        IconButton(
+                          icon: const Icon(Icons.fullscreen, size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                          tooltip: 'Fullscreen',
+                          onPressed: _toggleFullscreen,
+                        ),
+
+                        // Copy All
+                        IconButton(
+                          icon: const Icon(Icons.copy_all_outlined, size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                          tooltip: 'Copy Document Text',
+                          onPressed: _copyAllText,
+                        ),
+
+                        // Info / Properties
+                        IconButton(
+                          icon: const Icon(Icons.info_outline, size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                          tooltip: 'Document Properties',
+                          onPressed: _showInfoSheet,
+                        ),
+
+                        // Share
+                        IconButton(
+                          icon: const Icon(Icons.share_outlined, size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                          tooltip: 'Share',
+                          onPressed: _shareFile,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  // View Mode Toggle (Single Page vs Continuous Scroll)
-                  IconButton(
-                    icon: Icon(
-                      _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
-                      size: 20,
-                    ),
-                    tooltip: _isSinglePageMode
-                        ? 'Single Page Mode (Tap for Continuous)'
-                        : 'Continuous Mode (Tap for Single Page)',
-                    onPressed: () {
-                      setState(() {
-                        _isSinglePageMode = !_isSinglePageMode;
-                      });
-                      if (_isSinglePageMode) {
-                        _docxPageController.dispose();
-                        _docxPageController = PageController(initialPage: _currentPageIndex);
-                      }
-                    },
-                  ),
-
-                  // Search Action
-                  IconButton(
-                    icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _isSearchOpen ? 'Close Search' : 'Search in Document',
-                    onPressed: () {
-                      setState(() {
-                        _isSearchOpen = !_isSearchOpen;
-                        if (!_isSearchOpen) {
-                          _searchController.clear();
-                          _onSearchChanged('');
-                        }
-                      });
-                    },
-                  ),
-
-                  // Bookmark Toggle
-                  IconButton(
-                    icon: Icon(
-                      _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                      size: 20,
-                      color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
-                    onPressed: _toggleBookmark,
-                  ),
-
-                  // Bookmarks List
-                  IconButton(
-                    icon: const Icon(Icons.bookmarks_outlined, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Saved Bookmarks',
-                    onPressed: _showBookmarksSheet,
-                  ),
-
-                  // Copy All
-                  IconButton(
-                    icon: const Icon(Icons.copy_all_outlined, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Copy Document Text',
-                    onPressed: _copyAllText,
-                  ),
-
-                  // Info / Properties
-                  IconButton(
-                    icon: const Icon(Icons.info_outline, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Document Properties',
-                    onPressed: _showInfoSheet,
-                  ),
-
-                  // Share
-                  IconButton(
-                    icon: const Icon(Icons.share_outlined, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Share',
-                    onPressed: _shareFile,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
       body: _isLoading
           ? const Center(
               child: Column(
@@ -719,6 +747,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                     final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
                     _calculateInitialFit(viewportSize);
 
+                    final docSheetW = (_document != null ? _document!.pageSettings.widthPt * _zoomScale : 595.0) + 32.0;
+
                     return Stack(
                       children: [
                         _isSinglePageMode
@@ -731,35 +761,33 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                   _checkBookmarkStatus();
                                 },
                                 itemBuilder: (context, index) {
-                                  return InteractiveViewer(
-                                    panEnabled: true,
-                                    scaleEnabled: true,
-                                    minScale: 0.4,
-                                    maxScale: 3.5,
-                                    child: Center(
-                                      child: SingleChildScrollView(
-                                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                                        child: _buildDocxSinglePageWidget(index, theme, isDark),
-                                      ),
-                                    ),
+                                  return _DocxSinglePageItem(
+                                    key: ValueKey('docx_page_$index'),
+                                    child: _buildDocxSinglePageWidget(index, theme, isDark),
                                   );
                                 },
                               )
-                            : Scrollbar(
-                                controller: _verticalScrollController,
-                                thumbVisibility: true,
-                                child: Scrollbar(
-                                  controller: _horizontalScrollController,
-                                  thumbVisibility: true,
-                                  notificationPredicate: (notif) => notif.depth == 1,
-                                  child: SingleChildScrollView(
-                                    controller: _verticalScrollController,
-                                    scrollDirection: Axis.vertical,
-                                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 90),
-                                    child: SingleChildScrollView(
-                                      controller: _horizontalScrollController,
-                                      scrollDirection: Axis.horizontal,
-                                      child: Center(
+                            : GestureDetector(
+                                onDoubleTap: () {
+                                  if (_continuousTransformationController.value != Matrix4.identity()) {
+                                    _continuousTransformationController.value = Matrix4.identity();
+                                  } else {
+                                    _continuousTransformationController.value = Matrix4.diagonal3Values(1.5, 1.5, 1.0);
+                                  }
+                                },
+                                child: InteractiveViewer(
+                                  transformationController: _continuousTransformationController,
+                                  panEnabled: true,
+                                  scaleEnabled: true,
+                                  minScale: 0.5,
+                                  maxScale: 4.0,
+                                  constrained: false,
+                                  boundaryMargin: const EdgeInsets.symmetric(vertical: 100, horizontal: 80),
+                                  child: SizedBox(
+                                    width: math.max(viewportSize.width, docSheetW),
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 90),
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.center,
                                           children: _buildPages(theme, isDark),
@@ -792,6 +820,39 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                                     ),
                                   ),
                                 ],
+                              ),
+                            ),
+                          ),
+
+                        // Floating Exit Fullscreen Button
+                        if (_isFullscreen)
+                          Positioned(
+                            top: MediaQuery.paddingOf(context).top + 12,
+                            right: 16,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _toggleFullscreen,
+                                borderRadius: BorderRadius.circular(24),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: (isDark ? Colors.black87 : Colors.white.withValues(alpha: 0.9)),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.25),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    Icons.fullscreen_exit,
+                                    size: 22,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -1065,7 +1126,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       ];
       
       if (content is SizedBox) {
-        final inner = (content as SizedBox).child;
+        final inner = content.child;
         if (inner is Text) {
           final span = inner.textSpan;
           if (span is TextSpan) {
@@ -1077,7 +1138,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
           }
         }
       } else if (content is Text) {
-        final span = (content as Text).textSpan;
+        final span = content.textSpan;
         if (span is TextSpan) {
           if (span.children != null) {
             spans.addAll(span.children!);
@@ -1438,6 +1499,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 min: 0.3,
                 max: 3.0,
                 onChanged: (val) {
+                  _continuousTransformationController.value = Matrix4.identity();
                   setState(() {
                     _zoomScale = val;
                   });
@@ -1453,6 +1515,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: () {
+              _continuousTransformationController.value = Matrix4.identity();
               setState(() {
                 _zoomScale = (_zoomScale + 0.15).clamp(0.3, 3.0);
               });
@@ -1463,7 +1526,10 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
           // Zoom Percentage Badge (Tap to reset 100%)
           InkWell(
-            onTap: () => setState(() => _zoomScale = 1.0),
+            onTap: () {
+              _continuousTransformationController.value = Matrix4.identity();
+              setState(() => _zoomScale = 1.0);
+            },
             borderRadius: BorderRadius.circular(12),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
@@ -1547,3 +1613,71 @@ class _DocxPageShapePainter extends CustomPainter {
     return oldDelegate.shapes != shapes || oldDelegate.zoomScale != zoomScale;
   }
 }
+
+/// Single DOCX page item widget that manages zoom and enables pan only when scaled,
+/// ensuring PageView horizontal swiping is smooth and responsive at normal scale.
+class _DocxSinglePageItem extends StatefulWidget {
+  final Widget child;
+
+  const _DocxSinglePageItem({super.key, required this.child});
+
+  @override
+  State<_DocxSinglePageItem> createState() => _DocxSinglePageItemState();
+}
+
+class _DocxSinglePageItemState extends State<_DocxSinglePageItem> {
+  final TransformationController _transformationController = TransformationController();
+  bool _panEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _transformationController.addListener(_onTransformChanged);
+  }
+
+  @override
+  void dispose() {
+    _transformationController.removeListener(_onTransformChanged);
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _onTransformChanged() {
+    final scale = _transformationController.value.getMaxScaleOnAxis();
+    final shouldEnablePan = scale > 1.05;
+    if (shouldEnablePan != _panEnabled) {
+      setState(() {
+        _panEnabled = shouldEnablePan;
+      });
+    }
+  }
+
+  void _onDoubleTap() {
+    if (_transformationController.value != Matrix4.identity()) {
+      _transformationController.value = Matrix4.identity();
+    } else {
+      _transformationController.value = Matrix4.diagonal3Values(2.0, 2.0, 1.0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onDoubleTap: _onDoubleTap,
+      child: InteractiveViewer(
+        transformationController: _transformationController,
+        panEnabled: _panEnabled,
+        scaleEnabled: true,
+        minScale: 0.8,
+        maxScale: 4.0,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+

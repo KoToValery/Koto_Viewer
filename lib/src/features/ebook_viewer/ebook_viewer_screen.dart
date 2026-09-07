@@ -49,6 +49,8 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
   int? _pendingResumeBlock;
   int? _pendingResumeChar;
   bool _hasRestoredProgress = false;
+  int _paginatedChapterIndex = -1;
+  bool _isTransitioningChapter = false;
 
   String get _fileName => widget.filePath.split(Platform.pathSeparator).last;
 
@@ -116,6 +118,18 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
   void _paginateChapter(Size viewportSize) {
     if (_book == null || _book!.chapters.isEmpty) return;
 
+    // Capture currently visible reading anchor before repaginating
+    int? currentBlock;
+    int? currentChar;
+    if (_currentMiniPages.isNotEmpty && _currentMiniPageIndex < _currentMiniPages.length) {
+      final curPage = _currentMiniPages[_currentMiniPageIndex];
+      currentBlock = curPage.startBlockIndex;
+      currentChar = curPage.startCharOffset;
+    }
+
+    final isSameChapter = _paginatedChapterIndex == _currentChapterIndex;
+    _paginatedChapterIndex = _currentChapterIndex;
+
     final chapter = _book!.chapters[_currentChapterIndex];
     final pages = EbookPaginator.paginateChapter(
       chapter: chapter,
@@ -148,7 +162,15 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
           );
         }
       });
+    } else if (isSameChapter && currentBlock != null) {
+      // Repaginating SAME chapter (fullscreen toggle, screen rotate, font size change)
+      targetIndex = EbookPaginator.findMiniPageIndex(
+        pages,
+        blockIndex: currentBlock,
+        charOffset: currentChar,
+      );
     } else {
+      // Navigating to chapter with preferred target page
       targetIndex = _currentMiniPageIndex.clamp(0, pages.length - 1);
     }
 
@@ -386,6 +408,7 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
   void _goToChapter(int chapterIndex, {int? targetMiniPage}) {
     if (_book == null || chapterIndex < 0 || chapterIndex >= _book!.chapters.length) return;
 
+    _isTransitioningChapter = false;
     setState(() {
       _currentChapterIndex = chapterIndex;
       _currentMiniPageIndex = targetMiniPage ?? 0;
@@ -1248,57 +1271,81 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     return Column(
       children: [
         Expanded(
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: _currentMiniPages.length,
-            onPageChanged: _onMiniPageChanged,
-            itemBuilder: (context, index) {
-              final page = _currentMiniPages[index];
-              return BookPageTurnWrapper(
-                index: index,
-                pageController: _pageController,
-                child: Container(
-                  color: theme.backgroundColor,
-                  padding: EdgeInsets.fromLTRB(
-                    _settings.horizontalPadding,
-                    16,
-                    _settings.horizontalPadding,
-                    8,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // If first mini-page of chapter, show chapter title
-                      if (index == 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
-                          child: Text(
-                            page.chapterTitle,
-                            style: _settings.fontFamily.getTextStyle(
-                              fontSize: _settings.fontSize * 1.3,
-                              color: theme.textColor,
-                              height: 1.3,
-                              fontWeight: FontWeight.bold,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is OverscrollNotification) {
+                // Swiping forward past the end (e.g. on cover page or last mini-page of chapter)
+                if (notification.overscroll > 15 && !_isTransitioningChapter) {
+                  if (_currentMiniPageIndex >= _currentMiniPages.length - 1 &&
+                      _currentChapterIndex < _book!.chapters.length - 1) {
+                    _isTransitioningChapter = true;
+                    _goToNextChapterOrPage();
+                  }
+                } else if (notification.overscroll < -15 && !_isTransitioningChapter) {
+                  // Swiping backward past the beginning (e.g. to previous chapter)
+                  if (_currentMiniPageIndex <= 0 && _currentChapterIndex > 0) {
+                    _isTransitioningChapter = true;
+                    _goToPrevChapterOrPage();
+                  }
+                }
+              } else if (notification is ScrollEndNotification) {
+                _isTransitioningChapter = false;
+              }
+              return false;
+            },
+            child: PageView.builder(
+              controller: _pageController,
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              itemCount: _currentMiniPages.length,
+              onPageChanged: _onMiniPageChanged,
+              itemBuilder: (context, index) {
+                final page = _currentMiniPages[index];
+                return BookPageTurnWrapper(
+                  index: index,
+                  pageController: _pageController,
+                  child: Container(
+                    color: theme.backgroundColor,
+                    padding: EdgeInsets.fromLTRB(
+                      _settings.horizontalPadding,
+                      16,
+                      _settings.horizontalPadding,
+                      8,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // If first mini-page of chapter, show chapter title
+                        if (index == 0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
+                            child: Text(
+                              page.chapterTitle,
+                              style: _settings.fontFamily.getTextStyle(
+                                fontSize: _settings.fontSize * 1.3,
+                                color: theme.textColor,
+                                height: 1.3,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
+                          ),
+
+                        // Render mini-page blocks
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final block in page.blocks)
+                                _buildBlockWidget(block, theme),
+                            ],
                           ),
                         ),
-
-                      // Render mini-page blocks
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (final block in page.blocks)
-                              _buildBlockWidget(block, theme),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
 
