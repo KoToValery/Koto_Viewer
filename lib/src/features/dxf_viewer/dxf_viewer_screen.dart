@@ -13,6 +13,7 @@ import '../../core/services/coordinate_system_service.dart';
 import '../../core/services/dxf_exporter_service.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
+import '../../core/widgets/viewer_loading_screen.dart';
 import '../home/widgets/share_options_sheet.dart';
 import 'models/dxf_display_settings.dart';
 import 'models/dxf_models.dart';
@@ -1204,6 +1205,19 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      final isDwg = _fileName.toLowerCase().endsWith('.dwg');
+      return ViewerLoadingScreen(
+        fileName: _fileName,
+        fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
+        icon: Icons.architecture_rounded,
+        accentColor: const Color(0xFFFF9800),
+        loadingTitle: isDwg ? 'Конвертиране и зареждане на DWG...' : 'Зареждане на CAD чертеж...',
+        statusMessage: 'Анализиране на CAD слоеве, блокове и геометрия...',
+        onCancel: () => Navigator.of(context).pop(false),
+      );
+    }
+
     final theme = Theme.of(context);
     final activeCrs = CoordinateSystemService.activeSystemNotifier.value;
 

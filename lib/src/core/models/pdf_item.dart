@@ -45,7 +45,7 @@ extension FileCategoryExtension on FileCategory {
   }
 }
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, gpx, kml, kmz, geojson, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, gpx, kml, kmz, geojson, fbx, other }
 
 class PdfItem {
   final String path;
@@ -77,6 +77,7 @@ class PdfItem {
     if (lower.endsWith('.obj')) return KotoFileType.obj;
     if (lower.endsWith('.gltf')) return KotoFileType.gltf;
     if (lower.endsWith('.glb')) return KotoFileType.glb;
+    if (lower.endsWith('.fbx')) return KotoFileType.fbx;
     if (lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.p21')) return KotoFileType.step;
     if (lower.endsWith('.iges') || lower.endsWith('.igs')) return KotoFileType.iges;
     if (lower.endsWith('.ifc')) return KotoFileType.ifc;
@@ -151,9 +152,11 @@ class PdfItem {
       fileType == KotoFileType.obj ||
       fileType == KotoFileType.gltf ||
       fileType == KotoFileType.glb ||
+      fileType == KotoFileType.fbx ||
       fileType == KotoFileType.step ||
       fileType == KotoFileType.iges ||
       fileType == KotoFileType.ifc;
+  bool get isFbx => fileType == KotoFileType.fbx;
   bool get isStep => fileType == KotoFileType.step;
   bool get isIges => fileType == KotoFileType.iges;
   bool get isIfc => fileType == KotoFileType.ifc;

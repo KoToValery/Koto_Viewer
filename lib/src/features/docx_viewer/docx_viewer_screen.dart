@@ -7,6 +7,7 @@ import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
 import 'models/docx_models.dart';
 import 'parser/docx_parser.dart';
+import '../../core/widgets/viewer_loading_screen.dart';
 
 /// Microsoft Word Document (.docx) Viewer Screen with 1:1 A4 Page Formatting,
 /// Authentic Page Framing, Logo Header, Tab Stops, Exact Borders, and Zoom Slider.
@@ -537,6 +538,18 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return ViewerLoadingScreen(
+        fileName: _fileName,
+        fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
+        icon: Icons.description_rounded,
+        accentColor: const Color(0xFF2B579A),
+        loadingTitle: 'Зареждане на Word документ...',
+        statusMessage: 'Парсиране на страници, форматиране и таблици...',
+        onCancel: () => Navigator.of(context).pop(false),
+      );
+    }
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 

@@ -169,6 +169,7 @@ class FileSourceService {
         lower.endsWith('.obj') ||
         lower.endsWith('.gltf') ||
         lower.endsWith('.glb') ||
+        lower.endsWith('.fbx') ||
         lower.endsWith('.xlsx') ||
         lower.endsWith('.xls') ||
         lower.endsWith('.txt') ||

@@ -15,6 +15,7 @@ import 'parser/ifc_parser.dart';
 import 'widgets/ifc_bim_sheet.dart';
 import 'rendering/cad_3d_camera.dart';
 import 'rendering/cad_3d_mesh_painter.dart';
+import '../../core/widgets/viewer_loading_screen.dart';
 
 /// Interactive 3D CAD & Model Viewer Screen for STL, OBJ, GLTF, GLB, STEP, and IGES files.
 class Dxf3DViewerScreen extends StatefulWidget {
@@ -344,6 +345,18 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return ViewerLoadingScreen(
+        fileName: _fileName,
+        fileSizeBytes: _fileSizeBytes,
+        icon: Icons.view_in_ar_rounded,
+        accentColor: const Color(0xFF00E5FF),
+        loadingTitle: 'Зареждане на 3D модел...',
+        statusMessage: 'Триангулация и изграждане на полигонална мрежа...',
+        onCancel: () => Navigator.of(context).pop(false),
+      );
+    }
+
     final theme = Theme.of(context);
 
     return Scaffold(

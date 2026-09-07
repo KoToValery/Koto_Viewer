@@ -87,6 +87,7 @@ class FileTypeIcon extends StatelessWidget {
       case KotoFileType.iges:
         return _buildIgesIcon();
       case KotoFileType.ifc:
+      case KotoFileType.fbx:
         return _buildIfcIcon();
       case KotoFileType.zip:
         return _buildZipIcon();
@@ -1624,6 +1625,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.step:
       case KotoFileType.iges:
       case KotoFileType.ifc:
+      case KotoFileType.fbx:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => Dxf3DViewerScreen(filePath: resolvedPath),

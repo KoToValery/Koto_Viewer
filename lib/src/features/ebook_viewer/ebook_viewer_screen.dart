@@ -9,6 +9,7 @@ import '../../core/services/reading_progress_service.dart';
 import 'models/ebook_models.dart';
 import 'parser/ebook_parser.dart';
 import 'parser/ebook_paginator.dart';
+import '../../core/widgets/viewer_loading_screen.dart';
 
 /// Digital E-Book Reader Screen (.epub, .fb2, .fb2.zip).
 /// Features full Cyrillic & international script support, customizable typography,
@@ -1040,6 +1041,19 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      final isFb2 = _fileName.toLowerCase().endsWith('.fb2') || _fileName.toLowerCase().endsWith('.fb2.zip');
+      return ViewerLoadingScreen(
+        fileName: _fileName,
+        fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
+        icon: Icons.menu_book_rounded,
+        accentColor: isFb2 ? const Color(0xFF059669) : const Color(0xFFD97706),
+        loadingTitle: isFb2 ? 'Зареждане на книга (FB2)...' : 'Зареждане на електронна книга...',
+        statusMessage: 'Декодиране на текст, глави и съдържание...',
+        onCancel: () => Navigator.of(context).pop(false),
+      );
+    }
+
     final currentTheme = _settings.themeMode;
     final isPaginated = _settings.readingMode == EbookReadingMode.paginated;
 

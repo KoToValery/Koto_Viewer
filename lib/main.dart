@@ -139,6 +139,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.step:
       case KotoFileType.iges:
       case KotoFileType.ifc:
+      case KotoFileType.fbx:
         navigator.push(
           MaterialPageRoute(builder: (_) => Dxf3DViewerScreen(filePath: filePath)),
         );

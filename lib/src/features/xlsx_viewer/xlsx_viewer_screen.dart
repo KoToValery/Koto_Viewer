@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +9,7 @@ import 'package:excel/excel.dart' as xl;
 import 'package:share_plus/share_plus.dart';
 import 'package:xml/xml.dart' as xml;
 import '../../core/services/recent_files_service.dart';
+import '../../core/widgets/viewer_loading_screen.dart';
 import 'excel_formula_evaluator.dart';
 
 /// Interactive Excel Spreadsheet Viewer (.xlsx / .xls)
@@ -625,6 +625,18 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return ViewerLoadingScreen(
+        fileName: _fileName,
+        fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
+        icon: Icons.table_chart_rounded,
+        accentColor: const Color(0xFF107C41),
+        loadingTitle: 'Зареждане на електронна таблица...',
+        statusMessage: 'Индексиране на работни листи, клетки и формули...',
+        onCancel: () => Navigator.of(context).pop(false),
+      );
+    }
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 

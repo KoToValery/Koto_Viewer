@@ -7,6 +7,7 @@ import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
 import '../home/widgets/share_options_sheet.dart';
+import '../../core/widgets/viewer_loading_screen.dart';
 
 /// PDF Document Viewer Screen with Single Page Mode (Swipe) and Continuous Scroll,
 /// 2-row header navigation, reading progress auto-save & resume, bookmarks,
@@ -31,6 +32,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   int _pageCount = 0;
   int _currentPage = 1;
   String _fileName = '';
+  int _fileSizeBytes = 0;
+  bool get _isPresentation => _fileName.toLowerCase().endsWith('.pptx') || _fileName.toLowerCase().endsWith('.ppt');
 
   double _currentZoom = 1.0;
   bool _isZoomBarExpanded = true;
@@ -70,6 +73,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       final file = File(widget.filePath);
       if (await file.exists()) {
         final size = await file.length();
+        if (mounted) {
+          setState(() {
+            _fileSizeBytes = size;
+          });
+        }
         final pdfItem = PdfItem(
           path: widget.filePath,
           name: _fileName,
@@ -764,6 +772,20 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
               ),
             ),
+
+          // Modern Fullscreen Loading Overlay
+          if (_pageCount == 0)
+            Positioned.fill(
+              child: ViewerLoadingScreen(
+                fileName: _fileName,
+                fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
+                icon: _isPresentation ? Icons.slideshow_rounded : Icons.picture_as_pdf_rounded,
+                accentColor: _isPresentation ? const Color(0xFFD24726) : const Color(0xFFE53935),
+                loadingTitle: _isPresentation ? 'Зареждане на презентация...' : 'Зареждане на PDF документ...',
+                statusMessage: 'Подготовка и анализиране на страниците...',
+                onCancel: () => Navigator.of(context).pop(false),
+              ),
+            ),
         ],
       ),
       bottomNavigationBar: _isFullscreen
@@ -825,7 +847,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       documentRef: _documentRef,
       builder: (context, document) {
         if (document == null) {
-          return const Center(child: CircularProgressIndicator());
+          return ViewerLoadingScreen(
+            fileName: _fileName,
+            fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
+            icon: _isPresentation ? Icons.slideshow_rounded : Icons.picture_as_pdf_rounded,
+            accentColor: _isPresentation ? const Color(0xFFD24726) : const Color(0xFFE53935),
+            loadingTitle: _isPresentation ? 'Зареждане на презентация...' : 'Зареждане на PDF документ...',
+            statusMessage: 'Подготовка и анализиране на страниците...',
+            onCancel: () => Navigator.of(context).pop(false),
+          );
         }
 
         if (_pageCount != document.pages.length) {
