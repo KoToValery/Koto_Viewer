@@ -59,12 +59,35 @@ class EbookPaginator {
     // -------------------------------------------------------------
     // 1. FORWARD PAGINATION (from safeAnchorBlock, safeAnchorChar to end)
     // -------------------------------------------------------------
+    final double titleHeight;
+    if (chapter.title.isNotEmpty) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: chapter.title,
+          style: settings.fontFamily.getTextStyle(
+            fontSize: settings.fontSize * 1.3,
+            color: textColor,
+            height: 1.3,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: availableWidth);
+      titleHeight = painter.height + 24.0;
+    } else {
+      titleHeight = 0.0;
+    }
+
     final List<List<EbookBlock>> forwardRawPages = [];
     final List<int> forwardStartBlocks = [];
     final List<int> forwardStartChars = [];
 
     List<EbookBlock> currentBlocks = [];
-    double remainingHeight = availableHeight;
+    final bool isAnchorAtBeginning = (safeAnchorBlock == 0 && safeAnchorChar == 0);
+    double remainingHeight = isAnchorAtBeginning
+        ? math.max(100.0, availableHeight - titleHeight)
+        : availableHeight;
     int currentStartBlock = safeAnchorBlock;
     int currentStartChar = safeAnchorChar;
 
@@ -523,13 +546,7 @@ class EbookPaginator {
     // Find nearest preceding space or newline to avoid cutting words in half
     int safeCut = block.text.lastIndexOf(RegExp(r'\s'), cutOffset);
     if (safeCut <= 15) {
-      // If no good space backwards, search slightly forward
-      final forwardCut = block.text.indexOf(RegExp(r'\s'), cutOffset);
-      if (forwardCut > 0 && forwardCut < block.text.length - 10) {
-        safeCut = forwardCut;
-      } else {
-        safeCut = cutOffset;
-      }
+      safeCut = cutOffset;
     }
 
     final text1 = block.text.substring(0, safeCut).trimRight();

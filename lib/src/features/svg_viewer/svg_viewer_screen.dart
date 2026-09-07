@@ -9,11 +9,12 @@ import '../../core/services/recent_files_service.dart';
 
 /// Available canvas themes for the SVG viewer.
 enum SvgCanvasTheme {
+  lightStudio('Light Studio', Color(0xFFF2F2F6), Color(0xFFDCDCE4)),
+  darkStudio('Dark Studio', Color(0xFF1E1E24), Color(0xFF2C2C34)),
+  pureWhite('Pure White', Color(0xFFFFFFFF), Color(0xFFE5E5E5)),
+  pureBlack('Pure Black', Color(0xFF121212), Color(0xFF242424)),
   darkCad('Dark CAD', Color(0xFF1E1E1E), Color(0xFF2E2E2E)),
-  blueprint('Blueprint', Color(0xFF0D253A), Color(0xFF194364)),
-  lightStudio('Light Studio', Color(0xFFF5F5F7), Color(0xFFE2E2E6)),
-  pureBlack('Pure Black', Color(0xFF000000), Color(0xFF1F1F1F)),
-  pureWhite('Pure White', Color(0xFFFFFFFF), Color(0xFFE0E0E0));
+  blueprint('Blueprint', Color(0xFF0D253A), Color(0xFF194364));
 
   final String label;
   final Color background;
@@ -32,6 +33,7 @@ class SvgMetadata {
   final int pathCount;
   final int shapeCount;
   final int textCount;
+  final int imageCount;
 
   const SvgMetadata({
     this.width,
@@ -40,15 +42,17 @@ class SvgMetadata {
     this.pathCount = 0,
     this.shapeCount = 0,
     this.textCount = 0,
+    this.imageCount = 0,
   });
 
-  int get totalElements => pathCount + shapeCount + textCount;
+  int get totalElements => pathCount + shapeCount + textCount + imageCount;
 
   String get summary {
     final List<String> parts = [];
     if (pathCount > 0) parts.add('$pathCount paths');
     if (shapeCount > 0) parts.add('$shapeCount shapes');
     if (textCount > 0) parts.add('$textCount text');
+    if (imageCount > 0) parts.add('$imageCount images');
     return parts.isEmpty ? '$totalElements elements' : parts.join(', ');
   }
 }
@@ -78,9 +82,11 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
   late String _fileName;
   int _fileSizeBytes = 0;
 
-  SvgCanvasTheme _canvasTheme = SvgCanvasTheme.darkCad;
+  SvgCanvasTheme _canvasTheme = SvgCanvasTheme.lightStudio;
+  bool _showWhitePage = true;
   bool _showGrid = true;
   double _currentScale = 1.0;
+  bool _hasFittedInitial = false;
 
   @override
   void initState() {
@@ -137,17 +143,22 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       );
       await RecentFilesService.addRecentFile(pdfItem);
 
-      if (mounted) {
-        setState(() {
-          _svgContent = content;
-          _metadata = metadata;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _svgContent = content;
+            _metadata = metadata;
+            _isLoading = false;
+          });
 
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _fitToScreen();
-        });
-      }
+          debugPrint('[SVG_VIEWER] Loaded "${widget.filePath}": ${metadata.summary}, viewBox=${metadata.viewBox}, size=${metadata.width}x${metadata.height}');
+
+          if (!_viewportSize.isEmpty) {
+            _hasFittedInitial = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _fitToScreen();
+            });
+          }
+        }
     } catch (e) {
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
@@ -159,35 +170,72 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
     }
   }
 
+  static double _convertUnitToPixels(double val, String unit) {
+    switch (unit) {
+      case 'mm':
+        return val * 3.7795275591;
+      case 'cm':
+        return val * 37.795275591;
+      case 'in':
+        return val * 96.0;
+      case 'pt':
+        return val * 1.3333333333;
+      default:
+        return val;
+    }
+  }
+
   SvgMetadata _parseSvgMetadata(String svg) {
     double? width;
     double? height;
     Rect? viewBox;
 
-    final vbMatch = RegExp(r'''viewBox\s*=\s*["']\s*([-\d.]+)[,\s]+([-\d.]+)[,\s]+([-\d.]+)[,\s]+([-\d.]+)''', caseSensitive: false).firstMatch(svg);
+    final vbMatch = RegExp(
+      r'''viewBox\s*=\s*["']\s*([-\d.]+)[,\s]+([-\d.]+)[,\s]+([-\d.]+)[,\s]+([-\d.]+)''',
+      caseSensitive: false,
+    ).firstMatch(svg);
     if (vbMatch != null) {
       final minX = double.tryParse(vbMatch.group(1)!) ?? 0;
       final minY = double.tryParse(vbMatch.group(2)!) ?? 0;
       final vbW = double.tryParse(vbMatch.group(3)!) ?? 100;
       final vbH = double.tryParse(vbMatch.group(4)!) ?? 100;
-      viewBox = Rect.fromLTWH(minX, minY, vbW, vbH);
-      width = vbW;
-      height = vbH;
+      if (vbW > 0 && vbH > 0) {
+        viewBox = Rect.fromLTWH(minX, minY, vbW, vbH);
+        width = vbW;
+        height = vbH;
+      }
     }
 
-    final widthMatch = RegExp(r'''<svg[^>]*\bwidth\s*=\s*["']([\d.]+)(?:px|pt|mm|cm)?["']''', caseSensitive: false).firstMatch(svg);
-    if (widthMatch != null) {
-      width = double.tryParse(widthMatch.group(1)!);
-    }
+    if (viewBox == null) {
+      final widthMatch = RegExp(
+        r'''<svg[^>]*\bwidth\s*=\s*["']([\d.]+)(px|pt|mm|cm|in)?["']''',
+        caseSensitive: false,
+      ).firstMatch(svg);
+      if (widthMatch != null) {
+        final val = double.tryParse(widthMatch.group(1)!);
+        final unit = widthMatch.group(2)?.toLowerCase() ?? 'px';
+        if (val != null && val > 0) {
+          width = _convertUnitToPixels(val, unit);
+        }
+      }
 
-    final heightMatch = RegExp(r'''<svg[^>]*\bheight\s*=\s*["']([\d.]+)(?:px|pt|mm|cm)?["']''', caseSensitive: false).firstMatch(svg);
-    if (heightMatch != null) {
-      height = double.tryParse(heightMatch.group(1)!);
+      final heightMatch = RegExp(
+        r'''<svg[^>]*\bheight\s*=\s*["']([\d.]+)(px|pt|mm|cm|in)?["']''',
+        caseSensitive: false,
+      ).firstMatch(svg);
+      if (heightMatch != null) {
+        final val = double.tryParse(heightMatch.group(1)!);
+        final unit = heightMatch.group(2)?.toLowerCase() ?? 'px';
+        if (val != null && val > 0) {
+          height = _convertUnitToPixels(val, unit);
+        }
+      }
     }
 
     final pathCount = RegExp(r'<path\b', caseSensitive: false).allMatches(svg).length;
     final shapeCount = RegExp(r'<(?:rect|circle|ellipse|line|polyline|polygon)\b', caseSensitive: false).allMatches(svg).length;
     final textCount = RegExp(r'<text\b', caseSensitive: false).allMatches(svg).length;
+    final imageCount = RegExp(r'<image\b', caseSensitive: false).allMatches(svg).length;
 
     return SvgMetadata(
       width: width,
@@ -196,6 +244,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       pathCount: pathCount,
       shapeCount: shapeCount,
       textCount: textCount,
+      imageCount: imageCount,
     );
   }
 
@@ -210,7 +259,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
     final svgWidth = _metadata.width ?? _metadata.viewBox?.width ?? 600.0;
     final svgHeight = _metadata.height ?? _metadata.viewBox?.height ?? 600.0;
 
-    const double padding = 40.0;
+    const double padding = 32.0;
     final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
     final double availH = math.max(_viewportSize.height - padding * 2, 10.0);
 
@@ -220,10 +269,11 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
     final double dy = (_viewportSize.height - svgHeight * scale) / 2.0;
 
     final matrix = Matrix4.identity()
-      ..translate(dx, dy)
-      ..scale(scale, scale);
+      ..translateByDouble(dx, dy, 0.0, 1.0)
+      ..scaleByDouble(scale, scale, 1.0, 1.0);
 
     _transformController.value = matrix;
+    debugPrint('[SVG_VIEWER] _fitToScreen: viewport=$_viewportSize, svg=${svgWidth.toStringAsFixed(1)}x${svgHeight.toStringAsFixed(1)}, scale=${scale.toStringAsFixed(4)}, dx=${dx.toStringAsFixed(1)}, dy=${dy.toStringAsFixed(1)}');
   }
 
   void _zoomIn() {
@@ -249,8 +299,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
     final dy = targetPoint.dy - (targetPoint.dy - translation.y) * (newScale / scale);
 
     final newMatrix = Matrix4.identity()
-      ..translate(dx, dy)
-      ..scale(newScale);
+      ..translateByDouble(dx, dy, 0.0, 1.0)
+      ..scaleByDouble(newScale, newScale, 1.0, 1.0);
 
     _transformController.value = newMatrix;
   }
@@ -310,6 +360,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
             _buildInfoRow('Basic Shapes', '${_metadata.shapeCount}'),
             if (_metadata.textCount > 0)
               _buildInfoRow('Text Elements', '${_metadata.textCount}'),
+            if (_metadata.imageCount > 0)
+              _buildInfoRow('Embedded Images', '${_metadata.imageCount}'),
           ],
         ),
         actions: [
@@ -373,6 +425,19 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
             child: Row(
               children: [
                 const Spacer(),
+
+                // White Page Sheet Toggle
+                IconButton(
+                  icon: Icon(
+                    _showWhitePage ? Icons.description : Icons.description_outlined,
+                    size: 20,
+                    color: _showWhitePage ? theme.colorScheme.primary : null,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: _showWhitePage ? 'White Page: ON' : 'White Page: OFF (Transparent)',
+                  onPressed: () => setState(() => _showWhitePage = !_showWhitePage),
+                ),
 
                 // Fit to Screen Button
                 IconButton(
@@ -453,7 +518,16 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+          final newSize = Size(constraints.maxWidth, constraints.maxHeight);
+          final wasEmpty = _viewportSize.isEmpty;
+          _viewportSize = newSize;
+
+          if ((wasEmpty || !_hasFittedInitial) && !newSize.isEmpty && _svgContent.isNotEmpty) {
+            _hasFittedInitial = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _fitToScreen();
+            });
+          }
 
           if (_isLoading) {
             return const Center(
@@ -499,33 +573,77 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
 
           return Stack(
             children: [
-              // Interactive Canvas with Background Grid & SVG Rendering + Mouse Wheel
+              // Background Grid
+              if (_showGrid)
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _SvgGridPainter(
+                      gridColor: _canvasTheme.gridColor,
+                      scale: _currentScale,
+                    ),
+                  ),
+                ),
+
+              // Interactive Canvas with SVG Rendering + Mouse Wheel
               Listener(
                 onPointerSignal: _handlePointerSignal,
                 child: InteractiveViewer(
                   transformationController: _transformController,
                   minScale: 0.002,
                   maxScale: 2000.0,
+                  constrained: false,
                   boundaryMargin: const EdgeInsets.all(2500.0),
-                  child: CustomPaint(
-                    painter: _showGrid
-                        ? _SvgGridPainter(
-                            gridColor: _canvasTheme.gridColor,
-                            scale: _currentScale,
-                          )
-                        : null,
-                    child: Center(
-                      child: Container(
-                        width: svgWidth,
-                        height: svgHeight,
-                        alignment: Alignment.center,
-                        child: SvgPicture.string(
+                  child: Container(
+                    width: svgWidth,
+                    height: svgHeight,
+                    decoration: BoxDecoration(
+                      color: _showWhitePage ? Colors.white : Colors.transparent,
+                      borderRadius: BorderRadius.circular(2),
+                      boxShadow: _showWhitePage
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.18),
+                                blurRadius: 16,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: SvgPicture.file(
+                      File(widget.filePath),
+                      width: svgWidth,
+                      height: svgHeight,
+                      fit: BoxFit.contain,
+                      placeholderBuilder: (context) => const Center(
+                        child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint('[SVG_VIEWER] SvgPicture.file error: $error, falling back to SvgPicture.string');
+                        return SvgPicture.string(
                           _svgContent,
                           width: svgWidth,
                           height: svgHeight,
                           fit: BoxFit.contain,
-                        ),
-                      ),
+                          errorBuilder: (context, strErr, strStack) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  'Error rendering SVG: $strErr',
+                                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
                   ),
                 ),
