@@ -213,7 +213,6 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     }
 
     _checkBookmarkStatus();
-    debugPrint('[EBOOK_PAGING] _paginateChapter: ch $_currentChapterIndex, ${_currentMiniPages.length} pages generated, active page index $targetIndex');
   }
 
   void _saveReadingProgress() {
@@ -442,7 +441,6 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
   void _goToChapter(int chapterIndex, {int? targetMiniPage, int? targetBlock, int? targetChar}) {
     if (_book == null || chapterIndex < 0 || chapterIndex >= _book!.chapters.length) return;
 
-    debugPrint('[EBOOK_PAGING] _goToChapter: to Ch ${chapterIndex + 1}/${_book!.chapters.length}, targetMiniPage: $targetMiniPage, targetBlock: $targetBlock');
     setState(() {
       _currentChapterIndex = chapterIndex;
       _currentMiniPageIndex = targetMiniPage ?? 0;
@@ -474,7 +472,6 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
   }
 
   void _onMiniPageChanged(int index) {
-    debugPrint('[EBOOK_PAGING] Page changed: index $index (page ${index + 1}/${_currentMiniPages.length}), Ch ${_currentChapterIndex + 1}/${_book?.chapters.length}');
     setState(() {
       _currentMiniPageIndex = index;
     });
@@ -483,7 +480,6 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
   }
 
   void _goToNextChapterOrPage() {
-    debugPrint('[EBOOK_PAGING] Action _goToNextChapterOrPage: page ${_currentMiniPageIndex + 1}/${_currentMiniPages.length}, ch ${_currentChapterIndex + 1}/${_book?.chapters.length}');
     if (_currentMiniPageIndex < _currentMiniPages.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 350),
@@ -495,7 +491,6 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
   }
 
   void _goToPrevChapterOrPage() {
-    debugPrint('[EBOOK_PAGING] Action _goToPrevChapterOrPage: page ${_currentMiniPageIndex + 1}/${_currentMiniPages.length}, ch ${_currentChapterIndex + 1}/${_book?.chapters.length}');
     if (_currentMiniPageIndex > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 350),
@@ -1321,7 +1316,6 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                 _overscrollDistance = 0.0;
                 _dragStartedOnLastPage = _currentMiniPages.isNotEmpty && (_currentMiniPageIndex >= _currentMiniPages.length - 1);
                 _dragStartedOnFirstPage = _currentMiniPages.isNotEmpty && (_currentMiniPageIndex <= 0);
-                debugPrint('[EBOOK_PAGING] Drag START: Ch ${_currentChapterIndex + 1}, Page ${_currentMiniPageIndex + 1}/${_currentMiniPages.length} (first=$_dragStartedOnFirstPage, last=$_dragStartedOnLastPage)');
               } else if (notification is ScrollUpdateNotification) {
                 if (notification.metrics.hasContentDimensions) {
                   // If drag started on the last page of current chapter, track forward overscroll
@@ -1329,7 +1323,6 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                     final over = notification.metrics.pixels - notification.metrics.maxScrollExtent;
                     if (over > 0 && over > _overscrollDistance) {
                       _overscrollDistance = over;
-                      debugPrint('[EBOOK_PAGING] ScrollUpdate forward overscroll: ${_overscrollDistance.toStringAsFixed(1)}');
                     }
                   }
                   // If drag started on the first page of current chapter, track backward overscroll
@@ -1337,7 +1330,6 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                     final over = notification.metrics.minScrollExtent - notification.metrics.pixels;
                     if (over > 0 && -over < _overscrollDistance) {
                       _overscrollDistance = -over;
-                      debugPrint('[EBOOK_PAGING] ScrollUpdate backward overscroll: ${_overscrollDistance.toStringAsFixed(1)}');
                     }
                   }
                 }
@@ -1345,12 +1337,10 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                 if (_dragStartedOnLastPage && _currentChapterIndex < _book!.chapters.length - 1) {
                   if (notification.overscroll > 0) {
                     _overscrollDistance += notification.overscroll;
-                    debugPrint('[EBOOK_PAGING] Overscroll forward: delta=${notification.overscroll.toStringAsFixed(1)}, total=${_overscrollDistance.toStringAsFixed(1)}');
                   }
                 } else if (_dragStartedOnFirstPage && _currentChapterIndex > 0) {
                   if (notification.overscroll < 0) {
                     _overscrollDistance += notification.overscroll; // negative
-                    debugPrint('[EBOOK_PAGING] Overscroll backward: delta=${notification.overscroll.toStringAsFixed(1)}, total=${_overscrollDistance.toStringAsFixed(1)}');
                   }
                 }
               } else if (notification is ScrollEndNotification ||
@@ -1362,14 +1352,11 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                 _dragStartedOnLastPage = false;
                 _dragStartedOnFirstPage = false;
 
-                debugPrint('[EBOOK_PAGING] Drag END: dist=${dist.toStringAsFixed(1)}, wasStartedLast=$wasStartedLast, wasStartedFirst=$wasStartedFirst, isTransitioning=$_isTransitioningChapter, ch=${_currentChapterIndex + 1}, page=${_currentMiniPageIndex + 1}/${_currentMiniPages.length}');
-
                 if (!_isTransitioningChapter) {
                   if (wasStartedLast &&
                       dist > 25 &&
                       _currentMiniPageIndex >= _currentMiniPages.length - 1 &&
                       _currentChapterIndex < _book!.chapters.length - 1) {
-                    debugPrint('[EBOOK_PAGING] -> Chapter advance triggered by swipe -> Next Chapter ${_currentChapterIndex + 2}');
                     _isTransitioningChapter = true;
                     _goToChapter(_currentChapterIndex + 1, targetMiniPage: 0);
                     Future.delayed(const Duration(milliseconds: 400), () {
@@ -1379,7 +1366,6 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                       dist < -25 &&
                       _currentMiniPageIndex <= 0 &&
                       _currentChapterIndex > 0) {
-                    debugPrint('[EBOOK_PAGING] -> Chapter retreat triggered by swipe -> Prev Chapter $_currentChapterIndex');
                     _isTransitioningChapter = true;
                     _goToPrevChapterOrPage();
                     Future.delayed(const Duration(milliseconds: 400), () {

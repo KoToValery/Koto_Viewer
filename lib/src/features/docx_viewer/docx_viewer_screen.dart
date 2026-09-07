@@ -29,6 +29,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   bool _hasCalculatedInitialFit = false;
   bool _isZoomBarExpanded = true;
   bool _isSinglePageMode = false;
+  bool _isSinglePageZoomed = false;
+  TapDownDetails? _continuousDoubleTapDetails;
   bool _isFullscreen = false;
   int _currentPageIndex = 0;
   late PageController _docxPageController;
@@ -755,24 +757,66 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                             ? PageView.builder(
                                 controller: _docxPageController,
                                 itemCount: _document!.pages.length,
+                                physics: _isSinglePageZoomed
+                                    ? const NeverScrollableScrollPhysics()
+                                    : const PageScrollPhysics(),
                                 onPageChanged: (index) {
-                                  setState(() => _currentPageIndex = index);
+                                  setState(() {
+                                    _currentPageIndex = index;
+                                    _isSinglePageZoomed = false;
+                                  });
                                   _saveReadingProgress();
                                   _checkBookmarkStatus();
                                 },
                                 itemBuilder: (context, index) {
-                                  return _DocxSinglePageItem(
+                                  return DocxSinglePageItem(
                                     key: ValueKey('docx_page_$index'),
+                                    onZoomChanged: (zoom) {
+                                      if (_currentPageIndex == index && mounted) {
+                                        final isZoomed = zoom > 1.05;
+                                        if (isZoomed != _isSinglePageZoomed) {
+                                          setState(() {
+                                            _isSinglePageZoomed = isZoomed;
+                                          });
+                                        }
+                                      }
+                                    },
+                                    onLeftTap: () {
+                                      if (_currentPageIndex > 0 && _docxPageController.hasClients) {
+                                        _docxPageController.previousPage(
+                                          duration: const Duration(milliseconds: 220),
+                                          curve: Curves.easeOutCubic,
+                                        );
+                                      }
+                                    },
+                                    onRightTap: () {
+                                      if (_document != null && _currentPageIndex < _document!.pages.length - 1 && _docxPageController.hasClients) {
+                                        _docxPageController.nextPage(
+                                          duration: const Duration(milliseconds: 220),
+                                          curve: Curves.easeOutCubic,
+                                        );
+                                      }
+                                    },
+                                    onCenterTap: _toggleFullscreen,
                                     child: _buildDocxSinglePageWidget(index, theme, isDark),
                                   );
                                 },
                               )
                             : GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onDoubleTapDown: (details) => _continuousDoubleTapDetails = details,
                                 onDoubleTap: () {
-                                  if (_continuousTransformationController.value != Matrix4.identity()) {
+                                  if (_continuousTransformationController.value.getMaxScaleOnAxis() > 1.05) {
                                     _continuousTransformationController.value = Matrix4.identity();
                                   } else {
-                                    _continuousTransformationController.value = Matrix4.diagonal3Values(1.5, 1.5, 1.0);
+                                    final pos = _continuousDoubleTapDetails?.localPosition ?? Offset(viewportSize.width / 2, viewportSize.height / 2);
+                                    const scale = 1.75;
+                                    final matrix = Matrix4.identity();
+                                    matrix.setEntry(0, 0, scale);
+                                    matrix.setEntry(1, 1, scale);
+                                    matrix.setEntry(0, 3, pos.dx * (1 - scale));
+                                    matrix.setEntry(1, 3, pos.dy * (1 - scale));
+                                    _continuousTransformationController.value = matrix;
                                   }
                                 },
                                 child: InteractiveViewer(
@@ -1616,53 +1660,133 @@ class _DocxPageShapePainter extends CustomPainter {
 
 /// Single DOCX page item widget that manages zoom and enables pan only when scaled,
 /// ensuring PageView horizontal swiping is smooth and responsive at normal scale.
-class _DocxSinglePageItem extends StatefulWidget {
+class DocxSinglePageItem extends StatefulWidget {
   final Widget child;
+  final ValueChanged<double>? onZoomChanged;
+  final VoidCallback? onLeftTap;
+  final VoidCallback? onCenterTap;
+  final VoidCallback? onRightTap;
 
-  const _DocxSinglePageItem({super.key, required this.child});
+  const DocxSinglePageItem({
+    super.key,
+    required this.child,
+    this.onZoomChanged,
+    this.onLeftTap,
+    this.onCenterTap,
+    this.onRightTap,
+  });
 
   @override
-  State<_DocxSinglePageItem> createState() => _DocxSinglePageItemState();
+  State<DocxSinglePageItem> createState() => DocxSinglePageItemState();
 }
 
-class _DocxSinglePageItemState extends State<_DocxSinglePageItem> {
-  final TransformationController _transformationController = TransformationController();
+class DocxSinglePageItemState extends State<DocxSinglePageItem> with SingleTickerProviderStateMixin {
+  late final TransformationController _transformationController;
+  late final AnimationController _animController;
+  Animation<Matrix4>? _matrixAnimation;
+
   bool _panEnabled = false;
+  double _currentScale = 1.0;
+  TapDownDetails? _doubleTapDetails;
 
   @override
   void initState() {
     super.initState();
+    _transformationController = TransformationController();
     _transformationController.addListener(_onTransformChanged);
+
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _animController.addListener(_onAnimationTick);
   }
 
   @override
   void dispose() {
+    _animController.removeListener(_onAnimationTick);
+    _animController.dispose();
     _transformationController.removeListener(_onTransformChanged);
     _transformationController.dispose();
     super.dispose();
   }
 
+  void _onAnimationTick() {
+    if (_matrixAnimation != null) {
+      _transformationController.value = _matrixAnimation!.value;
+    }
+  }
+
   void _onTransformChanged() {
     final scale = _transformationController.value.getMaxScaleOnAxis();
+    _currentScale = scale;
     final shouldEnablePan = scale > 1.05;
     if (shouldEnablePan != _panEnabled) {
       setState(() {
         _panEnabled = shouldEnablePan;
       });
     }
+    widget.onZoomChanged?.call(scale);
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    if (_currentScale > 1.05) return;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final width = renderBox.size.width;
+    final x = details.localPosition.dx;
+
+    if (x < width * 0.25) {
+      widget.onLeftTap?.call();
+    } else if (x > width * 0.75) {
+      widget.onRightTap?.call();
+    } else {
+      widget.onCenterTap?.call();
+    }
+  }
+
+  void _animateToMatrix(Matrix4 target) {
+    _matrixAnimation = Matrix4Tween(
+      begin: _transformationController.value,
+      end: target,
+    ).animate(CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutCubic,
+    ));
+    _animController.forward(from: 0.0);
   }
 
   void _onDoubleTap() {
-    if (_transformationController.value != Matrix4.identity()) {
-      _transformationController.value = Matrix4.identity();
+    if (_animController.isAnimating) return;
+
+    if (_currentScale > 1.05) {
+      _animateToMatrix(Matrix4.identity());
     } else {
-      _transformationController.value = Matrix4.diagonal3Values(2.0, 2.0, 1.0);
+      final tapPos = _doubleTapDetails?.localPosition ?? Offset.zero;
+      final renderBox = context.findRenderObject() as RenderBox?;
+      final size = renderBox?.size ?? MediaQuery.sizeOf(context);
+
+      const targetScale = 2.5;
+      final matrix = Matrix4.identity();
+      matrix.setEntry(0, 0, targetScale);
+      matrix.setEntry(1, 1, targetScale);
+
+      final targetDx = (tapPos.dx * (1 - targetScale)).clamp(size.width * (1 - targetScale), 0.0);
+      final targetDy = (tapPos.dy * (1 - targetScale)).clamp(size.height * (1 - targetScale), 0.0);
+
+      matrix.setEntry(0, 3, targetDx);
+      matrix.setEntry(1, 3, targetDy);
+
+      _animateToMatrix(matrix);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapUp: _onTapUp,
+      onDoubleTapDown: (d) => _doubleTapDetails = d,
       onDoubleTap: _onDoubleTap,
       child: InteractiveViewer(
         transformationController: _transformationController,

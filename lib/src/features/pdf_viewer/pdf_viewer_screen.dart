@@ -857,6 +857,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         return PageView.builder(
           controller: _singlePageController,
           itemCount: document.pages.length,
+          physics: _currentZoom > 1.05
+              ? const NeverScrollableScrollPhysics()
+              : const PageScrollPhysics(),
           onPageChanged: (index) {
             final prevPage = _currentPage;
             _pageTransformControllers[prevPage]?.value = Matrix4.identity();
@@ -869,7 +872,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           },
           itemBuilder: (context, index) {
             final pageNum = index + 1;
-            return _PdfSinglePageItem(
+            return PdfSinglePageItem(
               key: ValueKey('pdf_page_$pageNum'),
               document: document,
               pageNumber: pageNum,
@@ -880,6 +883,23 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   });
                 }
               },
+              onLeftTap: () {
+                if (_currentPage > 1 && _singlePageController.hasClients) {
+                  _singlePageController.previousPage(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                  );
+                }
+              },
+              onRightTap: () {
+                if (_currentPage < _pageCount && _singlePageController.hasClients) {
+                  _singlePageController.nextPage(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                  );
+                }
+              },
+              onCenterTap: _toggleFullscreen,
               onControllerCreated: (controller) {
                 _pageTransformControllers[pageNum] = controller;
               },
@@ -1051,49 +1071,76 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 }
 
-/// Single PDF page widget that manages zoom and allows horizontal swiping when unzoomed
-class _PdfSinglePageItem extends StatefulWidget {
+/// Single PDF page widget that manages zoom, animated double-tap, and 3-zone tap navigation
+class PdfSinglePageItem extends StatefulWidget {
   final PdfDocument document;
   final int pageNumber;
   final ValueChanged<double>? onZoomChanged;
   final ValueChanged<TransformationController>? onControllerCreated;
   final VoidCallback? onControllerDisposed;
+  final VoidCallback? onLeftTap;
+  final VoidCallback? onCenterTap;
+  final VoidCallback? onRightTap;
 
-  const _PdfSinglePageItem({
+  const PdfSinglePageItem({
     super.key,
     required this.document,
     required this.pageNumber,
     this.onZoomChanged,
     this.onControllerCreated,
     this.onControllerDisposed,
+    this.onLeftTap,
+    this.onCenterTap,
+    this.onRightTap,
   });
 
   @override
-  State<_PdfSinglePageItem> createState() => _PdfSinglePageItemState();
+  State<PdfSinglePageItem> createState() => PdfSinglePageItemState();
 }
 
-class _PdfSinglePageItemState extends State<_PdfSinglePageItem> {
-  final TransformationController _transformController = TransformationController();
+class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerProviderStateMixin {
+  late final TransformationController _transformController;
+  late final AnimationController _animController;
+  Animation<Matrix4>? _matrixAnimation;
+
   bool _panEnabled = false;
+  double _currentScale = 1.0;
   TapDownDetails? _doubleTapDetails;
 
   @override
   void initState() {
     super.initState();
+    _transformController = TransformationController();
     _transformController.addListener(_onTransformChanged);
+
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _animController.addListener(_onAnimationTick);
+
     widget.onControllerCreated?.call(_transformController);
   }
 
   @override
   void dispose() {
     widget.onControllerDisposed?.call();
+    _animController.removeListener(_onAnimationTick);
+    _animController.dispose();
     _transformController.removeListener(_onTransformChanged);
     _transformController.dispose();
     super.dispose();
   }
 
+  void _onAnimationTick() {
+    if (_matrixAnimation != null) {
+      _transformController.value = _matrixAnimation!.value;
+    }
+  }
+
   void _onTransformChanged() {
     final scale = _transformController.value.getMaxScaleOnAxis();
+    _currentScale = scale;
     final shouldEnablePan = scale > 1.05;
     if (shouldEnablePan != _panEnabled) {
       setState(() {
@@ -1103,42 +1150,81 @@ class _PdfSinglePageItemState extends State<_PdfSinglePageItem> {
     widget.onZoomChanged?.call(scale);
   }
 
+  void _animateToMatrix(Matrix4 targetMatrix) {
+    _matrixAnimation = Matrix4Tween(
+      begin: _transformController.value,
+      end: targetMatrix,
+    ).animate(
+      CurvedAnimation(
+        parent: _animController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    _animController.forward(from: 0.0);
+  }
+
   void _onDoubleTapDown(TapDownDetails details) {
     _doubleTapDetails = details;
   }
 
   void _onDoubleTap() {
-    if (_transformController.value != Matrix4.identity()) {
-      _transformController.value = Matrix4.identity();
-      widget.onZoomChanged?.call(1.0);
+    if (_animController.isAnimating) return;
+
+    if (_currentScale > 1.05) {
+      _animateToMatrix(Matrix4.identity());
     } else {
-      const double newScale = 2.0;
-      final pos = _doubleTapDetails?.localPosition;
-      final double dx;
-      final double dy;
-      if (pos != null) {
-        dx = pos.dx * (1 - newScale);
-        dy = pos.dy * (1 - newScale);
-      } else {
-        final size = MediaQuery.sizeOf(context);
-        dx = (size.width / 2) * (1 - newScale);
-        dy = (size.height / 2) * (1 - newScale);
-      }
+      const double targetScale = 2.5;
+      final size = context.size ?? MediaQuery.sizeOf(context);
+      final pos = _doubleTapDetails?.localPosition ?? Offset(size.width / 2, size.height / 2);
+
+      final rawDx = pos.dx * (1 - targetScale);
+      final rawDy = pos.dy * (1 - targetScale);
+
+      final minDx = size.width * (1 - targetScale);
+      final minDy = size.height * (1 - targetScale);
+
+      final clampedDx = rawDx.clamp(minDx, 0.0);
+      final clampedDy = rawDy.clamp(minDy, 0.0);
+
       final matrix = Matrix4.identity();
-      matrix.setEntry(0, 0, newScale);
-      matrix.setEntry(1, 1, newScale);
-      matrix.setEntry(0, 3, dx);
-      matrix.setEntry(1, 3, dy);
-      _transformController.value = matrix;
-      widget.onZoomChanged?.call(newScale);
+      matrix.setEntry(0, 0, targetScale);
+      matrix.setEntry(1, 1, targetScale);
+      matrix.setEntry(0, 3, clampedDx);
+      matrix.setEntry(1, 3, clampedDy);
+
+      _animateToMatrix(matrix);
+    }
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    if (_animController.isAnimating) return;
+
+    final size = context.size;
+    if (size == null || size.width == 0) return;
+
+    // When zoomed in, tapping on sides does NOT flip pages
+    if (_currentScale > 1.05) {
+      widget.onCenterTap?.call();
+      return;
+    }
+
+    final xRatio = details.localPosition.dx / size.width;
+    if (xRatio < 0.25) {
+      widget.onLeftTap?.call();
+    } else if (xRatio > 0.75) {
+      widget.onRightTap?.call();
+    } else {
+      widget.onCenterTap?.call();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onDoubleTapDown: _onDoubleTapDown,
       onDoubleTap: _onDoubleTap,
+      onTapUp: _onTapUp,
       child: InteractiveViewer(
         transformationController: _transformController,
         panEnabled: _panEnabled,
