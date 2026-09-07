@@ -6,6 +6,7 @@ import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
 import 'models/comic_models.dart';
 import 'parser/comic_parser.dart';
+import 'widgets/comic_page_item.dart';
 
 /// Interactive Digital Comic Book & Manga Viewer Screen (.cbz, .cbr, .cbt).
 /// Features LTR Western, RTL Manga, and Continuous Vertical Webtoon reading modes,
@@ -28,7 +29,14 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   int _currentPageIndex = 0;
   ComicReadingMode _readingMode = ComicReadingMode.leftToRight;
   bool _showControls = true;
-  bool _fitToWidth = true;
+  ComicFitMode _fitMode = ComicFitMode.fitWidth;
+  double _currentZoomScale = 1.0;
+  bool _isCurrentPageZoomed = false;
+  final Map<int, ComicPageController> _pageItemControllers = {};
+
+  // Webtoon zoom controller
+  final TransformationController _webtoonTransformController = TransformationController();
+  TapDownDetails? _webtoonDoubleTapDetails;
 
   // Bookmarks & Reading Progress
   bool _isCurrentBookmarked = false;
@@ -54,6 +62,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     _pageController.dispose();
     _webtoonScrollController.dispose();
     _thumbnailScrollController.dispose();
+    _webtoonTransformController.dispose();
     super.dispose();
   }
 
@@ -305,8 +314,13 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
   void _onPageChanged(int index) {
     if (_currentPageIndex != index) {
+      final prevIndex = _currentPageIndex;
+      _pageItemControllers[prevIndex]?.resetZoom();
+
       setState(() {
         _currentPageIndex = index;
+        _currentZoomScale = 1.0;
+        _isCurrentPageZoomed = false;
       });
       _saveReadingProgress();
       _checkBookmarkStatus();
@@ -316,8 +330,13 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
   void _goToPage(int index) {
     if (_comic == null || index < 0 || index >= _comic!.pages.length) return;
+    final prevIndex = _currentPageIndex;
+    _pageItemControllers[prevIndex]?.resetZoom();
+
     setState(() {
       _currentPageIndex = index;
+      _currentZoomScale = 1.0;
+      _isCurrentPageZoomed = false;
     });
     if (_readingMode == ComicReadingMode.verticalContinuous) {
       // In webtoon mode, estimate scroll position
@@ -336,6 +355,104 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       }
     }
     _scrollThumbnailToView(index);
+  }
+
+  void _goToPreviousPage() {
+    if (_readingMode == ComicReadingMode.verticalContinuous) return;
+    if (_readingMode == ComicReadingMode.rightToLeft) {
+      // In RTL (Manga), the visual left advances to next page
+      if (_comic != null && _currentPageIndex < _comic!.pageCount - 1 && _pageController.hasClients) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    } else {
+      // In LTR, visual left goes to previous page
+      if (_currentPageIndex > 0 && _pageController.hasClients) {
+        _pageController.previousPage(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    }
+  }
+
+  void _goToNextPage() {
+    if (_readingMode == ComicReadingMode.verticalContinuous) return;
+    if (_readingMode == ComicReadingMode.rightToLeft) {
+      // In RTL (Manga), visual right goes to previous page
+      if (_currentPageIndex > 0 && _pageController.hasClients) {
+        _pageController.previousPage(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    } else {
+      // In LTR, visual right advances to next page
+      if (_comic != null && _currentPageIndex < _comic!.pageCount - 1 && _pageController.hasClients) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    }
+  }
+
+  void _zoomIn() {
+    if (_readingMode == ComicReadingMode.verticalContinuous) {
+      final cur = _webtoonTransformController.value.getMaxScaleOnAxis();
+      final target = (cur + 0.5).clamp(1.0, 4.0);
+      _webtoonTransformController.value = Matrix4.diagonal3Values(target, target, 1.0);
+      setState(() => _currentZoomScale = target);
+    } else {
+      _pageItemControllers[_currentPageIndex]?.zoomIn();
+    }
+  }
+
+  void _zoomOut() {
+    if (_readingMode == ComicReadingMode.verticalContinuous) {
+      final cur = _webtoonTransformController.value.getMaxScaleOnAxis();
+      final target = (cur - 0.5).clamp(1.0, 4.0);
+      if (target <= 1.05) {
+        _webtoonTransformController.value = Matrix4.identity();
+        setState(() => _currentZoomScale = 1.0);
+      } else {
+        _webtoonTransformController.value = Matrix4.diagonal3Values(target, target, 1.0);
+        setState(() => _currentZoomScale = target);
+      }
+    } else {
+      _pageItemControllers[_currentPageIndex]?.zoomOut();
+    }
+  }
+
+  void _resetZoom() {
+    if (_readingMode == ComicReadingMode.verticalContinuous) {
+      _webtoonTransformController.value = Matrix4.identity();
+      setState(() => _currentZoomScale = 1.0);
+    } else {
+      _pageItemControllers[_currentPageIndex]?.resetZoom();
+      setState(() {
+        _currentZoomScale = 1.0;
+        _isCurrentPageZoomed = false;
+      });
+    }
+  }
+
+  void _cycleFitMode() {
+    setState(() {
+      switch (_fitMode) {
+        case ComicFitMode.fitWidth:
+          _fitMode = ComicFitMode.fitPage;
+          break;
+        case ComicFitMode.fitPage:
+          _fitMode = ComicFitMode.fitHeight;
+          break;
+        case ComicFitMode.fitHeight:
+          _fitMode = ComicFitMode.fitWidth;
+          break;
+      }
+    });
   }
 
   void _scrollThumbnailToView(int index) {
@@ -622,14 +739,18 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                             }).toList(),
                           ),
 
-                          // Fit to Width toggle
+                          // Fit Mode toggle
                           IconButton(
                             icon: Icon(
-                              _fitToWidth ? Icons.fit_screen : Icons.fullscreen,
+                              _fitMode == ComicFitMode.fitWidth
+                                  ? Icons.fit_screen
+                                  : _fitMode == ComicFitMode.fitPage
+                                      ? Icons.fullscreen
+                                      : Icons.swap_vert,
                               size: 20,
                             ),
-                            tooltip: _fitToWidth ? 'Fit to Width' : 'Fit to Page',
-                            onPressed: () => setState(() => _fitToWidth = !_fitToWidth),
+                            tooltip: '${_fitMode.label} (Tap to change)',
+                            onPressed: _cycleFitMode,
                           ),
 
                           // Jump to Page
@@ -677,53 +798,53 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                 ),
               )
             : null,
-        body: GestureDetector(
-          onTap: _toggleControls,
-          child: _isLoading
-              ? const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: Color(0xFFE11D48)),
-                      SizedBox(height: 16),
-                      Text('Opening Comic Book...', style: TextStyle(color: Colors.white70)),
-                    ],
-                  ),
-                )
-              : _errorMessage != null
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-                            const SizedBox(height: 16),
-                            Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _loadComic,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Retry'),
-                            ),
-                          ],
-                        ),
+        body: _isLoading
+            ? const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Color(0xFFE11D48)),
+                    SizedBox(height: 16),
+                    Text('Opening Comic Book...', style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              )
+            : _errorMessage != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                          const SizedBox(height: 16),
+                          Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _loadComic,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                          ),
+                        ],
                       ),
-                    )
-                  : _comic == null || _comic!.pages.isEmpty
-                      ? const Center(child: Text('No pages found', style: TextStyle(color: Colors.white70)))
-                      : Stack(
-                          children: [
-                            // Main Reader Surface
-                            _readingMode == ComicReadingMode.verticalContinuous
-                                ? _buildWebtoonView()
-                                : _buildPagedView(),
+                    ),
+                  )
+                : _comic == null || _comic!.pages.isEmpty
+                    ? const Center(child: Text('No pages found', style: TextStyle(color: Colors.white70)))
+                    : Stack(
+                        children: [
+                          // Main Reader Surface
+                          _readingMode == ComicReadingMode.verticalContinuous
+                              ? _buildWebtoonView()
+                              : _buildPagedView(),
 
-                            // Bottom Controls Overlay
-                            if (_showControls) _buildBottomControlsOverlay(theme),
-                          ],
-                        ),
-        ),
+                          // Floating Zoom & Fit Bar
+                          if (_showControls) _buildFloatingZoomBar(theme),
+
+                          // Bottom Controls Overlay
+                          if (_showControls) _buildBottomControlsOverlay(theme),
+                        ],
+                      ),
       ),
     );
   }
@@ -733,51 +854,171 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       controller: _pageController,
       reverse: _readingMode == ComicReadingMode.rightToLeft,
       itemCount: _comic!.pageCount,
+      physics: _isCurrentPageZoomed
+          ? const NeverScrollableScrollPhysics()
+          : const PageScrollPhysics(),
       onPageChanged: _onPageChanged,
       itemBuilder: (context, index) {
         final page = _comic!.pages[index];
-        return InteractiveViewer(
-          minScale: 1.0,
-          maxScale: 5.0,
-          child: Center(
-            child: Image.memory(
-              page.bytes,
-              fit: _fitToWidth ? BoxFit.fitWidth : BoxFit.contain,
-              errorBuilder: (ctx, err, stack) => Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.broken_image, size: 48, color: Colors.grey),
-                    const SizedBox(height: 8),
-                    Text('Error loading page ${index + 1}', style: const TextStyle(color: Colors.white70)),
-                  ],
-                ),
-              ),
-            ),
-          ),
+        return ComicPageItem(
+          key: ValueKey('comic_page_$index'),
+          page: page,
+          fitMode: _fitMode,
+          onZoomChanged: (scale) {
+            if (_currentPageIndex == index && mounted) {
+              final isZoomed = scale > 1.05;
+              if (isZoomed != _isCurrentPageZoomed || (_currentZoomScale - scale).abs() > 0.05) {
+                setState(() {
+                  _isCurrentPageZoomed = isZoomed;
+                  _currentZoomScale = scale;
+                });
+              }
+            }
+          },
+          onLeftTap: _goToPreviousPage,
+          onRightTap: _goToNextPage,
+          onCenterTap: _toggleControls,
+          onControllerCreated: (controller) {
+            _pageItemControllers[index] = controller;
+          },
+          onControllerDisposed: () {
+            _pageItemControllers.remove(index);
+          },
         );
       },
     );
   }
 
   Widget _buildWebtoonView() {
-    return ListView.builder(
-      controller: _webtoonScrollController,
-      itemCount: _comic!.pageCount,
-      itemBuilder: (context, index) {
-        final page = _comic!.pages[index];
-        return Image.memory(
-          page.bytes,
-          fit: BoxFit.fitWidth,
-          errorBuilder: (ctx, err, stack) => Container(
-            height: 200,
-            color: Colors.black26,
-            child: Center(
-              child: Text('Page ${index + 1} Error', style: const TextStyle(color: Colors.white70)),
-            ),
-          ),
-        );
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onDoubleTapDown: (details) => _webtoonDoubleTapDetails = details,
+      onDoubleTap: () {
+        if (_webtoonTransformController.value != Matrix4.identity()) {
+          _webtoonTransformController.value = Matrix4.identity();
+          setState(() => _currentZoomScale = 1.0);
+        } else {
+          final pos = _webtoonDoubleTapDetails?.localPosition ?? Offset.zero;
+          const scale = 2.0;
+          final matrix = Matrix4.identity();
+          matrix.setEntry(0, 0, scale);
+          matrix.setEntry(1, 1, scale);
+          matrix.setEntry(0, 3, pos.dx * (1 - scale));
+          matrix.setEntry(1, 3, pos.dy * (1 - scale));
+          _webtoonTransformController.value = matrix;
+          setState(() => _currentZoomScale = scale);
+        }
       },
+      onTap: _toggleControls,
+      child: InteractiveViewer(
+        transformationController: _webtoonTransformController,
+        minScale: 1.0,
+        maxScale: 4.0,
+        panEnabled: true,
+        scaleEnabled: true,
+        boundaryMargin: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
+        child: ListView.builder(
+          controller: _webtoonScrollController,
+          itemCount: _comic!.pageCount,
+          itemBuilder: (context, index) {
+            final page = _comic!.pages[index];
+            return Image.memory(
+              page.bytes,
+              fit: _fitMode.boxFit,
+              errorBuilder: (ctx, err, stack) => Container(
+                height: 200,
+                color: Colors.black26,
+                child: Center(
+                  child: Text('Page ${index + 1} Error', style: const TextStyle(color: Colors.white70)),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingZoomBar(ThemeData theme) {
+    return Positioned(
+      bottom: 148,
+      right: 16,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white24, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.remove, size: 18, color: Colors.white),
+              tooltip: 'Zoom Out',
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+              onPressed: _currentZoomScale > 1.05 ? _zoomOut : null,
+            ),
+            const SizedBox(width: 4),
+            InkWell(
+              onTap: _resetZoom,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${(_currentZoomScale * 100).round()}%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.add, size: 18, color: Colors.white),
+              tooltip: 'Zoom In',
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+              onPressed: _currentZoomScale < 3.95 ? _zoomIn : null,
+            ),
+            Container(
+              height: 18,
+              width: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              color: Colors.white24,
+            ),
+            IconButton(
+              icon: Icon(
+                _fitMode == ComicFitMode.fitWidth
+                    ? Icons.fit_screen
+                    : _fitMode == ComicFitMode.fitPage
+                        ? Icons.fullscreen
+                        : Icons.swap_vert,
+                size: 18,
+                color: Colors.white,
+              ),
+              tooltip: '${_fitMode.label} (Tap to change)',
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+              onPressed: _cycleFitMode,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

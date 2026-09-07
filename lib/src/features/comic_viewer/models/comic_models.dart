@@ -1,4 +1,35 @@
 import 'dart:typed_data';
+import 'package:flutter/widgets.dart';
+
+enum ComicFitMode {
+  fitWidth,
+  fitPage,
+  fitHeight,
+}
+
+extension ComicFitModeExtension on ComicFitMode {
+  String get label {
+    switch (this) {
+      case ComicFitMode.fitWidth:
+        return 'Fit Width';
+      case ComicFitMode.fitPage:
+        return 'Fit Page';
+      case ComicFitMode.fitHeight:
+        return 'Fit Height';
+    }
+  }
+
+  BoxFit get boxFit {
+    switch (this) {
+      case ComicFitMode.fitWidth:
+        return BoxFit.fitWidth;
+      case ComicFitMode.fitPage:
+        return BoxFit.contain;
+      case ComicFitMode.fitHeight:
+        return BoxFit.fitHeight;
+    }
+  }
+}
 
 enum ComicReadingMode {
   leftToRight,
