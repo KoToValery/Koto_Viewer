@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:kotoview/src/core/services/recent_files_service.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
+import 'package:kotoview/src/core/services/reading_progress_service.dart';
 
 /// Text Viewer Screen for .txt, .log, .csv, and coordinate files.
 class TextViewerScreen extends StatefulWidget {
@@ -33,6 +34,9 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   bool _isZoomBarExpanded = true;
   bool _isFullscreen = false;
 
+  // Bookmarks & Reading Progress
+  List<BookmarkItem> _bookmarks = [];
+
   // Search
   bool _isSearchOpen = false;
   final TextEditingController _searchController = TextEditingController();
@@ -54,6 +58,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _saveReadingProgress();
     _verticalScrollController.dispose();
     _horizontalScrollController.dispose();
     _searchController.dispose();
@@ -80,10 +85,35 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
       _encodingName = result.encodingName;
       _lines = result.text.split(RegExp(r'\r?\n'));
 
+      // Load saved progress and bookmarks
+      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      if (progress != null) {
+        _bookmarks = progress.bookmarks;
+      } else {
+        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      }
+
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+
+        if (progress != null && progress.scrollOffset > 0) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _verticalScrollController.hasClients) {
+              _verticalScrollController.jumpTo(
+                progress.scrollOffset.clamp(0.0, _verticalScrollController.position.maxScrollExtent),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  content: Text('Resumed reading position'),
+                ),
+              );
+            }
+          });
+        }
       }
     } catch (e) {
       await RecentFilesService.removeRecentFile(widget.filePath);
@@ -94,6 +124,163 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         });
       }
     }
+  }
+
+  void _saveReadingProgress() {
+    if (!_verticalScrollController.hasClients) return;
+    final offset = _verticalScrollController.offset;
+    final max = _verticalScrollController.position.maxScrollExtent;
+    final fraction = max > 0 ? (offset / max).clamp(0.0, 1.0) : 0.0;
+
+    ReadingProgressService.saveProgress(
+      widget.filePath,
+      scrollOffset: offset,
+      progressFraction: fraction,
+    );
+  }
+
+  Future<void> _toggleBookmark() async {
+    final offset = _verticalScrollController.hasClients ? _verticalScrollController.offset : 0.0;
+    final max = _verticalScrollController.hasClients ? _verticalScrollController.position.maxScrollExtent : 1.0;
+    final percent = max > 0 ? ((offset / max) * 100).toInt() : 0;
+
+    // Estimate current line
+    final lineIndex = ((offset / (max > 0 ? max : 1.0)) * (_lines.isNotEmpty ? _lines.length : 1)).clamp(0, _lines.length - 1).toInt();
+    final snippet = _lines.isNotEmpty && lineIndex < _lines.length && _lines[lineIndex].trim().isNotEmpty
+        ? _lines[lineIndex].trim()
+        : 'Line ${lineIndex + 1}';
+
+    final newBookmark = BookmarkItem(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      page: lineIndex + 1,
+      label: 'Line ${lineIndex + 1} ($percent%)',
+      snippet: snippet.length > 60 ? '${snippet.substring(0, 57)}...' : snippet,
+      createdAt: DateTime.now(),
+    );
+
+    await ReadingProgressService.addBookmark(widget.filePath, newBookmark);
+    _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+    setState(() {});
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+          content: Text('Bookmarked Line ${lineIndex + 1}'),
+        ),
+      );
+    }
+  }
+
+  void _showBookmarksSheet() {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              return DraggableScrollableSheet(
+                initialChildSize: 0.55,
+                minChildSize: 0.3,
+                maxChildSize: 0.85,
+                expand: false,
+                builder: (context, scrollController) {
+                  return Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(Icons.bookmark, color: theme.colorScheme.primary),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Bookmarks (${_bookmarks.length})',
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: _bookmarks.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No bookmarks saved yet.\nTap the bookmark icon to save your place.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                                ),
+                              )
+                            : ListView.separated(
+                                controller: scrollController,
+                                itemCount: _bookmarks.length,
+                                separatorBuilder: (context, index) => const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final b = _bookmarks[index];
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                                      child: Icon(Icons.bookmark, color: theme.colorScheme.primary, size: 18),
+                                    ),
+                                    title: Text(
+                                      b.label,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                    subtitle: Text(
+                                      b.snippet,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                                    ),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      onPressed: () async {
+                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id);
+                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+                                        setSheetState(() {});
+                                        setState(() {});
+                                      },
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      if (_verticalScrollController.hasClients && _lines.isNotEmpty) {
+                                        final targetFraction = (b.page - 1) / _lines.length;
+                                        final targetOffset = targetFraction * _verticalScrollController.position.maxScrollExtent;
+                                        _verticalScrollController.animateTo(
+                                          targetOffset,
+                                          duration: const Duration(milliseconds: 300),
+                                          curve: Curves.easeOut,
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   void _onSearchChanged(String query) {
@@ -147,12 +334,14 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               Center(
                 child: Container(
                   width: 36,
@@ -202,9 +391,11 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
               _buildInfoRow('Detected Encoding:', _encodingName),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
+  },
+);
   }
 
   Widget _buildInfoRow(String label, String value) {
@@ -294,7 +485,6 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
           preferredSize: const Size.fromHeight(44),
           child: Container(
             height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
@@ -302,90 +492,114 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                 ),
               ),
             ),
-            child: Row(
-              children: [
-                const Spacer(),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  // Search Action
+                  IconButton(
+                    icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: _isSearchOpen ? 'Close Search' : 'Find in Text',
+                    onPressed: () {
+                      setState(() {
+                        _isSearchOpen = !_isSearchOpen;
+                        if (!_isSearchOpen) {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        }
+                      });
+                    },
+                  ),
 
-                // Search Action
-                IconButton(
-                  icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: _isSearchOpen ? 'Close Search' : 'Find in Text',
-                  onPressed: () {
-                    setState(() {
-                      _isSearchOpen = !_isSearchOpen;
-                      if (!_isSearchOpen) {
-                        _searchController.clear();
-                        _onSearchChanged('');
-                      }
-                    });
-                  },
-                ),
+                  // Bookmark button
+                  IconButton(
+                    icon: const Icon(Icons.bookmark_add_outlined, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Add Bookmark',
+                    onPressed: _toggleBookmark,
+                  ),
 
-                // Monospace Toggle
-                IconButton(
-                  icon: Icon(_isMonospace ? Icons.font_download : Icons.font_download_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: _isMonospace ? 'Switch to Proportional Font' : 'Switch to Monospace Font',
-                  onPressed: () => setState(() => _isMonospace = !_isMonospace),
-                ),
+                  // Bookmarks list
+                  IconButton(
+                    icon: Badge(
+                      isLabelVisible: _bookmarks.isNotEmpty,
+                      label: Text('${_bookmarks.length}'),
+                      child: const Icon(Icons.bookmarks_outlined, size: 20),
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Bookmarks',
+                    onPressed: _showBookmarksSheet,
+                  ),
 
-                // Word Wrap Toggle (Fit to Screen)
-                IconButton(
-                  icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: _isWordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
-                  onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
-                ),
+                  // Monospace Toggle
+                  IconButton(
+                    icon: Icon(_isMonospace ? Icons.font_download : Icons.font_download_outlined, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: _isMonospace ? 'Switch to Proportional Font' : 'Switch to Monospace Font',
+                    onPressed: () => setState(() => _isMonospace = !_isMonospace),
+                  ),
 
-                // Copy All
-                IconButton(
-                  icon: const Icon(Icons.copy_all_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Copy All',
-                  onPressed: _copyAllText,
-                ),
+                  // Word Wrap Toggle (Fit to Screen)
+                  IconButton(
+                    icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: _isWordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
+                    onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
+                  ),
 
-                // Line Numbers Toggle
-                IconButton(
-                  icon: Icon(_showLineNumbers ? Icons.format_list_numbered : Icons.format_list_numbered_rtl, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: _showLineNumbers ? 'Hide Line Numbers' : 'Show Line Numbers',
-                  onPressed: () => setState(() => _showLineNumbers = !_showLineNumbers),
-                ),
+                  // Copy All
+                  IconButton(
+                    icon: const Icon(Icons.copy_all_outlined, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Copy All',
+                    onPressed: _copyAllText,
+                  ),
 
-                // Fullscreen
-                IconButton(
-                  icon: const Icon(Icons.fullscreen, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Fullscreen',
-                  onPressed: _toggleFullscreen,
-                ),
+                  // Line Numbers Toggle
+                  IconButton(
+                    icon: Icon(_showLineNumbers ? Icons.format_list_numbered : Icons.format_list_numbered_rtl, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: _showLineNumbers ? 'Hide Line Numbers' : 'Show Line Numbers',
+                    onPressed: () => setState(() => _showLineNumbers = !_showLineNumbers),
+                  ),
 
-                // Info / Properties
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Text Properties',
-                  onPressed: _showInfoSheet,
-                ),
+                  // Fullscreen
+                  IconButton(
+                    icon: const Icon(Icons.fullscreen, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Fullscreen',
+                    onPressed: _toggleFullscreen,
+                  ),
 
-                // Share
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Share',
-                  onPressed: _shareFile,
-                ),
-              ],
+                  // Info / Properties
+                  IconButton(
+                    icon: const Icon(Icons.info_outline, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Text Properties',
+                    onPressed: _showInfoSheet,
+                  ),
+
+                  // Share
+                  IconButton(
+                    icon: const Icon(Icons.share_outlined, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Share',
+                    onPressed: _shareFile,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -503,7 +717,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
                           // Floating Zoom Slider Controls
                           Positioned(
-                            bottom: 20,
+                            bottom: 20 + MediaQuery.paddingOf(context).bottom,
                             right: 20,
                             child: _buildZoomControls(theme),
                           ),

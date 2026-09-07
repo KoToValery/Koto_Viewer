@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/services/recent_files_service.dart';
+import '../../core/services/reading_progress_service.dart';
 import 'models/docx_models.dart';
 import 'parser/docx_parser.dart';
 
@@ -27,6 +28,13 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   double _zoomScale = 1.0;
   bool _hasCalculatedInitialFit = false;
   bool _isZoomBarExpanded = true;
+  bool _isSinglePageMode = false;
+  int _currentPageIndex = 0;
+  late PageController _docxPageController;
+
+  // Bookmarks & Reading Progress
+  bool _isCurrentBookmarked = false;
+  List<BookmarkItem> _bookmarks = [];
 
   // Search
   bool _isSearchOpen = false;
@@ -42,11 +50,14 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   @override
   void initState() {
     super.initState();
+    _docxPageController = PageController(initialPage: _currentPageIndex);
     _loadDocxFile();
   }
 
   @override
   void dispose() {
+    _saveReadingProgress();
+    _docxPageController.dispose();
     _verticalScrollController.dispose();
     _horizontalScrollController.dispose();
     _searchController.dispose();
@@ -70,11 +81,40 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
       final doc = DocxParser.parse(bytes);
 
+      // Restore saved reading progress
+      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      int restoredPage = 0;
+      if (progress != null && doc.pages.isNotEmpty) {
+        restoredPage = (progress.page - 1).clamp(0, doc.pages.length - 1);
+        _bookmarks = progress.bookmarks;
+      } else {
+        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      }
+
       if (mounted) {
         setState(() {
           _document = doc;
+          _currentPageIndex = restoredPage;
           _isLoading = false;
         });
+
+        _docxPageController.dispose();
+        _docxPageController = PageController(initialPage: restoredPage);
+        _checkBookmarkStatus();
+
+        if (restoredPage > 0) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  content: Text('Resumed at Page ${restoredPage + 1} of ${doc.pages.length}'),
+                ),
+              );
+            }
+          });
+        }
       }
     } catch (e) {
       await RecentFilesService.removeRecentFile(widget.filePath);
@@ -85,6 +125,200 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         });
       }
     }
+  }
+
+  void _saveReadingProgress() {
+    if (_document == null || _document!.pages.isEmpty) return;
+    ReadingProgressService.saveProgress(
+      widget.filePath,
+      page: _currentPageIndex + 1,
+      progressFraction: (_currentPageIndex + 1) / _document!.pages.length,
+    );
+  }
+
+  Future<void> _checkBookmarkStatus() async {
+    final bookmarked = await ReadingProgressService.isBookmarked(
+      widget.filePath,
+      page: _currentPageIndex + 1,
+    );
+    if (mounted) {
+      setState(() {
+        _isCurrentBookmarked = bookmarked;
+      });
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_document == null || _document!.pages.isEmpty) return;
+    final pageNum = _currentPageIndex + 1;
+
+    if (_isCurrentBookmarked) {
+      final existing = _bookmarks.firstWhere(
+        (b) => b.page == pageNum,
+        orElse: () => BookmarkItem(
+          id: '',
+          page: pageNum,
+          label: '',
+          snippet: '',
+          createdAt: DateTime.now(),
+        ),
+      );
+      if (existing.id.isNotEmpty) {
+        await ReadingProgressService.removeBookmark(widget.filePath, existing.id);
+      }
+      _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      setState(() => _isCurrentBookmarked = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Bookmark removed'),
+          ),
+        );
+      }
+    } else {
+      final newBookmark = BookmarkItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        page: pageNum,
+        label: 'Page $pageNum',
+        snippet: '$_fileName - Page $pageNum of ${_document!.pages.length}',
+        createdAt: DateTime.now(),
+      );
+
+      await ReadingProgressService.addBookmark(widget.filePath, newBookmark);
+      _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      setState(() => _isCurrentBookmarked = true);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Bookmarked Page $pageNum'),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showBookmarksSheet() {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              return DraggableScrollableSheet(
+                initialChildSize: 0.55,
+                minChildSize: 0.3,
+                maxChildSize: 0.85,
+                expand: false,
+                builder: (context, scrollController) {
+                  return Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(Icons.bookmark, color: theme.colorScheme.primary),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Bookmarks (${_bookmarks.length})',
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: _bookmarks.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No bookmarks saved yet.\nTap the bookmark icon on any page.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                                ),
+                              )
+                            : ListView.separated(
+                                controller: scrollController,
+                                itemCount: _bookmarks.length,
+                                separatorBuilder: (context, index) => const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final b = _bookmarks[index];
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                                      child: Icon(Icons.bookmark, color: theme.colorScheme.primary, size: 18),
+                                    ),
+                                    title: Text(
+                                      b.label,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                    subtitle: Text(
+                                      b.snippet,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                                    ),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      onPressed: () async {
+                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id);
+                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+                                        _checkBookmarkStatus();
+                                        setSheetState(() {});
+                                        setState(() {});
+                                      },
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _goToPage(b.page - 1);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _goToPage(int pageIndex) {
+    if (_document == null || pageIndex < 0 || pageIndex >= _document!.pages.length) return;
+    setState(() {
+      _currentPageIndex = pageIndex;
+    });
+
+    if (_isSinglePageMode) {
+      if (_docxPageController.hasClients) {
+        _docxPageController.jumpToPage(pageIndex);
+      }
+    }
+    _saveReadingProgress();
+    _checkBookmarkStatus();
   }
 
   void _calculateInitialFit(Size viewportSize) {
@@ -177,65 +411,70 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: theme.colorScheme.surface,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2B579A).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.article_rounded, color: Color(0xFF2B579A)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Word Document • Properties',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          _fileName,
-                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2B579A).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.article_rounded, color: Color(0xFF2B579A)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Word Document • Properties',
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              _fileName,
+                              style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  _buildInfoRow('File Name:', _fileName),
+                  _buildInfoRow('File Size:', formattedSize),
+                  _buildInfoRow('Page Format:', paperStr),
+                  _buildInfoRow('Pages / Sheets:', '${_document!.pages.length}'),
+                  _buildInfoRow('Paragraphs:', '${_document!.paragraphCount}'),
+                  _buildInfoRow('Tables:', '${_document!.tableCount}'),
+                  _buildInfoRow('Estimated Words:', '${_document!.wordCount} words'),
                 ],
               ),
-              const Divider(height: 24),
-              _buildInfoRow('File Name:', _fileName),
-              _buildInfoRow('File Size:', formattedSize),
-              _buildInfoRow('Page Format:', paperStr),
-              _buildInfoRow('Pages / Sheets:', '${_document!.pages.length}'),
-              _buildInfoRow('Paragraphs:', '${_document!.paragraphCount}'),
-              _buildInfoRow('Tables:', '${_document!.tableCount}'),
-              _buildInfoRow('Estimated Words:', '${_document!.wordCount} words'),
-            ],
+            ),
           ),
         );
       },
@@ -288,11 +527,15 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       backgroundColor: viewerBg,
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
+        elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () {
+            _saveReadingProgress();
+            Navigator.of(context).pop(true);
+          },
         ),
+        // Row 1: Document Title & Page subtitle
         title: _isSearchOpen
             ? TextField(
                 controller: _searchController,
@@ -311,72 +554,131 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 ),
                 onChanged: _onSearchChanged,
               )
-            : Text(
-                _fileName,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _fileName,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (_document != null && _document!.pages.isNotEmpty)
+                    Text(
+                      'Page ${_currentPageIndex + 1} of ${_document!.pages.length} • ${_isSinglePageMode ? "Single Page" : "Continuous"}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: theme.textTheme.bodySmall?.color,
+                      ),
+                    ),
+                ],
               ),
+        actions: const [],
+        // Row 2: Action commands (horizontally scrollable, no overflow)
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(44),
           child: Container(
             height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
               border: Border(
                 bottom: BorderSide(
                   color: isDark ? Colors.white10 : Colors.black12,
                 ),
               ),
             ),
-            child: Row(
-              children: [
-                const Spacer(),
-
-                // Search Action
-                IconButton(
-                  icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: _isSearchOpen ? 'Close Search' : 'Search in Document',
-                  onPressed: () {
-                    setState(() {
-                      _isSearchOpen = !_isSearchOpen;
-                      if (!_isSearchOpen) {
-                        _searchController.clear();
-                        _onSearchChanged('');
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  // View Mode Toggle (Single Page vs Continuous Scroll)
+                  IconButton(
+                    icon: Icon(
+                      _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
+                      size: 20,
+                    ),
+                    tooltip: _isSinglePageMode
+                        ? 'Single Page Mode (Tap for Continuous)'
+                        : 'Continuous Mode (Tap for Single Page)',
+                    onPressed: () {
+                      setState(() {
+                        _isSinglePageMode = !_isSinglePageMode;
+                      });
+                      if (_isSinglePageMode) {
+                        _docxPageController.dispose();
+                        _docxPageController = PageController(initialPage: _currentPageIndex);
                       }
-                    });
-                  },
-                ),
+                    },
+                  ),
 
-                // Copy All
-                IconButton(
-                  icon: const Icon(Icons.copy_all_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Copy Document Text',
-                  onPressed: _copyAllText,
-                ),
+                  // Search Action
+                  IconButton(
+                    icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: _isSearchOpen ? 'Close Search' : 'Search in Document',
+                    onPressed: () {
+                      setState(() {
+                        _isSearchOpen = !_isSearchOpen;
+                        if (!_isSearchOpen) {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        }
+                      });
+                    },
+                  ),
 
-                // Info / Properties
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Document Properties',
-                  onPressed: _showInfoSheet,
-                ),
+                  // Bookmark Toggle
+                  IconButton(
+                    icon: Icon(
+                      _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      size: 20,
+                      color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+                    onPressed: _toggleBookmark,
+                  ),
 
-                // Share
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Share',
-                  onPressed: _shareFile,
-                ),
-              ],
+                  // Bookmarks List
+                  IconButton(
+                    icon: const Icon(Icons.bookmarks_outlined, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Saved Bookmarks',
+                    onPressed: _showBookmarksSheet,
+                  ),
+
+                  // Copy All
+                  IconButton(
+                    icon: const Icon(Icons.copy_all_outlined, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Copy Document Text',
+                    onPressed: _copyAllText,
+                  ),
+
+                  // Info / Properties
+                  IconButton(
+                    icon: const Icon(Icons.info_outline, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Document Properties',
+                    onPressed: _showInfoSheet,
+                  ),
+
+                  // Share
+                  IconButton(
+                    icon: const Icon(Icons.share_outlined, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: 'Share',
+                    onPressed: _shareFile,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -419,31 +721,54 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
                     return Stack(
                       children: [
-                        // Main Document Scroll Area (Unified 2D Pan & Scroll)
-                        Scrollbar(
-                          controller: _verticalScrollController,
-                          thumbVisibility: true,
-                          child: Scrollbar(
-                            controller: _horizontalScrollController,
-                            thumbVisibility: true,
-                            notificationPredicate: (notif) => notif.depth == 1,
-                            child: SingleChildScrollView(
-                              controller: _verticalScrollController,
-                              scrollDirection: Axis.vertical,
-                              padding: const EdgeInsets.fromLTRB(16, 20, 16, 90),
-                              child: SingleChildScrollView(
-                                controller: _horizontalScrollController,
-                                scrollDirection: Axis.horizontal,
-                                child: Center(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: _buildPages(theme, isDark),
+                        _isSinglePageMode
+                            ? PageView.builder(
+                                controller: _docxPageController,
+                                itemCount: _document!.pages.length,
+                                onPageChanged: (index) {
+                                  setState(() => _currentPageIndex = index);
+                                  _saveReadingProgress();
+                                  _checkBookmarkStatus();
+                                },
+                                itemBuilder: (context, index) {
+                                  return InteractiveViewer(
+                                    panEnabled: true,
+                                    scaleEnabled: true,
+                                    minScale: 0.4,
+                                    maxScale: 3.5,
+                                    child: Center(
+                                      child: SingleChildScrollView(
+                                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                                        child: _buildDocxSinglePageWidget(index, theme, isDark),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : Scrollbar(
+                                controller: _verticalScrollController,
+                                thumbVisibility: true,
+                                child: Scrollbar(
+                                  controller: _horizontalScrollController,
+                                  thumbVisibility: true,
+                                  notificationPredicate: (notif) => notif.depth == 1,
+                                  child: SingleChildScrollView(
+                                    controller: _verticalScrollController,
+                                    scrollDirection: Axis.vertical,
+                                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 90),
+                                    child: SingleChildScrollView(
+                                      controller: _horizontalScrollController,
+                                      scrollDirection: Axis.horizontal,
+                                      child: Center(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: _buildPages(theme, isDark),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
-                        ),
 
                         // Search Match Bar
                         if (_searchQuery.isNotEmpty)
@@ -471,9 +796,9 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                             ),
                           ),
 
-                        // Floating Zoom Control Bar (with Slider & Fit-to-Screen)
+                        // Floating Zoom Control Bar (Offset above system safe area)
                         Positioned(
-                          bottom: 16,
+                          bottom: 16 + MediaQuery.paddingOf(context).bottom,
                           right: 16,
                           child: _buildZoomControls(theme, viewportSize),
                         ),
@@ -487,7 +812,13 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   /// Builds authentic 1:1 A4 Paper Sheet widgets for all document pages.
   List<Widget> _buildPages(ThemeData theme, bool isDark) {
     if (_document == null) return [];
+    return [
+      for (int i = 0; i < _document!.pages.length; i++)
+        _buildDocxSinglePageWidget(i, theme, isDark),
+    ];
+  }
 
+  Widget _buildDocxSinglePageWidget(int i, ThemeData theme, bool isDark) {
     final settings = _document!.pageSettings;
     final sheetW = settings.widthPt * _zoomScale;
     final sheetH = settings.heightPt * _zoomScale;
@@ -495,70 +826,62 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
     final docBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final docBorderColor = isDark ? const Color(0xFF383838) : const Color(0xFFCBD5E1);
+    final page = _document!.pages[i];
 
-    final List<Widget> pageWidgets = [];
-
-    for (int i = 0; i < _document!.pages.length; i++) {
-      final page = _document!.pages[i];
-
-      pageWidgets.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 24.0),
-          child: Column(
-            children: [
-              // 1:1 Paper Sheet Container with Page Framing Canvas
-              Container(
-                width: sheetW,
-                constraints: BoxConstraints(minHeight: sheetH),
-                decoration: BoxDecoration(
-                  color: docBg,
-                  borderRadius: BorderRadius.circular(3),
-                  border: Border.all(color: docBorderColor, width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDark
-                          ? Colors.black.withValues(alpha: 0.4)
-                          : Colors.black.withValues(alpha: 0.12),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 1:1 Paper Sheet Container with Page Framing Canvas
+          Container(
+            width: sheetW,
+            constraints: BoxConstraints(minHeight: sheetH),
+            decoration: BoxDecoration(
+              color: docBg,
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: docBorderColor, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.4)
+                      : Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-                child: CustomPaint(
-                  painter: _DocxPageShapePainter(
-                    shapes: settings.pageShapes,
-                    zoomScale: _zoomScale,
-                  ),
-                  child: Padding(
-                    padding: sheetPadding,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: _buildPageBlocks(page.blocks, theme, isDark),
-                    ),
-                  ),
+              ],
+            ),
+            child: CustomPaint(
+              painter: _DocxPageShapePainter(
+                shapes: settings.pageShapes,
+                zoomScale: _zoomScale,
+              ),
+              child: Padding(
+                padding: sheetPadding,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _buildPageBlocks(page.blocks, theme, isDark),
                 ),
               ),
-
-              // Page footer tag
-              if (_document!.pages.length > 1)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    'Page ${i + 1} of ${_document!.pages.length}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: theme.textTheme.bodySmall?.color,
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
-        ),
-      );
-    }
 
-    return pageWidgets;
+          // Page footer tag
+          if (_document!.pages.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                'Page ${i + 1} of ${_document!.pages.length}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textTheme.bodySmall?.color,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   List<Widget> _buildPageBlocks(List<DocxBlock> blocks, ThemeData theme, bool isDark) {

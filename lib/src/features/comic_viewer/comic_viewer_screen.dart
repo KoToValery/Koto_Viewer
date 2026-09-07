@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/services/recent_files_service.dart';
+import '../../core/services/reading_progress_service.dart';
 import 'models/comic_models.dart';
 import 'parser/comic_parser.dart';
 
@@ -29,7 +30,11 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   bool _showControls = true;
   bool _fitToWidth = true;
 
-  late final PageController _pageController;
+  // Bookmarks & Reading Progress
+  bool _isCurrentBookmarked = false;
+  List<BookmarkItem> _bookmarks = [];
+
+  late PageController _pageController;
   final ScrollController _webtoonScrollController = ScrollController();
   final ScrollController _thumbnailScrollController = ScrollController();
 
@@ -45,6 +50,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _saveReadingProgress();
     _pageController.dispose();
     _webtoonScrollController.dispose();
     _thumbnailScrollController.dispose();
@@ -66,14 +72,43 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       _fileSizeBytes = await file.length();
       final comic = await ComicParser.parseFromFile(widget.filePath);
 
+      // Restore saved reading progress
+      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      int restoredPage = 0;
+      if (progress != null) {
+        restoredPage = (progress.page - 1).clamp(0, comic.pageCount - 1);
+        _bookmarks = progress.bookmarks;
+      } else {
+        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      }
+
       if (mounted) {
         setState(() {
           _comic = comic;
+          _currentPageIndex = restoredPage;
           if (comic.metadata.isManga) {
             _readingMode = ComicReadingMode.rightToLeft;
           }
           _isLoading = false;
         });
+
+        _pageController.dispose();
+        _pageController = PageController(initialPage: restoredPage);
+        _checkBookmarkStatus();
+
+        if (restoredPage > 0) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  content: Text('Resumed at Page ${restoredPage + 1} of ${comic.pageCount}'),
+                ),
+              );
+            }
+          });
+        }
       }
     } catch (e) {
       await RecentFilesService.removeRecentFile(widget.filePath);
@@ -86,11 +121,195 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     }
   }
 
+  void _saveReadingProgress() {
+    if (_comic == null || _comic!.pageCount == 0) return;
+    ReadingProgressService.saveProgress(
+      widget.filePath,
+      page: _currentPageIndex + 1,
+      progressFraction: (_currentPageIndex + 1) / _comic!.pageCount,
+    );
+  }
+
+  Future<void> _checkBookmarkStatus() async {
+    final bookmarked = await ReadingProgressService.isBookmarked(
+      widget.filePath,
+      page: _currentPageIndex + 1,
+    );
+    if (mounted) {
+      setState(() {
+        _isCurrentBookmarked = bookmarked;
+      });
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_comic == null) return;
+    final pageNum = _currentPageIndex + 1;
+
+    if (_isCurrentBookmarked) {
+      final existing = _bookmarks.firstWhere(
+        (b) => b.page == pageNum,
+        orElse: () => BookmarkItem(
+          id: '',
+          page: pageNum,
+          label: '',
+          snippet: '',
+          createdAt: DateTime.now(),
+        ),
+      );
+      if (existing.id.isNotEmpty) {
+        await ReadingProgressService.removeBookmark(widget.filePath, existing.id);
+      }
+      _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      setState(() => _isCurrentBookmarked = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Bookmark removed'),
+          ),
+        );
+      }
+    } else {
+      final newBookmark = BookmarkItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        page: pageNum,
+        label: 'Page $pageNum',
+        snippet: '${_comic!.title} - Page $pageNum of ${_comic!.pageCount}',
+        createdAt: DateTime.now(),
+      );
+
+      await ReadingProgressService.addBookmark(widget.filePath, newBookmark);
+      _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      setState(() => _isCurrentBookmarked = true);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Bookmarked Page $pageNum'),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showBookmarksSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              return DraggableScrollableSheet(
+                initialChildSize: 0.55,
+                minChildSize: 0.3,
+                maxChildSize: 0.85,
+                expand: false,
+                builder: (context, scrollController) {
+                  return Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.bookmark, color: Color(0xFFE11D48)),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Bookmarks (${_bookmarks.length})',
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1, color: Colors.white12),
+                      Expanded(
+                        child: _bookmarks.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No bookmarks saved yet.\nTap the bookmark icon on any page.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white54),
+                                ),
+                              )
+                            : ListView.separated(
+                                controller: scrollController,
+                                itemCount: _bookmarks.length,
+                                separatorBuilder: (context, index) => const Divider(height: 1, color: Colors.white10),
+                                itemBuilder: (context, index) {
+                                  final b = _bookmarks[index];
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: const Color(0xFFE11D48).withValues(alpha: 0.2),
+                                      child: const Icon(Icons.bookmark, color: Color(0xFFE11D48), size: 18),
+                                    ),
+                                    title: Text(
+                                      b.label,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                    subtitle: Text(
+                                      b.snippet,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: Colors.white60, fontSize: 12),
+                                    ),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.white54),
+                                      onPressed: () async {
+                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id);
+                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+                                        _checkBookmarkStatus();
+                                        setSheetState(() {});
+                                        setState(() {});
+                                      },
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _goToPage(b.page - 1);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   void _onPageChanged(int index) {
     if (_currentPageIndex != index) {
       setState(() {
         _currentPageIndex = index;
       });
+      _saveReadingProgress();
+      _checkBookmarkStatus();
       _scrollThumbnailToView(index);
     }
   }
@@ -321,18 +540,20 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
         extendBodyBehindAppBar: true,
         appBar: _showControls
             ? AppBar(
-                backgroundColor: Colors.black.withValues(alpha: 0.85),
+                backgroundColor: Colors.black.withValues(alpha: 0.88),
                 foregroundColor: Colors.white,
                 elevation: 0,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () {
+                    _saveReadingProgress();
                     if (_errorMessage != null) {
                       RecentFilesService.removeRecentFile(widget.filePath);
                     }
                     Navigator.of(context).pop(_errorMessage == null);
                   },
                 ),
+                // Row 1: Comic Title & Subtitle
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -349,73 +570,111 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                       ),
                   ],
                 ),
-                actions: [
-                  // Reading Mode Menu
-                  PopupMenuButton<ComicReadingMode>(
-                    icon: const Icon(Icons.menu_book_rounded, size: 20),
-                    tooltip: 'Reading Mode',
-                    onSelected: (mode) {
-                      setState(() {
-                        _readingMode = mode;
-                      });
-                    },
-                    itemBuilder: (context) => ComicReadingMode.values.map((mode) {
-                      return PopupMenuItem<ComicReadingMode>(
-                        value: mode,
-                        child: Row(
-                          children: [
-                            Icon(
-                              mode == ComicReadingMode.verticalContinuous
-                                  ? Icons.view_headline_rounded
-                                  : mode == ComicReadingMode.rightToLeft
-                                      ? Icons.keyboard_double_arrow_left_rounded
-                                      : Icons.keyboard_double_arrow_right_rounded,
-                              size: 18,
-                              color: _readingMode == mode ? theme.colorScheme.primary : null,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(mode.label),
-                            if (_readingMode == mode) ...[
-                              const Spacer(),
-                              Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                            ],
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-
-                  // Fit to Width toggle
-                  IconButton(
-                    icon: Icon(
-                      _fitToWidth ? Icons.fit_screen : Icons.fullscreen,
-                      size: 20,
+                actions: const [],
+                // Row 2: Command Actions Bar (horizontally scrollable, no overflow)
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(44),
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.88),
+                      border: const Border(
+                        bottom: BorderSide(color: Colors.white12),
+                      ),
                     ),
-                    tooltip: _fitToWidth ? 'Fit to Width' : 'Fit to Page',
-                    onPressed: () => setState(() => _fitToWidth = !_fitToWidth),
-                  ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          // Reading Mode Menu
+                          PopupMenuButton<ComicReadingMode>(
+                            icon: const Icon(Icons.menu_book_rounded, size: 20),
+                            tooltip: 'Reading Mode',
+                            onSelected: (mode) {
+                              setState(() {
+                                _readingMode = mode;
+                              });
+                            },
+                            itemBuilder: (context) => ComicReadingMode.values.map((mode) {
+                              return PopupMenuItem<ComicReadingMode>(
+                                value: mode,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      mode == ComicReadingMode.verticalContinuous
+                                          ? Icons.view_headline_rounded
+                                          : mode == ComicReadingMode.rightToLeft
+                                              ? Icons.keyboard_double_arrow_left_rounded
+                                              : Icons.keyboard_double_arrow_right_rounded,
+                                      size: 18,
+                                      color: _readingMode == mode ? theme.colorScheme.primary : null,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(mode.label),
+                                    if (_readingMode == mode) ...[
+                                      const Spacer(),
+                                      Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
 
-                  // Jump to Page
-                  IconButton(
-                    icon: const Icon(Icons.pin_outlined, size: 20),
-                    tooltip: 'Jump to Page',
-                    onPressed: _showJumpToPageDialog,
-                  ),
+                          // Fit to Width toggle
+                          IconButton(
+                            icon: Icon(
+                              _fitToWidth ? Icons.fit_screen : Icons.fullscreen,
+                              size: 20,
+                            ),
+                            tooltip: _fitToWidth ? 'Fit to Width' : 'Fit to Page',
+                            onPressed: () => setState(() => _fitToWidth = !_fitToWidth),
+                          ),
 
-                  // Info
-                  IconButton(
-                    icon: const Icon(Icons.info_outline, size: 20),
-                    tooltip: 'Comic Info',
-                    onPressed: _showInfoSheet,
-                  ),
+                          // Jump to Page
+                          IconButton(
+                            icon: const Icon(Icons.pin_outlined, size: 20),
+                            tooltip: 'Jump to Page',
+                            onPressed: _showJumpToPageDialog,
+                          ),
 
-                  // Share
-                  IconButton(
-                    icon: const Icon(Icons.share_outlined, size: 20),
-                    tooltip: 'Share',
-                    onPressed: _shareFile,
+                          // Bookmark Toggle
+                          IconButton(
+                            icon: Icon(
+                              _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                              size: 20,
+                              color: _isCurrentBookmarked ? const Color(0xFFE11D48) : null,
+                            ),
+                            tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+                            onPressed: _toggleBookmark,
+                          ),
+
+                          // View Bookmarks
+                          IconButton(
+                            icon: const Icon(Icons.bookmarks_outlined, size: 20),
+                            tooltip: 'Saved Bookmarks',
+                            onPressed: _showBookmarksSheet,
+                          ),
+
+                          // Info
+                          IconButton(
+                            icon: const Icon(Icons.info_outline, size: 20),
+                            tooltip: 'Comic Info',
+                            onPressed: _showInfoSheet,
+                          ),
+
+                          // Share
+                          IconButton(
+                            icon: const Icon(Icons.share_outlined, size: 20),
+                            tooltip: 'Share',
+                            onPressed: _shareFile,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
+                ),
               )
             : null,
         body: GestureDetector(
@@ -527,8 +786,10 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       bottom: 0,
       left: 0,
       right: 0,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -606,6 +867,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

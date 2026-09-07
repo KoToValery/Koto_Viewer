@@ -5,8 +5,12 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:printing/printing.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
+import '../../core/services/reading_progress_service.dart';
 import '../home/widgets/share_options_sheet.dart';
 
+/// PDF Document Viewer Screen with Single Page Mode (Swipe) and Continuous Scroll,
+/// 2-row header navigation, reading progress auto-save & resume, bookmarks,
+/// invert color mode, zoom slider, and Android system-safe UI.
 class PdfViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
@@ -19,6 +23,9 @@ class PdfViewerScreen extends StatefulWidget {
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfController = PdfViewerController();
+  late PageController _singlePageController;
+
+  bool _isSinglePageMode = true;
   bool _isDarkModeView = false;
   int _pageCount = 0;
   int _currentPage = 1;
@@ -29,20 +36,343 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _isZoomBarExpanded = true;
   bool _isFullscreen = false;
 
+  // Bookmarks & Reading Progress
+  bool _isCurrentBookmarked = false;
+  List<BookmarkItem> _bookmarks = [];
+  bool _hasRestoredPage = false;
+  int? _savedPageToRestore;
+
   @override
   void initState() {
     super.initState();
-    _fileName =
-        widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
+    _fileName = widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
+    _singlePageController = PageController(initialPage: _currentPage - 1);
     _pdfController.addListener(_onControllerChanged);
-    _saveToRecentFiles();
+    _loadProgressAndSaveRecent();
   }
 
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _saveReadingProgress();
     _pdfController.removeListener(_onControllerChanged);
+    _singlePageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProgressAndSaveRecent() async {
+    try {
+      final file = File(widget.filePath);
+      if (await file.exists()) {
+        final size = await file.length();
+        final pdfItem = PdfItem(
+          path: widget.filePath,
+          name: _fileName,
+          sizeInBytes: size,
+          lastOpened: DateTime.now(),
+        );
+        await RecentFilesService.addRecentFile(pdfItem);
+      }
+
+      // Check saved reading progress
+      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      if (progress != null && progress.page > 0) {
+        _savedPageToRestore = progress.page;
+        _bookmarks = progress.bookmarks;
+      } else {
+        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      }
+      _checkBookmarkStatus();
+    } catch (_) {}
+  }
+
+  void _saveReadingProgress() {
+    if (_pageCount <= 0) return;
+    ReadingProgressService.saveProgress(
+      widget.filePath,
+      page: _currentPage,
+      progressFraction: _currentPage / _pageCount,
+    );
+  }
+
+  Future<void> _checkBookmarkStatus() async {
+    final bookmarked = await ReadingProgressService.isBookmarked(
+      widget.filePath,
+      page: _currentPage,
+    );
+    if (mounted) {
+      setState(() {
+        _isCurrentBookmarked = bookmarked;
+      });
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_pageCount <= 0) return;
+
+    if (_isCurrentBookmarked) {
+      final existing = _bookmarks.firstWhere(
+        (b) => b.page == _currentPage,
+        orElse: () => BookmarkItem(
+          id: '',
+          page: _currentPage,
+          label: '',
+          snippet: '',
+          createdAt: DateTime.now(),
+        ),
+      );
+      if (existing.id.isNotEmpty) {
+        await ReadingProgressService.removeBookmark(widget.filePath, existing.id);
+      }
+      _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      setState(() => _isCurrentBookmarked = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Bookmark removed'),
+          ),
+        );
+      }
+    } else {
+      final newBookmark = BookmarkItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        page: _currentPage,
+        label: 'Page $_currentPage',
+        snippet: '$_fileName - Page $_currentPage of $_pageCount',
+        createdAt: DateTime.now(),
+      );
+
+      await ReadingProgressService.addBookmark(widget.filePath, newBookmark);
+      _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      setState(() => _isCurrentBookmarked = true);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Bookmarked Page $_currentPage'),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showBookmarksSheet() {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              return DraggableScrollableSheet(
+                initialChildSize: 0.55,
+                minChildSize: 0.3,
+                maxChildSize: 0.85,
+                expand: false,
+                builder: (context, scrollController) {
+                  return Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(Icons.bookmark, color: theme.colorScheme.primary),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Bookmarks (${_bookmarks.length})',
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: _bookmarks.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No bookmarks saved yet.\nTap the bookmark icon on any page.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                                ),
+                              )
+                            : ListView.separated(
+                                controller: scrollController,
+                                itemCount: _bookmarks.length,
+                                separatorBuilder: (context, index) => const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final b = _bookmarks[index];
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                                      child: Icon(Icons.bookmark, color: theme.colorScheme.primary, size: 18),
+                                    ),
+                                    title: Text(
+                                      b.label,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                    subtitle: Text(
+                                      b.snippet,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                                    ),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      onPressed: () async {
+                                        await ReadingProgressService.removeBookmark(widget.filePath, b.id);
+                                        _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+                                        _checkBookmarkStatus();
+                                        setSheetState(() {});
+                                        setState(() {});
+                                      },
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _goToPage(b.page);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _showInfoSheet() async {
+    final theme = Theme.of(context);
+    int sizeBytes = 0;
+    try {
+      final file = File(widget.filePath);
+      if (await file.exists()) {
+        sizeBytes = await file.length();
+      }
+    } catch (_) {}
+
+    final formattedSize = sizeBytes < 1024 * 1024
+        ? '${(sizeBytes / 1024).toStringAsFixed(1)} KB'
+        : '${(sizeBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.picture_as_pdf, color: Color(0xFFDC2626), size: 28),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _fileName,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'PDF Document',
+                              style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  _buildInfoRow('Total Pages:', '$_pageCount pages'),
+                  _buildInfoRow('Current Page:', 'Page $_currentPage of $_pageCount'),
+                  _buildInfoRow('File Size:', formattedSize),
+                  _buildInfoRow('View Mode:', _isSinglePageMode ? 'Single Page (Swipe)' : 'Continuous Scroll'),
+                  _buildInfoRow('File Path:', widget.filePath),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface.withValues(alpha: 0.7))),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onControllerChanged() {
@@ -57,20 +387,24 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } catch (_) {}
   }
 
-  Future<void> _saveToRecentFiles() async {
-    try {
-      final file = File(widget.filePath);
-      if (await file.exists()) {
-        final size = await file.length();
-        final pdfItem = PdfItem(
-          path: widget.filePath,
-          name: _fileName,
-          sizeInBytes: size,
-          lastOpened: DateTime.now(),
-        );
-        await RecentFilesService.addRecentFile(pdfItem);
+  void _goToPage(int page) {
+    if (page < 1 || page > _pageCount) return;
+    setState(() {
+      _currentPage = page;
+    });
+
+    if (_isSinglePageMode) {
+      if (_singlePageController.hasClients) {
+        _singlePageController.jumpToPage(page - 1);
       }
-    } catch (_) {}
+    } else {
+      if (_pdfController.isReady) {
+        _pdfController.goToPage(pageNumber: page, anchor: PdfPageAnchor.center);
+      }
+    }
+
+    _saveReadingProgress();
+    _checkBookmarkStatus();
   }
 
   void _fitCurrentPage() {
@@ -118,9 +452,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       await Printing.layoutPdf(onLayout: (_) => bytes, name: _fileName);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error printing file: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error printing file: $e')),
+        );
       }
     }
   }
@@ -152,7 +486,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               onPressed: () {
                 final page = int.tryParse(controller.text);
                 if (page != null && page >= 1 && page <= _pageCount) {
-                  _pdfController.goToPage(pageNumber: page, anchor: PdfPageAnchor.center);
+                  _goToPage(page);
                   Navigator.of(context).pop();
                 }
               },
@@ -175,195 +509,179 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     });
   }
 
+  void _toggleViewMode() {
+    setState(() {
+      _isSinglePageMode = !_isSinglePageMode;
+    });
+    if (_isSinglePageMode) {
+      _singlePageController.dispose();
+      _singlePageController = PageController(initialPage: _currentPage - 1);
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pdfController.isReady) {
+          _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center);
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: _isFullscreen ? null : AppBar(
-        backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(true),
-        ),
-        title: Text(
-          _fileName,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+      appBar: _isFullscreen
+          ? null
+          : AppBar(
+              backgroundColor: theme.colorScheme.surface,
+              elevation: 0.5,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  _saveReadingProgress();
+                  Navigator.of(context).pop(true);
+                },
+              ),
+              // Row 1: PDF Title & Page Subtitle
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _fileName,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (_pageCount > 0)
+                    Text(
+                      'Page $_currentPage of $_pageCount • ${_isSinglePageMode ? "Single Page" : "Continuous"}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                      ),
+                    ),
+                ],
+              ),
+              actions: const [],
+              // Row 2: Actions Bar (horizontally scrollable, no overflow)
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(44),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // View Mode Toggle (Single Page vs Continuous Scroll)
+                        IconButton(
+                          icon: Icon(
+                            _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
+                            size: 20,
+                          ),
+                          tooltip: _isSinglePageMode
+                              ? 'Single Page Mode (Tap for Continuous)'
+                              : 'Continuous Mode (Tap for Single Page)',
+                          onPressed: _toggleViewMode,
+                        ),
+
+                        // Jump to Page
+                        IconButton(
+                          icon: const Icon(Icons.pin_outlined, size: 20),
+                          tooltip: 'Jump to Page',
+                          onPressed: _showJumpToPageDialog,
+                        ),
+
+                        // Bookmark Toggle
+                        IconButton(
+                          icon: Icon(
+                            _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                            size: 20,
+                            color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
+                          ),
+                          tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+                          onPressed: _toggleBookmark,
+                        ),
+
+                        // Bookmarks List
+                        IconButton(
+                          icon: const Icon(Icons.bookmarks_outlined, size: 20),
+                          tooltip: 'Saved Bookmarks',
+                          onPressed: _showBookmarksSheet,
+                        ),
+
+                        // Invert Mode (Dark/Light)
+                        IconButton(
+                          icon: Icon(_isDarkModeView ? Icons.light_mode : Icons.dark_mode, size: 20),
+                          tooltip: 'Toggle Invert Colors',
+                          onPressed: () {
+                            setState(() {
+                              _isDarkModeView = !_isDarkModeView;
+                            });
+                          },
+                        ),
+
+                        // Fullscreen
+                        IconButton(
+                          icon: const Icon(Icons.fullscreen, size: 20),
+                          tooltip: 'Fullscreen',
+                          onPressed: _toggleFullscreen,
+                        ),
+
+                        // Info Sheet
+                        IconButton(
+                          icon: const Icon(Icons.info_outline, size: 20),
+                          tooltip: 'PDF Properties',
+                          onPressed: _showInfoSheet,
+                        ),
+
+                        // Share
+                        IconButton(
+                          icon: const Icon(Icons.share_outlined, size: 20),
+                          tooltip: 'Share PDF',
+                          onPressed: _sharePdf,
+                        ),
+
+                        // Print
+                        IconButton(
+                          icon: const Icon(Icons.print_outlined, size: 20),
+                          tooltip: 'Print PDF',
+                          onPressed: _printPdf,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-            child: Row(
-              children: [
-                const Spacer(),
-
-                // Invert mode
-                IconButton(
-                  icon: Icon(_isDarkModeView ? Icons.light_mode : Icons.dark_mode, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Toggle Invert Colors',
-                  onPressed: () {
-                    setState(() {
-                      _isDarkModeView = !_isDarkModeView;
-                    });
-                  },
-                ),
-
-                // Fullscreen
-                IconButton(
-                  icon: const Icon(Icons.fullscreen, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Fullscreen',
-                  onPressed: _toggleFullscreen,
-                ),
-
-                // Share
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Share PDF',
-                  onPressed: _sharePdf,
-                ),
-
-                // Print
-                IconButton(
-                  icon: const Icon(Icons.print_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Print PDF',
-                  onPressed: _printPdf,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
       body: Stack(
         children: [
           ColorFiltered(
             colorFilter: _isDarkModeView
                 ? const ColorFilter.matrix([
-                    -1.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    255.0,
-                    0.0,
-                    -1.0,
-                    0.0,
-                    0.0,
-                    255.0,
-                    0.0,
-                    0.0,
-                    -1.0,
-                    0.0,
-                    255.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
-                    0.0,
+                    -1.0, 0.0, 0.0, 0.0, 255.0,
+                    0.0, -1.0, 0.0, 0.0, 255.0,
+                    0.0, 0.0, -1.0, 0.0, 255.0,
+                    0.0, 0.0, 0.0, 1.0, 0.0,
                   ])
                 : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-            child: PdfViewer.file(
-              widget.filePath,
-              controller: _pdfController,
-              params: PdfViewerParams(
-                margin: 12.0,
-                panAxis: PanAxis.free,
-                boundaryMargin: const EdgeInsets.all(36.0),
-                scrollByMouseWheel: 0.2,
-                onViewerReady: (document, controller) {
-                  setState(() {
-                    _pageCount = document.pages.length;
-                    _isLoading = false;
-                  });
-                  // Fit page 1 on screen by default so full text is visible
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted && controller.isReady) {
-                      _fitCurrentPage();
-                    }
-                  });
-                },
-                onPageChanged: (pageNumber) {
-                  if (pageNumber != null) {
-                    setState(() {
-                      _currentPage = pageNumber;
-                    });
-                  }
-                },
-                errorBannerBuilder: (context, error, stackTrace, documentRef) {
-                  RecentFilesService.removeRecentFile(widget.filePath);
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.15),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.warning_amber_rounded,
-                              size: 48,
-                              color: Colors.amber,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Failed to load document',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'The file is damaged, incomplete (0 bytes), or not in a valid PDF format.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          FilledButton.icon(
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.arrow_back),
-                            label: const Text('Go Back'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+            child: _isSinglePageMode
+                ? _buildSinglePageView()
+                : _buildContinuousView(),
           ),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
 
-          // Floating Zoom Control Bar
-          if (!_isLoading)
+          // Floating Zoom Controls (Offset above system safe area)
+          if (!_isSinglePageMode && !_isFullscreen)
             Positioned(
-              bottom: 16,
+              bottom: 16 + MediaQuery.paddingOf(context).bottom,
               right: 16,
               child: _buildZoomControls(theme),
             ),
@@ -381,62 +699,172 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             ),
         ],
       ),
-      bottomNavigationBar: _isFullscreen ? null : BottomAppBar(
-        height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.first_page),
-              tooltip: 'First Page',
-              onPressed: _currentPage > 1
-                  ? () => _pdfController.goToPage(pageNumber: 1, anchor: PdfPageAnchor.center)
-                  : null,
-            ),
-            IconButton(
-              icon: const Icon(Icons.chevron_left),
-              tooltip: 'Previous Page',
-              onPressed: _currentPage > 1
-                  ? () => _pdfController.goToPage(pageNumber: _currentPage - 1, anchor: PdfPageAnchor.center)
-                  : null,
-            ),
-            GestureDetector(
-              onTap: _showJumpToPageDialog,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '$_currentPage / $_pageCount',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                  ),
+      bottomNavigationBar: _isFullscreen
+          ? null
+          : SafeArea(
+              child: BottomAppBar(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.first_page),
+                      tooltip: 'First Page',
+                      onPressed: _currentPage > 1 ? () => _goToPage(1) : null,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      tooltip: 'Previous Page',
+                      onPressed: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
+                    ),
+                    GestureDetector(
+                      onTap: _showJumpToPageDialog,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$_currentPage / $_pageCount',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      tooltip: 'Next Page',
+                      onPressed: _currentPage < _pageCount ? () => _goToPage(_currentPage + 1) : null,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.last_page),
+                      tooltip: 'Last Page',
+                      onPressed: _currentPage < _pageCount ? () => _goToPage(_pageCount) : null,
+                    ),
+                  ],
                 ),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right),
-              tooltip: 'Next Page',
-              onPressed: _currentPage < _pageCount
-                  ? () => _pdfController.goToPage(pageNumber: _currentPage + 1, anchor: PdfPageAnchor.center)
-                  : null,
-            ),
-            IconButton(
-              icon: const Icon(Icons.last_page),
-              tooltip: 'Last Page',
-              onPressed: _currentPage < _pageCount
-                  ? () => _pdfController.goToPage(pageNumber: _pageCount, anchor: PdfPageAnchor.center)
-                  : null,
-            ),
-          ],
-        ),
+    );
+  }
+
+  /// Single Page Mode: Exactly 1 page on screen with swipe page-turning and pinch-to-zoom
+  Widget _buildSinglePageView() {
+    return PdfDocumentViewBuilder.file(
+      widget.filePath,
+      builder: (context, document) {
+        if (document == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (_pageCount != document.pages.length) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _pageCount = document.pages.length;
+                _isLoading = false;
+              });
+
+              // Restore saved page
+              if (!_hasRestoredPage && _savedPageToRestore != null) {
+                _hasRestoredPage = true;
+                final restoreTo = _savedPageToRestore!.clamp(1, _pageCount);
+                if (restoreTo > 1) {
+                  _goToPage(restoreTo);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                      content: Text('Resumed at Page $restoreTo of $_pageCount'),
+                    ),
+                  );
+                }
+              }
+            }
+          });
+        }
+
+        return PageView.builder(
+          controller: _singlePageController,
+          itemCount: document.pages.length,
+          onPageChanged: (index) {
+            setState(() {
+              _currentPage = index + 1;
+            });
+            _saveReadingProgress();
+            _checkBookmarkStatus();
+          },
+          itemBuilder: (context, index) {
+            return InteractiveViewer(
+              panEnabled: true,
+              scaleEnabled: true,
+              minScale: 1.0,
+              maxScale: 4.0,
+              child: Center(
+                child: PdfPageView(
+                  document: document,
+                  pageNumber: index + 1,
+                  alignment: Alignment.center,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Continuous Mode: Vertical scrolling of all pages
+  Widget _buildContinuousView() {
+    return PdfViewer.file(
+      widget.filePath,
+      controller: _pdfController,
+      params: PdfViewerParams(
+        margin: 12.0,
+        panAxis: PanAxis.free,
+        boundaryMargin: const EdgeInsets.all(36.0),
+        scrollByMouseWheel: 0.2,
+        onViewerReady: (document, controller) {
+          setState(() {
+            _pageCount = document.pages.length;
+            _isLoading = false;
+          });
+
+          // Restore saved page
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && controller.isReady) {
+              if (!_hasRestoredPage && _savedPageToRestore != null) {
+                _hasRestoredPage = true;
+                final restoreTo = _savedPageToRestore!.clamp(1, _pageCount);
+                if (restoreTo > 1) {
+                  _goToPage(restoreTo);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                      content: Text('Resumed at Page $restoreTo of $_pageCount'),
+                    ),
+                  );
+                  return;
+                }
+              }
+              _fitCurrentPage();
+            }
+          });
+        },
+        onPageChanged: (pageNumber) {
+          if (pageNumber != null && mounted) {
+            setState(() {
+              _currentPage = pageNumber;
+            });
+            _saveReadingProgress();
+            _checkBookmarkStatus();
+          }
+        },
       ),
     );
   }
@@ -466,7 +894,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Zoom Out
+          // Zoom Out (-)
           IconButton(
             icon: const Icon(Icons.remove, size: 18),
             tooltip: 'Zoom Out (-)',
@@ -477,7 +905,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
           // Zoom Slider
           SizedBox(
-            width: 110,
+            width: 100,
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 3,
@@ -492,7 +920,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             ),
           ),
 
-          // Zoom In
+          // Zoom In (+)
           IconButton(
             icon: const Icon(Icons.add, size: 18),
             tooltip: 'Zoom In (+)',
@@ -503,7 +931,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
           const SizedBox(width: 4),
 
-          // Zoom Percentage Badge (Tap to reset / fit page)
+          // Zoom Percentage Badge
           InkWell(
             onTap: _fitCurrentPage,
             borderRadius: BorderRadius.circular(12),

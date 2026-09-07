@@ -132,6 +132,31 @@ extension EbookFontFamilyExtension on EbookFontFamily {
   }
 }
 
+enum EbookReadingMode {
+  paginated,
+  continuous,
+}
+
+extension EbookReadingModeExtension on EbookReadingMode {
+  String get label {
+    switch (this) {
+      case EbookReadingMode.paginated:
+        return 'Paginated (Swipe)';
+      case EbookReadingMode.continuous:
+        return 'Continuous Scroll';
+    }
+  }
+
+  String get shortLabel {
+    switch (this) {
+      case EbookReadingMode.paginated:
+        return 'Pages';
+      case EbookReadingMode.continuous:
+        return 'Scroll';
+    }
+  }
+}
+
 class EbookSettings {
   final double fontSize;
   final double lineHeight;
@@ -139,6 +164,7 @@ class EbookSettings {
   final EbookThemeMode themeMode;
   final EbookFontFamily fontFamily;
   final TextAlign textAlign;
+  final EbookReadingMode readingMode;
 
   const EbookSettings({
     this.fontSize = 17.0,
@@ -147,6 +173,7 @@ class EbookSettings {
     this.themeMode = EbookThemeMode.sepia,
     this.fontFamily = EbookFontFamily.serif,
     this.textAlign = TextAlign.left,
+    this.readingMode = EbookReadingMode.paginated,
   });
 
   EbookSettings copyWith({
@@ -156,6 +183,7 @@ class EbookSettings {
     EbookThemeMode? themeMode,
     EbookFontFamily? fontFamily,
     TextAlign? textAlign,
+    EbookReadingMode? readingMode,
   }) {
     return EbookSettings(
       fontSize: fontSize ?? this.fontSize,
@@ -164,8 +192,32 @@ class EbookSettings {
       themeMode: themeMode ?? this.themeMode,
       fontFamily: fontFamily ?? this.fontFamily,
       textAlign: textAlign ?? this.textAlign,
+      readingMode: readingMode ?? this.readingMode,
     );
   }
+}
+
+/// Represents a single screen-sized mini-page of a chapter in paginated mode.
+class EbookMiniPage {
+  final int chapterIndex;
+  final int pageIndex; // 0-based
+  final int totalPagesInChapter;
+  final String chapterTitle;
+  final List<EbookBlock> blocks;
+  final int startBlockIndex;
+  final int startCharOffset;
+  final String snippet;
+
+  const EbookMiniPage({
+    required this.chapterIndex,
+    required this.pageIndex,
+    required this.totalPagesInChapter,
+    required this.chapterTitle,
+    required this.blocks,
+    required this.startBlockIndex,
+    required this.startCharOffset,
+    this.snippet = '',
+  });
 }
 
 class EbookMetadata {
