@@ -46,7 +46,7 @@ class BookPageTurnWrapper extends StatelessWidget {
         } else {
           // Subtle parallax slip for the page underneath
           final slip = clampedOffset * 0.15 * MediaQuery.of(context).size.width;
-          transform.translate(slip, 0.0, -10.0);
+          transform.translateByDouble(slip, 0.0, -10.0, 1.0);
         }
 
         return Transform(

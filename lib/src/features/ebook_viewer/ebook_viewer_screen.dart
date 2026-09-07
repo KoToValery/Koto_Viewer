@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/services/recent_files_service.dart';
@@ -8,7 +9,6 @@ import '../../core/services/reading_progress_service.dart';
 import 'models/ebook_models.dart';
 import 'parser/ebook_parser.dart';
 import 'parser/ebook_paginator.dart';
-import 'widgets/book_page_turn.dart';
 
 /// Digital E-Book Reader Screen (.epub, .fb2, .fb2.zip).
 /// Features full Cyrillic & international script support, customizable typography,
@@ -51,6 +51,7 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
   bool _hasRestoredProgress = false;
   int _paginatedChapterIndex = -1;
   bool _isTransitioningChapter = false;
+  double _overscrollDistance = 0.0;
 
   String get _fileName => widget.filePath.split(Platform.pathSeparator).last;
 
@@ -115,13 +116,13 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     }
   }
 
-  void _paginateChapter(Size viewportSize) {
+  void _paginateChapter(Size viewportSize, {int? preferredAnchorBlock, int? preferredAnchorChar}) {
     if (_book == null || _book!.chapters.isEmpty) return;
 
     // Capture currently visible reading anchor before repaginating
-    int? currentBlock;
-    int? currentChar;
-    if (_currentMiniPages.isNotEmpty && _currentMiniPageIndex < _currentMiniPages.length) {
+    int? currentBlock = preferredAnchorBlock;
+    int? currentChar = preferredAnchorChar;
+    if (currentBlock == null && _currentMiniPages.isNotEmpty && _currentMiniPageIndex < _currentMiniPages.length) {
       final curPage = _currentMiniPages[_currentMiniPageIndex];
       currentBlock = curPage.startBlockIndex;
       currentChar = curPage.startCharOffset;
@@ -131,25 +132,33 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     _paginatedChapterIndex = _currentChapterIndex;
 
     final chapter = _book!.chapters[_currentChapterIndex];
-    final pages = EbookPaginator.paginateChapter(
-      chapter: chapter,
-      viewportSize: viewportSize,
-      settings: _settings,
-      textColor: _settings.themeMode.textColor,
-    );
 
     int targetIndex = 0;
-    if (!_hasRestoredProgress && _pendingResumeMiniPage != null) {
+    if (!_hasRestoredProgress && (_pendingResumeMiniPage != null || _pendingResumeBlock != null)) {
       _hasRestoredProgress = true;
-      targetIndex = EbookPaginator.findMiniPageIndex(
-        pages,
-        preferredMiniPage: _pendingResumeMiniPage,
-        blockIndex: _pendingResumeBlock,
-        charOffset: _pendingResumeChar,
-      );
+      final savedBlock = _pendingResumeBlock;
+      final savedChar = _pendingResumeChar;
+      final savedMiniPage = _pendingResumeMiniPage;
       _pendingResumeMiniPage = null;
       _pendingResumeBlock = null;
       _pendingResumeChar = null;
+
+      final result = EbookPaginator.paginateChapterWithAnchor(
+        chapter: chapter,
+        viewportSize: viewportSize,
+        settings: _settings,
+        textColor: _settings.themeMode.textColor,
+        anchorBlockIndex: savedBlock,
+        anchorCharOffset: savedChar,
+      );
+
+      if (savedBlock != null) {
+        targetIndex = result.anchorPageIndex;
+      } else if (savedMiniPage != null) {
+        targetIndex = savedMiniPage.clamp(0, result.pages.length - 1);
+      }
+      _currentMiniPages = result.pages;
+      _currentMiniPageIndex = targetIndex;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && targetIndex > 0) {
@@ -164,18 +173,35 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
       });
     } else if (isSameChapter && currentBlock != null) {
       // Repaginating SAME chapter (fullscreen toggle, screen rotate, font size change)
-      targetIndex = EbookPaginator.findMiniPageIndex(
-        pages,
-        blockIndex: currentBlock,
-        charOffset: currentChar,
+      final result = EbookPaginator.paginateChapterWithAnchor(
+        chapter: chapter,
+        viewportSize: viewportSize,
+        settings: _settings,
+        textColor: _settings.themeMode.textColor,
+        anchorBlockIndex: currentBlock,
+        anchorCharOffset: currentChar,
       );
+      targetIndex = result.anchorPageIndex;
+      _currentMiniPages = result.pages;
+      _currentMiniPageIndex = targetIndex;
     } else {
-      // Navigating to chapter with preferred target page
-      targetIndex = _currentMiniPageIndex.clamp(0, pages.length - 1);
+      // Navigating to chapter (preferredAnchorBlock or preferred mini page)
+      final result = EbookPaginator.paginateChapterWithAnchor(
+        chapter: chapter,
+        viewportSize: viewportSize,
+        settings: _settings,
+        textColor: _settings.themeMode.textColor,
+        anchorBlockIndex: preferredAnchorBlock,
+        anchorCharOffset: preferredAnchorChar,
+      );
+      if (preferredAnchorBlock != null) {
+        targetIndex = result.anchorPageIndex;
+      } else {
+        targetIndex = _currentMiniPageIndex.clamp(0, result.pages.length - 1);
+      }
+      _currentMiniPages = result.pages;
+      _currentMiniPageIndex = targetIndex;
     }
-
-    _currentMiniPages = pages;
-    _currentMiniPageIndex = targetIndex;
 
     if (_pageController.hasClients) {
       _pageController.jumpToPage(targetIndex);
@@ -387,7 +413,12 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                                     onTap: () {
                                       Navigator.pop(context);
                                       if (b.chapter != null) {
-                                        _goToChapter(b.chapter!, targetMiniPage: b.miniPage);
+                                        _goToChapter(
+                                          b.chapter!,
+                                          targetMiniPage: b.miniPage,
+                                          targetBlock: b.blockIndex,
+                                          targetChar: b.charOffset,
+                                        );
                                       }
                                     },
                                   );
@@ -405,7 +436,7 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     );
   }
 
-  void _goToChapter(int chapterIndex, {int? targetMiniPage}) {
+  void _goToChapter(int chapterIndex, {int? targetMiniPage, int? targetBlock, int? targetChar}) {
     if (_book == null || chapterIndex < 0 || chapterIndex >= _book!.chapters.length) return;
 
     _isTransitioningChapter = false;
@@ -415,12 +446,19 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     });
 
     if (_lastViewportSize != null) {
-      _paginateChapter(_lastViewportSize!);
-      if (targetMiniPage != null && targetMiniPage < _currentMiniPages.length) {
+      _paginateChapter(
+        _lastViewportSize!,
+        preferredAnchorBlock: targetBlock,
+        preferredAnchorChar: targetChar,
+      );
+      if (targetBlock == null && targetMiniPage != null && targetMiniPage < _currentMiniPages.length) {
         _currentMiniPageIndex = targetMiniPage;
         if (_pageController.hasClients) {
           _pageController.jumpToPage(targetMiniPage);
         }
+      }
+      if (mounted) {
+        setState(() {});
       }
     }
 
@@ -1273,23 +1311,60 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
         Expanded(
           child: NotificationListener<ScrollNotification>(
             onNotification: (notification) {
-              if (notification is OverscrollNotification) {
-                // Swiping forward past the end (e.g. on cover page or last mini-page of chapter)
-                if (notification.overscroll > 15 && !_isTransitioningChapter) {
+              if (notification is ScrollStartNotification) {
+                _overscrollDistance = 0.0;
+              } else if (notification is ScrollUpdateNotification) {
+                if (notification.metrics.hasContentDimensions) {
+                  // If on the last page of current chapter, track forward overscroll
                   if (_currentMiniPageIndex >= _currentMiniPages.length - 1 &&
+                      _currentChapterIndex < _book!.chapters.length - 1) {
+                    final over = notification.metrics.pixels - notification.metrics.maxScrollExtent;
+                    if (over > _overscrollDistance) {
+                      _overscrollDistance = over;
+                    }
+                  }
+                  // If on the first page of current chapter, track backward overscroll
+                  else if (_currentMiniPageIndex <= 0 && _currentChapterIndex > 0) {
+                    final over = notification.metrics.minScrollExtent - notification.metrics.pixels;
+                    if (over > -_overscrollDistance) {
+                      _overscrollDistance = -over;
+                    }
+                  }
+                }
+              } else if (notification is OverscrollNotification) {
+                if (_currentMiniPageIndex >= _currentMiniPages.length - 1 &&
+                    _currentChapterIndex < _book!.chapters.length - 1) {
+                  if (notification.overscroll > 0) {
+                    _overscrollDistance += notification.overscroll;
+                  }
+                } else if (_currentMiniPageIndex <= 0 && _currentChapterIndex > 0) {
+                  if (notification.overscroll < 0) {
+                    _overscrollDistance += notification.overscroll; // negative
+                  }
+                }
+              } else if (notification is ScrollEndNotification ||
+                  (notification is UserScrollNotification && notification.direction == ScrollDirection.idle)) {
+                final dist = _overscrollDistance;
+                _overscrollDistance = 0.0;
+                if (!_isTransitioningChapter) {
+                  if (dist > 15 &&
+                      _currentMiniPageIndex >= _currentMiniPages.length - 1 &&
                       _currentChapterIndex < _book!.chapters.length - 1) {
                     _isTransitioningChapter = true;
                     _goToNextChapterOrPage();
-                  }
-                } else if (notification.overscroll < -15 && !_isTransitioningChapter) {
-                  // Swiping backward past the beginning (e.g. to previous chapter)
-                  if (_currentMiniPageIndex <= 0 && _currentChapterIndex > 0) {
+                    Future.delayed(const Duration(milliseconds: 350), () {
+                      if (mounted) _isTransitioningChapter = false;
+                    });
+                  } else if (dist < -15 &&
+                      _currentMiniPageIndex <= 0 &&
+                      _currentChapterIndex > 0) {
                     _isTransitioningChapter = true;
                     _goToPrevChapterOrPage();
+                    Future.delayed(const Duration(milliseconds: 350), () {
+                      if (mounted) _isTransitioningChapter = false;
+                    });
                   }
                 }
-              } else if (notification is ScrollEndNotification) {
-                _isTransitioningChapter = false;
               }
               return false;
             },
@@ -1300,48 +1375,44 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
               onPageChanged: _onMiniPageChanged,
               itemBuilder: (context, index) {
                 final page = _currentMiniPages[index];
-                return BookPageTurnWrapper(
-                  index: index,
-                  pageController: _pageController,
-                  child: Container(
-                    color: theme.backgroundColor,
-                    padding: EdgeInsets.fromLTRB(
-                      _settings.horizontalPadding,
-                      16,
-                      _settings.horizontalPadding,
-                      8,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // If first mini-page of chapter, show chapter title
-                        if (index == 0)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
-                            child: Text(
-                              page.chapterTitle,
-                              style: _settings.fontFamily.getTextStyle(
-                                fontSize: _settings.fontSize * 1.3,
-                                color: theme.textColor,
-                                height: 1.3,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
+                return Container(
+                  color: theme.backgroundColor,
+                  padding: EdgeInsets.fromLTRB(
+                    _settings.horizontalPadding,
+                    16,
+                    _settings.horizontalPadding,
+                    8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // If first mini-page of chapter, show chapter title
+                      if (index == 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
+                          child: Text(
+                            page.chapterTitle,
+                            style: _settings.fontFamily.getTextStyle(
+                              fontSize: _settings.fontSize * 1.3,
+                              color: theme.textColor,
+                              height: 1.3,
+                              fontWeight: FontWeight.bold,
                             ),
-                          ),
-
-                        // Render mini-page blocks
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              for (final block in page.blocks)
-                                _buildBlockWidget(block, theme),
-                            ],
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                      ],
-                    ),
+
+                      // Render mini-page blocks
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final block in page.blocks)
+                              _buildBlockWidget(block, theme),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },

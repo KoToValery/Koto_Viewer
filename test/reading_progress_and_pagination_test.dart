@@ -193,5 +193,123 @@ void main() {
       expect(lastPage, greaterThan(0));
       expect(lastPage, lessThanOrEqualTo(pages.length - 1));
     });
+
+    test('paginateChapterWithAnchor preserves top line across normal and fullscreen viewports', () {
+      // Setup chapter with 20 distinct paragraphs
+      final paragraphs = List.generate(
+        20,
+        (i) => 'Paragraph $i: Line of text about topic $i with some more details to ensure decent length.',
+      );
+
+      final chapter = EbookChapter(
+        index: 0,
+        title: 'Anchor Test',
+        rawText: paragraphs.join('\n\n'),
+        blocks: paragraphs.map((p) => EbookBlock(type: EbookBlockType.paragraph, text: p)).toList(),
+        wordCount: 300,
+      );
+
+      const normalViewport = Size(360, 500); // Normal mode (with app bar, bottom bar, status bar)
+      const fullscreenViewport = Size(360, 750); // Fullscreen mode (immersive, more vertical space)
+      const settings = EbookSettings(fontSize: 16.0);
+
+      // 1. Initial pagination in normal mode
+      final normalResult = EbookPaginator.paginateChapterWithAnchor(
+        chapter: chapter,
+        viewportSize: normalViewport,
+        settings: settings,
+        textColor: Colors.black,
+      );
+      expect(normalResult.pages.length, greaterThan(3));
+
+      // Assume reader is on Page 2 in normal mode
+      const readingPageIndex = 2;
+      final curPage = normalResult.pages[readingPageIndex];
+      final anchorBlock = curPage.startBlockIndex;
+      final anchorChar = curPage.startCharOffset;
+      final topSnippet = curPage.snippet;
+
+      // 2. Toggle to FULLSCREEN mode: paginate with current top line anchor
+      final fullscreenResult = EbookPaginator.paginateChapterWithAnchor(
+        chapter: chapter,
+        viewportSize: fullscreenViewport,
+        settings: settings,
+        textColor: Colors.black,
+        anchorBlockIndex: anchorBlock,
+        anchorCharOffset: anchorChar,
+      );
+
+      final fsAnchorPage = fullscreenResult.pages[fullscreenResult.anchorPageIndex];
+
+      // Verify the new fullscreen page starts with the EXACT same top line anchor
+      expect(fsAnchorPage.startBlockIndex, equals(anchorBlock));
+      expect(fsAnchorPage.startCharOffset, equals(anchorChar));
+      expect(fsAnchorPage.snippet, equals(topSnippet));
+
+      // Verify preceding pages exist if anchor was not on block 0
+      if (anchorBlock > 0) {
+        expect(fullscreenResult.anchorPageIndex, greaterThan(0));
+        // The preceding page should end before the anchor page begins
+        final prevFsPage = fullscreenResult.pages[fullscreenResult.anchorPageIndex - 1];
+        expect(prevFsPage.startBlockIndex, lessThanOrEqualTo(anchorBlock));
+      }
+
+      // 3. Toggle back to NORMAL mode from fullscreen: paginate with fs top line anchor
+      final normalRestored = EbookPaginator.paginateChapterWithAnchor(
+        chapter: chapter,
+        viewportSize: normalViewport,
+        settings: settings,
+        textColor: Colors.black,
+        anchorBlockIndex: fsAnchorPage.startBlockIndex,
+        anchorCharOffset: fsAnchorPage.startCharOffset,
+      );
+
+      final restoredPage = normalRestored.pages[normalRestored.anchorPageIndex];
+      expect(restoredPage.startBlockIndex, equals(anchorBlock));
+      expect(restoredPage.startCharOffset, equals(anchorChar));
+      expect(restoredPage.snippet, equals(topSnippet));
+    });
+
+    test('Multiple chapters paginate consistently for seamless swiping', () {
+      final ch1 = EbookChapter(
+        index: 0,
+        title: 'Chapter 1',
+        rawText: 'Text 1',
+        blocks: List.generate(10, (i) => EbookBlock(type: EbookBlockType.paragraph, text: 'Ch 1 Para $i ' * 10)),
+        wordCount: 100,
+      );
+
+      final ch2 = EbookChapter(
+        index: 1,
+        title: 'Chapter 2',
+        rawText: 'Text 2',
+        blocks: List.generate(10, (i) => EbookBlock(type: EbookBlockType.paragraph, text: 'Ch 2 Para $i ' * 10)),
+        wordCount: 100,
+      );
+
+      const viewport = Size(360, 600);
+      const settings = EbookSettings();
+
+      final pagesCh1 = EbookPaginator.paginateChapter(
+        chapter: ch1,
+        viewportSize: viewport,
+        settings: settings,
+        textColor: Colors.black,
+      );
+
+      final pagesCh2 = EbookPaginator.paginateChapter(
+        chapter: ch2,
+        viewportSize: viewport,
+        settings: settings,
+        textColor: Colors.black,
+      );
+
+      expect(pagesCh1.isNotEmpty, isTrue);
+      expect(pagesCh2.isNotEmpty, isTrue);
+      expect(pagesCh1.first.chapterIndex, equals(0));
+      expect(pagesCh2.first.chapterIndex, equals(1));
+      expect(pagesCh1.last.pageIndex, equals(pagesCh1.length - 1));
+      expect(pagesCh2.first.pageIndex, equals(0));
+    });
   });
 }

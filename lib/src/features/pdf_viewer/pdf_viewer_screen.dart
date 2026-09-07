@@ -42,6 +42,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _hasRestoredPage = false;
   int? _savedPageToRestore;
 
+  // Page zoom controllers for Single Page Mode
+  final Map<int, TransformationController> _pageTransformControllers = {};
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +58,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _pageTransformControllers.clear();
     _saveReadingProgress();
     _pdfController.removeListener(_onControllerChanged);
     _singlePageController.dispose();
@@ -392,9 +396,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     if (page < 1 || page > _pageCount) return;
     setState(() {
       _currentPage = page;
+      _currentZoom = 1.0;
     });
 
     if (_isSinglePageMode) {
+      _pageTransformControllers[_currentPage]?.value = Matrix4.identity();
       if (_singlePageController.hasClients) {
         _singlePageController.jumpToPage(page - 1);
       } else {
@@ -414,33 +420,86 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     _checkBookmarkStatus();
   }
 
+  void _setSinglePageZoom(TransformationController controller, double newScale) {
+    if (newScale <= 1.01) {
+      controller.value = Matrix4.identity();
+      setState(() {
+        _currentZoom = 1.0;
+      });
+    } else {
+      final size = MediaQuery.sizeOf(context);
+      final dx = (size.width / 2) * (1 - newScale);
+      final dy = (size.height / 2) * (1 - newScale);
+      final matrix = Matrix4.identity();
+      matrix.setEntry(0, 0, newScale);
+      matrix.setEntry(1, 1, newScale);
+      matrix.setEntry(0, 3, dx);
+      matrix.setEntry(1, 3, dy);
+      controller.value = matrix;
+      setState(() {
+        _currentZoom = newScale;
+      });
+    }
+  }
+
   void _fitCurrentPage() {
-    if (!_pdfController.isReady) return;
-    try {
-      _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center);
-    } catch (_) {}
+    if (_isSinglePageMode) {
+      final controller = _pageTransformControllers[_currentPage];
+      if (controller != null) {
+        controller.value = Matrix4.identity();
+        setState(() => _currentZoom = 1.0);
+      }
+    } else {
+      if (!_pdfController.isReady) return;
+      try {
+        _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center);
+      } catch (_) {}
+    }
   }
 
   void _onZoomSliderChanged(double newZoom) {
-    if (!_pdfController.isReady) return;
-    setState(() {
-      _currentZoom = newZoom;
-    });
-    try {
-      _pdfController.setZoom(_pdfController.centerPosition, newZoom);
-    } catch (_) {}
+    if (_isSinglePageMode) {
+      final controller = _pageTransformControllers[_currentPage];
+      if (controller != null) {
+        _setSinglePageZoom(controller, newZoom);
+      }
+    } else {
+      if (!_pdfController.isReady) return;
+      setState(() {
+        _currentZoom = newZoom;
+      });
+      try {
+        _pdfController.setZoom(_pdfController.centerPosition, newZoom);
+      } catch (_) {}
+    }
   }
 
   void _zoomIn() {
-    if (!_pdfController.isReady) return;
-    final newZoom = (_currentZoom * 1.25).clamp(0.3, 4.0);
-    _onZoomSliderChanged(newZoom);
+    if (_isSinglePageMode) {
+      final controller = _pageTransformControllers[_currentPage];
+      if (controller != null) {
+        final newZoom = (_currentZoom * 1.25).clamp(1.0, 4.0);
+        _setSinglePageZoom(controller, newZoom);
+      }
+    } else {
+      if (!_pdfController.isReady) return;
+      final newZoom = (_currentZoom * 1.25).clamp(0.3, 4.0);
+      _onZoomSliderChanged(newZoom);
+    }
   }
 
   void _zoomOut() {
-    if (!_pdfController.isReady) return;
-    final newZoom = (_currentZoom / 1.25).clamp(0.3, 4.0);
-    _onZoomSliderChanged(newZoom);
+    if (_isSinglePageMode) {
+      final controller = _pageTransformControllers[_currentPage];
+      if (controller != null) {
+        final newZoom = (_currentZoom / 1.25).clamp(1.0, 4.0);
+        _setSinglePageZoom(controller, newZoom);
+      }
+    } else {
+      if (!_pdfController.isReady) return;
+      final newZoom = (_currentZoom / 1.25).clamp(0.3, 4.0);
+      _onZoomSliderChanged(newZoom);
+    }
   }
 
   void _sharePdf() {
@@ -519,6 +578,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   void _toggleViewMode() {
     setState(() {
       _isSinglePageMode = !_isSinglePageMode;
+      _currentZoom = 1.0;
     });
     if (_isSinglePageMode) {
       _singlePageController.dispose();
@@ -686,7 +746,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           ),
 
           // Floating Zoom Controls (Offset above system safe area)
-          if (!_isSinglePageMode && !_isFullscreen)
+          if (!_isFullscreen)
             Positioned(
               bottom: 16 + MediaQuery.paddingOf(context).bottom,
               right: 16,
@@ -798,17 +858,34 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           controller: _singlePageController,
           itemCount: document.pages.length,
           onPageChanged: (index) {
+            final prevPage = _currentPage;
+            _pageTransformControllers[prevPage]?.value = Matrix4.identity();
             setState(() {
               _currentPage = index + 1;
+              _currentZoom = 1.0;
             });
             _saveReadingProgress();
             _checkBookmarkStatus();
           },
           itemBuilder: (context, index) {
+            final pageNum = index + 1;
             return _PdfSinglePageItem(
-              key: ValueKey('pdf_page_${index + 1}'),
+              key: ValueKey('pdf_page_$pageNum'),
               document: document,
-              pageNumber: index + 1,
+              pageNumber: pageNum,
+              onZoomChanged: (zoom) {
+                if (_currentPage == pageNum && mounted) {
+                  setState(() {
+                    _currentZoom = zoom;
+                  });
+                }
+              },
+              onControllerCreated: (controller) {
+                _pageTransformControllers[pageNum] = controller;
+              },
+              onControllerDisposed: () {
+                _pageTransformControllers.remove(pageNum);
+              },
             );
           },
         );
@@ -909,8 +986,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
               ),
               child: Slider(
-                value: _currentZoom.clamp(0.3, 4.0),
-                min: 0.3,
+                value: _currentZoom.clamp(_isSinglePageMode ? 1.0 : 0.3, 4.0),
+                min: _isSinglePageMode ? 1.0 : 0.3,
                 max: 4.0,
                 onChanged: _onZoomSliderChanged,
               ),
@@ -978,11 +1055,17 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 class _PdfSinglePageItem extends StatefulWidget {
   final PdfDocument document;
   final int pageNumber;
+  final ValueChanged<double>? onZoomChanged;
+  final ValueChanged<TransformationController>? onControllerCreated;
+  final VoidCallback? onControllerDisposed;
 
   const _PdfSinglePageItem({
     super.key,
     required this.document,
     required this.pageNumber,
+    this.onZoomChanged,
+    this.onControllerCreated,
+    this.onControllerDisposed,
   });
 
   @override
@@ -992,15 +1075,18 @@ class _PdfSinglePageItem extends StatefulWidget {
 class _PdfSinglePageItemState extends State<_PdfSinglePageItem> {
   final TransformationController _transformController = TransformationController();
   bool _panEnabled = false;
+  TapDownDetails? _doubleTapDetails;
 
   @override
   void initState() {
     super.initState();
     _transformController.addListener(_onTransformChanged);
+    widget.onControllerCreated?.call(_transformController);
   }
 
   @override
   void dispose() {
+    widget.onControllerDisposed?.call();
     _transformController.removeListener(_onTransformChanged);
     _transformController.dispose();
     super.dispose();
@@ -1014,19 +1100,44 @@ class _PdfSinglePageItemState extends State<_PdfSinglePageItem> {
         _panEnabled = shouldEnablePan;
       });
     }
+    widget.onZoomChanged?.call(scale);
+  }
+
+  void _onDoubleTapDown(TapDownDetails details) {
+    _doubleTapDetails = details;
   }
 
   void _onDoubleTap() {
     if (_transformController.value != Matrix4.identity()) {
       _transformController.value = Matrix4.identity();
+      widget.onZoomChanged?.call(1.0);
     } else {
-      _transformController.value = Matrix4.diagonal3Values(2.0, 2.0, 1.0);
+      const double newScale = 2.0;
+      final pos = _doubleTapDetails?.localPosition;
+      final double dx;
+      final double dy;
+      if (pos != null) {
+        dx = pos.dx * (1 - newScale);
+        dy = pos.dy * (1 - newScale);
+      } else {
+        final size = MediaQuery.sizeOf(context);
+        dx = (size.width / 2) * (1 - newScale);
+        dy = (size.height / 2) * (1 - newScale);
+      }
+      final matrix = Matrix4.identity();
+      matrix.setEntry(0, 0, newScale);
+      matrix.setEntry(1, 1, newScale);
+      matrix.setEntry(0, 3, dx);
+      matrix.setEntry(1, 3, dy);
+      _transformController.value = matrix;
+      widget.onZoomChanged?.call(newScale);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onDoubleTapDown: _onDoubleTapDown,
       onDoubleTap: _onDoubleTap,
       child: InteractiveViewer(
         transformationController: _transformController,
@@ -1034,11 +1145,13 @@ class _PdfSinglePageItemState extends State<_PdfSinglePageItem> {
         scaleEnabled: true,
         minScale: 1.0,
         maxScale: 4.0,
+        boundaryMargin: const EdgeInsets.all(80.0),
         child: Center(
           child: PdfPageView(
             key: ValueKey('pdf_pv_${widget.pageNumber}'),
             document: widget.document,
             pageNumber: widget.pageNumber,
+            maximumDpi: 300,
             alignment: Alignment.center,
           ),
         ),
