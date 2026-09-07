@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
   #define KOTO_EXPORT __declspec(dllexport)
@@ -9,6 +7,7 @@
 #endif
 
 #ifdef HAVE_LIBREDWG
+#include <string.h>
 #include <dwg.h>
 #include <dwg_api.h>
 

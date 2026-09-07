@@ -1,0 +1,35 @@
+# Configuration for clangd in Flutter project on Windows
+
+# 1. Linux Runner: GTK headers (gtk/gtk.h) are not available on Windows
+If:
+  PathMatch: .*/linux/.*
+Index:
+  Background: Skip
+Diagnostics:
+  Suppress: ['*']
+
+---
+# 2. Windows Runner: Provide Flutter engine & runner include paths
+If:
+  PathMatch: .*/windows/.*
+CompileFlags:
+  Add:
+    - -Iwindows/flutter/ephemeral/cpp_client_wrapper/include
+    - -Iwindows/flutter/ephemeral
+    - -Iwindows/runner
+    - -Iwindows
+    - -std=c++17
+    - -DUNICODE
+    - -D_UNICODE
+    - -DNOMINMAX
+
+---
+# 3. Android C Bridge: Provide LibreDWG definitions & headers
+If:
+  PathMatch: .*/android/.*
+CompileFlags:
+  Add:
+    - -Iandroid/app/src/main/cpp/include
+    - -DHAVE_LIBREDWG=1
+Diagnostics:
+  UnusedIncludes: None
