@@ -25,6 +25,7 @@ import '../hpgl_viewer/hpgl_viewer_screen.dart';
 import '../cdr_viewer/cdr_viewer_screen.dart';
 import '../comic_viewer/comic_viewer_screen.dart';
 import '../ebook_viewer/ebook_viewer_screen.dart';
+import '../route_viewer/route_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 import 'widgets/app_info_dialog.dart';
 
@@ -97,6 +98,14 @@ class FileTypeIcon extends StatelessWidget {
         return _buildEpubIcon();
       case KotoFileType.fb2:
         return _buildFb2Icon();
+      case KotoFileType.gpx:
+        return _buildGpxIcon();
+      case KotoFileType.kml:
+        return _buildKmlIcon();
+      case KotoFileType.kmz:
+        return _buildKmzIcon();
+      case KotoFileType.geojson:
+        return _buildGeoJsonIcon();
       case KotoFileType.other:
         return _buildGenericIcon();
     }
@@ -1011,6 +1020,146 @@ class FileTypeIcon extends StatelessWidget {
     );
   }
 
+  Widget _buildGpxIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.terrain_rounded,
+              color: const Color(0xFF16A34A),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'GPX',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF16A34A),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKmlIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDFA),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF99F6E4)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.route_rounded,
+              color: const Color(0xFF0D9488),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'KML',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF0D9488),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKmzIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.map_rounded,
+              color: const Color(0xFF2563EB),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'KMZ',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF2563EB),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGeoJsonIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFED7AA)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.explore_rounded,
+              color: const Color(0xFFEA580C),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'GEO',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFEA580C),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGenericIcon() {
     return Container(
       width: width,
@@ -1649,6 +1798,22 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         break;
 
+      case KotoFileType.gpx:
+      case KotoFileType.kml:
+      case KotoFileType.kmz:
+      case KotoFileType.geojson:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => RouteViewerScreen(filePath: resolvedPath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
       case KotoFileType.other:
         ScaffoldMessenger.of(
           context,
@@ -2029,6 +2194,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.view_in_ar_rounded;
       case FileCategory.pcb:
         return Icons.memory_rounded;
+      case FileCategory.routes:
+        return Icons.terrain_rounded;
       case FileCategory.documents:
         return Icons.description_rounded;
     }

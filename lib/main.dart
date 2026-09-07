@@ -24,6 +24,7 @@ import 'src/features/hpgl_viewer/hpgl_viewer_screen.dart';
 import 'src/features/cdr_viewer/cdr_viewer_screen.dart';
 import 'src/features/comic_viewer/comic_viewer_screen.dart';
 import 'src/features/ebook_viewer/ebook_viewer_screen.dart';
+import 'src/features/route_viewer/route_viewer_screen.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -221,6 +222,15 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.fb2:
         navigator.push(
           MaterialPageRoute(builder: (_) => EbookViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.gpx:
+      case KotoFileType.kml:
+      case KotoFileType.kmz:
+      case KotoFileType.geojson:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => RouteViewerScreen(filePath: filePath)),
         );
         break;
 

@@ -221,7 +221,11 @@ class FileSourceService {
         lower.endsWith('.smb') ||
         lower.endsWith('.sst') ||
         lower.endsWith('.ssb') ||
-        lower.endsWith('.edge');
+        lower.endsWith('.edge') ||
+        lower.endsWith('.gpx') ||
+        lower.endsWith('.kml') ||
+        lower.endsWith('.kmz') ||
+        lower.endsWith('.geojson');
   }
 
   static List<String> getSafePublicDirectoryPaths() {

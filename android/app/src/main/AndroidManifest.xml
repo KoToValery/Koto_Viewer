@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:label="KoToViewer"
@@ -96,6 +98,26 @@
                 <data android:pathPattern=".*\\.DXF" />
                 <data android:pathPattern=".*\\.dwg" />
                 <data android:pathPattern=".*\\.DWG" />
+                <data android:pathPattern=".*\\.gpx" />
+                <data android:pathPattern=".*\\.GPX" />
+                <data android:pathPattern=".*\\.kml" />
+                <data android:pathPattern=".*\\.KML" />
+                <data android:pathPattern=".*\\.kmz" />
+                <data android:pathPattern=".*\\.KMZ" />
+                <data android:pathPattern=".*\\.geojson" />
+                <data android:pathPattern=".*\\.GEOJSON" />
+            </intent-filter>
+
+            <!-- Route & Geo File MIME types -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.QUICK_VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/gpx+xml" />
+                <data android:mimeType="application/vnd.google-earth.kml+xml" />
+                <data android:mimeType="application/vnd.google-earth.kmz" />
+                <data android:mimeType="application/geo+json" />
             </intent-filter>
 
             <intent-filter>

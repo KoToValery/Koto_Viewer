@@ -5,6 +5,7 @@ enum FileCategory {
   cad2d,
   cad3d,
   pcb,
+  routes,
   documents,
 }
 
@@ -19,6 +20,8 @@ extension FileCategoryExtension on FileCategory {
         return '3D Models';
       case FileCategory.pcb:
         return 'PCB & Hardware';
+      case FileCategory.routes:
+        return 'Routes & Maps';
       case FileCategory.documents:
         return 'Documents';
     }
@@ -34,13 +37,15 @@ extension FileCategoryExtension on FileCategory {
         return '3D';
       case FileCategory.pcb:
         return 'PCB';
+      case FileCategory.routes:
+        return 'Routes';
       case FileCategory.documents:
         return 'Docs';
     }
   }
 }
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, gpx, kml, kmz, geojson, other }
 
 class PdfItem {
   final String path;
@@ -125,6 +130,10 @@ class PdfItem {
         lower.endsWith('.drd')) {
       return KotoFileType.drl;
     }
+    if (lower.endsWith('.gpx')) return KotoFileType.gpx;
+    if (lower.endsWith('.kml')) return KotoFileType.kml;
+    if (lower.endsWith('.kmz')) return KotoFileType.kmz;
+    if (lower.endsWith('.geojson') || lower.endsWith('.geo.json')) return KotoFileType.geojson;
     return KotoFileType.other;
   }
 
@@ -132,6 +141,11 @@ class PdfItem {
   bool get isSvg => fileType == KotoFileType.svg;
   bool get isComic => fileType == KotoFileType.cbz || fileType == KotoFileType.cbr || fileType == KotoFileType.cbt;
   bool get isEbook => fileType == KotoFileType.epub || fileType == KotoFileType.fb2;
+  bool get isRoute =>
+      fileType == KotoFileType.gpx ||
+      fileType == KotoFileType.kml ||
+      fileType == KotoFileType.kmz ||
+      fileType == KotoFileType.geojson;
   bool get is3d =>
       fileType == KotoFileType.stl ||
       fileType == KotoFileType.obj ||
@@ -162,6 +176,7 @@ class PdfItem {
   bool get isTextDoc => isTxt || isMd || isDocx || isRtf || isPresentation || isComic || isEbook;
 
   FileCategory get category {
+    if (isRoute) return FileCategory.routes;
     if (is3d) return FileCategory.cad3d;
     if (isCad || isPlotter || isSvg || isEps || isCdr) return FileCategory.cad2d;
     if (isPcb) return FileCategory.pcb;
