@@ -62,7 +62,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       });
     }
 
-    _intentService.listenForPdfIntents((filePath) {
+    _intentService.listenForFileIntents((filePath) {
       if (filePath.isNotEmpty) {
         _pendingFilePath = filePath;
         WidgetsBinding.instance.addPostFrameCallback((_) {

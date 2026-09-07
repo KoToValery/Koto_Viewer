@@ -2,12 +2,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pdf_item.dart';
 
 class RecentFilesService {
-  static const String _keyRecentFiles = 'koto_recent_pdf_files';
+  static const String _keyRecentFiles = 'koto_recent_files';
+  static const String _legacyKeyRecentFiles = 'koto_recent_pdf_files';
   static const int _maxRecentFiles = 25;
 
   static Future<List<PdfItem>> getRecentFiles() async {
     final prefs = await SharedPreferences.getInstance();
-    final List<String>? jsonList = prefs.getStringList(_keyRecentFiles);
+    final List<String>? jsonList = prefs.getStringList(_keyRecentFiles) ??
+        prefs.getStringList(_legacyKeyRecentFiles);
 
     if (jsonList == null) return [];
 
@@ -49,5 +51,6 @@ class RecentFilesService {
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyRecentFiles);
+    await prefs.remove(_legacyKeyRecentFiles);
   }
 }

@@ -2,31 +2,39 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 class IntentService {
-  static const MethodChannel _channel = MethodChannel('com.koto.pdfviewer/intent');
+  static const MethodChannel _channel = MethodChannel('com.koto.kotoviewer/intent');
 
-  void listenForPdfIntents(Function(String filePath) onPdfOpened) {
+  void listenForFileIntents(Function(String filePath) onFileOpened) {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'onPdfOpened') {
+      if (call.method == 'onFileOpened' || call.method == 'onPdfOpened') {
         final String? filePath = call.arguments as String?;
         if (filePath != null && filePath.isNotEmpty) {
-          onPdfOpened(filePath);
+          onFileOpened(filePath);
         }
       }
     });
 
-    _getInitialPdfPath().then((filePath) {
+    _getInitialFilePath().then((filePath) {
       if (filePath != null && filePath.isNotEmpty) {
-        onPdfOpened(filePath);
+        onFileOpened(filePath);
       }
     });
   }
 
-  Future<String?> _getInitialPdfPath() async {
+  /// Backward-compatible alias
+  void listenForPdfIntents(Function(String filePath) onPdfOpened) =>
+      listenForFileIntents(onPdfOpened);
+
+  Future<String?> _getInitialFilePath() async {
     try {
-      final String? path = await _channel.invokeMethod<String>('getInitialPdfPath');
+      final String? path = await _channel.invokeMethod<String>('getInitialFilePath');
       return path;
     } catch (_) {
-      return null;
+      try {
+        return await _channel.invokeMethod<String>('getInitialPdfPath');
+      } catch (_) {
+        return null;
+      }
     }
   }
 

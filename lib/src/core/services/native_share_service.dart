@@ -2,7 +2,7 @@ import 'package:flutter/services.dart';
 
 /// Native share service with filtered app categories
 class NativeShareService {
-  static const _channel = MethodChannel('com.koto.pdf_viewer/share');
+  static const _channel = MethodChannel('com.koto.kotoviewer/share');
 
   /// Share ONLY to Email apps (Gmail, Outlook, etc.)
   static Future<bool> shareViaEmail(
@@ -12,7 +12,7 @@ class NativeShareService {
     try {
       final result = await _channel.invokeMethod<bool>('shareViaEmail', {
         'filePath': filePath,
-        'subject': subject ?? 'PDF Document',
+        'subject': subject ?? 'Shared Document',
       });
       return result ?? false;
     } on PlatformException catch (e) {
@@ -29,7 +29,7 @@ class NativeShareService {
     try {
       final result = await _channel.invokeMethod<bool>('shareViaMessaging', {
         'filePath': filePath,
-        'text': text ?? 'PDF Document',
+        'text': text ?? 'Shared Document',
       });
       return result ?? false;
     } on PlatformException catch (e) {

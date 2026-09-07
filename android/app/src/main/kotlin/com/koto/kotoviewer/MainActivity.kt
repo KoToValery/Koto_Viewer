@@ -1,4 +1,4 @@
-package com.koto.pdfviewer
+package com.koto.kotoviewer
 
 import android.app.Activity
 import android.content.Intent
@@ -14,11 +14,11 @@ import java.io.FileOutputStream
 
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.koto.pdfviewer/intent"
-    private val SHARE_CHANNEL = "com.koto.pdf_viewer/share"
+    private val CHANNEL = "com.koto.kotoviewer/intent"
+    private val SHARE_CHANNEL = "com.koto.kotoviewer/share"
     private val SAF_CHANNEL = "koto/saf"
     private val DIRECTORY_PICKER_REQUEST = 2001
-    private var initialPdfPath: String? = null
+    private var initialFilePath: String? = null
     private var methodChannel: MethodChannel? = null
     private var shareMethodChannel: MethodChannel? = null
     private var safMethodChannel: MethodChannel? = null
@@ -42,9 +42,9 @@ class MainActivity : FlutterActivity() {
         // Original intent channel
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel?.setMethodCallHandler { call, result ->
-            if (call.method == "getInitialPdfPath") {
-                result.success(initialPdfPath)
-                initialPdfPath = null
+            if (call.method == "getInitialFilePath" || call.method == "getInitialPdfPath") {
+                result.success(initialFilePath)
+                initialFilePath = null
             } else {
                 result.notImplemented()
             }
@@ -265,7 +265,8 @@ class MainActivity : FlutterActivity() {
         if (uri != null) {
             val localPath = resolveUriToFilePath(uri)
             if (localPath != null) {
-                initialPdfPath = localPath
+                initialFilePath = localPath
+                methodChannel?.invokeMethod("onFileOpened", localPath)
                 methodChannel?.invokeMethod("onPdfOpened", localPath)
             }
         }
@@ -295,7 +296,7 @@ class MainActivity : FlutterActivity() {
                         mime.contains("word") || mime.contains("document") -> "$fileName.docx"
                         mime.contains("text") || mime.contains("plain") -> "$fileName.txt"
                         mime.contains("markdown") -> "$fileName.md"
-                        else -> "$fileName.pdf"
+                        else -> fileName
                     }
                 }
                 val tempFile = File(cacheDir, sanitizedFileName)
@@ -343,6 +344,27 @@ class MainActivity : FlutterActivity() {
         return result
     }
     
+    private fun getMimeTypeForFile(file: File): String {
+        val extension = file.extension.lowercase()
+        return when (extension) {
+            "pdf" -> "application/pdf"
+            "dxf" -> "application/dxf"
+            "dwg" -> "application/acad"
+            "svg" -> "image/svg+xml"
+            "stl" -> "model/stl"
+            "obj" -> "model/obj"
+            "gltf" -> "model/gltf+json"
+            "glb" -> "model/gltf-binary"
+            "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            "txt" -> "text/plain"
+            "md" -> "text/markdown"
+            "epub" -> "application/epub+zip"
+            else -> "*/*"
+        }
+    }
+    
     // Share to EMAIL APPS ONLY
     private fun shareViaEmail(filePath: String, subject: String?): Boolean {
         return try {
@@ -355,10 +377,11 @@ class MainActivity : FlutterActivity() {
                 file
             )
 
+            val mimeType = getMimeTypeForFile(file)
             val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"
+                type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, subject ?: "PDF Document")
+                putExtra(Intent.EXTRA_SUBJECT, subject ?: "KoToViewer Document")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
@@ -394,9 +417,9 @@ class MainActivity : FlutterActivity() {
                     activityName.contains("email") || 
                     activityName.contains("mail")) {
                     val targetIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "application/pdf"
+                        type = mimeType
                         putExtra(Intent.EXTRA_STREAM, uri)
-                        putExtra(Intent.EXTRA_SUBJECT, subject ?: "PDF Document")
+                        putExtra(Intent.EXTRA_SUBJECT, subject ?: "KoToViewer Document")
                         setPackage(packageName)
                         setClassName(packageName, info.activityInfo.name)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -409,7 +432,7 @@ class MainActivity : FlutterActivity() {
             val fallbackIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "message/rfc822"
                 putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, subject ?: "PDF Document")
+                putExtra(Intent.EXTRA_SUBJECT, subject ?: "KoToViewer Document")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
@@ -425,7 +448,7 @@ class MainActivity : FlutterActivity() {
                     val targetIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "message/rfc822"
                         putExtra(Intent.EXTRA_STREAM, uri)
-                        putExtra(Intent.EXTRA_SUBJECT, subject ?: "PDF Document")
+                        putExtra(Intent.EXTRA_SUBJECT, subject ?: "KoToViewer Document")
                         setPackage(packageName)
                         setClassName(packageName, info.activityInfo.name)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -465,8 +488,9 @@ class MainActivity : FlutterActivity() {
                 file
             )
 
+            val mimeType = getMimeTypeForFile(file)
             val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"
+                type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
                 putExtra(Intent.EXTRA_TEXT, text ?: "")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -531,7 +555,7 @@ class MainActivity : FlutterActivity() {
                     activityName.contains("sms") ||
                     activityName.contains("mms")) {
                     val targetIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "application/pdf"
+                        type = mimeType
                         putExtra(Intent.EXTRA_STREAM, uri)
                         putExtra(Intent.EXTRA_TEXT, text)
                         setPackage(packageName)
@@ -573,8 +597,9 @@ class MainActivity : FlutterActivity() {
                 file
             )
 
+            val mimeType = getMimeTypeForFile(file)
             val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"
+                type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
@@ -640,7 +665,7 @@ class MainActivity : FlutterActivity() {
                     activityName.contains("backup") ||
                     activityName.contains("save")) {
                     val targetIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "application/pdf"
+                        type = mimeType
                         putExtra(Intent.EXTRA_STREAM, uri)
                         setPackage(packageName)
                         setClassName(packageName, info.activityInfo.name)

@@ -1,11 +1,11 @@
 {
-    "name": "koto_viewer",
-    "short_name": "koto_viewer",
+    "name": "KoToViewer",
+    "short_name": "KoToViewer",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#2563EB",
     "theme_color": "#2563EB",
-    "description": "A new Flutter project.",
+    "description": "KoToViewer - Free All in One Viewer",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -2538,7 +2538,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 8),
             const Expanded(
-              child: Text('KotoView', overflow: TextOverflow.ellipsis),
+              child: Text('KoToViewer', overflow: TextOverflow.ellipsis),
             ),
           ],
         ),
