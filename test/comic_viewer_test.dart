@@ -116,6 +116,31 @@ void main() {
       expect(comic.metadata.isManga, isTrue);
       expect(comic.pageCount, equals(2));
     });
+
+    test('ComicParser reports progressive extraction updates via onProgress callback', () {
+      final archive = Archive();
+      final dummyPng = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+      archive.addFile(ArchiveFile('page_1.png', dummyPng.length, dummyPng));
+      archive.addFile(ArchiveFile('page_2.png', dummyPng.length, dummyPng));
+      archive.addFile(ArchiveFile('page_3.png', dummyPng.length, dummyPng));
+
+      final zipBytes = Uint8List.fromList(ZipEncoder().encode(archive)!);
+      final List<ComicParseProgress> progressList = [];
+
+      final comic = ComicParser.parseFromBytes(
+        zipBytes,
+        fileName: 'SpiderMan.cbz',
+        filePath: '/test/SpiderMan.cbz',
+        onProgress: (p) => progressList.add(p),
+      );
+
+      expect(comic.pageCount, equals(3));
+      expect(progressList, isNotEmpty);
+      expect(progressList.first.progress, greaterThanOrEqualTo(0.20));
+      expect(progressList.last.progress, greaterThanOrEqualTo(0.95));
+      expect(progressList.any((p) => p.currentPage == 1 && p.totalPages == 3), isTrue);
+      expect(progressList.any((p) => p.currentPage == 3 && p.totalPages == 3), isTrue);
+    });
   });
 
   group('ComicFitMode & Zoom Best Practice Tests', () {

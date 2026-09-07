@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart' as xml;
@@ -18,21 +20,78 @@ class ComicParser {
     '.avif',
   ];
 
-  static Future<ComicBook> parseFromFile(String filePath) async {
+  /// Parses a comic book file in a background Isolate, reporting real-time extraction progress.
+  static Future<ComicBook> parseFromFile(
+    String filePath, {
+    void Function(ComicParseProgress progress)? onProgress,
+  }) async {
     final file = File(filePath);
     if (!await file.exists()) {
       throw Exception('Comic book file not found: $filePath');
     }
-    final bytes = await file.readAsBytes();
-    final fileName = filePath.split(Platform.pathSeparator).last;
-    return parseFromBytes(bytes, fileName: fileName, filePath: filePath);
+
+    final fileSizeBytes = await file.length();
+    final sizeMb = (fileSizeBytes / (1024 * 1024)).toStringAsFixed(1);
+
+    onProgress?.call(ComicParseProgress(
+      progress: 0.05,
+      status: 'Отваряне на файл ($sizeMb MB)...',
+    ));
+
+    final receivePort = ReceivePort();
+    final completer = Completer<ComicBook>();
+
+    Isolate? isolate;
+    try {
+      isolate = await Isolate.spawn(
+        _parseWorker,
+        _ParseWorkerRequest(filePath, receivePort.sendPort),
+      );
+
+      receivePort.listen((message) {
+        if (message is ComicParseProgress) {
+          onProgress?.call(message);
+        } else if (message is ComicBook) {
+          if (!completer.isCompleted) completer.complete(message);
+          receivePort.close();
+          isolate?.kill(priority: Isolate.immediate);
+        } else if (message is Exception || message is Error) {
+          if (!completer.isCompleted) completer.completeError(message);
+          receivePort.close();
+          isolate?.kill(priority: Isolate.immediate);
+        } else if (message is String && message.startsWith('ERROR:')) {
+          if (!completer.isCompleted) completer.completeError(Exception(message.substring(6)));
+          receivePort.close();
+          isolate?.kill(priority: Isolate.immediate);
+        }
+      });
+
+      return await completer.future;
+    } catch (e) {
+      receivePort.close();
+      isolate?.kill(priority: Isolate.immediate);
+      // In-process fallback if isolate spawn fails on any restricted platform
+      final bytes = await file.readAsBytes();
+      return parseFromBytes(
+        bytes,
+        fileName: filePath.split(Platform.pathSeparator).last,
+        filePath: filePath,
+        onProgress: onProgress,
+      );
+    }
   }
 
   static ComicBook parseFromBytes(
     Uint8List bytes, {
     required String fileName,
     required String filePath,
+    void Function(ComicParseProgress progress)? onProgress,
   }) {
+    onProgress?.call(const ComicParseProgress(
+      progress: 0.20,
+      status: 'Разархивиране на структурата...',
+    ));
+
     Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes, verify: false);
@@ -82,12 +141,19 @@ class ComicParser {
     // Sort pages in natural alphanumeric order
     imageFiles.sort((a, b) => _naturalCompare(a.name, b.name));
 
+    final totalPages = imageFiles.length;
     final List<ComicPage> pages = [];
-    for (int i = 0; i < imageFiles.length; i++) {
+    for (int i = 0; i < totalPages; i++) {
       final file = imageFiles[i];
-      final fileBytes = file.content is List<int>
-          ? Uint8List.fromList(file.content as List<int>)
-          : Uint8List(0);
+      final content = file.content;
+      final Uint8List fileBytes;
+      if (content is Uint8List) {
+        fileBytes = content;
+      } else if (content is List<int>) {
+        fileBytes = Uint8List.fromList(content);
+      } else {
+        fileBytes = Uint8List(0);
+      }
 
       if (fileBytes.isNotEmpty) {
         pages.add(ComicPage(
@@ -96,11 +162,24 @@ class ComicParser {
           bytes: fileBytes,
         ));
       }
+
+      final fraction = 0.25 + 0.70 * ((i + 1) / totalPages);
+      onProgress?.call(ComicParseProgress(
+        progress: fraction,
+        status: 'Разархивиране на страница ${i + 1} от $totalPages...',
+        currentPage: i + 1,
+        totalPages: totalPages,
+      ));
     }
 
     if (pages.isEmpty) {
       throw Exception('Failed to extract comic pages.');
     }
+
+    onProgress?.call(const ComicParseProgress(
+      progress: 0.98,
+      status: 'Финализиране на страниците...',
+    ));
 
     final defaultTitle = _extractCleanTitle(fileName);
     final metadata = _parseMetadata(comicInfoFile, defaultTitle, pages.length);
@@ -210,5 +289,48 @@ class ComicParser {
       }
     }
     return aMatches.length.compareTo(bMatches.length);
+  }
+}
+
+class _ParseWorkerRequest {
+  final String filePath;
+  final SendPort sendPort;
+
+  const _ParseWorkerRequest(this.filePath, this.sendPort);
+}
+
+void _parseWorker(_ParseWorkerRequest request) {
+  final sendPort = request.sendPort;
+  try {
+    final file = File(request.filePath);
+    if (!file.existsSync()) {
+      sendPort.send('ERROR: Comic book file not found: ${request.filePath}');
+      return;
+    }
+    final fileSizeBytes = file.lengthSync();
+    final sizeMb = (fileSizeBytes / (1024 * 1024)).toStringAsFixed(1);
+
+    sendPort.send(ComicParseProgress(
+      progress: 0.08,
+      status: 'Четене на файл ($sizeMb MB)...',
+    ));
+
+    final bytes = file.readAsBytesSync();
+
+    sendPort.send(const ComicParseProgress(
+      progress: 0.20,
+      status: 'Индексиране на страниците...',
+    ));
+
+    final comic = ComicParser.parseFromBytes(
+      bytes,
+      fileName: request.filePath.split(Platform.pathSeparator).last,
+      filePath: request.filePath,
+      onProgress: (p) => sendPort.send(p),
+    );
+
+    sendPort.send(comic);
+  } catch (e) {
+    sendPort.send('ERROR: $e');
   }
 }

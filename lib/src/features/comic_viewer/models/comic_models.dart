@@ -118,3 +118,17 @@ class ComicBook {
 
   int get pageCount => pages.length;
 }
+
+class ComicParseProgress {
+  final double progress;
+  final String status;
+  final int? currentPage;
+  final int? totalPages;
+
+  const ComicParseProgress({
+    required this.progress,
+    required this.status,
+    this.currentPage,
+    this.totalPages,
+  });
+}

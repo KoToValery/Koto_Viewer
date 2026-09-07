@@ -24,6 +24,10 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   int _fileSizeBytes = 0;
+  double _loadingProgress = 0.0;
+  String _loadingStatus = 'Отваряне на файл...';
+  int _loadedPagesCount = 0;
+  int _totalPagesCount = 0;
 
   ComicBook? _comic;
   int _currentPageIndex = 0;
@@ -70,6 +74,10 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _loadingProgress = 0.05;
+      _loadingStatus = 'Отваряне на файл...';
+      _loadedPagesCount = 0;
+      _totalPagesCount = 0;
     });
 
     try {
@@ -79,7 +87,23 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       }
 
       _fileSizeBytes = await file.length();
-      final comic = await ComicParser.parseFromFile(widget.filePath);
+      final comic = await ComicParser.parseFromFile(
+        widget.filePath,
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() {
+              _loadingProgress = progress.progress;
+              _loadingStatus = progress.status;
+              if (progress.currentPage != null) {
+                _loadedPagesCount = progress.currentPage!;
+              }
+              if (progress.totalPages != null) {
+                _totalPagesCount = progress.totalPages!;
+              }
+            });
+          }
+        },
+      );
 
       // Restore saved reading progress
       final progress = await ReadingProgressService.getProgress(widget.filePath);
@@ -645,6 +669,10 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    if (_isLoading) {
+      return _buildLoadingScreen(theme);
+    }
+
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
@@ -798,53 +826,188 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                 ),
               )
             : null,
-        body: _isLoading
-            ? const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: Color(0xFFE11D48)),
-                    SizedBox(height: 16),
-                    Text('Opening Comic Book...', style: TextStyle(color: Colors.white70)),
-                  ],
+        body: _errorMessage != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                      const SizedBox(height: 16),
+                      Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _loadComic,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
               )
-            : _errorMessage != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-                          const SizedBox(height: 16),
-                          Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
-                          const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: _loadComic,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Retry'),
-                          ),
-                        ],
+            : _comic == null || _comic!.pages.isEmpty
+                ? const Center(child: Text('No pages found', style: TextStyle(color: Colors.white70)))
+                : Stack(
+                    children: [
+                      // Main Reader Surface
+                      _readingMode == ComicReadingMode.verticalContinuous
+                          ? _buildWebtoonView()
+                          : _buildPagedView(),
+
+                      // Floating Zoom & Fit Bar
+                      if (_showControls) _buildFloatingZoomBar(theme),
+
+                      // Bottom Controls Overlay
+                      if (_showControls) _buildBottomControlsOverlay(theme),
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingScreen(ThemeData theme) {
+    final formattedSize = _fileSizeBytes > 0
+        ? (_fileSizeBytes < 1024 * 1024
+            ? '${(_fileSizeBytes / 1024).toStringAsFixed(1)} KB'
+            : '${(_fileSizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB')
+        : '';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F12),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white70),
+          tooltip: 'Отказ',
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Glowing Comic Icon
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE11D48).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFE11D48).withValues(alpha: 0.4),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE11D48).withValues(alpha: 0.25),
+                        blurRadius: 24,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.auto_stories_rounded,
+                    color: Color(0xFFE11D48),
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Title
+                Text(
+                  _fileName,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+
+                if (formattedSize.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white12,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      formattedSize,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  )
-                : _comic == null || _comic!.pages.isEmpty
-                    ? const Center(child: Text('No pages found', style: TextStyle(color: Colors.white70)))
-                    : Stack(
-                        children: [
-                          // Main Reader Surface
-                          _readingMode == ComicReadingMode.verticalContinuous
-                              ? _buildWebtoonView()
-                              : _buildPagedView(),
+                  ),
+                ],
 
-                          // Floating Zoom & Fit Bar
-                          if (_showControls) _buildFloatingZoomBar(theme),
+                const SizedBox(height: 32),
 
-                          // Bottom Controls Overlay
-                          if (_showControls) _buildBottomControlsOverlay(theme),
-                        ],
+                // Progress Bar with Percentage Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _totalPagesCount > 0
+                          ? 'Страница $_loadedPagesCount от $_totalPagesCount'
+                          : 'Зареждане на архив...',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                       ),
+                    ),
+                    Text(
+                      '${(_loadingProgress * 100).clamp(0, 100).toInt()}%',
+                      style: const TextStyle(
+                        color: Color(0xFFE11D48),
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Linear Progress Bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: _loadingProgress > 0 ? _loadingProgress.clamp(0.0, 1.0) : null,
+                    minHeight: 8,
+                    backgroundColor: Colors.white12,
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFE11D48)),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Detailed Status
+                Text(
+                  _loadingStatus,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
