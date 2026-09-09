@@ -49,3 +49,5 @@ test_files/Archicad_export.dwl
 test_files/Archicad_export.dwl2
 test_files/text_wrap.dwg
 test_files/text.dwg
+nakov_*
+test/nakov_debug_test.dart

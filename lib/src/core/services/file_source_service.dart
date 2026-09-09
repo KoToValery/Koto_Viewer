@@ -237,6 +237,8 @@ class FileSourceService {
         lower.endsWith('.ico') ||
         lower.endsWith('.psd') ||
         lower.endsWith('.psb') ||
+        lower.endsWith('.dcm') ||
+        lower.endsWith('.dicom') ||
         lower.endsWith('.dart') ||
         lower.endsWith('.js') ||
         lower.endsWith('.mjs') ||

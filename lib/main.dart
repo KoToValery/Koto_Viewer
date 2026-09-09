@@ -31,6 +31,7 @@ import 'src/features/font_viewer/font_viewer_screen.dart';
 import 'src/features/image_viewer/image_viewer_screen.dart';
 import 'src/features/csv_viewer/csv_viewer_screen.dart';
 import 'src/features/jupyter_viewer/jupyter_viewer_screen.dart';
+import 'src/features/dicom_viewer/dicom_viewer_screen.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -269,6 +270,12 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.font:
         navigator.push(
           MaterialPageRoute(builder: (_) => FontViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.dicom:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => DicomViewerScreen(filePath: filePath)),
         );
         break;
 

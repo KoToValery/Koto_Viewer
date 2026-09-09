@@ -57,6 +57,13 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# ---------------------------------------------------------------------------
+# openjpeg JPEG 2000 bridge library
+# ---------------------------------------------------------------------------
+# Enable C language in addition to CXX for openjpeg_bridge
+enable_language(C)
+
+include("${CMAKE_CURRENT_SOURCE_DIR}/../src/openjpeg_bridge/openjpeg_bridge.cmake")
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
@@ -86,6 +93,12 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+# Install the openjpeg_bridge DLL (JPEG 2000 support).
+# install(FILES) with generator expression works correctly across subdirectories.
+install(FILES "$<TARGET_FILE:openjpeg_bridge>"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
 
 # Install LibreDWG Windows binaries next to the executable if present
 set(LIBREDWG_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libredwg/bin")

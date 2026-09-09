@@ -32,6 +32,7 @@ import '../font_viewer/font_viewer_screen.dart';
 import '../image_viewer/image_viewer_screen.dart';
 import '../csv_viewer/csv_viewer_screen.dart';
 import '../jupyter_viewer/jupyter_viewer_screen.dart';
+import '../dicom_viewer/dicom_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 import 'widgets/app_info_dialog.dart';
 
@@ -129,6 +130,8 @@ class FileTypeIcon extends StatelessWidget {
         return _buildCsvIcon();
       case KotoFileType.jupyter:
         return _buildJupyterIcon();
+      case KotoFileType.dicom:
+        return _buildDicomIcon();
       default:
         return _buildGenericIcon();
     }
@@ -194,6 +197,41 @@ class FileTypeIcon extends StatelessWidget {
                 fontSize: width * 0.16,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFFD97706),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDicomIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C1A2E),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF0EA5E9)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.medical_services_outlined,
+              color: const Color(0xFF0EA5E9),
+              size: width * 0.52,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'DCM',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF0EA5E9),
                 letterSpacing: 0.5,
                 height: 1,
               ),
@@ -2189,6 +2227,19 @@ class _HomeScreenState extends State<HomeScreen> {
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => ImageViewerScreen(filePath: resolvedPath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.dicom:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => DicomViewerScreen(filePath: resolvedPath),
           ),
         );
         if (success != false) {
