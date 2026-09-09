@@ -93,7 +93,16 @@ class Cad3DMeshPainter extends CustomPainter {
     }
 
     // 2. Transform, Light, and Depth-Sort Triangles
-    final lightDir = Vector3(0.577, -0.577, 0.577).normalized(); // Directional light from top-right-front
+    // Professional 3-point Studio Lighting + Camera Headlight in View Space:
+    // In view space, camera looks along +Y. Surfaces facing camera have norm.y <= 0.
+    // Lights placed on camera side have Ly < 0, guaranteeing positive front illumination.
+    final keyLight = const Vector3(0.55, -0.65, 0.52).normalized(); // Top-Right-Front
+    final fillLight = const Vector3(-0.60, -0.45, 0.35).normalized(); // Top-Left-Front
+    const headLight = Vector3(0.0, -1.0, 0.0); // Camera Headlight (view axis)
+    final bounceLight = const Vector3(0.0, -0.30, -0.85).normalized(); // Ground Bounce
+
+    // Blinn-Phong specular half-vector for key light (view direction V = (0, -1, 0))
+    final keyHalf = (keyLight + const Vector3(0.0, -1.0, 0.0)).normalized();
     final List<_RenderTriangle> renderList = [];
 
     // Interactive adaptive LOD: when rotating/panning large models, stride for 60 FPS responsiveness
@@ -101,9 +110,6 @@ class Cad3DMeshPainter extends CustomPainter {
     final int stride = (isInteracting && totalTris > 40000)
         ? (totalTris / 25000).ceil()
         : 1;
-
-    final bool cullBackfaces = shadingMode != Cad3DShadingMode.xray &&
-        shadingMode != Cad3DShadingMode.wireframe;
 
     final double screenW = size.width;
     final double screenH = size.height;
@@ -146,13 +152,46 @@ class Cad3DMeshPainter extends CustomPainter {
       final maxY = math.max(p0.dy, math.max(p1.dy, p2.dy));
       if (maxY < -margin) continue;
 
-      // Two-sided lighting calculation (Lambertian + Ambient):
-      // In BIM / architectural models, roof tiles, eaves, and thin elements have single-sided geometry.
-      // Flip normal for backfaces so both sides receive smooth architectural lighting without holes or stripes.
-      final normalToUse = isBackface ? -tri.normal : tri.normal;
-      final transformedNorm = camera.transformPoint(normalToUse).normalized();
-      final double diffuse = math.max(0.18, -transformedNorm.dot(lightDir));
-      final double intensity = (diffuse * 0.72 + 0.28).clamp(0.18, 1.0);
+      // Multi-source lighting calculation:
+      // Determine effective normal facing toward the camera (two-sided lighting)
+      final normLen = viewNormal.length;
+      Vector3 norm = normLen > 1e-9 ? viewNormal / normLen : const Vector3(0, -1, 0);
+
+      // If authored normal is present, utilize it for smooth shading
+      if (tri.normal.lengthSquared > 1e-6) {
+        final authNorm = camera.transformPoint(tri.normal).normalized();
+        if (authNorm.lengthSquared > 0.5 && shadingMode == Cad3DShadingMode.smoothShaded) {
+          norm = authNorm;
+        }
+      }
+
+      // Ensure normal faces camera so both sides of thin geometry (e.g. roofs, wings) are lit
+      if (norm.y > 0) {
+        norm = -norm;
+      }
+
+      // Diffuse Lambertian terms (norm.y <= 0 and L.y < 0 => positive illumination)
+      final double diffKey = math.max(0.0, norm.dot(keyLight));
+      final double diffFill = math.max(0.0, norm.dot(fillLight));
+      final double diffHead = math.max(0.0, norm.dot(headLight));
+      final double diffBounce = math.max(0.0, norm.dot(bounceLight));
+
+      const double ambient = 0.22;
+      final double diffuseFactor = (ambient +
+          diffKey * 0.45 +
+          diffFill * 0.22 +
+          diffHead * 0.25 +
+          diffBounce * 0.12).clamp(0.20, 1.15);
+
+      // Blinn-Phong Specular Highlights
+      double specTotal = 0.0;
+      if (shadingMode != Cad3DShadingMode.xray && shadingMode != Cad3DShadingMode.wireframe) {
+        final double specKey = math.max(0.0, norm.dot(keyHalf));
+        final double specHead = math.max(0.0, -norm.y);
+        final double keyHighlight = math.pow(specKey, 20.0).toDouble() * 0.38;
+        final double headHighlight = math.pow(specHead, 45.0).toDouble() * 0.16;
+        specTotal = keyHighlight + headHighlight;
+      }
 
       final effectiveColor = customModelColor ?? tri.color ?? baseColor;
       Color faceColor;
@@ -161,11 +200,15 @@ class Cad3DMeshPainter extends CustomPainter {
       } else if (shadingMode == Cad3DShadingMode.wireframe) {
         faceColor = Colors.transparent;
       } else {
-        final hsl = HSLColor.fromColor(effectiveColor);
-        faceColor = hsl.withLightness((hsl.lightness * intensity).clamp(0.08, 0.95)).toColor();
-        if (effectiveColor.a < 1.0) {
-          faceColor = faceColor.withValues(alpha: effectiveColor.a);
-        }
+        final double rLit = (effectiveColor.r * diffuseFactor + specTotal).clamp(0.0, 1.0);
+        final double gLit = (effectiveColor.g * diffuseFactor + specTotal).clamp(0.0, 1.0);
+        final double bLit = (effectiveColor.b * diffuseFactor + specTotal).clamp(0.0, 1.0);
+        faceColor = Color.from(
+          alpha: effectiveColor.a,
+          red: rLit,
+          green: gLit,
+          blue: bLit,
+        );
       }
 
       renderList.add(_RenderTriangle(

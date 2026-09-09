@@ -246,6 +246,38 @@ f 1//1 2//1 3//1 4//1
       expect(camera.zoom, 1.0);
     });
 
+    test('Cad3DCamera inverted Y orbit and toggle behavior', () {
+      final camera = Cad3DCamera();
+      expect(camera.invertY, isTrue);
+
+      final initialPitch = camera.pitch;
+      // Drag down (deltaY = 10): with invertY == true, pitch should increase
+      camera.orbit(0, 10);
+      expect(camera.pitch, closeTo(initialPitch + 0.10, 0.001));
+
+      // Drag up (deltaY = -10): pitch should decrease back
+      camera.orbit(0, -10);
+      expect(camera.pitch, closeTo(initialPitch, 0.001));
+
+      // When invertY is toggled to false, drag down should decrease pitch
+      camera.invertY = false;
+      camera.orbit(0, 10);
+      expect(camera.pitch, closeTo(initialPitch - 0.10, 0.001));
+    });
+
+    test('Cad3DCamera mouse scroll zoom in and zoom out math', () {
+      final camera = Cad3DCamera();
+      expect(camera.zoom, 1.0);
+
+      // Mouse scroll up -> zoom in (factor 1.15)
+      camera.zoomBy(1.15);
+      expect(camera.zoom, closeTo(1.15, 0.001));
+
+      // Mouse scroll down -> zoom out (factor 1 / 1.15)
+      camera.zoomBy(1.0 / 1.15);
+      expect(camera.zoom, closeTo(1.0, 0.001));
+    });
+
     test('PdfItem correctly identifies 3D file formats (STL, OBJ, GLTF, GLB)', () {
       final stlItem = PdfItem(
         path: '/storage/part.stl',

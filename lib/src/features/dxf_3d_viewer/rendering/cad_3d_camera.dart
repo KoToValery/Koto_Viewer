@@ -23,17 +23,19 @@ class Cad3DCamera {
   double pitch; // Elevation angle (radians)
   double zoom; // Zoom multiplier
   Offset panOffset; // Screen pan translation
+  bool invertY; // Invert vertical orbit direction (default: true)
 
   Cad3DCamera({
     this.yaw = math.pi / 4, // 45°
     this.pitch = 0.6154797, // ~35.264° standard isometric
     this.zoom = 1.0,
     this.panOffset = Offset.zero,
+    this.invertY = true,
   });
 
   void orbit(double deltaX, double deltaY) {
     yaw += deltaX * 0.01;
-    pitch -= deltaY * 0.01;
+    pitch += (invertY ? 1 : -1) * deltaY * 0.01;
     // Clamp pitch to avoid gimbal flip
     const limit = math.pi / 2 - 0.01;
     pitch = pitch.clamp(-limit, limit);

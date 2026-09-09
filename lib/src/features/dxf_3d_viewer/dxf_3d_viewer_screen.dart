@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -45,7 +46,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   Cad3DShadingMode _shadingMode = Cad3DShadingMode.smoothShaded;
   Cad3DTheme _theme = Cad3DTheme.darkCad;
   bool _showBoundingBox = false;
-  bool _showGrid = true;
+  final bool _showGrid = true;
+  Color? _customModelColor;
 
   Offset? _lastPanPos;
   double _baseScale = 1.0;
@@ -164,6 +166,46 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     setState(() {
       _isInteracting = false;
     });
+  }
+
+  Offset? _mousePanStart;
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent) {
+      final delta = event.scrollDelta.dy;
+      if (delta < 0) {
+        // Scrolled up -> Zoom In
+        setState(() {
+          _camera.zoomBy(1.15);
+        });
+      } else if (delta > 0) {
+        // Scrolled down -> Zoom Out
+        setState(() {
+          _camera.zoomBy(1.0 / 1.15);
+        });
+      }
+    }
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if ((event.buttons & kTertiaryButton) != 0 || (event.buttons & kSecondaryMouseButton) != 0) {
+      _mousePanStart = event.position;
+    }
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (_mousePanStart != null &&
+        ((event.buttons & kTertiaryButton) != 0 || (event.buttons & kSecondaryMouseButton) != 0)) {
+      final delta = event.position - _mousePanStart!;
+      _mousePanStart = event.position;
+      setState(() {
+        _camera.pan(delta);
+      });
+    }
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    _mousePanStart = null;
   }
 
   void _resetView() {
@@ -390,25 +432,122 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
               children: [
                 const Spacer(),
 
-                // Quick Views Menu
-                PopupMenuButton<Cad3DViewPreset>(
+                // Quick Views Menu & Controls
+                PopupMenuButton<dynamic>(
                   icon: const Icon(Icons.videocam_outlined, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                   tooltip: 'Camera View',
-                  onSelected: _setViewPreset,
-                  itemBuilder: (context) => Cad3DViewPreset.values.map((v) {
-                    return PopupMenuItem<Cad3DViewPreset>(
-                      value: v,
+                  onSelected: (val) {
+                    if (val is Cad3DViewPreset) {
+                      _setViewPreset(val);
+                    } else if (val == 'toggle_invert_y') {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        _camera.invertY = !_camera.invertY;
+                      });
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    ...Cad3DViewPreset.values.map((v) {
+                      return PopupMenuItem<dynamic>(
+                        value: v,
+                        child: Row(
+                          children: [
+                            Icon(v.icon, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 10),
+                            Text(v.label),
+                          ],
+                        ),
+                      );
+                    }),
+                    const PopupMenuDivider(),
+                    PopupMenuItem<dynamic>(
+                      value: 'toggle_invert_y',
                       child: Row(
                         children: [
-                          Icon(v.icon, size: 18, color: theme.colorScheme.primary),
+                          Icon(
+                            _camera.invertY ? Icons.swap_vert_rounded : Icons.swap_vert_outlined,
+                            size: 18,
+                            color: theme.colorScheme.primary,
+                          ),
                           const SizedBox(width: 10),
-                          Text(v.label),
+                          const Text('Invert Up/Down (Y)'),
+                          const Spacer(),
+                          if (_camera.invertY)
+                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
                         ],
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ],
+                ),
+
+                // Model Color / Material Menu
+                PopupMenuButton<Color?>(
+                  icon: const Icon(Icons.format_paint_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  tooltip: 'Model Color',
+                  onSelected: (c) => setState(() => _customModelColor = c),
+                  itemBuilder: (context) => [
+                    PopupMenuItem<Color?>(
+                      value: null,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: _theme.defaultMeshColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey, width: 1),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text('Theme Default'),
+                          if (_customModelColor == null) ...[
+                            const Spacer(),
+                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                          ],
+                        ],
+                      ),
+                    ),
+                    ...[
+                      ('CAD Blue', const Color(0xFF3B82F6)),
+                      ('Titanium Silver', const Color(0xFFCBD5E1)),
+                      ('Steel Slate', const Color(0xFF94A3B8)),
+                      ('Studio White', const Color(0xFFF8FAFC)),
+                      ('Amber Gold', const Color(0xFFF59E0B)),
+                      ('Cyber Cyan', const Color(0xFF06B6D4)),
+                      ('Emerald Green', const Color(0xFF10B981)),
+                      ('Crimson Red', const Color(0xFFEF4444)),
+                      ('Graphite Charcoal', const Color(0xFF475569)),
+                    ].map((entry) {
+                      final (name, col) = entry;
+                      return PopupMenuItem<Color?>(
+                        value: col,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: col,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.grey, width: 1),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(name),
+                            if (_customModelColor == col) ...[
+                              const Spacer(),
+                              Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                            ],
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
                 ),
 
                 // Shading Mode Menu
@@ -558,22 +697,29 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
           return Stack(
             children: [
-              // 3D Gesture Detector & Canvas
-              GestureDetector(
-                onScaleStart: _onScaleStart,
-                onScaleUpdate: _onScaleUpdate,
-                onScaleEnd: _onScaleEnd,
-                onDoubleTap: _resetView,
-                child: CustomPaint(
-                  size: Size(constraints.maxWidth, constraints.maxHeight),
-                  painter: Cad3DMeshPainter(
-                    mesh: _mesh!,
-                    camera: _camera,
-                    shadingMode: _shadingMode,
-                    theme: _theme,
-                    showBoundingBox: _showBoundingBox,
-                    showGrid: _showGrid,
-                    isInteracting: _isInteracting,
+              // 3D Viewport with Mouse Wheel Zoom & Gestures
+              Listener(
+                onPointerSignal: _handlePointerSignal,
+                onPointerDown: _handlePointerDown,
+                onPointerMove: _handlePointerMove,
+                onPointerUp: _handlePointerUp,
+                child: GestureDetector(
+                  onScaleStart: _onScaleStart,
+                  onScaleUpdate: _onScaleUpdate,
+                  onScaleEnd: _onScaleEnd,
+                  onDoubleTap: _resetView,
+                  child: CustomPaint(
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: Cad3DMeshPainter(
+                      mesh: _mesh!,
+                      camera: _camera,
+                      shadingMode: _shadingMode,
+                      theme: _theme,
+                      showBoundingBox: _showBoundingBox,
+                      showGrid: _showGrid,
+                      customModelColor: _customModelColor,
+                      isInteracting: _isInteracting,
+                    ),
                   ),
                 ),
               ),
