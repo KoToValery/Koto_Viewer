@@ -366,11 +366,15 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
             },
           ),
           children: [
-            // Base Layer: OpenTopoMap
+            // Base Layer: Configurable (OpenTopoMap, OpenStreetMap, CyclOSM)
             TileLayer(
-              urlTemplate: 'https://tile.opentopomap.org/{z}/{x}/{y}.png',
+              key: ValueKey(_layersSettings.baseMap),
+              urlTemplate: _layersSettings.baseMap.urlTemplate,
+              subdomains: _layersSettings.baseMap.subdomains,
+              fallbackUrl: _layersSettings.baseMap.fallbackUrl,
+              maxZoom: _layersSettings.baseMap.maxZoom,
+              evictErrorTileStrategy: EvictErrorTileStrategy.dispose,
               userAgentPackageName: 'com.koto.kotoviewer',
-              maxZoom: 17,
             ),
 
             // Overlay Layer: Waymarked Trails (Hiking)
@@ -399,21 +403,21 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
               markers: _buildMarkers(doc),
             ),
 
-            // Mandatory OpenTopoMap & OSM Attribution
-            const Align(
+            // Mandatory License & Attribution banner
+            Align(
               alignment: Alignment.bottomRight,
               child: Padding(
-                padding: EdgeInsets.only(bottom: 90, right: 8),
+                padding: const EdgeInsets.only(bottom: 90, right: 8),
                 child: DecoratedBox(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Color(0xCCFFFFFF),
                     borderRadius: BorderRadius.all(Radius.circular(4)),
                   ),
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     child: Text(
-                      '© OpenStreetMap, SRTM | © OpenTopoMap (CC-BY-SA)',
-                      style: TextStyle(fontSize: 9, color: Colors.black87),
+                      _buildAttributionText(),
+                      style: const TextStyle(fontSize: 9, color: Colors.black87),
                     ),
                   ),
                 ),
@@ -466,6 +470,14 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
         ),
       ],
     );
+  }
+
+  String _buildAttributionText() {
+    final buffer = StringBuffer(_layersSettings.baseMap.attribution);
+    if (_layersSettings.showHikingTrails || _layersSettings.showCyclingTrails) {
+      buffer.write(' | Trails: © Waymarked Trails (CC-BY-SA)');
+    }
+    return buffer.toString();
   }
 
   List<Polyline> _buildPolylines(GeoRouteDocument doc) {

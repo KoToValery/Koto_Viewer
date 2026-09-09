@@ -1,12 +1,72 @@
 import 'package:flutter/material.dart';
 
+enum BaseMapType {
+  openTopoMap(
+    displayName: 'OpenTopoMap',
+    description: 'Topographic contours, hillshading & peaks',
+    icon: Icons.terrain_rounded,
+    iconColor: Color(0xFF15803D),
+    urlTemplate: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    subdomains: ['a', 'b', 'c'],
+    fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    maxZoom: 17,
+    attribution: '© OpenStreetMap, SRTM | © OpenTopoMap (CC-BY-SA)',
+  ),
+  openStreetMap(
+    displayName: 'OpenStreetMap',
+    description: 'Standard OSM, fast global CDN & reliable',
+    icon: Icons.map_rounded,
+    iconColor: Color(0xFF2563EB),
+    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    subdomains: [],
+    fallbackUrl: null,
+    maxZoom: 19,
+    attribution: '© OpenStreetMap contributors',
+  ),
+  cyclOsm(
+    displayName: 'CyclOSM / Outdoor',
+    description: 'Cycleways, hiking paths & contour lines',
+    icon: Icons.directions_bike_rounded,
+    iconColor: Color(0xFFD97706),
+    urlTemplate: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+    subdomains: ['a', 'b', 'c'],
+    fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    maxZoom: 18,
+    attribution: '© OpenStreetMap contributors | Style: © CyclOSM',
+  );
+
+  final String displayName;
+  final String description;
+  final IconData icon;
+  final Color iconColor;
+  final String urlTemplate;
+  final List<String> subdomains;
+  final String? fallbackUrl;
+  final double maxZoom;
+  final String attribution;
+
+  const BaseMapType({
+    required this.displayName,
+    required this.description,
+    required this.icon,
+    required this.iconColor,
+    required this.urlTemplate,
+    required this.subdomains,
+    this.fallbackUrl,
+    required this.maxZoom,
+    required this.attribution,
+  });
+}
+
 class RouteLayersSettings {
+  final BaseMapType baseMap;
   final bool showHikingTrails;
   final bool showCyclingTrails;
   final double trackWidth;
   final double trackOpacity;
 
   const RouteLayersSettings({
+    this.baseMap = BaseMapType.openTopoMap,
     this.showHikingTrails = true,
     this.showCyclingTrails = false,
     this.trackWidth = 4.0,
@@ -14,12 +74,14 @@ class RouteLayersSettings {
   });
 
   RouteLayersSettings copyWith({
+    BaseMapType? baseMap,
     bool? showHikingTrails,
     bool? showCyclingTrails,
     double? trackWidth,
     double? trackOpacity,
   }) {
     return RouteLayersSettings(
+      baseMap: baseMap ?? this.baseMap,
       showHikingTrails: showHikingTrails ?? this.showHikingTrails,
       showCyclingTrails: showCyclingTrails ?? this.showCyclingTrails,
       trackWidth: trackWidth ?? this.trackWidth,
@@ -125,41 +187,80 @@ class _RouteLayersSheetState extends State<RouteLayersSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-
-            // Base Map Info Banner
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                ),
+            Text(
+              'Base Map Layer',
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.terrain_rounded, size: 20, color: Color(0xFF15803D)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            const SizedBox(height: 8),
+
+            // Base Map Options
+            ...BaseMapType.values.map((type) {
+              final isSelected = _current.baseMap == type;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: InkWell(
+                  onTap: () => _update(_current.copyWith(baseMap: type)),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                          : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.grey.shade50),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : (isDark ? Colors.white12 : Colors.grey.shade300),
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        const Text(
-                          'Base: OpenTopoMap',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        CircleAvatar(
+                          radius: 15,
+                          backgroundColor: type.iconColor.withValues(alpha: 0.15),
+                          child: Icon(type.icon, size: 18, color: type.iconColor),
                         ),
-                        Text(
-                          'Topographic contours, hillshading, peaks & mountain relief',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                type.displayName,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                type.description,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                          size: 20,
+                          color: isSelected ? theme.colorScheme.primary : Colors.grey,
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
 
             // 1. Hiking Trails Switch
             SwitchListTile.adaptive(
