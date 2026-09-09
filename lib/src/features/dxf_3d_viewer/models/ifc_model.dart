@@ -99,6 +99,8 @@ class IfcModel {
         return const Color(0xFF5A626A);
       case 'furniture':
         return const Color(0xFF4E7D96);
+      case 'site':
+        return const Color(0xFF8DA385);
       default:
         return const Color(0xFF94A3B8);
     }
@@ -128,6 +130,8 @@ class IfcModel {
         return Icons.fence_rounded;
       case 'furniture':
         return Icons.chair_rounded;
+      case 'site':
+        return Icons.landscape_rounded;
       default:
         return Icons.domain_rounded;
     }
@@ -136,6 +140,7 @@ class IfcModel {
   /// Converts the visible elements of the IFC model into a renderable 3D Mesh.
   Mesh3D toMesh3D() {
     final List<Triangle3D> visibleTriangles = [];
+    final List<Vector3> framingPoints = [];
 
     for (final element in elements) {
       if (hiddenStoreys.contains(element.storeyName)) continue;
@@ -143,11 +148,23 @@ class IfcModel {
       if (element.layer.isNotEmpty && hiddenLayers.contains(element.layer)) continue;
 
       visibleTriangles.addAll(element.triangles);
+      if (element.category != 'Site') {
+        for (final t in element.triangles) {
+          framingPoints.add(t.v0);
+          framingPoints.add(t.v1);
+          framingPoints.add(t.v2);
+        }
+      }
     }
+
+    final bounds = framingPoints.isNotEmpty
+        ? BoundingBox3D.fromPoints(framingPoints)
+        : null;
 
     return Mesh3D(
       name: projectName,
       triangles: visibleTriangles,
+      bounds: bounds,
     );
   }
 

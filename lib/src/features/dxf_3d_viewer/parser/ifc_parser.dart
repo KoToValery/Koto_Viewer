@@ -198,6 +198,7 @@ class _IfcGeometrySolver {
   final Map<int, Vector3> pointCache = {};
   final Map<int, _Transform3D> placementCache = {};
   final Map<int, Color> itemToStyledColor = {};
+  final Map<int, Color> materialToStyledColor = {};
   final Map<int, Color> elementToMaterialColor = {};
 
   _IfcGeometrySolver({required this.entityMap});
@@ -271,7 +272,25 @@ class _IfcGeometrySolver {
       }
     }
 
-    // 2.3. Parse Material Associations (IFCRELASSOCIATESMATERIAL -> IFCMATERIAL / LAYERSET / LIST)
+    // 2.3. Parse Material Definition Representations (IFCMATERIALDEFINITIONREPRESENTATION)
+    // Maps IFCMATERIAL -> IFCSTYLEDREPRESENTATION -> IFCSTYLEDITEM -> IFCSURFACESTYLE -> IFCCOLOURRGB
+    for (final ent in entityMap.values) {
+      if (ent.type == 'IFCMATERIALDEFINITIONREPRESENTATION') {
+        final params = ent.splitParams;
+        if (params.length >= 4) {
+          final repsParam = params[2];
+          final matId = int.tryParse(params[3].replaceAll(RegExp(r'[#\s]'), ''));
+          if (matId != null) {
+            final color = _resolveStyleColorFromParam(repsParam);
+            if (color != null) {
+              materialToStyledColor[matId] = color;
+            }
+          }
+        }
+      }
+    }
+
+    // 2.4. Parse Material Associations (IFCRELASSOCIATESMATERIAL -> IFCMATERIAL / LAYERSET / LIST)
     for (final ent in entityMap.values) {
       if (ent.type == 'IFCRELASSOCIATESMATERIAL') {
         final params = ent.splitParams;
@@ -368,18 +387,36 @@ class _IfcGeometrySolver {
         name = IfcParser.decodeIfcString(params[2].replaceAll("'", ""));
       }
 
-      // Re-categorize building element proxies that fill window/door openings
-      if (ent.type == 'IFCBUILDINGELEMENTPROXY' && fillElementIds.contains(ent.id)) {
-        final lowerName = name.toLowerCase();
+      final placementId = params.length > 5 ? int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), '')) : null;
+      final shapeRepId = params.length > 6 ? int.tryParse(params[6].replaceAll(RegExp(r'[#\s]'), '')) : null;
+      final layer = _resolveElementLayer(ent.id, shapeRepId, itemToLayerName);
+
+      final lowerName = name.toLowerCase();
+      final lowerLayer = layer.toLowerCase();
+
+      // Intelligent architectural categorization:
+      if (lowerLayer.contains('покрив') || lowerLayer.contains('roof') ||
+          lowerName.contains('roof') || lowerName.contains('покрив') ||
+          lowerName.startsWith('rt ') || ent.params.toUpperCase().contains('.ROOF.')) {
+        category = 'Roof';
+      } else if (lowerLayer.contains('стълби') || lowerLayer.contains('stair') ||
+                 lowerName.contains('stair') || lowerName.contains('стълб') ||
+                 lowerName.startsWith('sf ') || lowerName.startsWith('sl ')) {
+        category = 'Stair';
+      } else if (lowerLayer.contains('обзавеждане') || lowerLayer.contains('furniture') ||
+                 lowerName.contains('furniture') || lowerName.contains('обзавеждане') ||
+                 lowerName.startsWith('fu ')) {
+        category = 'Furniture';
+      } else if (lowerLayer.contains('повърхности') || lowerLayer.contains('terrain') ||
+                 lowerLayer.contains('site') || ent.type == 'IFCSITE' || ent.type == 'IFCGEOGRAPHICELEMENT') {
+        category = 'Site';
+      } else if (ent.type == 'IFCBUILDINGELEMENTPROXY' && fillElementIds.contains(ent.id)) {
         if (lowerName.contains('door') || lowerName.contains('врата') || lowerName.contains('doo')) {
           category = 'Door';
         } else {
           category = 'Window';
         }
       }
-
-      final placementId = params.length > 5 ? int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), '')) : null;
-      final shapeRepId = params.length > 6 ? int.tryParse(params[6].replaceAll(RegExp(r'[#\s]'), '')) : null;
 
       final transform = placementId != null ? _resolvePlacement(placementId) : _Transform3D.identity;
       
@@ -397,12 +434,25 @@ class _IfcGeometrySolver {
           rawTris = _applyOpeningVoids(rawTris, openingIds);
         }
 
-        triangles.addAll(_filterDegenerateTriangles(rawTris));
+        final filteredTris = _filterDegenerateTriangles(rawTris);
+        if (category == 'Roof' || category == 'Site') {
+          for (final t in filteredTris) {
+            triangles.add(Triangle3D(
+              v0: t.v0,
+              v1: t.v1,
+              v2: t.v2,
+              normal: t.normal,
+              color: t.color,
+              isDoubleSided: true,
+            ));
+          }
+        } else {
+          triangles.addAll(filteredTris);
+        }
       }
 
       if (triangles.isNotEmpty) {
         final storeyName = elementToStoreyName[ent.id] ?? storeys.first.name;
-        final layer = _resolveElementLayer(ent.id, shapeRepId, itemToLayerName);
         categories.add(category);
 
         elements.add(IfcElement(
@@ -418,6 +468,10 @@ class _IfcGeometrySolver {
         ));
       }
     }
+
+    // Prune redundant unclipped duplicate walls (e.g. ArchiCAD phantom wall exports
+    // where an unclipped raw box was exported concurrently with a trimmed wall at the exact same location)
+    _pruneDuplicateGhostWalls(elements);
 
     // Filter out layers that do not contain any elements
     final usedLayers = elements.map((e) => e.layer.trim()).where((l) => l.isNotEmpty).toSet();
@@ -477,9 +531,10 @@ class _IfcGeometrySolver {
       case 'IFCBUILDINGELEMENTPROXY':
       case 'IFCMEMBER':
       case 'IFCPLATE':
+        return 'Generic';
       case 'IFCSITE':
       case 'IFCGEOGRAPHICELEMENT':
-        return 'Generic';
+        return 'Site';
       default:
         return null;
     }
@@ -507,8 +562,45 @@ class _IfcGeometrySolver {
         return const Color(0xFF5A626A); // Dark Metallic Gray
       case 'Furniture':
         return const Color(0xFF4E7D96); // Modern Teal / Marine
+      case 'Site':
+        return const Color(0xFF8DA385); // Natural Terrain Sage Green
       default:
         return const Color(0xFFC0C0C0);
+    }
+  }
+
+  void _pruneDuplicateGhostWalls(List<IfcElement> elements) {
+    final toRemove = <int>{};
+    final walls = elements.where((e) => e.category == 'Wall').toList();
+    for (int i = 0; i < walls.length; i++) {
+      for (int j = i + 1; j < walls.length; j++) {
+        final w1 = walls[i];
+        final w2 = walls[j];
+        if (w1.name != w2.name) continue;
+        if (w1.storeyName != w2.storeyName) continue;
+
+        final diffMinX = (w1.bounds.min.x - w2.bounds.min.x).abs();
+        final diffMaxX = (w1.bounds.max.x - w2.bounds.max.x).abs();
+        final diffMinY = (w1.bounds.min.y - w2.bounds.min.y).abs();
+        final diffMaxY = (w1.bounds.max.y - w2.bounds.max.y).abs();
+
+        if (diffMinX < 5.0 && diffMaxX < 5.0 && diffMinY < 5.0 && diffMaxY < 5.0) {
+          final overlapZ = math.min(w1.bounds.max.z, w2.bounds.max.z) - math.max(w1.bounds.min.z, w2.bounds.min.z);
+          if (overlapZ > 10.0) {
+            // Overlapping in 3D on the same storey with identical XY footprint:
+            // One is a duplicate. Suppress the unclipped raw 12-triangle box that extends higher.
+            if (w1.triangles.length == 12 && w1.bounds.max.z > w2.bounds.max.z) {
+              toRemove.add(w1.id);
+            } else if (w2.triangles.length == 12 && w2.bounds.max.z > w1.bounds.max.z) {
+              toRemove.add(w2.id);
+            }
+          }
+        }
+      }
+    }
+
+    if (toRemove.isNotEmpty) {
+      elements.removeWhere((e) => toRemove.contains(e.id));
     }
   }
 
@@ -1032,7 +1124,6 @@ class _IfcGeometrySolver {
     else if (ent.type.contains('BOOLEAN')) {
       final params = ent.splitParams;
       if (params.length >= 3) {
-        final op = params[0].toUpperCase();
         final firstId = int.tryParse(params[1].replaceAll(RegExp(r'[#\s]'), ''));
         final secondId = int.tryParse(params[2].replaceAll(RegExp(r'[#\s]'), ''));
 
@@ -1054,11 +1145,29 @@ class _IfcGeometrySolver {
                     if (planeDef != null) {
                       final agreementFlagStr = halfParams[1].trim();
                       final bool agreementFlag = agreementFlagStr == '.T.';
-                      bool keepPositiveSide = agreementFlag;
-                      if (op == '.DIFFERENCE.') {
-                        keepPositiveSide = !agreementFlag;
+                      final bool keepPositiveSide = agreementFlag;
+
+                      if (secondEnt.type == 'IFCPOLYGONALBOUNDEDHALFSPACE' && halfParams.length >= 4) {
+                        final posId = int.tryParse(halfParams[2].replaceAll(RegExp(r'[#\s]'), ''));
+                        final polyId = int.tryParse(halfParams[3].replaceAll(RegExp(r'[#\s]'), ''));
+                        if (posId != null && polyId != null) {
+                          final posPlacement = _resolveAxis2Placement3D(posId);
+                          final boundaryTransform = transform.multiply(posPlacement);
+                          final boundaryPoly = _resolveCurvePoints(polyId);
+                          if (boundaryPoly.length >= 3) {
+                            final clipped = _clipTrianglesByBoundedHalfSpace(
+                              firstTris,
+                              planeDef.origin,
+                              planeDef.normal,
+                              keepPositiveSide,
+                              boundaryPoly,
+                              boundaryTransform,
+                            );
+                            return _filterDegenerateTriangles(clipped);
+                          }
+                        }
                       }
-                      
+
                       final clipped = _clipTrianglesByPlane(firstTris, planeDef.origin, planeDef.normal, keepPositiveSide);
                       return _filterDegenerateTriangles(clipped);
                     }
@@ -1167,7 +1276,63 @@ class _IfcGeometrySolver {
     var currentTris = wallTris;
 
     for (final obb in openingOBBs) {
-      var sliced = currentTris;
+      final toSlice = <Triangle3D>[];
+      final unaffected = <Triangle3D>[];
+
+      // Calculate OBB projection ranges along its three axes
+      final minXProj = math.min(0.0, (obb.pMax - obb.pMin).dot(obb.nX));
+      final maxXProj = math.max(0.0, (obb.pMax - obb.pMin).dot(obb.nX));
+
+      final minYProj = math.min(0.0, (obb.pMax - obb.pMin).dot(obb.nY));
+      final maxYProj = math.max(0.0, (obb.pMax - obb.pMin).dot(obb.nY));
+
+      final minZProj = math.min(0.0, (obb.pMax - obb.pMin).dot(obb.nZ));
+      final maxZProj = math.max(0.0, (obb.pMax - obb.pMin).dot(obb.nZ));
+
+      const double margin = 2.0; // 2mm margin for intersection
+
+      for (final tri in currentTris) {
+        final d0x = (tri.v0 - obb.pMin).dot(obb.nX);
+        final d1x = (tri.v1 - obb.pMin).dot(obb.nX);
+        final d2x = (tri.v2 - obb.pMin).dot(obb.nX);
+        final triMinX = math.min(d0x, math.min(d1x, d2x));
+        final triMaxX = math.max(d0x, math.max(d1x, d2x));
+
+        if (triMaxX < minXProj - margin || triMinX > maxXProj + margin) {
+          unaffected.add(tri);
+          continue;
+        }
+
+        final d0y = (tri.v0 - obb.pMin).dot(obb.nY);
+        final d1y = (tri.v1 - obb.pMin).dot(obb.nY);
+        final d2y = (tri.v2 - obb.pMin).dot(obb.nY);
+        final triMinY = math.min(d0y, math.min(d1y, d2y));
+        final triMaxY = math.max(d0y, math.max(d1y, d2y));
+
+        if (triMaxY < minYProj - margin || triMinY > maxYProj + margin) {
+          unaffected.add(tri);
+          continue;
+        }
+
+        final d0z = (tri.v0 - obb.pMin).dot(obb.nZ);
+        final d1z = (tri.v1 - obb.pMin).dot(obb.nZ);
+        final d2z = (tri.v2 - obb.pMin).dot(obb.nZ);
+        final triMinZ = math.min(d0z, math.min(d1z, d2z));
+        final triMaxZ = math.max(d0z, math.max(d1z, d2z));
+
+        if (triMaxZ < minZProj - margin || triMinZ > maxZProj + margin) {
+          unaffected.add(tri);
+          continue;
+        }
+
+        toSlice.add(tri);
+      }
+
+      if (toSlice.isEmpty) {
+        continue;
+      }
+
+      var sliced = toSlice;
 
       // Slice along Z (sill and lintel)
       sliced = _sliceByPlane(sliced, obb.pMin, obb.nZ);
@@ -1204,7 +1369,8 @@ class _IfcGeometrySolver {
         }
       }
 
-      currentTris = filtered;
+      unaffected.addAll(filtered);
+      currentTris = unaffected;
     }
 
     return currentTris;
@@ -1282,12 +1448,14 @@ class _IfcGeometrySolver {
       final in2 = keepPositiveSide ? (d2 >= -eps) : (d2 <= eps);
       final inCount = (in0 ? 1 : 0) + (in1 ? 1 : 0) + (in2 ? 1 : 0);
 
-      // Check if the triangle centroid projects inside the polygon boundary
+      // Check if the triangle centroid or any vertex projects inside the polygon boundary
       final centroid = (tri.v0 + tri.v1 + tri.v2) * (1.0 / 3.0);
-      final local = centroid - bOrigin;
-      final cx = local.dot(bAxisX);
-      final cy = local.dot(bAxisY);
-      final insideBoundary = _pointInPolygon2D(cx, cy, boundaryPoly, bOrigin, bAxisX, bAxisY);
+      final cx = (centroid - bOrigin).dot(bAxisX);
+      final cy = (centroid - bOrigin).dot(bAxisY);
+      final insideBoundary = _pointInPolygon2D(cx, cy, boundaryPoly) ||
+          _pointInPolygon2D((tri.v0 - bOrigin).dot(bAxisX), (tri.v0 - bOrigin).dot(bAxisY), boundaryPoly) ||
+          _pointInPolygon2D((tri.v1 - bOrigin).dot(bAxisX), (tri.v1 - bOrigin).dot(bAxisY), boundaryPoly) ||
+          _pointInPolygon2D((tri.v2 - bOrigin).dot(bAxisX), (tri.v2 - bOrigin).dot(bAxisY), boundaryPoly);
 
       if (!insideBoundary) {
         // Triangle is outside the boundary polygon → leave it untouched
@@ -1337,19 +1505,16 @@ class _IfcGeometrySolver {
   }
 
   /// Point-in-polygon test in 2D projected space (ray casting).
-  bool _pointInPolygon2D(double px, double py, List<Vector3> worldPoly,
-      Vector3 bOrigin, Vector3 bAxisX, Vector3 bAxisY) {
+  bool _pointInPolygon2D(double px, double py, List<Vector3> poly) {
     bool inside = false;
-    int n = worldPoly.length;
+    final int n = poly.length;
     int j = n - 1;
 
     for (int i = 0; i < n; j = i++) {
-      final vi = worldPoly[i] - bOrigin;
-      final vj = worldPoly[j] - bOrigin;
-      final xi = vi.dot(bAxisX);
-      final yi = vi.dot(bAxisY);
-      final xj = vj.dot(bAxisX);
-      final yj = vj.dot(bAxisY);
+      final xi = poly[i].x;
+      final yi = poly[i].y;
+      final xj = poly[j].x;
+      final yj = poly[j].y;
 
       if (((yi > py) != (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi + 1e-10) + xi)) {
         inside = !inside;
@@ -1453,37 +1618,26 @@ class _IfcGeometrySolver {
 
   Color? _resolveStyleColorFromParam(String styleParam) {
     final styleIds = RegExp(r'#(\d+)').allMatches(styleParam).map((m) => int.parse(m.group(1)!)).toList();
-    for (final sId in styleIds) {
-      final styleEnt = entityMap[sId];
-      if (styleEnt == null) continue;
-      if (styleEnt.type == 'IFCSURFACESTYLESHADING' || styleEnt.type == 'IFCSURFACESTYLERENDERING') {
-        final c = _extractColourRgbFromParams(styleEnt.params);
+    final queue = <int>[...styleIds];
+    final visited = <int>{...styleIds};
+
+    while (queue.isNotEmpty) {
+      final currId = queue.removeAt(0);
+      final ent = entityMap[currId];
+      if (ent == null) continue;
+
+      if (ent.type == 'IFCSURFACESTYLESHADING' || ent.type == 'IFCSURFACESTYLERENDERING') {
+        final c = _extractColourRgbFromParams(ent.params);
+        if (c != null) return c;
+      } else if (ent.type == 'IFCCOLOURRGB') {
+        final c = _extractColourRgbDirect(ent.params);
         if (c != null) return c;
       }
-      for (final refId in styleEnt.referencedIds) {
-        final sub = entityMap[refId];
-        if (sub != null) {
-          if (sub.type == 'IFCSURFACESTYLESHADING' || sub.type == 'IFCSURFACESTYLERENDERING') {
-            final c = _extractColourRgbFromParams(sub.params);
-            if (c != null) return c;
-          }
-          if (sub.type == 'IFCCOLOURRGB') {
-            final c = _extractColourRgbDirect(sub.params);
-            if (c != null) return c;
-          }
-          for (final subRef in sub.referencedIds) {
-            final deep = entityMap[subRef];
-            if (deep != null) {
-              if (deep.type == 'IFCSURFACESTYLESHADING' || deep.type == 'IFCSURFACESTYLERENDERING') {
-                final c = _extractColourRgbFromParams(deep.params);
-                if (c != null) return c;
-              }
-              if (deep.type == 'IFCCOLOURRGB') {
-                final c = _extractColourRgbDirect(deep.params);
-                if (c != null) return c;
-              }
-            }
-          }
+
+      for (final refId in ent.referencedIds) {
+        if (!visited.contains(refId)) {
+          visited.add(refId);
+          queue.add(refId);
         }
       }
     }
@@ -1529,9 +1683,14 @@ class _IfcGeometrySolver {
       final queue = <int>[mId];
       final visited = <int>{mId};
       final rawNames = <String>[];
+      final matchedColors = <Color>[];
 
       while (queue.isNotEmpty) {
         final currId = queue.removeAt(0);
+        if (materialToStyledColor.containsKey(currId)) {
+          matchedColors.add(materialToStyledColor[currId]!);
+        }
+
         final matEnt = entityMap[currId];
         if (matEnt == null) continue;
 
@@ -1550,6 +1709,10 @@ class _IfcGeometrySolver {
         }
       }
 
+      if (matchedColors.isNotEmpty) {
+        return matchedColors.first;
+      }
+
       // Check materials from outside-in (usually first layer is exterior)
       for (final name in rawNames) {
         final col = _mapMaterialNameToColor(name);
@@ -1562,6 +1725,26 @@ class _IfcGeometrySolver {
   Color? _mapMaterialNameToColor(String name) {
     final lower = name.toLowerCase().trim();
     if (lower.isEmpty) return null;
+
+    // Plaster / Stucco / White Render / Facade / Insulation
+    if (lower.contains('plaster') ||
+        lower.contains('stucco') ||
+        lower.contains('render') ||
+        lower.contains('gypsum') ||
+        lower.contains('white') ||
+        lower.contains('мазилка') ||
+        lower.contains('фасада') ||
+        lower.contains('шпакловка') ||
+        lower.contains('бял') ||
+        lower.contains('eps') ||
+        lower.contains('xps') ||
+        lower.contains('изолация') ||
+        lower.contains('вата') ||
+        lower.contains('термо') ||
+        lower.contains('putz') ||
+        lower.contains('crepi')) {
+      return const Color(0xFFF4F0E8); // Clean Crisp Architectural White/Sand Plaster
+    }
 
     // Stone / Plinth / Granite
     if (lower.contains('stone') ||
@@ -1623,20 +1806,6 @@ class _IfcGeometrySolver {
       return const Color(0xFFA64032); // Terracotta Clay Roof Tile
     }
 
-    // Plaster / Stucco / White Render / Facade
-    if (lower.contains('plaster') ||
-        lower.contains('stucco') ||
-        lower.contains('render') ||
-        lower.contains('gypsum') ||
-        lower.contains('white') ||
-        lower.contains('мазилка') ||
-        lower.contains('фасада') ||
-        lower.contains('шпакловка') ||
-        lower.contains('бял') ||
-        lower.contains('putz') ||
-        lower.contains('crepi')) {
-      return const Color(0xFFF4F0E8); // Clean Crisp Architectural White/Sand Plaster
-    }
 
     // Brick
     if (lower.contains('brick') ||
@@ -2088,6 +2257,21 @@ class _IfcGeometrySolver {
         v2: cleanPts[indices[2]],
         color: color,
       ));
+    }
+
+    // Ensure all triangle face normals match the true Newell 3D polygon normal
+    final polyNorm = Vector3(nx, ny, nz).normalized();
+    for (int i = 0; i < result.length; i++) {
+      final t = result[i];
+      if (t.normal.dot(polyNorm) < 0) {
+        result[i] = Triangle3D(
+          v0: t.v0,
+          v1: t.v2,
+          v2: t.v1,
+          color: t.color,
+          isDoubleSided: t.isDoubleSided,
+        );
+      }
     }
 
     return result;

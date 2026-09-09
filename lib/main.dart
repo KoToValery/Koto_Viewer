@@ -25,6 +25,12 @@ import 'src/features/cdr_viewer/cdr_viewer_screen.dart';
 import 'src/features/comic_viewer/comic_viewer_screen.dart';
 import 'src/features/ebook_viewer/ebook_viewer_screen.dart';
 import 'src/features/route_viewer/route_viewer_screen.dart';
+import 'src/features/code_viewer/code_viewer_screen.dart';
+import 'src/features/lottie_viewer/lottie_viewer_screen.dart';
+import 'src/features/font_viewer/font_viewer_screen.dart';
+import 'src/features/image_viewer/image_viewer_screen.dart';
+import 'src/features/csv_viewer/csv_viewer_screen.dart';
+import 'src/features/jupyter_viewer/jupyter_viewer_screen.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -140,6 +146,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.iges:
       case KotoFileType.ifc:
       case KotoFileType.fbx:
+      case KotoFileType.threeMf:
         navigator.push(
           MaterialPageRoute(builder: (_) => Dxf3DViewerScreen(filePath: filePath)),
         );
@@ -154,6 +161,18 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.txt:
         navigator.push(
           MaterialPageRoute(builder: (_) => TextViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.csv:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => CsvViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.jupyter:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => JupyterViewerScreen(filePath: filePath)),
         );
         break;
 
@@ -232,6 +251,31 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
       case KotoFileType.geojson:
         navigator.push(
           MaterialPageRoute(builder: (_) => RouteViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.code:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => CodeViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.lottie:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => LottieViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.font:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => FontViewerScreen(filePath: filePath)),
+        );
+        break;
+
+      case KotoFileType.ico:
+      case KotoFileType.psd:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => ImageViewerScreen(filePath: filePath)),
         );
         break;
 

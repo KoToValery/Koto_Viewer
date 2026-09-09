@@ -170,11 +170,13 @@ class FileSourceService {
         lower.endsWith('.gltf') ||
         lower.endsWith('.glb') ||
         lower.endsWith('.fbx') ||
+        lower.endsWith('.3mf') ||
         lower.endsWith('.xlsx') ||
         lower.endsWith('.xls') ||
         lower.endsWith('.txt') ||
         lower.endsWith('.log') ||
         lower.endsWith('.csv') ||
+        lower.endsWith('.tsv') ||
         lower.endsWith('.md') ||
         lower.endsWith('.markdown') ||
         lower.endsWith('.docx') ||
@@ -226,7 +228,52 @@ class FileSourceService {
         lower.endsWith('.gpx') ||
         lower.endsWith('.kml') ||
         lower.endsWith('.kmz') ||
-        lower.endsWith('.geojson');
+        lower.endsWith('.geojson') ||
+        lower.endsWith('.lottie') ||
+        lower.endsWith('.ttf') ||
+        lower.endsWith('.otf') ||
+        lower.endsWith('.woff') ||
+        lower.endsWith('.woff2') ||
+        lower.endsWith('.ico') ||
+        lower.endsWith('.psd') ||
+        lower.endsWith('.psb') ||
+        lower.endsWith('.dart') ||
+        lower.endsWith('.js') ||
+        lower.endsWith('.mjs') ||
+        lower.endsWith('.ts') ||
+        lower.endsWith('.tsx') ||
+        lower.endsWith('.py') ||
+        lower.endsWith('.pyw') ||
+        lower.endsWith('.java') ||
+        lower.endsWith('.kt') ||
+        lower.endsWith('.kts') ||
+        lower.endsWith('.swift') ||
+        lower.endsWith('.cpp') ||
+        lower.endsWith('.cc') ||
+        lower.endsWith('.cxx') ||
+        lower.endsWith('.c') ||
+        lower.endsWith('.h') ||
+        lower.endsWith('.hpp') ||
+        lower.endsWith('.cs') ||
+        lower.endsWith('.go') ||
+        lower.endsWith('.rs') ||
+        lower.endsWith('.php') ||
+        lower.endsWith('.rb') ||
+        lower.endsWith('.sh') ||
+        lower.endsWith('.bash') ||
+        lower.endsWith('.ps1') ||
+        lower.endsWith('.css') ||
+        lower.endsWith('.html') ||
+        lower.endsWith('.htm') ||
+        lower.endsWith('.json') ||
+        lower.endsWith('.xml') ||
+        lower.endsWith('.yaml') ||
+        lower.endsWith('.yml') ||
+        lower.endsWith('.toml') ||
+        lower.endsWith('.ini') ||
+        lower.endsWith('.env') ||
+        lower.endsWith('.sql') ||
+        lower.endsWith('.proto');
   }
 
   static List<String> getSafePublicDirectoryPaths() {

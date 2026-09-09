@@ -60,6 +60,15 @@ class BoundingBox3D {
   double get maxDimension => math.max(sizeX, math.max(sizeY, sizeZ));
   double get diagonal => math.sqrt(sizeX * sizeX + sizeY * sizeY + sizeZ * sizeZ);
 
+  bool intersects(BoundingBox3D other) {
+    return min.x <= other.max.x &&
+        max.x >= other.min.x &&
+        min.y <= other.max.y &&
+        max.y >= other.min.y &&
+        min.z <= other.max.z &&
+        max.z >= other.min.z;
+  }
+
   static BoundingBox3D fromPoints(List<Vector3> points) {
     if (points.isEmpty) {
       return const BoundingBox3D(min: Vector3.zero, max: Vector3.zero);
@@ -92,6 +101,7 @@ class Triangle3D {
   final Vector3 v2;
   final Vector3 normal;
   final Color? color;
+  final bool isDoubleSided;
 
   Triangle3D({
     required this.v0,
@@ -99,6 +109,7 @@ class Triangle3D {
     required this.v2,
     Vector3? normal,
     this.color,
+    this.isDoubleSided = false,
   }) : normal = normal ?? _calculateNormal(v0, v1, v2);
 
   static Vector3 _calculateNormal(Vector3 a, Vector3 b, Vector3 c) {

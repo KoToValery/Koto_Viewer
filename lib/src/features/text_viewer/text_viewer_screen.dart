@@ -7,6 +7,8 @@ import 'package:kotoview/src/core/services/recent_files_service.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 import 'package:kotoview/src/core/services/reading_progress_service.dart';
 
+enum LogLevelFilter { all, error, warn, info, debug }
+
 /// Text Viewer Screen for .txt, .log, .csv, and coordinate files.
 class TextViewerScreen extends StatefulWidget {
   final String filePath;
@@ -25,6 +27,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
   String _fullText = '';
   List<String> _lines = [];
+
+  LogLevelFilter _logLevelFilter = LogLevelFilter.all;
 
   // Options
   bool _showLineNumbers = false; // User requested to default off
@@ -48,6 +52,38 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   final ScrollController _horizontalScrollController = ScrollController();
 
   String get _fileName => widget.filePath.split(Platform.pathSeparator).last;
+
+  bool get _isLogFile {
+    if (_fileName.toLowerCase().endsWith('.log')) return true;
+    int count = 0;
+    for (final line in _lines) {
+      final l = line.toUpperCase();
+      if (l.contains('ERROR') || l.contains('WARN') || l.contains('INFO') || l.contains('DEBUG')) {
+        count++;
+        if (count >= 5) return true;
+      }
+    }
+    return false;
+  }
+
+  List<String> get _filteredLines {
+    if (!_isLogFile || _logLevelFilter == LogLevelFilter.all) return _lines;
+    return _lines.where((line) {
+      final l = line.toUpperCase();
+      switch (_logLevelFilter) {
+        case LogLevelFilter.error:
+          return l.contains('ERROR') || l.contains('FATAL');
+        case LogLevelFilter.warn:
+          return l.contains('WARN');
+        case LogLevelFilter.info:
+          return l.contains('INFO');
+        case LogLevelFilter.debug:
+          return l.contains('DEBUG') || l.contains('TRACE');
+        default:
+          return true;
+      }
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -291,8 +327,9 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
-        for (int i = 0; i < _lines.length; i++) {
-          if (_lines[i].toLowerCase().contains(q)) {
+        final currentLines = _filteredLines;
+        for (int i = 0; i < currentLines.length; i++) {
+          if (currentLines[i].toLowerCase().contains(q)) {
             _matchedLineIndices.add(i);
           }
         }
@@ -385,7 +422,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
               const Divider(height: 24),
               _buildInfoRow('File Name:', _fileName),
               _buildInfoRow('File Size:', formattedSize),
-              _buildInfoRow('Total Lines:', '${_lines.length} lines'),
+              _buildInfoRow('Total Lines:', _isLogFile && _logLevelFilter != LogLevelFilter.all ? '${_filteredLines.length} / ${_lines.length} lines' : '${_lines.length} lines'),
               _buildInfoRow('Total Words:', '$wordCount words'),
               _buildInfoRow('Total Characters:', '${_fullText.length} chars'),
               _buildInfoRow('Detected Encoding:', _encodingName),
@@ -436,6 +473,47 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     });
   }
 
+  Widget _buildLogFilterBar() {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: LogLevelFilter.values.map((filter) {
+          final isSelected = _logLevelFilter == filter;
+          String label;
+          switch (filter) {
+            case LogLevelFilter.all: label = 'All'; break;
+            case LogLevelFilter.error: label = 'ERROR'; break;
+            case LogLevelFilter.warn: label = 'WARN'; break;
+            case LogLevelFilter.info: label = 'INFO'; break;
+            case LogLevelFilter.debug: label = 'DEBUG'; break;
+          }
+          return Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ChoiceChip(
+              label: Text(label),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    _logLevelFilter = filter;
+                    // Reset search since lines changed
+                    _matchedLineIndices.clear();
+                    _currentMatchIndex = -1;
+                    if (_searchQuery.isNotEmpty) {
+                      _onSearchChanged(_searchQuery); // Re-run search
+                    }
+                  });
+                }
+              },
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -447,6 +525,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     final fontStyle = _isMonospace
         ? GoogleFonts.firaCode(fontSize: _fontSize, height: 1.45)
         : TextStyle(fontSize: _fontSize, height: 1.45);
+
+    final currentLines = _filteredLines;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -637,6 +717,8 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                 )
               : Column(
                   children: [
+                    if (_isLogFile) _buildLogFilterBar(),
+
                     // Search Match Status Bar with Next/Prev
                     if (_searchQuery.isNotEmpty)
                       Container(
@@ -684,9 +766,10 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                               ? ListView.builder(
                                   controller: _verticalScrollController,
                                   padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
-                                  itemCount: _lines.length,
+                                  itemCount: currentLines.length,
                                   itemBuilder: (context, index) => _buildLineItem(
                                     index,
+                                    currentLines[index],
                                     fontStyle,
                                     lineGutterColor,
                                     gutterBg,
@@ -703,9 +786,10 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                       child: ListView.builder(
                                         controller: _verticalScrollController,
                                         padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
-                                        itemCount: _lines.length,
+                                        itemCount: currentLines.length,
                                         itemBuilder: (context, index) => _buildLineItem(
                                           index,
+                                          currentLines[index],
                                           fontStyle,
                                           lineGutterColor,
                                           gutterBg,
@@ -743,22 +827,34 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
   Widget _buildLineItem(
     int index,
+    String lineText,
     TextStyle fontStyle,
     Color lineGutterColor,
     Color gutterBg,
   ) {
-    final lineText = _lines[index];
     final isCurrentMatch = _matchedLineIndices.isNotEmpty &&
         _currentMatchIndex >= 0 &&
         _matchedLineIndices[_currentMatchIndex] == index;
     final isMatch = _matchedLineIndices.contains(index);
+
+    Color? lineBgColor;
+    if (_isLogFile) {
+      final l = lineText.toUpperCase();
+      if (l.contains('ERROR') || l.contains('FATAL')) {
+        lineBgColor = Colors.red.withValues(alpha: 0.15);
+      } else if (l.contains('WARN') || l.contains('WARNING')) {
+        lineBgColor = Colors.orange.withValues(alpha: 0.15);
+      } else if (l.contains('DEBUG') || l.contains('TRACE')) {
+        lineBgColor = Colors.blue.withValues(alpha: 0.08);
+      }
+    }
 
     return Container(
       color: isCurrentMatch
           ? const Color(0xFFFFD54F).withValues(alpha: 0.45)
           : isMatch
               ? const Color(0xFFFFD54F).withValues(alpha: 0.2)
-              : null,
+              : lineBgColor,
       padding: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

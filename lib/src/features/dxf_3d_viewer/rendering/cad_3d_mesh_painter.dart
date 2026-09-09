@@ -134,6 +134,14 @@ class Cad3DMeshPainter extends CustomPainter {
       final viewNormal = edge1.cross(edge2);
       final bool isBackface = viewNormal.y >= 0;
 
+      // Backface Culling for closed solids in opaque shading modes
+      if (isBackface &&
+          !tri.isDoubleSided &&
+          shadingMode != Cad3DShadingMode.wireframe &&
+          shadingMode != Cad3DShadingMode.xray) {
+        continue;
+      }
+
       // Centroid depth in view space (larger Y is further away)
       final avgDepth = (tv0.y + tv1.y + tv2.y) / 3.0;
 

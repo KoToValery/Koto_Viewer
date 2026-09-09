@@ -13,12 +13,14 @@ import 'parser/glb_gltf_parser.dart';
 import 'parser/step_parser.dart';
 import 'parser/iges_parser.dart';
 import 'parser/ifc_parser.dart';
+import 'parser/fbx_parser.dart';
+import 'parser/three_mf_parser.dart';
 import 'widgets/ifc_bim_sheet.dart';
 import 'rendering/cad_3d_camera.dart';
 import 'rendering/cad_3d_mesh_painter.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
 
-/// Interactive 3D CAD & Model Viewer Screen for STL, OBJ, GLTF, GLB, STEP, and IGES files.
+/// Interactive 3D CAD & Model Viewer Screen for STL, OBJ, GLTF, GLB, STEP, IGES, IFC, and FBX files.
 class Dxf3DViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
@@ -95,17 +97,29 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         mesh = await ObjParser.parseFromFile(widget.filePath);
       } else if (lower.endsWith('.glb') || lower.endsWith('.gltf')) {
         mesh = await GlbGltfParser.parseFromFile(widget.filePath);
+      } else if (lower.endsWith('.fbx')) {
+        mesh = await FbxParser.parseFromFile(widget.filePath);
+      } else if (lower.endsWith('.3mf')) {
+        mesh = await ThreeMfParser.parseFromFile(widget.filePath);
       } else {
-        // Fallback: try STEP -> STL -> OBJ
+        // Fallback: try FBX -> STEP -> STL -> OBJ
         try {
-          mesh = await StepParser.parseFromFile(widget.filePath);
+          mesh = await FbxParser.parseFromFile(widget.filePath);
         } catch (_) {
           try {
-            mesh = await StlParser.parseFromFile(widget.filePath);
+            mesh = await StepParser.parseFromFile(widget.filePath);
           } catch (_) {
-            mesh = await ObjParser.parseFromFile(widget.filePath);
+            try {
+              mesh = await StlParser.parseFromFile(widget.filePath);
+            } catch (_) {
+              mesh = await ObjParser.parseFromFile(widget.filePath);
+            }
           }
         }
+      }
+
+      if (mesh.triangles.isEmpty) {
+        throw const FormatException('No 3D mesh geometry found in model file');
       }
 
       // Record in recent files

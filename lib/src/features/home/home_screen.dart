@@ -26,6 +26,12 @@ import '../cdr_viewer/cdr_viewer_screen.dart';
 import '../comic_viewer/comic_viewer_screen.dart';
 import '../ebook_viewer/ebook_viewer_screen.dart';
 import '../route_viewer/route_viewer_screen.dart';
+import '../code_viewer/code_viewer_screen.dart';
+import '../lottie_viewer/lottie_viewer_screen.dart';
+import '../font_viewer/font_viewer_screen.dart';
+import '../image_viewer/image_viewer_screen.dart';
+import '../csv_viewer/csv_viewer_screen.dart';
+import '../jupyter_viewer/jupyter_viewer_screen.dart';
 import 'widgets/share_options_sheet.dart';
 import 'widgets/app_info_dialog.dart';
 
@@ -89,6 +95,8 @@ class FileTypeIcon extends StatelessWidget {
       case KotoFileType.ifc:
       case KotoFileType.fbx:
         return _buildIfcIcon();
+      case KotoFileType.threeMf:
+        return _buildThreeMfIcon();
       case KotoFileType.zip:
         return _buildZipIcon();
       case KotoFileType.cbz:
@@ -107,9 +115,268 @@ class FileTypeIcon extends StatelessWidget {
         return _buildKmzIcon();
       case KotoFileType.geojson:
         return _buildGeoJsonIcon();
-      case KotoFileType.other:
+      case KotoFileType.code:
+        return _buildCodeIcon();
+      case KotoFileType.lottie:
+        return _buildLottieIcon();
+      case KotoFileType.font:
+        return _buildFontIcon();
+      case KotoFileType.ico:
+        return _buildIcoIcon();
+      case KotoFileType.psd:
+        return _buildPsdIcon();
+      case KotoFileType.csv:
+        return _buildCsvIcon();
+      case KotoFileType.jupyter:
+        return _buildJupyterIcon();
+      default:
         return _buildGenericIcon();
     }
+  }
+
+  Widget _buildCsvIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF86EFAC)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.grid_on_rounded,
+              color: const Color(0xFF16A34A),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'CSV',
+              style: TextStyle(
+                fontSize: width * 0.2,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF16A34A),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildJupyterIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.science_rounded,
+              color: const Color(0xFFD97706),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'IPYNB',
+              style: TextStyle(
+                fontSize: width * 0.16,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFD97706),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCodeIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.code_rounded,
+              color: const Color(0xFF94A3B8),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'CODE',
+              style: TextStyle(
+                fontSize: width * 0.16,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF94A3B8),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLottieIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3E8FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFD8B4FE)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.animation_rounded,
+              color: const Color(0xFF9333EA),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'LOTTIE',
+              style: TextStyle(
+                fontSize: width * 0.14,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF9333EA),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFontIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0E7FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFC7D2FE)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.font_download_rounded,
+              color: const Color(0xFF4F46E5),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'FONT',
+              style: TextStyle(
+                fontSize: width * 0.16,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF4F46E5),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIcoIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFDBEAFE),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF93C5FD)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.web_asset_rounded,
+              color: const Color(0xFF2563EB),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'ICO',
+              style: TextStyle(
+                fontSize: width * 0.16,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF2563EB),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPsdIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDE9FE),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFC4B5FD)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.photo_filter_rounded,
+              color: const Color(0xFF7C3AED),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'PSD',
+              style: TextStyle(
+                fontSize: width * 0.16,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF7C3AED),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEpubIcon() {
@@ -137,6 +404,41 @@ class FileTypeIcon extends StatelessWidget {
                 fontSize: width * 0.16,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFFD97706),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThreeMfIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F7FA),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFB2EBF2)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.view_in_ar_rounded,
+              color: const Color(0xFF00ACC1),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              '3MF',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF00ACC1),
                 letterSpacing: 0.5,
                 height: 1,
               ),
@@ -1626,6 +1928,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case KotoFileType.iges:
       case KotoFileType.ifc:
       case KotoFileType.fbx:
+      case KotoFileType.threeMf:
         final bool? success = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => Dxf3DViewerScreen(filePath: resolvedPath),
@@ -1658,6 +1961,32 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
         if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.csv:
+        final bool? successCsv = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => CsvViewerScreen(filePath: resolvedPath),
+          ),
+        );
+        if (successCsv != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.jupyter:
+        final bool? successJupyter = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => JupyterViewerScreen(filePath: resolvedPath),
+          ),
+        );
+        if (successJupyter != false) {
           await RecentFilesService.addRecentFile(item);
         } else {
           await RecentFilesService.removeRecentFile(filePath);
@@ -1816,7 +2145,60 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         break;
 
-      case KotoFileType.other:
+      case KotoFileType.code:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => CodeViewerScreen(filePath: resolvedPath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.lottie:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => LottieViewerScreen(filePath: resolvedPath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.font:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => FontViewerScreen(filePath: resolvedPath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      case KotoFileType.ico:
+      case KotoFileType.psd:
+        final bool? success = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => ImageViewerScreen(filePath: resolvedPath),
+          ),
+        );
+        if (success != false) {
+          await RecentFilesService.addRecentFile(item);
+        } else {
+          await RecentFilesService.removeRecentFile(filePath);
+        }
+        break;
+
+      default:
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Unsupported format.')));
