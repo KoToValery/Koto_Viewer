@@ -142,9 +142,11 @@ class Cad3DMeshPainter extends CustomPainter {
       if (maxY < -margin) continue;
 
       // Perspective-accurate 2D screen backface culling:
-      // In Flutter canvas space (X right, Y down), front-facing triangles have cross2d > 0.
+      // Perspective-accurate 2D screen backface culling:
+      // In Flutter canvas space (X right, Y down where screenY = centerY - sz*scale),
+      // front-facing triangles have cross2d < 0, and back-facing triangles have cross2d >= 0.
       final cross2d = (p1.dx - p0.dx) * (p2.dy - p0.dy) - (p1.dy - p0.dy) * (p2.dx - p0.dx);
-      final bool isBackface = cross2d <= 0;
+      final bool isBackface = cross2d >= 0;
       final bool isTransparent = (tri.color != null && tri.color!.a < 0.99);
 
       // Backface Culling for closed solids in opaque shading modes
