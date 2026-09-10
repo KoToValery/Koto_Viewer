@@ -126,23 +126,6 @@ class Cad3DMeshPainter extends CustomPainter {
       final tv1 = camera.transformPoint(v1Local);
       final tv2 = camera.transformPoint(v2Local);
 
-      // Fast view-space normal calculation
-      final edge1 = tv1 - tv0;
-      final edge2 = tv2 - tv0;
-      final viewNormal = edge1.cross(edge2);
-      final bool isBackface = viewNormal.y >= 0;
-
-      // Backface Culling for closed solids in opaque shading modes
-      if (isBackface &&
-          !tri.isDoubleSided &&
-          shadingMode != Cad3DShadingMode.wireframe &&
-          shadingMode != Cad3DShadingMode.xray) {
-        continue;
-      }
-
-      // Centroid depth in view space (larger Y is further away)
-      final avgDepth = (tv0.y + tv1.y + tv2.y) / 3.0;
-
       // Project vertices to 2D screen coordinates
       final p0 = camera.projectToScreen(tv0, size, modelScale);
       final p1 = camera.projectToScreen(tv1, size, modelScale);
@@ -157,6 +140,29 @@ class Cad3DMeshPainter extends CustomPainter {
       if (minY > screenH + margin) continue;
       final maxY = math.max(p0.dy, math.max(p1.dy, p2.dy));
       if (maxY < -margin) continue;
+
+      // Perspective-accurate 2D screen backface culling:
+      // In Flutter canvas space (X right, Y down), front-facing triangles have cross2d > 0.
+      final cross2d = (p1.dx - p0.dx) * (p2.dy - p0.dy) - (p1.dy - p0.dy) * (p2.dx - p0.dx);
+      final bool isBackface = cross2d <= 0;
+      final bool isTransparent = (tri.color != null && tri.color!.a < 0.99);
+
+      // Backface Culling for closed solids in opaque shading modes
+      if (isBackface &&
+          !tri.isDoubleSided &&
+          !isTransparent &&
+          shadingMode != Cad3DShadingMode.wireframe &&
+          shadingMode != Cad3DShadingMode.xray) {
+        continue;
+      }
+
+      // Fast view-space normal calculation for lighting
+      final edge1 = tv1 - tv0;
+      final edge2 = tv2 - tv0;
+      final viewNormal = edge1.cross(edge2);
+
+      // Centroid depth in view space (larger Y is further away)
+      final avgDepth = (tv0.y + tv1.y + tv2.y) / 3.0;
 
       // Multi-source lighting calculation:
       // Determine effective normal facing toward the camera (two-sided lighting)

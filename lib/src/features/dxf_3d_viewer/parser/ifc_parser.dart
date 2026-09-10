@@ -435,19 +435,23 @@ class _IfcGeometrySolver {
         }
 
         final filteredTris = _filterDegenerateTriangles(rawTris);
-        if (category == 'Roof' || category == 'Site') {
-          for (final t in filteredTris) {
+        for (final t in filteredTris) {
+          final bool makeDoubleSided = category == 'Roof' ||
+              category == 'Site' ||
+              (t.color != null && t.color!.a < 0.99) ||
+              t.isDoubleSided;
+          if (makeDoubleSided != t.isDoubleSided) {
             triangles.add(Triangle3D(
               v0: t.v0,
               v1: t.v1,
               v2: t.v2,
               normal: t.normal,
               color: t.color,
-              isDoubleSided: true,
+              isDoubleSided: makeDoubleSided,
             ));
+          } else {
+            triangles.add(t);
           }
-        } else {
-          triangles.addAll(filteredTris);
         }
       }
 
@@ -1508,6 +1512,7 @@ class _IfcGeometrySolver {
       // 2. Discard all sub-triangles whose centroid lies inside the oriented box
       const double eps = 0.5; // 0.5mm tolerance
       final filtered = <Triangle3D>[];
+      final discarded = <Triangle3D>[];
       for (final tri in sliced) {
         final c = (tri.v0 + tri.v1 + tri.v2) * (1.0 / 3.0);
         
@@ -1525,6 +1530,102 @@ class _IfcGeometrySolver {
                              dzMin >= -eps && dzMax <= eps);
         if (!inside) {
           filtered.add(tri);
+        } else {
+          discarded.add(tri);
+        }
+      }
+
+      // 3. Generate inner reveal surfaces (sill, lintel, left jamb, right jamb)
+      // connecting the wall's front and back surfaces across the opening cutout.
+      if (discarded.isNotEmpty) {
+        double dMinX = double.infinity, dMaxX = -double.infinity;
+        double dMinY = double.infinity, dMaxY = -double.infinity;
+
+        for (final tri in discarded) {
+          for (final v in [tri.v0, tri.v1, tri.v2]) {
+            final px = (v - obb.pMin).dot(obb.nX);
+            final py = (v - obb.pMin).dot(obb.nY);
+            if (px < dMinX) dMinX = px;
+            if (px > dMaxX) dMaxX = px;
+            if (py < dMinY) dMinY = py;
+            if (py > dMaxY) dMaxY = py;
+          }
+        }
+
+        final spanX = dMaxX - dMinX;
+        final spanY = dMaxY - dMinY;
+
+        // The through-wall (thickness) axis has the smaller wall span
+        final bool xIsThroughWall = spanX < spanY;
+        final Vector3 tAxis = xIsThroughWall ? obb.nX : obb.nY;
+        final Vector3 jAxis = xIsThroughWall ? obb.nY : obb.nX;
+        final double tWallMin = xIsThroughWall ? dMinX : dMinY;
+        final double tWallMax = xIsThroughWall ? dMaxX : dMaxY;
+        final double jMin = xIsThroughWall ? minYProj : minXProj;
+        final double jMax = xIsThroughWall ? maxYProj : maxXProj;
+        final double zMin = minZProj;
+        final double zMax = maxZProj;
+
+        if (tWallMax - tWallMin > 1.0 && jMax - jMin > 1.0 && zMax - zMin > 1.0) {
+          final wallColor = wallTris.first.color;
+
+          void addQuad(Vector3 v0, Vector3 v1, Vector3 v2, Vector3 v3, Vector3 desiredNormal) {
+            // Tri 1: v0, v1, v2
+            final n1 = (v1 - v0).cross(v2 - v0);
+            if (n1.dot(desiredNormal) >= 0) {
+              filtered.add(Triangle3D(v0: v0, v1: v1, v2: v2, color: wallColor));
+            } else {
+              filtered.add(Triangle3D(v0: v0, v1: v2, v2: v1, color: wallColor));
+            }
+
+            // Tri 2: v0, v2, v3
+            final n2 = (v2 - v0).cross(v3 - v0);
+            if (n2.dot(desiredNormal) >= 0) {
+              filtered.add(Triangle3D(v0: v0, v1: v2, v2: v3, color: wallColor));
+            } else {
+              filtered.add(Triangle3D(v0: v0, v1: v3, v2: v2, color: wallColor));
+            }
+          }
+
+          Vector3 pt(double j, double t, double z) {
+            return obb.pMin + jAxis * j + tAxis * t + obb.nZ * z;
+          }
+
+          // Lintel (underside of wall above opening, facing downward into opening)
+          addQuad(
+            pt(jMin, tWallMin, zMax),
+            pt(jMax, tWallMin, zMax),
+            pt(jMax, tWallMax, zMax),
+            pt(jMin, tWallMax, zMax),
+            -obb.nZ,
+          );
+
+          // Sill (top surface of wall below opening, facing upward into opening)
+          addQuad(
+            pt(jMin, tWallMin, zMin),
+            pt(jMax, tWallMin, zMin),
+            pt(jMax, tWallMax, zMin),
+            pt(jMin, tWallMax, zMin),
+            obb.nZ,
+          );
+
+          // Left Jamb (at jMin, facing into opening toward jMax)
+          addQuad(
+            pt(jMin, tWallMin, zMin),
+            pt(jMin, tWallMax, zMin),
+            pt(jMin, tWallMax, zMax),
+            pt(jMin, tWallMin, zMax),
+            jAxis,
+          );
+
+          // Right Jamb (at jMax, facing into opening toward jMin)
+          addQuad(
+            pt(jMax, tWallMin, zMin),
+            pt(jMax, tWallMax, zMin),
+            pt(jMax, tWallMax, zMax),
+            pt(jMax, tWallMin, zMax),
+            -jAxis,
+          );
         }
       }
 
@@ -1884,8 +1985,18 @@ class _IfcGeometrySolver {
       if (ent == null) continue;
 
       if (ent.type == 'IFCSURFACESTYLESHADING' || ent.type == 'IFCSURFACESTYLERENDERING') {
-        final c = _extractColourRgbFromParams(ent.params);
-        if (c != null) return c;
+        var c = _extractColourRgbFromParams(ent.params);
+        if (c != null) {
+          final params = ent.splitParams;
+          if (params.length > 1) {
+            final t = double.tryParse(params[1].trim());
+            if (t != null && t > 0.0) {
+              final alpha = ((1.0 - t.clamp(0.0, 1.0)) * 255).round().clamp(10, 255);
+              c = c.withAlpha(alpha);
+            }
+          }
+          return c;
+        }
       } else if (ent.type == 'IFCCOLOURRGB') {
         final c = _extractColourRgbDirect(ent.params);
         if (c != null) return c;

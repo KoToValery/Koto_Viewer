@@ -673,6 +673,27 @@ END-ISO-10303-21;
           }
         }
       }
+      final windows = model.elements.where((e) => e.category == 'Window').toList();
+      if (windows.isNotEmpty) {
+        // Verify window glass transparency and doubleSided
+        final win = windows.first;
+        final glassTris = win.triangles.where((t) => (t.color?.a ?? 1.0) < 0.99).toList();
+        expect(glassTris.isNotEmpty, isTrue);
+        for (final t in glassTris) {
+          expect(t.isDoubleSided, isTrue);
+        }
+      }
+
+      // Verify Wall 178 has generated inner reveals
+      final w178List = walls.where((e) => e.id == 178).toList();
+      if (w178List.isNotEmpty) {
+        final w178 = w178List.first;
+        // Triangles with normal (0, 0, -1) for lintel and (0, 1, 0) / (0, -1, 0) for jambs
+        final lintelTris = w178.triangles.where((t) => t.normal.z < -0.9 && (t.v0.z - 2400.0).abs() < 0.1).toList();
+        final jambTris = w178.triangles.where((t) => t.normal.y.abs() > 0.9).toList();
+        expect(lintelTris.isNotEmpty, isTrue);
+        expect(jambTris.isNotEmpty, isTrue);
+      }
     });
   });
 }
