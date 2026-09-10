@@ -1809,9 +1809,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final stat = await file.stat();
     // Use original filePath as the item identity (SAF URI or real path),
     // but resolvedPath for actual file access.
-    final name = filePath.contains('/')
-        ? filePath.split('/').where((s) => s.isNotEmpty).last
-        : filePath.split(Platform.pathSeparator).last;
+    // Use resolvedPath for the display name so that SAF-cached files
+    // (content:// URIs) get their real filename (e.g. "Dockerfile", "script.sh")
+    // rather than the opaque encoded document-ID from the SAF URI.
+    final name = resolvedPath.contains('/')
+        ? resolvedPath.split('/').where((s) => s.isNotEmpty).last
+        : resolvedPath.split(Platform.pathSeparator).last;
 
     final item = PdfItem(
       path: filePath,

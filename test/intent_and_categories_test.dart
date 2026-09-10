@@ -79,5 +79,18 @@ void main() {
       final searchFiles = items.where((f) => f.name.toLowerCase().contains('engine')).toList();
       expect(searchFiles.length, equals(2)); // engine.step and engine_spec.pdf
     });
+
+    test('Dockerfile detection and support', () {
+      final now = DateTime.now();
+      final docker1 = PdfItem(path: '/cache/Dockerfile', name: 'Dockerfile', sizeInBytes: 100, lastOpened: now);
+      final docker2 = PdfItem(path: '/cache/docker-compose.yml', name: 'docker-compose.yml', sizeInBytes: 100, lastOpened: now);
+      final docker3 = PdfItem(path: '/cache/Dockerfile.prod', name: 'Dockerfile.prod', sizeInBytes: 100, lastOpened: now);
+      final docker4 = PdfItem(path: '/cache/test.dockerfile', name: 'test.dockerfile', sizeInBytes: 100, lastOpened: now);
+
+      expect(docker1.fileType, equals(KotoFileType.code));
+      expect(docker2.fileType, equals(KotoFileType.code));
+      expect(docker3.fileType, equals(KotoFileType.code));
+      expect(docker4.fileType, equals(KotoFileType.code));
+    });
   });
 }

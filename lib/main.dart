@@ -96,7 +96,9 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
     }
 
     final file = File(filePath);
-    final fileName = filePath.split(Platform.pathSeparator).last;
+    final fileName = filePath.contains('/')
+        ? filePath.split('/').where((s) => s.isNotEmpty).last
+        : filePath.split(Platform.pathSeparator).last;
     final size = file.existsSync() ? file.lengthSync() : 0;
 
     final item = PdfItem(

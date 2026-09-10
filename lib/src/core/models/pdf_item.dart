@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 enum FileCategory {
   all,
@@ -144,15 +145,32 @@ class PdfItem {
     if (lower.endsWith('.psd') || lower.endsWith('.psb')) return KotoFileType.psd;
     if (lower.endsWith('.dcm') || lower.endsWith('.dicom')) return KotoFileType.dicom;
     
-    // --- Docker files (matched by name, not extension) ---
-    if (lower == 'dockerfile' ||
-        lower.startsWith('dockerfile.') ||
-        lower.endsWith('.dockerfile') ||
-        lower == '.dockerignore' ||
-        lower == 'docker-compose.yml' ||
-        lower == 'docker-compose.yaml' ||
-        (lower.startsWith('docker-compose.') &&
-            (lower.endsWith('.yml') || lower.endsWith('.yaml')))) {
+    // --- Docker files (matched by filename, not extension) ---
+    final baseName = (name.contains('/')
+            ? name.split('/').where((s) => s.isNotEmpty).last
+            : (name.contains(Platform.pathSeparator)
+                ? name.split(Platform.pathSeparator).last
+                : name))
+        .toLowerCase();
+    final basePath = (path.contains('/')
+            ? path.split('/').where((s) => s.isNotEmpty).last
+            : (path.contains(Platform.pathSeparator)
+                ? path.split(Platform.pathSeparator).last
+                : path))
+        .toLowerCase();
+
+    bool isDocker(String str) {
+      return str == 'dockerfile' ||
+          str.startsWith('dockerfile.') ||
+          str.endsWith('.dockerfile') ||
+          str == '.dockerignore' ||
+          str == 'docker-compose.yml' ||
+          str == 'docker-compose.yaml' ||
+          (str.startsWith('docker-compose.') &&
+              (str.endsWith('.yml') || str.endsWith('.yaml')));
+    }
+
+    if (isDocker(baseName) || isDocker(basePath) || isDocker(lower)) {
       return KotoFileType.code;
     }
 

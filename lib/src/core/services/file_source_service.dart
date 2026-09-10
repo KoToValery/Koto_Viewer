@@ -155,6 +155,35 @@ class FileSourceService {
   }
 
   static bool isSupportedFile(String path) {
+    final rawName = path.contains('/')
+        ? path.split('/').where((s) => s.isNotEmpty).last
+        : (path.contains(Platform.pathSeparator)
+            ? path.split(Platform.pathSeparator).last
+            : path);
+    final nameLower = rawName.toLowerCase();
+
+    // --- Docker files ---
+    if (nameLower == 'dockerfile' ||
+        nameLower.startsWith('dockerfile.') ||
+        nameLower.endsWith('.dockerfile') ||
+        nameLower == '.dockerignore' ||
+        nameLower == 'docker-compose.yml' ||
+        nameLower == 'docker-compose.yaml' ||
+        (nameLower.startsWith('docker-compose.') &&
+            (nameLower.endsWith('.yml') || nameLower.endsWith('.yaml')))) {
+      return true;
+    }
+
+    final testItem = PdfItem(
+      path: path,
+      name: rawName,
+      sizeInBytes: 0,
+      lastOpened: DateTime.fromMillisecondsSinceEpoch(0),
+    );
+    if (testItem.fileType != KotoFileType.other) {
+      return true;
+    }
+
     final lower = path.toLowerCase();
     return lower.endsWith('.pdf') ||
         lower.endsWith('.epub') ||
