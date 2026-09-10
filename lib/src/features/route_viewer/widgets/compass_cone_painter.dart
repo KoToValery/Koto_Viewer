@@ -7,11 +7,13 @@ import 'package:flutter/material.dart';
 /// 3. A luminous directional field-of-view (FOV) cone pointing in the heading direction.
 class UserLocationMarker extends StatelessWidget {
   final double? heading; // In degrees (0 = North)
+  final double? accuracy;
   final double size;
 
   const UserLocationMarker({
     super.key,
     this.heading,
+    this.accuracy,
     this.size = 80.0,
   });
 
@@ -21,7 +23,10 @@ class UserLocationMarker extends StatelessWidget {
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _CompassConePainter(heading: heading),
+        painter: _CompassConePainter(
+          heading: heading,
+          accuracy: accuracy,
+        ),
       ),
     );
   }
@@ -29,8 +34,9 @@ class UserLocationMarker extends StatelessWidget {
 
 class _CompassConePainter extends CustomPainter {
   final double? heading;
+  final double? accuracy;
 
-  _CompassConePainter({this.heading});
+  _CompassConePainter({this.heading, this.accuracy});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -39,7 +45,8 @@ class _CompassConePainter extends CustomPainter {
     // 1. Draw Field-of-View Cone if heading is available
     if (heading != null) {
       final double radHeading = (heading! - 90) * (math.pi / 180.0); // Offset so 0° is North (Up)
-      const double fovAngle = 55.0 * (math.pi / 180.0); // 55 degree beam width
+      final bool isUnreliable = accuracy == null || accuracy! > 35.0;
+      final double fovAngle = (isUnreliable ? 85.0 : 55.0) * (math.pi / 180.0);
       final double coneRadius = size.width * 0.46;
 
       final Path conePath = Path()
@@ -52,12 +59,12 @@ class _CompassConePainter extends CustomPainter {
         )
         ..close();
 
-      // Cone gradient: bright blue at origin, fading out softly
+      // Cone gradient: bright blue at origin, fading out softly (wider/gentler when uncalibrated)
       final Paint conePaint = Paint()
         ..shader = RadialGradient(
           colors: [
-            const Color(0xFF2563EB).withValues(alpha: 0.45),
-            const Color(0xFF38BDF8).withValues(alpha: 0.15),
+            const Color(0xFF2563EB).withValues(alpha: isUnreliable ? 0.28 : 0.45),
+            const Color(0xFF38BDF8).withValues(alpha: isUnreliable ? 0.10 : 0.15),
             const Color(0xFF38BDF8).withValues(alpha: 0.0),
           ],
           stops: const [0.0, 0.65, 1.0],

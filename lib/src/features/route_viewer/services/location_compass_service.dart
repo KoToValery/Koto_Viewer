@@ -103,13 +103,62 @@ class LocationCompassService {
     }
   }
 
-  /// Stream compass heading events (0-360 degrees).
-  static Stream<double?>? getCompassStream() {
+  /// Stream compass events with deadband filtering to prevent jitter and excessive rebuilds.
+  /// Only emits when heading changes by at least [minDeltaDegrees] (default: 2.5°).
+  static Stream<CompassHeadingData>? getFilteredCompassStream({
+    double minDeltaDegrees = 2.5,
+  }) {
     try {
-      return FlutterCompass.events?.map((event) => event.heading);
+      double? lastEmittedHeading;
+      return FlutterCompass.events
+          ?.where((event) => event.heading != null)
+          .where((event) {
+            final double current = event.heading!;
+            if (lastEmittedHeading == null) {
+              lastEmittedHeading = current;
+              return true;
+            }
+            double diff = (current - lastEmittedHeading!).abs();
+            if (diff > 180.0) diff = 360.0 - diff;
+            if (diff >= minDeltaDegrees) {
+              lastEmittedHeading = current;
+              return true;
+            }
+            return false;
+          })
+          .map((event) => CompassHeadingData(
+                heading: event.heading!,
+                accuracy: event.accuracy,
+              ));
+    } catch (e) {
+      debugPrint('Error getting filtered compass stream: $e');
+      return null;
+    }
+  }
+
+  /// Stream compass heading events (0-360 degrees) with deadband filtering.
+  static Stream<double?>? getCompassStream({double minDeltaDegrees = 2.5}) {
+    try {
+      return getFilteredCompassStream(minDeltaDegrees: minDeltaDegrees)
+          ?.map((data) => data.heading);
     } catch (e) {
       debugPrint('Error getting compass stream: $e');
       return null;
     }
   }
+}
+
+/// Represents compass heading and sensor accuracy.
+class CompassHeadingData {
+  final double heading;
+  final double? accuracy;
+
+  const CompassHeadingData({
+    required this.heading,
+    this.accuracy,
+  });
+
+  /// On Android, accuracy == null indicates SENSOR_STATUS_UNRELIABLE (-1).
+  /// On iOS, accuracy > 35 degrees indicates low/poor calibration.
+  bool get isUnreliable => accuracy == null || accuracy! > 35.0;
 }

@@ -11,6 +11,7 @@ import 'parser/geojson_parser.dart';
 import 'parser/gpx_parser.dart';
 import 'parser/kml_parser.dart';
 import 'services/location_compass_service.dart';
+import 'widgets/compass_calibration_dialog.dart';
 import 'widgets/compass_cone_painter.dart';
 import 'widgets/route_info_sheet.dart';
 import 'widgets/route_layers_sheet.dart';
@@ -43,10 +44,21 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
   // Location & Compass state
   Position? _currentPosition;
   double? _currentHeading;
+  double? _compassAccuracy;
+  bool _hasShownCalibrationPrompt = false;
   bool _isLocationActive = false;
   bool _followUser = false;
   StreamSubscription<Position>? _positionSub;
-  StreamSubscription<double?>? _compassSub;
+  StreamSubscription<CompassHeadingData>? _compassSub;
+
+  bool get _isCompassUnreliable =>
+      _compassAccuracy == null || _compassAccuracy! > 35.0;
+
+  bool get _isBulgarian {
+    final code = Localizations.maybeLocaleOf(context)?.languageCode ??
+        WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    return code.toLowerCase() == 'bg';
+  }
 
   @override
   void initState() {
@@ -209,13 +221,50 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
       }
     });
 
-    // Compass heading
-    _compassSub = LocationCompassService.getCompassStream()?.listen((heading) {
+    // Compass heading with deadband filtering (minDeltaDegrees: 2.5) to avoid excessive setState
+    _compassSub = LocationCompassService.getFilteredCompassStream(minDeltaDegrees: 2.5)?.listen((data) {
       if (!mounted) return;
-      if (heading != null) {
-        setState(() => _currentHeading = heading);
+      setState(() {
+        _currentHeading = data.heading;
+        _compassAccuracy = data.accuracy;
+      });
+
+      // Prompt calibration if sensor is unreliable and user hasn't been notified yet this session
+      if (data.isUnreliable && !_hasShownCalibrationPrompt) {
+        _hasShownCalibrationPrompt = true;
+        _showCalibrationSnackbar();
       }
     });
+  }
+
+  void _showCalibrationSnackbar() {
+    if (!mounted) return;
+    final isBg = _isBulgarian;
+
+    final message = isBg
+        ? 'Компасът е ненадежден. Нужна е калибровка.'
+        : 'Compass sensor is unreliable. Calibration needed.';
+    final actionLabel = isBg ? 'Калибрирай' : 'Calibrate';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.sync_problem_rounded, color: Colors.amberAccent, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        duration: const Duration(seconds: 7),
+        action: SnackBarAction(
+          label: actionLabel,
+          textColor: Colors.amberAccent,
+          onPressed: () => CompassCalibrationDialog.show(context),
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   void _stopLocationTracking() {
@@ -228,6 +277,8 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
         _isLocationActive = false;
         _followUser = false;
         _currentPosition = null;
+        _currentHeading = null;
+        _compassAccuracy = null;
       });
     }
   }
@@ -457,6 +508,18 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
                 iconColor: _isLocationActive ? Colors.white : null,
                 onPressed: _toggleLocation,
               ),
+
+              // Calibration button when sensor is uncalibrated
+              if (_isLocationActive && _isCompassUnreliable) ...[
+                const SizedBox(height: 10),
+                _buildFloatingButton(
+                  icon: Icons.sync_problem_rounded,
+                  tooltip: _isBulgarian ? 'Калибриране на компаса' : 'Calibrate Compass',
+                  color: Colors.amber.shade700,
+                  iconColor: Colors.white,
+                  onPressed: () => CompassCalibrationDialog.show(context),
+                ),
+              ],
             ],
           ),
         ),
@@ -588,7 +651,17 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
           point: userLatLng,
           width: 80,
           height: 80,
-          child: UserLocationMarker(heading: _currentHeading),
+          child: GestureDetector(
+            onTap: () {
+              if (_isCompassUnreliable) {
+                CompassCalibrationDialog.show(context);
+              }
+            },
+            child: UserLocationMarker(
+              heading: _currentHeading,
+              accuracy: _compassAccuracy,
+            ),
+          ),
         ),
       );
     }
