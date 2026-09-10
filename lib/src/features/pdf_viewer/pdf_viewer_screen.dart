@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
 import '../home/widgets/share_options_sheet.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
+import 'models/pdf_reflow_models.dart';
+import 'services/pdf_text_extractor_service.dart';
+import 'widgets/pdf_reflow_view.dart';
 
 /// PDF Document Viewer Screen with Single Page Mode (Swipe) and Continuous Scroll,
 /// 2-row header navigation, reading progress auto-save & resume, bookmarks,
@@ -45,6 +49,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _hasRestoredPage = false;
   int? _savedPageToRestore;
 
+  // Reflow / E-Book Reading Mode
+  bool _isReflowMode = false;
+  PdfReflowSettings _reflowSettings = const PdfReflowSettings();
+  late final PdfTextExtractorService _textExtractorService;
+
   // Page zoom controllers for Single Page Mode
   final Map<int, TransformationController> _pageTransformControllers = {};
 
@@ -54,18 +63,52 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     _fileName = widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
     _documentRef = PdfDocumentRefFile(widget.filePath);
     _singlePageController = PageController(initialPage: _currentPage - 1);
+    _textExtractorService = PdfTextExtractorService(filePath: widget.filePath);
     _pdfController.addListener(_onControllerChanged);
     _loadProgressAndSaveRecent();
+    _loadReflowSettings();
   }
 
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _pageTransformControllers.clear();
+    _textExtractorService.clearMemoryCache();
     _saveReadingProgress();
     _pdfController.removeListener(_onControllerChanged);
     _singlePageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadReflowSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final fontSize = prefs.getDouble('pdf_reflow_font_size') ?? 17.0;
+      final themeIndex = prefs.getInt('pdf_reflow_theme') ?? PdfReflowTheme.sepia.index;
+      final fontIndex = prefs.getInt('pdf_reflow_font') ?? PdfReflowFont.serif.index;
+      final isContinuous = prefs.getBool('pdf_reflow_is_continuous') ?? false;
+
+      if (mounted) {
+        setState(() {
+          _reflowSettings = PdfReflowSettings(
+            fontSize: fontSize.clamp(12.0, 32.0),
+            theme: PdfReflowTheme.values.elementAtOrNull(themeIndex) ?? PdfReflowTheme.sepia,
+            font: PdfReflowFont.values.elementAtOrNull(fontIndex) ?? PdfReflowFont.serif,
+            isContinuous: isContinuous,
+          );
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveReflowSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('pdf_reflow_font_size', _reflowSettings.fontSize);
+      await prefs.setInt('pdf_reflow_theme', _reflowSettings.theme.index);
+      await prefs.setInt('pdf_reflow_font', _reflowSettings.font.index);
+      await prefs.setBool('pdf_reflow_is_continuous', _reflowSettings.isContinuous);
+    } catch (_) {}
   }
 
   Future<void> _loadProgressAndSaveRecent() async {
@@ -600,6 +643,26 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
+  void _toggleReflowMode() {
+    setState(() {
+      _isReflowMode = !_isReflowMode;
+      _currentZoom = 1.0;
+    });
+
+    if (!_isReflowMode) {
+      if (_isSinglePageMode) {
+        _singlePageController.dispose();
+        _singlePageController = PageController(initialPage: _currentPage - 1);
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _pdfController.isReady) {
+            _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center);
+          }
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -629,7 +692,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   ),
                   if (_pageCount > 0)
                     Text(
-                      'Page $_currentPage of $_pageCount • ${_isSinglePageMode ? "Single Page" : "Continuous"}',
+                      'Page $_currentPage of $_pageCount • ${_isReflowMode ? "Reading Mode (Reflow)" : (_isSinglePageMode ? "Single Page" : "Continuous")}',
                       style: TextStyle(
                         fontSize: 11.5,
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
@@ -656,6 +719,19 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
+                        // Reading Mode / Reflow Toggle (E-Book Experience)
+                        IconButton(
+                          icon: Icon(
+                            _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
+                            size: 20,
+                            color: _isReflowMode ? theme.colorScheme.primary : null,
+                          ),
+                          tooltip: _isReflowMode
+                              ? 'Exit Reading Mode (Back to Original PDF)'
+                              : 'Reading Mode (Reflow / E-Book)',
+                          onPressed: _toggleReflowMode,
+                        ),
+
                         // View Mode Toggle (Single Page vs Continuous Scroll)
                         IconButton(
                           icon: Icon(
@@ -740,7 +816,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       body: Stack(
         children: [
           ColorFiltered(
-            colorFilter: _isDarkModeView
+            colorFilter: _isDarkModeView && !_isReflowMode
                 ? const ColorFilter.matrix([
                     -1.0, 0.0, 0.0, 0.0, 255.0,
                     0.0, -1.0, 0.0, 0.0, 255.0,
@@ -748,13 +824,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     0.0, 0.0, 0.0, 1.0, 0.0,
                   ])
                 : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-            child: _isSinglePageMode
-                ? _buildSinglePageView()
-                : _buildContinuousView(),
+            child: _isReflowMode
+                ? _buildReflowView()
+                : (_isSinglePageMode
+                    ? _buildSinglePageView()
+                    : _buildContinuousView()),
           ),
 
-          // Floating Zoom Controls (Offset above system safe area)
-          if (!_isFullscreen)
+          // Floating Zoom Controls (Offset above system safe area) - only in standard PDF mode
+          if (!_isFullscreen && !_isReflowMode)
             Positioned(
               bottom: 16 + MediaQuery.paddingOf(context).bottom,
               right: 16,
@@ -781,8 +859,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
                 icon: _isPresentation ? Icons.slideshow_rounded : Icons.picture_as_pdf_rounded,
                 accentColor: _isPresentation ? const Color(0xFFD24726) : const Color(0xFFE53935),
-                loadingTitle: _isPresentation ? 'Зареждане на презентация...' : 'Зареждане на PDF документ...',
-                statusMessage: 'Подготовка и анализиране на страниците...',
+                loadingTitle: _isPresentation ? 'Loading presentation...' : 'Loading PDF document...',
+                statusMessage: 'Preparing and analyzing pages...',
                 onCancel: () => Navigator.of(context).pop(false),
               ),
             ),
@@ -841,6 +919,62 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
+  /// Reading Mode (Reflow): Responsive e-book experience with OCR support for scanned pages
+  Widget _buildReflowView() {
+    return PdfDocumentViewBuilder(
+      documentRef: _documentRef,
+      builder: (context, document) {
+        if (document == null) {
+          return ViewerLoadingScreen(
+            fileName: _fileName,
+            fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
+            icon: Icons.auto_stories,
+            accentColor: const Color(0xFF2563EB),
+            loadingTitle: 'Loading document for reading...',
+            statusMessage: 'Extracting and preparing pages...',
+            onCancel: () => Navigator.of(context).pop(false),
+          );
+        }
+
+        if (_pageCount != document.pages.length) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _pageCount = document.pages.length;
+              });
+            }
+          });
+        }
+
+        return PdfReflowView(
+          document: document,
+          currentPage: _currentPage,
+          onPageChanged: (newPage) {
+            setState(() {
+              _currentPage = newPage;
+            });
+            _saveReadingProgress();
+            _checkBookmarkStatus();
+          },
+          onToggleControls: _toggleFullscreen,
+          onExitReflow: () {
+            setState(() {
+              _isReflowMode = false;
+            });
+          },
+          extractorService: _textExtractorService,
+          settings: _reflowSettings,
+          onSettingsChanged: (newSettings) {
+            setState(() {
+              _reflowSettings = newSettings;
+            });
+            _saveReflowSettings();
+          },
+        );
+      },
+    );
+  }
+
   /// Single Page Mode: Exactly 1 page on screen with swipe page-turning and pinch-to-zoom
   Widget _buildSinglePageView() {
     return PdfDocumentViewBuilder(
@@ -852,8 +986,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
             icon: _isPresentation ? Icons.slideshow_rounded : Icons.picture_as_pdf_rounded,
             accentColor: _isPresentation ? const Color(0xFFD24726) : const Color(0xFFE53935),
-            loadingTitle: _isPresentation ? 'Зареждане на презентация...' : 'Зареждане на PDF документ...',
-            statusMessage: 'Подготовка и анализиране на страниците...',
+            loadingTitle: _isPresentation ? 'Loading presentation...' : 'Loading PDF document...',
+            statusMessage: 'Preparing and analyzing pages...',
             onCancel: () => Navigator.of(context).pop(false),
           );
         }
