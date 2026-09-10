@@ -2451,22 +2451,26 @@ class _IfcGeometrySolver {
         return false; // Reflex or collinear
       }
 
-      // Check if any other remaining vertex lies inside triangle ABC
+      // Check if any other remaining vertex lies inside or on the boundary of triangle ABC
       for (final idx in curIndices) {
         if (idx == prevIdx || idx == earIdx || idx == nextIdx) continue;
         final p = poly2d[idx];
+
+        // Seam duplicate vertices at identical coordinates don't invalidate the ear
+        final dSqA = (p.x - a.x) * (p.x - a.x) + (p.y - a.y) * (p.y - a.y);
+        final dSqB = (p.x - b.x) * (p.x - b.x) + (p.y - b.y) * (p.y - b.y);
+        final dSqC = (p.x - c.x) * (p.x - c.x) + (p.y - c.y) * (p.y - c.y);
+        if (dSqA < 1e-6 || dSqB < 1e-6 || dSqC < 1e-6) continue;
 
         final cp1 = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
         final cp2 = (c.x - b.x) * (p.y - b.y) - (c.y - b.y) * (p.x - b.x);
         final cp3 = (a.x - c.x) * (p.y - c.y) - (a.y - c.y) * (p.x - c.x);
 
-        // Use a strict inequality with a small epsilon so that points exactly ON 
-        // the edge (like a seam for a cut-out hole) do not invalidate the ear.
-        final eps = 1e-6;
+        const eps = 1e-6;
         if (ccw) {
-          if (cp1 > eps && cp2 > eps && cp3 > eps) return false;
+          if (cp1 >= -eps && cp2 >= -eps && cp3 >= -eps) return false;
         } else {
-          if (cp1 < -eps && cp2 < -eps && cp3 < -eps) return false;
+          if (cp1 <= eps && cp2 <= eps && cp3 <= eps) return false;
         }
       }
 
