@@ -43,7 +43,6 @@ class _RenderTriangle {
   final Offset p2;
   final double depth;
   final Color color;
-  final bool isBackface;
 
   const _RenderTriangle({
     required this.p0,
@@ -51,7 +50,6 @@ class _RenderTriangle {
     required this.p2,
     required this.depth,
     required this.color,
-    required this.isBackface,
   });
 }
 
@@ -141,22 +139,6 @@ class Cad3DMeshPainter extends CustomPainter {
       final maxY = math.max(p0.dy, math.max(p1.dy, p2.dy));
       if (maxY < -margin) continue;
 
-      // Perspective-accurate 2D screen backface culling:
-      // Perspective-accurate 2D screen backface culling:
-      // In Flutter canvas space (X right, Y down where screenY = centerY - sz*scale),
-      // front-facing triangles have cross2d < 0, and back-facing triangles have cross2d >= 0.
-      final cross2d = (p1.dx - p0.dx) * (p2.dy - p0.dy) - (p1.dy - p0.dy) * (p2.dx - p0.dx);
-      final bool isBackface = cross2d >= 0;
-      final bool isTransparent = (tri.color != null && tri.color!.a < 0.99);
-
-      // Backface Culling for closed solids in opaque shading modes
-      if (isBackface &&
-          !tri.isDoubleSided &&
-          !isTransparent &&
-          shadingMode != Cad3DShadingMode.wireframe &&
-          shadingMode != Cad3DShadingMode.xray) {
-        continue;
-      }
 
       // Fast view-space normal calculation for lighting
       final edge1 = tv1 - tv0;
@@ -231,7 +213,6 @@ class Cad3DMeshPainter extends CustomPainter {
         p2: p2,
         depth: avgDepth,
         color: faceColor,
-        isBackface: isBackface,
       ));
     }
 

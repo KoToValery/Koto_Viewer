@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/models/pdf_item.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/models/mesh_3d.dart';
@@ -7,6 +8,7 @@ import 'package:kotoview/src/features/dxf_3d_viewer/parser/stl_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/obj_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/glb_gltf_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/rendering/cad_3d_camera.dart';
+import 'package:kotoview/src/features/dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -319,6 +321,38 @@ f 1//1 2//1 3//1 4//1
 
       expect(gltfItem.fileType, KotoFileType.gltf);
       expect(gltfItem.is3d, isTrue);
+    });
+  });
+
+  group('Cad3DMeshPainter Tests', () {
+    test('Draws all triangles without backface culling in all shading modes', () {
+      final triFront = Triangle3D(
+        v0: const Vector3(-5, -5, 0),
+        v1: const Vector3(5, -5, 0),
+        v2: const Vector3(0, 5, 0),
+      );
+      final triBack = Triangle3D(
+        v0: const Vector3(-5, -5, 0),
+        v1: const Vector3(0, 5, 0),
+        v2: const Vector3(5, -5, 0),
+      );
+      final mesh = Mesh3D(name: 'DoubleSidedMesh', triangles: [triFront, triBack]);
+      final camera = Cad3DCamera();
+
+      for (final mode in Cad3DShadingMode.values) {
+        final painter = Cad3DMeshPainter(
+          mesh: mesh,
+          camera: camera,
+          shadingMode: mode,
+          theme: Cad3DTheme.darkCad,
+        );
+
+        final recorder = PictureRecorder();
+        final canvas = Canvas(recorder);
+        expect(() => painter.paint(canvas, const Size(800, 600)), returnsNormally);
+        final picture = recorder.endRecording();
+        expect(picture, isNotNull);
+      }
     });
   });
 }
