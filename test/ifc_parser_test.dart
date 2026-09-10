@@ -585,14 +585,21 @@ END-ISO-10303-21;
       final slab = model.elements.first;
 
       expect(slab.triangles.isNotEmpty, isTrue);
+      // Closed 3D slabs have isDoubleSided = false so backface culling prevents bottom cap from artifacting over top cap
       for (final t in slab.triangles) {
-        expect(t.isDoubleSided, isTrue);
+        expect(t.isDoubleSided, isFalse);
       }
 
       final topTris = slab.triangles.where((t) => t.v0.z > 0.29 && t.v1.z > 0.29 && t.v2.z > 0.29).toList();
       expect(topTris.isNotEmpty, isTrue);
       for (final t in topTris) {
         expect(t.normal.z, greaterThan(0.5));
+      }
+
+      final bottomTris = slab.triangles.where((t) => t.v0.z < 0.01 && t.v1.z < 0.01 && t.v2.z < 0.01).toList();
+      expect(bottomTris.isNotEmpty, isTrue);
+      for (final t in bottomTris) {
+        expect(t.normal.z, lessThan(-0.5));
       }
     });
 

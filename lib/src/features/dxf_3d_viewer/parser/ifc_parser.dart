@@ -435,7 +435,7 @@ class _IfcGeometrySolver {
         }
 
         final filteredTris = _filterDegenerateTriangles(rawTris);
-        if (category == 'Roof' || category == 'Site' || category == 'Slab') {
+        if (category == 'Roof' || category == 'Site') {
           for (final t in filteredTris) {
             triangles.add(Triangle3D(
               v0: t.v0,
