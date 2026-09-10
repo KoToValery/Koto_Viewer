@@ -56,7 +56,37 @@ void main() {
         sizeInBytes: 3072,
         lastOpened: DateTime.now(),
       );
-      expect(csvItem.fileType, equals(KotoFileType.txt));
+      expect(csvItem.fileType, equals(KotoFileType.csv));
+      expect(csvItem.isCsv, isTrue);
+    });
+
+    test('PdfItem correctly identifies code and config files (.py, .xml, .dart, .json)', () {
+      final pyItem = PdfItem(
+        path: '/storage/emulated/0/Download/main.py',
+        name: 'main.py',
+        sizeInBytes: 1024,
+        lastOpened: DateTime.now(),
+      );
+      expect(pyItem.fileType, equals(KotoFileType.code));
+      expect(pyItem.isCode, isTrue);
+
+      final xmlItem = PdfItem(
+        path: '/storage/emulated/0/Download/layout.xml',
+        name: 'layout.xml',
+        sizeInBytes: 2048,
+        lastOpened: DateTime.now(),
+      );
+      expect(xmlItem.fileType, equals(KotoFileType.code));
+      expect(xmlItem.isCode, isTrue);
+
+      final dartItem = PdfItem(
+        path: '/storage/emulated/0/Download/app.dart',
+        name: 'app.dart',
+        sizeInBytes: 4096,
+        lastOpened: DateTime.now(),
+      );
+      expect(dartItem.fileType, equals(KotoFileType.code));
+      expect(dartItem.isCode, isTrue);
     });
 
     test('PdfItem correctly identifies .md and .markdown files', () {

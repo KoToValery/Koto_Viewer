@@ -50,9 +50,17 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
   
   bool get _isJsonOrXml => _language == 'json' || _language == 'xml';
   bool get _isEnv => _language == 'bash' && widget.filePath.toLowerCase().endsWith('.env');
+  String get _fileName {
+    return widget.filePath.contains('/')
+        ? widget.filePath.split('/').where((s) => s.isNotEmpty).last
+        : widget.filePath.split(Platform.pathSeparator).last;
+  }
 
   static String _detectLanguage(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
+    final name = fileName.contains('/')
+        ? fileName.split('/').where((s) => s.isNotEmpty).last
+        : fileName.split(Platform.pathSeparator).last;
+    final ext = name.split('.').last.toLowerCase();
     switch (ext) {
       case 'dart': return 'dart';
       case 'js': case 'mjs': return 'javascript';
@@ -431,7 +439,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
 
     if (_showAsPlainText) {
       viewer = Container(
-        width: double.infinity,
+        width: _wordWrap ? double.infinity : null,
         padding: const EdgeInsets.all(16),
         child: Text(
           _displayContent,
@@ -451,46 +459,58 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
     // Overlay search highlights
     Widget searchOverlay = const SizedBox.shrink();
     if (_searchMatches.isNotEmpty) {
-      // Create a CustomPaint overlay that draws highlights based on line index
-      searchOverlay = CustomPaint(
-        painter: _SearchHighlightPainter(
-          matches: _searchMatches,
-          currentMatch: _searchMatches[_currentMatchIndex],
-          lineHeight: _fontSize * 1.5,
-          paddingTop: 16.0,
+      searchOverlay = Positioned.fill(
+        child: CustomPaint(
+          painter: _SearchHighlightPainter(
+            matches: _searchMatches,
+            currentMatch: _searchMatches[_currentMatchIndex],
+            lineHeight: _fontSize * 1.5,
+            paddingTop: 16.0,
+          ),
         ),
-        size: Size.infinite,
       );
     }
 
     Widget content = Stack(
       children: [
         viewer,
-        if (_searchMatches.isNotEmpty) Positioned.fill(child: searchOverlay),
+        if (_searchMatches.isNotEmpty) searchOverlay,
       ],
     );
 
     if (_showLineNumbers) {
       final lines = _displayContent.split('\n');
       final lineNumbers = lines.asMap().keys.map((i) => '${i + 1}').join('\n');
-      
-      content = Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
-            color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF0F0F0),
-            child: Text(
-              lineNumbers,
-              style: textStyle.copyWith(
-                color: isDark ? Colors.white54 : Colors.black54,
-              ),
-              textAlign: TextAlign.right,
-            ),
+
+      final lineNumbersWidget = Container(
+        padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
+        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF0F0F0),
+        child: Text(
+          lineNumbers,
+          style: textStyle.copyWith(
+            color: isDark ? Colors.white54 : Colors.black54,
           ),
-          Expanded(child: content),
-        ],
+          textAlign: TextAlign.right,
+        ),
       );
+
+      if (_wordWrap) {
+        content = Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            lineNumbersWidget,
+            Expanded(child: content),
+          ],
+        );
+      } else {
+        content = Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            lineNumbersWidget,
+            content,
+          ],
+        );
+      }
     }
 
     if (_wordWrap) {
@@ -514,7 +534,15 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.filePath.split(Platform.pathSeparator).last),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+        title: Text(
+          _fileName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           _buildToolbar(),
         ],
