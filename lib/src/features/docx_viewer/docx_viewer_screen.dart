@@ -28,7 +28,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   DocxDocument? _document;
   double _zoomScale = 1.0;
   bool _hasCalculatedInitialFit = false;
-  bool _isZoomBarExpanded = true;
+  bool _isZoomBarExpanded = false;
   bool _isSinglePageMode = false;
   bool _isSinglePageZoomed = false;
   TapDownDetails? _continuousDoubleTapDetails;

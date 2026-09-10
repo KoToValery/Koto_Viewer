@@ -77,11 +77,7 @@ class PdfOcrService {
         final rawBlockText = textBlock.text.trim();
         if (rawBlockText.isEmpty) continue;
 
-        // Clean up hyphenated line breaks (e.g. "com- \n puter" -> "computer")
-        final cleanedText = rawBlockText
-            .replaceAll(RegExp(r'(\w+)-\s*\n\s*(\w+)'), r'$1$2')
-            .replaceAll(RegExp(r'\n+'), ' ')
-            .trim();
+        final cleanedText = cleanReflowText(rawBlockText);
 
         if (cleanedText.isNotEmpty) {
           // Detect short uppercase or title-like lines as headings
@@ -114,6 +110,40 @@ class PdfOcrService {
         } catch (_) {}
       }
     }
+  }
+
+  /// Cleans up raw OCR / PDF extracted text:
+  /// - Removes soft hyphens (\u00AD), zero-width characters, and replacement chars (\uFFFD)
+  ///   which otherwise render as a missing-glyph square-with-x ([x]) in many fonts.
+  /// - Joins words split across lines by a hyphen for both Cyrillic and Latin alphabets.
+  /// - Collapses intra-paragraph newlines and extra whitespaces.
+  static String cleanReflowText(String rawText) {
+    var cleaned = rawText
+        .replaceAll('\u00AD', '') // Soft hyphen (renders as tofu square with X)
+        .replaceAll('\uFEFF', '') // Zero-width no-break space
+        .replaceAll('\u200B', '') // Zero-width space
+        .replaceAll('\u200C', '') // Zero-width non-joiner
+        .replaceAll('\u200D', '') // Zero-width joiner
+        .replaceAll('\u001F', ''); // Unit separator
+
+    // Line-break hyphenation for Latin, Cyrillic, Greek, and all Unicode alphabets
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r'([\p{L}\p{N}]+)[-\u2010\u2011\u2013\u2212\uFFFD]\s*[\r\n]+\s*([\p{L}\p{N}]+)', unicode: true),
+      (m) => '${m[1]}${m[2]}',
+    );
+
+    // Embedded replacement char (tofu square with X) inside a word
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r'([\p{L}\p{N}])[\uFFFD]([\p{L}\p{N}])', unicode: true),
+      (m) => '${m[1]}${m[2]}',
+    );
+
+    cleaned = cleaned.replaceAll('\uFFFD', '');
+    cleaned = cleaned.replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1E]'), '');
+    cleaned = cleaned.replaceAll(RegExp(r'[\r\n]+'), ' ');
+    cleaned = cleaned.replaceAll(RegExp(r'[ \t]{2,}'), ' ').trim();
+
+    return cleaned;
   }
 
   /// Closes and frees OCR engine resources.

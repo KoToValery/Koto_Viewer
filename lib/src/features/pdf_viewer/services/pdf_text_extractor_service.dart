@@ -115,14 +115,7 @@ class PdfTextExtractorService {
       final trimmed = rawPara.trim();
       if (trimmed.isEmpty) continue;
 
-      // Clean up hyphenation at end of lines: e.g. "connec- \n tion" -> "connection"
-      var mergedLines = trimmed.replaceAll(RegExp(r'(\w+)-\s*\n\s*(\w+)'), r'$1$2');
-
-      // Replace single newlines within paragraph with spaces
-      mergedLines = mergedLines.replaceAll(RegExp(r'\n+'), ' ');
-
-      // Compress multiple consecutive spaces
-      mergedLines = mergedLines.replaceAll(RegExp(r'[ \t]{2,}'), ' ').trim();
+      final mergedLines = PdfOcrService.cleanReflowText(trimmed);
 
       if (mergedLines.isEmpty) continue;
 

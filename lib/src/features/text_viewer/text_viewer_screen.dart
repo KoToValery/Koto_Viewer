@@ -35,7 +35,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   bool _isMonospace = true;
   bool _isWordWrap = true;
   double _fontSize = 13.5;
-  bool _isZoomBarExpanded = true;
+  bool _isZoomBarExpanded = false;
   bool _isFullscreen = false;
 
   // Bookmarks & Reading Progress

@@ -40,7 +40,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool get _isPresentation => _fileName.toLowerCase().endsWith('.pptx') || _fileName.toLowerCase().endsWith('.ppt');
 
   double _currentZoom = 1.0;
-  bool _isZoomBarExpanded = true;
+  bool _isZoomBarExpanded = false;
   bool _isFullscreen = false;
 
   // Bookmarks & Reading Progress
@@ -668,7 +668,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: _isFullscreen
+      appBar: (_isFullscreen || _pageCount == 0)
           ? null
           : AppBar(
               backgroundColor: theme.colorScheme.surface,
@@ -866,7 +866,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             ),
         ],
       ),
-      bottomNavigationBar: _isFullscreen
+      bottomNavigationBar: (_isFullscreen || _pageCount == 0)
           ? null
           : SafeArea(
               child: BottomAppBar(
@@ -1087,6 +1087,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         panAxis: PanAxis.free,
         boundaryMargin: const EdgeInsets.all(36.0),
         scrollByMouseWheel: 0.2,
+        loadingBannerBuilder: (context, bytesDownloaded, totalBytes) => const SizedBox.shrink(),
         onViewerReady: (document, controller) {
           setState(() {
             _pageCount = document.pages.length;
