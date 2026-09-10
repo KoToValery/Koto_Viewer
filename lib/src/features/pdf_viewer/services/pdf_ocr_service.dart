@@ -118,28 +118,56 @@ class PdfOcrService {
   /// - Joins words split across lines by a hyphen for both Cyrillic and Latin alphabets.
   /// - Collapses intra-paragraph newlines and extra whitespaces.
   static String cleanReflowText(String rawText) {
-    var cleaned = rawText
-        .replaceAll('\u00AD', '') // Soft hyphen (renders as tofu square with X)
+    if (rawText.isEmpty) return rawText;
+
+    var cleaned = rawText;
+
+    // 1. Remove Soft Hyphen (U+00AD), Unit Separator (U+001F), Zero-Width chars,
+    // and BOM which render as a missing-glyph square-with-x ([x]) or tofu in Flutter/Android.
+    cleaned = cleaned
+        .replaceAll('\u00AD', '') // Soft Hyphen (SHY)
+        .replaceAll('\u001F', '') // Unit Separator
         .replaceAll('\uFEFF', '') // Zero-width no-break space
         .replaceAll('\u200B', '') // Zero-width space
         .replaceAll('\u200C', '') // Zero-width non-joiner
         .replaceAll('\u200D', '') // Zero-width joiner
-        .replaceAll('\u001F', ''); // Unit separator
+        .replaceAll('\u2060', ''); // Word joiner
 
-    // Line-break hyphenation for Latin, Cyrillic, Greek, and all Unicode alphabets
+    // 2. Fix line-break hyphenation: e.g. "пре- \n несена" or "пре-\nнесена"
+    // Supports any dash/hyphen variant (-, \u2010, \u2011, \u2012, \u2013, \u2014, \u2212, \uFFFD, \u00AC)
+    // Matches any Unicode letter in any alphabet (Cyrillic, Latin, Greek, etc.)
     cleaned = cleaned.replaceAllMapped(
-      RegExp(r'([\p{L}\p{N}]+)[-\u2010\u2011\u2013\u2212\uFFFD]\s*[\r\n]+\s*([\p{L}\p{N}]+)', unicode: true),
+      RegExp(r'([\p{L}\p{N}]+)\s*[-\u2010\u2011\u2012\u2013\u2014\u2212\uFFFD\u00AC]\s*[\r\n]+\s*([\p{L}\p{N}]+)', unicode: true),
       (m) => '${m[1]}${m[2]}',
     );
 
-    // Embedded replacement char (tofu square with X) inside a word
+    // 3. Fix words that were ALREADY joined on a single line by OCR or PDF text extraction,
+    // but have an embedded soft hyphen / tofu / non-breaking hyphen / replacement char / PUA char / square symbol:
+    // e.g. "прене\uFFFDсена" -> "пренесена", "литера\u2011тура" -> "литература", "дума\u00ACта" -> "думата"
     cleaned = cleaned.replaceAllMapped(
-      RegExp(r'([\p{L}\p{N}])[\uFFFD]([\p{L}\p{N}])', unicode: true),
+      RegExp(r'([\p{L}\p{N}])\s*[\u2010\u2011\uFFFD\u00AC\uE000-\uF8FF\u2300-\u23FF\u25A0-\u26FF\u001F]\s*([\p{L}\p{N}])', unicode: true),
       (m) => '${m[1]}${m[2]}',
     );
 
-    cleaned = cleaned.replaceAll('\uFFFD', '');
-    cleaned = cleaned.replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1E]'), '');
+    // 4. Remove all remaining replacement chars (U+FFFD), PUA chars (U+E000-U+F8FF),
+    // and geometric / box tofu symbols (U+2300-U+26FF like ⌧, ☒, □)
+    cleaned = cleaned
+        .replaceAll('\uFFFD', '')
+        .replaceAll('\u00AC', '')
+        .replaceAll(RegExp(r'[\uE000-\uF8FF]'), '')
+        .replaceAll(RegExp(r'[\u2327\u2610\u2612\u25A0-\u25FF]'), '');
+
+    // 5. Replace obscure non-breaking hyphens with standard ASCII hyphen '-'
+    cleaned = cleaned
+        .replaceAll('\u2010', '-')
+        .replaceAll('\u2011', '-')
+        .replaceAll('\uFE63', '-')
+        .replaceAll('\uFF0D', '-');
+
+    // 6. Remove non-printable ASCII/C0/C1 control characters (keep \n, \r, \t)
+    cleaned = cleaned.replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]'), '');
+
+    // 7. Collapse newlines and multiple spaces
     cleaned = cleaned.replaceAll(RegExp(r'[\r\n]+'), ' ');
     cleaned = cleaned.replaceAll(RegExp(r'[ \t]{2,}'), ' ').trim();
 

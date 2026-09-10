@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 import '../models/pdf_reflow_models.dart';
 import '../services/pdf_text_extractor_service.dart';
+import '../services/pdf_ocr_service.dart';
 
 /// Full-screen responsive e-book style reflow viewer for PDF documents.
 /// Adapts PDF text to phone screen dimensions, with OCR support for scanned pages.
@@ -596,11 +597,14 @@ class _PdfReflowViewState extends State<PdfReflowView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: data.blocks.map((block) {
+              final displayText = PdfOcrService.cleanReflowText(block.text);
+              if (displayText.isEmpty) return const SizedBox.shrink();
+
               if (block.isHeading) {
                 return Padding(
                   padding: const EdgeInsets.only(top: 20.0, bottom: 10.0),
                   child: Text(
-                    block.text,
+                    displayText,
                     textAlign: widget.settings.textAlign,
                     style: widget.settings.font.getTextStyle(
                       fontSize: widget.settings.fontSize * 1.25,
@@ -615,7 +619,7 @@ class _PdfReflowViewState extends State<PdfReflowView> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 14.0),
                 child: Text(
-                  block.text,
+                  displayText,
                   textAlign: widget.settings.textAlign,
                   style: widget.settings.font.getTextStyle(
                     fontSize: widget.settings.fontSize,

@@ -146,8 +146,9 @@ class PdfTextExtractorService {
 
       final rawBlocks = map['blocks'] as List<dynamic>? ?? [];
       final blocks = rawBlocks.map((b) {
+        final rawText = b['text'] as String? ?? '';
         return PdfReflowBlock(
-          text: b['text'] as String? ?? '',
+          text: PdfOcrService.cleanReflowText(rawText),
           isHeading: b['isHeading'] as bool? ?? false,
           isOcr: b['isOcr'] as bool? ?? false,
         );
