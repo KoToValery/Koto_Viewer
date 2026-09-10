@@ -936,14 +936,152 @@ class _IfcGeometrySolver {
 
     // 4. IFCTRIMMEDCURVE
     if (ent.type == 'IFCTRIMMEDCURVE') {
-      final List<Vector3> pts = [];
+      final params = ent.splitParams;
+      if (params.isEmpty) return [];
+
+      final basisCurveId = int.tryParse(params[0].replaceAll(RegExp(r'[#\s]'), ''));
+      if (basisCurveId == null) return [];
+      final basisEnt = entityMap[basisCurveId];
+      if (basisEnt == null) return [];
+
+      // Extract Cartesian trim points if available
+      Vector3? trimPt1;
+      Vector3? trimPt2;
+      double? paramVal1;
+      double? paramVal2;
+
       for (final id in ent.referencedIds) {
+        if (id == basisCurveId) continue;
         final sub = entityMap[id];
         if (sub != null && sub.type == 'IFCCARTESIANPOINT') {
-          pts.add(_resolvePoint(id));
+          if (trimPt1 == null) {
+            trimPt1 = _resolvePoint(id);
+          } else {
+            trimPt2 = _resolvePoint(id);
+          }
         }
       }
-      if (pts.length >= 2) return pts;
+
+      // Check parameter values e.g. IFCPARAMETERVALUE(0.), IFCPARAMETERVALUE(316.04)
+      final paramMatches = RegExp(r'IFCPARAMETERVALUE\(\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*\)').allMatches(ent.params).toList();
+      if (paramMatches.isNotEmpty) {
+        paramVal1 = double.tryParse(paramMatches[0].group(1)!);
+        if (paramMatches.length > 1) {
+          paramVal2 = double.tryParse(paramMatches[1].group(1)!);
+        }
+      }
+
+      // Check SenseAgreement (.T. or .F.)
+      bool senseAgreement = true;
+      if (params.length >= 4) {
+        if (params[3].contains('.F.')) {
+          senseAgreement = false;
+        }
+      }
+
+      if (basisEnt.type == 'IFCCIRCLE' || basisEnt.type == 'IFCELLIPSE') {
+        final circleParams = basisEnt.splitParams;
+        double r1 = 1.0;
+        double r2 = 1.0;
+        if (circleParams.length >= 2) {
+          r1 = double.tryParse(circleParams[1].replaceAll(RegExp(r'[#\s]'), '')) ?? 1.0;
+          r2 = r1;
+        }
+        if (basisEnt.type == 'IFCELLIPSE' && circleParams.length >= 3) {
+          r2 = double.tryParse(circleParams[2].replaceAll(RegExp(r'[#\s]'), '')) ?? r1;
+        }
+
+        Vector3 center = Vector3.zero;
+        Vector3 axisU = const Vector3(1, 0, 0);
+        Vector3 axisV = const Vector3(0, 1, 0);
+
+        if (circleParams.isNotEmpty && circleParams[0].contains('#')) {
+          final posId = int.tryParse(circleParams[0].replaceAll(RegExp(r'[#\s]'), ''));
+          if (posId != null) {
+            final posEnt = entityMap[posId];
+            if (posEnt != null && posEnt.type == 'IFCAXIS2PLACEMENT2D') {
+              final placementParams = posEnt.splitParams;
+              if (placementParams.isNotEmpty) {
+                final ptId = int.tryParse(placementParams[0].replaceAll(RegExp(r'[#\s]'), ''));
+                if (ptId != null) {
+                  center = _resolvePoint(ptId);
+                }
+              }
+              if (placementParams.length > 1) {
+                final dirId = int.tryParse(placementParams[1].replaceAll(RegExp(r'[#\s]'), ''));
+                if (dirId != null) {
+                  axisU = _resolveDirection(dirId).normalized();
+                  axisV = Vector3(-axisU.y, axisU.x, 0);
+                }
+              }
+            } else if (posEnt != null && posEnt.type == 'IFCAXIS2PLACEMENT3D') {
+              final t = _resolveAxis2Placement3D(posId);
+              center = t.transform(Vector3.zero);
+              axisU = (t.transform(const Vector3(1, 0, 0)) - center).normalized();
+              axisV = (t.transform(const Vector3(0, 1, 0)) - center).normalized();
+            }
+          }
+        }
+
+        // Determine start and end angles in the local circle plane
+        double startAngle = 0.0;
+        double endAngle = 2.0 * math.pi;
+
+        if (trimPt1 != null && trimPt2 != null) {
+          final v1 = trimPt1 - center;
+          final v2 = trimPt2 - center;
+          startAngle = math.atan2(v1.dot(axisV), v1.dot(axisU));
+          endAngle = math.atan2(v2.dot(axisV), v2.dot(axisU));
+        } else if (paramVal1 != null && paramVal2 != null) {
+          if (paramVal2.abs() > 2.0 * math.pi || paramVal1.abs() > 2.0 * math.pi) {
+            startAngle = paramVal1 * math.pi / 180.0;
+            endAngle = paramVal2 * math.pi / 180.0;
+          } else {
+            startAngle = paramVal1;
+            endAngle = paramVal2;
+          }
+        }
+
+        // Calculate angular sweep based on senseAgreement
+        double sweep = 0.0;
+        if (senseAgreement) {
+          while (endAngle <= startAngle) {
+            endAngle += 2.0 * math.pi;
+          }
+          sweep = endAngle - startAngle;
+        } else {
+          while (endAngle >= startAngle) {
+            endAngle -= 2.0 * math.pi;
+          }
+          sweep = endAngle - startAngle;
+        }
+
+        // Discretize the arc smoothly (up to 32 segments per full circle, min 4)
+        final numSegs = math.max(4, (sweep.abs() / (2.0 * math.pi) * 32).ceil());
+        final List<Vector3> arcPts = [];
+
+        for (int i = 0; i <= numSegs; i++) {
+          if (i == 0 && trimPt1 != null) {
+            arcPts.add(trimPt1);
+          } else if (i == numSegs && trimPt2 != null) {
+            arcPts.add(trimPt2);
+          } else {
+            final theta = startAngle + sweep * (i / numSegs);
+            final pt = center + axisU * (r1 * math.cos(theta)) + axisV * (r2 * math.sin(theta));
+            arcPts.add(pt);
+          }
+        }
+
+        return arcPts;
+      } else if (basisEnt.type == 'IFCLINE') {
+        if (trimPt1 != null && trimPt2 != null) {
+          return [trimPt1, trimPt2];
+        }
+      }
+
+      if (trimPt1 != null && trimPt2 != null) {
+        return [trimPt1, trimPt2];
+      }
     }
 
     // 5. IFCCIRCLE
