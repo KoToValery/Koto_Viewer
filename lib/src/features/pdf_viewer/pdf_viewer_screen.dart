@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:printing/printing.dart';
@@ -950,11 +951,22 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           document: document,
           currentPage: _currentPage,
           onPageChanged: (newPage) {
-            setState(() {
-              _currentPage = newPage;
-            });
-            _saveReadingProgress();
-            _checkBookmarkStatus();
+            if (_currentPage == newPage || !mounted) return;
+            void update() {
+              if (mounted && _currentPage != newPage) {
+                setState(() {
+                  _currentPage = newPage;
+                });
+                _saveReadingProgress();
+                _checkBookmarkStatus();
+              }
+            }
+
+            if (WidgetsBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => update());
+            } else {
+              update();
+            }
           },
           onToggleControls: _toggleFullscreen,
           onExitReflow: () {
@@ -1025,10 +1037,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               ? const NeverScrollableScrollPhysics()
               : const PageScrollPhysics(),
           onPageChanged: (index) {
+            final newPage = index + 1;
+            if (_currentPage == newPage) return;
             final prevPage = _currentPage;
             _pageTransformControllers[prevPage]?.value = Matrix4.identity();
             setState(() {
-              _currentPage = index + 1;
+              _currentPage = newPage;
               _currentZoom = 1.0;
             });
             _saveReadingProgress();
@@ -1116,7 +1130,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           });
         },
         onPageChanged: (pageNumber) {
-          if (pageNumber != null && mounted) {
+          if (pageNumber != null && mounted && _currentPage != pageNumber) {
             setState(() {
               _currentPage = pageNumber;
             });

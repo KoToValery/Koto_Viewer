@@ -50,7 +50,13 @@ class _PdfReflowViewState extends State<PdfReflowView> {
     if (oldWidget.currentPage != widget.currentPage) {
       if (_pageController.hasClients &&
           (_pageController.page?.round() ?? -1) != widget.currentPage - 1) {
-        _pageController.jumpToPage(widget.currentPage - 1);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              _pageController.hasClients &&
+              (_pageController.page?.round() ?? -1) != widget.currentPage - 1) {
+            _pageController.jumpToPage(widget.currentPage - 1);
+          }
+        });
       }
       _prefetchPages(widget.currentPage);
     }
@@ -384,7 +390,9 @@ class _PdfReflowViewState extends State<PdfReflowView> {
       itemCount: widget.document.pages.length,
       onPageChanged: (index) {
         final newPage = index + 1;
-        widget.onPageChanged(newPage);
+        if (newPage != widget.currentPage) {
+          widget.onPageChanged(newPage);
+        }
         _prefetchPages(newPage);
       },
       itemBuilder: (context, index) {
