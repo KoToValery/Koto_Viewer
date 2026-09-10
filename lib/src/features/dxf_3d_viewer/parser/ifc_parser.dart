@@ -435,7 +435,7 @@ class _IfcGeometrySolver {
         }
 
         final filteredTris = _filterDegenerateTriangles(rawTris);
-        if (category == 'Roof' || category == 'Site') {
+        if (category == 'Roof' || category == 'Site' || category == 'Slab') {
           for (final t in filteredTris) {
             triangles.add(Triangle3D(
               v0: t.v0,
@@ -1143,9 +1143,17 @@ class _IfcGeometrySolver {
                   if (planeId != null) {
                     final planeDef = _resolvePlane(planeId, transform);
                     if (planeDef != null) {
-                      final agreementFlagStr = halfParams[1].trim();
-                      final bool agreementFlag = agreementFlagStr == '.T.';
-                      final bool keepPositiveSide = agreementFlag;
+                      // Building walls stand on the floor and extend up to the roof.
+                      // Roof planes cut off the top of the wall, keeping the base of the wall intact.
+                      double minZ = double.infinity;
+                      Vector3 basePt = planeDef.origin;
+                      for (final t in firstTris) {
+                        if (t.v0.z < minZ) { minZ = t.v0.z; basePt = t.v0; }
+                        if (t.v1.z < minZ) { minZ = t.v1.z; basePt = t.v1; }
+                        if (t.v2.z < minZ) { minZ = t.v2.z; basePt = t.v2; }
+                      }
+                      final double baseDist = (basePt - planeDef.origin).dot(planeDef.normal);
+                      final bool keepPositiveSide = baseDist >= 0;
 
                       if (secondEnt.type == 'IFCPOLYGONALBOUNDEDHALFSPACE' && halfParams.length >= 4) {
                         final posId = int.tryParse(halfParams[2].replaceAll(RegExp(r'[#\s]'), ''));
@@ -1172,6 +1180,19 @@ class _IfcGeometrySolver {
                       return _filterDegenerateTriangles(clipped);
                     }
                   }
+                }
+              } else if (secondEnt.type == 'IFCFACETEDBREP' ||
+                  secondEnt.type == 'IFCSHELLBASEDSURFACEMODEL' ||
+                  secondEnt.type == 'IFCFACETEDBREPWITHVOIDS' ||
+                  secondEnt.type == 'IFCCLOSEDSHELL' ||
+                  secondEnt.type == 'IFCEXTRUDEDAREASOLID' ||
+                  secondEnt.type.contains('BREP') ||
+                  secondEnt.type.contains('SOLID')) {
+                // CSG Boolean difference with a cutting solid Brep (e.g. Archicad 1.ifc wall-roof cutting body)
+                final secondTris = _resolveGeometryItem(secondId, transform, color);
+                if (secondTris.isNotEmpty && firstTris.isNotEmpty) {
+                  final clipped = _clipMeshByCuttingSolid(firstTris, secondTris);
+                  return _filterDegenerateTriangles(clipped);
                 }
               }
             }
@@ -1437,6 +1458,19 @@ class _IfcGeometrySolver {
     final bAxisX = (boundaryTransform.transform(const Vector3(1, 0, 0)) - bOrigin).normalized();
     final bAxisY = (boundaryTransform.transform(const Vector3(0, 1, 0)) - bOrigin).normalized();
 
+    // 2D bounding box of boundaryPoly with generous tolerance so boundary wall faces are included
+    double bMinX = double.infinity, bMaxX = -double.infinity;
+    double bMinY = double.infinity, bMaxY = -double.infinity;
+    for (final p in boundaryPoly) {
+      if (p.x < bMinX) bMinX = p.x;
+      if (p.x > bMaxX) bMaxX = p.x;
+      if (p.y < bMinY) bMinY = p.y;
+      if (p.y > bMaxY) bMaxY = p.y;
+    }
+    const double tol = 100.0; // 100mm tolerance for boundary CAD edge snapping
+    bMinX -= tol; bMaxX += tol;
+    bMinY -= tol; bMaxY += tol;
+
     for (final tri in inputTris) {
       final d0 = (tri.v0 - planePoint).dot(planeNormal);
       final d1 = (tri.v1 - planePoint).dot(planeNormal);
@@ -1448,14 +1482,33 @@ class _IfcGeometrySolver {
       final in2 = keepPositiveSide ? (d2 >= -eps) : (d2 <= eps);
       final inCount = (in0 ? 1 : 0) + (in1 ? 1 : 0) + (in2 ? 1 : 0);
 
-      // Check if the triangle centroid or any vertex projects inside the polygon boundary
+      // Project vertices to boundary 2D space
+      final p0x = (tri.v0 - bOrigin).dot(bAxisX);
+      final p0y = (tri.v0 - bOrigin).dot(bAxisY);
+      final p1x = (tri.v1 - bOrigin).dot(bAxisX);
+      final p1y = (tri.v1 - bOrigin).dot(bAxisY);
+      final p2x = (tri.v2 - bOrigin).dot(bAxisX);
+      final p2y = (tri.v2 - bOrigin).dot(bAxisY);
+
+      final triMinX = math.min(p0x, math.min(p1x, p2x));
+      final triMaxX = math.max(p0x, math.max(p1x, p2x));
+      final triMinY = math.min(p0y, math.min(p1y, p2y));
+      final triMaxY = math.max(p0y, math.max(p1y, p2y));
+
+      // Rejection test: if triangle 2D bounding box doesn't overlap boundary polygon box
+      if (triMaxX < bMinX || triMinX > bMaxX || triMaxY < bMinY || triMinY > bMaxY) {
+        result.add(tri);
+        continue;
+      }
+
       final centroid = (tri.v0 + tri.v1 + tri.v2) * (1.0 / 3.0);
       final cx = (centroid - bOrigin).dot(bAxisX);
       final cy = (centroid - bOrigin).dot(bAxisY);
       final insideBoundary = _pointInPolygon2D(cx, cy, boundaryPoly) ||
-          _pointInPolygon2D((tri.v0 - bOrigin).dot(bAxisX), (tri.v0 - bOrigin).dot(bAxisY), boundaryPoly) ||
-          _pointInPolygon2D((tri.v1 - bOrigin).dot(bAxisX), (tri.v1 - bOrigin).dot(bAxisY), boundaryPoly) ||
-          _pointInPolygon2D((tri.v2 - bOrigin).dot(bAxisX), (tri.v2 - bOrigin).dot(bAxisY), boundaryPoly);
+          _pointInPolygon2D(p0x, p0y, boundaryPoly) ||
+          _pointInPolygon2D(p1x, p1y, boundaryPoly) ||
+          _pointInPolygon2D(p2x, p2y, boundaryPoly) ||
+          (triMinX >= bMinX && triMaxX <= bMaxX && triMinY >= bMinY && triMaxY <= bMaxY);
 
       if (!insideBoundary) {
         // Triangle is outside the boundary polygon → leave it untouched
@@ -1584,6 +1637,72 @@ class _IfcGeometrySolver {
     }
 
     return result;
+  }
+
+  /// Slices a building element (such as an extruded wall) against CSG boolean subtraction solids
+  /// (e.g. Archicad IFCBOOLEANRESULT with IFCFACETEDBREP or IFCEXTRUDEDAREASOLID roof trimming bodies).
+  List<Triangle3D> _clipMeshByCuttingSolid(List<Triangle3D> meshTris, List<Triangle3D> cuttingTris) {
+    if (meshTris.isEmpty || cuttingTris.isEmpty) return meshTris;
+
+    // 1. Group cutting solid triangles into unique cutting planes
+    final uniquePlanes = <_Plane3D>[];
+    for (final tri in cuttingTris) {
+      final edge1 = tri.v1 - tri.v0;
+      final edge2 = tri.v2 - tri.v0;
+      final rawNorm = edge1.cross(edge2);
+      final lenSq = rawNorm.lengthSquared;
+      if (lenSq < 1e-8) continue;
+      final norm = rawNorm * (1.0 / math.sqrt(lenSq));
+
+      bool exists = false;
+      for (final up in uniquePlanes) {
+        if (up.normal.dot(norm) > 0.99 && (tri.v0 - up.origin).dot(up.normal).abs() < 2.0) {
+          exists = true;
+          break;
+        }
+      }
+      if (!exists) {
+        uniquePlanes.add(_Plane3D(origin: tri.v0, normal: norm));
+      }
+    }
+
+    var currentTris = meshTris;
+
+    // 2. Identify wall base reference point (minimum Z) to ensure wall bottom is always preserved
+    double minZ = double.infinity;
+    Vector3 basePt = Vector3.zero;
+    for (final t in meshTris) {
+      for (final v in [t.v0, t.v1, t.v2]) {
+        if (v.z < minZ) {
+          minZ = v.z;
+          basePt = v;
+        }
+      }
+    }
+
+    // 3. For each plane of the cutting solid, check if it slices strictly through the mesh
+    for (final plane in uniquePlanes) {
+      double minD = double.infinity;
+      double maxD = -double.infinity;
+      for (final t in currentTris) {
+        for (final v in [t.v0, t.v1, t.v2]) {
+          final d = (v - plane.origin).dot(plane.normal);
+          if (d < minD) minD = d;
+          if (d > maxD) maxD = d;
+        }
+      }
+
+      // If the plane slices strictly through the mesh (vertices on both sides)
+      // and is a cutting roof/slope plane:
+      if (minD < -5.0 && maxD > 5.0 && plane.normal.z.abs() > 0.02 && plane.normal.z.abs() < 0.999) {
+        final baseDist = (basePt - plane.origin).dot(plane.normal);
+        final bool keepPositiveSide = baseDist >= 0;
+
+        currentTris = _clipTrianglesByPlane(currentTris, plane.origin, plane.normal, keepPositiveSide);
+      }
+    }
+
+    return _filterDegenerateTriangles(currentTris);
   }
 
   static Vector3 _intersectEdge(Vector3 pIn, Vector3 pOut, double dIn, double dOut) {
@@ -1896,8 +2015,47 @@ class _IfcGeometrySolver {
     final extrudeVec = extrudeDir * depth; // stays in local solid space
 
     // Resolve 2D Profile into polygon points (in solid local space)
-    final List<Vector3> polygon = _resolveProfilePoints(profileId);
-    if (polygon.length < 3) return tris;
+    final profileEnt = entityMap[profileId];
+    List<Vector3> rawPolygon = _resolveProfilePoints(profileId);
+    final List<List<Vector3>> innerHoles = [];
+
+    if (profileEnt != null && profileEnt.type == 'IFCARBITRARYPROFILEDEFWITHVOIDS') {
+      final pParams = profileEnt.splitParams;
+      if (pParams.length >= 3) {
+        final outerId = int.tryParse(pParams[2].replaceAll(RegExp(r'[#\s]'), ''));
+        if (outerId != null) {
+          rawPolygon = _resolveCurvePoints(outerId);
+          if (rawPolygon.length > 1 && rawPolygon.first.distanceTo(rawPolygon.last) < 1e-4) {
+            rawPolygon.removeLast();
+          }
+        }
+      }
+      if (pParams.length >= 4) {
+        final innerIds = RegExp(r'#(\d+)').allMatches(pParams[3]).map((m) => int.parse(m.group(1)!)).toList();
+        for (final inId in innerIds) {
+          final hPts = _resolveCurvePoints(inId);
+          if (hPts.length > 1 && hPts.first.distanceTo(hPts.last) < 1e-4) {
+            hPts.removeLast();
+          }
+          if (hPts.length >= 3) {
+            innerHoles.add(hPts);
+          }
+        }
+      }
+    }
+
+    if (rawPolygon.length < 3) return tris;
+
+    // Ensure outer 2D Profile polygon has Counter-Clockwise (CCW) winding.
+    // If authored in CW order, extruding along +Z produces inward-facing normals on top and side surfaces,
+    // which causes backface culling to incorrectly hide the slab's top face and front walls!
+    double area2d = 0.0;
+    for (int i = 0; i < rawPolygon.length; i++) {
+      final p1 = rawPolygon[i];
+      final p2 = rawPolygon[(i + 1) % rawPolygon.length];
+      area2d += (p1.x * p2.y - p2.x * p1.y);
+    }
+    final List<Vector3> polygon = area2d < 0 ? rawPolygon.reversed.toList() : rawPolygon;
 
     final int n = polygon.length;
     final List<Vector3> bottom = [];
@@ -1908,14 +2066,7 @@ class _IfcGeometrySolver {
       top.add(compositeTransform.transform(p + extrudeVec));   // local+extrude → world
     }
 
-    // 1. Bottom Cap: robust ear-clipping triangulation (reversed winding for downward face normal)
-    final bottomReversed = bottom.reversed.toList();
-    tris.addAll(_triangulatePolygon3D(bottomReversed, color: color));
-
-    // 2. Top Cap: robust ear-clipping triangulation (upward face normal)
-    tris.addAll(_triangulatePolygon3D(top, color: color));
-
-    // 3. Side Walls
+    // 1. Outer Side Walls
     for (int i = 0; i < n; i++) {
       final next = (i + 1) % n;
       final b0 = bottom[i];
@@ -1927,7 +2078,109 @@ class _IfcGeometrySolver {
       tris.add(Triangle3D(v0: b0, v1: t1, v2: t0, color: color));
     }
 
+    // 2. Inner Hole Walls (if profile has voids)
+    for (final hole in innerHoles) {
+      double hArea = 0.0;
+      for (int i = 0; i < hole.length; i++) {
+        final p1 = hole[i];
+        final p2 = hole[(i + 1) % hole.length];
+        hArea += (p1.x * p2.y - p2.x * p1.y);
+      }
+      final List<Vector3> ccwHole = hArea < 0 ? hole.reversed.toList() : hole;
+      final List<Vector3> holeBottom = [];
+      final List<Vector3> holeTop = [];
+      for (final p in ccwHole) {
+        holeBottom.add(compositeTransform.transform(p));
+        holeTop.add(compositeTransform.transform(p + extrudeVec));
+      }
+      final int hn = ccwHole.length;
+      for (int i = 0; i < hn; i++) {
+        final next = (i + 1) % hn;
+        final hb0 = holeBottom[i];
+        final hb1 = holeBottom[next];
+        final ht0 = holeTop[i];
+        final ht1 = holeTop[next];
+
+        // Inner walls facing inward into the opening
+        tris.add(Triangle3D(v0: hb0, v1: ht1, v2: hb1, color: color));
+        tris.add(Triangle3D(v0: hb0, v1: ht0, v2: ht1, color: color));
+      }
+    }
+
+    // 3. Bottom and Top Caps (bridging holes if present)
+    final capPoly = innerHoles.isNotEmpty ? _bridgePolygonWithHoles(polygon, innerHoles) : polygon;
+    final List<Vector3> capBottom = [];
+    final List<Vector3> capTop = [];
+    for (final p in capPoly) {
+      capBottom.add(compositeTransform.transform(p));
+      capTop.add(compositeTransform.transform(p + extrudeVec));
+    }
+
+    // Bottom Cap: robust ear-clipping triangulation (reversed winding for downward face normal)
+    final bottomReversed = capBottom.reversed.toList();
+    tris.addAll(_triangulatePolygon3D(bottomReversed, color: color));
+
+    // Top Cap: robust ear-clipping triangulation (upward face normal)
+    tris.addAll(_triangulatePolygon3D(capTop, color: color));
+
     return tris;
+  }
+
+  /// Bridges holes into an outer planar polygon using seam cuts
+  /// so ear-clipping triangulation seamlessly cuts around the holes.
+  List<Vector3> _bridgePolygonWithHoles(List<Vector3> outer, List<List<Vector3>> holes) {
+    if (holes.isEmpty) return outer;
+    var currentPoly = List<Vector3>.from(outer);
+
+    for (final hole in holes) {
+      if (hole.length < 3) continue;
+
+      // Find vertex with maximum X in the hole
+      int hMaxIdx = 0;
+      double maxHx = hole[0].x;
+      for (int i = 1; i < hole.length; i++) {
+        if (hole[i].x > maxHx) {
+          maxHx = hole[i].x;
+          hMaxIdx = i;
+        }
+      }
+      final hPt = hole[hMaxIdx];
+
+      // Find closest vertex on currentPoly
+      int bestOuterIdx = 0;
+      double minScore = double.infinity;
+      for (int i = 0; i < currentPoly.length; i++) {
+        final oPt = currentPoly[i];
+        final distSq = (oPt.x - hPt.x) * (oPt.x - hPt.x) +
+            (oPt.y - hPt.y) * (oPt.y - hPt.y) +
+            (oPt.z - hPt.z) * (oPt.z - hPt.z);
+        final score = (oPt.x >= hPt.x - 1e-4) ? distSq : distSq + 1e10;
+        if (score < minScore) {
+          minScore = score;
+          bestOuterIdx = i;
+        }
+      }
+
+      final reorderedHole = <Vector3>[];
+      for (int i = 0; i < hole.length; i++) {
+        reorderedHole.add(hole[(hMaxIdx + i) % hole.length]);
+      }
+      reorderedHole.add(reorderedHole.first);
+
+      final newPoly = <Vector3>[];
+      for (int i = 0; i <= bestOuterIdx; i++) {
+        newPoly.add(currentPoly[i]);
+      }
+      newPoly.addAll(reorderedHole);
+      newPoly.add(currentPoly[bestOuterIdx]);
+      for (int i = bestOuterIdx + 1; i < currentPoly.length; i++) {
+        newPoly.add(currentPoly[i]);
+      }
+
+      currentPoly = newPoly;
+    }
+
+    return currentPoly;
   }
 
   List<Triangle3D> _generateFacetedBrep(int shellOrFaceId, _Transform3D transform, Color color) {
@@ -1940,18 +2193,35 @@ class _IfcGeometrySolver {
         tris.addAll(_generateFacetedBrep(faceId, transform, color));
       }
     } else if (ent.type == 'IFCFACE') {
+      List<Vector3>? outerPts;
+      final innerHoles = <List<Vector3>>[];
+
       for (final boundId in ent.referencedIds) {
         final boundEnt = entityMap[boundId];
         if (boundEnt != null) {
+          final isOuter = boundEnt.type == 'IFCFACEOUTERBOUND' || outerPts == null;
           for (final loopId in boundEnt.referencedIds) {
             final loopEnt = entityMap[loopId];
             if (loopEnt != null && loopEnt.type == 'IFCPOLYLOOP') {
               final pts = loopEnt.referencedIds.map((id) => transform.transform(_resolvePoint(id))).toList();
               if (pts.length >= 3) {
-                tris.addAll(_triangulatePolygon3D(pts, color: color));
+                if (isOuter && outerPts == null) {
+                  outerPts = pts;
+                } else {
+                  innerHoles.add(pts);
+                }
               }
             }
           }
+        }
+      }
+
+      if (outerPts != null) {
+        if (innerHoles.isNotEmpty) {
+          final bridged = _bridgePolygonWithHoles(outerPts, innerHoles);
+          tris.addAll(_triangulatePolygon3D(bridged, color: color));
+        } else {
+          tris.addAll(_triangulatePolygon3D(outerPts, color: color));
         }
       }
     }
@@ -2112,8 +2382,9 @@ class _IfcGeometrySolver {
         final curr = poly2d.last;
         final next = rawPoly2d[i];
         final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
-        if (cross.abs() < 1e-4) {
-          // curr is collinear, replace it with next
+        final dot = (curr.x - prev.x) * (next.x - curr.x) + (curr.y - prev.y) * (next.y - curr.y);
+        if (cross.abs() < 1e-4 && dot > 0) {
+          // curr is strictly along the same direction, replace it with next
           poly2d[poly2d.length - 1] = next;
           cleanPts[cleanPts.length - 1] = pts[i];
         } else {
@@ -2129,7 +2400,8 @@ class _IfcGeometrySolver {
       final curr = poly2d.first;
       final next = poly2d[1];
       final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
-      if (cross.abs() < 1e-4) {
+      final dot = (curr.x - prev.x) * (next.x - curr.x) + (curr.y - prev.y) * (next.y - curr.y);
+      if (cross.abs() < 1e-4 && dot > 0) {
         poly2d.removeAt(0);
         cleanPts.removeAt(0);
       } else {
@@ -2143,7 +2415,8 @@ class _IfcGeometrySolver {
       final curr = poly2d.last;
       final next = poly2d.first;
       final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
-      if (cross.abs() < 1e-4) {
+      final dot = (curr.x - prev.x) * (next.x - curr.x) + (curr.y - prev.y) * (next.y - curr.y);
+      if (cross.abs() < 1e-4 && dot > 0) {
         poly2d.removeLast();
         cleanPts.removeLast();
       } else {
@@ -2221,21 +2494,27 @@ class _IfcGeometrySolver {
       }
 
       if (!earFound) {
-        // Fallback: clip the vertex that forms the shortest internal edge
-        // to minimize degenerate visual spikes across the model.
+        // Fallback: clip the vertex that forms the shortest internal edge,
+        // prioritizing convex vertices to prevent cutting outside concave polygonal boundaries.
         int bestIdx = 0;
         double minScore = double.infinity;
         
         for (int i = 0; i < count; i++) {
           final pIdx = indices[(i - 1 + count) % count];
+          final earIdx = indices[i];
           final nIdx = indices[(i + 1) % count];
           
           final a = poly2d[pIdx];
+          final b = poly2d[earIdx];
           final c = poly2d[nIdx];
-          final distSq = (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y);
           
-          if (distSq < minScore) {
-            minScore = distSq;
+          final cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+          final bool isConvex = ccw ? (cross > 0) : (cross < 0);
+          final distSq = (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y);
+          final score = isConvex ? distSq : distSq + 1e12;
+          
+          if (score < minScore) {
+            minScore = score;
             bestIdx = i;
           }
         }

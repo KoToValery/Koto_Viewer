@@ -545,6 +545,118 @@ END-ISO-10303-21;
       expect(model.layers.contains('Used_Layer'), isTrue);
       expect(model.layers.contains('Empty_Layer_Unused'), isFalse);
     });
+
+    test('Verify clockwise polygonal slab has upward top normals and isDoubleSided', () {
+      const cwSlabIfc = r'''
+ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC2X3'));
+ENDSEC;
+DATA;
+#1=IFCPROJECT('p',$,'P',$,$,$,$,(#2),#3);
+#2=IFCBUILDING('b',$,'B',$,$,$,$,$,.ELEMENT.,$,$,$);
+#3=IFCBUILDINGSTOREY('s',$,'S',$,$,#14,$,$,.ELEMENT.,0.);
+#10=IFCCARTESIANPOINT((0.,0.,0.));
+#11=IFCDIRECTION((0.,0.,1.));
+#12=IFCDIRECTION((1.,0.,0.));
+#13=IFCAXIS2PLACEMENT3D(#10,#11,#12);
+#14=IFCLOCALPLACEMENT($,#13);
+
+#100=IFCSLAB('slab_1',$,'CW Polygonal Slab',$,$,#14,#101,$,.FLOOR.);
+#101=IFCPRODUCTDEFINITIONSHAPE($,$,(#102));
+#102=IFCSHAPEREPRESENTATION(#1,'Body','SweptSolid',(#103));
+#103=IFCEXTRUDEDAREASOLID(#104,#13,#11,0.30);
+#104=IFCARBITRARYCLOSEDPROFILEDEF(.AREA.,$,#105);
+/* CW polygon */
+#105=IFCPOLYLINE((#201,#206,#205,#204,#203,#202,#201));
+#201=IFCCARTESIANPOINT((0.,0.));
+#202=IFCCARTESIANPOINT((8.,0.));
+#203=IFCCARTESIANPOINT((8.,3.));
+#204=IFCCARTESIANPOINT((4.,3.));
+#205=IFCCARTESIANPOINT((4.,8.));
+#206=IFCCARTESIANPOINT((0.,8.));
+
+#300=IFCRELCONTAINEDINSPATIALSTRUCTURE('r',$,$,$,(#100),#3);
+ENDSEC;
+END-ISO-10303-21;
+''';
+
+      final model = IfcParser.parseFromText(cwSlabIfc);
+      final slab = model.elements.first;
+
+      expect(slab.triangles.isNotEmpty, isTrue);
+      for (final t in slab.triangles) {
+        expect(t.isDoubleSided, isTrue);
+      }
+
+      final topTris = slab.triangles.where((t) => t.v0.z > 0.29 && t.v1.z > 0.29 && t.v2.z > 0.29).toList();
+      expect(topTris.isNotEmpty, isTrue);
+      for (final t in topTris) {
+        expect(t.normal.z, greaterThan(0.5));
+      }
+    });
+
+    test('Verify IFCARBITRARYPROFILEDEFWITHVOIDS creates slab with hole cutouts', () {
+      const voidSlabIfc = r'''
+ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC2X3'));
+ENDSEC;
+DATA;
+#1=IFCPROJECT('p',$,'P',$,$,$,$,(#2),#3);
+#2=IFCBUILDING('b',$,'B',$,$,$,$,$,.ELEMENT.,$,$,$);
+#3=IFCBUILDINGSTOREY('s',$,'S',$,$,#14,$,$,.ELEMENT.,0.);
+#10=IFCCARTESIANPOINT((0.,0.,0.));
+#11=IFCDIRECTION((0.,0.,1.));
+#12=IFCDIRECTION((1.,0.,0.));
+#13=IFCAXIS2PLACEMENT3D(#10,#11,#12);
+#14=IFCLOCALPLACEMENT($,#13);
+
+#100=IFCSLAB('slab_2',$,'Slab With Hole',$,$,#14,#101,$,.FLOOR.);
+#101=IFCPRODUCTDEFINITIONSHAPE($,$,(#102));
+#102=IFCSHAPEREPRESENTATION(#1,'Body','SweptSolid',(#103));
+#103=IFCEXTRUDEDAREASOLID(#104,#13,#11,0.25);
+#104=IFCARBITRARYPROFILEDEFWITHVOIDS(.AREA.,$,#105,(#106));
+/* Outer 10x10 */
+#105=IFCPOLYLINE((#201,#202,#203,#204,#201));
+#201=IFCCARTESIANPOINT((0.,0.));
+#202=IFCCARTESIANPOINT((10.,0.));
+#203=IFCCARTESIANPOINT((10.,10.));
+#204=IFCCARTESIANPOINT((0.,10.));
+/* Inner 4x4 hole from (3,3) to (7,7) */
+#106=IFCPOLYLINE((#211,#212,#213,#214,#211));
+#211=IFCCARTESIANPOINT((3.,3.));
+#212=IFCCARTESIANPOINT((7.,3.));
+#213=IFCCARTESIANPOINT((7.,7.));
+#214=IFCCARTESIANPOINT((3.,7.));
+
+#300=IFCRELCONTAINEDINSPATIALSTRUCTURE('r',$,$,$,(#100),#3);
+ENDSEC;
+END-ISO-10303-21;
+''';
+
+      final model = IfcParser.parseFromText(voidSlabIfc);
+      final slab = model.elements.first;
+
+      expect(slab.triangles.isNotEmpty, isTrue);
+      expect(slab.triangles.length, greaterThanOrEqualTo(24));
+    });
+
+    test('Verify 1.ifc wall trimming by roof plane if test file exists', () {
+      final file = File(r'C:\Users\Creator\Dropbox\test_files\1.ifc');
+      if (!file.existsSync()) return;
+
+      final model = IfcParser.parseFromText(file.readAsStringSync());
+      final w152 = model.elements.firstWhere((e) => e.id == 152);
+      final w191 = model.elements.firstWhere((e) => e.id == 191);
+      final w242 = model.elements.firstWhere((e) => e.id == 242);
+      final w245 = model.elements.firstWhere((e) => e.id == 245);
+
+      expect(w152.bounds.max.z, lessThan(2725.0));
+      expect(w242.bounds.max.z, lessThan(2725.0));
+      expect(w191.triangles.length, greaterThan(150));
+      expect(w245.triangles.length, greaterThan(12));
+    });
   });
 }
 

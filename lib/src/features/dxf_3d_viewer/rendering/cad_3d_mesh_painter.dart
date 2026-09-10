@@ -105,11 +105,9 @@ class Cad3DMeshPainter extends CustomPainter {
     final keyHalf = (keyLight + const Vector3(0.0, -1.0, 0.0)).normalized();
     final List<_RenderTriangle> renderList = [];
 
-    // Interactive adaptive LOD: when rotating/panning large models, stride for 60 FPS responsiveness
+    // Render 100% of triangles at full quality without decimation during interaction
     final int totalTris = mesh.triangles.length;
-    final int stride = (isInteracting && totalTris > 40000)
-        ? (totalTris / 25000).ceil()
-        : 1;
+    const int stride = 1;
 
     final double screenW = size.width;
     final double screenH = size.height;
