@@ -60,7 +60,28 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
     final name = fileName.contains('/')
         ? fileName.split('/').where((s) => s.isNotEmpty).last
         : fileName.split(Platform.pathSeparator).last;
-    final ext = name.split('.').last.toLowerCase();
+    final nameLower = name.toLowerCase();
+
+    // --- Filename-based detection (no extension) ---
+    // Dockerfile, Dockerfile.prod, Dockerfile.dev, etc.
+    if (nameLower == 'dockerfile' ||
+        nameLower.startsWith('dockerfile.') ||
+        nameLower.endsWith('.dockerfile')) {
+      return 'dockerfile';
+    }
+    // docker-compose files
+    if (nameLower == 'docker-compose.yml' ||
+        nameLower == 'docker-compose.yaml' ||
+        nameLower.startsWith('docker-compose.') &&
+            (nameLower.endsWith('.yml') || nameLower.endsWith('.yaml'))) {
+      return 'yaml';
+    }
+    // .dockerignore
+    if (nameLower == '.dockerignore') {
+      return 'bash';
+    }
+
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
     switch (ext) {
       case 'dart': return 'dart';
       case 'js': case 'mjs': return 'javascript';
@@ -89,6 +110,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
       case 'env': return 'bash';
       case 'sql': return 'sql';
       case 'proto': return 'protobuf';
+      case 'dockerfile': return 'dockerfile';
       default: return 'plaintext';
     }
   }
@@ -570,10 +592,33 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Size: ${_formatSize(_fileSize)}'),
-                          Text('Lines: $_lineCount'),
-                          Text('Encoding: $_encodingName'),
-                          Text('Lang: $_language'),
+                          Flexible(
+                            child: Text(
+                              'Size: ${_formatSize(_fileSize)}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Lines: $_lineCount',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Encoding: $_encodingName',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Lang: $_language',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                     ),

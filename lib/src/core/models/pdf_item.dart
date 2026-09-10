@@ -144,6 +144,18 @@ class PdfItem {
     if (lower.endsWith('.psd') || lower.endsWith('.psb')) return KotoFileType.psd;
     if (lower.endsWith('.dcm') || lower.endsWith('.dicom')) return KotoFileType.dicom;
     
+    // --- Docker files (matched by name, not extension) ---
+    if (lower == 'dockerfile' ||
+        lower.startsWith('dockerfile.') ||
+        lower.endsWith('.dockerfile') ||
+        lower == '.dockerignore' ||
+        lower == 'docker-compose.yml' ||
+        lower == 'docker-compose.yaml' ||
+        (lower.startsWith('docker-compose.') &&
+            (lower.endsWith('.yml') || lower.endsWith('.yaml')))) {
+      return KotoFileType.code;
+    }
+
     if (lower.endsWith('.dart') || lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.ts') || lower.endsWith('.tsx') ||
         lower.endsWith('.py') || lower.endsWith('.pyw') || lower.endsWith('.java') || lower.endsWith('.kt') || lower.endsWith('.kts') ||
         lower.endsWith('.swift') || lower.endsWith('.cpp') || lower.endsWith('.cc') || lower.endsWith('.cxx') || lower.endsWith('.c') ||
