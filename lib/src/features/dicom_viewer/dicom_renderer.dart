@@ -10,11 +10,15 @@ class DicomRenderResult {
   final ui.Image image;
   final int frameIndex;
   final int totalFrames;
+  final double windowCenter;
+  final double windowWidth;
 
   const DicomRenderResult({
     required this.image,
     required this.frameIndex,
     required this.totalFrames,
+    this.windowCenter = 127,
+    this.windowWidth = 256,
   });
 }
 
@@ -117,18 +121,20 @@ class DicomRenderer {
       frameEnd.clamp(0, fileBytes.length),
     );
 
-    final rgba = _pixelBytesToRgba(pixelBytes, header, windowCenter, windowWidth);
-    final image = await _createImage(rgba, header.columns, header.rows);
+    final res = _pixelBytesToRgba(pixelBytes, header, windowCenter, windowWidth);
+    final image = await _createImage(res.$1, header.columns, header.rows);
 
     return DicomRenderResult(
       image: image,
       frameIndex: frameIndex,
       totalFrames: header.numberOfFrames,
+      windowCenter: res.$2,
+      windowWidth: res.$3,
     );
   }
 
   /// Convert raw pixel bytes to RGBA Uint8List using windowing.
-  static Uint8List _pixelBytesToRgba(
+  static (Uint8List rgba, double wc, double ww) _pixelBytesToRgba(
     Uint8List pixelBytes,
     DicomHeader header,
     double? overrideCenter,
@@ -137,6 +143,8 @@ class DicomRenderer {
     final w = header.columns;
     final h = header.rows;
     final rgba = Uint8List(w * h * 4);
+    double wc = overrideCenter ?? header.windowCenter ?? 127;
+    double ww = overrideWidth ?? header.windowWidth ?? 256;
 
     if (header.samplesPerPixel == 3) {
       // RGB (8-bit per channel)
@@ -145,7 +153,7 @@ class DicomRenderer {
       _renderMono8(pixelBytes, rgba, w, h, header);
     } else {
       // 16-bit (most CT/MRI)
-      _renderMono16(
+      final res = _renderMono16(
         pixelBytes,
         rgba,
         w,
@@ -154,9 +162,11 @@ class DicomRenderer {
         overrideCenter,
         overrideWidth,
       );
+      wc = res.$1;
+      ww = res.$2;
     }
 
-    return rgba;
+    return (rgba, wc, ww);
   }
 
   static void _renderRgb(Uint8List src, Uint8List dst, int w, int h) {
@@ -191,7 +201,54 @@ class DicomRenderer {
     }
   }
 
-  static void _renderMono16(
+  /// Apply VOI LUT (windowing) on pre-calculated Hounsfield/modality values
+  /// and write to dst RGBA buffer. Returns the effective (center, width).
+  static (double center, double width) _applyWindowingToRgba({
+    required Float64List values,
+    required Uint8List dst,
+    required bool invert,
+    required double? overrideCenter,
+    required double? overrideWidth,
+    required double defaultCenter,
+    required double defaultWidth,
+    required double pixMin,
+    required double pixMax,
+  }) {
+    double wc = overrideCenter ?? (defaultWidth > 0 ? defaultCenter : 0);
+    double ww = overrideWidth ?? defaultWidth;
+
+    final needAutoWindow = ww <= 0;
+    if (needAutoWindow) {
+      ww = (pixMax - pixMin).clamp(1, double.maxFinite);
+      wc = pixMin + ww / 2;
+    }
+
+    final winLow = wc - ww / 2.0;
+    final winHigh = wc + ww / 2.0;
+    final pixels = values.length;
+
+    for (int i = 0; i < pixels; i++) {
+      final val = values[i];
+      int v;
+      if (val <= winLow) {
+        v = 0;
+      } else if (val >= winHigh) {
+        v = 255;
+      } else {
+        v = ((val - winLow) / ww * 255.0).round().clamp(0, 255);
+      }
+      if (invert) v = 255 - v;
+      final di = i * 4;
+      dst[di] = v;
+      dst[di + 1] = v;
+      dst[di + 2] = v;
+      dst[di + 3] = 255;
+    }
+
+    return (wc, ww);
+  }
+
+  static (double center, double width) _renderMono16(
     Uint8List src,
     Uint8List dst,
     int w,
@@ -214,11 +271,6 @@ class DicomRenderer {
     final storedMask = (1 << bitsStored) - 1;
     final signBit = 1 << highBit;
 
-    // First pass — find actual min/max if no windowing specified
-    double wc = overrideCenter ?? header.windowCenter ?? 0;
-    double ww = overrideWidth ?? header.windowWidth ?? 0;
-
-    final needAutoWindow = ww <= 0;
     double pixMin = double.maxFinite;
     double pixMax = -double.maxFinite;
 
@@ -243,39 +295,21 @@ class DicomRenderer {
       // Apply modality LUT (rescale)
       final hounsfieldValue = pixelValue * slope + intercept;
       values[i] = hounsfieldValue;
-      if (needAutoWindow) {
-        if (hounsfieldValue < pixMin) pixMin = hounsfieldValue;
-        if (hounsfieldValue > pixMax) pixMax = hounsfieldValue;
-      }
+      if (hounsfieldValue < pixMin) pixMin = hounsfieldValue;
+      if (hounsfieldValue > pixMax) pixMax = hounsfieldValue;
     }
 
-    if (needAutoWindow) {
-      // Auto window — use full range
-      ww = (pixMax - pixMin).clamp(1, double.maxFinite);
-      wc = pixMin + ww / 2;
-    }
-
-    // Second pass — apply windowing and write RGBA
-    final winLow = wc - ww / 2.0;
-    final winHigh = wc + ww / 2.0;
-
-    for (int i = 0; i < pixels; i++) {
-      final val = values[i];
-      int v;
-      if (val <= winLow) {
-        v = 0;
-      } else if (val >= winHigh) {
-        v = 255;
-      } else {
-        v = ((val - winLow) / ww * 255.0).round().clamp(0, 255);
-      }
-      if (invert) v = 255 - v;
-      final di = i * 4;
-      dst[di] = v;
-      dst[di + 1] = v;
-      dst[di + 2] = v;
-      dst[di + 3] = 255;
-    }
+    return _applyWindowingToRgba(
+      values: values,
+      dst: dst,
+      invert: invert,
+      overrideCenter: overrideCenter,
+      overrideWidth: overrideWidth,
+      defaultCenter: header.windowCenter ?? 0,
+      defaultWidth: header.windowWidth ?? 0,
+      pixMin: pixMin,
+      pixMax: pixMax,
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -328,6 +362,62 @@ class DicomRenderer {
 
     // Try native openjpeg decoder first
     if (j2k.isJpeg2000Available) {
+      // 1. Try raw decoding to apply proper DICOM windowing/VOI LUT
+      final raw = j2k.decodeJpeg2000Raw(j2kBytes);
+      if (raw != null) {
+        if (raw.numComps == 1 && raw.rawPixels != null) {
+          final w = raw.width;
+          final h = raw.height;
+          final pixels = w * h;
+          final rawPixels = raw.rawPixels!;
+          final rgba = Uint8List(pixels * 4);
+
+          final intercept = header.rescaleIntercept ?? 0.0;
+          final slope = header.rescaleSlope ?? 1.0;
+          final invert = header.isMonochrome1;
+
+          double pixMin = double.maxFinite;
+          double pixMax = -double.maxFinite;
+
+          final values = Float64List(pixels);
+          for (int i = 0; i < pixels; i++) {
+            final val = rawPixels[i] * slope + intercept;
+            values[i] = val;
+            if (val < pixMin) pixMin = val;
+            if (val > pixMax) pixMax = val;
+          }
+
+          final res = _applyWindowingToRgba(
+            values: values,
+            dst: rgba,
+            invert: invert,
+            overrideCenter: windowCenter,
+            overrideWidth: windowWidth,
+            defaultCenter: header.windowCenter ?? 0,
+            defaultWidth: header.windowWidth ?? 0,
+            pixMin: pixMin,
+            pixMax: pixMax,
+          );
+
+          final image = await _createImage(rgba, w, h);
+          return DicomRenderResult(
+            image: image,
+            frameIndex: frameIndex,
+            totalFrames: header.numberOfFrames,
+            windowCenter: res.$1,
+            windowWidth: res.$2,
+          );
+        } else if (raw.rgba != null) {
+          final image = await _createImage(raw.rgba!, raw.width, raw.height);
+          return DicomRenderResult(
+            image: image,
+            frameIndex: frameIndex,
+            totalFrames: header.numberOfFrames,
+          );
+        }
+      }
+
+      // Fallback: opj_decode_to_rgba (now includes dynamic min-max normalization)
       final decoded = j2k.decodeJpeg2000(j2kBytes);
       if (decoded != null) {
         final image = await _createImage(decoded.rgba, decoded.width, decoded.height);

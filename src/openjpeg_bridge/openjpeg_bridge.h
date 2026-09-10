@@ -40,7 +40,33 @@ OPJ_BRIDGE_EXPORT int opj_decode_to_rgba(
 );
 
 /**
- * Free a buffer allocated by opj_decode_to_rgba.
+ * Decode a JPEG 2000 buffer to raw pixel data or RGBA.
+ *
+ * For grayscale (numcomps == 1):
+ *   - *out_pixels will contain (width * height) int32_t values.
+ *   - *out_rgba will be NULL.
+ * For color (numcomps >= 3):
+ *   - *out_pixels will be NULL.
+ *   - *out_rgba will contain (width * height * 4) uint8_t RGBA values.
+ *
+ * The non-null buffer must be freed with opj_free_buffer() after use.
+ *
+ * @return 1 on success, 0 on failure.
+ */
+OPJ_BRIDGE_EXPORT int opj_decode_raw(
+    const uint8_t *data,
+    int length,
+    int *out_width,
+    int *out_height,
+    int *out_num_comps,
+    int *out_prec,
+    int *out_sgnd,
+    int32_t **out_pixels,
+    uint8_t **out_rgba
+);
+
+/**
+ * Free a buffer allocated by opj_decode_to_rgba or opj_decode_raw.
  */
 OPJ_BRIDGE_EXPORT void opj_free_buffer(uint8_t *buf);
 

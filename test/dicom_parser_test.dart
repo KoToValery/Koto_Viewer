@@ -385,6 +385,71 @@ void main() {
       for (int i = 3; i < decoded.rgba.length; i += 4) {
         expect(decoded.rgba[i], equals(255));
       }
+
+      // Check that the image is NOT black (mean intensity and max are properly scaled)
+      int maxR = 0;
+      int sumR = 0;
+      for (int i = 0; i < decoded.rgba.length; i += 4) {
+        final r = decoded.rgba[i];
+        if (r > maxR) maxR = r;
+        sumR += r;
+      }
+      expect(maxR, equals(255), reason: 'Max intensity should be 255 after normalization');
+      expect(sumR / (64 * 64), greaterThan(50), reason: 'Average intensity should be visible, not black');
+
+      // Test raw 16-bit decoding
+      final raw = decodeJpeg2000Raw(frameBytes);
+      expect(raw, isNotNull);
+      expect(raw!.width, equals(64));
+      expect(raw.height, equals(64));
+      expect(raw.numComps, equals(1));
+      expect(raw.rawPixels, isNotNull);
+      expect(raw.rawPixels!.length, equals(64 * 64));
+
+      int rawMin = 999999;
+      int rawMax = -999999;
+      for (final val in raw.rawPixels!) {
+        if (val < rawMin) rawMin = val;
+        if (val > rawMax) rawMax = val;
+      }
+      expect(rawMin, equals(0));
+      expect(rawMax, equals(425));
+
+      // Test DicomRenderer.renderFrame with auto-windowing
+      final renderResult = await DicomRenderer.renderFrame(
+        fileBytes: bytes,
+        header: header,
+        frameIndex: 0,
+      );
+      expect(renderResult.image.width, equals(64));
+      expect(renderResult.image.height, equals(64));
+      expect(renderResult.windowCenter, closeTo(212.5, 1.0));
+      expect(renderResult.windowWidth, closeTo(425.0, 1.0));
+    });
+
+    test('parses and renders C:\\Users\\Creator\\Dropbox\\test_files\\1.dcm with full windowing', () async {
+      final file = File(r'C:\Users\Creator\Dropbox\test_files\1.dcm');
+      if (!file.existsSync()) return;
+
+      final bytes = await file.readAsBytes();
+      final header = DicomParser.parse(bytes);
+
+      expect(header.numberOfFrames, equals(10));
+      expect(header.rows, equals(64));
+      expect(header.columns, equals(64));
+      expect(header.transferSyntaxUID, equals(DicomTransferSyntax.jpeg2000Lossless));
+
+      // Verify all 10 frames can be rendered with auto-windowing
+      for (int f = 0; f < header.numberOfFrames; f++) {
+        final res = await DicomRenderer.renderFrame(
+          fileBytes: bytes,
+          header: header,
+          frameIndex: f,
+        );
+        expect(res.image.width, equals(64));
+        expect(res.image.height, equals(64));
+        expect(res.windowWidth, greaterThan(0));
+      }
     });
 
     test('parses uncompressed emri_small.dcm header and offsets', () async {

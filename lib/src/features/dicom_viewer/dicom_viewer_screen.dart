@@ -100,11 +100,11 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       final header = result.header;
 
       // Determine initial windowing
-      double wc = header.windowCenter ?? 127;
-      double ww = header.windowWidth ?? 256;
+      double? wc = header.windowCenter;
+      double? ww = header.windowWidth;
 
       // Apply modality suggestion if header has no windowing
-      if (header.windowCenter == null) {
+      if (wc == null) {
         final preset = DicomRenderer.suggestPresetForModality(header.modality);
         if (preset != null) {
           wc = preset.center;
@@ -115,13 +115,13 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       setState(() {
         _header = header;
         _fileBytes = result.fileBytes;
-        _windowCenter = wc;
-        _windowWidth = ww.clamp(1, 65535);
+        _windowCenter = wc ?? 127;
+        _windowWidth = (ww ?? 256).clamp(1, 65535);
         _showWindowing = header.isMonochrome && header.bitsAllocated >= 16;
         _isLoading = false;
       });
 
-      await _renderFrame(0);
+      await _renderFrame(0, initialWc: wc, initialWw: ww);
     } on DicomParseException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -137,19 +137,22 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
     }
   }
 
-  Future<void> _renderFrame(int frameIndex) async {
+  Future<void> _renderFrame(int frameIndex, {double? initialWc, double? initialWw}) async {
     if (_header == null || _fileBytes == null) return;
     if (_isRendering) return;
 
     setState(() => _isRendering = true);
 
     try {
+      final overrideWc = initialWc ?? (_header!.isMonochrome ? _windowCenter : null);
+      final overrideWw = initialWw ?? (_header!.isMonochrome ? _windowWidth : null);
+
       final result = await DicomRenderer.renderFrame(
         fileBytes: _fileBytes!,
         header: _header!,
         frameIndex: frameIndex,
-        windowCenter: _header!.isMonochrome ? _windowCenter : null,
-        windowWidth: _header!.isMonochrome ? _windowWidth : null,
+        windowCenter: overrideWc,
+        windowWidth: overrideWw,
       );
 
       if (!mounted) return;
@@ -158,6 +161,10 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       setState(() {
         _currentImage = result.image;
         _currentFrame = frameIndex;
+        if (initialWc == null || initialWw == null) {
+          _windowCenter = result.windowCenter.clamp(-2048.0, 4096.0);
+          _windowWidth = result.windowWidth.clamp(1.0, 8192.0);
+        }
         _isRendering = false;
       });
       // Dispose previous image after setState to avoid race

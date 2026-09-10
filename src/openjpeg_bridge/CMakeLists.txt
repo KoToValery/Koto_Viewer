@@ -6,7 +6,7 @@ project(openjpeg_bridge C)
 # Flutter plugin CMake is invoked from the build/ directory, but CMAKE_CURRENT_SOURCE_DIR
 # points to this file's directory. We locate third_party relative to the Flutter root.
 # ---------------------------------------------------------------------------
-set(OPJ_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/openjpeg")
+set(OPJ_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/openjpeg")
 set(OPJ_SRC  "${OPJ_ROOT}/src/lib/openjp2")
 
 # Collect openjpeg source files (exclude tools and test utilities)
@@ -27,6 +27,7 @@ add_library(openjpeg_bridge SHARED
 )
 
 target_include_directories(openjpeg_bridge PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
     "${OPJ_SRC}"
     "${OPJ_ROOT}/src/lib"  # for opj_common.h etc.
 )
@@ -38,11 +39,15 @@ target_compile_definitions(openjpeg_bridge PRIVATE
     _CRT_SECURE_NO_WARNINGS  # Windows: suppress fopen warnings
 )
 
-# Release optimisations
-if(CMAKE_BUILD_TYPE STREQUAL "Release" OR NOT CMAKE_BUILD_TYPE)
-    target_compile_options(openjpeg_bridge PRIVATE /O2 /W0)
+# Compiler options & optimisations
+if(MSVC)
+    target_compile_options(openjpeg_bridge PRIVATE
+        /W0
+        $<$<CONFIG:Release>:/O2>
+        $<$<CONFIG:Profile>:/O2>
+    )
 else()
-    target_compile_options(openjpeg_bridge PRIVATE /W0)
+    target_compile_options(openjpeg_bridge PRIVATE -w -O2)
 endif()
 
 # Export only our bridge symbols (not openjpeg internals)
