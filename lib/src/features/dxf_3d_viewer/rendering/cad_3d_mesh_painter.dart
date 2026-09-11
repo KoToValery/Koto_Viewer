@@ -59,7 +59,6 @@ class Cad3DMeshPainter extends CustomPainter {
   final Cad3DCamera camera;
   final Cad3DShadingMode shadingMode;
   final Cad3DTheme theme;
-  final bool showBoundingBox;
   final bool showGrid;
   final Color? customModelColor;
   final bool isInteracting;
@@ -69,7 +68,6 @@ class Cad3DMeshPainter extends CustomPainter {
     required this.camera,
     this.shadingMode = Cad3DShadingMode.smoothShaded,
     this.theme = Cad3DTheme.darkCad,
-    this.showBoundingBox = false,
     this.showGrid = true,
     this.customModelColor,
     this.isInteracting = false,
@@ -300,12 +298,7 @@ class Cad3DMeshPainter extends CustomPainter {
       }
     }
 
-    // 4. Draw 3D Bounding Box Dimensions Cage if enabled
-    if (showBoundingBox) {
-      _drawBoundingBox(canvas, size, center, modelScale);
-    }
-
-    // 5. Draw 3D Orientation XYZ Axis Gizmo in corner
+    // 4. Draw 3D Orientation XYZ Axis Gizmo in corner
     _drawOrientationGizmo(canvas, size);
   }
 
@@ -344,43 +337,6 @@ class Cad3DMeshPainter extends CustomPainter {
         modelScale,
       );
       canvas.drawLine(p3, p4, gridPaint);
-    }
-  }
-
-  void _drawBoundingBox(Canvas canvas, Size size, Vector3 center, double modelScale) {
-    final min = mesh.bounds.min - center;
-    final max = mesh.bounds.max - center;
-
-    // 8 vertices of the bounding box
-    final corners = [
-      Vector3(min.x, min.y, min.z), // 0
-      Vector3(max.x, min.y, min.z), // 1
-      Vector3(max.x, max.y, min.z), // 2
-      Vector3(min.x, max.y, min.z), // 3
-      Vector3(min.x, min.y, max.z), // 4
-      Vector3(max.x, min.y, max.z), // 5
-      Vector3(max.x, max.y, max.z), // 6
-      Vector3(min.x, max.y, max.z), // 7
-    ];
-
-    final projected = corners
-        .map((v) => camera.projectToScreen(camera.transformPoint(v), size, modelScale))
-        .toList();
-
-    final boxPaint = Paint()
-      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.45)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-
-    // 12 edges
-    const edges = [
-      [0, 1], [1, 2], [2, 3], [3, 0], // Bottom
-      [4, 5], [5, 6], [6, 7], [7, 4], // Top
-      [0, 4], [1, 5], [2, 6], [3, 7], // Vertical
-    ];
-
-    for (final edge in edges) {
-      canvas.drawLine(projected[edge[0]], projected[edge[1]], boxPaint);
     }
   }
 

@@ -72,16 +72,41 @@ class AndroidSafService {
     }
   }
 
+  /// Safely decodes percent-encoded UTF-8 strings (Cyrillic, Greek, Arabic, Chinese, emojis, etc.).
+  /// Handles single or double-encoded characters and never throws FormatException.
+  static String safeDecodeUtf8(String input) {
+    String current = input;
+    for (int i = 0; i < 2; i++) {
+      if (!current.contains('%')) break;
+      try {
+        final decoded = Uri.decodeComponent(current);
+        if (decoded == current) break;
+        current = decoded;
+      } catch (_) {
+        try {
+          final decoded = Uri.decodeFull(current);
+          if (decoded == current) break;
+          current = decoded;
+        } catch (_) {
+          break;
+        }
+      }
+    }
+    return current;
+  }
+
   /// Extracts a human-readable folder name from a SAF tree URI.
+  /// Supports Cyrillic and other non-ASCII scripts.
   ///
   /// Example:
   ///   `content://.../tree/primary%3ADownload` → `Download`
+  ///   `content://.../tree/primary%3A%D0%9A%D0%BD%D0%B8%D0%B3%D0%B8` → `Книги`
   ///   `content://.../tree/primary%3A` → `Internal Storage`
   static String folderNameFromSafUri(String safUri) {
     try {
-      final uri = Uri.parse(safUri);
-      // pathSegments: [..., 'tree', '<encoded-doc-id>']
-      final segments = uri.pathSegments;
+      final decodedUri = safeDecodeUtf8(safUri);
+      final uri = Uri.tryParse(decodedUri) ?? Uri.tryParse(safUri);
+      final segments = uri?.pathSegments ?? safUri.split('/');
       String? encoded;
       for (int i = 0; i < segments.length; i++) {
         if (segments[i] == 'tree' && i + 1 < segments.length) {
@@ -92,18 +117,32 @@ class AndroidSafService {
       encoded ??= segments.isNotEmpty ? segments.last : null;
       if (encoded == null || encoded.isEmpty) return 'Custom Folder';
 
-      // Double-decode: Uri.pathSegments decodes once; the ID itself has %3A
-      final decoded = Uri.decodeComponent(encoded);
-      // Format: "primary:RelativePath" or "XXXX-YYYY:RelativePath"
+      final decoded = safeDecodeUtf8(encoded);
+      // Format: "primary:RelativePath" or "XXXX-YYYY:RelativePath" or "raw:/storage/..."
       if (decoded.contains(':')) {
-        final rel = decoded.substring(decoded.indexOf(':') + 1);
-        if (rel.isEmpty) return 'Internal Storage';
-        // Return the last path component as the folder name
-        return rel.split('/').where((s) => s.isNotEmpty).last;
+        final rel = decoded.substring(decoded.lastIndexOf(':') + 1);
+        if (rel.isEmpty || rel == '/' || rel == '\\') return 'Internal Storage';
+        final parts = rel.split(RegExp(r'[/\\]')).where((s) => s.isNotEmpty).toList();
+        if (parts.isNotEmpty) return parts.last;
       }
-      return decoded.isNotEmpty ? decoded : 'Custom Folder';
+
+      final parts = decoded.split(RegExp(r'[/\\]')).where((s) => s.isNotEmpty).toList();
+      return parts.isNotEmpty ? parts.last : 'Custom Folder';
     } catch (_) {
       return 'Custom Folder';
+    }
+  }
+
+  /// Queries the Android OS directly for the display name of a SAF tree folder.
+  static Future<String?> getFolderDisplayName(String safTreeUri) async {
+    if (!Platform.isAndroid) return null;
+    try {
+      return await _channel.invokeMethod<String>(
+        'getFolderDisplayName',
+        {'uri': safTreeUri},
+      );
+    } catch (_) {
+      return null;
     }
   }
 

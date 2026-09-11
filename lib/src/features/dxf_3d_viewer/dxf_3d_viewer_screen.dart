@@ -47,7 +47,6 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
   Cad3DShadingMode _shadingMode = Cad3DShadingMode.smoothShaded;
   Cad3DTheme _theme = Cad3DTheme.darkCad;
-  bool _showBoundingBox = false;
   final bool _showGrid = true;
   Color? _customModelColor;
 
@@ -622,19 +621,6 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   }).toList(),
                 ),
 
-                // Bounding Box Toggle
-                IconButton(
-                  icon: Icon(
-                    _showBoundingBox ? Icons.crop_free : Icons.crop_square,
-                    size: 20,
-                    color: _showBoundingBox ? theme.colorScheme.primary : null,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Bounding Box',
-                  onPressed: () => setState(() => _showBoundingBox = !_showBoundingBox),
-                ),
-
                 // BIM Storeys & Categories (when IFC model is loaded)
                 if (_ifcModel != null)
                   IconButton(
@@ -729,7 +715,6 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                       camera: _camera,
                       shadingMode: _shadingMode,
                       theme: _theme,
-                      showBoundingBox: _showBoundingBox,
                       showGrid: _showGrid,
                       customModelColor: _customModelColor,
                       isInteracting: _isInteracting,

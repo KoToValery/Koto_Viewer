@@ -149,6 +149,27 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                "getFolderDisplayName" -> {
+                    val uriString = call.argument<String>("uri")
+                    if (uriString == null) {
+                        result.error("INVALID_ARGUMENT", "uri is required", null)
+                        return@setMethodCallHandler
+                    }
+                    safBackgroundExecutor.execute {
+                        try {
+                            val treeUri = Uri.parse(uriString)
+                            val docFolder = DocumentFile.fromTreeUri(this@MainActivity, treeUri)
+                            val displayName = docFolder?.name
+                            runOnUiThread {
+                                result.success(displayName)
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                result.success(null)
+                            }
+                        }
+                    }
+                }
                 "pickDirectory" -> {
                     // Launch ACTION_OPEN_DOCUMENT_TREE directly so we always get
                     // the raw SAF tree URI — bypassing file_picker's internal

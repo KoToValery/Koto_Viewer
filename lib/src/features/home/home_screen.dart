@@ -1636,8 +1636,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _confirmRemoveCustomFolder(String path) async {
-    final parts = path.split(Platform.pathSeparator).where((s) => s.isNotEmpty).toList();
-    final folderName = parts.isNotEmpty ? parts.last : path;
+    final String folderName;
+    if (AndroidSafService.isSafUri(path)) {
+      folderName = AndroidSafService.folderNameFromSafUri(path);
+    } else {
+      final parts = path.split(Platform.pathSeparator).where((s) => s.isNotEmpty).toList();
+      folderName = parts.isNotEmpty
+          ? AndroidSafService.safeDecodeUtf8(parts.last)
+          : path;
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2696,11 +2703,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 6),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 120),
+              constraints: const BoxConstraints(maxWidth: 85),
               child: Text(
-                '${_selectedCategory.label} (${_getCategoryCount(_selectedCategory)})',
+                '${_selectedCategory.shortLabel} (${_getCategoryCount(_selectedCategory)})',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: isCustomCategory
                       ? theme.colorScheme.onPrimaryContainer
@@ -2797,8 +2804,10 @@ class _HomeScreenState extends State<HomeScreen> {
               .split(Platform.pathSeparator)
               .where((s) => s.isNotEmpty)
               .toList();
-          titleText = parts.isNotEmpty ? parts.last : 'Custom Folder';
-          subtitleText = _customFolderPath!;
+          titleText = parts.isNotEmpty
+              ? AndroidSafService.safeDecodeUtf8(parts.last)
+              : 'Custom Folder';
+          subtitleText = AndroidSafService.safeDecodeUtf8(_customFolderPath!);
         }
       } else {
         titleText = 'Custom Folder';
@@ -2841,7 +2850,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Flexible(
                                 child: Text(
@@ -2849,10 +2857,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const Icon(Icons.arrow_drop_down),
+                              const Icon(Icons.arrow_drop_down, size: 20),
                             ],
                           ),
                           Text(
@@ -2914,8 +2923,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             .split(Platform.pathSeparator)
                             .where((s) => s.isNotEmpty)
                             .toList();
-                        folderName = parts.isNotEmpty ? parts.last : folderPath;
-                        folderSubtitle = folderPath;
+                        folderName = parts.isNotEmpty
+                            ? AndroidSafService.safeDecodeUtf8(parts.last)
+                            : folderPath;
+                        folderSubtitle = AndroidSafService.safeDecodeUtf8(folderPath);
                       }
                       final isSelected =
                           _currentMode == FileSourceMode.custom &&
@@ -3002,7 +3013,9 @@ class _HomeScreenState extends State<HomeScreen> {
               initialValue: _currentSort,
               onSelected: _switchSort,
               tooltip: 'Sort by',
-              icon: const Icon(Icons.sort),
+              icon: const Icon(Icons.sort, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -3057,10 +3070,13 @@ class _HomeScreenState extends State<HomeScreen> {
             if (_currentMode == FileSourceMode.custom) ...[
               // Toggle subfolders
               IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 icon: Icon(
                   _includeSubfolders
                       ? Icons.account_tree_rounded
                       : Icons.account_tree_outlined,
+                  size: 20,
                   color: _includeSubfolders
                       ? Theme.of(context).colorScheme.primary
                       : null,
@@ -3075,15 +3091,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   await _loadFiles();
                 },
               ),
-              IconButton(
-                icon: const Icon(Icons.create_new_folder_outlined),
-                tooltip: 'Add Folder',
-                onPressed: _pickCustomFolder,
-              ),
               if (_customFolderPath != null && _customFolderPath!.isNotEmpty)
                 IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   icon: Icon(
                     Icons.delete_outline,
+                    size: 20,
                     color: Theme.of(context).colorScheme.error,
                   ),
                   tooltip: 'Remove Folder from list',
