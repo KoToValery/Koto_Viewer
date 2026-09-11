@@ -585,15 +585,15 @@ class _IfcGeometrySolver {
       }
     }
 
-    // Prune redundant unclipped duplicate walls (e.g. ArchiCAD phantom wall exports
-    // where an unclipped raw box was exported concurrently with a trimmed wall at the exact same location)
-    _pruneDuplicateGhostWalls(elements);
+      // Prune redundant unclipped duplicate walls (e.g. ArchiCAD phantom wall exports
+      // where an unclipped raw box was exported concurrently with a trimmed wall at the exact same location)
+      _pruneDuplicateGhostWalls(elements);
 
-    // Clean up internal coincident touching faces between connected walls (miters and L/T-junctions)
-    _cleanWallJunctions(elements);
+      // Clean up internal coincident touching faces between connected walls (miters and L/T-junctions)
+      _cleanWallJunctions(elements);
 
-    // Clean up buried outer interface faces of windows and doors filling wall openings
-    _cleanOpeningFillInterfaces(elements, openingFillInterfaces);
+      // Clean up buried outer interface faces of windows and doors filling wall openings
+      _cleanOpeningFillInterfaces(elements, openingFillInterfaces);
 
     // Filter out layers that do not contain any elements
     final usedLayers = elements.map((e) => e.layer.trim()).where((l) => l.isNotEmpty).toSet();
@@ -765,10 +765,18 @@ class _IfcGeometrySolver {
                 final c2 = (t2.v0 + t2.v1 + t2.v2) * (1.0 / 3.0);
 
                 if (_pointInTriangle3D(c1, t2.v0, t2.v1, t2.v2)) {
-                  toRemoveByElementId.putIfAbsent(w1.id, () => {}).add(ti);
+                  if (_isPointInsideBounds(t1.v0, w2.bounds, tol) &&
+                      _isPointInsideBounds(t1.v1, w2.bounds, tol) &&
+                      _isPointInsideBounds(t1.v2, w2.bounds, tol)) {
+                    toRemoveByElementId.putIfAbsent(w1.id, () => {}).add(ti);
+                  }
                 }
                 if (_pointInTriangle3D(c2, t1.v0, t1.v1, t1.v2)) {
-                  toRemoveByElementId.putIfAbsent(w2.id, () => {}).add(tj);
+                  if (_isPointInsideBounds(t2.v0, w1.bounds, tol) &&
+                      _isPointInsideBounds(t2.v1, w1.bounds, tol) &&
+                      _isPointInsideBounds(t2.v2, w1.bounds, tol)) {
+                    toRemoveByElementId.putIfAbsent(w2.id, () => {}).add(tj);
+                  }
                 }
               }
             }
@@ -823,6 +831,12 @@ class _IfcGeometrySolver {
 
     const eps = 1e-2;
     return (u >= -eps) && (v >= -eps) && (u + v <= 1.0 + eps);
+  }
+
+  static bool _isPointInsideBounds(Vector3 p, BoundingBox3D bounds, double tol) {
+    return p.x >= bounds.min.x - tol && p.x <= bounds.max.x + tol &&
+           p.y >= bounds.min.y - tol && p.y <= bounds.max.y + tol &&
+           p.z >= bounds.min.z - tol && p.z <= bounds.max.z + tol;
   }
 
   /// Prunes buried outer interface faces of windows and doors filling wall openings.

@@ -415,7 +415,7 @@ class Cad3DMeshPainter extends CustomPainter {
       return mesh.triangles;
     }
 
-    const double thresholdSq = 1500.0 * 1500.0;
+    const double thresholdSq = 1200.0 * 1200.0;
     bool hasLarge = false;
     for (final t in mesh.triangles) {
       if ((t.v1 - t.v0).lengthSquared > thresholdSq ||
@@ -431,7 +431,7 @@ class Cad3DMeshPainter extends CustomPainter {
       return mesh.triangles;
     }
 
-    final subdivided = _subdivideTris(mesh.triangles, 1200.0);
+    final subdivided = _subdivideTris(mesh.triangles, 700.0);
     _subdivisionCache[mesh] = subdivided;
     return subdivided;
   }

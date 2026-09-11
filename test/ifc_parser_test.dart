@@ -711,6 +711,26 @@ END-ISO-10303-21;
       }
     });
 
+    test('Verify 1.ifc wall 216 preserves solid faces around door and partition wall', () {
+      final file = File(r'C:\Users\Creator\Dropbox\test_files\1.ifc');
+      if (!file.existsSync()) return;
+
+      final model = IfcParser.parseFromText(file.readAsStringSync());
+      final wall216 = model.elements.firstWhere((e) => e.id == 216);
+
+      // Wall 216 must retain 148 triangles (only the 4 corner end-cap triangles are pruned).
+      // Triangles between the door and window along the partition wall must NOT be deleted.
+      expect(wall216.triangles.length, equals(148));
+
+      // Verify that the north face (y = -8262.46) between the door (x = -1978.5) and window (x = -997.0) is solid
+      final northFaceTris = wall216.triangles.where((t) =>
+        t.normal.y > 0.9 &&
+        (t.v0.y - (-8262.46)).abs() < 1.0 &&
+        t.v0.x > -2000 && t.v0.x < -900
+      ).toList();
+      expect(northFaceTris.length, greaterThanOrEqualTo(10));
+    });
+
     test('Verify wall_openings.ifc cleans door & window interface faces and door floor opening', () {
       final file = File(r'C:\Users\Creator\Dropbox\test_files\wall_openings.ifc');
       if (!file.existsSync()) return;
