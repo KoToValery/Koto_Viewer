@@ -1537,6 +1537,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<PdfItem> _pdfFiles = [];
+  List<PdfItem> _filteredFiles = [];
+  Map<FileCategory, int> _categoryCounts = {};
   bool _isLoading = true;
   FileSourceMode _currentMode = FileSourceMode.recent;
   SortOption _currentSort = SortOption.date;
@@ -1560,16 +1562,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   int _getCategoryCount(FileCategory cat) {
-    if (cat == FileCategory.all) return _pdfFiles.length;
-    return _pdfFiles.where((f) => f.category == cat).length;
+    return _categoryCounts[cat] ?? 0;
   }
 
-  List<PdfItem> get _filteredFiles {
-    return _pdfFiles.where((f) {
+  void _recomputeCategoryCounts() {
+    final counts = <FileCategory, int>{
+      FileCategory.all: _pdfFiles.length,
+    };
+    for (final f in _pdfFiles) {
+      counts[f.category] = (counts[f.category] ?? 0) + 1;
+    }
+    _categoryCounts = counts;
+  }
+
+  void _updateFilteredFiles() {
+    final query = _searchQuery.toLowerCase();
+    _filteredFiles = _pdfFiles.where((f) {
       final matchesCategory =
           _selectedCategory == FileCategory.all || f.category == _selectedCategory;
-      final matchesSearch = _searchQuery.isEmpty ||
-          f.name.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSearch = query.isEmpty ||
+          f.name.toLowerCase().contains(query);
       return matchesCategory && matchesSearch;
     }).toList();
   }
@@ -1592,6 +1604,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _customFolderList = customFolders;
         _includeSubfolders = includeSubfolders;
         _pdfFiles = files;
+        _recomputeCategoryCounts();
+        _updateFilteredFiles();
         _isLoading = false;
       });
     }
@@ -2646,7 +2660,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return PopupMenuButton<FileCategory>(
       initialValue: _selectedCategory,
       onSelected: (cat) {
-        setState(() => _selectedCategory = cat);
+        setState(() {
+          _selectedCategory = cat;
+          _updateFilteredFiles();
+        });
       },
       tooltip: 'Filter by category',
       shape: RoundedRectangleBorder(
@@ -3099,7 +3116,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.clear, size: 18),
                   onPressed: () {
                     _searchController.clear();
-                    setState(() => _searchQuery = '');
+                    setState(() {
+                      _searchQuery = '';
+                      _updateFilteredFiles();
+                    });
                   },
                 )
               : null,
@@ -3118,7 +3138,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         style: const TextStyle(fontSize: 13),
         onChanged: (val) {
-          setState(() => _searchQuery = val.trim());
+          setState(() {
+            _searchQuery = val.trim();
+            _updateFilteredFiles();
+          });
         },
       ),
     );

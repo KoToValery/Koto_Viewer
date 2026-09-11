@@ -154,6 +154,30 @@ class FileSourceService {
     await prefs.setBool(_keyIncludeSubfolders, value);
   }
 
+  static final Set<String> _supportedExtensions = {
+    // Documents & eBooks
+    'pdf', 'epub', 'fb2', 'cbz', 'cbr', 'cbt', 'docx', 'pptx', 'ppsx', 'ppt', 'pps', 'rtf', 'txt', 'log', 'md', 'markdown',
+    // Spreadsheets & Data
+    'xlsx', 'xls', 'csv', 'tsv', 'ipynb',
+    // CAD & 3D
+    'dxf', 'dwg', 'svg', 'stl', 'obj', 'gltf', 'glb', 'fbx', '3mf', 'step', 'stp', 'p21', 'iges', 'igs', 'ifc',
+    // Vector & Graphic
+    'eps', 'cdr', 'zip', 'psd', 'psb', 'ico', 'lottie',
+    // PCB & Hardware
+    'kicad_pcb', 'kicad_sch', 'kicad_sym', 'sch', 'brd', 'plt', 'hpgl', 'hpg', 'prn',
+    'gbr', 'ger', 'pho', 'art', 'gtl', 'gbl', 'gts', 'gbs', 'gto', 'gbo', 'gko', 'gm1', 'gm2',
+    'drl', 'xln', 'exc', 'drd', 'top', 'bot', 'smt', 'smb', 'sst', 'ssb', 'edge',
+    // GIS / Maps
+    'gpx', 'kml', 'kmz', 'geojson',
+    // Fonts & Medical
+    'ttf', 'otf', 'woff', 'woff2', 'dcm', 'dicom',
+    // Code files
+    'dart', 'js', 'mjs', 'ts', 'tsx', 'py', 'pyw', 'java', 'kt', 'kts', 'swift',
+    'cpp', 'cc', 'cxx', 'c', 'h', 'hpp', 'cs', 'go', 'rs', 'php', 'rb',
+    'sh', 'bash', 'ps1', 'css', 'html', 'htm', 'json', 'xml', 'yaml', 'yml',
+    'toml', 'ini', 'env', 'sql', 'proto',
+  };
+
   static bool isSupportedFile(String path) {
     final rawName = path.contains('/')
         ? path.split('/').where((s) => s.isNotEmpty).last
@@ -162,7 +186,7 @@ class FileSourceService {
             : path);
     final nameLower = rawName.toLowerCase();
 
-    // --- Docker files ---
+    // --- Docker files & exact filenames ---
     if (nameLower == 'dockerfile' ||
         nameLower.startsWith('dockerfile.') ||
         nameLower.endsWith('.dockerfile') ||
@@ -174,137 +198,15 @@ class FileSourceService {
       return true;
     }
 
-    final testItem = PdfItem(
-      path: path,
-      name: rawName,
-      sizeInBytes: 0,
-      lastOpened: DateTime.fromMillisecondsSinceEpoch(0),
-    );
-    if (testItem.fileType != KotoFileType.other) {
-      return true;
-    }
+    final dotIndex = nameLower.lastIndexOf('.');
+    if (dotIndex == -1) return false;
+    final ext = nameLower.substring(dotIndex + 1);
+    if (_supportedExtensions.contains(ext)) return true;
 
-    final lower = path.toLowerCase();
-    return lower.endsWith('.pdf') ||
-        lower.endsWith('.epub') ||
-        lower.endsWith('.fb2') ||
-        lower.endsWith('.cbz') ||
-        lower.endsWith('.cbr') ||
-        lower.endsWith('.cbt') ||
-        lower.endsWith('.dxf') ||
-        lower.endsWith('.dwg') ||
-        lower.endsWith('.svg') ||
-        lower.endsWith('.stl') ||
-        lower.endsWith('.obj') ||
-        lower.endsWith('.gltf') ||
-        lower.endsWith('.glb') ||
-        lower.endsWith('.fbx') ||
-        lower.endsWith('.3mf') ||
-        lower.endsWith('.xlsx') ||
-        lower.endsWith('.xls') ||
-        lower.endsWith('.txt') ||
-        lower.endsWith('.log') ||
-        lower.endsWith('.csv') ||
-        lower.endsWith('.tsv') ||
-        lower.endsWith('.md') ||
-        lower.endsWith('.markdown') ||
-        lower.endsWith('.docx') ||
-        lower.endsWith('.pptx') ||
-        lower.endsWith('.ppsx') ||
-        lower.endsWith('.rtf') ||
-        lower.endsWith('.eps') ||
-        lower.endsWith('.cdr') ||
-        lower.endsWith('.gbr') ||
-        lower.endsWith('.ger') ||
-        lower.endsWith('.pho') ||
-        lower.endsWith('.art') ||
-        lower.endsWith('.gtl') ||
-        lower.endsWith('.gbl') ||
-        lower.endsWith('.gts') ||
-        lower.endsWith('.gbs') ||
-        lower.endsWith('.gto') ||
-        lower.endsWith('.gbo') ||
-        lower.endsWith('.gko') ||
-        lower.endsWith('.gm1') ||
-        lower.endsWith('.gm2') ||
-        lower.endsWith('.drl') ||
-        lower.endsWith('.xln') ||
-        lower.endsWith('.exc') ||
-        lower.endsWith('.drd') ||
-        lower.endsWith('.kicad_pcb') ||
-        lower.endsWith('.kicad_sch') ||
-        lower.endsWith('.kicad_sym') ||
-        lower.endsWith('.sch') ||
-        lower.endsWith('.brd') ||
-        lower.endsWith('.plt') ||
-        lower.endsWith('.hpgl') ||
-        lower.endsWith('.hpg') ||
-        lower.endsWith('.prn') ||
-        lower.endsWith('.step') ||
-        lower.endsWith('.stp') ||
-        lower.endsWith('.p21') ||
-        lower.endsWith('.iges') ||
-        lower.endsWith('.igs') ||
-        lower.endsWith('.ifc') ||
-        lower.endsWith('.zip') ||
-        lower.endsWith('.top') ||
-        lower.endsWith('.bot') ||
-        lower.endsWith('.smt') ||
-        lower.endsWith('.smb') ||
-        lower.endsWith('.sst') ||
-        lower.endsWith('.ssb') ||
-        lower.endsWith('.edge') ||
-        lower.endsWith('.gpx') ||
-        lower.endsWith('.kml') ||
-        lower.endsWith('.kmz') ||
-        lower.endsWith('.geojson') ||
-        lower.endsWith('.lottie') ||
-        lower.endsWith('.ttf') ||
-        lower.endsWith('.otf') ||
-        lower.endsWith('.woff') ||
-        lower.endsWith('.woff2') ||
-        lower.endsWith('.ico') ||
-        lower.endsWith('.psd') ||
-        lower.endsWith('.psb') ||
-        lower.endsWith('.dcm') ||
-        lower.endsWith('.dicom') ||
-        lower.endsWith('.dart') ||
-        lower.endsWith('.js') ||
-        lower.endsWith('.mjs') ||
-        lower.endsWith('.ts') ||
-        lower.endsWith('.tsx') ||
-        lower.endsWith('.py') ||
-        lower.endsWith('.pyw') ||
-        lower.endsWith('.java') ||
-        lower.endsWith('.kt') ||
-        lower.endsWith('.kts') ||
-        lower.endsWith('.swift') ||
-        lower.endsWith('.cpp') ||
-        lower.endsWith('.cc') ||
-        lower.endsWith('.cxx') ||
-        lower.endsWith('.c') ||
-        lower.endsWith('.h') ||
-        lower.endsWith('.hpp') ||
-        lower.endsWith('.cs') ||
-        lower.endsWith('.go') ||
-        lower.endsWith('.rs') ||
-        lower.endsWith('.php') ||
-        lower.endsWith('.rb') ||
-        lower.endsWith('.sh') ||
-        lower.endsWith('.bash') ||
-        lower.endsWith('.ps1') ||
-        lower.endsWith('.css') ||
-        lower.endsWith('.html') ||
-        lower.endsWith('.htm') ||
-        lower.endsWith('.json') ||
-        lower.endsWith('.xml') ||
-        lower.endsWith('.yaml') ||
-        lower.endsWith('.yml') ||
-        lower.endsWith('.toml') ||
-        lower.endsWith('.ini') ||
-        lower.endsWith('.env') ||
-        lower.endsWith('.sql') ||
-        lower.endsWith('.proto');
+    // Double extension check (e.g. .fb2.zip)
+    if (nameLower.endsWith('.fb2.zip')) return true;
+
+    return false;
   }
 
   static List<String> getSafePublicDirectoryPaths() {
@@ -431,10 +333,9 @@ class FileSourceService {
 
     final List<PdfItem> items = [];
     try {
-      final List<FileSystemEntity> entities = dir.listSync(recursive: recursive);
-      for (final entity in entities) {
+      await for (final entity in dir.list(recursive: recursive, followLinks: false)) {
         if (entity is File && isSupportedFile(entity.path)) {
-          final stat = entity.statSync();
+          final stat = await entity.stat();
           final fileName = entity.path.split(Platform.pathSeparator).last;
           items.add(
             PdfItem(

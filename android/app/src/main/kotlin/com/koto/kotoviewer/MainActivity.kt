@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
@@ -11,6 +12,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.Executors
 
 
 class MainActivity : FlutterActivity() {
@@ -24,6 +26,8 @@ class MainActivity : FlutterActivity() {
     private var safMethodChannel: MethodChannel? = null
     /** Holds the pending Dart result for a native directory-picker request. */
     private var directoryPickerResult: MethodChannel.Result? = null
+    /** Background thread pool for SAF operations to prevent blocking the UI thread. */
+    private val safBackgroundExecutor = Executors.newFixedThreadPool(2)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,12 +115,18 @@ class MainActivity : FlutterActivity() {
                         return@setMethodCallHandler
                     }
                     val recursive = call.argument<Boolean>("recursive") ?: false
-                    try {
-                        val files = listFilesInSafFolder(uriString, recursive = recursive)
-                        result.success(files)
-                    } catch (e: Exception) {
-                        android.util.Log.e("SAFChannel", "listFilesInFolder error", e)
-                        result.error("SAF_ERROR", e.message, null)
+                    safBackgroundExecutor.execute {
+                        try {
+                            val files = listFilesInSafFolder(uriString, recursive = recursive)
+                            runOnUiThread {
+                                result.success(files)
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("SAFChannel", "listFilesInFolder error", e)
+                            runOnUiThread {
+                                result.error("SAF_ERROR", e.message, null)
+                            }
+                        }
                     }
                 }
                 "resolveContentUri" -> {
@@ -125,12 +135,18 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGUMENT", "uri is required", null)
                         return@setMethodCallHandler
                     }
-                    try {
-                        val resolved = resolveUriToFilePath(Uri.parse(uriString))
-                        result.success(resolved)
-                    } catch (e: Exception) {
-                        android.util.Log.e("SAFChannel", "resolveContentUri error", e)
-                        result.error("SAF_ERROR", e.message, null)
+                    safBackgroundExecutor.execute {
+                        try {
+                            val resolved = resolveUriToFilePath(Uri.parse(uriString))
+                            runOnUiThread {
+                                result.success(resolved)
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("SAFChannel", "resolveContentUri error", e)
+                            runOnUiThread {
+                                result.error("SAF_ERROR", e.message, null)
+                            }
+                        }
                     }
                 }
                 "pickDirectory" -> {
@@ -178,18 +194,24 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    companion object {
+        private val SAF_PROJECTION = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED
+        )
+        private const val MAX_SAF_RECURSION_DEPTH = 10
+    }
+
     /**
-     * Lists files inside a SAF tree URI folder using [DocumentFile].
+     * Lists files inside a SAF tree URI folder.
      *
-     * @param uriString  SAF tree URI string
-     * @param recursive  If true, recursively includes files from sub-directories.
+     * Uses direct [DocumentsContract] batch cursor queries with [SAF_PROJECTION] to avoid
+     * the N*4 IPC query bottleneck of [DocumentFile.listFiles].
      *
-     * Takes persistable read permission so the access survives app restarts.
-     * Each entry map has:
-     *   "uri"          — the document content URI (String)
-     *   "name"         — display name (String)
-     *   "size"         — file size in bytes (Long)
-     *   "lastModified" — last-modified timestamp in ms since epoch (Long)
+     * Falls back to [DocumentFile] traversal if direct querying is not supported by the provider.
      */
     private fun listFilesInSafFolder(
         uriString: String,
@@ -197,7 +219,7 @@ class MainActivity : FlutterActivity() {
     ): List<Map<String, Any>> {
         val treeUri = Uri.parse(uriString)
 
-        // Persist the permission so it survives app restarts.
+        // Persist permission across app restarts
         try {
             contentResolver.takePersistableUriPermission(
                 treeUri,
@@ -207,24 +229,120 @@ class MainActivity : FlutterActivity() {
             android.util.Log.w("SAFChannel", "Could not take persistable permission: ${e.message}")
         }
 
-        val docFolder = DocumentFile.fromTreeUri(this, treeUri)
-            ?: return emptyList()
-
         val result = mutableListOf<Map<String, Any>>()
-        collectFiles(docFolder, result, recursive)
+
+        // 1. Try high-performance direct batch query via DocumentsContract
+        try {
+            val rootDocId = if (DocumentsContract.isDocumentUri(this, treeUri)) {
+                DocumentsContract.getDocumentId(treeUri)
+            } else {
+                DocumentsContract.getTreeDocumentId(treeUri)
+            }
+            if (rootDocId != null) {
+                collectFilesDirect(treeUri, rootDocId, result, recursive, currentDepth = 0)
+                return result
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("SAFChannel", "Direct query failed, trying DocumentFile fallback: ${e.message}")
+        }
+
+        // 2. Fallback to DocumentFile traversal (running safely off the UI thread)
+        try {
+            val docFolder = DocumentFile.fromTreeUri(this, treeUri)
+            if (docFolder != null) {
+                collectFilesFallback(docFolder, result, recursive, currentDepth = 0)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SAFChannel", "DocumentFile fallback also failed: ${e.message}")
+        }
+
         return result
     }
 
-    /** Recursively (or not) collects file entries from a [DocumentFile] directory. */
-    private fun collectFiles(
+    /**
+     * Fast batch collection using direct DocumentsContract cursor queries.
+     * Fetches all metadata (ID, display name, mime type, size, lastModified) in a single IPC call per directory.
+     */
+    private fun collectFilesDirect(
+        treeUri: Uri,
+        parentDocId: String,
+        result: MutableList<Map<String, Any>>,
+        recursive: Boolean,
+        currentDepth: Int
+    ) {
+        if (currentDepth > MAX_SAF_RECURSION_DEPTH) return
+
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+        val subDirs = mutableListOf<String>()
+
+        try {
+            contentResolver.query(
+                childrenUri,
+                SAF_PROJECTION,
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val idIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                val modIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+
+                while (cursor.moveToNext()) {
+                    val docId = if (idIndex != -1) cursor.getString(idIndex) else null ?: continue
+                    val name = if (nameIndex != -1) cursor.getString(nameIndex) else null ?: continue
+                    val mimeType = if (mimeIndex != -1) cursor.getString(mimeIndex) else ""
+
+                    if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        if (recursive) {
+                            subDirs.add(docId)
+                        }
+                    } else {
+                        val childUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                        val size = if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) cursor.getLong(sizeIndex) else 0L
+                        val lastModified = if (modIndex != -1 && !cursor.isNull(modIndex)) cursor.getLong(modIndex) else 0L
+
+                        result.add(
+                            mapOf(
+                                "uri"          to childUri.toString(),
+                                "name"         to name,
+                                "size"         to size,
+                                "lastModified" to lastModified
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("SAFChannel", "Error querying children for docId $parentDocId: ${e.message}")
+        }
+
+        // Recurse into subdirectories
+        if (recursive && subDirs.isNotEmpty()) {
+            for (subDirDocId in subDirs) {
+                collectFilesDirect(treeUri, subDirDocId, result, recursive = true, currentDepth = currentDepth + 1)
+            }
+        }
+    }
+
+    /** Safe fallback using DocumentFile. Fixes the bug where a null name would abort the entire traversal. */
+    private fun collectFilesFallback(
         folder: DocumentFile,
         result: MutableList<Map<String, Any>>,
-        recursive: Boolean
+        recursive: Boolean,
+        currentDepth: Int
     ) {
-        for (child in folder.listFiles()) {
-            when {
-                child.isFile -> {
-                    val name = child.name ?: return
+        if (currentDepth > MAX_SAF_RECURSION_DEPTH) return
+        val children = folder.listFiles()
+        for (child in children) {
+            try {
+                if (child.isDirectory) {
+                    if (recursive) {
+                        collectFilesFallback(child, result, recursive = true, currentDepth = currentDepth + 1)
+                    }
+                } else {
+                    val name = child.name ?: continue
                     result.add(
                         mapOf(
                             "uri"          to child.uri.toString(),
@@ -234,9 +352,8 @@ class MainActivity : FlutterActivity() {
                         )
                     )
                 }
-                child.isDirectory && recursive -> {
-                    collectFiles(child, result, recursive = true)
-                }
+            } catch (e: Exception) {
+                android.util.Log.w("SAFChannel", "Error reading child file in fallback: ${e.message}")
             }
         }
     }
@@ -703,5 +820,10 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             false
         }
+    }
+
+    override fun onDestroy() {
+        safBackgroundExecutor.shutdown()
+        super.onDestroy()
     }
 }
