@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pdf_item.dart';
 
@@ -5,6 +6,9 @@ class RecentFilesService {
   static const String _keyRecentFiles = 'koto_recent_files';
   static const String _legacyKeyRecentFiles = 'koto_recent_pdf_files';
   static const int _maxRecentFiles = 25;
+
+  /// Notifier that triggers whenever recent files are added, removed, or cleared.
+  static final ValueNotifier<int> recentFilesNotifier = ValueNotifier<int>(0);
 
   static Future<List<PdfItem>> getRecentFiles() async {
     final prefs = await SharedPreferences.getInstance();
@@ -36,6 +40,7 @@ class RecentFilesService {
 
     final jsonList = currentList.map((item) => item.toJson()).toList();
     await prefs.setStringList(_keyRecentFiles, jsonList);
+    recentFilesNotifier.value++;
   }
 
   static Future<void> removeRecentFile(String path) async {
@@ -46,11 +51,13 @@ class RecentFilesService {
 
     final jsonList = currentList.map((item) => item.toJson()).toList();
     await prefs.setStringList(_keyRecentFiles, jsonList);
+    recentFilesNotifier.value++;
   }
 
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyRecentFiles);
     await prefs.remove(_legacyKeyRecentFiles);
+    recentFilesNotifier.value++;
   }
 }
