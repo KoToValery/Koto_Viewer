@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../models/pdf_item.dart';
+import '../errors/app_error_handler.dart';
 import 'android_saf_service.dart';
 import 'dwg_converter_service.dart';
 import 'ppt_to_pdf_converter_service.dart';
@@ -427,16 +428,26 @@ class FileOpenerService {
     String originalFilePath,
     Widget screen,
   ) async {
-    final bool? success = await navigator.push<bool>(
-      MaterialPageRoute(builder: (_) => screen),
-    );
+    try {
+      final bool? success = await navigator.push<bool>(
+        MaterialPageRoute(builder: (_) => screen),
+      );
 
-    if (success != false) {
-      await RecentFilesService.addRecentFile(item);
-      return true;
-    } else {
-      await RecentFilesService.removeRecentFile(originalFilePath);
-      return false;
+      if (success != false) {
+        await RecentFilesService.addRecentFile(item);
+        return true;
+      } else {
+        await RecentFilesService.removeRecentFile(originalFilePath);
+        return false;
+      }
+    } catch (e, stack) {
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'FileOpenerService._pushViewer (${item.name})',
+        isFatal: false,
+      );
+      rethrow;
     }
   }
 

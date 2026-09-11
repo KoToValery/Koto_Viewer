@@ -41,6 +41,7 @@ void main() {
       // Verify License & Open Source
       expect(find.text('Open Source & Licensing'), findsOneWidget);
       expect(find.text('Licenses'), findsOneWidget);
+      expect(find.text('Logs'), findsOneWidget);
       expect(find.text('GitHub'), findsOneWidget);
       expect(find.text('Close'), findsOneWidget);
     });

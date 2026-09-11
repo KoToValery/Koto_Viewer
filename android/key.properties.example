@@ -1,0 +1,7 @@
+# Keystore configuration template for release signing
+# Copy this file to 'key.properties' and set your keystore details.
+# WARNING: Never commit 'key.properties' or keystore files to version control!
+storePassword=YourStorePassword
+keyPassword=YourKeyPassword
+keyAlias=upload
+storeFile=upload-keystore.jks

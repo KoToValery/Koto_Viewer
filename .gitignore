@@ -51,3 +51,10 @@ test_files/text_wrap.dwg
 test_files/text.dwg
 nakov_*
 test/nakov_debug_test.dart
+
+# Keystore and release signing
+key.properties
+*.jks
+*.keystore
+**/*.jks
+**/*.keystore

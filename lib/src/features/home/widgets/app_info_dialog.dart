@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/errors/error_log_dialog.dart';
 
 /// Modern, comprehensive App Info & About dialog with dynamic version detection.
 class AppInfoDialog extends StatefulWidget {
@@ -286,6 +287,16 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     },
                     icon: const Icon(Icons.article_outlined, size: 16),
                     label: const Text('Licenses', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => ErrorLogDialog.show(context),
+                    icon: const Icon(Icons.bug_report_outlined, size: 16),
+                    label: const Text('Logs', style: TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

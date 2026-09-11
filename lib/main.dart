@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'src/core/errors/app_error_handler.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/services/intent_service.dart';
 import 'src/core/services/local_server_service.dart';
@@ -7,14 +9,25 @@ import 'src/core/services/coordinate_system_service.dart';
 import 'src/core/services/file_opener_service.dart';
 import 'src/features/home/home_screen.dart';
 
-void main(List<String> args) async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await CoordinateSystemService.init();
-  String? initialFile;
-  if (args.isNotEmpty && File(args.first).existsSync()) {
-    initialFile = args.first;
-  }
-  runApp(KotoViewApp(initialFilePath: initialFile));
+void main(List<String> args) {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    AppErrorHandler.init();
+
+    await CoordinateSystemService.init();
+    String? initialFile;
+    if (args.isNotEmpty && File(args.first).existsSync()) {
+      initialFile = args.first;
+    }
+    runApp(KotoViewApp(initialFilePath: initialFile));
+  }, (error, stack) {
+    AppErrorHandler.recordError(
+      error,
+      stack,
+      context: 'runZonedGuarded',
+      isFatal: true,
+    );
+  });
 }
 
 class KotoViewApp extends StatefulWidget {
@@ -35,6 +48,7 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    AppErrorHandler.navigatorKey = _navigatorKey;
     WidgetsBinding.instance.addObserver(this);
 
     if (widget.initialFilePath != null && widget.initialFilePath!.isNotEmpty) {
