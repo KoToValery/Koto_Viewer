@@ -1,11 +1,15 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/core/services/recent_files_service.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 import 'package:kotoview/src/core/services/reading_progress_service.dart';
+import 'models/text_reflow_models.dart';
+import 'widgets/text_reflow_view.dart';
 
 enum LogLevelFilter { all, error, warn, info, debug }
 
@@ -29,6 +33,13 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   List<String> _lines = [];
 
   LogLevelFilter _logLevelFilter = LogLevelFilter.all;
+
+  // Reflow / E-Book Reading Mode
+  bool _isReflowMode = false;
+  TextReflowSettings _reflowSettings = const TextReflowSettings();
+  int? _resumedChapter;
+  int? _resumedMiniPage;
+  double? _resumedFraction;
 
   // Options
   bool _showLineNumbers = false; // User requested to default off
@@ -88,6 +99,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   @override
   void initState() {
     super.initState();
+    _loadReflowSettings();
     _loadTextFile();
   }
 
@@ -99,6 +111,51 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     _horizontalScrollController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadReflowSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isEnabled = prefs.getBool('txt_reflow_is_enabled') ?? false;
+      final fontSize = prefs.getDouble('txt_reflow_font_size') ?? 17.0;
+      final themeIndex = prefs.getInt('txt_reflow_theme') ?? TextReflowTheme.sepia.index;
+      final fontIndex = prefs.getInt('txt_reflow_font') ?? TextReflowFont.serif.index;
+      final modeIndex = prefs.getInt('txt_reflow_mode') ?? TextReflowMode.paginated.index;
+      final lineHeight = prefs.getDouble('txt_reflow_line_height') ?? 1.6;
+
+      if (mounted) {
+        setState(() {
+          // If it's a log file, default to raw code view, otherwise use preference
+          _isReflowMode = _isLogFile ? false : isEnabled;
+          _reflowSettings = TextReflowSettings(
+            fontSize: fontSize,
+            theme: TextReflowTheme.values.elementAtOrNull(themeIndex) ?? TextReflowTheme.sepia,
+            font: TextReflowFont.values.elementAtOrNull(fontIndex) ?? TextReflowFont.serif,
+            mode: TextReflowMode.values.elementAtOrNull(modeIndex) ?? TextReflowMode.paginated,
+            lineHeight: lineHeight,
+          );
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveReflowSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('txt_reflow_is_enabled', _isReflowMode);
+      await prefs.setDouble('txt_reflow_font_size', _reflowSettings.fontSize);
+      await prefs.setInt('txt_reflow_theme', _reflowSettings.theme.index);
+      await prefs.setInt('txt_reflow_font', _reflowSettings.font.index);
+      await prefs.setInt('txt_reflow_mode', _reflowSettings.mode.index);
+      await prefs.setDouble('txt_reflow_line_height', _reflowSettings.lineHeight);
+    } catch (_) {}
+  }
+
+  void _toggleReflowMode() {
+    setState(() {
+      _isReflowMode = !_isReflowMode;
+    });
+    _saveReflowSettings();
   }
 
   Future<void> _loadTextFile() async {
@@ -125,6 +182,9 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
       final progress = await ReadingProgressService.getProgress(widget.filePath);
       if (progress != null) {
         _bookmarks = progress.bookmarks;
+        _resumedChapter = progress.chapter;
+        _resumedMiniPage = progress.miniPage;
+        _resumedFraction = progress.progressFraction;
       } else {
         _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
       }
@@ -134,7 +194,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
           _isLoading = false;
         });
 
-        if (progress != null && progress.scrollOffset > 0) {
+        if (progress != null && progress.scrollOffset > 0 && !_isReflowMode) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && _verticalScrollController.hasClients) {
               _verticalScrollController.jumpTo(
@@ -163,6 +223,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   }
 
   void _saveReadingProgress() {
+    if (_isReflowMode) return;
     if (!_verticalScrollController.hasClients) return;
     final offset = _verticalScrollController.offset;
     final max = _verticalScrollController.position.maxScrollExtent;
@@ -176,6 +237,38 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   }
 
   Future<void> _toggleBookmark() async {
+    if (_isReflowMode) {
+      final progress = await ReadingProgressService.getProgress(widget.filePath);
+      final currentChapter = progress?.chapter ?? 0;
+      final currentMiniPage = progress?.miniPage ?? 0;
+      final totalPercent = ((progress?.progressFraction ?? 0.0) * 100).round();
+
+      final newBookmark = BookmarkItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        page: currentMiniPage + 1,
+        chapter: currentChapter,
+        miniPage: currentMiniPage,
+        label: 'Pg. ${currentMiniPage + 1} ($totalPercent%)',
+        snippet: 'Reading position ($totalPercent%)',
+        createdAt: DateTime.now(),
+      );
+
+      await ReadingProgressService.addBookmark(widget.filePath, newBookmark);
+      _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
+      setState(() {});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Bookmarked Page ${currentMiniPage + 1} ($totalPercent%)'),
+          ),
+        );
+      }
+      return;
+    }
+
     final offset = _verticalScrollController.hasClients ? _verticalScrollController.offset : 0.0;
     final max = _verticalScrollController.hasClients ? _verticalScrollController.position.maxScrollExtent : 1.0;
     final percent = max > 0 ? ((offset / max) * 100).toInt() : 0;
@@ -294,7 +387,12 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                     ),
                                     onTap: () {
                                       Navigator.pop(context);
-                                      if (_verticalScrollController.hasClients && _lines.isNotEmpty) {
+                                      if (_isReflowMode) {
+                                        setState(() {
+                                          _resumedChapter = b.chapter ?? 0;
+                                          _resumedMiniPage = b.miniPage ?? math.max(0, b.page - 1);
+                                        });
+                                      } else if (_verticalScrollController.hasClients && _lines.isNotEmpty) {
                                         final targetFraction = (b.page - 1) / _lines.length;
                                         final targetOffset = targetFraction * _verticalScrollController.position.maxScrollExtent;
                                         _verticalScrollController.animateTo(
@@ -529,9 +627,10 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     final currentLines = _filteredLines;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: _isReflowMode ? _reflowSettings.theme.backgroundColor : theme.scaffoldBackgroundColor,
       appBar: _isFullscreen ? null : AppBar(
-        backgroundColor: theme.colorScheme.surface,
+        backgroundColor: _isReflowMode ? _reflowSettings.theme.surfaceColor : theme.colorScheme.surface,
+        foregroundColor: _isReflowMode ? _reflowSettings.theme.textColor : null,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -566,9 +665,12 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
           child: Container(
             height: 44,
             decoration: BoxDecoration(
+              color: _isReflowMode ? _reflowSettings.theme.surfaceColor : null,
               border: Border(
                 bottom: BorderSide(
-                  color: isDark ? Colors.white10 : Colors.black12,
+                  color: _isReflowMode
+                      ? _reflowSettings.theme.textColor.withValues(alpha: 0.1)
+                      : (isDark ? Colors.white10 : Colors.black12),
                 ),
               ),
             ),
@@ -592,6 +694,21 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                         }
                       });
                     },
+                  ),
+
+                  // Reading Mode (Reflow / Overflow / E-Book)
+                  IconButton(
+                    icon: Icon(
+                      _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
+                      size: 20,
+                      color: _isReflowMode ? _reflowSettings.theme.accentColor : null,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: _isReflowMode
+                        ? 'Exit Reading Mode (Code/Log View)'
+                        : 'Reading Mode (Reflow / Overflow / E-Book)',
+                    onPressed: _toggleReflowMode,
                   ),
 
                   // Bookmark button
@@ -717,10 +834,10 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                 )
               : Column(
                   children: [
-                    if (_isLogFile) _buildLogFilterBar(),
+                    if (!_isReflowMode && _isLogFile) _buildLogFilterBar(),
 
                     // Search Match Status Bar with Next/Prev
-                    if (_searchQuery.isNotEmpty)
+                    if (!_isReflowMode && _searchQuery.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                         color: const Color(0xFFFFB74D).withValues(alpha: 0.2),
@@ -758,32 +875,39 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                         ),
                       ),
 
-                    // Main Text Display Area (Vertical & Horizontal Scrollable)
+                    // Main Text Display Area (Reflow E-Book View or Raw Line View)
                     Expanded(
-                      child: Stack(
-                        children: [
-                          _isWordWrap
-                              ? ListView.builder(
-                                  controller: _verticalScrollController,
-                                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
-                                  itemCount: currentLines.length,
-                                  itemBuilder: (context, index) => _buildLineItem(
-                                    index,
-                                    currentLines[index],
-                                    fontStyle,
-                                    lineGutterColor,
-                                    gutterBg,
-                                  ),
-                                )
-                              : Scrollbar(
-                                  controller: _horizontalScrollController,
-                                  thumbVisibility: true,
-                                  child: SingleChildScrollView(
-                                    controller: _horizontalScrollController,
-                                    scrollDirection: Axis.horizontal,
-                                    child: SizedBox(
-                                      width: 2500, // Wide canvas for unified horizontal scroll
-                                      child: ListView.builder(
+                      child: _isReflowMode
+                          ? TextReflowView(
+                              fullText: _fullText,
+                              fileName: _fileName,
+                              filePath: widget.filePath,
+                              settings: _reflowSettings,
+                              onSettingsChanged: (newSettings) {
+                                setState(() {
+                                  _reflowSettings = newSettings;
+                                });
+                                _saveReflowSettings();
+                              },
+                              onExitReflow: () {
+                                setState(() {
+                                  _isReflowMode = false;
+                                });
+                                _saveReflowSettings();
+                              },
+                              bookmarks: _bookmarks,
+                              onToggleBookmark: _toggleBookmark,
+                              onShowBookmarks: _showBookmarksSheet,
+                              onToggleFullscreen: _toggleFullscreen,
+                              isFullscreen: _isFullscreen,
+                              initialChapter: _resumedChapter,
+                              initialMiniPage: _resumedMiniPage,
+                              initialFraction: _resumedFraction,
+                            )
+                          : Stack(
+                              children: [
+                                _isWordWrap
+                                    ? ListView.builder(
                                         controller: _verticalScrollController,
                                         padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
                                         itemCount: currentLines.length,
@@ -794,31 +918,51 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                           lineGutterColor,
                                           gutterBg,
                                         ),
+                                      )
+                                    : Scrollbar(
+                                        controller: _horizontalScrollController,
+                                        thumbVisibility: true,
+                                        child: SingleChildScrollView(
+                                          controller: _horizontalScrollController,
+                                          scrollDirection: Axis.horizontal,
+                                          child: SizedBox(
+                                            width: 2500, // Wide canvas for unified horizontal scroll
+                                            child: ListView.builder(
+                                              controller: _verticalScrollController,
+                                              padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
+                                              itemCount: currentLines.length,
+                                              itemBuilder: (context, index) => _buildLineItem(
+                                                index,
+                                                currentLines[index],
+                                                fontStyle,
+                                                lineGutterColor,
+                                                gutterBg,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
+
+                                // Floating Zoom Slider Controls
+                                Positioned(
+                                  bottom: 20 + MediaQuery.paddingOf(context).bottom,
+                                  right: 20,
+                                  child: _buildZoomControls(theme),
                                 ),
 
-                          // Floating Zoom Slider Controls
-                          Positioned(
-                            bottom: 20 + MediaQuery.paddingOf(context).bottom,
-                            right: 20,
-                            child: _buildZoomControls(theme),
-                          ),
-
-                          if (_isFullscreen)
-                            Positioned(
-                              top: 20,
-                              right: 20,
-                              child: FloatingActionButton.small(
-                                heroTag: 'exit_fullscreen',
-                                onPressed: _toggleFullscreen,
-                                backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
-                                child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
-                              ),
+                                if (_isFullscreen)
+                                  Positioned(
+                                    top: 20,
+                                    right: 20,
+                                    child: FloatingActionButton.small(
+                                      heroTag: 'exit_fullscreen',
+                                      onPressed: _toggleFullscreen,
+                                      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+                                      child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+                                    ),
+                                  ),
+                              ],
                             ),
-                        ],
-                      ),
                     ),
                   ],
                 ),
