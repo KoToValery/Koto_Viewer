@@ -325,7 +325,7 @@ f 1//1 2//1 3//1 4//1
   });
 
   group('Cad3DMeshPainter Tests', () {
-    test('Draws all triangles without backface culling in all shading modes', () {
+    test('Draws triangles with perspective-accurate backface culling in all shading modes', () {
       final triFront = Triangle3D(
         v0: const Vector3(-5, -5, 0),
         v1: const Vector3(5, -5, 0),

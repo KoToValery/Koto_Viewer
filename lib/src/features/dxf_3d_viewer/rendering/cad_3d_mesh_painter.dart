@@ -103,8 +103,9 @@ class Cad3DMeshPainter extends CustomPainter {
     final keyHalf = (keyLight + const Vector3(0.0, -1.0, 0.0)).normalized();
     final List<_RenderTriangle> renderList = [];
 
-    // Render 100% of triangles at full quality without decimation during interaction
-    final int totalTris = mesh.triangles.length;
+    // Retrieve display triangles (smoothly subdivided for large triangles > 1500mm to eliminate painter's depth-sorting bleed-through)
+    final displayTriangles = _getDisplayTriangles(mesh);
+    final int totalTris = displayTriangles.length;
     const int stride = 1;
 
     final double screenW = size.width;
@@ -112,7 +113,7 @@ class Cad3DMeshPainter extends CustomPainter {
     const double margin = 50.0;
 
     for (int i = 0; i < totalTris; i += stride) {
-      final tri = mesh.triangles[i];
+      final tri = displayTriangles[i];
 
       // Offset by model center so model rotates around its geometric centroid
       final v0Local = tri.v0 - center;
@@ -139,6 +140,21 @@ class Cad3DMeshPainter extends CustomPainter {
       final maxY = math.max(p0.dy, math.max(p1.dy, p2.dy));
       if (maxY < -margin) continue;
 
+      // Perspective-accurate 2D screen backface culling:
+      // In Flutter canvas space (X right, Y down where screenY = centerY - sz*scale),
+      // front-facing triangles have cross2d < 0, and back-facing triangles have cross2d >= 0.
+      final cross2d = (p1.dx - p0.dx) * (p2.dy - p0.dy) - (p1.dy - p0.dy) * (p2.dx - p0.dx);
+      final bool isBackface = cross2d >= 0;
+      final bool isTransparent = (tri.color != null && tri.color!.a < 0.99);
+
+      // Backface Culling for closed solids in opaque shading modes
+      if (isBackface &&
+          !tri.isDoubleSided &&
+          !isTransparent &&
+          shadingMode != Cad3DShadingMode.wireframe &&
+          shadingMode != Cad3DShadingMode.xray) {
+        continue;
+      }
 
       // Fast view-space normal calculation for lighting
       final edge1 = tv1 - tv0;
@@ -428,6 +444,75 @@ class Cad3DMeshPainter extends CustomPainter {
     drawAxis(xAxis, const Color(0xFFEF4444), 'X');
     drawAxis(yAxis, const Color(0xFF10B981), 'Y');
     drawAxis(zAxis, const Color(0xFF3B82F6), 'Z');
+  }
+
+  static final Expando<List<Triangle3D>> _subdivisionCache = Expando<List<Triangle3D>>();
+
+  static List<Triangle3D> _getDisplayTriangles(Mesh3D mesh) {
+    final cached = _subdivisionCache[mesh];
+    if (cached != null) return cached;
+
+    // Only subdivide if mesh has a manageable number of triangles (< 8000)
+    // and contains large architectural triangles (> 1500 mm).
+    if (mesh.triangles.isEmpty || mesh.triangles.length > 8000) {
+      _subdivisionCache[mesh] = mesh.triangles;
+      return mesh.triangles;
+    }
+
+    const double thresholdSq = 1500.0 * 1500.0;
+    bool hasLarge = false;
+    for (final t in mesh.triangles) {
+      if ((t.v1 - t.v0).lengthSquared > thresholdSq ||
+          (t.v2 - t.v1).lengthSquared > thresholdSq ||
+          (t.v0 - t.v2).lengthSquared > thresholdSq) {
+        hasLarge = true;
+        break;
+      }
+    }
+
+    if (!hasLarge) {
+      _subdivisionCache[mesh] = mesh.triangles;
+      return mesh.triangles;
+    }
+
+    final subdivided = _subdivideTris(mesh.triangles, 1200.0);
+    _subdivisionCache[mesh] = subdivided;
+    return subdivided;
+  }
+
+  static List<Triangle3D> _subdivideTris(List<Triangle3D> tris, double maxEdgeLen) {
+    if (tris.isEmpty) return tris;
+    final result = <Triangle3D>[];
+    final maxEdgeLenSq = maxEdgeLen * maxEdgeLen;
+    for (final tri in tris) {
+      final e01 = (tri.v1 - tri.v0).lengthSquared;
+      final e12 = (tri.v2 - tri.v1).lengthSquared;
+      final e20 = (tri.v0 - tri.v2).lengthSquared;
+      if (e01 <= maxEdgeLenSq && e12 <= maxEdgeLenSq && e20 <= maxEdgeLenSq) {
+        result.add(tri);
+        continue;
+      }
+      if (e01 >= e12 && e01 >= e20) {
+        final mid = (tri.v0 + tri.v1) * 0.5;
+        result.addAll(_subdivideTris([
+          Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+          Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+        ], maxEdgeLen));
+      } else if (e12 >= e01 && e12 >= e20) {
+        final mid = (tri.v1 + tri.v2) * 0.5;
+        result.addAll(_subdivideTris([
+          Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+          Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+        ], maxEdgeLen));
+      } else {
+        final mid = (tri.v2 + tri.v0) * 0.5;
+        result.addAll(_subdivideTris([
+          Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+          Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+        ], maxEdgeLen));
+      }
+    }
+    return result;
   }
 
   @override

@@ -695,6 +695,72 @@ END-ISO-10303-21;
         expect(jambTris.isNotEmpty, isTrue);
       }
     });
+
+    test('Verify wall.ifc miter junction cleanup eliminates internal touching faces', () {
+      final file = File(r'C:\Users\Creator\Dropbox\test_files\wall.ifc');
+      if (!file.existsSync()) return;
+
+      final model = IfcParser.parseFromText(file.readAsStringSync());
+      final walls = model.elements.where((e) => e.category == 'Wall').toList();
+      expect(walls.length, equals(2));
+
+      // Each wall started with 12 triangles (including 2 miter triangles at the joint).
+      // After _cleanWallJunctions, the 2 internal miter triangles are pruned, leaving 10 clean triangles.
+      for (final w in walls) {
+        expect(w.triangles.length, equals(10));
+      }
+    });
+
+    test('Verify wall_openings.ifc cleans door & window interface faces and door floor opening', () {
+      final file = File(r'C:\Users\Creator\Dropbox\test_files\wall_openings.ifc');
+      if (!file.existsSync()) return;
+
+      final model = IfcParser.parseFromText(file.readAsStringSync());
+
+      // 1. Door categorization from IFCBUILDINGELEMENTPROXY with type/classification "Door 27"
+      final door = model.elements.firstWhere((e) => e.name.contains('Door') || e.category == 'Door');
+      expect(door.category, equals('Door'));
+
+      final window = model.elements.firstWhere((e) => e.name.contains('Window') || e.category == 'Window');
+      expect(window.category, equals('Window'));
+
+      // 2. Door bottom at Z=0 should not have an upward-facing sill quad (no triangles at Z=0 with normal +Z in the opening)
+      final wall = model.elements.firstWhere((e) => e.id == 118);
+      final doorFloorSillTris = wall.triangles.where((t) =>
+        t.normal.z > 0.9 &&
+        t.v0.z.abs() < 1.0 && t.v1.z.abs() < 1.0 && t.v2.z.abs() < 1.0 &&
+        t.v0.y > 530 && t.v0.y < 1530
+      ).toList();
+      expect(doorFloorSillTris, isEmpty);
+
+      // 3. Window and Door outer interface faces are pruned
+      // Door outer left jamb at y=530 with normal (0, -1, 0) should be pruned
+      final doorOuterLeftJamb = door.triangles.where((t) =>
+        t.normal.y < -0.85 &&
+        (t.v0.y - 530.0).abs() < 2.0 &&
+        (t.v1.y - 530.0).abs() < 2.0 &&
+        (t.v2.y - 530.0).abs() < 2.0
+      ).toList();
+      expect(doorOuterLeftJamb, isEmpty);
+
+      // Door outer right jamb at y=1530 with normal (0, 1, 0) should be pruned
+      final doorOuterRightJamb = door.triangles.where((t) =>
+        t.normal.y > 0.85 &&
+        (t.v0.y - 1530.0).abs() < 2.0 &&
+        (t.v1.y - 1530.0).abs() < 2.0 &&
+        (t.v2.y - 1530.0).abs() < 2.0
+      ).toList();
+      expect(doorOuterRightJamb, isEmpty);
+
+      // Window outer sill at z=900 with normal (0, 0, -1) should be pruned
+      final windowOuterSill = window.triangles.where((t) =>
+        t.normal.z < -0.85 &&
+        (t.v0.z - 900.0).abs() < 2.0 &&
+        (t.v1.z - 900.0).abs() < 2.0 &&
+        (t.v2.z - 900.0).abs() < 2.0
+      ).toList();
+      expect(windowOuterSill, isEmpty);
+    });
   });
 }
 

@@ -193,6 +193,37 @@ class _Obb {
   _Obb(this.pMin, this.pMax, this.nX, this.nY, this.nZ);
 }
 
+class _OpeningVoidData {
+  final int opId;
+  final _Obb obb;
+  _OpeningVoidData(this.opId, this.obb);
+}
+
+class _OpeningFillInterface {
+  final int openingId;
+  final int? fillElementId;
+  final Vector3 pMin;
+  final Vector3 jAxis;
+  final Vector3 nZ;
+  final double jMin;
+  final double jMax;
+  final double zMin;
+  final double zMax;
+
+  _OpeningFillInterface({
+    required this.openingId,
+    required this.fillElementId,
+    required this.pMin,
+    required this.jAxis,
+    required this.nZ,
+    required this.jMin,
+    required this.jMax,
+    required this.zMin,
+    required this.zMax,
+  });
+}
+
+
 class _IfcGeometrySolver {
   final Map<int, _RawIfcEntity> entityMap;
   final Map<int, Vector3> pointCache = {};
@@ -359,15 +390,74 @@ class _IfcGeometrySolver {
 
     // 2.7. Parse Window/Door Fills (IFCRELFILLSELEMENT -> Opening filled by Window/Door/Proxy)
     final Set<int> fillElementIds = {};
+    final Map<int, int> openingToFillElementId = {};
     for (final ent in entityMap.values) {
       if (ent.type == 'IFCRELFILLSELEMENT') {
         final params = ent.splitParams;
         if (params.length >= 6) {
+          final opId = int.tryParse(params[4].replaceAll(RegExp(r'[#\s]'), ''));
           final elId = int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), ''));
-          if (elId != null) fillElementIds.add(elId);
+          if (elId != null) {
+            fillElementIds.add(elId);
+            if (opId != null) openingToFillElementId[opId] = elId;
+          }
         }
       }
     }
+
+    // 2.8. Parse Type Definitions (IFCRELDEFINESBYTYPE -> RelatingType name)
+    final Map<int, String> elementToTypeName = {};
+    for (final ent in entityMap.values) {
+      if (ent.type == 'IFCRELDEFINESBYTYPE') {
+        final params = ent.splitParams;
+        if (params.length >= 6) {
+          final typeId = int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), ''));
+          final typeEnt = typeId != null ? entityMap[typeId] : null;
+          String typeName = '';
+          if (typeEnt != null) {
+            final tParams = typeEnt.splitParams;
+            if (tParams.length > 2 && tParams[2].startsWith("'")) {
+              typeName = IfcParser.decodeIfcString(tParams[2].replaceAll("'", ""));
+            }
+          }
+          final matches = RegExp(r'#(\d+)').allMatches(params[4]);
+          for (final m in matches) {
+            final elId = int.parse(m.group(1)!);
+            if (typeName.isNotEmpty) {
+              elementToTypeName[elId] = typeName;
+            }
+          }
+        }
+      }
+    }
+
+    // 2.9. Parse Classification References (IFCRELASSOCIATESCLASSIFICATION -> Classification name)
+    final Map<int, String> elementToClassification = {};
+    for (final ent in entityMap.values) {
+      if (ent.type == 'IFCRELASSOCIATESCLASSIFICATION') {
+        final params = ent.splitParams;
+        if (params.length >= 6) {
+          final classId = int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), ''));
+          final classEnt = classId != null ? entityMap[classId] : null;
+          String className = '';
+          if (classEnt != null) {
+            final cParams = classEnt.splitParams;
+            if (cParams.length > 1 && cParams[1].startsWith("'")) {
+              className = IfcParser.decodeIfcString(cParams[1].replaceAll("'", ""));
+            }
+          }
+          final matches = RegExp(r'#(\d+)').allMatches(params[4]);
+          for (final m in matches) {
+            final elId = int.parse(m.group(1)!);
+            if (className.isNotEmpty) {
+              elementToClassification[elId] = className;
+            }
+          }
+        }
+      }
+    }
+
+    final List<_OpeningFillInterface> openingFillInterfaces = [];
 
     // 3. Find and generate building elements
     final List<IfcElement> elements = [];
@@ -393,6 +483,10 @@ class _IfcGeometrySolver {
 
       final lowerName = name.toLowerCase();
       final lowerLayer = layer.toLowerCase();
+      final typeName = elementToTypeName[ent.id] ?? '';
+      final className = elementToClassification[ent.id] ?? '';
+      final lowerTypeName = typeName.toLowerCase();
+      final lowerClassName = className.toLowerCase();
 
       // Intelligent architectural categorization:
       if (lowerLayer.contains('покрив') || lowerLayer.contains('roof') ||
@@ -410,8 +504,17 @@ class _IfcGeometrySolver {
       } else if (lowerLayer.contains('повърхности') || lowerLayer.contains('terrain') ||
                  lowerLayer.contains('site') || ent.type == 'IFCSITE' || ent.type == 'IFCGEOGRAPHICELEMENT') {
         category = 'Site';
-      } else if (ent.type == 'IFCBUILDINGELEMENTPROXY' && fillElementIds.contains(ent.id)) {
-        if (lowerName.contains('door') || lowerName.contains('врата') || lowerName.contains('doo')) {
+      } else if (ent.type == 'IFCBUILDINGELEMENTPROXY' &&
+                 (fillElementIds.contains(ent.id) ||
+                  lowerName.contains('door') || lowerName.contains('врата') ||
+                  lowerTypeName.contains('door') || lowerTypeName.contains('врата') ||
+                  lowerClassName.contains('door') || lowerClassName.contains('врата') ||
+                  lowerName.contains('window') || lowerName.contains('прозорец') ||
+                  lowerTypeName.contains('window') || lowerTypeName.contains('прозорец') ||
+                  lowerClassName.contains('window') || lowerClassName.contains('прозорец'))) {
+        if (lowerName.contains('door') || lowerName.contains('врата') || lowerName.contains('doo') ||
+            lowerTypeName.contains('door') || lowerTypeName.contains('врата') || lowerTypeName.contains('doo') ||
+            lowerClassName.contains('door') || lowerClassName.contains('врата') || lowerClassName.contains('doo')) {
           category = 'Door';
         } else {
           category = 'Window';
@@ -426,17 +529,26 @@ class _IfcGeometrySolver {
 
       final triangles = <Triangle3D>[];
       if (shapeRepId != null) {
-        var rawTris = _resolveShapeRepresentation(shapeRepId, transform, elementColor);
+        var rawTris = _resolveShapeRepresentation(shapeRepId, transform, elementColor, category: category);
 
         // Apply Opening Voids (Windows and Doors cut into Walls)
         final openingIds = elementToVoidOpeningIds[ent.id];
         if (openingIds != null && openingIds.isNotEmpty) {
-          rawTris = _applyOpeningVoids(rawTris, openingIds);
+          rawTris = _applyOpeningVoids(
+            rawTris,
+            openingIds,
+            openingFillInterfaces: openingFillInterfaces,
+            openingToFillElementId: openingToFillElementId,
+          );
         }
 
         final filteredTris = _filterDegenerateTriangles(rawTris);
+        final hasUpward = filteredTris.any((t) => t.normal.z > 0.1);
+        final hasDownward = filteredTris.any((t) => t.normal.z < -0.1);
+        final bool isClosedSolid = hasUpward && hasDownward;
+
         for (final t in filteredTris) {
-          final bool makeDoubleSided = category == 'Roof' ||
+          final bool makeDoubleSided = (!isClosedSolid && category == 'Roof') ||
               category == 'Site' ||
               (t.color != null && t.color!.a < 0.99) ||
               t.isDoubleSided;
@@ -476,6 +588,12 @@ class _IfcGeometrySolver {
     // Prune redundant unclipped duplicate walls (e.g. ArchiCAD phantom wall exports
     // where an unclipped raw box was exported concurrently with a trimmed wall at the exact same location)
     _pruneDuplicateGhostWalls(elements);
+
+    // Clean up internal coincident touching faces between connected walls (miters and L/T-junctions)
+    _cleanWallJunctions(elements);
+
+    // Clean up buried outer interface faces of windows and doors filling wall openings
+    _cleanOpeningFillInterfaces(elements, openingFillInterfaces);
 
     // Filter out layers that do not contain any elements
     final usedLayers = elements.map((e) => e.layer.trim()).where((l) => l.isNotEmpty).toSet();
@@ -608,7 +726,205 @@ class _IfcGeometrySolver {
     }
   }
 
+  /// Cleans up internal coincident touching faces between connected walls at joints and corners.
+  /// When two walls meet at an L-junction, miter, or T-junction, the internal touching faces
+  /// are buried inside the wall mass and should not be drawn. Eliminating them prevents
+  /// depth-sorting artifacts (e.g. dark vertical strips at corners) in 3D rendering.
+  void _cleanWallJunctions(List<IfcElement> elements) {
+    final walls = elements.where((e) => e.category == 'Wall').toList();
+    if (walls.length < 2) return;
+
+    final Map<int, Set<int>> toRemoveByElementId = {};
+
+    for (int i = 0; i < walls.length; i++) {
+      final w1 = walls[i];
+      for (int j = i + 1; j < walls.length; j++) {
+        final w2 = walls[j];
+
+        // Quick 3D bounding box overlap check with 5mm tolerance
+        const double tol = 5.0;
+        if (w1.bounds.max.x < w2.bounds.min.x - tol || w1.bounds.min.x > w2.bounds.max.x + tol) continue;
+        if (w1.bounds.max.y < w2.bounds.min.y - tol || w1.bounds.min.y > w2.bounds.max.y + tol) continue;
+        if (w1.bounds.max.z < w2.bounds.min.z - tol || w1.bounds.min.z > w2.bounds.max.z + tol) continue;
+
+        // Find touching side faces (horizontal normal, normal.z.abs() < 0.8)
+        for (int ti = 0; ti < w1.triangles.length; ti++) {
+          final t1 = w1.triangles[ti];
+          if (t1.normal.z.abs() > 0.8) continue; // Skip horizontal top/bottom caps
+
+          for (int tj = 0; tj < w2.triangles.length; tj++) {
+            final t2 = w2.triangles[tj];
+            if (t2.normal.z.abs() > 0.8) continue;
+
+            // Opposing normals within tolerance
+            if (t1.normal.dot(t2.normal) < -0.98) {
+              // Coplanar within 2mm
+              final distPlane = ((t2.v0 - t1.v0).dot(t1.normal)).abs();
+              if (distPlane < 2.0) {
+                final c1 = (t1.v0 + t1.v1 + t1.v2) * (1.0 / 3.0);
+                final c2 = (t2.v0 + t2.v1 + t2.v2) * (1.0 / 3.0);
+
+                if (_pointInTriangle3D(c1, t2.v0, t2.v1, t2.v2)) {
+                  toRemoveByElementId.putIfAbsent(w1.id, () => {}).add(ti);
+                }
+                if (_pointInTriangle3D(c2, t1.v0, t1.v1, t1.v2)) {
+                  toRemoveByElementId.putIfAbsent(w2.id, () => {}).add(tj);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (toRemoveByElementId.isEmpty) return;
+
+    for (int i = 0; i < elements.length; i++) {
+      final el = elements[i];
+      final removeIndices = toRemoveByElementId[el.id];
+      if (removeIndices != null && removeIndices.isNotEmpty) {
+        final newTris = <Triangle3D>[];
+        for (int t = 0; t < el.triangles.length; t++) {
+          if (!removeIndices.contains(t)) {
+            newTris.add(el.triangles[t]);
+          }
+        }
+        elements[i] = IfcElement(
+          id: el.id,
+          globalId: el.globalId,
+          name: el.name,
+          ifcType: el.ifcType,
+          category: el.category,
+          storeyName: el.storeyName,
+          layer: el.layer,
+          color: el.color,
+          triangles: newTris,
+        );
+      }
+    }
+  }
+
+  static bool _pointInTriangle3D(Vector3 p, Vector3 a, Vector3 b, Vector3 c) {
+    final v0 = c - a;
+    final v1 = b - a;
+    final v2 = p - a;
+
+    final dot00 = v0.dot(v0);
+    final dot01 = v0.dot(v1);
+    final dot02 = v0.dot(v2);
+    final dot11 = v1.dot(v1);
+    final dot12 = v1.dot(v2);
+
+    final denom = dot00 * dot11 - dot01 * dot01;
+    if (denom.abs() < 1e-10) return false;
+    final invDenom = 1.0 / denom;
+    final u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+    final v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+    const eps = 1e-2;
+    return (u >= -eps) && (v >= -eps) && (u + v <= 1.0 + eps);
+  }
+
+  /// Prunes buried outer interface faces of windows and doors filling wall openings.
+  /// When a window or door is inserted into an opening void in a wall, its outer jambs,
+  /// lintel, and threshold/sill touch the opening void mass. Removing these concealed
+  /// outer faces prevents depth-sorting bleed-through and z-fighting in 3D rendering.
+  void _cleanOpeningFillInterfaces(
+    List<IfcElement> elements,
+    List<_OpeningFillInterface> openingFills,
+  ) {
+    if (openingFills.isEmpty) return;
+
+    for (final fill in openingFills) {
+      final candidateElements = <int, IfcElement>{};
+      for (final el in elements) {
+        if (fill.fillElementId != null && el.id == fill.fillElementId) {
+          candidateElements[el.id] = el;
+        } else if (el.category == 'Window' || el.category == 'Door') {
+          // Spatial overlap check: if element center projects inside opening OBB
+          final c = el.bounds.center;
+          final jProj = (c - fill.pMin).dot(fill.jAxis);
+          final zProj = (c - fill.pMin).dot(fill.nZ);
+          if (jProj >= fill.jMin - 50.0 && jProj <= fill.jMax + 50.0 &&
+              zProj >= fill.zMin - 50.0 && zProj <= fill.zMax + 50.0) {
+            candidateElements[el.id] = el;
+          }
+        }
+      }
+
+      for (final el in candidateElements.values) {
+        final newTris = <Triangle3D>[];
+        bool anyPruned = false;
+
+        for (final tri in el.triangles) {
+          if (_isInterfaceTriangle(tri, fill)) {
+            anyPruned = true;
+            continue;
+          }
+          newTris.add(tri);
+        }
+
+
+        if (anyPruned) {
+          final idx = elements.indexWhere((e) => e.id == el.id);
+          if (idx != -1) {
+            elements[idx] = IfcElement(
+              id: el.id,
+              globalId: el.globalId,
+              name: el.name,
+              ifcType: el.ifcType,
+              category: el.category,
+              storeyName: el.storeyName,
+              layer: el.layer,
+              color: el.color,
+              triangles: newTris,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  static bool _isInterfaceTriangle(Triangle3D tri, _OpeningFillInterface fill) {
+    const double tol = 3.0; // 3mm planar tolerance
+
+    // Check Left Jamb: plane at jMin, outward normal along -jAxis
+    if (tri.normal.dot(-fill.jAxis) > 0.85) {
+      final d0 = (tri.v0 - fill.pMin).dot(fill.jAxis) - fill.jMin;
+      final d1 = (tri.v1 - fill.pMin).dot(fill.jAxis) - fill.jMin;
+      final d2 = (tri.v2 - fill.pMin).dot(fill.jAxis) - fill.jMin;
+      if (d0.abs() < tol && d1.abs() < tol && d2.abs() < tol) return true;
+    }
+
+    // Check Right Jamb: plane at jMax, outward normal along +jAxis
+    if (tri.normal.dot(fill.jAxis) > 0.85) {
+      final d0 = (tri.v0 - fill.pMin).dot(fill.jAxis) - fill.jMax;
+      final d1 = (tri.v1 - fill.pMin).dot(fill.jAxis) - fill.jMax;
+      final d2 = (tri.v2 - fill.pMin).dot(fill.jAxis) - fill.jMax;
+      if (d0.abs() < tol && d1.abs() < tol && d2.abs() < tol) return true;
+    }
+
+    // Check Lintel: plane at zMax, outward normal along +nZ
+    if (tri.normal.dot(fill.nZ) > 0.85) {
+      final d0 = (tri.v0 - fill.pMin).dot(fill.nZ) - fill.zMax;
+      final d1 = (tri.v1 - fill.pMin).dot(fill.nZ) - fill.zMax;
+      final d2 = (tri.v2 - fill.pMin).dot(fill.nZ) - fill.zMax;
+      if (d0.abs() < tol && d1.abs() < tol && d2.abs() < tol) return true;
+    }
+
+    // Check Sill / Bottom: plane at zMin, outward normal along -nZ
+    if (tri.normal.dot(-fill.nZ) > 0.85) {
+      final d0 = (tri.v0 - fill.pMin).dot(fill.nZ) - fill.zMin;
+      final d1 = (tri.v1 - fill.pMin).dot(fill.nZ) - fill.zMin;
+      final d2 = (tri.v2 - fill.pMin).dot(fill.nZ) - fill.zMin;
+      if (d0.abs() < tol && d1.abs() < tol && d2.abs() < tol) return true;
+    }
+
+    return false;
+  }
+
   /// Extracts numbers from parentheses, robust to Archicad trailing dots e.g. (0., -1200., 25.37)
+
   static List<double> _parseCoordinateList(String params) {
     final parenMatches = RegExp(r'\(([^()]*)\)').allMatches(params);
     for (final m in parenMatches) {
@@ -1206,14 +1522,19 @@ class _IfcGeometrySolver {
     return [];
   }
 
-  List<Triangle3D> _resolveShapeRepresentation(int shapeId, _Transform3D parentTransform, Color color) {
+  List<Triangle3D> _resolveShapeRepresentation(
+    int shapeId,
+    _Transform3D parentTransform,
+    Color color, {
+    String? category,
+  }) {
     final List<Triangle3D> tris = [];
     final ent = entityMap[shapeId];
     if (ent == null) return tris;
 
     if (ent.type == 'IFCPRODUCTDEFINITIONSHAPE') {
       for (final id in ent.referencedIds) {
-        tris.addAll(_resolveShapeRepresentation(id, parentTransform, color));
+        tris.addAll(_resolveShapeRepresentation(id, parentTransform, color, category: category));
       }
     } else if (ent.type == 'IFCSHAPEREPRESENTATION') {
       final params = ent.splitParams;
@@ -1224,8 +1545,21 @@ class _IfcGeometrySolver {
           return tris;
         }
       }
+
+      final geomItemIds = <int>[];
       for (final id in ent.referencedIds) {
-        tris.addAll(_resolveGeometryItem(id, parentTransform, color));
+        final sub = entityMap[id];
+        if (sub != null && _isGeometryItem(sub.type)) {
+          geomItemIds.add(id);
+        }
+      }
+
+      if (geomItemIds.length > 1 && _isCompositeBrepStack(geomItemIds, category: category)) {
+        tris.addAll(_resolveCompositeBrepOuterEnvelope(geomItemIds, parentTransform, color, category: category));
+      } else {
+        for (final id in ent.referencedIds) {
+          tris.addAll(_resolveGeometryItem(id, parentTransform, color));
+        }
       }
     } else {
       tris.addAll(_resolveGeometryItem(shapeId, parentTransform, color));
@@ -1233,6 +1567,118 @@ class _IfcGeometrySolver {
 
     return tris;
   }
+
+  bool _isGeometryItem(String type) {
+    return type == 'IFCEXTRUDEDAREASOLID' ||
+        type == 'IFCFACETEDBREP' ||
+        type == 'IFCSHELLBASEDSURFACEMODEL' ||
+        type == 'IFCFACETEDBREPWITHVOIDS' ||
+        type == 'IFCSURFACEMODEL' ||
+        type == 'IFCTRIANGULATEDFACESET' ||
+        type == 'IFCPOLYGONALFACESET' ||
+        type.contains('BOOLEAN') ||
+        type == 'IFCMAPPEDITEM' ||
+        type == 'IFCREVOLVEDAREASOLID' ||
+        type == 'IFCSWEPTDISKSOLID';
+  }
+
+  BoundingBox3D _computeItemLocalBounds(int itemId) {
+    final pts = <Vector3>[];
+    final visited = <int>{itemId};
+    final queue = <int>[itemId];
+    while (queue.isNotEmpty) {
+      final curr = queue.removeAt(0);
+      final ent = entityMap[curr];
+      if (ent == null) continue;
+      if (ent.type == 'IFCCARTESIANPOINT') {
+        pts.add(_resolvePoint(curr));
+      } else {
+        for (final nextId in ent.referencedIds) {
+          if (!visited.contains(nextId)) {
+            visited.add(nextId);
+            queue.add(nextId);
+          }
+        }
+      }
+    }
+    return BoundingBox3D.fromPoints(pts);
+  }
+
+  bool _isCompositeBrepStack(List<int> itemIds, {String? category}) {
+    if (itemIds.length < 2) return false;
+    if (category != 'Roof' && category != 'Slab' && category != null) return false;
+
+    // Check if all items are Brep solids or shell surface models
+    final allBrep = itemIds.every((id) {
+      final type = entityMap[id]?.type ?? '';
+      return type == 'IFCFACETEDBREP' ||
+          type == 'IFCSHELLBASEDSURFACEMODEL' ||
+          type == 'IFCFACETEDBREPWITHVOIDS' ||
+          type == 'IFCSURFACEMODEL';
+    });
+    if (!allBrep) return false;
+
+    final boxes = itemIds.map(_computeItemLocalBounds).toList();
+    if (boxes.any((b) => b.sizeX <= 1e-3 || b.sizeY <= 1e-3)) {
+      return false;
+    }
+
+    final ref = boxes.first;
+    for (int i = 1; i < boxes.length; i++) {
+      final b = boxes[i];
+      final overlapX = (math.min(ref.max.x, b.max.x) - math.max(ref.min.x, b.min.x));
+      final overlapY = (math.min(ref.max.y, b.max.y) - math.max(ref.min.y, b.min.y));
+      if (overlapX < 0.75 * ref.sizeX || overlapY < 0.75 * ref.sizeY) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  List<Triangle3D> _resolveCompositeBrepOuterEnvelope(
+    List<int> itemIds,
+    _Transform3D parentTransform,
+    Color defaultColor, {
+    String? category,
+  }) {
+    final boxes = itemIds.map(_computeItemLocalBounds).toList();
+    int topIndex = 0;
+    int bottomIndex = 0;
+    double highestZ = -double.infinity;
+    double lowestZ = double.infinity;
+
+    for (int i = 0; i < boxes.length; i++) {
+      if (boxes[i].max.z > highestZ) {
+        highestZ = boxes[i].max.z;
+        topIndex = i;
+      }
+      if (boxes[i].min.z < lowestZ) {
+        lowestZ = boxes[i].min.z;
+        bottomIndex = i;
+      }
+    }
+
+    final outerTris = <Triangle3D>[];
+
+    for (int i = 0; i < itemIds.length; i++) {
+      final id = itemIds[i];
+      final layerTris = _resolveGeometryItem(id, parentTransform, defaultColor);
+
+      if (i == topIndex) {
+        // Sky-facing exterior surface (e.g. roof tiles or floor finish)
+        outerTris.addAll(layerTris.where((t) => t.normal.z > 0.2));
+      }
+      if (i == bottomIndex) {
+        // Ground-facing exterior surface (e.g. ceiling or slab underside)
+        outerTris.addAll(layerTris.where((t) => t.normal.z < -0.2));
+      }
+      // Side / fascia perimeter faces across ALL layers form the complete physical thickness
+      outerTris.addAll(layerTris.where((t) => t.normal.z.abs() <= 0.2));
+    }
+
+    return outerTris;
+  }
+
 
   List<Triangle3D> _resolveGeometryItem(int itemId, _Transform3D transform, Color defaultColor) {
     final List<Triangle3D> tris = [];
@@ -1390,12 +1836,173 @@ class _IfcGeometrySolver {
     return tris;
   }
 
+  /// Resolves the local bounding box of an opening's shape representation.
+  /// When multiple swept solids exist (e.g., deep through-wall void + shallow 50mm exterior rebate),
+  /// filters out shallow non-penetrating solids so the void cutout matches the true through-wall opening width.
+  BoundingBox3D? _resolveOpeningLocalBox(int shapeRepId) {
+    final ent = entityMap[shapeRepId];
+    if (ent == null) return null;
+
+    final List<int> itemIds = [];
+    if (ent.type == 'IFCPRODUCTDEFINITIONSHAPE') {
+      for (final id in ent.referencedIds) {
+        final sub = entityMap[id];
+        if (sub != null && sub.type == 'IFCSHAPEREPRESENTATION') {
+          itemIds.addAll(sub.referencedIds);
+        } else {
+          itemIds.add(id);
+        }
+      }
+    } else if (ent.type == 'IFCSHAPEREPRESENTATION') {
+      itemIds.addAll(ent.referencedIds);
+    } else {
+      itemIds.add(shapeRepId);
+    }
+
+    if (itemIds.isEmpty) return null;
+
+    final List<BoundingBox3D> itemBoxes = [];
+    final List<double> itemDepths = [];
+    for (final itemId in itemIds) {
+      final itemTris = _resolveGeometryItem(itemId, _Transform3D.identity, Colors.transparent);
+      if (itemTris.isNotEmpty) {
+        final pts = itemTris.expand((t) => [t.v0, t.v1, t.v2]).toList();
+        final box = BoundingBox3D.fromPoints(pts);
+        if (box.sizeX > 1.0 && box.sizeY > 1.0 && box.sizeZ > 1.0) {
+          itemBoxes.add(box);
+          final itemEnt = entityMap[itemId];
+          double depth = box.sizeY;
+          if (itemEnt != null && itemEnt.type == 'IFCEXTRUDEDAREASOLID') {
+            final params = itemEnt.splitParams;
+            if (params.length >= 4) {
+              final d = double.tryParse(params[3].replaceAll(RegExp(r'[#\s]'), ''));
+              if (d != null && d > 0) depth = d;
+            }
+          }
+          itemDepths.add(depth);
+        }
+      }
+    }
+
+    if (itemBoxes.isEmpty) return null;
+    if (itemBoxes.length == 1) return itemBoxes.first;
+
+    double maxDepth = 0;
+    for (final d in itemDepths) {
+      if (d > maxDepth) maxDepth = d;
+    }
+
+    final candidateBoxes = <BoundingBox3D>[];
+    for (int i = 0; i < itemBoxes.length; i++) {
+      if (maxDepth >= 200.0 && itemDepths[i] < 100.0) {
+        continue;
+      }
+      candidateBoxes.add(itemBoxes[i]);
+    }
+
+    if (candidateBoxes.isEmpty) candidateBoxes.addAll(itemBoxes);
+
+    var minPt = candidateBoxes.first.min;
+    var maxPt = candidateBoxes.first.max;
+    for (int i = 1; i < candidateBoxes.length; i++) {
+      minPt = Vector3(
+        math.min(minPt.x, candidateBoxes[i].min.x),
+        math.min(minPt.y, candidateBoxes[i].min.y),
+        math.min(minPt.z, candidateBoxes[i].min.z),
+      );
+      maxPt = Vector3(
+        math.max(maxPt.x, candidateBoxes[i].max.x),
+        math.max(maxPt.y, candidateBoxes[i].max.y),
+        math.max(maxPt.z, candidateBoxes[i].max.z),
+      );
+    }
+    return BoundingBox3D(min: minPt, max: maxPt);
+  }
+
+  /// Resolves the frame thickness range [minT, maxT] of a filling element (Window or Door)
+  /// along the wall thickness axis [tAxis], measured relative to [pMin].
+  /// Samples triangles in the mid-height region of the opening to avoid sill boards and thresholds.
+  (double, double)? _resolveFillElementFrameRange(
+    int fillElId,
+    Vector3 pMin,
+    Vector3 tAxis,
+    Vector3 nZ,
+    double zMin,
+    double zMax,
+  ) {
+    final ent = entityMap[fillElId];
+    if (ent == null) return null;
+    final params = ent.splitParams;
+    final placementId = params.length > 5 ? int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), '')) : null;
+    final shapeRepId = params.length > 6 ? int.tryParse(params[6].replaceAll(RegExp(r'[#\s]'), '')) : null;
+    if (shapeRepId == null) return null;
+
+    final transform = placementId != null ? _resolvePlacement(placementId) : _Transform3D.identity;
+    final tris = _resolveShapeRepresentation(shapeRepId, transform, Colors.transparent);
+    if (tris.isEmpty) return null;
+
+    final midZ = (zMin + zMax) / 2.0;
+    final halfH = (zMax - zMin) * 0.3;
+    final lowZ = midZ - halfH;
+    final highZ = midZ + halfH;
+
+    double minT = double.infinity;
+    double maxT = -double.infinity;
+    int sampledCount = 0;
+
+    for (final t in tris) {
+      final z0 = (t.v0 - pMin).dot(nZ);
+      final z1 = (t.v1 - pMin).dot(nZ);
+      final z2 = (t.v2 - pMin).dot(nZ);
+      final triMinZ = math.min(z0, math.min(z1, z2));
+      final triMaxZ = math.max(z0, math.max(z1, z2));
+
+      if (triMaxZ >= lowZ && triMinZ <= highZ) {
+        for (final v in [t.v0, t.v1, t.v2]) {
+          final pt = (v - pMin).dot(tAxis);
+          if (pt < minT) minT = pt;
+          if (pt > maxT) maxT = pt;
+        }
+        sampledCount++;
+      }
+    }
+
+    if (sampledCount > 0 && minT < maxT) {
+      return (minT, maxT);
+    }
+
+    for (final t in tris) {
+      for (final v in [t.v0, t.v1, t.v2]) {
+        final pt = (v - pMin).dot(tAxis);
+        if (pt < minT) minT = pt;
+        if (pt > maxT) maxT = pt;
+      }
+    }
+    if (minT < maxT) return (minT, maxT);
+    return null;
+  }
+
   /// Subtracts window and door opening voids (IFCRELVOIDSELEMENT) from wall geometry.
+
   /// Slices wall faces against opening void boundaries and removes geometry inside the opening hole.
-  List<Triangle3D> _applyOpeningVoids(List<Triangle3D> wallTris, List<int> openingIds) {
+  List<Triangle3D> _applyOpeningVoids(
+    List<Triangle3D> wallTris,
+    List<int> openingIds, {
+    List<_OpeningFillInterface>? openingFillInterfaces,
+    Map<int, int>? openingToFillElementId,
+  }) {
     if (wallTris.isEmpty || openingIds.isEmpty) return wallTris;
 
-    final List<_Obb> openingOBBs = [];
+    double wallMinZ = double.infinity;
+    double wallMaxZ = -double.infinity;
+    for (final t in wallTris) {
+      for (final v in [t.v0, t.v1, t.v2]) {
+        if (v.z < wallMinZ) wallMinZ = v.z;
+        if (v.z > wallMaxZ) wallMaxZ = v.z;
+      }
+    }
+
+    final List<_OpeningVoidData> openingVoids = [];
 
     for (final opId in openingIds) {
       final opEnt = entityMap[opId];
@@ -1407,12 +2014,9 @@ class _IfcGeometrySolver {
 
       if (shapeRepId != null) {
         // Resolve in LOCAL space to get the accurate unrotated bounding box
-        final opTrisLocal = _resolveShapeRepresentation(shapeRepId, _Transform3D.identity, Colors.transparent);
-        if (opTrisLocal.isNotEmpty) {
-          final ptsLocal = opTrisLocal.expand((t) => [t.v0, t.v1, t.v2]).toList();
-          final localBox = BoundingBox3D.fromPoints(ptsLocal);
-          
-          if (localBox.sizeX > 1.0 && localBox.sizeY > 1.0 && localBox.sizeZ > 1.0) {
+        final localBox = _resolveOpeningLocalBox(shapeRepId);
+        if (localBox != null && localBox.sizeX > 1.0 && localBox.sizeY > 1.0 && localBox.sizeZ > 1.0) {
+
             final opTransform = placementId != null ? _resolvePlacement(placementId) : _Transform3D.identity;
             
             final origin = opTransform.transform(Vector3.zero);
@@ -1420,25 +2024,56 @@ class _IfcGeometrySolver {
             final nY = opTransform.transform(const Vector3(0, 1, 0)) - origin;
             final nZ = opTransform.transform(const Vector3(0, 0, 1)) - origin;
             
-            final pMin = opTransform.transform(localBox.min);
-            final pMax = opTransform.transform(localBox.max);
-            
             // Normalize axes in case of scaling
             final nXNorm = nX * (1.0 / (math.sqrt(nX.lengthSquared) + 1e-12));
             final nYNorm = nY * (1.0 / (math.sqrt(nY.lengthSquared) + 1e-12));
             final nZNorm = nZ * (1.0 / (math.sqrt(nZ.lengthSquared) + 1e-12));
+
+            // Project 8 corners through opTransform to find true OBB min/max along local axes
+            final corners = [
+              Vector3(localBox.min.x, localBox.min.y, localBox.min.z),
+              Vector3(localBox.min.x, localBox.min.y, localBox.max.z),
+              Vector3(localBox.min.x, localBox.max.y, localBox.min.z),
+              Vector3(localBox.min.x, localBox.max.y, localBox.max.z),
+              Vector3(localBox.max.x, localBox.min.y, localBox.min.z),
+              Vector3(localBox.max.x, localBox.min.y, localBox.max.z),
+              Vector3(localBox.max.x, localBox.max.y, localBox.min.z),
+              Vector3(localBox.max.x, localBox.max.y, localBox.max.z),
+            ];
+
+            double minX = double.infinity, maxX = -double.infinity;
+            double minY = double.infinity, maxY = -double.infinity;
+            double minZ = double.infinity, maxZ = -double.infinity;
+
+            for (final c in corners) {
+              final wc = opTransform.transform(c);
+              final px = (wc - origin).dot(nXNorm);
+              final py = (wc - origin).dot(nYNorm);
+              final pz = (wc - origin).dot(nZNorm);
+
+              if (px < minX) minX = px;
+              if (px > maxX) maxX = px;
+              if (py < minY) minY = py;
+              if (py > maxY) maxY = py;
+              if (pz < minZ) minZ = pz;
+              if (pz > maxZ) maxZ = pz;
+            }
+
+            final pMin = origin + nXNorm * minX + nYNorm * minY + nZNorm * minZ;
+            final pMax = origin + nXNorm * maxX + nYNorm * maxY + nZNorm * maxZ;
             
-            openingOBBs.add(_Obb(pMin, pMax, nXNorm, nYNorm, nZNorm));
+            openingVoids.add(_OpeningVoidData(opId, _Obb(pMin, pMax, nXNorm, nYNorm, nZNorm)));
           }
         }
       }
-    }
 
-    if (openingOBBs.isEmpty) return wallTris;
+    if (openingVoids.isEmpty) return wallTris;
+
 
     var currentTris = wallTris;
 
-    for (final obb in openingOBBs) {
+    for (final voidData in openingVoids) {
+      final obb = voidData.obb;
       final toSlice = <Triangle3D>[];
       final unaffected = <Triangle3D>[];
 
@@ -1591,41 +2226,116 @@ class _IfcGeometrySolver {
             return obb.pMin + jAxis * j + tAxis * t + obb.nZ * z;
           }
 
+          final fillElId = openingToFillElementId?[voidData.opId];
+          final fillRange = fillElId != null
+              ? _resolveFillElementFrameRange(fillElId, obb.pMin, tAxis, obb.nZ, zMin, zMax)
+              : null;
+
+          // Intervals along tAxis for reveals (exterior reveal and interior reveal).
+          // To prevent wall reveal quads from penetrating window frames or duplicating door casing,
+          // reveal quads are generated outside the frame bounding range [tFrameMin, tFrameMax].
+          final List<(double, double)> tIntervals = [];
+          if (fillRange == null) {
+            // Unfilled opening: single reveal spanning full wall thickness
+            tIntervals.add((tWallMin, tWallMax));
+          } else {
+            final (tFrameMin, tFrameMax) = fillRange;
+            // Exterior reveal (from tWallMin to tFrameMin)
+            final extEnd = math.min(tFrameMin, tWallMax);
+            if (extEnd > tWallMin + 5.0) {
+              tIntervals.add((tWallMin, extEnd));
+            }
+            // Interior reveal (from tFrameMax to tWallMax)
+            final intStart = math.max(tFrameMax, tWallMin);
+            if (tWallMax > intStart + 5.0) {
+              tIntervals.add((intStart, tWallMax));
+            }
+          }
+
+          // Calculate world Z for sill and lintel
+          final worldZMin = pt(jMin, tWallMin, zMin).z;
+          final worldZMax = pt(jMin, tWallMin, zMax).z;
+
           // Lintel (underside of wall above opening, facing downward into opening)
-          addQuad(
-            pt(jMin, tWallMin, zMax),
-            pt(jMax, tWallMin, zMax),
-            pt(jMax, tWallMax, zMax),
-            pt(jMin, tWallMax, zMax),
-            -obb.nZ,
-          );
+          // Suppress lintel quad if opening extends to or above the wall top
+          if (worldZMax < wallMaxZ - 10.0) {
+            for (final interval in tIntervals) {
+              final t0 = interval.$1;
+              final t1 = interval.$2;
+              addQuad(
+                pt(jMin, t0, zMax),
+                pt(jMax, t0, zMax),
+                pt(jMax, t1, zMax),
+                pt(jMin, t1, zMax),
+                -obb.nZ,
+              );
+            }
+          }
 
           // Sill (top surface of wall below opening, facing upward into opening)
-          addQuad(
-            pt(jMin, tWallMin, zMin),
-            pt(jMax, tWallMin, zMin),
-            pt(jMax, tWallMax, zMin),
-            pt(jMin, tWallMax, zMin),
-            obb.nZ,
-          );
+          // Suppress sill quad if opening extends to the floor / bottom of wall (door)
+          if (worldZMin > wallMinZ + 10.0 && worldZMin > 10.0) {
+            for (final interval in tIntervals) {
+              final t0 = interval.$1;
+              final t1 = interval.$2;
+              // For windows, exterior sill is already covered by the window's sill board / frame;
+              // only the interior sill (behind the frame) is exposed.
+              if (fillRange != null && t0 < fillRange.$1 + 1.0) {
+                continue;
+              }
+              addQuad(
+                pt(jMin, t0, zMin),
+                pt(jMax, t0, zMin),
+                pt(jMax, t1, zMin),
+                pt(jMin, t1, zMin),
+                obb.nZ,
+              );
+            }
+          }
 
           // Left Jamb (at jMin, facing into opening toward jMax)
-          addQuad(
-            pt(jMin, tWallMin, zMin),
-            pt(jMin, tWallMax, zMin),
-            pt(jMin, tWallMax, zMax),
-            pt(jMin, tWallMin, zMax),
-            jAxis,
-          );
+          for (final interval in tIntervals) {
+            final t0 = interval.$1;
+            final t1 = interval.$2;
+            addQuad(
+              pt(jMin, t0, zMin),
+              pt(jMin, t1, zMin),
+              pt(jMin, t1, zMax),
+              pt(jMin, t0, zMax),
+              jAxis,
+            );
+          }
 
           // Right Jamb (at jMax, facing into opening toward jMin)
-          addQuad(
-            pt(jMax, tWallMin, zMin),
-            pt(jMax, tWallMax, zMin),
-            pt(jMax, tWallMax, zMax),
-            pt(jMax, tWallMin, zMax),
-            -jAxis,
-          );
+          for (final interval in tIntervals) {
+            final t0 = interval.$1;
+            final t1 = interval.$2;
+            addQuad(
+              pt(jMax, t0, zMin),
+              pt(jMax, t1, zMin),
+              pt(jMax, t1, zMax),
+              pt(jMax, t0, zMax),
+              -jAxis,
+            );
+          }
+
+
+          // Record Opening Fill Interface so any filling door or window can have its
+          // outer faces matching the wall opening pruned.
+          if (openingFillInterfaces != null) {
+            final fillElId = openingToFillElementId?[voidData.opId];
+            openingFillInterfaces.add(_OpeningFillInterface(
+              openingId: voidData.opId,
+              fillElementId: fillElId,
+              pMin: obb.pMin,
+              jAxis: jAxis,
+              nZ: obb.nZ,
+              jMin: jMin,
+              jMax: jMax,
+              zMin: zMin,
+              zMax: zMax,
+            ));
+          }
         }
       }
 
@@ -1878,14 +2588,68 @@ class _IfcGeometrySolver {
     return result;
   }
 
-  /// Slices a building element (such as an extruded wall) against CSG boolean subtraction solids
-  /// (e.g. Archicad IFCBOOLEANRESULT with IFCFACETEDBREP or IFCEXTRUDEDAREASOLID roof trimming bodies).
+  /// Performs CSG boolean subtraction (meshTris \ cuttingTris) between a solid element (e.g. Wall)
+  /// and a cutting body (e.g. Roof trimming Brep or ExtrudedAreaSolid).
   List<Triangle3D> _clipMeshByCuttingSolid(List<Triangle3D> meshTris, List<Triangle3D> cuttingTris) {
     if (meshTris.isEmpty || cuttingTris.isEmpty) return meshTris;
 
-    // 1. Group cutting solid triangles into unique cutting planes
+    // 1. Extract unique clipping planes from cutting solid and mesh
+    final planesCut = _extractMeshPlanes(cuttingTris);
+    final planesMesh = _extractMeshPlanes(meshTris);
+
+    // 2. Split mesh triangles across all cutting solid planes
+    var splitMesh = meshTris;
+    for (final p in planesCut) {
+      splitMesh = _sliceByPlane(splitMesh, p.origin, p.normal);
+    }
+
+    // 3. Split cutting solid triangles across all mesh planes
+    var splitCut = cuttingTris;
+    for (final p in planesMesh) {
+      splitCut = _sliceByPlane(splitCut, p.origin, p.normal);
+    }
+
+    final result = <Triangle3D>[];
+    final wallColor = meshTris.first.color;
+
+    // 4. Keep pieces of meshTris where the interior of mesh is OUTSIDE cutting solid
+    for (final t in splitMesh) {
+      final edge1 = t.v1 - t.v0;
+      final edge2 = t.v2 - t.v0;
+      final norm = edge1.cross(edge2);
+      final len = norm.length;
+      if (len < 1e-6) continue;
+      final unitNorm = norm * (1.0 / len);
+
+      final centroid = (t.v0 + t.v1 + t.v2) * (1.0 / 3.0);
+      final testPt = centroid - unitNorm * 0.5;
+      if (!_isPointInsideClosedMesh(testPt, cuttingTris)) {
+        result.add(t);
+      }
+    }
+
+    // 5. Keep pieces of cuttingTris where the exterior of cutting solid is INSIDE mesh, inverted
+    for (final t in splitCut) {
+      final edge1 = t.v1 - t.v0;
+      final edge2 = t.v2 - t.v0;
+      final norm = edge1.cross(edge2);
+      final len = norm.length;
+      if (len < 1e-6) continue;
+      final unitNorm = norm * (1.0 / len);
+
+      final centroid = (t.v0 + t.v1 + t.v2) * (1.0 / 3.0);
+      final testPt = centroid + unitNorm * 0.5;
+      if (_isPointInsideClosedMesh(testPt, meshTris)) {
+        result.add(Triangle3D(v0: t.v0, v1: t.v2, v2: t.v1, color: wallColor ?? t.color));
+      }
+    }
+
+    return _filterDegenerateTriangles(result);
+  }
+
+  List<_Plane3D> _extractMeshPlanes(List<Triangle3D> tris) {
     final uniquePlanes = <_Plane3D>[];
-    for (final tri in cuttingTris) {
+    for (final tri in tris) {
       final edge1 = tri.v1 - tri.v0;
       final edge2 = tri.v2 - tri.v0;
       final rawNorm = edge1.cross(edge2);
@@ -1895,7 +2659,7 @@ class _IfcGeometrySolver {
 
       bool exists = false;
       for (final up in uniquePlanes) {
-        if (up.normal.dot(norm) > 0.99 && (tri.v0 - up.origin).dot(up.normal).abs() < 2.0) {
+        if (up.normal.dot(norm) > 0.99 && (tri.v0 - up.origin).dot(up.normal).abs() < 1.0) {
           exists = true;
           break;
         }
@@ -1904,44 +2668,48 @@ class _IfcGeometrySolver {
         uniquePlanes.add(_Plane3D(origin: tri.v0, normal: norm));
       }
     }
+    return uniquePlanes;
+  }
 
-    var currentTris = meshTris;
+  static bool _isPointInsideClosedMesh(Vector3 p, List<Triangle3D> mesh) {
+    // Cast multiple rays with irrational directions and take majority vote
+    // to protect against rays hitting shared edges or vertices.
+    const rayDirs = [
+      Vector3(0.26726124, 0.53452248, 0.80178373),
+      Vector3(-0.80178373, 0.26726124, 0.53452248),
+      Vector3(0.53452248, -0.80178373, 0.26726124),
+    ];
 
-    // 2. Identify wall base reference point (minimum Z) to ensure wall bottom is always preserved
-    double minZ = double.infinity;
-    Vector3 basePt = Vector3.zero;
-    for (final t in meshTris) {
-      for (final v in [t.v0, t.v1, t.v2]) {
-        if (v.z < minZ) {
-          minZ = v.z;
-          basePt = v;
+    int votes = 0;
+    for (final dir in rayDirs) {
+      final unitDir = dir.normalized();
+      int count = 0;
+      for (final tri in mesh) {
+        if (_rayIntersectsTri(p, unitDir, tri.v0, tri.v1, tri.v2)) {
+          count++;
         }
       }
+      if ((count % 2) == 1) votes++;
     }
+    return votes >= 2;
+  }
 
-    // 3. For each plane of the cutting solid, check if it slices strictly through the mesh
-    for (final plane in uniquePlanes) {
-      double minD = double.infinity;
-      double maxD = -double.infinity;
-      for (final t in currentTris) {
-        for (final v in [t.v0, t.v1, t.v2]) {
-          final d = (v - plane.origin).dot(plane.normal);
-          if (d < minD) minD = d;
-          if (d > maxD) maxD = d;
-        }
-      }
-
-      // If the plane slices strictly through the mesh (vertices on both sides)
-      // and is a cutting roof/slope plane:
-      if (minD < -5.0 && maxD > 5.0 && plane.normal.z.abs() > 0.02 && plane.normal.z.abs() < 0.999) {
-        final baseDist = (basePt - plane.origin).dot(plane.normal);
-        final bool keepPositiveSide = baseDist >= 0;
-
-        currentTris = _clipTrianglesByPlane(currentTris, plane.origin, plane.normal, keepPositiveSide);
-      }
-    }
-
-    return _filterDegenerateTriangles(currentTris);
+  static bool _rayIntersectsTri(Vector3 origin, Vector3 dir, Vector3 v0, Vector3 v1, Vector3 v2) {
+    const double eps = 1e-7;
+    final edge1 = v1 - v0;
+    final edge2 = v2 - v0;
+    final h = dir.cross(edge2);
+    final a = edge1.dot(h);
+    if (a > -eps && a < eps) return false;
+    final f = 1.0 / a;
+    final s = origin - v0;
+    final u = f * s.dot(h);
+    if (u < 0.0 || u > 1.0) return false;
+    final q = s.cross(edge1);
+    final v = f * dir.dot(q);
+    if (v < 0.0 || u + v > 1.0) return false;
+    final t = f * edge2.dot(q);
+    return t > eps;
   }
 
   static Vector3 _intersectEdge(Vector3 pIn, Vector3 pOut, double dIn, double dOut) {
@@ -1950,11 +2718,10 @@ class _IfcGeometrySolver {
     return pIn + (pOut - pIn) * t;
   }
 
-  /// Removes degenerate triangles (zero area or extreme coordinates) to prevent visual spikes.
+  /// Removes degenerate triangles (zero area, coincident vertices, or extreme coordinates) to prevent visual spikes.
   /// Degenerate triangles can arise from numerical issues in plane clipping.
   static List<Triangle3D> _filterDegenerateTriangles(List<Triangle3D> tris) {
     if (tris.isEmpty) return tris;
-    const double minArea = 0.01;       // min 0.01 mm² (IFC uses mm as unit)
     const double maxCoord = 1e6;       // max 1km from origin (reasonable for any building)
     final List<Triangle3D> result = [];
     for (final tri in tris) {
@@ -1964,12 +2731,60 @@ class _IfcGeometrySolver {
           tri.v2.x.abs() > maxCoord || tri.v2.y.abs() > maxCoord || tri.v2.z.abs() > maxCoord) {
         continue;
       }
-      // Reject if triangle has near-zero area (degenerate)
+      // Reject if any two vertices are coincident
+      if ((tri.v1 - tri.v0).lengthSquared < 1e-8 ||
+          (tri.v2 - tri.v1).lengthSquared < 1e-8 ||
+          (tri.v0 - tri.v2).lengthSquared < 1e-8) {
+        continue;
+      }
+      // Reject if triangle has near-zero area (degenerate sliver)
       final e1 = tri.v1 - tri.v0;
       final e2 = tri.v2 - tri.v0;
       final cross = e1.cross(e2);
-      if (cross.lengthSquared < minArea * minArea) continue;
+      if (cross.lengthSquared < 1e-8) continue;
       result.add(tri);
+    }
+    return result;
+  }
+
+  /// Recursively subdivides triangles whose edges exceed [maxEdgeLen] mm.
+  /// Used for large roofs and slabs so that painter's algorithm depth-sorting is accurate
+  /// and eliminates occlusion bleed-through.
+  static List<Triangle3D> _subdivideLargeTriangles(List<Triangle3D> tris, double maxEdgeLen) {
+    if (tris.isEmpty) return tris;
+    final result = <Triangle3D>[];
+    final maxEdgeLenSq = maxEdgeLen * maxEdgeLen;
+
+    for (final tri in tris) {
+      final e01 = (tri.v1 - tri.v0).lengthSquared;
+      final e12 = (tri.v2 - tri.v1).lengthSquared;
+      final e20 = (tri.v0 - tri.v2).lengthSquared;
+
+      if (e01 <= maxEdgeLenSq && e12 <= maxEdgeLenSq && e20 <= maxEdgeLenSq) {
+        result.add(tri);
+        continue;
+      }
+
+      // Subdivide by splitting the longest edge
+      if (e01 >= e12 && e01 >= e20) {
+        final mid = (tri.v0 + tri.v1) * 0.5;
+        result.addAll(_subdivideLargeTriangles([
+          Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+          Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+        ], maxEdgeLen));
+      } else if (e12 >= e01 && e12 >= e20) {
+        final mid = (tri.v1 + tri.v2) * 0.5;
+        result.addAll(_subdivideLargeTriangles([
+          Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+          Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+        ], maxEdgeLen));
+      } else {
+        final mid = (tri.v2 + tri.v0) * 0.5;
+        result.addAll(_subdivideLargeTriangles([
+          Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+          Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
+        ], maxEdgeLen));
+      }
     }
     return result;
   }
@@ -2442,6 +3257,7 @@ class _IfcGeometrySolver {
         tris.addAll(_generateFacetedBrep(faceId, transform, color));
       }
     } else if (ent.type == 'IFCFACE') {
+      final faceColor = itemToStyledColor[ent.id] ?? color;
       List<Vector3>? outerPts;
       final innerHoles = <List<Vector3>>[];
 
@@ -2468,9 +3284,9 @@ class _IfcGeometrySolver {
       if (outerPts != null) {
         if (innerHoles.isNotEmpty) {
           final bridged = _bridgePolygonWithHoles(outerPts, innerHoles);
-          tris.addAll(_triangulatePolygon3D(bridged, color: color));
+          tris.addAll(_triangulatePolygon3D(bridged, color: faceColor));
         } else {
-          tris.addAll(_triangulatePolygon3D(outerPts, color: color));
+          tris.addAll(_triangulatePolygon3D(outerPts, color: faceColor));
         }
       }
     }
