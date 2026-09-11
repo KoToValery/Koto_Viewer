@@ -19,12 +19,12 @@ class AppErrorRecord {
     this.isFatal = false,
   });
 
-  String get summary => error?.toString() ?? 'Неизвестна грешка';
+  String get summary => error?.toString() ?? 'Unknown error';
 
   String toFormattedString() {
     final buffer = StringBuffer();
-    buffer.writeln('[$timestamp] Контекст: $errorContext | Фатална: $isFatal');
-    buffer.writeln('Грешка: $error');
+    buffer.writeln('[$timestamp] Context: $errorContext | Fatal: $isFatal');
+    buffer.writeln('Error: $error');
     if (stackTrace != null) {
       buffer.writeln('Stack Trace:');
       buffer.writeln(stackTrace);
@@ -109,7 +109,7 @@ class AppErrorHandler {
       }
 
       if (kDebugMode) {
-        debugPrint('🚨 [AppErrorHandler] ($context) Грешка: $error');
+        debugPrint('🚨 [AppErrorHandler] ($context) Error: $error');
       }
     } catch (_) {
       // Avoid recursive crash inside error handler
@@ -124,19 +124,19 @@ class AppErrorHandler {
   /// Generates a full formatted diagnostic report.
   static String exportErrorReport() {
     final buffer = StringBuffer();
-    buffer.writeln('=== KoToViewer Дневник на грешките ===');
-    buffer.writeln('Дата/Час: ${DateTime.now().toIso8601String()}');
+    buffer.writeln('=== KoToViewer Error Report ===');
+    buffer.writeln('Timestamp: ${DateTime.now().toIso8601String()}');
     try {
-      buffer.writeln('Платформа: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
+      buffer.writeln('Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
     } catch (_) {}
-    buffer.writeln('Общ брой записани грешки: ${_errors.length}');
-    buffer.writeln('=======================================\n');
+    buffer.writeln('Total recorded errors: ${_errors.length}');
+    buffer.writeln('================================\n');
 
     if (_errors.isEmpty) {
-      buffer.writeln('Няма регистрирани грешки в текущата сесия.');
+      buffer.writeln('No errors recorded in current session.');
     } else {
       for (int i = 0; i < _errors.length; i++) {
-        buffer.writeln('--- Грешка #${i + 1} ---');
+        buffer.writeln('--- Error #${i + 1} ---');
         buffer.writeln(_errors[i].toFormattedString());
         buffer.writeln();
       }

@@ -406,8 +406,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         fileSizeBytes: _fileSizeBytes,
         icon: Icons.view_in_ar_rounded,
         accentColor: const Color(0xFF00E5FF),
-        loadingTitle: 'Зареждане на 3D модел...',
-        statusMessage: 'Триангулация и изграждане на полигонална мрежа...',
+        loadingTitle: 'Loading 3D model...',
+        statusMessage: 'Triangulating and building polygon mesh...',
         onCancel: () => Navigator.of(context).pop(false),
       );
     }

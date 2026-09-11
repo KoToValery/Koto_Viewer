@@ -46,7 +46,7 @@ void main() {
       );
 
       final report = AppErrorHandler.exportErrorReport();
-      expect(report, contains('KoToViewer Дневник на грешките'));
+      expect(report, contains('KoToViewer Error Report'));
       expect(report, contains('Invalid DWG header stream'));
       expect(report, contains('dwg_ffi'));
     });
@@ -78,22 +78,22 @@ void main() {
       await tester.pumpAndSettle();
 
       // Check title and friendly description
-      expect(find.text('Нещо се обърка'), findsOneWidget);
-      expect(find.textContaining('Приложението срещна неочакван проблем'), findsOneWidget);
+      expect(find.text('Something went wrong'), findsOneWidget);
+      expect(find.textContaining('The application encountered an unexpected issue'), findsOneWidget);
 
       // Check action buttons
-      expect(find.text('Към началния екран'), findsOneWidget);
-      expect(find.text('Копирай отчета'), findsOneWidget);
+      expect(find.text('Go to Home'), findsOneWidget);
+      expect(find.text('Copy Report'), findsOneWidget);
 
       // Initially, detailed stack trace container is collapsed
-      expect(find.text('Покажи технически детайли'), findsOneWidget);
+      expect(find.text('Show technical details'), findsOneWidget);
       expect(find.textContaining('custom_painter.dart'), findsNothing);
 
       // Tap to expand technical details
-      await tester.tap(find.text('Покажи технически детайли'));
+      await tester.tap(find.text('Show technical details'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Скрий техническите детайли'), findsOneWidget);
+      expect(find.text('Hide technical details'), findsOneWidget);
       expect(find.textContaining('custom_painter.dart'), findsOneWidget);
     });
   });
@@ -109,8 +109,8 @@ void main() {
       );
 
       await tester.pumpAndSettle();
-      expect(find.text('Дневник на грешките'), findsOneWidget);
-      expect(find.text('Няма записани грешки'), findsOneWidget);
+      expect(find.text('Error Log'), findsOneWidget);
+      expect(find.text('No errors recorded'), findsOneWidget);
     });
 
     testWidgets('ErrorLogDialog shows logged errors and allows clearing', (tester) async {
@@ -130,15 +130,15 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Дневник на грешките'), findsOneWidget);
+      expect(find.text('Error Log'), findsOneWidget);
       expect(find.textContaining('Corrupt DXF entity EOF'), findsOneWidget);
       expect(find.text('dxf_parser'), findsOneWidget);
 
       // Clear logs
-      await tester.tap(find.text('Изчисти'));
+      await tester.tap(find.text('Clear'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Няма записани грешки'), findsOneWidget);
+      expect(find.text('No errors recorded'), findsOneWidget);
     });
   });
 }

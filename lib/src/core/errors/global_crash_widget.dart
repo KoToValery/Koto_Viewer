@@ -23,13 +23,13 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
 
   String _formatErrorDetails() {
     final buffer = StringBuffer();
-    buffer.writeln('=== ДЕТАЙЛИ ЗА ГРЕШКАТА ===');
-    buffer.writeln('Изключение: ${widget.details.exception}');
+    buffer.writeln('=== ERROR DETAILS ===');
+    buffer.writeln('Exception: ${widget.details.exception}');
     if (widget.details.context != null) {
-      buffer.writeln('Контекст: ${widget.details.context}');
+      buffer.writeln('Context: ${widget.details.context}');
     }
     if (widget.details.library != null) {
-      buffer.writeln('Библиотека: ${widget.details.library}');
+      buffer.writeln('Library: ${widget.details.library}');
     }
     if (widget.details.stack != null) {
       buffer.writeln('\n=== STACK TRACE ===');
@@ -121,7 +121,7 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
 
                     // Title
                     Text(
-                      'Нещо се обърка',
+                      'Something went wrong',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 22,
@@ -134,7 +134,7 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
 
                     // Subtitle
                     Text(
-                      'Приложението срещна неочакван проблем при обработката или визуализирането на този екран.',
+                      'The application encountered an unexpected issue while rendering or processing this screen.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -153,7 +153,7 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                         FilledButton.icon(
                           onPressed: _navigateHome,
                           icon: const Icon(Icons.home_rounded, size: 18),
-                          label: const Text('Към началния екран'),
+                          label: const Text('Go to Home'),
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),
                             foregroundColor: Colors.white,
@@ -170,7 +170,7 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                             size: 18,
                             color: _isCopied ? Colors.green : null,
                           ),
-                          label: Text(_isCopied ? 'Копирано!' : 'Копирай отчета'),
+                          label: Text(_isCopied ? 'Copied!' : 'Copy Report'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: textColor,
                             side: BorderSide(color: borderColor),
@@ -188,7 +188,7 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                     TextButton.icon(
                       onPressed: () => ErrorLogDialog.show(context),
                       icon: const Icon(Icons.history_rounded, size: 16),
-                      label: const Text('Преглед на дневника с грешки'),
+                      label: const Text('View Error Log'),
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFF2563EB),
                         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
@@ -213,7 +213,7 @@ class _GlobalCrashWidgetState extends State<GlobalCrashWidget> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              _isExpanded ? 'Скрий техническите детайли' : 'Покажи технически детайли',
+                              _isExpanded ? 'Hide technical details' : 'Show technical details',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,

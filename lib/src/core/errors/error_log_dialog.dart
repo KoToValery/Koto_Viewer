@@ -89,7 +89,7 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Дневник на грешките',
+                          'Error Log',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -97,7 +97,7 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                           ),
                         ),
                         Text(
-                          '${errors.length} записани събития в текущата сесия',
+                          '${errors.length} events recorded in current session',
                           style: TextStyle(fontSize: 12, color: subtextColor),
                         ),
                       ],
@@ -128,7 +128,7 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Няма записани грешки',
+                              'No errors recorded',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -137,7 +137,7 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Всички модули и viewer-и работят стабилно.',
+                              'All modules and viewers are operating normally.',
                               style: TextStyle(fontSize: 13, color: subtextColor),
                             ),
                           ],
@@ -263,12 +263,12 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.copy_rounded, size: 16),
-                                            tooltip: 'Копирай тази грешка',
+                                            tooltip: 'Copy this error',
                                             onPressed: () {
                                               Clipboard.setData(ClipboardData(text: record.toFormattedString()));
                                               ScaffoldMessenger.of(context).showSnackBar(
                                                 const SnackBar(
-                                                  content: Text('Грешката е копирана в буфера'),
+                                                  content: Text('Error copied to clipboard'),
                                                   duration: Duration(seconds: 1),
                                                 ),
                                               );
@@ -286,7 +286,7 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                                         ),
                                         child: SingleChildScrollView(
                                           child: SelectableText(
-                                            record.stackTrace?.toString() ?? 'Няма наличен stack trace.',
+                                            record.stackTrace?.toString() ?? 'No stack trace available.',
                                             style: TextStyle(
                                               fontFamily: 'monospace',
                                               fontSize: 10,
@@ -316,7 +316,7 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                     OutlinedButton.icon(
                       onPressed: _clearLogs,
                       icon: const Icon(Icons.delete_sweep_outlined, size: 16),
-                      label: const Text('Изчисти'),
+                      label: const Text('Clear'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFEF4444),
                         side: const BorderSide(color: Color(0xFFFCA5A5)),
@@ -331,7 +331,7 @@ class _ErrorLogDialogState extends State<ErrorLogDialog> {
                       _copied ? Icons.check_rounded : Icons.copy_all_rounded,
                       size: 16,
                     ),
-                    label: Text(_copied ? 'Копирано!' : 'Копирай целия лог'),
+                    label: Text(_copied ? 'Copied!' : 'Copy All Logs'),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
                     ),

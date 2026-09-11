@@ -20,7 +20,7 @@ class ViewerLoadingScreen extends StatelessWidget {
     this.fileSizeBytes,
     required this.icon,
     required this.accentColor,
-    this.loadingTitle = 'Зареждане на файл...',
+    this.loadingTitle = 'Loading file...',
     this.statusMessage,
     this.progress,
     this.progressDetails,
@@ -46,7 +46,7 @@ class ViewerLoadingScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white70),
-          tooltip: 'Отказ',
+          tooltip: 'Cancel',
           onPressed: () {
             if (onCancel != null) {
               onCancel!();

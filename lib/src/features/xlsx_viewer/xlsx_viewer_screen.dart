@@ -631,8 +631,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
         fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
         icon: Icons.table_chart_rounded,
         accentColor: const Color(0xFF107C41),
-        loadingTitle: 'Зареждане на електронна таблица...',
-        statusMessage: 'Индексиране на работни листи, клетки и формули...',
+        loadingTitle: 'Loading spreadsheet...',
+        statusMessage: 'Indexing worksheets, cells, and formulas...',
         onCancel: () => Navigator.of(context).pop(false),
       );
     }
