@@ -143,7 +143,7 @@ class PdfItem {
     if (lower.endsWith('.ttf') || lower.endsWith('.otf') || lower.endsWith('.woff') || lower.endsWith('.woff2')) return KotoFileType.font;
     if (lower.endsWith('.ico')) return KotoFileType.ico;
     if (lower.endsWith('.psd') || lower.endsWith('.psb')) return KotoFileType.psd;
-    if (lower.endsWith('.dcm') || lower.endsWith('.dicom')) return KotoFileType.dicom;
+    if (lower.endsWith('.dcm') || lower.endsWith('.dicom') || lower.endsWith('dicomdir')) return KotoFileType.dicom;
     
     // --- Docker files (matched by filename, not extension) ---
     final baseName = (name.contains('/')
@@ -183,6 +183,28 @@ class PdfItem {
         lower.endsWith('.yaml') || lower.endsWith('.yml') || lower.endsWith('.toml') || lower.endsWith('.ini') || lower.endsWith('.env') ||
         lower.endsWith('.sql') || lower.endsWith('.proto')) {
       return KotoFileType.code;
+    }
+
+    // Check extensionless files for DICOM magic
+    if (!baseName.contains('.') && path.isNotEmpty) {
+      try {
+        final f = File(path);
+        if (f.existsSync() && f.lengthSync() >= 132) {
+          final raf = f.openSync(mode: FileMode.read);
+          try {
+            final magicBytes = raf.readSync(132);
+            if (magicBytes.length >= 132 &&
+                magicBytes[128] == 0x44 &&
+                magicBytes[129] == 0x49 &&
+                magicBytes[130] == 0x43 &&
+                magicBytes[131] == 0x4D) {
+              return KotoFileType.dicom;
+            }
+          } finally {
+            raf.closeSync();
+          }
+        }
+      } catch (_) {}
     }
 
     return KotoFileType.other;

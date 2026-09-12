@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/models/pdf_item.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/fbx_parser.dart';
@@ -163,6 +164,22 @@ Objects:  {
       expect(item.fileType, KotoFileType.fbx);
       expect(item.is3d, isTrue);
       expect(item.isFbx, isTrue);
+    });
+
+    test('inspect 1.fbx real file with materials and subdivision', () {
+      final file = File(r'C:\Users\Creator\Dropbox\test_files\1.fbx');
+      if (file.existsSync()) {
+        final bytes = file.readAsBytesSync();
+        final mesh = FbxParser.parseFromBytes(bytes, name: '1.fbx');
+        expect(mesh.triangleCount, greaterThan(1000));
+        
+        // Verify colors are extracted and assigned
+        final coloredTris = mesh.triangles.where((t) => t.color != null).toList();
+        expect(coloredTris.isNotEmpty, isTrue);
+
+        final uniqueColors = mesh.triangles.map((t) => t.color).whereType<Color>().toSet();
+        expect(uniqueColors.length, greaterThanOrEqualTo(5));
+      }
     });
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import '../models/mesh_3d.dart';
@@ -333,6 +334,16 @@ class FbxParser {
   // FBX TREE TO MESH3D CONVERTER
   // ==========================================
 
+  static String _cleanFbxName(String raw) {
+    var s = raw;
+    if (s.contains('::')) {
+      s = s.split('::').last;
+    }
+    // Remove trailing " Material", " Geometry", " Model"
+    s = s.replaceAll(RegExp(r'\s+(Material|Geometry|Model)$', caseSensitive: false), '');
+    return s.trim();
+  }
+
   static Mesh3D _buildMeshFromFbxTree(FbxNode root, {required String name}) {
     // 1. Detect coordinate system (UpAxis)
     // UpAxis: 0 = X, 1 = Y, 2 = Z. Default in FBX / Maya is often 1 (Y-up).
@@ -351,9 +362,94 @@ class FbxParser {
       }
     }
 
-    // 2. Find all Geometry nodes (Mesh type)
-    final List<FbxNode> geomNodes = [];
     final objectsNode = root.findChild('Objects') ?? root;
+
+    // 2. Parse Materials
+    final Map<dynamic, Color> materialColorsById = {};
+    final Map<String, Color> materialColorsByName = {};
+
+    for (final child in objectsNode.children) {
+      if (child.name.toLowerCase() == 'material') {
+        dynamic matId;
+        String? matName;
+        if (child.properties.isNotEmpty) {
+          matId = child.properties[0];
+          if (child.properties.length > 1) {
+            matName = child.properties[1].toString();
+          }
+        }
+
+        Color? matColor;
+        final props70 = child.findChild('Properties70');
+        if (props70 != null) {
+          double? r, g, b, alpha;
+          for (final p in props70.findChildren('P')) {
+            if (p.properties.isEmpty) continue;
+            final propName = p.properties[0].toString();
+            if ((propName == 'DiffuseColor' || propName == 'Diffuse') && p.properties.length >= 7) {
+              final pr = (p.properties[4] as num?)?.toDouble();
+              final pg = (p.properties[5] as num?)?.toDouble();
+              final pb = (p.properties[6] as num?)?.toDouble();
+              if (pr != null && pg != null && pb != null) {
+                r = pr;
+                g = pg;
+                b = pb;
+              }
+            } else if (propName == 'Color' && p.properties.length >= 7) {
+              r ??= (p.properties[4] as num?)?.toDouble();
+              g ??= (p.properties[5] as num?)?.toDouble();
+              b ??= (p.properties[6] as num?)?.toDouble();
+            } else if ((propName == 'Opacity' || propName == 'TransparencyFactor') && p.properties.length >= 5) {
+              final val = (p.properties[4] as num?)?.toDouble();
+              if (val != null) {
+                if (propName == 'TransparencyFactor') {
+                  alpha = (1.0 - val).clamp(0.0, 1.0);
+                } else {
+                  alpha = val.clamp(0.0, 1.0);
+                }
+              }
+            }
+          }
+
+          if (r != null && g != null && b != null) {
+            matColor = Color.from(
+              alpha: alpha ?? 1.0,
+              red: r.clamp(0.0, 1.0),
+              green: g.clamp(0.0, 1.0),
+              blue: b.clamp(0.0, 1.0),
+            );
+          }
+        }
+
+        if (matColor != null) {
+          if (matId != null) {
+            materialColorsById[matId] = matColor;
+          }
+          if (matName != null && matName.isNotEmpty) {
+            final clean = _cleanFbxName(matName).toLowerCase();
+            materialColorsByName[clean] = matColor;
+          }
+        }
+      }
+    }
+
+    // 3. Parse Connections
+    final Map<dynamic, List<dynamic>> parentToChildren = {};
+    final Map<dynamic, List<dynamic>> childToParents = {};
+    final connNode = root.findChild('Connections');
+    if (connNode != null) {
+      for (final c in connNode.findChildren('C')) {
+        if (c.properties.length >= 3) {
+          final childId = c.properties[1];
+          final parentId = c.properties[2];
+          parentToChildren.putIfAbsent(parentId, () => []).add(childId);
+          childToParents.putIfAbsent(childId, () => []).add(parentId);
+        }
+      }
+    }
+
+    // 4. Find all Geometry nodes (Mesh type)
+    final List<FbxNode> geomNodes = [];
 
     for (final child in objectsNode.children) {
       if (child.name.toLowerCase() == 'geometry') {
@@ -411,6 +507,62 @@ class FbxParser {
 
       if (vertices.isEmpty) continue;
 
+      // Resolve Geometry Color via Material Connections or Name Matching
+      dynamic geomId;
+      String? geomName;
+      if (geom.properties.isNotEmpty) {
+        geomId = geom.properties[0];
+        if (geom.properties.length > 1) {
+          geomName = geom.properties[1].toString();
+        }
+      }
+
+      Color? geomColor;
+      if (geomId != null) {
+        final parentModels = childToParents[geomId] ?? [];
+        for (final pModel in parentModels) {
+          final siblings = parentToChildren[pModel] ?? [];
+          for (final sib in siblings) {
+            if (materialColorsById.containsKey(sib)) {
+              geomColor = materialColorsById[sib];
+              break;
+            }
+          }
+          if (geomColor != null) break;
+        }
+
+        geomColor ??= materialColorsById[geomId];
+        if (geomColor == null) {
+          for (final p in (childToParents[geomId] ?? [])) {
+            if (materialColorsById.containsKey(p)) {
+              geomColor = materialColorsById[p];
+              break;
+            }
+          }
+        }
+        if (geomColor == null) {
+          for (final ch in (parentToChildren[geomId] ?? [])) {
+            if (materialColorsById.containsKey(ch)) {
+              geomColor = materialColorsById[ch];
+              break;
+            }
+          }
+        }
+      }
+
+      if (geomColor == null && geomName != null && geomName.isNotEmpty) {
+        final clean = _cleanFbxName(geomName).toLowerCase();
+        geomColor = materialColorsByName[clean];
+        if (geomColor == null) {
+          for (final entry in materialColorsByName.entries) {
+            if (clean.contains(entry.key) || entry.key.contains(clean)) {
+              geomColor = entry.value;
+              break;
+            }
+          }
+        }
+      }
+
       // Optional Normals
       List<Vector3>? normals;
       String? normalMapping;
@@ -418,22 +570,48 @@ class FbxParser {
       if (normalElem != null) {
         final normalsNode = normalElem.findChild('Normals');
         final mappingNode = normalElem.findChild('MappingInformationType');
+        final refNode = normalElem.findChild('ReferenceInformationType');
+        final normalIndicesNode = normalElem.findChild('NormalsIndex') ?? normalElem.findChild('NormalIndex');
+
         if (mappingNode != null && mappingNode.properties.isNotEmpty) {
           normalMapping = mappingNode.properties[0].toString();
         }
         if (normalsNode != null && normalsNode.properties.isNotEmpty) {
           final rawNormals = normalsNode.properties[0];
           if (rawNormals is List) {
-            normals = [];
+            final parsedNormals = <Vector3>[];
             for (int i = 0; i + 2 < rawNormals.length; i += 3) {
               final nx = (rawNormals[i] as num).toDouble();
               final ny = (rawNormals[i + 1] as num).toDouble();
               final nz = (rawNormals[i + 2] as num).toDouble();
               if (upAxis == 1) {
-                normals.add(Vector3(nx, -nz, ny).normalized());
+                parsedNormals.add(Vector3(nx, -nz, ny).normalized());
               } else {
-                normals.add(Vector3(nx, ny, nz).normalized());
+                parsedNormals.add(Vector3(nx, ny, nz).normalized());
               }
+            }
+
+            final isIndexToDirect = refNode != null &&
+                refNode.properties.isNotEmpty &&
+                refNode.properties[0].toString().toLowerCase() == 'indextodirect';
+
+            if (isIndexToDirect && normalIndicesNode != null && normalIndicesNode.properties.isNotEmpty) {
+              final rawNormIndices = normalIndicesNode.properties[0];
+              if (rawNormIndices is List) {
+                normals = [];
+                for (int i = 0; i < rawNormIndices.length; i++) {
+                  final idx = (rawNormIndices[i] as num).toInt();
+                  if (idx >= 0 && idx < parsedNormals.length) {
+                    normals.add(parsedNormals[idx]);
+                  } else {
+                    normals.add(Vector3.zero);
+                  }
+                }
+              } else {
+                normals = parsedNormals;
+              }
+            } else {
+              normals = parsedNormals;
             }
           }
         }
@@ -454,6 +632,7 @@ class FbxParser {
         if (isLast) {
           // Polygon complete! Triangulate n-gon via fan triangulation
           if (polyIndices.length >= 3) {
+            final baseIdx = i - polyIndices.length + 1;
             for (int t = 1; t < polyIndices.length - 1; t++) {
               final i0 = polyIndices[0];
               final i1 = polyIndices[t];
@@ -466,11 +645,23 @@ class FbxParser {
 
                 Vector3? normal;
                 if (normals != null && normals.isNotEmpty) {
-                  if (normalMapping == 'ByVertex' || normalMapping == 'ByControlPoint') {
-                    if (i0 < normals.length) normal = normals[i0];
-                  } else if (normalMapping == 'ByPolygonVertex') {
-                    final nIdx = (i - polyIndices.length + 1) + t;
-                    if (nIdx < normals.length) normal = normals[nIdx];
+                  if (normalMapping == 'ByPolygonVertex') {
+                    final n0 = baseIdx;
+                    final n1 = baseIdx + t;
+                    final n2 = baseIdx + t + 1;
+                    if (n0 < normals.length && n1 < normals.length && n2 < normals.length) {
+                      final sum = normals[n0] + normals[n1] + normals[n2];
+                      normal = sum.lengthSquared > 1e-6 ? sum.normalized() : normals[n0];
+                    } else if (n1 < normals.length) {
+                      normal = normals[n1];
+                    }
+                  } else if (normalMapping == 'ByVertex' || normalMapping == 'ByControlPoint') {
+                    if (i0 < normals.length && i1 < normals.length && i2 < normals.length) {
+                      final sum = normals[i0] + normals[i1] + normals[i2];
+                      normal = sum.lengthSquared > 1e-6 ? sum.normalized() : normals[i0];
+                    } else if (i0 < normals.length) {
+                      normal = normals[i0];
+                    }
                   }
                 }
 
@@ -479,6 +670,7 @@ class FbxParser {
                   v1: v1,
                   v2: v2,
                   normal: normal,
+                  color: geomColor,
                 ));
               }
             }

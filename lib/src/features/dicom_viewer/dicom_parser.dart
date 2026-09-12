@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 // ---------------------------------------------------------------------------
@@ -70,10 +71,20 @@ class DicomHeader {
   final String? patientId;
   final String? patientBirthDate;
   final String? patientSex;
+  final String? patientAge;
   final String? modality;
   final String? studyDate;
   final String? studyDescription;
   final String? seriesDescription;
+  final String? studyInstanceUID;
+  final String? seriesInstanceUID;
+  final String? sopInstanceUID;
+  final int? instanceNumber;
+  final double? sliceLocation;
+  final double? sliceThickness;
+  final List<double>? pixelSpacing;
+  final List<double>? imagePositionPatient;
+  final List<double>? imageOrientationPatient;
   final String? institutionName;
   final String? manufacturer;
   final int rows;
@@ -102,10 +113,20 @@ class DicomHeader {
     this.patientId,
     this.patientBirthDate,
     this.patientSex,
+    this.patientAge,
     this.modality,
     this.studyDate,
     this.studyDescription,
     this.seriesDescription,
+    this.studyInstanceUID,
+    this.seriesInstanceUID,
+    this.sopInstanceUID,
+    this.instanceNumber,
+    this.sliceLocation,
+    this.sliceThickness,
+    this.pixelSpacing,
+    this.imagePositionPatient,
+    this.imageOrientationPatient,
     this.institutionName,
     this.manufacturer,
     required this.rows,
@@ -145,6 +166,22 @@ class DicomHeader {
 
   String get transferSyntaxLabel =>
       DicomTransferSyntax.humanReadable(transferSyntaxUID);
+
+  /// Row spacing in mm (vertical distance between adjacent pixels)
+  double? get pixelSpacingRow =>
+      pixelSpacing != null && pixelSpacing!.isNotEmpty ? pixelSpacing![0] : null;
+
+  /// Column spacing in mm (horizontal distance between adjacent pixels)
+  double? get pixelSpacingCol =>
+      pixelSpacing != null && pixelSpacing!.length > 1 ? pixelSpacing![1] : null;
+
+  /// Formatted slice location string (e.g. "-120.5 mm")
+  String? get formattedSliceLocation =>
+      sliceLocation != null ? '${sliceLocation!.toStringAsFixed(1)} mm' : null;
+
+  /// Formatted slice thickness string (e.g. "1.25 mm")
+  String? get formattedSliceThickness =>
+      sliceThickness != null ? '${sliceThickness!.toStringAsFixed(2)} mm' : null;
 
   /// Human-readable patient name (DICOM uses ^ as separator)
   String get formattedPatientName {
@@ -264,61 +301,113 @@ class _ByteReader {
 // Main parser
 // ---------------------------------------------------------------------------
 class DicomParser {
+  /// Check if the byte buffer is a valid DICOM file (with standard DICM magic or preamble-less).
+  static bool isDicom(Uint8List bytes) {
+    if (bytes.length < 132) {
+      if (bytes.length >= 8 &&
+          ((bytes[0] == 0x08 && bytes[1] == 0x00) ||
+              (bytes[0] == 0x02 && bytes[1] == 0x00))) {
+        return true;
+      }
+      return false;
+    }
+    // Standard DICOM has 128 bytes preamble followed by "DICM"
+    if (bytes[128] == 0x44 &&
+        bytes[129] == 0x49 &&
+        bytes[130] == 0x43 &&
+        bytes[131] == 0x4D) {
+      return true;
+    }
+    // Preamble-less
+    if ((bytes[0] == 0x08 && bytes[1] == 0x00) ||
+        (bytes[0] == 0x02 && bytes[1] == 0x00)) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Fast check if a local file is a DICOM file by reading up to 132 bytes.
+  static bool isDicomFile(File file) {
+    try {
+      if (!file.existsSync()) return false;
+      final len = file.lengthSync();
+      if (len < 8) return false;
+      final raf = file.openSync(mode: FileMode.read);
+      try {
+        final toRead = len < 132 ? len : 132;
+        final headerBytes = raf.readSync(toRead);
+        return isDicom(headerBytes);
+      } finally {
+        raf.closeSync();
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Parse the header from raw file bytes.
   /// Throws [DicomParseException] if the file is not valid DICOM.
   static DicomHeader parse(Uint8List bytes) {
     final r = _ByteReader(bytes);
 
-    // ---- Validate DICM magic (PS3.10 §7.1) ----
-    if (bytes.length < 132) {
-      throw DicomParseException('File too small to be DICOM (${bytes.length} bytes)');
-    }
-    final magic = bytes.sublist(128, 132);
-    if (magic[0] != 0x44 || magic[1] != 0x49 || magic[2] != 0x43 || magic[3] != 0x4D) {
+    // ---- Validate DICM magic (PS3.10 §7.1) or preamble-less ----
+    bool hasPreamble = false;
+    if (bytes.length >= 132 &&
+        bytes[128] == 0x44 &&
+        bytes[129] == 0x49 &&
+        bytes[130] == 0x43 &&
+        bytes[131] == 0x4D) {
+      hasPreamble = true;
+      r.seek(132);
+    } else if (bytes.length >= 8 &&
+        ((bytes[0] == 0x08 && bytes[1] == 0x00) ||
+            (bytes[0] == 0x02 && bytes[1] == 0x00))) {
+      hasPreamble = false;
+      r.seek(0);
+    } else {
       throw DicomParseException(
-          'Not a valid DICOM file — missing DICM magic at offset 128. '
-          'Got: ${magic.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+          'Not a valid DICOM file — missing DICM magic at offset 128.');
     }
-
-    r.seek(132);
 
     // ---- Parse Meta Information Group (0002,xxxx) ----
     // Always Explicit VR Little Endian, regardless of dataset transfer syntax
     String transferSyntaxUID = DicomTransferSyntax.explicitVrLittleEndian;
 
-    while (!r.isAtEnd) {
-      if (r.position + 4 > r.length) break;
+    if (hasPreamble) {
+      while (!r.isAtEnd) {
+        if (r.position + 4 > r.length) break;
 
-      final group = _readUint16LE(bytes, r.position);
-      if (group != 0x0002) break; // meta group ends
+        final group = _readUint16LE(bytes, r.position);
+        if (group != 0x0002) break; // meta group ends
 
-      r.skip(2);
-      final elem = _readUint16LE(bytes, r.position);
-      r.skip(2);
-
-      final vr = r.readVR();
-      int length;
-      if (_isLongVr(vr)) {
-        r.skip(2); // reserved
-        length = _readUint32LE(bytes, r.position);
-        r.skip(4);
-      } else {
-        length = _readUint16LE(bytes, r.position);
         r.skip(2);
-      }
+        final elem = _readUint16LE(bytes, r.position);
+        r.skip(2);
 
-      final tag = (group << 16) | elem;
+        final vr = r.readVR();
+        int length;
+        if (_isLongVr(vr)) {
+          r.skip(2); // reserved
+          length = _readUint32LE(bytes, r.position);
+          r.skip(4);
+        } else {
+          length = _readUint16LE(bytes, r.position);
+          r.skip(2);
+        }
 
-      if (length == 0xFFFFFFFF) {
-        // Undefined length — skip (rare in meta)
-        break;
-      }
+        final tag = (group << 16) | elem;
 
-      if (tag == 0x00020010) {
-        // TransferSyntaxUID
-        transferSyntaxUID = r.readString(length);
-      } else {
-        r.skip(length);
+        if (length == 0xFFFFFFFF) {
+          // Undefined length — skip (rare in meta)
+          break;
+        }
+
+        if (tag == 0x00020010) {
+          // TransferSyntaxUID
+          transferSyntaxUID = r.readString(length);
+        } else {
+          r.skip(length);
+        }
       }
     }
 
@@ -332,10 +421,20 @@ class DicomParser {
     String? patientId;
     String? patientBirthDate;
     String? patientSex;
+    String? patientAge;
     String? modality;
     String? studyDate;
     String? studyDescription;
     String? seriesDescription;
+    String? studyInstanceUID;
+    String? seriesInstanceUID;
+    String? sopInstanceUID;
+    int? instanceNumber;
+    double? sliceLocation;
+    double? sliceThickness;
+    List<double>? pixelSpacing;
+    List<double>? imagePositionPatient;
+    List<double>? imageOrientationPatient;
     String? institutionName;
     String? manufacturer;
     int rows = 0;
@@ -446,6 +545,9 @@ class DicomParser {
         case 0x00100040:
           patientSex = r.readString(length);
           break;
+        case 0x00101010:
+          patientAge = r.readString(length);
+          break;
         case 0x00080060:
           modality = r.readString(length);
           break;
@@ -457,6 +559,33 @@ class DicomParser {
           break;
         case 0x0008103E:
           seriesDescription = r.readString(length);
+          break;
+        case 0x0020000D:
+          studyInstanceUID = r.readString(length);
+          break;
+        case 0x0020000E:
+          seriesInstanceUID = r.readString(length);
+          break;
+        case 0x00080018:
+          sopInstanceUID = r.readString(length);
+          break;
+        case 0x00200013:
+          instanceNumber = int.tryParse(r.readString(length).trim());
+          break;
+        case 0x00201041:
+          sliceLocation = _parseDS(r.readString(length));
+          break;
+        case 0x00180050:
+          sliceThickness = _parseDS(r.readString(length));
+          break;
+        case 0x00280030:
+          pixelSpacing = _parseDSList(r.readString(length));
+          break;
+        case 0x00200032:
+          imagePositionPatient = _parseDSList(r.readString(length));
+          break;
+        case 0x00200037:
+          imageOrientationPatient = _parseDSList(r.readString(length));
           break;
         case 0x00080080:
           institutionName = r.readString(length);
@@ -527,10 +656,20 @@ class DicomParser {
       patientId: patientId,
       patientBirthDate: patientBirthDate,
       patientSex: patientSex,
+      patientAge: patientAge,
       modality: modality,
       studyDate: studyDate,
       studyDescription: studyDescription,
       seriesDescription: seriesDescription,
+      studyInstanceUID: studyInstanceUID,
+      seriesInstanceUID: seriesInstanceUID,
+      sopInstanceUID: sopInstanceUID,
+      instanceNumber: instanceNumber,
+      sliceLocation: sliceLocation,
+      sliceThickness: sliceThickness,
+      pixelSpacing: pixelSpacing,
+      imagePositionPatient: imagePositionPatient,
+      imageOrientationPatient: imageOrientationPatient,
       institutionName: institutionName,
       manufacturer: manufacturer,
       rows: rows,
@@ -620,6 +759,18 @@ class DicomParser {
     // Take first value if multi-valued
     final parts = s.split('\\');
     return double.tryParse(parts.first.trim());
+  }
+
+  /// Parse DICOM DS (Decimal String) list separated by backslash
+  static List<double>? _parseDSList(String s) {
+    if (s.isEmpty) return null;
+    final parts = s.split('\\');
+    final list = <double>[];
+    for (final p in parts) {
+      final v = double.tryParse(p.trim());
+      if (v != null) list.add(v);
+    }
+    return list.isEmpty ? null : list;
   }
 
   /// Brute-force search for (7FE0,0010) pixel data tag when sequences make

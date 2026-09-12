@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -64,6 +65,7 @@ class FileSourceService {
   static const String _keySourceMode = 'koto_file_source_mode';
   static const String _keyCustomPath = 'koto_custom_folder_path';
   static const String _keyCustomFolders = 'koto_custom_folder_list';
+  static const String _keyCustomFolderNames = 'koto_custom_folder_names';
   static const String _keySortOption = 'koto_sort_option';
   static const String _keyIncludeSubfolders = 'koto_include_subfolders';
 
@@ -90,12 +92,41 @@ class FileSourceService {
     return list;
   }
 
-  static Future<void> addCustomFolder(String path) async {
+  static Future<Map<String, String>> getCustomFolderNames() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonStr = prefs.getString(_keyCustomFolderNames);
+    if (jsonStr == null || jsonStr.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
+      return decoded.map((k, v) => MapEntry(k, v.toString()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> setCustomFolderName(String path, String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = await getCustomFolderNames();
+    map[path] = name;
+    await prefs.setString(_keyCustomFolderNames, jsonEncode(map));
+  }
+
+  static Future<void> saveCustomFolderNames(Map<String, String> names) async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = await getCustomFolderNames();
+    map.addAll(names);
+    await prefs.setString(_keyCustomFolderNames, jsonEncode(map));
+  }
+
+  static Future<void> addCustomFolder(String path, {String? displayName}) async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_keyCustomFolders) ?? [];
     if (!list.contains(path)) {
       list.add(path);
       await prefs.setStringList(_keyCustomFolders, list);
+    }
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      await setCustomFolderName(path, displayName.trim());
     }
     await prefs.setString(_keyCustomPath, path);
     await prefs.setString(_keySourceMode, FileSourceMode.custom.key);
@@ -106,6 +137,12 @@ class FileSourceService {
     final list = prefs.getStringList(_keyCustomFolders) ?? [];
     list.remove(path);
     await prefs.setStringList(_keyCustomFolders, list);
+
+    final map = await getCustomFolderNames();
+    if (map.containsKey(path)) {
+      map.remove(path);
+      await prefs.setString(_keyCustomFolderNames, jsonEncode(map));
+    }
 
     final currentActive = prefs.getString(_keyCustomPath);
     if (currentActive == path) {

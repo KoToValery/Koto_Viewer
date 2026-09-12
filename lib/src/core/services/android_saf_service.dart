@@ -95,8 +95,77 @@ class AndroidSafService {
     return current;
   }
 
+  /// Checks if [str] looks like an internal/opaque provider ID rather than a human-readable folder name.
+  /// E.g. "acc=10;doc=encoded=...", "373a94fc-5181-4bc4-a2f2-b21a8d115e5c", "msf:123", raw hashes.
+  static bool isOpaqueProviderId(String str) {
+    final s = str.trim();
+    if (s.isEmpty) return true;
+    if (s.startsWith('acc=') || s.contains(';doc=') || s.startsWith('doc=encoded=')) {
+      return true;
+    }
+    // UUID pattern: 8-4-4-4-12 hex chars
+    final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+    if (uuidRegex.hasMatch(s)) return true;
+    // Hex hash pattern of 20+ chars
+    final hexRegex = RegExp(r'^[0-9a-fA-F]{20,}$');
+    if (hexRegex.hasMatch(s)) return true;
+    if (s.startsWith('msf:') || s.startsWith('msf%3A') || s.startsWith('msf%3a')) return true;
+    // Percent encoded sequences that were not decoded
+    if (s.contains('%3A') || s.contains('%3a') || s.contains('%2F') || s.contains('%2f')) return true;
+    return false;
+  }
+
+  /// Returns a clean, user-friendly fallback name based on the authority/provider in [safUri].
+  static String providerFallbackName(String safUri) {
+    final lower = safUri.toLowerCase();
+    if (lower.contains('com.google.android.apps.docs')) {
+      return 'Google Drive Folder';
+    }
+    if (lower.contains('downloads')) {
+      return 'Downloads';
+    }
+    if (lower.contains('media')) {
+      return 'Media Folder';
+    }
+    if (lower.contains('externalstorage')) {
+      return 'Internal Storage';
+    }
+    if (lower.contains('onedrive')) {
+      return 'OneDrive Folder';
+    }
+    if (lower.contains('dropbox')) {
+      return 'Dropbox Folder';
+    }
+    return 'Custom Folder';
+  }
+
+  /// Returns a concise, user-friendly subtitle indicating the storage provider.
+  static String folderSubtitleFromSafUri(String safUri) {
+    final lower = safUri.toLowerCase();
+    if (lower.contains('com.google.android.apps.docs')) {
+      return 'Google Drive';
+    }
+    if (lower.contains('externalstorage')) {
+      return 'Internal Storage';
+    }
+    if (lower.contains('downloads')) {
+      return 'Downloads';
+    }
+    if (lower.contains('media')) {
+      return 'Media';
+    }
+    if (lower.contains('onedrive')) {
+      return 'OneDrive';
+    }
+    if (lower.contains('dropbox')) {
+      return 'Dropbox';
+    }
+    return 'Android Folder';
+  }
+
   /// Extracts a human-readable folder name from a SAF tree URI.
   /// Supports Cyrillic and other non-ASCII scripts.
+  /// Ensures opaque provider IDs are never returned as user-facing names.
   ///
   /// Example:
   ///   `content://.../tree/primary%3ADownload` → `Download`
@@ -109,13 +178,20 @@ class AndroidSafService {
       final segments = uri?.pathSegments ?? safUri.split('/');
       String? encoded;
       for (int i = 0; i < segments.length; i++) {
-        if (segments[i] == 'tree' && i + 1 < segments.length) {
-          encoded = segments[i + 1];
+        if (segments[i] == 'tree') {
+          final treeParts = <String>[];
+          for (int j = i + 1; j < segments.length; j++) {
+            if (segments[j] == 'document') break;
+            treeParts.add(segments[j]);
+          }
+          if (treeParts.isNotEmpty) {
+            encoded = treeParts.join('/');
+          }
           break;
         }
       }
       encoded ??= segments.isNotEmpty ? segments.last : null;
-      if (encoded == null || encoded.isEmpty) return 'Custom Folder';
+      if (encoded == null || encoded.isEmpty) return providerFallbackName(safUri);
 
       final decoded = safeDecodeUtf8(encoded);
       // Format: "primary:RelativePath" or "XXXX-YYYY:RelativePath" or "raw:/storage/..."
@@ -123,11 +199,19 @@ class AndroidSafService {
         final rel = decoded.substring(decoded.lastIndexOf(':') + 1);
         if (rel.isEmpty || rel == '/' || rel == '\\') return 'Internal Storage';
         final parts = rel.split(RegExp(r'[/\\]')).where((s) => s.isNotEmpty).toList();
-        if (parts.isNotEmpty) return parts.last;
+        if (parts.isNotEmpty) {
+          final candidate = parts.last;
+          if (!isOpaqueProviderId(candidate)) return candidate;
+        }
       }
 
       final parts = decoded.split(RegExp(r'[/\\]')).where((s) => s.isNotEmpty).toList();
-      return parts.isNotEmpty ? parts.last : 'Custom Folder';
+      if (parts.isNotEmpty) {
+        final candidate = parts.last;
+        if (!isOpaqueProviderId(candidate)) return candidate;
+      }
+
+      return providerFallbackName(safUri);
     } catch (_) {
       return 'Custom Folder';
     }
@@ -143,6 +227,21 @@ class AndroidSafService {
       );
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Batch queries the Android OS directly for the display names of multiple SAF tree folders.
+  static Future<Map<String, String>> getFolderDisplayNames(List<String> safTreeUris) async {
+    if (!Platform.isAndroid || safTreeUris.isEmpty) return {};
+    try {
+      final res = await _channel.invokeMapMethod<String, String>(
+        'getFolderDisplayNames',
+        {'uris': safTreeUris},
+      );
+      return res ?? {};
+    } catch (e) {
+      debugPrint('AndroidSafService.getFolderDisplayNames error: $e');
+      return {};
     }
   }
 

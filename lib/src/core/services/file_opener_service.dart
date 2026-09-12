@@ -30,6 +30,7 @@ import '../../features/image_viewer/image_viewer_screen.dart';
 import '../../features/csv_viewer/csv_viewer_screen.dart';
 import '../../features/jupyter_viewer/jupyter_viewer_screen.dart';
 import '../../features/dicom_viewer/dicom_viewer_screen.dart';
+import '../../features/dicom_viewer/dicom_study_loader.dart';
 
 /// Unified service for resolving, converting, and opening all file formats
 /// supported by KotoViewer.
@@ -294,7 +295,23 @@ class FileOpenerService {
       case KotoFileType.gbr:
       case KotoFileType.drl:
       case KotoFileType.kicad:
+        return await _pushViewer(
+          nav,
+          item,
+          filePath,
+          PcbViewerScreen(filePath: resolvedPath),
+        );
+
       case KotoFileType.zip:
+        // Smart ZIP routing: check if the archive contains a DICOM study
+        if (DicomStudyLoader.isDicomZip(resolvedPath)) {
+          return await _pushViewer(
+            nav,
+            item,
+            filePath,
+            DicomViewerScreen(filePath: resolvedPath),
+          );
+        }
         return await _pushViewer(
           nav,
           item,

@@ -354,5 +354,27 @@ f 1//1 2//1 3//1 4//1
         expect(picture, isNotNull);
       }
     });
+
+    test('Paints meter-scale model with adaptive subdivision without error', () {
+      final largeTri = Triangle3D(
+        v0: const Vector3(0, 0, 0),
+        v1: const Vector3(5, 0, 0),
+        v2: const Vector3(0, 5, 0),
+      );
+      final mesh = Mesh3D(name: 'LargeMeterMesh', triangles: [largeTri]);
+      final camera = Cad3DCamera();
+      final painter = Cad3DMeshPainter(
+        mesh: mesh,
+        camera: camera,
+        shadingMode: Cad3DShadingMode.smoothShaded,
+        theme: Cad3DTheme.darkCad,
+      );
+
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+      expect(() => painter.paint(canvas, const Size(800, 600)), returnsNormally);
+      final picture = recorder.endRecording();
+      expect(picture, isNotNull);
+    });
   });
 }

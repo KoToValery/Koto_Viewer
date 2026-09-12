@@ -156,17 +156,24 @@ class MainActivity : FlutterActivity() {
                         return@setMethodCallHandler
                     }
                     safBackgroundExecutor.execute {
-                        try {
-                            val treeUri = Uri.parse(uriString)
-                            val docFolder = DocumentFile.fromTreeUri(this@MainActivity, treeUri)
-                            val displayName = docFolder?.name
-                            runOnUiThread {
-                                result.success(displayName)
+                        val displayName = resolveFolderDisplayName(uriString)
+                        runOnUiThread {
+                            result.success(displayName)
+                        }
+                    }
+                }
+                "getFolderDisplayNames" -> {
+                    val uris = call.argument<List<String>>("uris") ?: emptyList()
+                    safBackgroundExecutor.execute {
+                        val resultMap = mutableMapOf<String, String>()
+                        for (uriStr in uris) {
+                            val displayName = resolveFolderDisplayName(uriStr)
+                            if (displayName != null && displayName.isNotBlank()) {
+                                resultMap[uriStr] = displayName
                             }
-                        } catch (e: Exception) {
-                            runOnUiThread {
-                                result.success(null)
-                            }
+                        }
+                        runOnUiThread {
+                            result.success(resultMap)
                         }
                     }
                 }
@@ -224,6 +231,102 @@ class MainActivity : FlutterActivity() {
             DocumentsContract.Document.COLUMN_LAST_MODIFIED
         )
         private const val MAX_SAF_RECURSION_DEPTH = 10
+    }
+
+    /**
+     * Resolves the human-readable display name of a SAF folder (tree URI).
+     *
+     * Tries DocumentFile first, falls back to direct DocumentsContract query,
+     * and handles primary/root storage labels.
+     */
+    private fun resolveFolderDisplayName(uriString: String): String? {
+        try {
+            val treeUri = Uri.parse(uriString)
+            try {
+                contentResolver.takePersistableUriPermission(
+                    treeUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) {}
+
+            var displayName: String? = null
+
+            // 1. Try DocumentFile.fromTreeUri
+            try {
+                val docFolder = DocumentFile.fromTreeUri(this@MainActivity, treeUri)
+                displayName = docFolder?.name
+            } catch (e: Exception) {
+                android.util.Log.w("SAFChannel", "DocumentFile.fromTreeUri failed for $uriString: ${e.message}")
+            }
+
+            // 2. Fallback: direct DocumentsContract query using tree docId
+            if (displayName.isNullOrBlank()) {
+                try {
+                    val docId = if (DocumentsContract.isDocumentUri(this@MainActivity, treeUri)) {
+                        DocumentsContract.getDocumentId(treeUri)
+                    } else {
+                        DocumentsContract.getTreeDocumentId(treeUri)
+                    }
+                    if (docId != null) {
+                        val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                        contentResolver.query(
+                            docUri,
+                            arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                            null,
+                            null,
+                            null
+                        )?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val colIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                                if (colIdx != -1 && !cursor.isNull(colIdx)) {
+                                    displayName = cursor.getString(colIdx)
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("SAFChannel", "Direct query for display name failed: ${e.message}")
+                }
+            }
+
+            // 3. Fallback: direct query on treeUri itself
+            if (displayName.isNullOrBlank()) {
+                try {
+                    contentResolver.query(
+                        treeUri,
+                        arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                        null,
+                        null,
+                        null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val colIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                            if (colIdx != -1 && !cursor.isNull(colIdx)) {
+                                displayName = cursor.getString(colIdx)
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            // 4. Special root volume case
+            if (displayName.isNullOrBlank()) {
+                val docId = try {
+                    if (DocumentsContract.isDocumentUri(this@MainActivity, treeUri)) {
+                        DocumentsContract.getDocumentId(treeUri)
+                    } else {
+                        DocumentsContract.getTreeDocumentId(treeUri)
+                    }
+                } catch (e: Exception) { null }
+                if (docId == "primary:" || docId == "primary") {
+                    displayName = "Internal Storage"
+                }
+            }
+
+            return displayName
+        } catch (e: Exception) {
+            return null
+        }
     }
 
     /**

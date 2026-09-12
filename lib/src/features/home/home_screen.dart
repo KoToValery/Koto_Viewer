@@ -1522,6 +1522,7 @@ class _HomeScreenState extends State<HomeScreen> {
   SortOption _currentSort = SortOption.date;
   String? _customFolderPath;
   List<String> _customFolderList = [];
+  Map<String, String> _customFolderNames = {};
   bool _includeSubfolders = false;
   FileCategory _selectedCategory = FileCategory.all;
   String _searchQuery = '';
@@ -1579,6 +1580,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final sort = await FileSourceService.getSortOption();
     final customPath = await FileSourceService.getCustomFolderPath();
     final customFolders = await FileSourceService.getCustomFolderList();
+    final customFolderNames = await FileSourceService.getCustomFolderNames();
     final includeSubfolders = await FileSourceService.getIncludeSubfolders();
     final files = await FileSourceService.getPdfFilesForCurrentSource();
 
@@ -1588,6 +1590,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentSort = sort;
         _customFolderPath = customPath;
         _customFolderList = customFolders;
+        _customFolderNames = customFolderNames;
         _includeSubfolders = includeSubfolders;
         _pdfFiles = files;
         _recomputeCategoryCounts();
@@ -1595,6 +1598,95 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     }
+
+    _resolveMissingFolderNames(customFolders);
+  }
+
+  /// Asynchronously queries Android OS for display names of any folders that
+  /// are not yet cached or currently have opaque/ugly internal IDs.
+  Future<void> _resolveMissingFolderNames(List<String> folders) async {
+    if (folders.isEmpty) return;
+    final toResolve = <String>[];
+    for (final f in folders) {
+      final cached = _customFolderNames[f];
+      if (cached == null ||
+          cached.trim().isEmpty ||
+          AndroidSafService.isOpaqueProviderId(cached)) {
+        if (AndroidSafService.isSafUri(f)) {
+          toResolve.add(f);
+        } else {
+          final parts = f
+              .split(Platform.pathSeparator)
+              .where((s) => s.isNotEmpty)
+              .toList();
+          final name = parts.isNotEmpty
+              ? AndroidSafService.safeDecodeUtf8(parts.last)
+              : f;
+          _customFolderNames[f] = name;
+          await FileSourceService.setCustomFolderName(f, name);
+        }
+      }
+    }
+
+    if (toResolve.isEmpty) return;
+
+    final resolved = await AndroidSafService.getFolderDisplayNames(toResolve);
+    bool changed = false;
+    for (final entry in resolved.entries) {
+      if (entry.value.trim().isNotEmpty &&
+          !AndroidSafService.isOpaqueProviderId(entry.value)) {
+        _customFolderNames[entry.key] = entry.value.trim();
+        changed = true;
+      }
+    }
+
+    // Fallback query for any still unresolved
+    for (final uri in toResolve) {
+      final current = _customFolderNames[uri];
+      if (current == null ||
+          current.trim().isEmpty ||
+          AndroidSafService.isOpaqueProviderId(current)) {
+        final single = await AndroidSafService.getFolderDisplayName(uri);
+        if (single != null &&
+            single.trim().isNotEmpty &&
+            !AndroidSafService.isOpaqueProviderId(single)) {
+          _customFolderNames[uri] = single.trim();
+          changed = true;
+        } else {
+          _customFolderNames[uri] = AndroidSafService.folderNameFromSafUri(uri);
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      await FileSourceService.saveCustomFolderNames(_customFolderNames);
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  String _getFolderName(String path) {
+    final cached = _customFolderNames[path];
+    if (cached != null &&
+        cached.trim().isNotEmpty &&
+        !AndroidSafService.isOpaqueProviderId(cached)) {
+      return cached;
+    }
+    if (AndroidSafService.isSafUri(path)) {
+      return AndroidSafService.folderNameFromSafUri(path);
+    }
+    final parts =
+        path.split(Platform.pathSeparator).where((s) => s.isNotEmpty).toList();
+    return parts.isNotEmpty ? AndroidSafService.safeDecodeUtf8(parts.last) : path;
+  }
+
+  String _getFolderSubtitle(String path) {
+    if (AndroidSafService.isSafUri(path)) {
+      return AndroidSafService.folderSubtitleFromSafUri(path);
+    }
+    return AndroidSafService.safeDecodeUtf8(path);
   }
 
   Future<void> _switchMode(FileSourceMode newMode) async {
@@ -1622,15 +1714,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _confirmRemoveCustomFolder(String path) async {
-    final String folderName;
-    if (AndroidSafService.isSafUri(path)) {
-      folderName = AndroidSafService.folderNameFromSafUri(path);
-    } else {
-      final parts = path.split(Platform.pathSeparator).where((s) => s.isNotEmpty).toList();
-      folderName = parts.isNotEmpty
-          ? AndroidSafService.safeDecodeUtf8(parts.last)
-          : path;
-    }
+    final String folderName = _getFolderName(path);
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1659,6 +1743,46 @@ class _HomeScreenState extends State<HomeScreen> {
     if (confirmed == true) {
       await FileSourceService.removeCustomFolder(path);
       await _loadFiles();
+    }
+  }
+
+  Future<void> _showRenameFolderDialog(String folderPath) async {
+    final currentName = _getFolderName(folderPath);
+    final controller = TextEditingController(text: currentName);
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename Folder'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Folder Name',
+            hintText: 'Enter folder display name',
+          ),
+          onSubmitted: (val) => Navigator.pop(context, val.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (newName != null && newName.isNotEmpty && newName != currentName) {
+      await FileSourceService.setCustomFolderName(folderPath, newName);
+      if (mounted) {
+        setState(() {
+          _customFolderNames[folderPath] = newName;
+        });
+      }
     }
   }
 
@@ -1718,7 +1842,31 @@ class _HomeScreenState extends State<HomeScreen> {
           return false;
         }
 
-        await FileSourceService.addCustomFolder(selectedDirectory);
+        // Resolve human-readable display name immediately
+        String? displayName;
+        if (AndroidSafService.isSafUri(selectedDirectory)) {
+          displayName =
+              await AndroidSafService.getFolderDisplayName(selectedDirectory);
+          if (displayName == null ||
+              displayName.trim().isEmpty ||
+              AndroidSafService.isOpaqueProviderId(displayName)) {
+            displayName =
+                AndroidSafService.folderNameFromSafUri(selectedDirectory);
+          }
+        } else {
+          final parts = selectedDirectory
+              .split(Platform.pathSeparator)
+              .where((s) => s.isNotEmpty)
+              .toList();
+          if (parts.isNotEmpty) {
+            displayName = AndroidSafService.safeDecodeUtf8(parts.last);
+          }
+        }
+
+        await FileSourceService.addCustomFolder(
+          selectedDirectory,
+          displayName: displayName,
+        );
         await _loadFiles();
         return true;
       }
@@ -2291,20 +2439,8 @@ class _HomeScreenState extends State<HomeScreen> {
       subtitleText = 'Recently opened files (PDF, DXF, DWG)';
     } else if (_currentMode == FileSourceMode.custom) {
       if (_customFolderPath != null && _customFolderPath!.isNotEmpty) {
-        // SAF content URI on Android — extract human-readable folder name
-        if (AndroidSafService.isSafUri(_customFolderPath!)) {
-          titleText = AndroidSafService.folderNameFromSafUri(_customFolderPath!);
-          subtitleText = titleText; // no real path to show
-        } else {
-          final parts = _customFolderPath!
-              .split(Platform.pathSeparator)
-              .where((s) => s.isNotEmpty)
-              .toList();
-          titleText = parts.isNotEmpty
-              ? AndroidSafService.safeDecodeUtf8(parts.last)
-              : 'Custom Folder';
-          subtitleText = AndroidSafService.safeDecodeUtf8(_customFolderPath!);
-        }
+        titleText = _getFolderName(_customFolderPath!);
+        subtitleText = _getFolderSubtitle(_customFolderPath!);
       } else {
         titleText = 'Custom Folder';
         subtitleText = 'No folder selected';
@@ -2407,23 +2543,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 2. Saved Custom Folders
                   if (_customFolderList.isNotEmpty) {
                     for (final folderPath in _customFolderList) {
-                      // For Android SAF URIs, extract human-readable name instead
-                      // of splitting by path separator (which doesn't work for content://)
-                      final String folderName;
-                      final String folderSubtitle;
-                      if (AndroidSafService.isSafUri(folderPath)) {
-                        folderName = AndroidSafService.folderNameFromSafUri(folderPath);
-                        folderSubtitle = 'Android Folder';
-                      } else {
-                        final parts = folderPath
-                            .split(Platform.pathSeparator)
-                            .where((s) => s.isNotEmpty)
-                            .toList();
-                        folderName = parts.isNotEmpty
-                            ? AndroidSafService.safeDecodeUtf8(parts.last)
-                            : folderPath;
-                        folderSubtitle = AndroidSafService.safeDecodeUtf8(folderPath);
-                      }
+                      final String folderName = _getFolderName(folderPath);
+                      final String folderSubtitle = _getFolderSubtitle(folderPath);
                       final isSelected =
                           _currentMode == FileSourceMode.custom &&
                           _customFolderPath == folderPath;
@@ -2587,7 +2708,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   await _loadFiles();
                 },
               ),
-              if (_customFolderPath != null && _customFolderPath!.isNotEmpty)
+              if (_customFolderPath != null && _customFolderPath!.isNotEmpty) ...[
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  icon: const Icon(Icons.drive_file_rename_outline, size: 20),
+                  tooltip: 'Rename Folder',
+                  onPressed: () =>
+                      _showRenameFolderDialog(_customFolderPath!),
+                ),
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -2600,6 +2729,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: () =>
                       _confirmRemoveCustomFolder(_customFolderPath!),
                 ),
+              ],
             ],
             if (_currentMode == FileSourceMode.recent && _pdfFiles.isNotEmpty)
               TextButton(
