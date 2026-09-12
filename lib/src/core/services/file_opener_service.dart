@@ -389,6 +389,7 @@ class FileOpenerService {
           DicomViewerScreen(filePath: resolvedPath),
         );
 
+      case KotoFileType.image:
       case KotoFileType.ico:
       case KotoFileType.psd:
         return await _pushViewer(

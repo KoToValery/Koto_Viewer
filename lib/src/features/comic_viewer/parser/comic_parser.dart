@@ -99,6 +99,17 @@ class ComicParser {
       try {
         archive = TarDecoder().decodeBytes(bytes);
       } catch (e) {
+        if (_isRar5(bytes)) {
+          throw Exception(
+            'Този CBR файл е компресиран в RAR5 формат, който не се поддържа от вградения архив декомпресор. '
+            'Моля, преобразувайте комикса в .cbz (ZIP) за пълна съвместимост.',
+          );
+        } else if (_isRar(bytes)) {
+          throw Exception(
+            'Този CBR файл използва RAR компресия, която не се поддържа от вградения декомпресор. '
+            'Моля, преобразувайте архива в .cbz (ZIP) формат.',
+          );
+        }
         throw Exception('Could not decode comic archive: $e');
       }
     }
@@ -197,6 +208,30 @@ class ComicParser {
       if (lowerName.endsWith(ext)) return true;
     }
     return false;
+  }
+
+  /// Checks if bytes start with the RAR5 magic signature (Rar!\x1a\x07\x01\x00)
+  static bool _isRar5(Uint8List bytes) {
+    return bytes.length >= 8 &&
+        bytes[0] == 0x52 && // 'R'
+        bytes[1] == 0x61 && // 'a'
+        bytes[2] == 0x72 && // 'r'
+        bytes[3] == 0x21 && // '!'
+        bytes[4] == 0x1A &&
+        bytes[5] == 0x07 &&
+        bytes[6] == 0x01 &&
+        bytes[7] == 0x00;
+  }
+
+  /// Checks if bytes start with the legacy RAR signature (Rar!\x1a\x07)
+  static bool _isRar(Uint8List bytes) {
+    return bytes.length >= 7 &&
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x61 &&
+        bytes[2] == 0x72 &&
+        bytes[3] == 0x21 &&
+        bytes[4] == 0x1A &&
+        bytes[5] == 0x07;
   }
 
   static String _extractCleanTitle(String fileName) {

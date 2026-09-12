@@ -46,7 +46,7 @@ extension FileCategoryExtension on FileCategory {
   }
 }
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, gpx, kml, kmz, geojson, fbx, threeMf, lottie, font, ico, psd, code, csv, jupyter, dicom, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, gpx, kml, kmz, geojson, fbx, threeMf, lottie, font, ico, psd, code, csv, jupyter, dicom, image, other }
 
 class PdfItem {
   final String path;
@@ -143,6 +143,14 @@ class PdfItem {
     if (lower.endsWith('.ttf') || lower.endsWith('.otf') || lower.endsWith('.woff') || lower.endsWith('.woff2')) return KotoFileType.font;
     if (lower.endsWith('.ico')) return KotoFileType.ico;
     if (lower.endsWith('.psd') || lower.endsWith('.psb')) return KotoFileType.psd;
+    if (lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.bmp')) {
+      return KotoFileType.image;
+    }
     if (lower.endsWith('.dcm') || lower.endsWith('.dicom') || lower.endsWith('dicomdir')) return KotoFileType.dicom;
     
     // --- Docker files (matched by filename, not extension) ---
@@ -217,6 +225,7 @@ class PdfItem {
   bool get isFont => fileType == KotoFileType.font;
   bool get isIco => fileType == KotoFileType.ico;
   bool get isPsd => fileType == KotoFileType.psd;
+  bool get isImage => fileType == KotoFileType.image || isIco || isPsd;
   bool get isDicom => fileType == KotoFileType.dicom;
   bool get isComic => fileType == KotoFileType.cbz || fileType == KotoFileType.cbr || fileType == KotoFileType.cbt;
   bool get isEbook => fileType == KotoFileType.epub || fileType == KotoFileType.fb2;

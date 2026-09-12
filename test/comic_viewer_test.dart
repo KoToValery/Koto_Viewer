@@ -141,6 +141,48 @@ void main() {
       expect(progressList.any((p) => p.currentPage == 1 && p.totalPages == 3), isTrue);
       expect(progressList.any((p) => p.currentPage == 3 && p.totalPages == 3), isTrue);
     });
+
+    test('ComicParser throws descriptive exception when encountering RAR5 (.cbr) archive', () {
+      // RAR5 magic signature: 52 61 72 21 1A 07 01 00
+      final rar5Bytes = Uint8List.fromList([
+        0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x01, 0x00, 0x00, 0x01, 0x02, 0x03,
+      ]);
+
+      expect(
+        () => ComicParser.parseFromBytes(
+          rar5Bytes,
+          fileName: 'Manga_Volume1.cbr',
+          filePath: '/test/Manga_Volume1.cbr',
+        ),
+        throwsA(
+          predicate((e) =>
+              e is Exception &&
+              e.toString().contains('RAR5') &&
+              e.toString().contains('.cbz (ZIP)')),
+        ),
+      );
+    });
+
+    test('ComicParser throws descriptive exception when encountering legacy RAR archive', () {
+      // Legacy RAR magic signature: 52 61 72 21 1A 07 00
+      final rar4Bytes = Uint8List.fromList([
+        0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00, 0x00, 0x01, 0x02,
+      ]);
+
+      expect(
+        () => ComicParser.parseFromBytes(
+          rar4Bytes,
+          fileName: 'Batman.cbr',
+          filePath: '/test/Batman.cbr',
+        ),
+        throwsA(
+          predicate((e) =>
+              e is Exception &&
+              e.toString().contains('RAR') &&
+              e.toString().contains('.cbz (ZIP)')),
+        ),
+      );
+    });
   });
 
   group('ComicFitMode & Zoom Best Practice Tests', () {

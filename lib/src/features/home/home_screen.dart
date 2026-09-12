@@ -104,6 +104,8 @@ class FileTypeIcon extends StatelessWidget {
         return _buildIcoIcon();
       case KotoFileType.psd:
         return _buildPsdIcon();
+      case KotoFileType.image:
+        return _buildImageIcon();
       case KotoFileType.csv:
         return _buildCsvIcon();
       case KotoFileType.jupyter:
@@ -385,6 +387,41 @@ class FileTypeIcon extends StatelessWidget {
                 fontSize: width * 0.16,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFF7C3AED),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF2F8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFF472B6)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.image_rounded,
+              color: const Color(0xFFDB2777),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'IMG',
+              style: TextStyle(
+                fontSize: width * 0.16,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFDB2777),
                 letterSpacing: 0.5,
                 height: 1,
               ),

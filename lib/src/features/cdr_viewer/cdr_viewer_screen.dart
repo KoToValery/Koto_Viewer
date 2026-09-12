@@ -157,6 +157,7 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
                   _buildInfoTile('Title:', _document!.title!, Icons.title_rounded, isDark),
                 _buildInfoTile('Resolution:', _document!.formattedDimensions, Icons.aspect_ratio_rounded, isDark),
                 _buildInfoTile('Container Type:', _document!.isZipBased ? 'Modern ZIP Container (X4+)' : 'Legacy RIFF Container (v3–X3)', Icons.archive_outlined, isDark),
+                _buildInfoTile('Mode:', 'Raster Preview (Вграден преглед)', Icons.visibility_outlined, isDark),
                 _buildInfoTile('Pages:', '${_document!.pageCount} page(s)', Icons.layers_outlined, isDark),
                 _buildInfoTile('File Size:', _document!.formattedFileSize, Icons.sd_storage_outlined, isDark),
                 const SizedBox(height: 12),
@@ -283,6 +284,37 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
             ),
             child: Row(
               children: [
+                // Preview Mode Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: isDark ? 0.16 : 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: isDark ? 0.35 : 0.45),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.visibility_outlined,
+                        size: 13,
+                        color: isDark ? Colors.amber[300] : Colors.amber[900],
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Preview-only (Raster)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.amber[200] : Colors.amber[900],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const Spacer(),
 
                 // Theme Switcher

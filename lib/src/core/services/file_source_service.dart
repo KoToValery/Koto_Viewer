@@ -200,6 +200,8 @@ class FileSourceService {
     'dxf', 'dwg', 'svg', 'stl', 'obj', 'gltf', 'glb', 'fbx', '3mf', 'step', 'stp', 'p21', 'iges', 'igs', 'ifc',
     // Vector & Graphic
     'eps', 'cdr', 'zip', 'psd', 'psb', 'ico', 'lottie',
+    // Raster Images
+    'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp',
     // PCB & Hardware
     'kicad_pcb', 'kicad_sch', 'kicad_sym', 'sch', 'brd', 'plt', 'hpgl', 'hpg', 'prn',
     'gbr', 'ger', 'pho', 'art', 'gtl', 'gbl', 'gts', 'gbs', 'gto', 'gbo', 'gko', 'gm1', 'gm2',
@@ -207,7 +209,7 @@ class FileSourceService {
     // GIS / Maps
     'gpx', 'kml', 'kmz', 'geojson',
     // Fonts & Medical
-    'ttf', 'otf', 'woff', 'woff2', 'dcm', 'dicom',
+    'ttf', 'otf', 'dcm', 'dicom',
     // Code files
     'dart', 'js', 'mjs', 'ts', 'tsx', 'py', 'pyw', 'java', 'kt', 'kts', 'swift',
     'cpp', 'cc', 'cxx', 'c', 'h', 'hpp', 'cs', 'go', 'rs', 'php', 'rb',

@@ -146,8 +146,9 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     } catch (e) {
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
         setState(() {
-          _errorMessage = 'Error reading comic book: $e';
+          _errorMessage = cleanMsg;
           _isLoading = false;
         });
       }
