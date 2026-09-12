@@ -8,6 +8,7 @@ import '../../core/services/reading_progress_service.dart';
 import 'models/docx_models.dart';
 import 'parser/docx_parser.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
+import '../../core/l10n/l10n_extensions.dart';
 
 /// Microsoft Word Document (.docx) Viewer Screen with 1:1 A4 Page Formatting,
 /// Authentic Page Framing, Logo Header, Tab Stops, Exact Borders, and Zoom Slider.
@@ -539,13 +540,14 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
+      final l10n = context.l10n;
       return ViewerLoadingScreen(
         fileName: _fileName,
         fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
         icon: Icons.description_rounded,
         accentColor: const Color(0xFF2B579A),
-        loadingTitle: 'Зареждане на Word документ...',
-        statusMessage: 'Парсиране на страници, форматиране и таблици...',
+        loadingTitle: l10n.loadingWordDoc,
+        statusMessage: l10n.statusParsingWord,
         onCancel: () => Navigator.of(context).pop(false),
       );
     }
@@ -1533,7 +1535,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
           // Zoom Out
           IconButton(
             icon: const Icon(Icons.remove, size: 18),
-            tooltip: 'Zoom Out (-)',
+            tooltip: l10n.zoomOut,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: () {
@@ -1568,7 +1570,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
           // Zoom In
           IconButton(
             icon: const Icon(Icons.add, size: 18),
-            tooltip: 'Zoom In (+)',
+            tooltip: l10n.zoomIn,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: () {
@@ -1610,7 +1612,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
           // Fit to Screen (Fit Page)
           IconButton(
             icon: const Icon(Icons.fit_screen, size: 18),
-            tooltip: 'Fit Page to Screen',
+            tooltip: l10n.fitPage,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: () => _fitPage(viewportSize),
@@ -1619,7 +1621,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
           // Fit Width
           IconButton(
             icon: const Icon(Icons.swap_horiz, size: 18),
-            tooltip: 'Fit Width',
+            tooltip: l10n.fitWidth,
             padding: const EdgeInsets.all(6),
             constraints: const BoxConstraints(),
             onPressed: () => _fitWidth(viewportSize),

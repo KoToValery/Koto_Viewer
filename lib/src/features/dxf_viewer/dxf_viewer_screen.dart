@@ -14,6 +14,7 @@ import '../../core/services/dxf_exporter_service.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
+import '../../core/l10n/l10n_extensions.dart';
 import '../home/widgets/share_options_sheet.dart';
 import 'models/dxf_display_settings.dart';
 import 'models/dxf_models.dart';
@@ -1207,13 +1208,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       final isDwg = _fileName.toLowerCase().endsWith('.dwg');
+      final l10n = context.l10n;
       return ViewerLoadingScreen(
         fileName: _fileName,
         fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
         icon: Icons.architecture_rounded,
         accentColor: const Color(0xFFFF9800),
-        loadingTitle: isDwg ? 'Конвертиране и зареждане на DWG...' : 'Зареждане на CAD чертеж...',
-        statusMessage: 'Анализиране на CAD слоеве, блокове и геометрия...',
+        loadingTitle: isDwg ? l10n.convertingDwg : l10n.loadingCad,
+        statusMessage: l10n.statusAnalyzingCad,
         onCancel: () => Navigator.of(context).pop(false),
       );
     }

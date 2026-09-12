@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
+import '../../core/l10n/l10n_extensions.dart';
 import 'models/comic_models.dart';
 import 'parser/comic_parser.dart';
 import 'widgets/comic_page_item.dart';
@@ -25,7 +26,9 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   String? _errorMessage;
   int _fileSizeBytes = 0;
   double _loadingProgress = 0.0;
-  String _loadingStatus = 'Отваряне на файл...';
+  String _loadingStatus = '';
+  ComicParseStage? _currentStage;
+  String? _stageSizeMb;
   int _loadedPagesCount = 0;
   int _totalPagesCount = 0;
 
@@ -75,7 +78,9 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       _isLoading = true;
       _errorMessage = null;
       _loadingProgress = 0.05;
-      _loadingStatus = 'Отваряне на файл...';
+      _currentStage = ComicParseStage.opening;
+      _stageSizeMb = null;
+      _loadingStatus = '';
       _loadedPagesCount = 0;
       _totalPagesCount = 0;
     });
@@ -94,6 +99,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
             setState(() {
               _loadingProgress = progress.progress;
               _loadingStatus = progress.status;
+              _currentStage = progress.stage;
+              _stageSizeMb = progress.sizeMb;
               if (progress.currentPage != null) {
                 _loadedPagesCount = progress.currentPage!;
               }
@@ -505,25 +512,26 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   void _showJumpToPageDialog() {
     if (_comic == null || _comic!.pageCount <= 1) return;
     final controller = TextEditingController(text: '${_currentPageIndex + 1}');
+    final l10n = context.l10n;
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Jump to Page'),
+          title: Text(l10n.jumpToPage),
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'Page Number (1 - ${_comic!.pageCount})',
+              labelText: l10n.enterPageNumber(_comic!.pageCount),
               border: const OutlineInputBorder(),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
             FilledButton(
               onPressed: () {
@@ -533,7 +541,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                   _goToPage(pageNum - 1);
                 }
               },
-              child: const Text('Go'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -867,12 +875,33 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     );
   }
 
+  String _getFormattedStatus(BuildContext context) {
+    final l10n = context.l10n;
+    switch (_currentStage) {
+      case ComicParseStage.opening:
+        return _stageSizeMb != null ? l10n.statusReadingFile(_stageSizeMb!) : l10n.statusOpeningFile;
+      case ComicParseStage.reading:
+        return l10n.statusReadingFile(_stageSizeMb ?? '');
+      case ComicParseStage.indexing:
+        return l10n.statusIndexingPages;
+      case ComicParseStage.extractingStructure:
+        return l10n.statusExtractingStructure;
+      case ComicParseStage.extractingPage:
+        return l10n.statusExtractingPage(_loadedPagesCount, _totalPagesCount);
+      case ComicParseStage.finalizing:
+        return l10n.statusFinalizingPages;
+      case null:
+        return _loadingStatus.isNotEmpty ? _loadingStatus : l10n.loadingComic;
+    }
+  }
+
   Widget _buildLoadingScreen(ThemeData theme) {
     final formattedSize = _fileSizeBytes > 0
         ? (_fileSizeBytes < 1024 * 1024
             ? '${(_fileSizeBytes / 1024).toStringAsFixed(1)} KB'
             : '${(_fileSizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB')
         : '';
+    final l10n = context.l10n;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F12),
@@ -881,7 +910,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white70),
-          tooltip: 'Отказ',
+          tooltip: l10n.cancel,
           onPressed: () => Navigator.of(context).pop(false),
         ),
       ),
@@ -961,8 +990,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                   children: [
                     Text(
                       _totalPagesCount > 0
-                          ? 'Страница $_loadedPagesCount от $_totalPagesCount'
-                          : 'Зареждане на архив...',
+                          ? l10n.pageIndicator(_loadedPagesCount, _totalPagesCount)
+                          : l10n.loadingComic,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 13,
@@ -996,7 +1025,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
                 // Detailed Status
                 Text(
-                  _loadingStatus,
+                  _getFormattedStatus(context),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

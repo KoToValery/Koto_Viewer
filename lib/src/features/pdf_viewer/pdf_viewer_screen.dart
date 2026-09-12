@@ -10,6 +10,7 @@ import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
 import '../home/widgets/share_options_sheet.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
+import '../../core/l10n/l10n_extensions.dart';
 import 'models/pdf_reflow_models.dart';
 import 'services/pdf_text_extractor_service.dart';
 import 'widgets/pdf_reflow_view.dart';
@@ -580,25 +581,26 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   void _showJumpToPageDialog() {
     if (_pageCount <= 1) return;
     final controller = TextEditingController(text: _currentPage.toString());
+    final l10n = context.l10n;
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Jump to Page'),
+          title: Text(l10n.jumpToPage),
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'Page Number (1 - $_pageCount)',
+              labelText: l10n.enterPageNumber(_pageCount),
               border: const OutlineInputBorder(),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
             ElevatedButton(
               onPressed: () {
@@ -608,7 +610,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   Navigator.of(context).pop();
                 }
               },
-              child: const Text('Go'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -667,6 +669,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: (_isFullscreen || _pageCount == 0)
@@ -860,8 +863,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
                 icon: _isPresentation ? Icons.slideshow_rounded : Icons.picture_as_pdf_rounded,
                 accentColor: _isPresentation ? const Color(0xFFD24726) : const Color(0xFFE53935),
-                loadingTitle: _isPresentation ? 'Loading presentation...' : 'Loading PDF document...',
-                statusMessage: 'Preparing and analyzing pages...',
+                loadingTitle: _isPresentation ? l10n.loadingPresentation : l10n.loadingPdf,
+                statusMessage: l10n.statusPreparingPages,
                 onCancel: () => Navigator.of(context).pop(false),
               ),
             ),
@@ -878,12 +881,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.first_page),
-                      tooltip: 'First Page',
+                      tooltip: l10n.firstPage,
                       onPressed: _currentPage > 1 ? () => _goToPage(1) : null,
                     ),
                     IconButton(
                       icon: const Icon(Icons.chevron_left),
-                      tooltip: 'Previous Page',
+                      tooltip: l10n.previousPage,
                       onPressed: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
                     ),
                     GestureDetector(
@@ -905,12 +908,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.chevron_right),
-                      tooltip: 'Next Page',
+                      tooltip: l10n.nextPage,
                       onPressed: _currentPage < _pageCount ? () => _goToPage(_currentPage + 1) : null,
                     ),
                     IconButton(
                       icon: const Icon(Icons.last_page),
-                      tooltip: 'Last Page',
+                      tooltip: l10n.lastPage,
                       onPressed: _currentPage < _pageCount ? () => _goToPage(_pageCount) : null,
                     ),
                   ],
@@ -926,13 +929,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       documentRef: _documentRef,
       builder: (context, document) {
         if (document == null) {
+          final l10n = context.l10n;
           return ViewerLoadingScreen(
             fileName: _fileName,
             fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
             icon: Icons.auto_stories,
             accentColor: const Color(0xFF2563EB),
-            loadingTitle: 'Loading document for reading...',
-            statusMessage: 'Extracting and preparing pages...',
+            loadingTitle: l10n.loadingPdf,
+            statusMessage: l10n.statusPreparingPages,
             onCancel: () => Navigator.of(context).pop(false),
           );
         }
@@ -993,13 +997,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       documentRef: _documentRef,
       builder: (context, document) {
         if (document == null) {
+          final l10n = context.l10n;
           return ViewerLoadingScreen(
             fileName: _fileName,
             fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
             icon: _isPresentation ? Icons.slideshow_rounded : Icons.picture_as_pdf_rounded,
             accentColor: _isPresentation ? const Color(0xFFD24726) : const Color(0xFFE53935),
-            loadingTitle: _isPresentation ? 'Loading presentation...' : 'Loading PDF document...',
-            statusMessage: 'Preparing and analyzing pages...',
+            loadingTitle: _isPresentation ? l10n.loadingPresentation : l10n.loadingPdf,
+            statusMessage: l10n.statusPreparingPages,
             onCancel: () => Navigator.of(context).pop(false),
           );
         }

@@ -11,6 +11,8 @@ import '../../core/services/android_saf_service.dart';
 import '../../core/services/dwg_converter_service.dart';
 import '../../core/services/file_opener_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
+import '../../core/widgets/language_selection_dialog.dart';
+import '../../core/l10n/l10n_extensions.dart';
 import 'widgets/share_options_sheet.dart';
 import 'widgets/app_info_dialog.dart';
 
@@ -2425,7 +2427,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    cat.label,
+                    cat.localizedLabel(context),
                     style: TextStyle(
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                       color: isSelected ? theme.colorScheme.primary : null,
@@ -2468,18 +2470,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSourceHeader(ThemeData theme) {
+    final l10n = context.l10n;
     String titleText = '';
     String subtitleText = '';
 
     if (_currentMode == FileSourceMode.recent) {
-      titleText = 'Recent Files';
+      titleText = l10n.recentFiles;
       subtitleText = 'Recently opened files (PDF, DXF, DWG)';
     } else if (_currentMode == FileSourceMode.custom) {
       if (_customFolderPath != null && _customFolderPath!.isNotEmpty) {
         titleText = _getFolderName(_customFolderPath!);
         subtitleText = _getFolderSubtitle(_customFolderPath!);
       } else {
-        titleText = 'Custom Folder';
+        titleText = l10n.customFolder;
         subtitleText = 'No folder selected';
       }
     }
@@ -2558,10 +2561,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           const Icon(Icons.history_rounded, color: Colors.orange),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Recent Files',
-                              style: TextStyle(fontWeight: FontWeight.w600),
+                              l10n.recentFiles,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
                           if (_currentMode == FileSourceMode.recent)
@@ -2642,16 +2645,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // 3. Add Custom Folder
                   items.add(
-                    const PopupMenuItem<String>(
+                    PopupMenuItem<String>(
                       value: '__add_new__',
                       child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.create_new_folder_outlined,
                             color: Colors.blue,
                           ),
-                          SizedBox(width: 12),
-                          Text('Add Custom Folder...'),
+                          const SizedBox(width: 12),
+                          Text(l10n.addFolder),
                         ],
                       ),
                     ),
@@ -2666,7 +2669,7 @@ class _HomeScreenState extends State<HomeScreen> {
             PopupMenuButton<SortOption>(
               initialValue: _currentSort,
               onSelected: _switchSort,
-              tooltip: 'Sort by',
+              tooltip: l10n.sortBy,
               icon: const Icon(Icons.sort, size: 20),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -2686,7 +2689,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Date',
+                        l10n.sortByDate,
                         style: TextStyle(
                           fontWeight: _currentSort == SortOption.date
                               ? FontWeight.bold
@@ -2708,7 +2711,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Name',
+                        l10n.sortByName,
                         style: TextStyle(
                           fontWeight: _currentSort == SortOption.name
                               ? FontWeight.bold
@@ -2771,7 +2774,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (_currentMode == FileSourceMode.recent && _pdfFiles.isNotEmpty)
               TextButton(
                 onPressed: _clearAllRecent,
-                child: const Text('Clear'),
+                child: Text(l10n.clear),
               ),
           ],
         ),
@@ -2785,7 +2788,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search in ${_selectedCategory.label}...',
+          hintText: '${context.l10n.search} (${_selectedCategory.localizedLabel(context)})...',
           hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
           prefixIcon: const Icon(Icons.search, size: 20),
           suffixIcon: _searchQuery.isNotEmpty
@@ -2827,6 +2830,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final dateFormat = DateFormat('MMM dd, yyyy • HH:mm');
 
     return Scaffold(
@@ -2849,23 +2853,28 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.translate_rounded),
+            tooltip: l10n.language,
+            onPressed: () => LanguageSelectionDialog.show(context),
+          ),
+          IconButton(
             icon: const Icon(Icons.public_rounded),
-            tooltip: 'Coordinate System Settings',
+            tooltip: l10n.coordinateSettings,
             onPressed: _showCoordinateSettings,
           ),
           IconButton(
             icon: const Icon(Icons.favorite, color: Color(0xFF7C3AED)),
-            tooltip: 'Support Developer',
+            tooltip: l10n.supportDeveloper,
             onPressed: _showSupportDeveloperDialog,
           ),
           IconButton(
             icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            tooltip: 'Toggle Theme',
+            tooltip: l10n.toggleTheme,
             onPressed: () => widget.onToggleTheme(!widget.isDarkMode),
           ),
           IconButton(
             icon: const Icon(Icons.info_outline),
-            tooltip: 'About',
+            tooltip: l10n.about,
             onPressed: _showAboutDialog,
           ),
         ],
@@ -2904,9 +2913,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Open Drawings, Models & Documents',
-                          style: TextStyle(
+                        Text(
+                          l10n.homeBannerTitle,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -2921,9 +2930,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ElevatedButton.icon(
                               onPressed: _pickAndOpenFile,
                               icon: const Icon(Icons.folder_open_rounded),
-                              label: const Text(
-                                'Browse Files',
-                                style: TextStyle(
+                              label: Text(
+                                l10n.browseFiles,
+                                style: const TextStyle(
                                   fontSize: 15.5,
                                   fontWeight: FontWeight.bold,
                                 ),

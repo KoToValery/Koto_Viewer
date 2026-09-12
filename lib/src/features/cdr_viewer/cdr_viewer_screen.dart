@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/services/recent_files_service.dart';
 import 'models/cdr_document.dart';
 import 'parser/cdr_parser.dart';
+import '../../core/l10n/l10n_extensions.dart';
 
 /// Interactive CorelDRAW (.cdr) Vector Graphics Viewer Screen.
 class CdrViewerScreen extends StatefulWidget {
@@ -157,7 +158,7 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
                   _buildInfoTile('Title:', _document!.title!, Icons.title_rounded, isDark),
                 _buildInfoTile('Resolution:', _document!.formattedDimensions, Icons.aspect_ratio_rounded, isDark),
                 _buildInfoTile('Container Type:', _document!.isZipBased ? 'Modern ZIP Container (X4+)' : 'Legacy RIFF Container (v3–X3)', Icons.archive_outlined, isDark),
-                _buildInfoTile('Mode:', 'Raster Preview (Вграден преглед)', Icons.visibility_outlined, isDark),
+                _buildInfoTile('Mode:', context.l10n.rasterPreview, Icons.visibility_outlined, isDark),
                 _buildInfoTile('Pages:', '${_document!.pageCount} page(s)', Icons.layers_outlined, isDark),
                 _buildInfoTile('File Size:', _document!.formattedFileSize, Icons.sd_storage_outlined, isDark),
                 const SizedBox(height: 12),
@@ -305,7 +306,7 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        'Preview-only (Raster)',
+                        '${context.l10n.previewOnly} (Raster)',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,

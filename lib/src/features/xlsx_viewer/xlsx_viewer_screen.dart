@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:xml/xml.dart' as xml;
 import '../../core/services/recent_files_service.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
+import '../../core/l10n/l10n_extensions.dart';
 import 'excel_formula_evaluator.dart';
 
 /// Interactive Excel Spreadsheet Viewer (.xlsx / .xls)
@@ -626,13 +627,14 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
+      final l10n = context.l10n;
       return ViewerLoadingScreen(
         fileName: _fileName,
         fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
         icon: Icons.table_chart_rounded,
         accentColor: const Color(0xFF107C41),
-        loadingTitle: 'Loading spreadsheet...',
-        statusMessage: 'Indexing worksheets, cells, and formulas...',
+        loadingTitle: l10n.loadingSpreadsheet,
+        statusMessage: l10n.statusIndexingWorksheet,
         onCancel: () => Navigator.of(context).pop(false),
       );
     }

@@ -1,14 +1,26 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pdf_item.dart';
+import '../l10n/l10n_extensions.dart';
 import 'recent_files_service.dart';
 import 'android_saf_service.dart';
 
 enum FileSourceMode { recent, custom }
 
 extension FileSourceModeExtension on FileSourceMode {
+  String localizedLabel(BuildContext context) {
+    final l10n = context.l10n;
+    switch (this) {
+      case FileSourceMode.recent:
+        return l10n.recentFiles;
+      case FileSourceMode.custom:
+        return l10n.customFolder;
+    }
+  }
+
   String get key {
     switch (this) {
       case FileSourceMode.recent:
@@ -41,6 +53,16 @@ extension FileSourceModeExtension on FileSourceMode {
 enum SortOption { date, name }
 
 extension SortOptionExtension on SortOption {
+  String localizedLabel(BuildContext context) {
+    final l10n = context.l10n;
+    switch (this) {
+      case SortOption.date:
+        return l10n.sortByDate;
+      case SortOption.name:
+        return l10n.sortByName;
+    }
+  }
+
   String get key {
     switch (this) {
       case SortOption.date:

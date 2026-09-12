@@ -19,6 +19,7 @@ import 'widgets/ifc_bim_sheet.dart';
 import 'rendering/cad_3d_camera.dart';
 import 'rendering/cad_3d_mesh_painter.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
+import '../../core/l10n/l10n_extensions.dart';
 
 /// Interactive 3D CAD & Model Viewer Screen for STL, OBJ, GLTF, GLB, STEP, IGES, IFC, and FBX files.
 class Dxf3DViewerScreen extends StatefulWidget {
@@ -401,13 +402,14 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
+      final l10n = context.l10n;
       return ViewerLoadingScreen(
         fileName: _fileName,
         fileSizeBytes: _fileSizeBytes,
         icon: Icons.view_in_ar_rounded,
         accentColor: const Color(0xFF00E5FF),
-        loadingTitle: 'Loading 3D model...',
-        statusMessage: 'Triangulating and building polygon mesh...',
+        loadingTitle: l10n.loading3dModel,
+        statusMessage: l10n.statusTriangulatingMesh,
         onCancel: () => Navigator.of(context).pop(false),
       );
     }

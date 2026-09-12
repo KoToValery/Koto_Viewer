@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/l10n_extensions.dart';
 
 /// Unified modern loading screen for file viewers (PDF, 3D CAD, Ebooks, CAD, DOCX, XLSX, etc.)
 /// Displays a glowing format-themed icon, file name, formatted file size badge,
@@ -8,7 +9,7 @@ class ViewerLoadingScreen extends StatelessWidget {
   final int? fileSizeBytes;
   final IconData icon;
   final Color accentColor;
-  final String loadingTitle;
+  final String? loadingTitle;
   final String? statusMessage;
   final double? progress;
   final String? progressDetails;
@@ -20,7 +21,7 @@ class ViewerLoadingScreen extends StatelessWidget {
     this.fileSizeBytes,
     required this.icon,
     required this.accentColor,
-    this.loadingTitle = 'Loading file...',
+    this.loadingTitle,
     this.statusMessage,
     this.progress,
     this.progressDetails,
@@ -38,6 +39,8 @@ class ViewerLoadingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formattedSize = fileSizeBytes != null ? _formatFileSize(fileSizeBytes!) : '';
+    final l10n = context.l10n;
+    final effectiveTitle = loadingTitle ?? l10n.loadingFile;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F12),
@@ -46,7 +49,7 @@ class ViewerLoadingScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white70),
-          tooltip: 'Cancel',
+          tooltip: l10n.cancel,
           onPressed: () {
             if (onCancel != null) {
               onCancel!();
@@ -134,7 +137,7 @@ class ViewerLoadingScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        progressDetails ?? loadingTitle,
+                        progressDetails ?? effectiveTitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

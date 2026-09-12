@@ -7,6 +7,8 @@ import 'src/core/services/intent_service.dart';
 import 'src/core/services/local_server_service.dart';
 import 'src/core/services/coordinate_system_service.dart';
 import 'src/core/services/file_opener_service.dart';
+import 'src/core/services/locale_service.dart';
+import 'src/core/l10n/l10n_extensions.dart';
 import 'src/features/home/home_screen.dart';
 
 void main(List<String> args) {
@@ -15,6 +17,7 @@ void main(List<String> args) {
     AppErrorHandler.init();
 
     await CoordinateSystemService.init();
+    await LocaleService.init();
     String? initialFile;
     if (args.isNotEmpty && File(args.first).existsSync()) {
       initialFile = args.first;
@@ -124,18 +127,26 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
-      scaffoldMessengerKey: _messengerKey,
-      title: 'KoToViewer',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightThemeData(),
-      darkTheme: AppTheme.darkThemeData(),
-      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: HomeScreen(
-        onToggleTheme: _toggleTheme,
-        isDarkMode: _isDarkMode,
-      ),
+    return ValueListenableBuilder<Locale?>(
+      valueListenable: LocaleService.currentLocaleNotifier,
+      builder: (context, locale, _) {
+        return MaterialApp(
+          navigatorKey: _navigatorKey,
+          scaffoldMessengerKey: _messengerKey,
+          title: 'KoToViewer',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightThemeData(),
+          darkTheme: AppTheme.darkThemeData(),
+          themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HomeScreen(
+            onToggleTheme: _toggleTheme,
+            isDarkMode: _isDarkMode,
+          ),
+        );
+      },
     );
   }
 }

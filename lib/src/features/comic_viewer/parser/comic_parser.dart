@@ -35,7 +35,9 @@ class ComicParser {
 
     onProgress?.call(ComicParseProgress(
       progress: 0.05,
-      status: 'Отваряне на файл ($sizeMb MB)...',
+      stage: ComicParseStage.opening,
+      sizeMb: sizeMb,
+      status: 'Opening file ($sizeMb MB)...',
     ));
 
     final receivePort = ReceivePort();
@@ -89,7 +91,8 @@ class ComicParser {
   }) {
     onProgress?.call(const ComicParseProgress(
       progress: 0.20,
-      status: 'Разархивиране на структурата...',
+      stage: ComicParseStage.extractingStructure,
+      status: 'Extracting archive structure...',
     ));
 
     Archive archive;
@@ -177,9 +180,10 @@ class ComicParser {
       final fraction = 0.25 + 0.70 * ((i + 1) / totalPages);
       onProgress?.call(ComicParseProgress(
         progress: fraction,
-        status: 'Разархивиране на страница ${i + 1} от $totalPages...',
+        stage: ComicParseStage.extractingPage,
         currentPage: i + 1,
         totalPages: totalPages,
+        status: 'Extracting page ${i + 1} of $totalPages...',
       ));
     }
 
@@ -189,7 +193,8 @@ class ComicParser {
 
     onProgress?.call(const ComicParseProgress(
       progress: 0.98,
-      status: 'Финализиране на страниците...',
+      stage: ComicParseStage.finalizing,
+      status: 'Finalizing pages...',
     ));
 
     final defaultTitle = _extractCleanTitle(fileName);
@@ -347,14 +352,17 @@ void _parseWorker(_ParseWorkerRequest request) {
 
     sendPort.send(ComicParseProgress(
       progress: 0.08,
-      status: 'Четене на файл ($sizeMb MB)...',
+      stage: ComicParseStage.reading,
+      sizeMb: sizeMb,
+      status: 'Reading file ($sizeMb MB)...',
     ));
 
     final bytes = file.readAsBytesSync();
 
     sendPort.send(const ComicParseProgress(
       progress: 0.20,
-      status: 'Индексиране на страниците...',
+      stage: ComicParseStage.indexing,
+      status: 'Indexing pages...',
     ));
 
     final comic = ComicParser.parseFromBytes(

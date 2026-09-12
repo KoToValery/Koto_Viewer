@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/widgets/viewer_loading_screen.dart';
+import '../../core/l10n/l10n_extensions.dart';
 import 'dicom_models.dart';
 import 'dicom_parser.dart';
 import 'dicom_renderer.dart';
@@ -275,13 +276,14 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
     final fileSize = file.existsSync() ? file.lengthSync() : 0;
 
     if (_isLoading) {
+      final l10n = context.l10n;
       return ViewerLoadingScreen(
         fileName: fileName,
         fileSizeBytes: fileSize,
         icon: Icons.medical_services_outlined,
         accentColor: _accent,
-        loadingTitle: 'Loading DICOM study...',
-        statusMessage: 'Scanning series, slices & metadata',
+        loadingTitle: l10n.loadingDicom,
+        statusMessage: l10n.statusScanningSeries,
         onCancel: () => Navigator.of(context).pop(),
       );
     }

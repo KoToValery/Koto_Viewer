@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/widgets.dart';
+import '../l10n/l10n_extensions.dart';
 
 enum FileCategory {
   all,
@@ -11,6 +13,24 @@ enum FileCategory {
 }
 
 extension FileCategoryExtension on FileCategory {
+  String localizedLabel(BuildContext context) {
+    final l10n = context.l10n;
+    switch (this) {
+      case FileCategory.all:
+        return l10n.categoryAll;
+      case FileCategory.cad2d:
+        return l10n.categoryCad2d;
+      case FileCategory.cad3d:
+        return l10n.categoryCad3d;
+      case FileCategory.pcb:
+        return l10n.categoryPcb;
+      case FileCategory.routes:
+        return l10n.categoryRoutes;
+      case FileCategory.documents:
+        return l10n.categoryDocuments;
+    }
+  }
+
   String get label {
     switch (this) {
       case FileCategory.all:
