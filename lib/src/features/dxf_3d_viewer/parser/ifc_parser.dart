@@ -602,6 +602,14 @@ class _IfcGeometrySolver {
       initialHiddenLayers.removeWhere((l) => !usedLayers.contains(l));
     }
 
+    final totalTris = elements.fold<int>(0, (sum, e) => sum + e.triangles.length);
+    debugPrint('[IfcParser] Parsed "$projectName" ($schema): ${elements.length} elements across ${storeys.length} storeys, ${categories.length} categories, $totalTris total triangles');
+    for (final cat in categories) {
+      final catElements = elements.where((e) => e.category == cat);
+      final catTris = catElements.fold<int>(0, (sum, e) => sum + e.triangles.length);
+      debugPrint('[IfcParser]   - Category "$cat": ${catElements.length} elements, $catTris triangles');
+    }
+
     return IfcModel(
       projectName: projectName,
       schema: schema,
@@ -2761,47 +2769,6 @@ class _IfcGeometrySolver {
     return result;
   }
 
-  /// Recursively subdivides triangles whose edges exceed [maxEdgeLen] mm.
-  /// Used for large roofs and slabs so that painter's algorithm depth-sorting is accurate
-  /// and eliminates occlusion bleed-through.
-  static List<Triangle3D> _subdivideLargeTriangles(List<Triangle3D> tris, double maxEdgeLen) {
-    if (tris.isEmpty) return tris;
-    final result = <Triangle3D>[];
-    final maxEdgeLenSq = maxEdgeLen * maxEdgeLen;
-
-    for (final tri in tris) {
-      final e01 = (tri.v1 - tri.v0).lengthSquared;
-      final e12 = (tri.v2 - tri.v1).lengthSquared;
-      final e20 = (tri.v0 - tri.v2).lengthSquared;
-
-      if (e01 <= maxEdgeLenSq && e12 <= maxEdgeLenSq && e20 <= maxEdgeLenSq) {
-        result.add(tri);
-        continue;
-      }
-
-      // Subdivide by splitting the longest edge
-      if (e01 >= e12 && e01 >= e20) {
-        final mid = (tri.v0 + tri.v1) * 0.5;
-        result.addAll(_subdivideLargeTriangles([
-          Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-          Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-        ], maxEdgeLen));
-      } else if (e12 >= e01 && e12 >= e20) {
-        final mid = (tri.v1 + tri.v2) * 0.5;
-        result.addAll(_subdivideLargeTriangles([
-          Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-          Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-        ], maxEdgeLen));
-      } else {
-        final mid = (tri.v2 + tri.v0) * 0.5;
-        result.addAll(_subdivideLargeTriangles([
-          Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-          Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-        ], maxEdgeLen));
-      }
-    }
-    return result;
-  }
 
   Color? _resolveStyleColorFromParam(String styleParam) {
     final styleIds = RegExp(r'#(\d+)').allMatches(styleParam).map((m) => int.parse(m.group(1)!)).toList();

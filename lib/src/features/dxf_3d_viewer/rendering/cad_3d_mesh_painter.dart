@@ -159,8 +159,13 @@ class Cad3DMeshPainter extends CustomPainter {
       final edge2 = tv2 - tv0;
       final viewNormal = edge1.cross(edge2);
 
-      // Centroid depth in view space (larger Y is further away)
+      // Centroid and boundary depth in view space (larger Y is further away).
+      // Blending the centroid depth with the maximum depth prevents background surfaces
+      // (like pitched roof slopes or exterior walls) from falsely sorting in front of interior elements.
       final avgDepth = (tv0.y + tv1.y + tv2.y) / 3.0;
+      final maxDepth = math.max(tv0.y, math.max(tv1.y, tv2.y));
+      final depth = avgDepth * 0.65 + maxDepth * 0.35;
+
 
       // Multi-source lighting calculation:
       // Determine effective normal facing toward the camera (two-sided lighting)
@@ -225,7 +230,7 @@ class Cad3DMeshPainter extends CustomPainter {
         p0: p0,
         p1: p1,
         p2: p2,
-        depth: avgDepth,
+        depth: depth,
         color: faceColor,
       ));
     }
@@ -408,73 +413,79 @@ class Cad3DMeshPainter extends CustomPainter {
     final cached = _subdivisionCache[mesh];
     if (cached != null) return cached;
 
-    // Only subdivide if mesh has a manageable number of triangles (< 8000)
-    // and contains large architectural triangles.
-    if (mesh.triangles.isEmpty || mesh.triangles.length > 8000) {
+    if (mesh.triangles.isEmpty) {
       _subdivisionCache[mesh] = mesh.triangles;
       return mesh.triangles;
     }
 
     final double maxDim = math.max(mesh.bounds.maxDimension, 1e-4);
-    // Adaptive threshold: a triangle is considered large if its edge exceeds ~25% of model size,
-    // capped at 1200mm for millimeter-scale architectural models.
-    final double threshold = math.min(1200.0, maxDim * 0.25);
-    final double maxEdgeLen = math.min(700.0, maxDim * 0.15);
+    // Adaptive threshold: a triangle is considered large if its edge exceeds ~15% of model size,
+    // capped at 1200mm for millimeter-scale architectural models (e.g. big walls, roofs, slabs).
+    final double threshold = math.min(1200.0, maxDim * 0.15);
+    final double maxEdgeLen = math.min(800.0, maxDim * 0.10);
 
     final double thresholdSq = threshold * threshold;
     bool hasLarge = false;
+    int largeCount = 0;
     for (final t in mesh.triangles) {
       if ((t.v1 - t.v0).lengthSquared > thresholdSq ||
           (t.v2 - t.v1).lengthSquared > thresholdSq ||
           (t.v0 - t.v2).lengthSquared > thresholdSq) {
         hasLarge = true;
-        break;
+        largeCount++;
       }
     }
 
     if (!hasLarge) {
       _subdivisionCache[mesh] = mesh.triangles;
+      debugPrint('[Cad3D] Mesh "${mesh.name}" (${mesh.triangles.length} tris): No large triangles > ${threshold.toStringAsFixed(0)}mm. Subdivision skipped.');
       return mesh.triangles;
     }
 
-    final subdivided = _subdivideTris(mesh.triangles, maxEdgeLen, 0);
+    final sw = Stopwatch()..start();
+    final subdivided = _subdivideTris(mesh.triangles, maxEdgeLen);
+    sw.stop();
+    debugPrint('[Cad3D] Subdivided $largeCount large triangles (> ${threshold.toStringAsFixed(0)}mm) '
+        'in "${mesh.name}": ${mesh.triangles.length} -> ${subdivided.length} triangles in ${sw.elapsedMilliseconds}ms');
+
     _subdivisionCache[mesh] = subdivided;
     return subdivided;
   }
 
-  static List<Triangle3D> _subdivideTris(List<Triangle3D> tris, double maxEdgeLen, [int depth = 0]) {
-    if (tris.isEmpty || depth >= 4) return tris;
+  static List<Triangle3D> _subdivideTris(List<Triangle3D> tris, double maxEdgeLen) {
     final result = <Triangle3D>[];
     final maxEdgeLenSq = maxEdgeLen * maxEdgeLen;
     for (final tri in tris) {
-      final e01 = (tri.v1 - tri.v0).lengthSquared;
-      final e12 = (tri.v2 - tri.v1).lengthSquared;
-      final e20 = (tri.v0 - tri.v2).lengthSquared;
-      if (e01 <= maxEdgeLenSq && e12 <= maxEdgeLenSq && e20 <= maxEdgeLenSq) {
-        result.add(tri);
-        continue;
-      }
-      if (e01 >= e12 && e01 >= e20) {
-        final mid = (tri.v0 + tri.v1) * 0.5;
-        result.addAll(_subdivideTris([
-          Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-          Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-        ], maxEdgeLen, depth + 1));
-      } else if (e12 >= e01 && e12 >= e20) {
-        final mid = (tri.v1 + tri.v2) * 0.5;
-        result.addAll(_subdivideTris([
-          Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-          Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-        ], maxEdgeLen, depth + 1));
-      } else {
-        final mid = (tri.v2 + tri.v0) * 0.5;
-        result.addAll(_subdivideTris([
-          Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-          Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal),
-        ], maxEdgeLen, depth + 1));
-      }
+      _subdivideSingle(tri, maxEdgeLenSq, 0, result);
     }
     return result;
+  }
+
+  static void _subdivideSingle(Triangle3D tri, double maxEdgeLenSq, int depth, List<Triangle3D> out) {
+    if (depth >= 5) {
+      out.add(tri);
+      return;
+    }
+    final e01 = (tri.v1 - tri.v0).lengthSquared;
+    final e12 = (tri.v2 - tri.v1).lengthSquared;
+    final e20 = (tri.v0 - tri.v2).lengthSquared;
+    if (e01 <= maxEdgeLenSq && e12 <= maxEdgeLenSq && e20 <= maxEdgeLenSq) {
+      out.add(tri);
+      return;
+    }
+    if (e01 >= e12 && e01 >= e20) {
+      final mid = (tri.v0 + tri.v1) * 0.5;
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
+    } else if (e12 >= e01 && e12 >= e20) {
+      final mid = (tri.v1 + tri.v2) * 0.5;
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
+    } else {
+      final mid = (tri.v2 + tri.v0) * 0.5;
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
+    }
   }
 
   @override

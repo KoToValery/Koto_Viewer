@@ -376,5 +376,39 @@ f 1//1 2//1 3//1 4//1
       final picture = recorder.endRecording();
       expect(picture, isNotNull);
     });
+
+    test('Paints millimeter-scale large architectural BIM surfaces with adaptive subdivision', () {
+      // 16-meter roof span triangle (16,000mm)
+      final largeRoofTri = Triangle3D(
+        v0: const Vector3(-8000, 0, 7000),
+        v1: const Vector3(8000, 0, 7000),
+        v2: const Vector3(0, 5000, 9000),
+      );
+      // Small door triangle (500mm)
+      final smallDoorTri = Triangle3D(
+        v0: const Vector3(0, 0, 0),
+        v1: const Vector3(500, 0, 0),
+        v2: const Vector3(0, 0, 500),
+      );
+
+      final mesh = Mesh3D(
+        name: 'BimBuildingModel',
+        triangles: [largeRoofTri, smallDoorTri],
+      );
+
+      final camera = Cad3DCamera();
+      final painter = Cad3DMeshPainter(
+        mesh: mesh,
+        camera: camera,
+        shadingMode: Cad3DShadingMode.cadShadedEdges,
+        theme: Cad3DTheme.darkCad,
+      );
+
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+      expect(() => painter.paint(canvas, const Size(1024, 768)), returnsNormally);
+      final picture = recorder.endRecording();
+      expect(picture, isNotNull);
+    });
   });
 }
