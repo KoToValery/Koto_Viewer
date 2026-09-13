@@ -908,6 +908,33 @@ END-ISO-10303-21;
       final roofs = model.elements.where((e) => e.category == 'Roof').toList();
       expect(roofs.length, equals(7));
     });
+
+    test('Verify SM.ifc chimney corner bridging and thin cladding displacement if test file exists', () {
+      final file = File(r'C:\Users\KoTo\Dropbox\test_files\SM.ifc');
+      if (!file.existsSync()) return;
+
+      final content = file.readAsStringSync();
+      final model = IfcParser.parseFromText(content);
+
+      // 1. Chimney walls: 8 chimney walls connected via IFCRELCONNECTSPATHELEMENTS
+      final chimneyIds = [273, 283, 298, 303, 293, 308, 313, 318];
+      int bridgedCount = 0;
+      for (final id in chimneyIds) {
+        final el = model.elements.firstWhere((e) => e.id == id);
+        expect(el.color, equals(const Color(0xFF42474E)));
+        if (el.triangles.length > 12) bridgedCount++;
+      }
+      expect(bridgedCount, greaterThanOrEqualTo(4));
+
+      // 2. Cladding Slab 278 & Fascia Slab 288 have warm timber color and depthBias: 100.0
+      final s278 = model.elements.firstWhere((e) => e.id == 278);
+      expect(s278.color, equals(const Color(0xFFB57E4C)));
+      expect(s278.triangles.every((t) => t.depthBias == 100.0), isTrue);
+
+      final s288 = model.elements.firstWhere((e) => e.id == 288);
+      expect(s288.color, equals(const Color(0xFFB57E4C)));
+      expect(s288.triangles.every((t) => t.depthBias == 100.0), isTrue);
+    });
   });
 }
 

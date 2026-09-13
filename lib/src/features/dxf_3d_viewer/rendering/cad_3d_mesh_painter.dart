@@ -421,8 +421,8 @@ class Cad3DMeshPainter extends CustomPainter {
     final double maxDim = math.max(mesh.bounds.maxDimension, 1e-4);
     // Adaptive threshold: a triangle is considered large if its edge exceeds ~15% of model size,
     // capped at 1200mm for millimeter-scale architectural models (e.g. big walls, roofs, slabs).
-    final double threshold = math.min(1200.0, maxDim * 0.15);
-    final double maxEdgeLen = math.min(800.0, maxDim * 0.10);
+    final double threshold = math.min(1000.0, maxDim * 0.15);
+    final double maxEdgeLen = math.min(600.0, maxDim * 0.08);
 
     final double thresholdSq = threshold * threshold;
     bool hasLarge = false;

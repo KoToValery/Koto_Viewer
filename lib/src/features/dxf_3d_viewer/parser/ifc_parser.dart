@@ -479,13 +479,10 @@ class _IfcGeometrySolver {
     final List<(int, int)> connectedWallPairs = [];
     for (final ent in entityMap.values) {
       if (ent.type == 'IFCRELCONNECTSPATHELEMENTS') {
-        final params = ent.splitParams;
-        if (params.length >= 6) {
-          final id1 = int.tryParse(params[4].replaceAll(RegExp(r'[#\s]'), ''));
-          final id2 = int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), ''));
-          if (id1 != null && id2 != null) {
-            connectedWallPairs.add((id1, id2));
-          }
+        final ids = RegExp(r'#(\d+)').allMatches(ent.params).map((m) => int.parse(m.group(1)!)).toList();
+        if (ids.length >= 2) {
+          // In standard IFC, the relating and related wall IDs are the last two referenced entities
+          connectedWallPairs.add((ids[ids.length - 2], ids[ids.length - 1]));
         }
       }
     }
@@ -625,12 +622,22 @@ class _IfcGeometrySolver {
         final hasDownward = filteredTris.any((t) => t.normal.z < -0.1);
         final bool isClosedSolid = hasUpward && hasDownward;
 
-        // Pure geometric detection of thin cladding / siding (облицовка):
+        // Pure geometric and material detection of thin cladding / siding (облицовка):
         // Elements modeled as Slab, Wall, or Generic with thickness 10-55mm (typical 2-5cm)
-        // and large architectural span are geometrically identified as cladding.
+        // or styled with cladding/siding materials are identified as cladding.
         final b = BoundingBox3D.fromPoints(filteredTris.expand((t) => [t.v0, t.v1, t.v2]).toList());
-        isThinCladding = _isThinCladdingGeometry(b, category);
-        final double claddingDepthBias = isThinCladding ? 35.0 : 0.0;
+        final String lowerName = name.toLowerCase();
+        final bool hasCladdingColor = elementColor == const Color(0xFFB57E4C) ||
+            filteredTris.any((t) => t.color == const Color(0xFFB57E4C));
+        final bool isCladdingStyle = lowerName.contains('cladding') ||
+            lowerName.contains('siding') ||
+            lowerName.contains('обшивк') ||
+            lowerName.contains('облицовк') ||
+            lowerLayer.contains('обшивк') ||
+            lowerLayer.contains('cladding') ||
+            (hasCladdingColor && (category == 'Slab' || category == 'Wall' || category == 'Generic'));
+        isThinCladding = _isThinCladdingGeometry(b, category) || isCladdingStyle;
+        final double claddingDepthBias = isThinCladding ? 100.0 : 0.0;
         final Color? claddingColor = isThinCladding ? const Color(0xFFB57E4C) : null;
         final Color? chimneyColor = isChimney ? const Color(0xFF42474E) : null;
 
@@ -642,10 +649,17 @@ class _IfcGeometrySolver {
               t.isDoubleSided;
           final double triDepthBias = math.max(t.depthBias, claddingDepthBias);
           final Color? triColor = claddingColor ?? chimneyColor ?? t.color;
+
+          // Physically displace thin cladding outward along the face normal (12mm)
+          // to prevent Z-fighting and ensure it never merges with backing walls/slabs.
+          final Vector3 offset = isThinCladding && t.normal.lengthSquared > 0.5
+              ? t.normal * 12.0
+              : Vector3.zero;
+
           triangles.add(Triangle3D(
-            v0: t.v0,
-            v1: t.v1,
-            v2: t.v2,
+            v0: t.v0 + offset,
+            v1: t.v1 + offset,
+            v2: t.v2 + offset,
             normal: t.normal,
             color: triColor,
             isDoubleSided: makeDoubleSided,
@@ -1052,6 +1066,46 @@ class _IfcGeometrySolver {
     final Map<int, List<Triangle3D>> extraTriangles = {};
     final Set<String> bridgedCorners = {};
 
+    // Group connected walls into components to compute each group's center
+    final Map<int, Set<int>> adj = {};
+    for (final pair in connectedPairs) {
+      adj.putIfAbsent(pair.$1, () => {}).add(pair.$2);
+      adj.putIfAbsent(pair.$2, () => {}).add(pair.$1);
+    }
+    final Map<int, Vector3> groupCenters = {};
+    final visited = <int>{};
+    for (final startId in adj.keys) {
+      if (visited.contains(startId)) continue;
+      final comp = <int>[];
+      final q = [startId];
+      visited.add(startId);
+      while (q.isNotEmpty) {
+        final curr = q.removeAt(0);
+        comp.add(curr);
+        for (final next in adj[curr] ?? <int>{}) {
+          if (visited.add(next)) q.add(next);
+        }
+      }
+      double minX = double.infinity, maxX = -double.infinity;
+      double minY = double.infinity, maxY = -double.infinity;
+      double minZ = double.infinity, maxZ = -double.infinity;
+      for (final id in comp) {
+        final el = elMap[id];
+        if (el == null) continue;
+        final b = el.bounds;
+        if (b.min.x < minX) minX = b.min.x;
+        if (b.max.x > maxX) maxX = b.max.x;
+        if (b.min.y < minY) minY = b.min.y;
+        if (b.max.y > maxY) maxY = b.max.y;
+        if (b.min.z < minZ) minZ = b.min.z;
+        if (b.max.z > maxZ) maxZ = b.max.z;
+      }
+      final center = Vector3((minX + maxX) * 0.5, (minY + maxY) * 0.5, (minZ + maxZ) * 0.5);
+      for (final id in comp) {
+        groupCenters[id] = center;
+      }
+    }
+
     for (final pair in connectedPairs) {
       final w1 = elMap[pair.$1];
       final w2 = elMap[pair.$2];
@@ -1065,9 +1119,6 @@ class _IfcGeometrySolver {
       final zMin = math.max(b1.min.z, b2.min.z);
       final zMax = math.min(b1.max.z, b2.max.z);
       if (zMax - zMin < 100.0) continue; // Must overlap significantly in height
-
-      final c1 = (b1.min + b1.max) * 0.5;
-      final c2 = (b2.min + b2.max) * 0.5;
 
       // Determine touching coordinates in X and Y
       double? x0;
@@ -1086,50 +1137,37 @@ class _IfcGeometrySolver {
 
       if (x0 == null || y0 == null) continue;
 
-      // Determine which wall extends primarily in Y and which in X away from (x0, y0)
-      final dist1X = (c1.x - x0).abs();
-      final dist1Y = (c1.y - y0).abs();
-      final dist2X = (c2.x - x0).abs();
-      final dist2Y = (c2.y - y0).abs();
+      final c1 = (b1.min + b1.max) * 0.5;
+      final c2 = (b2.min + b2.max) * 0.5;
+      final q1x = (c1.x - x0) >= 0 ? 1.0 : -1.0;
+      final q1y = (c1.y - y0) >= 0 ? 1.0 : -1.0;
+      final q2x = (c2.x - x0) >= 0 ? 1.0 : -1.0;
+      final q2y = (c2.y - y0) >= 0 ? 1.0 : -1.0;
 
-      final IfcElement wallExtY;
-      final IfcElement wallExtX;
-      if (dist1Y >= dist1X && dist2X >= dist2Y) {
-        wallExtY = w1;
-        wallExtX = w2;
-      } else if (dist2Y >= dist2X && dist1X >= dist1Y) {
-        wallExtY = w2;
-        wallExtX = w1;
-      } else {
-        continue;
-      }
+      // Two candidate quadrants: (q1x, q2y) or (q2x, q1y)
+      final gCenter = groupCenters[pair.$1] ?? (c1 + c2) * 0.5;
+      final toCenter = Vector3(gCenter.x - x0, gCenter.y - y0, 0);
 
-      final by = wallExtY.bounds;
-      final bx = wallExtX.bounds;
+      final candA = Vector3(q1x, q2y, 0);
+      final candB = Vector3(q2x, q1y, 0);
+      // Exterior corner is the candidate that points AWAY from the group center
+      final extCornerQuad = candA.dot(toCenter) <= candB.dot(toCenter) ? candA : candB;
 
-      final cornerXMin = by.min.x;
-      final cornerXMax = by.max.x;
+      final cornerXMin = extCornerQuad.x < 0 ? math.min(b1.min.x, b2.min.x) : x0;
+      final cornerXMax = extCornerQuad.x > 0 ? math.max(b1.max.x, b2.max.x) : x0;
+      final cornerYMin = extCornerQuad.y < 0 ? math.min(b1.min.y, b2.min.y) : y0;
+      final cornerYMax = extCornerQuad.y > 0 ? math.max(b1.max.y, b2.max.y) : y0;
 
-      final double adjYMin;
-      final double adjYMax;
-      if (by.min.y >= bx.max.y - 35.0) {
-        adjYMin = bx.min.y;
-        adjYMax = math.max(bx.max.y, by.min.y);
-      } else {
-        adjYMin = math.min(bx.min.y, by.max.y);
-        adjYMax = bx.max.y;
-      }
+      if (cornerXMax <= cornerXMin || cornerYMax <= cornerYMin) continue;
 
-      if (cornerXMax <= cornerXMin || adjYMax <= adjYMin) continue;
-
-      final cornerKey = '${cornerXMin.round()}_${adjYMin.round()}_${zMin.round()}';
+      final cornerKey = '${cornerXMin.round()}_${cornerYMin.round()}_${zMin.round()}';
       if (!bridgedCorners.add(cornerKey)) continue;
 
-      final pMin = Vector3(cornerXMin, adjYMin, zMin);
-      final pMax = Vector3(cornerXMax, adjYMax, zMax);
+      final pMin = Vector3(cornerXMin, cornerYMin, zMin);
+      final pMax = Vector3(cornerXMax, cornerYMax, zMax);
 
-      final boxTris = _createBoxTriangles(pMin, pMax, wallExtX.color);
-      extraTriangles.putIfAbsent(wallExtX.id, () => []).addAll(boxTris);
+      final boxTris = _createBoxTriangles(pMin, pMax, w1.color);
+      extraTriangles.putIfAbsent(w1.id, () => []).addAll(boxTris);
     }
 
     if (extraTriangles.isNotEmpty) {
@@ -3039,6 +3077,16 @@ class _IfcGeometrySolver {
       final currId = queue.removeAt(0);
       final ent = entityMap[currId];
       if (ent == null) continue;
+      if (ent.type == 'IFCSURFACESTYLE') {
+        final params = ent.splitParams;
+        if (params.isNotEmpty && params[0].startsWith("'")) {
+          final styleName = IfcParser.decodeIfcString(params[0].replaceAll("'", ""));
+          final matCol = _mapMaterialNameToColor(styleName);
+          if (matCol != null) {
+            return matCol;
+          }
+        }
+      }
 
       if (ent.type == 'IFCSURFACESTYLESHADING' || ent.type == 'IFCSURFACESTYLERENDERING') {
         var c = _extractColourRgbFromParams(ent.params);
