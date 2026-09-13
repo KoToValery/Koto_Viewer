@@ -98,6 +98,15 @@ void main() {
       expect(l10n.retry, equals('Retry'));
       expect(l10n.bimStoreysAndCategories, equals('BIM Storeys & Categories'));
       expect(l10n.properties3d, equals('3D Properties'));
+      expect(l10n.errorLoadingDxf('corrupt'), equals('Error opening DXF file: corrupt'));
+      expect(l10n.failedToSaveDxf('disk full'), equals('Failed to save DXF: disk full'));
+      expect(l10n.savedDxf('plan.dxf'), equals('Saved DXF: plan.dxf'));
+      expect(l10n.errorImportingDxf('bad layer'), equals('Error importing DXF: bad layer'));
+      expect(l10n.importedDxfSuccess(42, 'blocks.dxf'), equals('Successfully imported 42 entities from blocks.dxf'));
+      expect(l10n.fitScreen, equals('Fit Screen'));
+      expect(l10n.printPreviewUnavailable('printer offline'), equals('Print preview unavailable: printer offline'));
+      expect(l10n.errorReadingHpgl('bad cmd'), equals('Error reading HPGL plotter file: bad cmd'));
+      expect(l10n.errorReadingPcb('bad header'), equals('Error reading PCB project: bad header'));
     });
 
     testWidgets('Bulgarian strings and parameters resolve correctly', (tester) async {
@@ -151,6 +160,15 @@ void main() {
       expect(l10n.retry, equals('Опитай отново'));
       expect(l10n.bimStoreysAndCategories, equals('BIM етажи и категории'));
       expect(l10n.properties3d, equals('3D Свойства'));
+      expect(l10n.errorLoadingDxf('corrupt'), equals('Грешка при отваряне на DXF файл: corrupt'));
+      expect(l10n.failedToSaveDxf('disk full'), equals('Грешка при запис на DXF: disk full'));
+      expect(l10n.savedDxf('plan.dxf'), equals('Записан DXF: plan.dxf'));
+      expect(l10n.errorImportingDxf('bad layer'), equals('Грешка при импортиране на DXF: bad layer'));
+      expect(l10n.importedDxfSuccess(42, 'blocks.dxf'), equals('Успешно импортирани 42 обекта от blocks.dxf'));
+      expect(l10n.fitScreen, equals('Побиране в екрана'));
+      expect(l10n.printPreviewUnavailable('printer offline'), equals('Прегледът за печат е недостъпен: printer offline'));
+      expect(l10n.errorReadingHpgl('bad cmd'), equals('Грешка при четене на HPGL плотерен файл: bad cmd'));
+      expect(l10n.errorReadingPcb('bad header'), equals('Грешка при четене на платка (PCB): bad header'));
 
       // Test category labels in Bulgarian
       expect(FileCategory.all.localizedLabel(buildCtx), equals('Всички'));

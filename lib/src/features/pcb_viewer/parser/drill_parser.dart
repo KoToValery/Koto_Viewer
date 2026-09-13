@@ -15,7 +15,8 @@ class DrillParser {
   static String _decodeText(Uint8List bytes) {
     try {
       return utf8.decode(bytes, allowMalformed: true);
-    } catch (_) {
+    } on FormatException catch (_) {
+      // Fall back to Latin-1 decoding if UTF-8 fails
       return latin1.decode(bytes);
     }
   }

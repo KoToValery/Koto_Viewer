@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/errors/app_error_handler.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/coordinate_system_service.dart';
 import '../../core/services/dxf_exporter_service.dart';
@@ -108,7 +109,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = _annotations.map((a) => a.toJson()).toList();
       await prefs.setString('dxf_annotations_${widget.filePath}', jsonEncode(jsonList));
-    } catch (_) {}
+    } on Exception catch (_) {
+      // Ignore preference write failure
+    }
   }
 
   Future<void> _loadSavedAnnotations() async {
@@ -125,7 +128,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
           });
         }
       }
-    } catch (_) {}
+    } on Exception catch (_) {
+      // Ignore corrupted or unreadable preferences
+    }
   }
 
   @override
@@ -172,20 +177,25 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     try {
       final file = File(widget.filePath);
       if (!await file.exists()) {
-        setState(() {
-          _errorMessage = 'File does not exist: ${widget.filePath}';
-          _isLoading = false;
-        });
+        final l10n = mounted ? AppLocalizations.of(context) : null;
+        if (mounted) {
+          setState(() {
+            _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File does not exist: ${widget.filePath}';
+            _isLoading = false;
+          });
+        }
         return;
       }
 
       _fileSizeBytes = await file.length();
       final doc = await DxfParser.parseFromFile(file);
 
-      setState(() {
-        _document = doc;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _document = doc;
+          _isLoading = false;
+        });
+      }
 
       _saveToRecentFiles();
 
@@ -193,14 +203,48 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _fitToScreen();
       });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to open DXF file: $e';
-        _isLoading = false;
-      });
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._loadDxfFile.fs');
+      final l10n = mounted ? AppLocalizations.of(context) : null;
+      if (mounted) {
+        setState(() {
+          _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _isLoading = false;
+        });
+      }
       try {
         await RecentFilesService.removeRecentFile(widget.filePath);
-      } catch (_) {}
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._loadDxfFile.format');
+      final l10n = mounted ? AppLocalizations.of(context) : null;
+      if (mounted) {
+        setState(() {
+          _errorMessage = l10n?.errorLoadingDxf(e.message) ?? 'Failed to open DXF file: ${e.message}';
+          _isLoading = false;
+        });
+      }
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._loadDxfFile');
+      final l10n = mounted ? AppLocalizations.of(context) : null;
+      if (mounted) {
+        setState(() {
+          _errorMessage = l10n?.errorLoadingDxf(e.toString()) ?? 'Failed to open DXF file: $e';
+          _isLoading = false;
+        });
+      }
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
     }
   }
 
@@ -213,7 +257,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         lastOpened: DateTime.now(),
       );
       await RecentFilesService.addRecentFile(pdfItem);
-    } catch (_) {}
+    } on Exception catch (_) {
+      // Ignore recent files save failure
+    }
   }
 
   /// Fit the entire DXF drawing inside the available viewport.
@@ -325,7 +371,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         right + marginX,
         top + marginY,
       );
-    } catch (_) {
+    } on Exception catch (_) {
       return null;
     }
   }
@@ -684,13 +730,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       );
 
       if (mounted) {
+        final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Saved DXF: $outputFileName'),
+            content: Text(l10n.savedDxf(outputFileName)),
             backgroundColor: const Color(0xFF1B2433),
             behavior: SnackBarBehavior.floating,
             action: SnackBarAction(
-              label: 'Share',
+              label: l10n.share,
               textColor: const Color(0xFF00E5FF),
               onPressed: () {
                 Share.shareXFiles([XFile(outputFile.path)], subject: outputFileName);
@@ -699,11 +746,25 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
           ),
         );
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._exportDxf.fs');
       if (mounted) {
+        final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save DXF: $e'),
+            content: Text(l10n.failedToSaveDxf(e.message)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._exportDxf');
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.failedToSaveDxf(e.toString())),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1134,19 +1195,38 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       });
 
       final importedName = filePath.split(Platform.pathSeparator).last;
+      final l10n = context.l10n;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Successfully imported ${importedDoc.totalEntities} entities from $importedName'),
+          content: Text(l10n.importedDxfSuccess(importedDoc.totalEntities, importedName)),
           action: SnackBarAction(
-            label: 'Fit Screen',
+            label: l10n.fitScreen,
             onPressed: _fitToScreen,
           ),
         ),
       );
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._importDxf.fs');
       if (mounted) {
+        final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error importing DXF: $e')),
+          SnackBar(content: Text(l10n.errorImportingDxf(e.message))),
+        );
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._importDxf.format');
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorImportingDxf(e.message))),
+        );
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._importDxf');
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorImportingDxf(e.toString()))),
         );
       }
     }
@@ -1195,10 +1275,20 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final file = File(widget.filePath);
       final bytes = await file.readAsBytes();
       await Printing.layoutPdf(onLayout: (_) => bytes, name: _fileName);
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._printDxf.fs');
       if (mounted) {
+        final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Print preview unavailable: $e')),
+          SnackBar(content: Text(l10n.printPreviewUnavailable(e.message))),
+        );
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._printDxf');
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.printPreviewUnavailable(e.toString()))),
         );
       }
     }

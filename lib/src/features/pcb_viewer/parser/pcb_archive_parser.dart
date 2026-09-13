@@ -16,7 +16,9 @@ class PcbArchiveParser {
     try {
       final archive = ZipDecoder().decodeBytes(bytes, verify: false);
       return archive.isNotEmpty;
-    } catch (_) {
+    } on ArchiveException catch (_) {
+      return false;
+    } on FormatException catch (_) {
       return false;
     }
   }
@@ -111,7 +113,11 @@ class PcbArchiveParser {
               ),
             );
           }
-        } catch (_) {}
+        } on FormatException catch (_) {
+          // Skip unparseable Gerber layer
+        } on Exception catch (_) {
+          // Ignore general parse failure for individual Gerber layer
+        }
         continue;
       }
 
@@ -130,7 +136,11 @@ class PcbArchiveParser {
               ),
             );
           }
-        } catch (_) {}
+        } on FormatException catch (_) {
+          // Skip unparseable drill file
+        } on Exception catch (_) {
+          // Ignore general parse failure for individual drill file
+        }
         continue;
       }
     }
@@ -247,7 +257,8 @@ class PcbArchiveParser {
     String text;
     try {
       text = utf8.decode(bytes, allowMalformed: true);
-    } catch (_) {
+    } on FormatException catch (_) {
+      // Fall back to Latin-1 decoding if UTF-8 fails
       text = latin1.decode(bytes);
     }
 

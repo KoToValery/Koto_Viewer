@@ -127,5 +127,14 @@
   "failedToParse3dMesh": "Неуспешно разчитане на 3D геометрията.",
   "retry": "Опитай отново",
   "bimStoreysAndCategories": "BIM етажи и категории",
-  "properties3d": "3D Свойства"
+  "properties3d": "3D Свойства",
+  "errorLoadingDxf": "Грешка при отваряне на DXF файл: {error}",
+  "failedToSaveDxf": "Грешка при запис на DXF: {error}",
+  "savedDxf": "Записан DXF: {name}",
+  "errorImportingDxf": "Грешка при импортиране на DXF: {error}",
+  "importedDxfSuccess": "Успешно импортирани {count} обекта от {name}",
+  "fitScreen": "Побиране в екрана",
+  "printPreviewUnavailable": "Прегледът за печат е недостъпен: {error}",
+  "errorReadingHpgl": "Грешка при четене на HPGL плотерен файл: {error}",
+  "errorReadingPcb": "Грешка при четене на платка (PCB): {error}"
 }

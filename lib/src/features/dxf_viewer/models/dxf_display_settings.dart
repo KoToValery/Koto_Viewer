@@ -131,7 +131,9 @@ class DxfDisplaySettingsService {
       if (jsonStr != null && jsonStr.isNotEmpty) {
         return DxfDisplaySettings.fromJson(jsonStr);
       }
-    } catch (_) {}
+    } on Exception catch (_) {
+      // Fallback to default settings if reading preferences fails
+    }
     return const DxfDisplaySettings();
   }
 
@@ -140,7 +142,9 @@ class DxfDisplaySettingsService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keySettings, settings.toJson());
-    } catch (_) {}
+    } on Exception catch (_) {
+      // Ignore preferences write failure
+    }
   }
 
   static Future<void> resetToDefaults() async {

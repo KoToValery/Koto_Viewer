@@ -309,5 +309,64 @@
   "bimStoreysAndCategories": "BIM Storeys & Categories",
   "@bimStoreysAndCategories": { "description": "Tooltip for BIM storeys and categories button" },
   "properties3d": "3D Properties",
-  "@properties3d": { "description": "Tooltip for 3D model properties button" }
+  "@properties3d": { "description": "Tooltip for 3D model properties button" },
+  "errorLoadingDxf": "Error opening DXF file: {error}",
+  "@errorLoadingDxf": {
+    "description": "Error message when opening DXF file fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "failedToSaveDxf": "Failed to save DXF: {error}",
+  "@failedToSaveDxf": {
+    "description": "Error message when saving DXF file fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "savedDxf": "Saved DXF: {name}",
+  "@savedDxf": {
+    "description": "Success message when DXF file is saved",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "errorImportingDxf": "Error importing DXF: {error}",
+  "@errorImportingDxf": {
+    "description": "Error message when importing DXF entities fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "importedDxfSuccess": "Successfully imported {count} entities from {name}",
+  "@importedDxfSuccess": {
+    "description": "Success message when DXF entities are imported",
+    "placeholders": {
+      "count": { "type": "int" },
+      "name": { "type": "String" }
+    }
+  },
+  "fitScreen": "Fit Screen",
+  "@fitScreen": { "description": "Button label to fit drawing to screen" },
+  "printPreviewUnavailable": "Print preview unavailable: {error}",
+  "@printPreviewUnavailable": {
+    "description": "Error message when print preview fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorReadingHpgl": "Error reading HPGL plotter file: {error}",
+  "@errorReadingHpgl": {
+    "description": "Error message when reading HPGL file fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorReadingPcb": "Error reading PCB project: {error}",
+  "@errorReadingPcb": {
+    "description": "Error message when reading PCB project fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  }
 }

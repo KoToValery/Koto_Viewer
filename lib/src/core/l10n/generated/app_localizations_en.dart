@@ -404,4 +404,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get properties3d => '3D Properties';
+
+  @override
+  String errorLoadingDxf(String error) {
+    return 'Error opening DXF file: $error';
+  }
+
+  @override
+  String failedToSaveDxf(String error) {
+    return 'Failed to save DXF: $error';
+  }
+
+  @override
+  String savedDxf(String name) {
+    return 'Saved DXF: $name';
+  }
+
+  @override
+  String errorImportingDxf(String error) {
+    return 'Error importing DXF: $error';
+  }
+
+  @override
+  String importedDxfSuccess(int count, String name) {
+    return 'Successfully imported $count entities from $name';
+  }
+
+  @override
+  String get fitScreen => 'Fit Screen';
+
+  @override
+  String printPreviewUnavailable(String error) {
+    return 'Print preview unavailable: $error';
+  }
+
+  @override
+  String errorReadingHpgl(String error) {
+    return 'Error reading HPGL plotter file: $error';
+  }
+
+  @override
+  String errorReadingPcb(String error) {
+    return 'Error reading PCB project: $error';
+  }
 }

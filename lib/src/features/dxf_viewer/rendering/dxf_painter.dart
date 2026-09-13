@@ -149,7 +149,7 @@ class DxfPainter extends CustomPainter {
           blocks: document.blocks,
           layers: document.layers,
         );
-      } catch (_) {
+      } on Exception catch (_) {
         // Individual entity rendering failure must never break the frame
       }
     }
@@ -158,28 +158,36 @@ class DxfPainter extends CustomPainter {
     if (highlightedEntity != null) {
       try {
         _drawEntityHighlight(canvas, highlightedEntity!, toCanvas);
-      } catch (_) {}
+      } on Exception catch (_) {
+        // Highlight rendering failure ignored
+      }
     }
 
     // 4. Draw Active Snap Marker
     if (snapResult != null) {
       try {
         _drawSnapMarker(canvas, snapResult!, toCanvas);
-      } catch (_) {}
+      } on Exception catch (_) {
+        // Snap marker rendering failure ignored
+      }
     }
 
     // 5. Draw Saved Annotations (Leader notes)
     if (annotations.isNotEmpty) {
       try {
         _drawAnnotations(canvas, toCanvas, fitScale);
-      } catch (_) {}
+      } on Exception catch (_) {
+        // Annotations rendering failure ignored
+      }
     }
 
     // 6. Draw Active Measurement Overlay
     if (measurement != null) {
       try {
         _drawMeasurement(canvas, measurement!, toCanvas, fitScale);
-      } catch (_) {}
+      } on Exception catch (_) {
+        // Measurement overlay rendering failure ignored
+      }
     }
   }
 
@@ -1871,7 +1879,9 @@ class DxfPainter extends CustomPainter {
       canvas.drawRRect(rrect, borderPaint);
 
       tp.paint(canvas, Offset(badgeLeft + padH, badgeTop + padV));
-    } catch (_) {}
+    } on Exception catch (_) {
+      // Badge rendering failure ignored
+    }
   }
 
   void _drawDistanceMeasurement(
@@ -2046,7 +2056,9 @@ class DxfPainter extends CustomPainter {
         );
         final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
         tp.paint(canvas, pts[i] - Offset(tp.width / 2, tp.height / 2));
-      } catch (_) {}
+      } on Exception catch (_) {
+        // Area point label rendering failure ignored
+      }
     }
 
     // 4. Centroid Result Badge (real-time live area & perimeter!)
@@ -2332,7 +2344,9 @@ class DxfPainter extends CustomPainter {
           Offset(textLeft, textTop + textPainter.height + (2.0 / scale)),
         );
       }
-    } catch (_) {}
+    } on Exception catch (_) {
+      // Annotation bubble rendering failure ignored
+    }
   }
 
   @override

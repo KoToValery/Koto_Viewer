@@ -407,4 +407,47 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get properties3d => '3D Свойства';
+
+  @override
+  String errorLoadingDxf(String error) {
+    return 'Грешка при отваряне на DXF файл: $error';
+  }
+
+  @override
+  String failedToSaveDxf(String error) {
+    return 'Грешка при запис на DXF: $error';
+  }
+
+  @override
+  String savedDxf(String name) {
+    return 'Записан DXF: $name';
+  }
+
+  @override
+  String errorImportingDxf(String error) {
+    return 'Грешка при импортиране на DXF: $error';
+  }
+
+  @override
+  String importedDxfSuccess(int count, String name) {
+    return 'Успешно импортирани $count обекта от $name';
+  }
+
+  @override
+  String get fitScreen => 'Побиране в екрана';
+
+  @override
+  String printPreviewUnavailable(String error) {
+    return 'Прегледът за печат е недостъпен: $error';
+  }
+
+  @override
+  String errorReadingHpgl(String error) {
+    return 'Грешка при четене на HPGL плотерен файл: $error';
+  }
+
+  @override
+  String errorReadingPcb(String error) {
+    return 'Грешка при четене на платка (PCB): $error';
+  }
 }

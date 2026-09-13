@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:archive/archive.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/errors/app_error_handler.dart';
+import '../../core/l10n/l10n_extensions.dart';
 import '../../core/services/recent_files_service.dart';
 import 'models/pcb_models.dart';
 import 'parser/gerber_parser.dart';
@@ -62,7 +65,14 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     try {
       final file = File(widget.filePath);
       if (!await file.exists()) {
-        throw Exception('File not found: ${widget.filePath}');
+        final l10n = mounted ? AppLocalizations.of(context) : null;
+        if (mounted) {
+          setState(() {
+            _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found: ${widget.filePath}';
+            _isLoading = false;
+          });
+        }
+        return;
       }
 
       _fileSizeBytes = await file.length();
@@ -80,7 +90,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         );
 
         if (project.layers.isEmpty && project.images.isEmpty && project.bomEntries.isEmpty && project.archiveFiles.isEmpty) {
-          throw Exception('The archive is empty or contains no readable files.');
+          throw const FormatException('The archive is empty or contains no readable files.');
         }
       }
       // 2. KiCad Schematics / Symbols
@@ -105,7 +115,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
       else if (lower.endsWith('.bom') || lower.endsWith('.csv')) {
         final bomEntries = PcbArchiveParser.parseBom(bytes, _fileName);
         if (bomEntries.isEmpty) {
-          throw Exception('The BOM file is empty or unsupported format.');
+          throw const FormatException('The BOM file is empty or unsupported format.');
         }
         project = PcbProject(
           projectName: _fileName.replaceAll(RegExp(r'\.(bom|csv)$', caseSensitive: false), ''),
@@ -139,11 +149,59 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
           }
         });
       }
-    } catch (e) {
-      await RecentFilesService.removeRecentFile(widget.filePath);
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PcbViewer._loadPcbFile.fs');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = 'Error reading PCB project: $e';
+          _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _isLoading = false;
+        });
+      }
+    } on ArchiveException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PcbViewer._loadPcbFile.archive');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorReadingPcb(e.message) ?? 'Error reading PCB project: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PcbViewer._loadPcbFile.format');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorReadingPcb(e.message) ?? 'Error reading PCB project: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PcbViewer._loadPcbFile');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorReadingPcb(e.toString()) ?? 'Error reading PCB project: $e';
           _isLoading = false;
         });
       }

@@ -829,6 +829,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'3D Properties'**
   String get properties3d;
+
+  /// Error message when opening DXF file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error opening DXF file: {error}'**
+  String errorLoadingDxf(String error);
+
+  /// Error message when saving DXF file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save DXF: {error}'**
+  String failedToSaveDxf(String error);
+
+  /// Success message when DXF file is saved
+  ///
+  /// In en, this message translates to:
+  /// **'Saved DXF: {name}'**
+  String savedDxf(String name);
+
+  /// Error message when importing DXF entities fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error importing DXF: {error}'**
+  String errorImportingDxf(String error);
+
+  /// Success message when DXF entities are imported
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully imported {count} entities from {name}'**
+  String importedDxfSuccess(int count, String name);
+
+  /// Button label to fit drawing to screen
+  ///
+  /// In en, this message translates to:
+  /// **'Fit Screen'**
+  String get fitScreen;
+
+  /// Error message when print preview fails
+  ///
+  /// In en, this message translates to:
+  /// **'Print preview unavailable: {error}'**
+  String printPreviewUnavailable(String error);
+
+  /// Error message when reading HPGL file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading HPGL plotter file: {error}'**
+  String errorReadingHpgl(String error);
+
+  /// Error message when reading PCB project fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading PCB project: {error}'**
+  String errorReadingPcb(String error);
 }
 
 class _AppLocalizationsDelegate
