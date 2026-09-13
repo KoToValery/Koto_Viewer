@@ -485,4 +485,23 @@ class AppLocalizationsBg extends AppLocalizations {
   String centeredOnWaypoint(String name) {
     return 'Центрирано върху: $name';
   }
+
+  @override
+  String dicomParseError(String error) {
+    return 'Грешка при анализ на DICOM: $error';
+  }
+
+  @override
+  String errorLoadingDicom(String error) {
+    return 'Грешка при зареждане на DICOM изследване: $error';
+  }
+
+  @override
+  String errorLoadingEbook(String error) {
+    return 'Грешка при зареждане на електронна книга: $error';
+  }
+
+  @override
+  String get couldNotDecodePsd =>
+      'Неуспешно декодиране на PSD композитно изображение.';
 }

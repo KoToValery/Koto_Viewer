@@ -438,7 +438,7 @@ class DicomRenderer {
         frameIndex: frameIndex,
         totalFrames: header.numberOfFrames,
       );
-    } catch (_) {
+    } on Exception catch (_) {
       throw UnsupportedError(
           'JPEG 2000 decoding is not available on this platform. '
           'The openjpeg_bridge native library was not found.');

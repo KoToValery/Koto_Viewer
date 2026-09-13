@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
+import '../../../core/errors/app_error_handler.dart';
 import '../models/pdf_reflow_models.dart';
 
 /// Service for Optical Character Recognition (OCR) on scanned PDF pages.
@@ -93,8 +95,17 @@ class PdfOcrService {
       }
 
       return blocks;
-    } catch (e, stack) {
-      debugPrint('[PdfOcrService] Error during OCR: $e\n$stack');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfOcrService.performOcrOnPage.platform');
+      return [
+        PdfReflowBlock(
+          text: 'Platform error recognizing text on this scanned page: ${e.message}',
+          isHeading: false,
+          isOcr: true,
+        ),
+      ];
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfOcrService.performOcrOnPage');
       return [
         PdfReflowBlock(
           text: 'Error recognizing text on this scanned page: $e',
@@ -107,7 +118,11 @@ class PdfOcrService {
       if (tempImageFile != null && await tempImageFile.exists()) {
         try {
           await tempImageFile.delete();
-        } catch (_) {}
+        } on FileSystemException catch (_) {
+          // Ignored: Best effort cleanup of temp image file
+        } on Exception catch (_) {
+          // Ignored: Best effort cleanup of temp image file
+        }
       }
     }
   }

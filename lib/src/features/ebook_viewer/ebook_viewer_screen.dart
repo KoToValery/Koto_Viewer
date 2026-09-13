@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/errors/app_error_handler.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
 import 'models/ebook_models.dart';
@@ -109,11 +111,43 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
         });
         _checkBookmarkStatus();
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook.fs');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = 'Error loading e-book: $e';
+          _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _isLoading = false;
+        });
+      }
+    } on ArchiveException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook.archive');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n != null ? l10n.errorLoadingEbook(e.message) : 'Error loading e-book: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook.format');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n != null ? l10n.errorLoadingEbook(e.message) : 'Error loading e-book: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'EbookViewer._loadBook');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n != null ? l10n.errorLoadingEbook(e.toString()) : 'Error loading e-book: $e';
           _isLoading = false;
         });
       }

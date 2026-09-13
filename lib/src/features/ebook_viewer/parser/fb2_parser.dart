@@ -23,7 +23,13 @@ class Fb2Parser {
             break;
           }
         }
-      } catch (_) {}
+      } on ArchiveException catch (_) {
+        // Fallback to reading raw bytes if not a valid zip archive
+      } on FormatException catch (_) {
+        // Fallback to reading raw bytes
+      } on Exception catch (_) {
+        // Fallback to reading raw bytes
+      }
     }
 
     final xmlString = UniversalEncodingService.decodeBytes(xmlBytes);
@@ -39,7 +45,9 @@ class Fb2Parser {
           final decoded = base64.decode(base64Content);
           images[id] = decoded;
           images['#$id'] = decoded;
-        } catch (_) {}
+        } on FormatException catch (_) {
+          // Ignore invalid base64 binary image data
+        }
       }
     }
 

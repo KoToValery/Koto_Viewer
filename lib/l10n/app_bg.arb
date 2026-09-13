@@ -143,5 +143,9 @@
   "errorReadingEps": "Грешка при четене на EPS файл: {error}",
   "errorLoadingSvg": "Грешка при зареждане на SVG: {error}",
   "errorLoadingRoute": "Грешка при зареждане на маршрут: {error}",
-  "centeredOnWaypoint": "Центрирано върху: {name}"
+  "centeredOnWaypoint": "Центрирано върху: {name}",
+  "dicomParseError": "Грешка при анализ на DICOM: {error}",
+  "errorLoadingDicom": "Грешка при зареждане на DICOM изследване: {error}",
+  "errorLoadingEbook": "Грешка при зареждане на електронна книга: {error}",
+  "couldNotDecodePsd": "Неуспешно декодиране на PSD композитно изображение."
 }

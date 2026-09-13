@@ -32,7 +32,9 @@ class EbookParser {
       // Check if it is a zipped EPUB or FB2
       try {
         return EpubParser.parse(bytes, fileName: fileName, filePath: filePath);
-      } catch (_) {
+      } on FormatException catch (_) {
+        return Fb2Parser.parse(bytes, fileName: fileName, filePath: filePath);
+      } on Exception catch (_) {
         return Fb2Parser.parse(bytes, fileName: fileName, filePath: filePath);
       }
     }
@@ -40,7 +42,9 @@ class EbookParser {
     // Default try EPUB, then FB2
     try {
       return EpubParser.parse(bytes, fileName: fileName, filePath: filePath);
-    } catch (_) {
+    } on FormatException catch (_) {
+      return Fb2Parser.parse(bytes, fileName: fileName, filePath: filePath);
+    } on Exception catch (_) {
       return Fb2Parser.parse(bytes, fileName: fileName, filePath: filePath);
     }
   }

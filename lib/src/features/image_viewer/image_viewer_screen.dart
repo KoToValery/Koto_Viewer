@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +10,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/errors/app_error_handler.dart';
+import '../../core/l10n/generated/app_localizations.dart';
 import '../../core/services/recent_files_service.dart';
 
 class _IcoFrame {
@@ -140,14 +141,17 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
               _imageWidth = decoded.width;
               _imageHeight = decoded.height;
             }
-          } catch (_) {}
+          } on Exception catch (_) {
+            // Best effort extraction of PSD dimensions
+          }
         }
         if (mounted) {
+          final l10n = AppLocalizations.of(context);
           setState(() {
             _psdBytes = bytes;
             _isLoading = false;
             if (bytes == null) {
-              _error = 'Could not decode PSD composite image.';
+              _error = l10n?.couldNotDecodePsd ?? 'Could not decode PSD composite image.';
             }
           });
         }
@@ -163,7 +167,9 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             w = decoded.width;
             h = decoded.height;
           }
-        } catch (_) {}
+        } on Exception catch (_) {
+          // Best effort extraction of raster dimensions
+        }
 
         final ext = widget.filePath.contains('.')
             ? widget.filePath.split('.').last.toUpperCase()
@@ -199,11 +205,32 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
           });
         }
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._loadImage.fs');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _error = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._loadImage.format');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+          _error = e.message;
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._loadImage');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        setState(() {
+          _error = cleanMsg;
           _isLoading = false;
         });
       }
@@ -311,7 +338,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
         [XFile(framePath, mimeType: 'image/png', name: '${nameWithoutExt}_${frame.width}x${frame.height}.png')],
         text: '$_fileName (${frame.width}x${frame.height})',
       );
-    } catch (_) {
+    } on Exception catch (_) {
       await Share.shareXFiles([XFile(widget.filePath)]);
     }
   }
@@ -342,10 +369,12 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
         onLayout: (format) async => doc.save(),
         name: _fileName,
       );
-    } catch (e) {
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ImageViewer._printOrExportPdf');
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Print error: $e')),
+          SnackBar(content: Text(l10n != null ? l10n.printError(e.toString()) : 'Print error: $e')),
         );
       }
     }

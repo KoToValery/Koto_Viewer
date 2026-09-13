@@ -340,7 +340,9 @@ class DicomParser {
       } finally {
         raf.closeSync();
       }
-    } catch (_) {
+    } on FileSystemException catch (_) {
+      return false;
+    } on Exception catch (_) {
       return false;
     }
   }

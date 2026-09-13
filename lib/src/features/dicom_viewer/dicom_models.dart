@@ -144,7 +144,11 @@ class DicomStudyItem {
     if (tempDirectory != null && tempDirectory!.existsSync()) {
       try {
         tempDirectory!.deleteSync(recursive: true);
-      } catch (_) {}
+      } on FileSystemException catch (_) {
+        // Best-effort cleanup of temporary directory
+      } on Exception catch (_) {
+        // Best-effort cleanup of temporary directory
+      }
     }
   }
 }

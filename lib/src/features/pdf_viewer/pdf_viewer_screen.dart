@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/errors/app_error_handler.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
@@ -100,7 +101,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           );
         });
       }
-    } catch (_) {}
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._loadReflowSettings');
+    }
   }
 
   Future<void> _saveReflowSettings() async {
@@ -110,7 +113,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       await prefs.setInt('pdf_reflow_theme', _reflowSettings.theme.index);
       await prefs.setInt('pdf_reflow_font', _reflowSettings.font.index);
       await prefs.setBool('pdf_reflow_is_continuous', _reflowSettings.isContinuous);
-    } catch (_) {}
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._saveReflowSettings');
+    }
   }
 
   Future<void> _loadProgressAndSaveRecent() async {
@@ -141,7 +146,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         _bookmarks = await ReadingProgressService.getBookmarks(widget.filePath);
       }
       _checkBookmarkStatus();
-    } catch (_) {}
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._loadProgressAndSaveRecent.fs');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._loadProgressAndSaveRecent');
+    }
   }
 
   void _saveReadingProgress() {
@@ -330,7 +339,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       if (await file.exists()) {
         sizeBytes = await file.length();
       }
-    } catch (_) {}
+    } on FileSystemException catch (_) {
+      // Best effort file size extraction
+    } on Exception catch (_) {
+      // Best effort file size extraction
+    }
 
     final formattedSize = sizeBytes < 1024 * 1024
         ? '${(sizeBytes / 1024).toStringAsFixed(1)} KB'
@@ -442,7 +455,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           _currentZoom = z;
         });
       }
-    } catch (_) {}
+    } on Exception catch (_) {
+      // PDF controller zoom access error ignored
+    }
   }
 
   void _goToPage(int page) {
@@ -506,7 +521,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       if (!_pdfController.isReady) return;
       try {
         _pdfController.goToPage(pageNumber: _currentPage, anchor: PdfPageAnchor.center);
-      } catch (_) {}
+      } on Exception catch (_) {
+        // Ignored if controller is not ready or disposed
+      }
     }
   }
 
@@ -523,7 +540,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       });
       try {
         _pdfController.setZoom(_pdfController.centerPosition, newZoom);
-      } catch (_) {}
+      } on Exception catch (_) {
+        // Ignored if controller is not ready or disposed
+      }
     }
   }
 
@@ -569,10 +588,20 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       final file = File(widget.filePath);
       final bytes = await file.readAsBytes();
       await Printing.layoutPdf(onLayout: (_) => bytes, name: _fileName);
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._printPdf.fs');
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error printing file: $e')),
+          SnackBar(content: Text(l10n != null ? l10n.printError(e.message) : 'Print error: ${e.message}')),
+        );
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfViewer._printPdf');
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n != null ? l10n.printError(e.toString()) : 'Print error: $e')),
         );
       }
     }

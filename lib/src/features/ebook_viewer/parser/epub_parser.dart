@@ -11,8 +11,12 @@ class EpubParser {
     Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes, verify: false);
-    } catch (e) {
-      throw Exception('Could not open EPUB archive: $e');
+    } on ArchiveException catch (e) {
+      throw FormatException('Could not open EPUB archive: $e');
+    } on FormatException catch (e) {
+      throw FormatException('Invalid EPUB archive: $e');
+    } on Exception catch (e) {
+      throw FormatException('Could not open EPUB archive: $e');
     }
 
     // 1. Locate container.xml
@@ -36,7 +40,11 @@ class EpubParser {
             opfPath = fullPath.replaceAll('\\', '/');
           }
         }
-      } catch (_) {}
+      } on FormatException catch (_) {
+        // Ignore container.xml format or XML parsing error
+      } on Exception catch (_) {
+        // Ignore other container.xml reading error
+      }
     }
 
     // 2. Locate OPF file
@@ -200,7 +208,11 @@ class EpubParser {
                 tocTitles[cleanSrc.split('/').last.toLowerCase()] = label;
               }
             }
-          } catch (_) {}
+          } on FormatException catch (_) {
+            // Ignore TOC parsing error
+          } on Exception catch (_) {
+            // Ignore other TOC error
+          }
           break;
         }
       }
@@ -358,8 +370,18 @@ class EpubParser {
           blocks.add(const EbookBlock(type: EbookBlockType.divider));
         }
       }
-    } catch (_) {
+    } on FormatException catch (_) {
       // Fallback regex parser if XML is malformed
+      final pRegex = RegExp(r'<p[^>]*>(.*?)</p>', caseSensitive: false, dotAll: true);
+      for (final match in pRegex.allMatches(html)) {
+        final text = _stripHtml(match.group(1) ?? '').trim();
+        if (text.isNotEmpty) {
+          blocks.add(EbookBlock(type: EbookBlockType.paragraph, text: text));
+          buffer.writeln(text);
+        }
+      }
+    } on Exception catch (_) {
+      // Fallback regex parser on other parsing issues
       final pRegex = RegExp(r'<p[^>]*>(.*?)</p>', caseSensitive: false, dotAll: true);
       for (final match in pRegex.allMatches(html)) {
         final text = _stripHtml(match.group(1) ?? '').trim();

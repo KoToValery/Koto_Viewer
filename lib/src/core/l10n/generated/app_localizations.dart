@@ -925,6 +925,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Centered on: {name}'**
   String centeredOnWaypoint(String name);
+
+  /// Error message when parsing DICOM fails
+  ///
+  /// In en, this message translates to:
+  /// **'DICOM Parse Error: {error}'**
+  String dicomParseError(String error);
+
+  /// Error message when loading DICOM study fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading DICOM study: {error}'**
+  String errorLoadingDicom(String error);
+
+  /// Error message when loading e-book fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading e-book: {error}'**
+  String errorLoadingEbook(String error);
+
+  /// Error message when PSD composite decoding fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not decode PSD composite image.'**
+  String get couldNotDecodePsd;
 }
 
 class _AppLocalizationsDelegate

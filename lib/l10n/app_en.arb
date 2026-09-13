@@ -417,5 +417,30 @@
     "placeholders": {
       "name": { "type": "String" }
     }
+  },
+  "dicomParseError": "DICOM Parse Error: {error}",
+  "@dicomParseError": {
+    "description": "Error message when parsing DICOM fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorLoadingDicom": "Error loading DICOM study: {error}",
+  "@errorLoadingDicom": {
+    "description": "Error message when loading DICOM study fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorLoadingEbook": "Error loading e-book: {error}",
+  "@errorLoadingEbook": {
+    "description": "Error message when loading e-book fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "couldNotDecodePsd": "Could not decode PSD composite image.",
+  "@couldNotDecodePsd": {
+    "description": "Error message when PSD composite decoding fails"
   }
 }

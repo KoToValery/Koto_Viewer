@@ -224,8 +224,14 @@ _ScanResult _scanInIsolate(_StudyScanPayload payload) {
       if (!seriesModalityMap.containsKey(sUid)) {
         seriesModalityMap[sUid] = header.modality ?? 'DICOM';
       }
-    } catch (_) {
-      // Ignore unparseable or corrupted files gracefully
+    } on FileSystemException catch (_) {
+      // Ignore unreadable files gracefully
+    } on DicomParseException catch (_) {
+      // Ignore non-DICOM or corrupted files gracefully
+    } on FormatException catch (_) {
+      // Ignore format errors gracefully
+    } on Exception catch (_) {
+      // Ignore other I/O or decode issues gracefully
     }
   }
 
@@ -300,7 +306,9 @@ class DicomStudyLoader {
       if (!file.existsSync()) return false;
       final bytes = file.readAsBytesSync();
       return isDicomZipBytes(bytes);
-    } catch (_) {
+    } on FileSystemException catch (_) {
+      return false;
+    } on Exception catch (_) {
       return false;
     }
   }
@@ -344,7 +352,11 @@ class DicomStudyLoader {
         }
       }
       return false;
-    } catch (_) {
+    } on ArchiveException catch (_) {
+      return false;
+    } on FormatException catch (_) {
+      return false;
+    } on Exception catch (_) {
       return false;
     }
   }

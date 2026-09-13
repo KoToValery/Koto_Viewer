@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
+import '../../../core/errors/app_error_handler.dart';
 import '../models/pdf_reflow_models.dart';
 import 'pdf_ocr_service.dart';
 
@@ -26,7 +28,16 @@ class PdfTextExtractorService {
       }
       _cacheDirectoryPath = dir.path;
       return _cacheDirectoryPath!;
-    } catch (_) {
+    } on FileSystemException catch (_) {
+      final temp = await getTemporaryDirectory();
+      final fileHash = filePath.hashCode.abs().toString();
+      final dir = Directory('${temp.path}/pdf_reflow_cache/$fileHash');
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      _cacheDirectoryPath = dir.path;
+      return _cacheDirectoryPath!;
+    } on Exception catch (_) {
       final temp = await getTemporaryDirectory();
       final fileHash = filePath.hashCode.abs().toString();
       final dir = Directory('${temp.path}/pdf_reflow_cache/$fileHash');
@@ -95,8 +106,11 @@ class PdfTextExtractorService {
       _memoryCache[pageNumber] = pageData;
       await _saveToDiskCache(pageData);
       return pageData;
-    } catch (e, stack) {
-      debugPrint('[PdfTextExtractor] Error extracting page $pageNumber: $e\n$stack');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfTextExtractor.getPageData.platform');
+      return PdfPageReflowData.empty(pageNumber, message: 'Platform error extracting text: ${e.message}');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PdfTextExtractor.getPageData');
       return PdfPageReflowData.empty(pageNumber, message: 'Failed to extract text: $e');
     }
   }
@@ -161,7 +175,11 @@ class PdfTextExtractorService {
         isScannedOcr: map['isScannedOcr'] as bool? ?? false,
         isLoaded: true,
       );
-    } catch (_) {
+    } on FileSystemException catch (_) {
+      return null;
+    } on FormatException catch (_) {
+      return null;
+    } on Exception catch (_) {
       return null;
     }
   }
@@ -183,7 +201,11 @@ class PdfTextExtractorService {
       };
 
       await cacheFile.writeAsString(jsonEncode(map));
-    } catch (_) {}
+    } on FileSystemException catch (_) {
+      // Ignored: Best effort disk caching
+    } on Exception catch (_) {
+      // Ignored: Best effort disk caching
+    }
   }
 
   void clearMemoryCache() {

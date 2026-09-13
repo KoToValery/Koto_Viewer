@@ -80,7 +80,7 @@ DynamicLibrary? _openLibrary() {
   _loadAttempted = true;
   try {
     _cachedLib = DynamicLibrary.open(_libraryName());
-  } catch (_) {
+  } on ArgumentError catch (_) {
     if (Platform.isWindows) {
       final candidates = [
         'build\\windows\\x64\\runner\\Debug\\openjpeg_bridge.dll',
@@ -92,11 +92,17 @@ DynamicLibrary? _openLibrary() {
           try {
             _cachedLib = DynamicLibrary.open(path);
             return _cachedLib;
-          } catch (_) {}
+          } on ArgumentError catch (_) {
+            // DLL candidate could not be opened
+          } on Exception catch (_) {
+            // Other error loading DLL candidate
+          }
         }
       }
     }
     _cachedLib = null; // JPEG 2000 not available on this platform
+  } on Exception catch (_) {
+    _cachedLib = null;
   }
   return _cachedLib;
 }
@@ -234,8 +240,10 @@ Jpeg2000RawResult? decodeJpeg2000Raw(List<int> compressedBytes) {
     decodeRawFunc = lib.lookupFunction<_OPJDecodeRawNative, _OPJDecodeRawDart>(
       'opj_decode_raw',
     );
-  } catch (_) {
+  } on ArgumentError catch (_) {
     // If opj_decode_raw is not available, fall back to null so caller can use decodeJpeg2000
+    return null;
+  } on Exception catch (_) {
     return null;
   }
 

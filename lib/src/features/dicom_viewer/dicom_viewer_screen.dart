@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/errors/app_error_handler.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
 import '../../core/l10n/l10n_extensions.dart';
 import 'dicom_models.dart';
@@ -121,16 +122,36 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       });
 
       await _renderCurrentSlice(initialWc: wc, initialWw: ww);
-    } on DicomParseException catch (e) {
+    } on DicomParseException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.parse');
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       setState(() {
-        _error = 'DICOM Parse Error:\n${e.message}';
+        _error = l10n != null ? l10n.dicomParseError(e.message) : 'DICOM Parse Error: ${e.message}';
         _isLoading = false;
       });
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.fs');
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       setState(() {
-        _error = e.toString();
+        _error = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+        _isLoading = false;
+      });
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.format');
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
+      setState(() {
+        _error = l10n != null ? l10n.errorLoadingDicom(e.message) : 'Error loading DICOM study: ${e.message}';
+        _isLoading = false;
+      });
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy');
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
+      setState(() {
+        _error = l10n != null ? l10n.errorLoadingDicom(e.toString()) : 'Error loading DICOM study: $e';
         _isLoading = false;
       });
     }
@@ -174,7 +195,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
         _isRendering = false;
       });
       old?.dispose();
-    } catch (e) {
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._renderCurrentSlice');
       if (!mounted) return;
       setState(() {
         _error = e.toString();

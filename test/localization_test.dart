@@ -114,6 +114,10 @@ void main() {
       expect(l10n.errorLoadingSvg('xml error'), equals('Error loading SVG: xml error'));
       expect(l10n.errorLoadingRoute('bad gpx'), equals('Could not load route file: bad gpx'));
       expect(l10n.centeredOnWaypoint('Peak A'), equals('Centered on: Peak A'));
+      expect(l10n.dicomParseError('bad header'), equals('DICOM Parse Error: bad header'));
+      expect(l10n.errorLoadingDicom('corrupt'), equals('Error loading DICOM study: corrupt'));
+      expect(l10n.errorLoadingEbook('damaged'), equals('Error loading e-book: damaged'));
+      expect(l10n.couldNotDecodePsd, equals('Could not decode PSD composite image.'));
     });
 
     testWidgets('Bulgarian strings and parameters resolve correctly', (tester) async {
@@ -183,6 +187,10 @@ void main() {
       expect(l10n.errorLoadingSvg('xml error'), equals('Грешка при зареждане на SVG: xml error'));
       expect(l10n.errorLoadingRoute('bad gpx'), equals('Грешка при зареждане на маршрут: bad gpx'));
       expect(l10n.centeredOnWaypoint('Връх А'), equals('Центрирано върху: Връх А'));
+      expect(l10n.dicomParseError('bad header'), equals('Грешка при анализ на DICOM: bad header'));
+      expect(l10n.errorLoadingDicom('corrupt'), equals('Грешка при зареждане на DICOM изследване: corrupt'));
+      expect(l10n.errorLoadingEbook('damaged'), equals('Грешка при зареждане на електронна книга: damaged'));
+      expect(l10n.couldNotDecodePsd, equals('Неуспешно декодиране на PSD композитно изображение.'));
 
       // Test category labels in Bulgarian
       expect(FileCategory.all.localizedLabel(buildCtx), equals('Всички'));

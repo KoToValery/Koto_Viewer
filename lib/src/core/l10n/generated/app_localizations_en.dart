@@ -482,4 +482,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String centeredOnWaypoint(String name) {
     return 'Centered on: $name';
   }
+
+  @override
+  String dicomParseError(String error) {
+    return 'DICOM Parse Error: $error';
+  }
+
+  @override
+  String errorLoadingDicom(String error) {
+    return 'Error loading DICOM study: $error';
+  }
+
+  @override
+  String errorLoadingEbook(String error) {
+    return 'Error loading e-book: $error';
+  }
+
+  @override
+  String get couldNotDecodePsd => 'Could not decode PSD composite image.';
 }
