@@ -399,8 +399,9 @@ class Cad3DGpuRenderer {
     final p12 = (2400.0 * z * modelScale) / h;
     final p13 = (-2400.0 * panY) / h;
 
-    const nearZ = 10.0;
-    const farZ = 10000.0;
+    // Optimized near/far bounds for maximum hardware depth buffer resolution
+    const nearZ = 400.0;
+    const farZ = 2400.0;
     const a = (farZ + nearZ) / (farZ - nearZ);
     const b = (-2.0 * farZ * nearZ) / (farZ - nearZ);
 

@@ -622,37 +622,22 @@ class _IfcGeometrySolver {
         final hasDownward = filteredTris.any((t) => t.normal.z < -0.1);
         final bool isClosedSolid = hasUpward && hasDownward;
 
-        // Pure geometric and material detection of thin cladding / siding (облицовка):
-        // Elements modeled as Slab, Wall, or Generic with thickness 10-55mm (typical 2-5cm)
-        // or styled with cladding/siding materials are identified as cladding.
+        // Pure geometric detection of thin architectural cladding / siding (облицовка):
+        // Only elements with very thin thickness (5-35mm) are treated as cladding.
+        // Structural walls (150-380mm) and slabs (150-550mm) are NEVER cladding.
         final b = BoundingBox3D.fromPoints(filteredTris.expand((t) => [t.v0, t.v1, t.v2]).toList());
         final String lowerName = name.toLowerCase();
-        final bool hasCladdingColor = elementColor == const Color(0xFFB57E4C) ||
-            filteredTris.any((t) => t.color == const Color(0xFFB57E4C));
-        final bool isCladdingStyle = lowerName.contains('cladding') ||
+        final bool isCladdingName = lowerName.contains('cladding') ||
             lowerName.contains('siding') ||
             lowerName.contains('обшивк') ||
             lowerName.contains('облицовк') ||
-            lowerName.contains('фасад') ||
-            lowerName.contains('finish') ||
-            lowerName.contains('panel') ||
             lowerName.contains('панел') ||
             lowerLayer.contains('обшивк') ||
             lowerLayer.contains('cladding') ||
-            lowerLayer.contains('siding') ||
-            lowerLayer.contains('finish') ||
-            (hasCladdingColor && (category == 'Slab' || category == 'Wall' || category == 'Generic' || category == 'Part' || category == 'Proxy'));
-        isThinCladding = _isThinCladdingGeometry(b, category) || isCladdingStyle;
+            lowerLayer.contains('siding');
+        isThinCladding = _isThinCladdingGeometry(b, category, isExplicitName: isCladdingName);
         final double claddingDepthBias = isThinCladding ? 1.0 : 0.0;
-        final Color? claddingColor = isThinCladding ? const Color(0xFFB57E4C) : null;
         final Color? chimneyColor = isChimney ? const Color(0xFF42474E) : null;
-
-        // Physical surface-normal offset for thin cladding/finish layers:
-        // By offsetting outward surface vertices along their normal (1.0mm in mm models, 0.001m in meter models),
-        // the finishing geometry physically resides in front of the backing wall in 3D world space.
-        final dims = [b.sizeX, b.sizeY, b.sizeZ]..sort();
-        final bool isMeters = dims[2] < 50.0;
-        final double normalOffsetDist = isThinCladding ? (isMeters ? 0.001 : 1.0) : 0.0;
 
         for (final t in filteredTris) {
           final bool makeDoubleSided = (!isClosedSolid && category == 'Roof') ||
@@ -661,16 +646,12 @@ class _IfcGeometrySolver {
               (t.color != null && t.color!.a < 0.99) ||
               t.isDoubleSided;
           final double triDepthBias = math.max(t.depthBias, claddingDepthBias);
-          final Color? triColor = claddingColor ?? chimneyColor ?? t.color;
-
-          final Vector3 v0Offset = normalOffsetDist > 0.0 ? t.v0 + t.normal * normalOffsetDist : t.v0;
-          final Vector3 v1Offset = normalOffsetDist > 0.0 ? t.v1 + t.normal * normalOffsetDist : t.v1;
-          final Vector3 v2Offset = normalOffsetDist > 0.0 ? t.v2 + t.normal * normalOffsetDist : t.v2;
+          final Color? triColor = chimneyColor ?? t.color;
 
           triangles.add(Triangle3D(
-            v0: v0Offset,
-            v1: v1Offset,
-            v2: v2Offset,
+            v0: t.v0,
+            v1: t.v1,
+            v2: t.v2,
             normal: t.normal,
             color: triColor,
             isDoubleSided: makeDoubleSided,
@@ -682,9 +663,9 @@ class _IfcGeometrySolver {
       if (triangles.isNotEmpty) {
         categories.add(category);
         final triangleColor = triangles.firstWhere((t) => t.color != null, orElse: () => triangles.first).color;
-        final finalColor = isThinCladding
-            ? const Color(0xFFB57E4C)
-            : (isChimney ? const Color(0xFF42474E) : (triangleColor ?? elementColor));
+        final finalColor = isChimney
+            ? const Color(0xFF42474E)
+            : (triangleColor ?? elementColor);
 
         elements.add(IfcElement(
           id: ent.id,
@@ -712,9 +693,6 @@ class _IfcGeometrySolver {
 
       // Bridge corner gaps between connected walls (e.g. 4-sided chimneys and corner miters)
       _bridgeConnectedWallCorners(elements, connectedWallPairs);
-
-      // Clean up coincident contact faces between thin cladding/finishes and backing structural walls
-      _cleanCladdingWallInterfaces(elements);
 
       // Pre-tessellate large planar architectural surfaces in background isolate
       _preTessellateLargeSurfaces(elements);
@@ -1208,117 +1186,6 @@ class _IfcGeometrySolver {
     }
   }
 
-  /// Cleans up coincident contact faces between thin cladding/finishing elements and backing structural walls.
-  /// Prunes the buried back-faces of cladding (facing inward towards the wall) and assigns a negative depth bias
-  /// to the backing wall front-faces so the cladding stably renders in front without z-fighting.
-  void _cleanCladdingWallInterfaces(List<IfcElement> elements) {
-    final claddings = elements.where((e) => e.triangles.any((t) => t.depthBias > 0.5)).toList();
-    final walls = elements.where((e) => e.category == 'Wall' || e.category == 'Slab' || e.category == 'Column').toList();
-    if (claddings.isEmpty || walls.isEmpty) return;
-
-    final Map<int, Set<int>> toRemoveCladdingTriangles = {};
-    final Map<int, Set<int>> wallBiasedTriangles = {};
-
-    for (final clad in claddings) {
-      final dims = [clad.bounds.sizeX, clad.bounds.sizeY, clad.bounds.sizeZ]..sort();
-      final bool isMeters = dims[2] < 50.0;
-      final double tol = isMeters ? 0.005 : 5.0; // 5mm tolerance
-
-      for (final wall in walls) {
-        if (clad.id == wall.id) continue;
-
-        // Bounding box overlap check
-        if (clad.bounds.max.x < wall.bounds.min.x - tol || clad.bounds.min.x > wall.bounds.max.x + tol) continue;
-        if (clad.bounds.max.y < wall.bounds.min.y - tol || clad.bounds.min.y > wall.bounds.max.y + tol) continue;
-        if (clad.bounds.max.z < wall.bounds.min.z - tol || clad.bounds.min.z > wall.bounds.max.z + tol) continue;
-
-        for (int ci = 0; ci < clad.triangles.length; ci++) {
-          final tc = clad.triangles[ci];
-
-          for (int wi = 0; wi < wall.triangles.length; wi++) {
-            final tw = wall.triangles[wi];
-
-            // 1. Buried back-face of cladding:
-            // Opposing normal to wall's outward normal: tc.normal.dot(tw.normal) < -0.90
-            if (tc.normal.dot(tw.normal) < -0.90) {
-              final distPlane = ((tc.v0 - tw.v0).dot(tw.normal)).abs();
-              if (distPlane < tol) {
-                final cCenter = (tc.v0 + tc.v1 + tc.v2) * (1.0 / 3.0);
-                if (_isPointInsideBounds(cCenter, wall.bounds, tol)) {
-                  toRemoveCladdingTriangles.putIfAbsent(clad.id, () => {}).add(ci);
-                  wallBiasedTriangles.putIfAbsent(wall.id, () => {}).add(wi);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Apply removals to cladding
-    for (final entry in toRemoveCladdingTriangles.entries) {
-      final idx = elements.indexWhere((e) => e.id == entry.key);
-      if (idx != -1) {
-        final el = elements[idx];
-        final kept = <Triangle3D>[];
-        for (int i = 0; i < el.triangles.length; i++) {
-          if (!entry.value.contains(i)) {
-            kept.add(el.triangles[i]);
-          }
-        }
-        elements[idx] = IfcElement(
-          id: el.id,
-          globalId: el.globalId,
-          name: el.name,
-          ifcType: el.ifcType,
-          category: el.category,
-          storeyName: el.storeyName,
-          layer: el.layer,
-          color: el.color,
-          triangles: kept,
-          properties: el.properties,
-        );
-      }
-    }
-
-    // Apply negative depth bias (-1.0) to covered wall faces so they sort strictly behind cladding
-    for (final entry in wallBiasedTriangles.entries) {
-      final idx = elements.indexWhere((e) => e.id == entry.key);
-      if (idx != -1) {
-        final el = elements[idx];
-        final updated = <Triangle3D>[];
-        for (int i = 0; i < el.triangles.length; i++) {
-          final t = el.triangles[i];
-          if (entry.value.contains(i)) {
-            updated.add(Triangle3D(
-              v0: t.v0,
-              v1: t.v1,
-              v2: t.v2,
-              normal: t.normal,
-              color: t.color,
-              isDoubleSided: t.isDoubleSided,
-              depthBias: -1.0,
-            ));
-          } else {
-            updated.add(t);
-          }
-        }
-        elements[idx] = IfcElement(
-          id: el.id,
-          globalId: el.globalId,
-          name: el.name,
-          ifcType: el.ifcType,
-          category: el.category,
-          storeyName: el.storeyName,
-          layer: el.layer,
-          color: el.color,
-          triangles: updated,
-          properties: el.properties,
-        );
-      }
-    }
-  }
-
   /// Pre-tessellates large planar architectural surfaces (e.g. walls, slabs, roofs)
   /// directly in the background isolate so that the UI thread receives an already-tessellated mesh
   /// and avoids first-frame lag.
@@ -1439,9 +1306,9 @@ class _IfcGeometrySolver {
   }
 
   /// Geometrically determines if an element is a thin architectural cladding / siding layer (облицовка).
-  /// Architects frequently model exterior wall cladding using either the Slab tool or the Wall tool,
-  /// with a characteristic thickness of 5-65 mm (typical 1-5 cm) and large architectural span.
-  static bool _isThinCladdingGeometry(BoundingBox3D b, String category) {
+  /// Real cladding is strictly thin sheet/panel (5-35mm).
+  /// Floor slabs (150-550mm) and structural walls (120-400mm) are NEVER cladding.
+  static bool _isThinCladdingGeometry(BoundingBox3D b, String category, {bool isExplicitName = false}) {
     if (category != 'Slab' && category != 'Wall' && category != 'Generic' && category != 'Part' && category != 'Proxy') {
       return false;
     }
@@ -1452,15 +1319,19 @@ class _IfcGeometrySolver {
     final d3 = dims[2]; // primary span
 
     // Cladding / siding (облицовка, обшивка, покрития, панели):
-    // Detects both millimeter-scale models (d3 >= 50mm) and meter-scale models (d3 < 50m)
     final bool isMeters = d3 < 50.0;
-    if (isMeters) {
-      // 5mm to 65mm in meters: 0.005m to 0.065m
-      return d1 >= 0.005 && d1 <= 0.065 && d2 >= 0.08 && d3 >= 0.12 && (d3 / d1 >= 2.5);
-    } else {
-      // 5mm to 65mm in millimeters: 5.0mm to 65.0mm
-      return d1 >= 5.0 && d1 <= 65.0 && d2 >= 80.0 && d3 >= 120.0 && (d3 / d1 >= 2.5);
+    final maxThickness = isMeters ? 0.035 : 35.0; // 35mm
+    final minSpan = isMeters ? 0.15 : 150.0;
+
+    if (d1 > maxThickness || d3 < minSpan) {
+      return false;
     }
+
+    if (isExplicitName) {
+      return true;
+    }
+
+    return (d3 / d1 >= 8.0) && (d2 / d1 >= 4.0);
   }
 
   /// Extracts numbers from parentheses, robust to Archicad trailing dots e.g. (0., -1200., 25.37)

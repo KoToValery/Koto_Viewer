@@ -272,19 +272,30 @@ int32_t cad_3d_gpu_render(
 
     const int32_t triCount = g_mesh.vertexCount / 3;
 
-    /* Multi-pass: Opaque triangles first, then depth-biased cladding with polygon offset */
-    for (int32_t pass = 0; pass < 2; pass++) {
+    /* Multi-pass:
+     * Pass 0: Base opaque geometry (Z-test, Z-write)
+     * Pass 1: Depth-biased cladding/decals (Z-test, Z-write, subtle polygon offset)
+     * Pass 2: Transparent elements (glass windows, railings) with alpha blending (Z-test, NO Z-write)
+     */
+    for (int32_t pass = 0; pass < 3; pass++) {
         for (int32_t t = 0; t < triCount; ++t) {
             const int32_t i0 = t * 3;
             const int32_t i1 = t * 3 + 1;
             const int32_t i2 = t * 3 + 2;
 
             const float depthBias = g_mesh.flags[i0 * 4 + 0];
+            const float isTrans = g_mesh.flags[i0 * 4 + 1];
             const int32_t isDoubleSided = (int32_t)g_mesh.flags[i0 * 4 + 2];
 
-            /* Pass 0 renders base geometry; Pass 1 renders depth-biased cladding/decals */
-            if (pass == 0 && depthBias > 0.5f) continue;
-            if (pass == 1 && depthBias <= 0.5f) continue;
+            /* Pass filters */
+            if (pass == 0) {
+                if (isTrans > 0.5f || depthBias > 0.5f) continue;
+            } else if (pass == 1) {
+                if (isTrans > 0.5f || depthBias <= 0.5f) continue;
+            } else {
+                /* Pass 2: Transparent surfaces */
+                if (isTrans <= 0.5f) continue;
+            }
 
             float p0Clip[4], p1Clip[4], p2Clip[4];
             transform_point(mvpMatrix, g_mesh.positions[i0*3], g_mesh.positions[i0*3+1], g_mesh.positions[i0*3+2], p0Clip);
@@ -321,12 +332,13 @@ int32_t cad_3d_gpu_render(
 
             /* 2D Backface culling: winding order cross product */
             const float area = edge_fn(sX0, sY0, sX1, sY1, sX2, sY2);
+            if (fabsf(area) < 1e-6f) continue;
             if (area <= 0.0f && !isDoubleSided) {
                 continue;
             }
 
-            /* Hardware Polygon Offset: offset Z toward camera for cladding (pass 1) */
-            const float zOffset = (depthBias > 0.5f) ? -0.0005f : (depthBias < -0.5f ? 0.0005f : 0.0f);
+            /* Hardware Polygon Offset: subtle offset toward camera for cladding (pass 1) */
+            const float zOffset = (pass == 1) ? -0.00002f : 0.0f;
             const float z0 = (ndcZ0 * 0.5f + 0.5f) + zOffset;
             const float z1 = (ndcZ1 * 0.5f + 0.5f) + zOffset;
             const float z2 = (ndcZ2 * 0.5f + 0.5f) + zOffset;
@@ -397,13 +409,23 @@ int32_t cad_3d_gpu_render(
 
                         /* Hardware Depth-Buffer Test: zVal <= depthBuffer[pixIdx] */
                         if (zVal >= 0.0f && zVal <= 1.0f && zVal <= g_depthBuffer[pixIdx]) {
-                            g_depthBuffer[pixIdx] = zVal; /* Z-write */
-
                             const int32_t byteIdx = pixIdx * 4;
-                            outRgbaPixels[byteIdx + 0] = uR;
-                            outRgbaPixels[byteIdx + 1] = uG;
-                            outRgbaPixels[byteIdx + 2] = uB;
-                            outRgbaPixels[byteIdx + 3] = uA;
+
+                            if (pass < 2) {
+                                g_depthBuffer[pixIdx] = zVal; /* Z-write for opaque surfaces */
+                                outRgbaPixels[byteIdx + 0] = uR;
+                                outRgbaPixels[byteIdx + 1] = uG;
+                                outRgbaPixels[byteIdx + 2] = uB;
+                                outRgbaPixels[byteIdx + 3] = uA;
+                            } else {
+                                /* Pass 2: Transparent alpha blending (Z-write disabled) */
+                                const float srcA = a;
+                                const float invA = 1.0f - srcA;
+                                outRgbaPixels[byteIdx + 0] = (uint8_t)(uR * srcA + (float)outRgbaPixels[byteIdx + 0] * invA);
+                                outRgbaPixels[byteIdx + 1] = (uint8_t)(uG * srcA + (float)outRgbaPixels[byteIdx + 1] * invA);
+                                outRgbaPixels[byteIdx + 2] = (uint8_t)(uB * srcA + (float)outRgbaPixels[byteIdx + 2] * invA);
+                                outRgbaPixels[byteIdx + 3] = 255;
+                            }
                         }
                     }
                 }
