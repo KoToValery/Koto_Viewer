@@ -62,6 +62,7 @@ class Cad3DMeshPainter extends CustomPainter {
   final bool showGrid;
   final Color? customModelColor;
   final bool isInteracting;
+  final ui.Image? gpuImage;
 
   const Cad3DMeshPainter({
     required this.mesh,
@@ -71,6 +72,7 @@ class Cad3DMeshPainter extends CustomPainter {
     this.showGrid = true,
     this.customModelColor,
     this.isInteracting = false,
+    this.gpuImage,
   });
 
   @override
@@ -86,6 +88,12 @@ class Cad3DMeshPainter extends CustomPainter {
     // 1. Draw 3D Ground Grid if enabled
     if (showGrid) {
       _drawGroundGrid(canvas, size, center, modelScale);
+    }
+
+    // If native hardware/SIMD GPU depth-buffered frame is ready, draw it with sub-pixel precision
+    if (gpuImage != null) {
+      canvas.drawImage(gpuImage!, Offset.zero, Paint());
+      return;
     }
 
     // 2. Transform, Light, and Depth-Sort Triangles

@@ -64,6 +64,7 @@ include(flutter/generated_plugins.cmake)
 enable_language(C)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/../src/openjpeg_bridge/openjpeg_bridge.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../src/cad_3d_gpu/cad_3d_gpu.cmake")
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
@@ -97,6 +98,10 @@ endif()
 # Install the openjpeg_bridge DLL (JPEG 2000 support).
 # install(FILES) with generator expression works correctly across subdirectories.
 install(FILES "$<TARGET_FILE:openjpeg_bridge>"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
+
+install(FILES "$<TARGET_FILE:kotoview_3d_gpu>"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 

@@ -11,6 +11,7 @@ import 'package:kotoview/src/features/dxf_3d_viewer/models/ifc_model.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/ifc_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/rendering/cad_3d_camera.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
+import 'package:kotoview/src/features/dxf_3d_viewer/rendering/cad_3d_gpu_bindings.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -572,6 +573,112 @@ END-20;
       expect(() => painter.paint(canvas, const Size(800, 600)), returnsNormally);
       final picture = recorder.endRecording();
       expect(picture, isNotNull);
+    });
+  });
+
+  group('Cad3D GPU Depth-Buffer Pipeline Tests', () {
+    test('Cad3DGpuMeshBuffer packs vertices, normals, colors, and flags correctly', () {
+      final tri1 = Triangle3D(
+        v0: const Vector3(0, 0, 0),
+        v1: const Vector3(10, 0, 0),
+        v2: const Vector3(0, 10, 0),
+        normal: const Vector3(0, 0, 1),
+        color: const Color(0xFFFF0000),
+        depthBias: 0.0,
+      );
+      final tri2 = Triangle3D(
+        v0: const Vector3(0, 0, 1),
+        v1: const Vector3(10, 0, 1),
+        v2: const Vector3(0, 10, 1),
+        normal: const Vector3(0, 0, 1),
+        color: const Color(0x8000FF00), // Transparent
+        depthBias: 1.0, // Cladding
+        isDoubleSided: true,
+      );
+
+      final mesh = Mesh3D(name: 'GpuTestMesh', triangles: [tri1, tri2]);
+      final buffer = Cad3DGpuMeshBuffer.fromMesh(mesh);
+
+      expect(buffer.vertexCount, 6);
+      expect(buffer.positions.length, 18);
+      expect(buffer.normals.length, 18);
+      expect(buffer.colors.length, 24);
+      expect(buffer.flags.length, 24);
+
+      // Verify normal packing
+      expect(buffer.normals[2], 1.0); // Z normal for tri1 v0
+      expect(buffer.normals[5], 1.0); // Z normal for tri1 v1
+
+      // Verify color packing (tri1 is red)
+      expect(buffer.colors[0], closeTo(1.0, 0.01)); // R
+      expect(buffer.colors[1], closeTo(0.0, 0.01)); // G
+      expect(buffer.colors[3], closeTo(1.0, 0.01)); // A
+
+      // Verify flags for tri2: [depthBias, isTransparent, isDoubleSided, reserved]
+      final tri2FlagBase = 3 * 4; // v3 (first vertex of tri2)
+      expect(buffer.flags[tri2FlagBase + 0], 1.0); // depthBias
+      expect(buffer.flags[tri2FlagBase + 1], 1.0); // isTransparent
+      expect(buffer.flags[tri2FlagBase + 2], 1.0); // isDoubleSided
+    });
+
+    test('Cad3DGpuRenderer.computeMvpMatrix calculates valid 4x4 matrix matching camera', () {
+      final camera = Cad3DCamera();
+      const viewport = Size(800, 600);
+      const modelScale = 2.5;
+
+      final mvp = Cad3DGpuRenderer.computeMvpMatrix(
+        camera: camera,
+        viewport: viewport,
+        modelScale: modelScale,
+      );
+
+      expect(mvp.length, 16);
+      for (int i = 0; i < 16; i++) {
+        expect(mvp[i].isNaN, isFalse, reason: 'mvp[$i] is NaN');
+        expect(mvp[i].isInfinite, isFalse, reason: 'mvp[$i] is Infinite');
+      }
+
+      // Column 3 w component is camera distance
+      expect(mvp[15], 1200.0);
+    });
+
+    test('Cad3DGpuRenderer.computeLightParams prepares view rotation matrix and lights', () {
+      final camera = Cad3DCamera();
+      final lightParams = Cad3DGpuRenderer.computeLightParams(
+        camera: camera,
+        customColor: const Color(0xFF3B82F6),
+      );
+
+      expect(lightParams.length, 16);
+      expect(lightParams[9], closeTo(0.25, 0.001));  // Ambient
+      expect(lightParams[10], closeTo(0.55, 0.001)); // Key
+      expect(lightParams[11], closeTo(0.25, 0.001)); // Fill
+      // Custom color channels
+      expect(lightParams[12], closeTo(const Color(0xFF3B82F6).r, 0.01));
+      expect(lightParams[13], closeTo(const Color(0xFF3B82F6).g, 0.01));
+      expect(lightParams[14], closeTo(const Color(0xFF3B82F6).b, 0.01));
+    });
+
+    test('Cad3DMeshPainter supports fallback rendering when gpuImage is null or provided', () {
+      final tri = Triangle3D(
+        v0: const Vector3(0, 0, 0),
+        v1: const Vector3(10, 0, 0),
+        v2: const Vector3(0, 10, 0),
+      );
+      final mesh = Mesh3D(name: 'PainterFallbackTest', triangles: [tri]);
+      final camera = Cad3DCamera();
+
+      final painter = Cad3DMeshPainter(
+        mesh: mesh,
+        camera: camera,
+        gpuImage: null, // Test canvas fallback
+      );
+
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+      expect(() => painter.paint(canvas, const Size(800, 600)), returnsNormally);
+      final pic = recorder.endRecording();
+      expect(pic, isNotNull);
     });
   });
 }

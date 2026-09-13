@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +20,7 @@ import 'parser/three_mf_parser.dart';
 import 'widgets/ifc_bim_sheet.dart';
 import 'rendering/cad_3d_camera.dart';
 import 'rendering/cad_3d_mesh_painter.dart';
+import 'rendering/cad_3d_gpu_bindings.dart';
 import 'package:archive/archive.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
@@ -56,6 +59,58 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
   Offset? _lastPanPos;
   double _baseScale = 1.0;
+
+  final Cad3DGpuRenderer _gpuRenderer = Cad3DGpuRenderer();
+  bool _useGpuAcceleration = true;
+  ui.Image? _gpuImage;
+  bool _isGpuRendering = false;
+  bool _pendingGpuRender = false;
+  Size _lastViewportSize = Size.zero;
+
+  @override
+  void dispose() {
+    _gpuRenderer.dispose();
+    _gpuImage?.dispose();
+    super.dispose();
+  }
+
+  void _requestGpuRender(Size size) {
+    if (!_useGpuAcceleration || !_gpuRenderer.isReady || _mesh == null || size.isEmpty) return;
+    if (_isGpuRendering) {
+      _pendingGpuRender = true;
+      return;
+    }
+    _isGpuRendering = true;
+    _pendingGpuRender = false;
+
+    final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
+    final modelScale = (math.min(size.width, size.height) * 0.55) / maxDim;
+
+    _gpuRenderer.renderFrame(
+      camera: _camera,
+      viewport: size,
+      modelScale: modelScale,
+      customColor: _customModelColor,
+    ).then((img) {
+      if (!mounted) {
+        img?.dispose();
+        return;
+      }
+      if (img != null) {
+        final old = _gpuImage;
+        setState(() {
+          _gpuImage = img;
+        });
+        old?.dispose();
+      }
+      _isGpuRendering = false;
+      if (_pendingGpuRender && _lastViewportSize != Size.zero) {
+        _requestGpuRender(_lastViewportSize);
+      }
+    }).catchError((_) {
+      _isGpuRendering = false;
+    });
+  }
 
   @override
   void initState() {
@@ -145,6 +200,12 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
           _mesh = mesh;
           _isLoading = false;
         });
+        if (_useGpuAcceleration && _gpuRenderer.bindings.isAvailable) {
+          _gpuRenderer.setMesh(mesh, customColor: _customModelColor);
+          if (_lastViewportSize != Size.zero) {
+            _requestGpuRender(_lastViewportSize);
+          }
+        }
       }
     } on FileSystemException catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'Dxf3DViewer._loadModel.fs');
@@ -245,6 +306,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         _camera.zoom = (_baseScale * details.scale).clamp(0.05, 100.0);
       }
     });
+    _requestGpuRender(_lastViewportSize);
   }
 
   void _onScaleEnd(ScaleEndDetails details) {
@@ -252,6 +314,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     setState(() {
       _isInteracting = false;
     });
+    _requestGpuRender(_lastViewportSize);
   }
 
   Offset? _mousePanStart;
@@ -264,11 +327,13 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         setState(() {
           _camera.zoomBy(1.15);
         });
+        _requestGpuRender(_lastViewportSize);
       } else if (delta > 0) {
         // Scrolled down -> Zoom Out
         setState(() {
           _camera.zoomBy(1.0 / 1.15);
         });
+        _requestGpuRender(_lastViewportSize);
       }
     }
   }
@@ -287,6 +352,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       setState(() {
         _camera.pan(delta);
       });
+      _requestGpuRender(_lastViewportSize);
     }
   }
 
@@ -299,6 +365,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     setState(() {
       _camera.reset();
     });
+    _requestGpuRender(_lastViewportSize);
   }
 
   void _setViewPreset(Cad3DViewPreset preset) {
@@ -306,6 +373,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     setState(() {
       _camera.setPreset(preset);
     });
+    _requestGpuRender(_lastViewportSize);
   }
 
   String _formatDimension(double val) {
@@ -464,9 +532,16 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       ifcModel: _ifcModel!,
       isDark: _theme.isDark,
       onFiltersChanged: () {
+        final newMesh = _ifcModel!.toMesh3D();
         setState(() {
-          _mesh = _ifcModel!.toMesh3D();
+          _mesh = newMesh;
         });
+        if (_useGpuAcceleration && _gpuRenderer.bindings.isAvailable) {
+          _gpuRenderer.setMesh(newMesh, customColor: _customModelColor);
+          if (_lastViewportSize != Size.zero) {
+            _requestGpuRender(_lastViewportSize);
+          }
+        }
       },
     );
   }
@@ -606,7 +681,12 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                   tooltip: 'Model Color',
-                  onSelected: (c) => setState(() => _customModelColor = c),
+                  onSelected: (c) {
+                    setState(() => _customModelColor = c);
+                    if (_useGpuAcceleration && _lastViewportSize != Size.zero) {
+                      _requestGpuRender(_lastViewportSize);
+                    }
+                  },
                   itemBuilder: (context) => [
                     PopupMenuItem<Color?>(
                       value: null,
@@ -726,6 +806,33 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   }).toList(),
                 ),
 
+                // Hardware GPU Depth-Buffer Acceleration Toggle
+                if (_gpuRenderer.bindings.isAvailable)
+                  IconButton(
+                    icon: Icon(
+                      _useGpuAcceleration ? Icons.speed_rounded : Icons.speed_outlined,
+                      size: 20,
+                      color: _useGpuAcceleration ? const Color(0xFF00E5FF) : Colors.grey,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: _useGpuAcceleration
+                        ? 'Hardware GPU Depth Buffer (Active)'
+                        : 'Hardware GPU Depth Buffer (Off - Canvas Fallback)',
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        _useGpuAcceleration = !_useGpuAcceleration;
+                        if (!_useGpuAcceleration) {
+                          _gpuImage = null;
+                        }
+                      });
+                      if (_useGpuAcceleration && _lastViewportSize != Size.zero) {
+                        _requestGpuRender(_lastViewportSize);
+                      }
+                    },
+                  ),
+
                 // BIM Storeys & Categories (when IFC model is loaded)
                 if (_ifcModel != null)
                   IconButton(
@@ -800,6 +907,16 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
             );
           }
 
+          final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+          if (_lastViewportSize != viewportSize) {
+            _lastViewportSize = viewportSize;
+            if (_useGpuAcceleration && _gpuRenderer.isReady && _mesh != null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _requestGpuRender(viewportSize);
+              });
+            }
+          }
+
           return Stack(
             children: [
               // 3D Viewport with Mouse Wheel Zoom & Gestures
@@ -829,6 +946,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                         showGrid: _showGrid,
                         customModelColor: _customModelColor,
                         isInteracting: _isInteracting,
+                        gpuImage: _useGpuAcceleration ? _gpuImage : null,
                       ),
                     ),
                   ),

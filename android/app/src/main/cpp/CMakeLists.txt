@@ -85,3 +85,9 @@ target_link_libraries(openjpeg_bridge PRIVATE
     ${log-lib}
     ${m-lib}
 )
+
+# ---------------------------------------------------------------------------
+# kotoview_3d_gpu — Hardware GPU Depth-Buffer 3D Renderer (Android GLES3 / EGL)
+# ---------------------------------------------------------------------------
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../../../../src/cad_3d_gpu/cad_3d_gpu.cmake")
+
