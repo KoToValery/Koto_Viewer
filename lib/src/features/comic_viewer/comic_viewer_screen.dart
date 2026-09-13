@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/errors/app_error_handler.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
 import '../../core/l10n/l10n_extensions.dart';
@@ -143,14 +144,43 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                 SnackBar(
                   duration: const Duration(seconds: 2),
                   behavior: SnackBarBehavior.floating,
-                  content: Text('Resumed at Page ${restoredPage + 1} of ${comic.pageCount}'),
+                  content: Text(context.l10n.resumedAtPage(restoredPage + 1, comic.pageCount)),
                 ),
               );
             }
           });
         }
       }
-    } catch (e) {
+    } on UnsupportedComicArchiveException catch (e) {
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.isRar5
+              ? context.l10n.comicRar5NotSupported
+              : (e.isRar ? context.l10n.comicRarNotSupported : context.l10n.comicArchiveCorrupted);
+          _isLoading = false;
+        });
+      }
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ComicViewer.fileSystem');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _errorMessage = context.l10n.fileNotFoundOrInaccessible;
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ComicViewer.format');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _errorMessage = context.l10n.comicArchiveCorrupted;
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ComicViewer.load');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');

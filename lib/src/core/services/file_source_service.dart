@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../errors/app_error_handler.dart';
 import '../models/pdf_item.dart';
 import '../l10n/l10n_extensions.dart';
 import 'recent_files_service.dart';
@@ -121,7 +122,14 @@ class FileSourceService {
     try {
       final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
       return decoded.map((k, v) => MapEntry(k, v.toString()));
-    } catch (_) {
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'FileSourceService.getCustomFolderNames.format');
+      return {};
+    } on TypeError catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'FileSourceService.getCustomFolderNames.typeMismatch');
+      return {};
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'FileSourceService.getCustomFolderNames');
       return {};
     }
   }
@@ -368,7 +376,12 @@ class FileSourceService {
         ));
       }
       return items;
-    } catch (e) {
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'FileSourceService._scanSafFolderForFiles.platform');
+      debugPrint('_scanSafFolderForFiles platform error for "$safTreeUri": $e');
+      return [];
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'FileSourceService._scanSafFolderForFiles');
       debugPrint('_scanSafFolderForFiles error for "$safTreeUri": $e');
       return [];
     }
@@ -408,7 +421,11 @@ class FileSourceService {
           );
         }
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'FileSourceService._scanDirectoryForFiles.fs');
+      debugPrint('FileSystem error scanning directory ${dir.path}: $e');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'FileSourceService._scanDirectoryForFiles');
       debugPrint('Error scanning directory ${dir.path}: $e');
     }
     return items;

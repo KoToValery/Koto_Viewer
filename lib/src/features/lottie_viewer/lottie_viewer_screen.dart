@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/errors/app_error_handler.dart';
 
 class LottieViewerScreen extends StatefulWidget {
   final String filePath;
@@ -44,12 +45,18 @@ class _LottieViewerScreenState extends State<LottieViewerScreen>
       final content = await file.readAsString();
       final data = jsonDecode(content);
       if (data is Map<String, dynamic> && data.containsKey('nm')) {
-        setState(() {
-          _animationName = data['nm']?.toString() ?? '';
-        });
+        if (mounted) {
+          setState(() {
+            _animationName = data['nm']?.toString() ?? '';
+          });
+        }
       }
-    } catch (e) {
-      // ignore
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._tryParseAnimationName.fs');
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._tryParseAnimationName.format');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._tryParseAnimationName');
     }
   }
 
@@ -109,8 +116,13 @@ class _LottieViewerScreenState extends State<LottieViewerScreen>
 
   void _showInfoSheet() {
     if (_composition == null) return;
-    final file = File(widget.filePath);
-    final size = file.lengthSync();
+    int size = 0;
+    try {
+      final file = File(widget.filePath);
+      size = file.lengthSync();
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LottieViewer._showInfoSheet.fs');
+    }
     
     showModalBottomSheet(
       context: context,

@@ -69,6 +69,10 @@ class ComicParser {
       });
 
       return await completer.future;
+    } on UnsupportedComicArchiveException {
+      receivePort.close();
+      isolate?.kill(priority: Isolate.immediate);
+      rethrow;
     } catch (e) {
       receivePort.close();
       isolate?.kill(priority: Isolate.immediate);
@@ -98,22 +102,22 @@ class ComicParser {
     Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes, verify: false);
-    } catch (_) {
+    } on Exception {
       try {
         archive = TarDecoder().decodeBytes(bytes);
-      } catch (e) {
+      } on Exception catch (e) {
         if (_isRar5(bytes)) {
-          throw Exception(
-            'Този CBR файл е компресиран в RAR5 формат, който не се поддържа от вградения архив декомпресор. '
-            'Моля, преобразувайте комикса в .cbz (ZIP) за пълна съвместимост.',
+          throw const UnsupportedComicArchiveException(
+            isRar5: true,
+            message: 'This CBR file is compressed in RAR5 format which is not supported. Please convert to .cbz (ZIP).',
           );
         } else if (_isRar(bytes)) {
-          throw Exception(
-            'Този CBR файл използва RAR компресия, която не се поддържа от вградения декомпресор. '
-            'Моля, преобразувайте архива в .cbz (ZIP) формат.',
+          throw const UnsupportedComicArchiveException(
+            isRar: true,
+            message: 'This CBR file uses RAR compression which is not supported. Please convert to .cbz (ZIP).',
           );
         }
-        throw Exception('Could not decode comic archive: $e');
+        throw FormatException('Could not decode comic archive: $e');
       }
     }
 
@@ -299,7 +303,12 @@ class ComicParser {
         isManga: isManga,
         pageCount: pageCount,
       );
-    } catch (_) {
+    } on xml.XmlException {
+      return ComicMetadata(
+        title: fallbackTitle,
+        pageCount: pageCount,
+      );
+    } on FormatException {
       return ComicMetadata(
         title: fallbackTitle,
         pageCount: pageCount,

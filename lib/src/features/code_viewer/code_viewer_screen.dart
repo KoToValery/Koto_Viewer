@@ -8,6 +8,8 @@ import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import 'package:flutter_highlight/themes/atom-one-light.dart';
 import 'package:xml/xml.dart';
 import '../../core/services/universal_encoding_service.dart';
+import '../../core/l10n/l10n_extensions.dart';
+import '../../core/errors/app_error_handler.dart';
 
 class CodeViewerScreen extends StatefulWidget {
   final String filePath;
@@ -156,7 +158,14 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
       
       _updateDisplayContent();
 
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CodeViewer._loadCodeFile.fs');
+      _error = mounted ? context.l10n.fileNotFoundOrInaccessible : e.toString();
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CodeViewer._loadCodeFile.format');
+      _error = e.message;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CodeViewer._loadCodeFile');
       _error = e.toString();
     } finally {
       if (mounted) {
@@ -179,8 +188,10 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
           final document = XmlDocument.parse(content);
           content = document.toXmlString(pretty: true);
         }
-      } catch (e) {
-        // Fallback to raw if parsing fails
+      } on FormatException {
+        // Fallback to raw if JSON parsing fails
+      } on XmlException {
+        // Fallback to raw if XML parsing fails
       }
     }
 

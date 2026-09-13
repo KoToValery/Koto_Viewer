@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/core/services/recent_files_service.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 import 'package:kotoview/src/core/services/reading_progress_service.dart';
+import '../../core/l10n/l10n_extensions.dart';
+import '../../core/errors/app_error_handler.dart';
 import 'models/text_reflow_models.dart';
 import 'widgets/text_reflow_view.dart';
 
@@ -136,7 +138,9 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
           );
         });
       }
-    } catch (_) {}
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadReflowSettings');
+    }
   }
 
   Future<void> _saveReflowSettings() async {
@@ -148,7 +152,9 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
       await prefs.setInt('txt_reflow_font', _reflowSettings.font.index);
       await prefs.setInt('txt_reflow_mode', _reflowSettings.mode.index);
       await prefs.setDouble('txt_reflow_line_height', _reflowSettings.lineHeight);
-    } catch (_) {}
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._saveReflowSettings');
+    }
   }
 
   void _toggleReflowMode() {
@@ -201,21 +207,41 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                 progress.scrollOffset.clamp(0.0, _verticalScrollController.position.maxScrollExtent),
               );
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  duration: Duration(seconds: 2),
+                SnackBar(
+                  duration: const Duration(seconds: 2),
                   behavior: SnackBarBehavior.floating,
-                  content: Text('Resumed reading position'),
+                  content: Text(context.l10n.resumedReadingPosition),
                 ),
               );
             }
           });
         }
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadTextFile.fs');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error reading text file: $e';
+          _errorMessage = context.l10n.fileNotFoundOrInaccessible;
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadTextFile.format');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _errorMessage = context.l10n.errorReadingTextFile(e.message);
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'TextViewer._loadTextFile');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        setState(() {
+          _errorMessage = context.l10n.errorReadingTextFile(cleanMsg);
           _isLoading = false;
         });
       }

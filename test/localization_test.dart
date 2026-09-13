@@ -79,6 +79,20 @@ void main() {
       expect(l10n.pageIndicator(3, 15), equals('Page 3 of 15'));
       expect(l10n.statusReadingFile('25.4'), equals('Reading file (25.4 MB)...'));
       expect(l10n.statusExtractingPage(2, 20), equals('Extracting page 2 of 20...'));
+      expect(l10n.resumedAtPage(2, 10), equals('Resumed at Page 2 of 10'));
+      expect(l10n.fileNotFoundOrInaccessible, equals('File not found or cannot be accessed.'));
+      expect(l10n.comicRar5NotSupported, contains('RAR5'));
+      expect(l10n.comicRarNotSupported, contains('RAR'));
+      expect(l10n.comicArchiveCorrupted, equals('Comic book archive is corrupted or unreadable.'));
+      expect(l10n.unsupportedFileFormat('sample.xyz'), equals('Unsupported file format: sample.xyz'));
+      expect(l10n.convertingDwgTitle, equals('Converting DWG...'));
+      expect(l10n.convertingPresentationTitle, equals('Converting Presentation...'));
+      expect(l10n.errorLoadingSpreadsheet('corrupt'), equals('Error loading Excel file: corrupt'));
+      expect(l10n.errorLoadingMarkdown('bad format'), equals('Error loading markdown: bad format'));
+      expect(l10n.errorReadingWordDocument('fail'), equals('Error reading Word document: fail'));
+      expect(l10n.errorReadingTextFile('fail'), equals('Error reading text file: fail'));
+      expect(l10n.resumedReadingPosition, equals('Resumed reading position'));
+      expect(l10n.woffNotSupported, equals('WOFF/WOFF2 preview is not supported. Please convert to TTF or OTF first.'));
     });
 
     testWidgets('Bulgarian strings and parameters resolve correctly', (tester) async {
@@ -113,6 +127,20 @@ void main() {
       expect(l10n.pageIndicator(3, 15), equals('Страница 3 от 15'));
       expect(l10n.statusReadingFile('25.4'), equals('Четене на файл (25.4 MB)...'));
       expect(l10n.statusExtractingPage(2, 20), equals('Разархивиране на страница 2 от 20...'));
+      expect(l10n.resumedAtPage(2, 10), equals('Възобновено от страница 2 от 10'));
+      expect(l10n.fileNotFoundOrInaccessible, equals('Файлът не е намерен или няма достъп до него.'));
+      expect(l10n.comicRar5NotSupported, contains('RAR5'));
+      expect(l10n.comicRarNotSupported, contains('RAR'));
+      expect(l10n.comicArchiveCorrupted, equals('Архивът на комикса е повреден или нечетлив.'));
+      expect(l10n.unsupportedFileFormat('sample.xyz'), equals('Неподдържан файлов формат: sample.xyz'));
+      expect(l10n.convertingDwgTitle, equals('Конвертиране на DWG...'));
+      expect(l10n.convertingPresentationTitle, equals('Конвертиране на презентация...'));
+      expect(l10n.errorLoadingSpreadsheet('corrupt'), equals('Грешка при зареждане на Excel файл: corrupt'));
+      expect(l10n.errorLoadingMarkdown('bad format'), equals('Грешка при зареждане на markdown: bad format'));
+      expect(l10n.errorReadingWordDocument('fail'), equals('Грешка при четене на Word документ: fail'));
+      expect(l10n.errorReadingTextFile('fail'), equals('Грешка при четене на текстов файл: fail'));
+      expect(l10n.resumedReadingPosition, equals('Възобновена позиция на четене'));
+      expect(l10n.woffNotSupported, equals('Прегледът на WOFF/WOFF2 не се поддържа. Моля, първо конвертирайте в TTF или OTF.'));
 
       // Test category labels in Bulgarian
       expect(FileCategory.all.localizedLabel(buildCtx), equals('Всички'));

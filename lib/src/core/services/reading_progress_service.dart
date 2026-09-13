@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../errors/app_error_handler.dart';
 
 /// Represents a user-saved bookmark within a document, book, or comic.
 class BookmarkItem {
@@ -151,7 +152,9 @@ class ReadingProgressService {
       );
 
       await prefs.setString(key, jsonEncode(progress.toJson()));
-    } catch (_) {}
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ReadingProgressService.saveProgress');
+    }
   }
 
   /// Retrieves the saved progress for [filePath], or null if none exists.
@@ -167,7 +170,14 @@ class ReadingProgressService {
         return ReadingProgress.fromJson(data);
       }
       return null;
-    } catch (_) {
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ReadingProgressService.getProgress.jsonFormat');
+      return null;
+    } on TypeError catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ReadingProgressService.getProgress.typeMismatch');
+      return null;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ReadingProgressService.getProgress');
       return null;
     }
   }
@@ -201,7 +211,9 @@ class ReadingProgressService {
       );
 
       await prefs.setString(key, jsonEncode(progress.toJson()));
-    } catch (_) {}
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ReadingProgressService.addBookmark');
+    }
   }
 
   /// Removes a bookmark by its ID.
@@ -229,7 +241,9 @@ class ReadingProgressService {
       );
 
       await prefs.setString(key, jsonEncode(progress.toJson()));
-    } catch (_) {}
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ReadingProgressService.removeBookmark');
+    }
   }
 
   /// Checks if a given position is bookmarked.
@@ -267,6 +281,8 @@ class ReadingProgressService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyForPath(filePath));
-    } catch (_) {}
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ReadingProgressService.clear');
+    }
   }
 }

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
+import '../../core/l10n/l10n_extensions.dart';
+import '../../core/errors/app_error_handler.dart';
 
 class CsvViewerScreen extends StatefulWidget {
   final String filePath;
@@ -66,11 +68,30 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
       setState(() {
         _isLoading = false;
       });
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CsvViewer._loadCsv.fs');
+      if (mounted) {
+        setState(() {
+          _errorMessage = context.l10n.fileNotFoundOrInaccessible;
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CsvViewer._loadCsv.format');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.message;
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CsvViewer._loadCsv');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -93,7 +114,11 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
       _rows = CsvDecoder(
         fieldDelimiter: _delimiter,
       ).convert(_rawText);
-    } catch (e) {
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CsvViewer._parseCsv.format');
+      _rows = [];
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CsvViewer._parseCsv');
       _rows = [];
     }
   }
@@ -227,7 +252,7 @@ class _CsvViewerScreenState extends State<CsvViewerScreen> {
         if (showNotice)
           Container(
             padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-            color: Colors.amber.withOpacity(0.2),
+            color: Colors.amber.withValues(alpha: 0.2),
             child: const Text('Showing first 1000 rows for performance', style: TextStyle(fontSize: 12)),
           ),
         Expanded(

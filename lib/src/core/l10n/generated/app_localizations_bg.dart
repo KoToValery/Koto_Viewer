@@ -324,4 +324,70 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get panZoom => 'Преместване / Мащаб';
+
+  @override
+  String resumedAtPage(int page, int total) {
+    return 'Възобновено от страница $page от $total';
+  }
+
+  @override
+  String get fileNotFoundOrInaccessible =>
+      'Файлът не е намерен или няма достъп до него.';
+
+  @override
+  String get comicRar5NotSupported =>
+      'Този CBR файл е компресиран в RAR5 формат, който не се поддържа от вградения архив декомпресор. Моля, преобразувайте комикса в .cbz (ZIP) за пълна съвместимост.';
+
+  @override
+  String get comicRarNotSupported =>
+      'Този CBR файл използва RAR компресия, която не се поддържа от вградения декомпресор. Моля, преобразувайте архива в .cbz (ZIP) формат.';
+
+  @override
+  String get comicArchiveCorrupted =>
+      'Архивът на комикса е повреден или нечетлив.';
+
+  @override
+  String unsupportedFileFormat(String name) {
+    return 'Неподдържан файлов формат: $name';
+  }
+
+  @override
+  String get convertingDwgTitle => 'Конвертиране на DWG...';
+
+  @override
+  String get convertingDwgMessage => 'Конвертиране на DWG към DXF за преглед';
+
+  @override
+  String get convertingPresentationTitle => 'Конвертиране на презентация...';
+
+  @override
+  String get convertingPresentationMessage =>
+      'Конвертиране на презентация към PDF за преглед';
+
+  @override
+  String errorLoadingSpreadsheet(String error) {
+    return 'Грешка при зареждане на Excel файл: $error';
+  }
+
+  @override
+  String errorLoadingMarkdown(String error) {
+    return 'Грешка при зареждане на markdown: $error';
+  }
+
+  @override
+  String errorReadingWordDocument(String error) {
+    return 'Грешка при четене на Word документ: $error';
+  }
+
+  @override
+  String errorReadingTextFile(String error) {
+    return 'Грешка при четене на текстов файл: $error';
+  }
+
+  @override
+  String get resumedReadingPosition => 'Възобновена позиция на четене';
+
+  @override
+  String get woffNotSupported =>
+      'Прегледът на WOFF/WOFF2 не се поддържа. Моля, първо конвертирайте в TTF или OTF.';
 }

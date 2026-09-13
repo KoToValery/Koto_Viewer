@@ -232,7 +232,11 @@ class PdfItem {
             raf.closeSync();
           }
         }
-      } catch (_) {}
+      } on FileSystemException {
+        // Inaccessible or unreadable file
+      } on Exception {
+        // Non-fatal I/O error
+      }
     }
 
     return KotoFileType.other;

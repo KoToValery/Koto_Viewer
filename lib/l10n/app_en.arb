@@ -229,5 +229,70 @@
   "invert": "Invert",
   "@invert": { "description": "DICOM invert colors tool" },
   "panZoom": "Pan / Zoom",
-  "@panZoom": { "description": "Pan and zoom tool" }
+  "@panZoom": { "description": "Pan and zoom tool" },
+
+  "resumedAtPage": "Resumed at Page {page} of {total}",
+  "@resumedAtPage": {
+    "description": "Toast message indicating resumed reading page",
+    "placeholders": {
+      "page": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "fileNotFoundOrInaccessible": "File not found or cannot be accessed.",
+  "@fileNotFoundOrInaccessible": { "description": "Error message when file is missing or inaccessible" },
+  "comicRar5NotSupported": "This CBR file is compressed using RAR5, which is not supported by the built-in decompressor. Please convert to .cbz (ZIP) for full compatibility.",
+  "@comicRar5NotSupported": { "description": "Error message when RAR5 archive is encountered" },
+  "comicRarNotSupported": "This CBR file uses RAR compression, which is not supported by the built-in decompressor. Please convert to .cbz (ZIP) format.",
+  "@comicRarNotSupported": { "description": "Error message when legacy RAR archive is encountered" },
+  "comicArchiveCorrupted": "Comic book archive is corrupted or unreadable.",
+  "@comicArchiveCorrupted": { "description": "Error message when comic archive cannot be extracted" },
+
+  "unsupportedFileFormat": "Unsupported file format: {name}",
+  "@unsupportedFileFormat": {
+    "description": "Error message when opening a file with unsupported format",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "convertingDwgTitle": "Converting DWG...",
+  "@convertingDwgTitle": { "description": "Title for DWG conversion dialog" },
+  "convertingDwgMessage": "Converting DWG to DXF for viewing",
+  "@convertingDwgMessage": { "description": "Message for DWG conversion dialog" },
+  "convertingPresentationTitle": "Converting Presentation...",
+  "@convertingPresentationTitle": { "description": "Title for PPTX conversion dialog" },
+  "convertingPresentationMessage": "Converting presentation to PDF for viewing",
+  "@convertingPresentationMessage": { "description": "Message for PPTX conversion dialog" },
+  "errorLoadingSpreadsheet": "Error loading Excel file: {error}",
+  "@errorLoadingSpreadsheet": {
+    "description": "Error message when loading spreadsheet fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorLoadingMarkdown": "Error loading markdown: {error}",
+  "@errorLoadingMarkdown": {
+    "description": "Error message when loading markdown fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorReadingWordDocument": "Error reading Word document: {error}",
+  "@errorReadingWordDocument": {
+    "description": "Error message when loading docx fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorReadingTextFile": "Error reading text file: {error}",
+  "@errorReadingTextFile": {
+    "description": "Error message when loading text file fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "resumedReadingPosition": "Resumed reading position",
+  "@resumedReadingPosition": { "description": "Toast message indicating resumed reading position" },
+  "woffNotSupported": "WOFF/WOFF2 preview is not supported. Please convert to TTF or OTF first.",
+  "@woffNotSupported": { "description": "Error message when opening unsupported font format" }
 }

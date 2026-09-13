@@ -11,6 +11,7 @@ import 'package:xml/xml.dart' as xml;
 import '../../core/services/recent_files_service.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
 import '../../core/l10n/l10n_extensions.dart';
+import '../../core/errors/app_error_handler.dart';
 import 'excel_formula_evaluator.dart';
 
 /// Interactive Excel Spreadsheet Viewer (.xlsx / .xls)
@@ -156,7 +157,14 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
             newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes));
             modified = true;
             continue;
-          } catch (_) {
+          } on xml.XmlException {
+            // Regex fallback: strip numFmts completely
+            final cleanContent = content.replaceAll(RegExp(r'<numFmts[\s\S]*?</numFmts>'), '');
+            final newBytes = utf8.encode(cleanContent);
+            newArchive.addFile(ArchiveFile(file.name, newBytes.length, newBytes));
+            modified = true;
+            continue;
+          } on FormatException {
             // Regex fallback: strip numFmts completely
             final cleanContent = content.replaceAll(RegExp(r'<numFmts[\s\S]*?</numFmts>'), '');
             final newBytes = utf8.encode(cleanContent);
@@ -178,7 +186,11 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
           return Uint8List.fromList(encoded);
         }
       }
-    } catch (_) {}
+    } on ArchiveException {
+      // Return original bytes if archive could not be parsed/encoded
+    } on FormatException {
+      // Return original bytes if archive format invalid
+    }
     return bytes;
   }
 
@@ -200,7 +212,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
       xl.Excel? excel;
       try {
         excel = xl.Excel.decodeBytes(bytes);
-      } catch (_) {
+      } on Exception catch (decodeEx, decodeStack) {
+        AppErrorHandler.recordError(decodeEx, decodeStack, context: 'XlsxViewer.decodeBytes.retrySanitized');
         // Retry with sanitized OpenXML styles
         final sanitized = _sanitizeXlsxBytes(bytes);
         excel = xl.Excel.decodeBytes(sanitized);
@@ -223,7 +236,8 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'XlsxViewer._loadExcelFile');
       // If it fails to load as Excel, try CSV / text fallback table
       try {
         final file = File(widget.filePath);
@@ -231,7 +245,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
         String text;
         try {
           text = utf8.decode(bytes, allowMalformed: true);
-        } catch (_) {
+        } on FormatException {
           text = latin1.decode(bytes);
         }
 
@@ -244,14 +258,17 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
           }
           return;
         }
-      } catch (_) {}
+      } on Exception catch (fallbackErr, fallbackStack) {
+        AppErrorHandler.recordError(fallbackErr, fallbackStack, context: 'XlsxViewer.textFallback');
+      }
 
       // If opening failed completely, remove from Recent Files
       await RecentFilesService.removeRecentFile(widget.filePath);
 
       if (mounted) {
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
         setState(() {
-          _errorMessage = 'Error loading Excel file: $e';
+          _errorMessage = context.l10n.errorLoadingSpreadsheet(cleanMsg);
           _isLoading = false;
         });
       }

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../../core/errors/app_error_handler.dart';
 
 /// Evaluates Excel formulas within a 2D sheet data grid.
 class ExcelFormulaEvaluator {
@@ -37,7 +38,16 @@ class ExcelFormulaEvaluator {
         return trimmed;
       }
       return result.toString();
-    } catch (_) {
+    } on FormatException {
+      return formula;
+    } on RangeError {
+      return formula;
+    } on ArgumentError {
+      return formula;
+    } on UnsupportedError {
+      return formula;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ExcelFormulaEvaluator.evaluate');
       return formula;
     }
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
+import '../../core/errors/app_error_handler.dart';
 
 class JupyterViewerScreen extends StatefulWidget {
   final String filePath;
@@ -45,11 +46,38 @@ class _JupyterViewerScreenState extends State<JupyterViewerScreen> {
         _nbformat = '${notebook['nbformat'] ?? '4'}.${notebook['nbformat_minor'] ?? '0'}';
         _isLoading = false;
       });
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook.fs');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.message;
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook.format');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.message;
+          _isLoading = false;
+        });
+      }
+    } on TypeError catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook.type');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'JupyterViewer._loadNotebook');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 

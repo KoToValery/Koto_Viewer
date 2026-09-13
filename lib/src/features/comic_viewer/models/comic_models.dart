@@ -145,3 +145,20 @@ class ComicParseProgress {
     this.totalPages,
   });
 }
+
+/// Thrown when a comic book archive format (such as proprietary RAR or RAR5)
+/// cannot be extracted by the built-in decompressor.
+class UnsupportedComicArchiveException implements Exception {
+  final bool isRar5;
+  final bool isRar;
+  final String message;
+
+  const UnsupportedComicArchiveException({
+    this.isRar5 = false,
+    this.isRar = false,
+    required this.message,
+  });
+
+  @override
+  String toString() => message;
+}

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/pdf_item.dart';
 import '../errors/app_error_handler.dart';
+import '../l10n/l10n_extensions.dart';
 import 'android_saf_service.dart';
 import 'dwg_converter_service.dart';
 import 'ppt_to_pdf_converter_service.dart';
@@ -50,6 +51,7 @@ class FileOpenerService {
   }) async {
     final nav = navigator ?? Navigator.of(context);
     final scaffoldMessenger = messenger ?? ScaffoldMessenger.maybeOf(context);
+    final l10n = AppLocalizations.of(context);
 
     // On Android, files from SAF custom folders have content:// URIs.
     // Dart's File class cannot read content URIs directly, so resolve/cache first.
@@ -126,11 +128,12 @@ class FileOpenerService {
         try {
           convertedDxfPath = await _showConversionProgressDialog(
             context: context,
-            title: 'Converting DWG...',
-            message: 'Converting DWG to DXF for viewing',
+            title: l10n?.convertingDwgTitle ?? 'Converting DWG...',
+            message: l10n?.convertingDwgMessage ?? 'Converting DWG to DXF for viewing',
             action: () => DwgConverterService.convertDwgToDxf(resolvedPath),
           );
-        } catch (e) {
+        } on Exception catch (e, stack) {
+          AppErrorHandler.recordError(e, stack, context: 'FileOpenerService.convertDwg');
           conversionError = e.toString();
         }
 
@@ -241,11 +244,12 @@ class FileOpenerService {
         try {
           convertedPdfPath = await _showConversionProgressDialog(
             context: context,
-            title: 'Converting Presentation...',
-            message: 'Converting presentation to PDF for viewing',
+            title: l10n?.convertingPresentationTitle ?? 'Converting Presentation...',
+            message: l10n?.convertingPresentationMessage ?? 'Converting presentation to PDF for viewing',
             action: () => PptToPdfConverterService.convertToPdf(resolvedPath),
           );
-        } catch (e) {
+        } on Exception catch (e, stack) {
+          AppErrorHandler.recordError(e, stack, context: 'FileOpenerService.convertPptx');
           conversionError = e.toString();
         }
 
@@ -400,7 +404,6 @@ class FileOpenerService {
         );
 
       case KotoFileType.other:
-      default:
         bool isRealPdf = false;
         try {
           final raf = File(resolvedPath).openSync();
@@ -416,7 +419,11 @@ class FileOpenerService {
           } finally {
             raf.closeSync();
           }
-        } catch (_) {}
+        } on FileSystemException catch (e, stack) {
+          AppErrorHandler.recordError(e, stack, context: 'FileOpenerService.probePdf.fs');
+        } on Exception catch (e, stack) {
+          AppErrorHandler.recordError(e, stack, context: 'FileOpenerService.probePdf');
+        }
 
         if (isRealPdf) {
           return await _pushViewer(
@@ -428,9 +435,10 @@ class FileOpenerService {
         } else {
           await RecentFilesService.removeRecentFile(filePath);
           if (context.mounted && scaffoldMessenger != null) {
+            final warningMsg = l10n?.unsupportedFileFormat(name) ?? 'Unsupported file format: $name';
             scaffoldMessenger.showSnackBar(
               SnackBar(
-                content: Text('Unsupported file format: $name'),
+                content: Text(warningMsg),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -458,7 +466,7 @@ class FileOpenerService {
         await RecentFilesService.removeRecentFile(originalFilePath);
         return false;
       }
-    } catch (e, stack) {
+    } on Exception catch (e, stack) {
       AppErrorHandler.recordError(
         e,
         stack,

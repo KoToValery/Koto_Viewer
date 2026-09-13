@@ -7,6 +7,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kotoview/src/core/services/recent_files_service.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
+import 'package:kotoview/src/core/l10n/l10n_extensions.dart';
+import 'package:kotoview/src/core/errors/app_error_handler.dart';
 
 /// Markdown Viewer Screen (.md / .markdown)
 class MarkdownViewerScreen extends StatefulWidget {
@@ -56,11 +58,31 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._loadMarkdownFile.fs');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error loading markdown: $e';
+          _errorMessage = context.l10n.fileNotFoundOrInaccessible;
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._loadMarkdownFile.format');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _errorMessage = context.l10n.errorLoadingMarkdown(e.message);
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._loadMarkdownFile');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        setState(() {
+          _errorMessage = context.l10n.errorLoadingMarkdown(cleanMsg);
           _isLoading = false;
         });
       }
@@ -74,8 +96,12 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-    } catch (e) {
-      debugPrint('Error launching URL: $e');
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._handleLinkTap.uri');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._handleLinkTap.platform');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'MarkdownViewer._handleLinkTap');
     }
   }
 

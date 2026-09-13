@@ -703,6 +703,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pan / Zoom'**
   String get panZoom;
+
+  /// Toast message indicating resumed reading page
+  ///
+  /// In en, this message translates to:
+  /// **'Resumed at Page {page} of {total}'**
+  String resumedAtPage(int page, int total);
+
+  /// Error message when file is missing or inaccessible
+  ///
+  /// In en, this message translates to:
+  /// **'File not found or cannot be accessed.'**
+  String get fileNotFoundOrInaccessible;
+
+  /// Error message when RAR5 archive is encountered
+  ///
+  /// In en, this message translates to:
+  /// **'This CBR file is compressed using RAR5, which is not supported by the built-in decompressor. Please convert to .cbz (ZIP) for full compatibility.'**
+  String get comicRar5NotSupported;
+
+  /// Error message when legacy RAR archive is encountered
+  ///
+  /// In en, this message translates to:
+  /// **'This CBR file uses RAR compression, which is not supported by the built-in decompressor. Please convert to .cbz (ZIP) format.'**
+  String get comicRarNotSupported;
+
+  /// Error message when comic archive cannot be extracted
+  ///
+  /// In en, this message translates to:
+  /// **'Comic book archive is corrupted or unreadable.'**
+  String get comicArchiveCorrupted;
+
+  /// Error message when opening a file with unsupported format
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported file format: {name}'**
+  String unsupportedFileFormat(String name);
+
+  /// Title for DWG conversion dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Converting DWG...'**
+  String get convertingDwgTitle;
+
+  /// Message for DWG conversion dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Converting DWG to DXF for viewing'**
+  String get convertingDwgMessage;
+
+  /// Title for PPTX conversion dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Converting Presentation...'**
+  String get convertingPresentationTitle;
+
+  /// Message for PPTX conversion dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Converting presentation to PDF for viewing'**
+  String get convertingPresentationMessage;
+
+  /// Error message when loading spreadsheet fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading Excel file: {error}'**
+  String errorLoadingSpreadsheet(String error);
+
+  /// Error message when loading markdown fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading markdown: {error}'**
+  String errorLoadingMarkdown(String error);
+
+  /// Error message when loading docx fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading Word document: {error}'**
+  String errorReadingWordDocument(String error);
+
+  /// Error message when loading text file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading text file: {error}'**
+  String errorReadingTextFile(String error);
+
+  /// Toast message indicating resumed reading position
+  ///
+  /// In en, this message translates to:
+  /// **'Resumed reading position'**
+  String get resumedReadingPosition;
+
+  /// Error message when opening unsupported font format
+  ///
+  /// In en, this message translates to:
+  /// **'WOFF/WOFF2 preview is not supported. Please convert to TTF or OTF first.'**
+  String get woffNotSupported;
 }
 
 class _AppLocalizationsDelegate

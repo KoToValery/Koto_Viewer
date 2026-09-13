@@ -7,8 +7,10 @@ import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
 import 'models/docx_models.dart';
 import 'parser/docx_parser.dart';
+import 'package:archive/archive.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
 import '../../core/l10n/l10n_extensions.dart';
+import '../../core/errors/app_error_handler.dart';
 
 /// Microsoft Word Document (.docx) Viewer Screen with 1:1 A4 Page Formatting,
 /// Authentic Page Framing, Logo Header, Tab Stops, Exact Borders, and Zoom Slider.
@@ -128,18 +130,47 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 SnackBar(
                   duration: const Duration(seconds: 2),
                   behavior: SnackBarBehavior.floating,
-                  content: Text('Resumed at Page ${restoredPage + 1} of ${doc.pages.length}'),
+                  content: Text(context.l10n.resumedAtPage(restoredPage + 1, doc.pages.length)),
                 ),
               );
             }
           });
         }
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument.fs');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error reading Word document: $e';
+          _errorMessage = context.l10n.fileNotFoundOrInaccessible;
+          _isLoading = false;
+        });
+      }
+    } on ArchiveException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument.archive');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _errorMessage = context.l10n.errorReadingWordDocument(e.message);
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument.format');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _errorMessage = context.l10n.errorReadingWordDocument(e.message);
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DocxViewer._loadDocument');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        setState(() {
+          _errorMessage = context.l10n.errorReadingWordDocument(cleanMsg);
           _isLoading = false;
         });
       }
@@ -1508,6 +1539,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
   /// Floating Zoom Control Bar with Slider, [-]/[+], % badge, Fit-Page and Fit-Width.
   Widget _buildZoomControls(ThemeData theme, Size viewportSize) {
+    final l10n = context.l10n;
     if (!_isZoomBarExpanded) {
       return FloatingActionButton.small(
         heroTag: 'docx_zoom_btn',

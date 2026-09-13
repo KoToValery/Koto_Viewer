@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/errors/app_error_handler.dart';
+import '../../core/l10n/l10n_extensions.dart';
 
 class FontViewerScreen extends StatefulWidget {
   final String filePath;
@@ -20,6 +22,7 @@ class _FontViewerScreenState extends State<FontViewerScreen> {
   late final String _fontFamily;
   bool _isLoading = false;
   bool _fontLoaded = false;
+  bool _isWoffNotSupported = false;
   String? _error;
   double _fontSize = 24.0;
   final TextEditingController _customTextController = TextEditingController(
@@ -36,7 +39,7 @@ class _FontViewerScreenState extends State<FontViewerScreen> {
     final lower = widget.filePath.toLowerCase();
     if (lower.endsWith('.woff') || lower.endsWith('.woff2')) {
       setState(() {
-        _error = "WOFF/WOFF2 preview is not supported. Please convert to TTF or OTF first.";
+        _isWoffNotSupported = true;
       });
       return;
     }
@@ -47,15 +50,28 @@ class _FontViewerScreenState extends State<FontViewerScreen> {
       final fontLoader = FontLoader(_fontFamily);
       fontLoader.addFont(Future.value(ByteData.view(bytes.buffer)));
       await fontLoader.load();
-      setState(() {
-        _fontLoaded = true;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _fontLoaded = true;
+          _isLoading = false;
+        });
+      }
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'FontViewer._loadFont.fs');
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'FontViewer._loadFont');
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -86,6 +102,19 @@ class _FontViewerScreenState extends State<FontViewerScreen> {
   }
 
   Widget _buildBody() {
+    if (_isWoffNotSupported) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            context.l10n.woffNotSupported,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+          ),
+        ),
+      );
+    }
+
     if (_error != null) {
       return Center(
         child: Padding(

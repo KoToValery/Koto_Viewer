@@ -106,5 +106,21 @@
   "rows": "Редове",
   "windowLevel": "Прозорец / Ниво",
   "invert": "Инвертиране",
-  "panZoom": "Преместване / Мащаб"
+  "panZoom": "Преместване / Мащаб",
+  "resumedAtPage": "Възобновено от страница {page} от {total}",
+  "fileNotFoundOrInaccessible": "Файлът не е намерен или няма достъп до него.",
+  "comicRar5NotSupported": "Този CBR файл е компресиран в RAR5 формат, който не се поддържа от вградения архив декомпресор. Моля, преобразувайте комикса в .cbz (ZIP) за пълна съвместимост.",
+  "comicRarNotSupported": "Този CBR файл използва RAR компресия, която не се поддържа от вградения декомпресор. Моля, преобразувайте архива в .cbz (ZIP) формат.",
+  "comicArchiveCorrupted": "Архивът на комикса е повреден или нечетлив.",
+  "unsupportedFileFormat": "Неподдържан файлов формат: {name}",
+  "convertingDwgTitle": "Конвертиране на DWG...",
+  "convertingDwgMessage": "Конвертиране на DWG към DXF за преглед",
+  "convertingPresentationTitle": "Конвертиране на презентация...",
+  "convertingPresentationMessage": "Конвертиране на презентация към PDF за преглед",
+  "errorLoadingSpreadsheet": "Грешка при зареждане на Excel файл: {error}",
+  "errorLoadingMarkdown": "Грешка при зареждане на markdown: {error}",
+  "errorReadingWordDocument": "Грешка при четене на Word документ: {error}",
+  "errorReadingTextFile": "Грешка при четене на текстов файл: {error}",
+  "resumedReadingPosition": "Възобновена позиция на четене",
+  "woffNotSupported": "Прегледът на WOFF/WOFF2 не се поддържа. Моля, първо конвертирайте в TTF или OTF."
 }

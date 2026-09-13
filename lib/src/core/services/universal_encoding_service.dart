@@ -35,7 +35,9 @@ class UniversalEncodingService {
       try {
         final text = utf8.decode(bytes.sublist(3));
         return DecodedTextResult(text: text, encodingName: 'UTF-8 (BOM)');
-      } catch (_) {}
+      } on FormatException {
+        // Not valid UTF-8 despite BOM, fallback
+      }
     }
 
     // 2. Check for UTF-16 LE BOM (FF FE)
@@ -43,7 +45,11 @@ class UniversalEncodingService {
       try {
         final text = _decodeUtf16Le(bytes.sublist(2));
         return DecodedTextResult(text: text, encodingName: 'UTF-16 LE (BOM)');
-      } catch (_) {}
+      } on FormatException {
+        // Corrupted UTF-16 LE, continue detection
+      } on ArgumentError {
+        // Invalid character code sequence, continue detection
+      }
     }
 
     // 3. Check for UTF-16 BE BOM (FE FF)
@@ -51,7 +57,11 @@ class UniversalEncodingService {
       try {
         final text = _decodeUtf16Be(bytes.sublist(2));
         return DecodedTextResult(text: text, encodingName: 'UTF-16 BE (BOM)');
-      } catch (_) {}
+      } on FormatException {
+        // Corrupted UTF-16 BE, continue detection
+      } on ArgumentError {
+        // Invalid character code sequence, continue detection
+      }
     }
 
     // 4. Check for UTF-16 LE without BOM (common in Windows CAD exports: alternating null bytes)
@@ -59,7 +69,11 @@ class UniversalEncodingService {
       try {
         final text = _decodeUtf16Le(bytes);
         return DecodedTextResult(text: text, encodingName: 'UTF-16 LE');
-      } catch (_) {}
+      } on FormatException {
+        // Fallback to strict UTF-8 or code pages
+      } on ArgumentError {
+        // Fallback to strict UTF-8 or code pages
+      }
     }
 
     // 5. Try strict UTF-8
@@ -68,7 +82,7 @@ class UniversalEncodingService {
       // Check if text was double-encoded into Latin-1/CP1252 Mojibake
       final repaired = repairDoubleEncodedUtf8(text);
       return DecodedTextResult(text: repaired, encodingName: 'UTF-8');
-    } catch (_) {
+    } on FormatException {
       // Not valid UTF-8, proceed to smart legacy code page detection
     }
 
@@ -351,7 +365,9 @@ class UniversalEncodingService {
       if (decoded != text && decoded.isNotEmpty) {
         return decoded;
       }
-    } catch (_) {}
+    } on FormatException {
+      // Not valid UTF-8, return original text
+    }
 
     return text;
   }

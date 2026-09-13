@@ -69,7 +69,11 @@ class DocxParser {
             relsMap[id] = target;
           }
         }
-      } catch (_) {}
+      } on xml.XmlException {
+        // Corrupted or missing relationships XML, proceed without rels
+      } on FormatException {
+        // Non-UTF8 relationships XML
+      }
     }
 
     // Load actual image bytes
@@ -95,7 +99,11 @@ class DocxParser {
             stylesMap[styleId] = _parseStyleElement(styleElem);
           }
         }
-      } catch (_) {}
+      } on xml.XmlException {
+        // Corrupted styles XML, proceed with default styling
+      } on FormatException {
+        // Non-UTF8 styles XML
+      }
     }
 
     // 3. Parse word/numbering.xml
@@ -106,7 +114,11 @@ class DocxParser {
         final numStr = utf8.decode(numberingFile.content as List<int>, allowMalformed: true);
         final numDoc = xml.XmlDocument.parse(numStr);
         _parseNumberingDoc(numDoc, numberingMap);
-      } catch (_) {}
+      } on xml.XmlException {
+        // Corrupted numbering XML, proceed with basic bullets
+      } on FormatException {
+        // Non-UTF8 numbering XML
+      }
     }
 
     // 4. Parse word/document.xml
@@ -732,7 +744,7 @@ class DocxParser {
     }
 
     // Filter out completely empty paragraphs unless they have spacing or borders
-    if (runs.isEmpty && headerBox == null && imageBlock == null && bottomBorder == null && !isPageBreak) {
+    if (runs.isEmpty && headerBox == null && bottomBorder == null && !isPageBreak) {
       if (spaceBefore == 0 && spaceAfter == 0) {
         return null;
       }
@@ -777,7 +789,6 @@ class DocxParser {
     Color? color = overrideColor ?? fallbackColor;
     double? fontSize = fallbackFontSize;
     String? fontFamily = fallbackFontFamily;
-    bool isTab = false;
 
     if (rPr != null) {
       if (rPr.findElements('w:b').isNotEmpty) {

@@ -321,4 +321,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get panZoom => 'Pan / Zoom';
+
+  @override
+  String resumedAtPage(int page, int total) {
+    return 'Resumed at Page $page of $total';
+  }
+
+  @override
+  String get fileNotFoundOrInaccessible =>
+      'File not found or cannot be accessed.';
+
+  @override
+  String get comicRar5NotSupported =>
+      'This CBR file is compressed using RAR5, which is not supported by the built-in decompressor. Please convert to .cbz (ZIP) for full compatibility.';
+
+  @override
+  String get comicRarNotSupported =>
+      'This CBR file uses RAR compression, which is not supported by the built-in decompressor. Please convert to .cbz (ZIP) format.';
+
+  @override
+  String get comicArchiveCorrupted =>
+      'Comic book archive is corrupted or unreadable.';
+
+  @override
+  String unsupportedFileFormat(String name) {
+    return 'Unsupported file format: $name';
+  }
+
+  @override
+  String get convertingDwgTitle => 'Converting DWG...';
+
+  @override
+  String get convertingDwgMessage => 'Converting DWG to DXF for viewing';
+
+  @override
+  String get convertingPresentationTitle => 'Converting Presentation...';
+
+  @override
+  String get convertingPresentationMessage =>
+      'Converting presentation to PDF for viewing';
+
+  @override
+  String errorLoadingSpreadsheet(String error) {
+    return 'Error loading Excel file: $error';
+  }
+
+  @override
+  String errorLoadingMarkdown(String error) {
+    return 'Error loading markdown: $error';
+  }
+
+  @override
+  String errorReadingWordDocument(String error) {
+    return 'Error reading Word document: $error';
+  }
+
+  @override
+  String errorReadingTextFile(String error) {
+    return 'Error reading text file: $error';
+  }
+
+  @override
+  String get resumedReadingPosition => 'Resumed reading position';
+
+  @override
+  String get woffNotSupported =>
+      'WOFF/WOFF2 preview is not supported. Please convert to TTF or OTF first.';
 }

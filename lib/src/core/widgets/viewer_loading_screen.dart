@@ -39,8 +39,8 @@ class ViewerLoadingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formattedSize = fileSizeBytes != null ? _formatFileSize(fileSizeBytes!) : '';
-    final l10n = context.l10n;
-    final effectiveTitle = loadingTitle ?? l10n.loadingFile;
+    final l10n = AppLocalizations.of(context);
+    final effectiveTitle = loadingTitle ?? l10n?.loadingFile ?? 'Loading...';
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F12),
@@ -49,7 +49,7 @@ class ViewerLoadingScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white70),
-          tooltip: l10n.cancel,
+          tooltip: l10n?.cancel ?? 'Cancel',
           onPressed: () {
             if (onCancel != null) {
               onCancel!();
