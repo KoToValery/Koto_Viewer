@@ -781,6 +781,43 @@ END-ISO-10303-21;
       ).toList();
       expect(windowOuterSill, isEmpty);
     });
+
+    test('Verify big_1.ifc terrain and elements triangulation without needle spikes if test file exists', () {
+      File? file;
+      for (final path in [
+        r'C:\Users\KoTo\Dropbox\test_files\big_1.ifc',
+        r'C:\Users\Creator\Dropbox\test_files\big_1.ifc',
+      ]) {
+        final f = File(path);
+        if (f.existsSync()) {
+          file = f;
+          break;
+        }
+      }
+      if (file == null) return;
+
+      final model = IfcParser.parseFromText(file.readAsStringSync());
+      expect(model.elements.length, equals(324));
+
+      final site = model.elements.firstWhere((e) => e.category == 'Site');
+      expect(site.triangles, isNotEmpty);
+
+      // Verify that no needle spikes cutting across the 30m site exist.
+      // Maximum triangle edge length must be within actual boundary plot edge (approx 20.1m)
+      double maxEdge = 0;
+      for (final t in site.triangles) {
+        final l0 = (t.v1 - t.v0).length;
+        final l1 = (t.v2 - t.v1).length;
+        final l2 = (t.v0 - t.v2).length;
+        final m = [l0, l1, l2].reduce((a, b) => a > b ? a : b);
+        if (m > maxEdge) maxEdge = m;
+      }
+      expect(maxEdge, lessThan(21000.0));
+
+      final roofs = model.elements.where((e) => e.category == 'Roof').toList();
+      expect(roofs.length, equals(7));
+    });
   });
 }
+
 

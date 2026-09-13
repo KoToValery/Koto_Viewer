@@ -3206,33 +3206,103 @@ class _IfcGeometrySolver {
 
   /// Bridges holes into an outer planar polygon using seam cuts
   /// so ear-clipping triangulation seamlessly cuts around the holes.
+  /// Projects 3D points onto the dominant 2D plane of the polygon to ensure
+  /// robustness regardless of face orientation (horizontal, vertical, or sloped).
   List<Vector3> _bridgePolygonWithHoles(List<Vector3> outer, List<List<Vector3>> holes) {
     if (holes.isEmpty) return outer;
+    if (outer.length < 3) return outer;
+
+    // 1. Calculate polygon normal via Newell's method to determine best 2D projection plane
+    double nx = 0, ny = 0, nz = 0;
+    final on = outer.length;
+    for (int i = 0; i < on; i++) {
+      final cur = outer[i];
+      final next = outer[(i + 1) % on];
+      nx += (cur.y - next.y) * (cur.z + next.z);
+      ny += (cur.z - next.z) * (cur.x + next.x);
+      nz += (cur.x - next.x) * (cur.y + next.y);
+    }
+
+    final ax = nx.abs(), ay = ny.abs(), az = nz.abs();
+    int dropAxis = 2; // drop Z (project to XY)
+    if (ax >= ay && ax >= az) {
+      dropAxis = 0; // drop X (project to YZ)
+    } else if (ay >= ax && ay >= az) {
+      dropAxis = 1; // drop Y (project to XZ)
+    }
+
+    math.Point<double> project2D(Vector3 p) {
+      if (dropAxis == 0) return math.Point(p.y, p.z);
+      if (dropAxis == 1) return math.Point(p.x, p.z);
+      return math.Point(p.x, p.y);
+    }
+
+    // Outer 2D signed area for winding check
+    double outerArea2d = 0.0;
+    for (int i = 0; i < on; i++) {
+      final p1 = project2D(outer[i]);
+      final p2 = project2D(outer[(i + 1) % on]);
+      outerArea2d += (p1.x * p2.y - p2.x * p1.y);
+    }
+    final bool outerCcw = outerArea2d > 0;
+
     var currentPoly = List<Vector3>.from(outer);
 
-    for (final hole in holes) {
-      if (hole.length < 3) continue;
+    // Filter valid holes and ensure winding is opposite to outer polygon
+    final validHoles = <List<Vector3>>[];
+    for (final rawHole in holes) {
+      if (rawHole.length < 3) continue;
 
-      // Find vertex with maximum X in the hole
+      double hArea = 0.0;
+      final hn = rawHole.length;
+      for (int i = 0; i < hn; i++) {
+        final p1 = project2D(rawHole[i]);
+        final p2 = project2D(rawHole[(i + 1) % hn]);
+        hArea += (p1.x * p2.y - p2.x * p1.y);
+      }
+      final bool holeCcw = hArea > 0;
+      final orientedHole = (holeCcw == outerCcw) ? rawHole.reversed.toList() : List<Vector3>.from(rawHole);
+      validHoles.add(orientedHole);
+    }
+
+    // Sort holes by max projected X descending so outermost holes are bridged first
+    validHoles.sort((hA, hB) {
+      double maxA = -double.infinity;
+      for (final p in hA) {
+        final u = project2D(p).x;
+        if (u > maxA) maxA = u;
+      }
+      double maxB = -double.infinity;
+      for (final p in hB) {
+        final u = project2D(p).x;
+        if (u > maxB) maxB = u;
+      }
+      return maxB.compareTo(maxA);
+    });
+
+    for (final hole in validHoles) {
+      // Find vertex with maximum projected X in the hole
       int hMaxIdx = 0;
-      double maxHx = hole[0].x;
-      for (int i = 1; i < hole.length; i++) {
-        if (hole[i].x > maxHx) {
-          maxHx = hole[i].x;
+      double maxHx = -double.infinity;
+      for (int i = 0; i < hole.length; i++) {
+        final u = project2D(hole[i]).x;
+        if (u > maxHx) {
+          maxHx = u;
           hMaxIdx = i;
         }
       }
       final hPt = hole[hMaxIdx];
+      final hPt2d = project2D(hPt);
 
-      // Find closest vertex on currentPoly
+      // Find closest vertex on currentPoly in projected 2D
       int bestOuterIdx = 0;
       double minScore = double.infinity;
       for (int i = 0; i < currentPoly.length; i++) {
         final oPt = currentPoly[i];
-        final distSq = (oPt.x - hPt.x) * (oPt.x - hPt.x) +
-            (oPt.y - hPt.y) * (oPt.y - hPt.y) +
-            (oPt.z - hPt.z) * (oPt.z - hPt.z);
-        final score = (oPt.x >= hPt.x - 1e-4) ? distSq : distSq + 1e10;
+        final oPt2d = project2D(oPt);
+        final distSq = (oPt2d.x - hPt2d.x) * (oPt2d.x - hPt2d.x) +
+            (oPt2d.y - hPt2d.y) * (oPt2d.y - hPt2d.y);
+        final score = (oPt2d.x >= hPt2d.x - 1e-4) ? distSq : distSq + 1e12;
         if (score < minScore) {
           minScore = score;
           bestOuterIdx = i;
@@ -3381,8 +3451,9 @@ class _IfcGeometrySolver {
   }
 
   /// Robust 3D Ear-Clipping Polygon Triangulator.
-  /// Handles arbitrary convex, concave, L-shaped, U-shaped, and stepped planar polygons.
-  /// Prevents false triangles from shooting across concave indentations or flying outside buildings.
+  /// Handles arbitrary convex, concave, L-shaped, U-shaped, stepped planar polygons, and polygons with bridged holes.
+  /// Normalizes coordinates to [0, 1] for uniform numerical stability regardless of CAD scale (mm to km).
+  /// Prevents false triangles from shooting across concave indentations, cadastral boundaries, or openings.
   static List<Triangle3D> _triangulatePolygon3D(List<Vector3> rawPts, {Color? color}) {
     // 0. Filter coincident points to prevent degenerate triangles and infinite loops
     final List<Vector3> pts = [];
@@ -3449,20 +3520,39 @@ class _IfcGeometrySolver {
       }
     }
 
-    // 3.5 Filter collinear points in 2D
+    // 3.1 Coordinate normalization to [0, 1] range to avoid floating-point cancellation
+    // on large cadastral / site coordinates (e.g. coordinates around +-240,000 mm)
+    double minX = double.infinity, maxX = -double.infinity;
+    double minY = double.infinity, maxY = -double.infinity;
+    for (final p in rawPoly2d) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    final span = math.max(maxX - minX, maxY - minY);
+    if (span < 1e-9) return [];
+    final invSpan = 1.0 / span;
+
+    final normPoly2d = rawPoly2d
+        .map((p) => math.Point((p.x - minX) * invSpan, (p.y - minY) * invSpan))
+        .toList();
+
+    // 3.5 Filter collinear points in normalized 2D
+    const double tolCollinear = 1e-5;
     final poly2d = <math.Point<double>>[];
     final cleanPts = <Vector3>[];
-    for (int i = 0; i < rawPoly2d.length; i++) {
+    for (int i = 0; i < normPoly2d.length; i++) {
       if (poly2d.length < 2) {
-        poly2d.add(rawPoly2d[i]);
+        poly2d.add(normPoly2d[i]);
         cleanPts.add(pts[i]);
       } else {
         final prev = poly2d[poly2d.length - 2];
         final curr = poly2d.last;
-        final next = rawPoly2d[i];
+        final next = normPoly2d[i];
         final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
         final dot = (curr.x - prev.x) * (next.x - curr.x) + (curr.y - prev.y) * (next.y - curr.y);
-        if (cross.abs() < 1e-4 && dot > 0) {
+        if (cross.abs() < tolCollinear && dot > 0) {
           // curr is strictly along the same direction, replace it with next
           poly2d[poly2d.length - 1] = next;
           cleanPts[cleanPts.length - 1] = pts[i];
@@ -3472,7 +3562,7 @@ class _IfcGeometrySolver {
         }
       }
     }
-    
+
     // Check if the first point is collinear with last and second
     while (poly2d.length > 2) {
       final prev = poly2d.last;
@@ -3480,14 +3570,14 @@ class _IfcGeometrySolver {
       final next = poly2d[1];
       final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
       final dot = (curr.x - prev.x) * (next.x - curr.x) + (curr.y - prev.y) * (next.y - curr.y);
-      if (cross.abs() < 1e-4 && dot > 0) {
+      if (cross.abs() < tolCollinear && dot > 0) {
         poly2d.removeAt(0);
         cleanPts.removeAt(0);
       } else {
         break;
       }
     }
-    
+
     // Also check if the last point is collinear with second to last and first
     while (poly2d.length > 2) {
       final prev = poly2d[poly2d.length - 2];
@@ -3495,7 +3585,7 @@ class _IfcGeometrySolver {
       final next = poly2d.first;
       final cross = (curr.x - prev.x) * (next.y - prev.y) - (curr.y - prev.y) * (next.x - prev.x);
       final dot = (curr.x - prev.x) * (next.x - curr.x) + (curr.y - prev.y) * (next.y - curr.y);
-      if (cross.abs() < 1e-4 && dot > 0) {
+      if (cross.abs() < tolCollinear && dot > 0) {
         poly2d.removeLast();
         cleanPts.removeLast();
       } else {
@@ -3515,18 +3605,18 @@ class _IfcGeometrySolver {
     }
     final bool ccw = area2d > 0;
 
-    // 5. Ear clipping loop
+    // 5. Ear clipping helper functions
     final indices = List<int>.generate(nClean, (i) => i);
     final List<Triangle3D> result = [];
 
-    bool isEar(int prevIdx, int earIdx, int nextIdx, List<int> curIndices) {
+    bool isEar(int prevIdx, int earIdx, int nextIdx, List<int> curIndices, {double epsInside = 1e-8}) {
       final a = poly2d[prevIdx];
       final b = poly2d[earIdx];
       final c = poly2d[nextIdx];
 
       // Check convexity
       final cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-      if (ccw ? (cross <= 1e-12) : (cross >= -1e-12)) {
+      if (ccw ? (cross <= 1e-10) : (cross >= -1e-10)) {
         return false; // Reflex or collinear
       }
 
@@ -3539,28 +3629,64 @@ class _IfcGeometrySolver {
         final dSqA = (p.x - a.x) * (p.x - a.x) + (p.y - a.y) * (p.y - a.y);
         final dSqB = (p.x - b.x) * (p.x - b.x) + (p.y - b.y) * (p.y - b.y);
         final dSqC = (p.x - c.x) * (p.x - c.x) + (p.y - c.y) * (p.y - c.y);
-        if (dSqA < 1e-6 || dSqB < 1e-6 || dSqC < 1e-6) continue;
+        if (dSqA < 1e-9 || dSqB < 1e-9 || dSqC < 1e-9) continue;
 
         final cp1 = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
         final cp2 = (c.x - b.x) * (p.y - b.y) - (c.y - b.y) * (p.x - b.x);
         final cp3 = (a.x - c.x) * (p.y - c.y) - (a.y - c.y) * (p.x - c.x);
 
-        const eps = 1e-6;
         if (ccw) {
-          if (cp1 >= -eps && cp2 >= -eps && cp3 >= -eps) return false;
+          if (cp1 >= -epsInside && cp2 >= -epsInside && cp3 >= -epsInside) return false;
         } else {
-          if (cp1 <= eps && cp2 <= eps && cp3 <= eps) return false;
+          if (cp1 <= epsInside && cp2 <= epsInside && cp3 <= epsInside) return false;
         }
       }
 
       return true;
     }
 
+    // Check if open line segments (p1, p2) and (q1, q2) intersect
+    bool segmentsIntersect(math.Point<double> p1, math.Point<double> p2, math.Point<double> q1, math.Point<double> q2) {
+      double cp(math.Point<double> a, math.Point<double> b, math.Point<double> c) =>
+          (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+
+      final cp1 = cp(p1, p2, q1);
+      final cp2 = cp(p1, p2, q2);
+      final cp3 = cp(q1, q2, p1);
+      final cp4 = cp(q1, q2, p2);
+
+      if (((cp1 > 1e-9 && cp2 < -1e-9) || (cp1 < -1e-9 && cp2 > 1e-9)) &&
+          ((cp3 > 1e-9 && cp4 < -1e-9) || (cp3 < -1e-9 && cp4 > 1e-9))) {
+        return true;
+      }
+      return false;
+    }
+
+    // Check if diagonal from prev to next intersects any remaining polygon edge
+    bool diagonalIntersectsPolygon(int prevIdx, int nextIdx, List<int> curIndices) {
+      final a = poly2d[prevIdx];
+      final c = poly2d[nextIdx];
+      final cnt = curIndices.length;
+      for (int i = 0; i < cnt; i++) {
+        final e1 = curIndices[i];
+        final e2 = curIndices[(i + 1) % cnt];
+        if (e1 == prevIdx || e1 == nextIdx || e2 == prevIdx || e2 == nextIdx) continue;
+        if (segmentsIntersect(a, c, poly2d[e1], poly2d[e2])) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     int count = indices.length;
     int watchdog = count * 3;
 
     while (count > 3 && watchdog-- > 0) {
-      bool earFound = false;
+      // Quality-aware ear clipping: evaluate all valid ears and pick the best one
+      // (shortest diagonal length), ensuring the diagonal does not intersect polygon edges.
+      // This prevents greedy fans from creating needle spikes across large spans.
+      int bestEarPos = -1;
+      double bestScore = double.infinity;
 
       for (int i = 0; i < count; i++) {
         final prev = indices[(i - 1 + count) % count];
@@ -3568,48 +3694,90 @@ class _IfcGeometrySolver {
         final next = indices[(i + 1) % count];
 
         if (isEar(prev, ear, next, indices)) {
-          result.add(Triangle3D(v0: cleanPts[prev], v1: cleanPts[ear], v2: cleanPts[next], color: color));
-          indices.removeAt(i);
-          count--;
-          earFound = true;
-          break;
+          if (!diagonalIntersectsPolygon(prev, next, indices)) {
+            final a = poly2d[prev];
+            final c = poly2d[next];
+            final distSq = (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y);
+            if (distSq < bestScore) {
+              bestScore = distSq;
+              bestEarPos = i;
+            }
+          }
         }
       }
 
-      if (!earFound) {
-        // Fallback: clip the vertex that forms the shortest internal edge,
-        // prioritizing convex vertices to prevent cutting outside concave polygonal boundaries.
-        int bestIdx = 0;
-        double minScore = double.infinity;
-        
-        for (int i = 0; i < count; i++) {
-          final pIdx = indices[(i - 1 + count) % count];
-          final earIdx = indices[i];
-          final nIdx = indices[(i + 1) % count];
-          
-          final a = poly2d[pIdx];
-          final b = poly2d[earIdx];
-          final c = poly2d[nIdx];
-          
-          final cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-          final bool isConvex = ccw ? (cross > 0) : (cross < 0);
+      if (bestEarPos != -1) {
+        final prev = indices[(bestEarPos - 1 + count) % count];
+        final ear = indices[bestEarPos];
+        final next = indices[(bestEarPos + 1) % count];
+
+        result.add(Triangle3D(v0: cleanPts[prev], v1: cleanPts[ear], v2: cleanPts[next], color: color));
+        indices.removeAt(bestEarPos);
+        count--;
+        continue;
+      }
+
+      // Phase 1 Fallback: If no ear passed strict checks, try with relaxed inside tolerance
+      for (int i = 0; i < count; i++) {
+        final prev = indices[(i - 1 + count) % count];
+        final ear = indices[i];
+        final next = indices[(i + 1) % count];
+
+        if (isEar(prev, ear, next, indices, epsInside: 1e-4)) {
+          final a = poly2d[prev];
+          final c = poly2d[next];
           final distSq = (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y);
-          final score = isConvex ? distSq : distSq + 1e12;
-          
-          if (score < minScore) {
-            minScore = score;
-            bestIdx = i;
+          if (distSq < bestScore) {
+            bestScore = distSq;
+            bestEarPos = i;
           }
         }
-        
-        final prev = indices[(bestIdx - 1 + count) % count];
-        final ear = indices[bestIdx];
-        final next = indices[(bestIdx + 1) % count];
-        
-        result.add(Triangle3D(v0: cleanPts[prev], v1: cleanPts[ear], v2: cleanPts[next], color: color));
-        indices.removeAt(bestIdx);
-        count--;
       }
+
+      if (bestEarPos != -1) {
+        final prev = indices[(bestEarPos - 1 + count) % count];
+        final ear = indices[bestEarPos];
+        final next = indices[(bestEarPos + 1) % count];
+
+        result.add(Triangle3D(v0: cleanPts[prev], v1: cleanPts[ear], v2: cleanPts[next], color: color));
+        indices.removeAt(bestEarPos);
+        count--;
+        continue;
+      }
+
+      // Phase 2 Fallback: pick convex vertex with shortest non-intersecting diagonal
+      int fallbackIdx = -1;
+      double minDiag = double.infinity;
+      for (int i = 0; i < count; i++) {
+        final prev = indices[(i - 1 + count) % count];
+        final ear = indices[i];
+        final next = indices[(i + 1) % count];
+
+        final a = poly2d[prev];
+        final b = poly2d[ear];
+        final c = poly2d[next];
+
+        final cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+        final bool isConvex = ccw ? (cross > 0) : (cross < 0);
+        final distSq = (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y);
+        final bool intersects = diagonalIntersectsPolygon(prev, next, indices);
+
+        final score = (isConvex ? 0.0 : 1e6) + (intersects ? 1e9 : 0.0) + distSq;
+        if (score < minDiag) {
+          minDiag = score;
+          fallbackIdx = i;
+        }
+      }
+
+      if (fallbackIdx == -1) fallbackIdx = 0;
+
+      final prev = indices[(fallbackIdx - 1 + count) % count];
+      final ear = indices[fallbackIdx];
+      final next = indices[(fallbackIdx + 1) % count];
+
+      result.add(Triangle3D(v0: cleanPts[prev], v1: cleanPts[ear], v2: cleanPts[next], color: color));
+      indices.removeAt(fallbackIdx);
+      count--;
     }
 
     if (indices.length == 3) {
