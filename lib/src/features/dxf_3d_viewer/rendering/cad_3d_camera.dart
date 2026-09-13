@@ -17,6 +17,17 @@ enum Cad3DViewPreset {
   const Cad3DViewPreset(this.label, this.icon);
 }
 
+/// Primary interaction mode for 3D gestures and mouse dragging.
+enum Cad3DInteractionMode {
+  orbit('Rotate / Orbit', Icons.threed_rotation_rounded),
+  pan('Drag / Pan', Icons.pan_tool_rounded);
+
+  final String label;
+  final IconData icon;
+
+  const Cad3DInteractionMode(this.label, this.icon);
+}
+
 /// 3D Orbit Camera Controller for CAD models.
 class Cad3DCamera {
   double yaw; // Azimuth angle (radians)

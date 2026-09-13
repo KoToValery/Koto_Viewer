@@ -830,6 +830,36 @@ abstract class AppLocalizations {
   /// **'3D Properties'**
   String get properties3d;
 
+  /// Drag and pan interaction mode for 3D viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Drag / Pan'**
+  String get dragMode;
+
+  /// Rotate and orbit interaction mode for 3D viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate / Orbit'**
+  String get orbitMode;
+
+  /// Tooltip indicating dragging will move/pan the 3D model
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to move model'**
+  String get dragModelTooltip;
+
+  /// Tooltip indicating dragging will rotate the 3D model
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to rotate model'**
+  String get rotateModelTooltip;
+
+  /// Badge indicator when drag/pan mode is active
+  ///
+  /// In en, this message translates to:
+  /// **'Drag Mode Active'**
+  String get dragModeActive;
+
   /// Error message when opening DXF file fails
   ///
   /// In en, this message translates to:

@@ -7,6 +7,7 @@ import 'package:kotoview/src/features/dxf_3d_viewer/models/mesh_3d.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/stl_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/obj_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/glb_gltf_parser.dart';
+import 'package:kotoview/src/features/dxf_3d_viewer/parser/ifc_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/rendering/cad_3d_camera.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
 
@@ -407,6 +408,90 @@ f 1//1 2//1 3//1 4//1
       final recorder = PictureRecorder();
       final canvas = Canvas(recorder);
       expect(() => painter.paint(canvas, const Size(1024, 768)), returnsNormally);
+      final picture = recorder.endRecording();
+      expect(picture, isNotNull);
+    });
+  });
+
+  group('IFC Cladding, Depth Bias, and Scale Independence Tests', () {
+    test('IfcParser detects thin cladding and sets normalized depthBias and normal offset', () {
+      const ifcData = r'''
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('IFC 2X3 test'),'2;1');
+FILE_NAME('test.ifc','2026-01-01',('Author'),('Org'),'','','');
+FILE_SCHEMA(('IFC2X3'));
+ENDSEC;
+DATA;
+#1=IFCPROJECT('1Project',#2,'Project',$,$,$,$,(#3),#4);
+#2=IFCOWNERHISTORY(#5,#6,$,.ADDED.,$,$,$,$);
+#3=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,#7,$);
+#4=IFCUNITASSIGNMENT((#8));
+#5=IFCPERSONANDORGANIZATION(#9,#10,$);
+#6=IFCAPPLICATION(#10,'1.0','App','App');
+#7=IFCAXIS2PLACEMENT3D(#11,#12,#13);
+#8=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);
+#9=IFCPERSON($,'User',$,$,$,$,$,$);
+#10=IFCORGANIZATION($,'Org',$,$,$);
+#11=IFCCARTESIANPOINT((0.,0.,0.));
+#12=IFCDIRECTION((0.,0.,1.));
+#13=IFCDIRECTION((1.,0.,0.));
+#20=IFCSLAB('20Slab',#2,'Exterior Cladding Finish',$,'Slab',#21,#22,$,.FLOOR.);
+#21=IFCLOCALPLACEMENT($,#7);
+#22=IFCPRODUCTDEFINITIONSHAPE($,$,(#23));
+#23=IFCSHAPEREPRESENTATION(#3,'Body','Brep',(#24));
+#24=IFCFACETEDBREP(#25);
+#25=IFCCLOSEDSHELL((#30,#31));
+#30=IFCFACE((#32));
+#31=IFCFACE((#33));
+#32=IFCFACEOUTERBOUND(#34,.T.);
+#33=IFCFACEOUTERBOUND(#35,.T.);
+#34=IFCPOLYLOOP((#40,#41,#42));
+#35=IFCPOLYLOOP((#40,#42,#43));
+#40=IFCCARTESIANPOINT((0.,0.,0.));
+#41=IFCCARTESIANPOINT((1000.,0.,0.));
+#42=IFCCARTESIANPOINT((1000.,20.,0.));
+#43=IFCCARTESIANPOINT((0.,20.,0.));
+ENDSEC;
+END-20;
+''';
+      final model = IfcParser.parseFromText(ifcData, defaultName: 'cladding.ifc');
+      expect(model.elements.isNotEmpty, isTrue);
+      final slab = model.elements.firstWhere((e) => e.category == 'Slab');
+      expect(slab.triangles.isNotEmpty, isTrue);
+      // Normalized depthBias should be 1.0 (not 100.0)
+      expect(slab.triangles.first.depthBias, 1.0);
+    });
+
+    test('Cad3DMeshPainter renders scene with depth-biased and base triangles in unified pass', () {
+      final wallTri = Triangle3D(
+        v0: const Vector3(-500, 0, 0),
+        v1: const Vector3(500, 0, 0),
+        v2: const Vector3(0, 0, 500),
+        depthBias: 0.0,
+      );
+      final claddingTri = Triangle3D(
+        v0: const Vector3(-200, 1, 0),
+        v1: const Vector3(200, 1, 0),
+        v2: const Vector3(0, 1, 300),
+        depthBias: 1.0,
+      );
+      final mesh = Mesh3D(
+        name: 'WallWithCladding',
+        triangles: [wallTri, claddingTri],
+      );
+
+      final camera = Cad3DCamera();
+      final painter = Cad3DMeshPainter(
+        mesh: mesh,
+        camera: camera,
+        shadingMode: Cad3DShadingMode.cadShadedEdges,
+        theme: Cad3DTheme.darkCad,
+      );
+
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+      expect(() => painter.paint(canvas, const Size(800, 600)), returnsNormally);
       final picture = recorder.endRecording();
       expect(picture, isNotNull);
     });

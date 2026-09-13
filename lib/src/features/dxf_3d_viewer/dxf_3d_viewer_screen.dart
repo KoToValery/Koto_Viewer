@@ -52,6 +52,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   Cad3DTheme _theme = Cad3DTheme.darkCad;
   final bool _showGrid = true;
   Color? _customModelColor;
+  Cad3DInteractionMode _interactionMode = Cad3DInteractionMode.orbit;
 
   Offset? _lastPanPos;
   double _baseScale = 1.0;
@@ -191,6 +192,31 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
   bool _isInteracting = false;
 
+  bool get _isPanActive {
+    if (_interactionMode == Cad3DInteractionMode.pan) return true;
+    final keys = HardwareKeyboard.instance.logicalKeysPressed;
+    return HardwareKeyboard.instance.isShiftPressed ||
+        HardwareKeyboard.instance.isControlPressed ||
+        keys.contains(LogicalKeyboardKey.space);
+  }
+
+  void _toggleInteractionMode() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _interactionMode = _interactionMode == Cad3DInteractionMode.orbit
+          ? Cad3DInteractionMode.pan
+          : Cad3DInteractionMode.orbit;
+    });
+  }
+
+  void _setInteractionMode(Cad3DInteractionMode mode) {
+    if (_interactionMode == mode) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _interactionMode = mode;
+    });
+  }
+
   void _onScaleStart(ScaleStartDetails details) {
     _lastPanPos = details.localFocalPoint;
     _baseScale = _camera.zoom;
@@ -206,8 +232,13 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     setState(() {
       _isInteracting = true;
       if (details.pointerCount == 1) {
-        // 1 finger: Orbit Rotation
-        _camera.orbit(delta.dx, delta.dy);
+        if (_isPanActive) {
+          // 1 pointer in Pan / Drag Mode (or Shift/Space/Ctrl held): Drag model across screen
+          _camera.pan(delta);
+        } else {
+          // 1 pointer in Orbit Mode: Rotate model
+          _camera.orbit(delta.dx, delta.dy);
+        }
       } else if (details.pointerCount >= 2) {
         // 2 fingers: Pan and Zoom
         _camera.pan(delta);
@@ -486,6 +517,37 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
             ),
             child: Row(
               children: [
+                // Interaction Mode Segmented Switch: Orbit (Rotate) vs Pan (Drag)
+                Container(
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: theme.brightness == Brightness.dark ? Colors.white12 : Colors.black12,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildModeButton(
+                        icon: Icons.threed_rotation_rounded,
+                        tooltip: '${l10n.orbitMode} (${l10n.rotateModelTooltip})',
+                        isSelected: _interactionMode == Cad3DInteractionMode.orbit,
+                        onTap: () => _setInteractionMode(Cad3DInteractionMode.orbit),
+                        theme: theme,
+                      ),
+                      _buildModeButton(
+                        icon: Icons.pan_tool_rounded,
+                        tooltip: '${l10n.dragMode} (${l10n.dragModelTooltip})',
+                        isSelected: _interactionMode == Cad3DInteractionMode.pan,
+                        onTap: () => _setInteractionMode(Cad3DInteractionMode.pan),
+                        theme: theme,
+                      ),
+                    ],
+                  ),
+                ),
+
                 const Spacer(),
 
                 // Quick Views Menu & Controls
@@ -751,28 +813,93 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   onScaleUpdate: _onScaleUpdate,
                   onScaleEnd: _onScaleEnd,
                   onDoubleTap: _resetView,
-                  child: CustomPaint(
-                    size: Size(constraints.maxWidth, constraints.maxHeight),
-                    painter: Cad3DMeshPainter(
-                      mesh: _mesh!,
-                      camera: _camera,
-                      shadingMode: _shadingMode,
-                      theme: _theme,
-                      showGrid: _showGrid,
-                      customModelColor: _customModelColor,
-                      isInteracting: _isInteracting,
+                  child: MouseRegion(
+                    cursor: _isInteracting
+                        ? (_isPanActive ? SystemMouseCursors.grabbing : SystemMouseCursors.move)
+                        : (_interactionMode == Cad3DInteractionMode.pan
+                            ? SystemMouseCursors.grab
+                            : SystemMouseCursors.basic),
+                    child: CustomPaint(
+                      size: Size(constraints.maxWidth, constraints.maxHeight),
+                      painter: Cad3DMeshPainter(
+                        mesh: _mesh!,
+                        camera: _camera,
+                        shadingMode: _shadingMode,
+                        theme: _theme,
+                        showGrid: _showGrid,
+                        customModelColor: _customModelColor,
+                        isInteracting: _isInteracting,
+                      ),
                     ),
                   ),
                 ),
               ),
 
-              // Floating Controls (Zoom +, Zoom -, Fit)
+              // Drag Mode Active Indicator Pill
+              if (_interactionMode == Cad3DInteractionMode.pan)
+                Positioned(
+                  top: 16,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: InkWell(
+                      onTap: _toggleInteractionMode,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFF00E5FF).withValues(alpha: 0.8),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.pan_tool_rounded, size: 15, color: Color(0xFF00E5FF)),
+                            const SizedBox(width: 6),
+                            Text(
+                              l10n.dragModeActive,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF00E5FF),
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Floating Controls (Mode Toggle, Zoom +, Zoom -, Fit)
               Positioned(
                 bottom: 24,
                 right: 20,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    _buildFloatingButton(
+                      icon: Icons.pan_tool_rounded,
+                      tooltip: _interactionMode == Cad3DInteractionMode.pan
+                          ? '${l10n.dragModeActive} (${l10n.rotateModelTooltip})'
+                          : '${l10n.dragMode} (${l10n.dragModelTooltip})',
+                      isActive: _interactionMode == Cad3DInteractionMode.pan,
+                      onTap: _toggleInteractionMode,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 8),
                     _buildFloatingButton(
                       icon: Icons.add,
                       tooltip: 'Zoom In (+)',
@@ -803,24 +930,64 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     );
   }
 
+  Widget _buildModeButton({
+    required IconData icon,
+    required String tooltip,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required ThemeData theme,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(7),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF00E5FF).withValues(alpha: 0.2) : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+            border: isSelected
+                ? Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.6), width: 1)
+                : null,
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: isSelected ? const Color(0xFF00E5FF) : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFloatingButton({
     required IconData icon,
     required String tooltip,
     required VoidCallback onTap,
     required ThemeData theme,
+    bool isActive = false,
+    Color? activeColor,
   }) {
-    return Material(
-      color: theme.colorScheme.surface.withValues(alpha: 0.9),
-      shape: const CircleBorder(),
-      elevation: 4,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Tooltip(
-          message: tooltip,
+    final effectiveActiveColor = activeColor ?? const Color(0xFF00E5FF);
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: isActive
+            ? effectiveActiveColor
+            : theme.colorScheme.surface.withValues(alpha: 0.9),
+        shape: const CircleBorder(),
+        elevation: isActive ? 6 : 4,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(10.0),
-            child: Icon(icon, size: 20, color: theme.colorScheme.onSurface),
+            child: Icon(
+              icon,
+              size: 20,
+              color: isActive ? Colors.black : theme.colorScheme.onSurface,
+            ),
           ),
         ),
       ),

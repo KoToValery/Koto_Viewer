@@ -406,6 +406,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get properties3d => '3D Properties';
 
   @override
+  String get dragMode => 'Drag / Pan';
+
+  @override
+  String get orbitMode => 'Rotate / Orbit';
+
+  @override
+  String get dragModelTooltip => 'Drag to move model';
+
+  @override
+  String get rotateModelTooltip => 'Drag to rotate model';
+
+  @override
+  String get dragModeActive => 'Drag Mode Active';
+
+  @override
   String errorLoadingDxf(String error) {
     return 'Error opening DXF file: $error';
   }

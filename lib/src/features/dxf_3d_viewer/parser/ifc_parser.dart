@@ -633,13 +633,26 @@ class _IfcGeometrySolver {
             lowerName.contains('siding') ||
             lowerName.contains('обшивк') ||
             lowerName.contains('облицовк') ||
+            lowerName.contains('фасад') ||
+            lowerName.contains('finish') ||
+            lowerName.contains('panel') ||
+            lowerName.contains('панел') ||
             lowerLayer.contains('обшивк') ||
             lowerLayer.contains('cladding') ||
-            (hasCladdingColor && (category == 'Slab' || category == 'Wall' || category == 'Generic'));
+            lowerLayer.contains('siding') ||
+            lowerLayer.contains('finish') ||
+            (hasCladdingColor && (category == 'Slab' || category == 'Wall' || category == 'Generic' || category == 'Part' || category == 'Proxy'));
         isThinCladding = _isThinCladdingGeometry(b, category) || isCladdingStyle;
-        final double claddingDepthBias = isThinCladding ? 100.0 : 0.0;
+        final double claddingDepthBias = isThinCladding ? 1.0 : 0.0;
         final Color? claddingColor = isThinCladding ? const Color(0xFFB57E4C) : null;
         final Color? chimneyColor = isChimney ? const Color(0xFF42474E) : null;
+
+        // Physical surface-normal offset for thin cladding/finish layers:
+        // By offsetting outward surface vertices along their normal (1.0mm in mm models, 0.001m in meter models),
+        // the finishing geometry physically resides in front of the backing wall in 3D world space.
+        final dims = [b.sizeX, b.sizeY, b.sizeZ]..sort();
+        final bool isMeters = dims[2] < 50.0;
+        final double normalOffsetDist = isThinCladding ? (isMeters ? 0.001 : 1.0) : 0.0;
 
         for (final t in filteredTris) {
           final bool makeDoubleSided = (!isClosedSolid && category == 'Roof') ||
@@ -650,10 +663,14 @@ class _IfcGeometrySolver {
           final double triDepthBias = math.max(t.depthBias, claddingDepthBias);
           final Color? triColor = claddingColor ?? chimneyColor ?? t.color;
 
+          final Vector3 v0Offset = normalOffsetDist > 0.0 ? t.v0 + t.normal * normalOffsetDist : t.v0;
+          final Vector3 v1Offset = normalOffsetDist > 0.0 ? t.v1 + t.normal * normalOffsetDist : t.v1;
+          final Vector3 v2Offset = normalOffsetDist > 0.0 ? t.v2 + t.normal * normalOffsetDist : t.v2;
+
           triangles.add(Triangle3D(
-            v0: t.v0,
-            v1: t.v1,
-            v2: t.v2,
+            v0: v0Offset,
+            v1: v1Offset,
+            v2: v2Offset,
             normal: t.normal,
             color: triColor,
             isDoubleSided: makeDoubleSided,
@@ -1220,9 +1237,9 @@ class _IfcGeometrySolver {
 
   /// Geometrically determines if an element is a thin architectural cladding / siding layer (облицовка).
   /// Architects frequently model exterior wall cladding using either the Slab tool or the Wall tool,
-  /// with a characteristic thickness of 10-55 mm (typical 2-5 cm) and large architectural span.
+  /// with a characteristic thickness of 5-65 mm (typical 1-5 cm) and large architectural span.
   static bool _isThinCladdingGeometry(BoundingBox3D b, String category) {
-    if (category != 'Slab' && category != 'Wall' && category != 'Generic') {
+    if (category != 'Slab' && category != 'Wall' && category != 'Generic' && category != 'Part' && category != 'Proxy') {
       return false;
     }
     // Sort dimensions d1 <= d2 <= d3
@@ -1231,10 +1248,16 @@ class _IfcGeometrySolver {
     final d2 = dims[1]; // secondary span
     final d3 = dims[2]; // primary span
 
-    // Cladding / siding (облицовка):
-    // Thickness between 8mm and 55mm (0.8cm to 5.5cm, typical 2-5cm)
-    // Span at least 80mm, with aspect ratio (span/thickness) >= 2.5
-    return d1 >= 8.0 && d1 <= 55.0 && d2 >= 80.0 && d3 >= 120.0 && (d3 / d1 >= 2.5);
+    // Cladding / siding (облицовка, обшивка, покрития, панели):
+    // Detects both millimeter-scale models (d3 >= 50mm) and meter-scale models (d3 < 50m)
+    final bool isMeters = d3 < 50.0;
+    if (isMeters) {
+      // 5mm to 65mm in meters: 0.005m to 0.065m
+      return d1 >= 0.005 && d1 <= 0.065 && d2 >= 0.08 && d3 >= 0.12 && (d3 / d1 >= 2.5);
+    } else {
+      // 5mm to 65mm in millimeters: 5.0mm to 65.0mm
+      return d1 >= 5.0 && d1 <= 65.0 && d2 >= 80.0 && d3 >= 120.0 && (d3 / d1 >= 2.5);
+    }
   }
 
   /// Extracts numbers from parentheses, robust to Archicad trailing dots e.g. (0., -1200., 25.37)

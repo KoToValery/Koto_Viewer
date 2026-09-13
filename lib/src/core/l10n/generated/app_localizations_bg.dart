@@ -409,6 +409,21 @@ class AppLocalizationsBg extends AppLocalizations {
   String get properties3d => '3D Свойства';
 
   @override
+  String get dragMode => 'Преместване (Drag)';
+
+  @override
+  String get orbitMode => 'Завъртане (Orbit)';
+
+  @override
+  String get dragModelTooltip => 'Влачене / преместване на модела';
+
+  @override
+  String get rotateModelTooltip => 'Завъртане на модела';
+
+  @override
+  String get dragModeActive => 'Режим преместване (активен)';
+
+  @override
   String errorLoadingDxf(String error) {
     return 'Грешка при отваряне на DXF файл: $error';
   }

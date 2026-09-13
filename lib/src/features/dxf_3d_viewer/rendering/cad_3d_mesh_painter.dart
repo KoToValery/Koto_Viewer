@@ -153,7 +153,6 @@ class Cad3DMeshPainter extends CustomPainter {
           shadingMode != Cad3DShadingMode.xray) {
         continue;
       }
-
       // Fast view-space normal calculation for lighting
       final edge1 = tv1 - tv0;
       final edge2 = tv2 - tv0;
@@ -164,8 +163,16 @@ class Cad3DMeshPainter extends CustomPainter {
       // (like pitched roof slopes or exterior walls) from falsely sorting in front of interior elements.
       final avgDepth = (tv0.y + tv1.y + tv2.y) / 3.0;
       final maxDepth = math.max(tv0.y, math.max(tv1.y, tv2.y));
-      final depth = (avgDepth * 0.65 + maxDepth * 0.35) - tri.depthBias;
 
+      // Scale-aware depth bias:
+      // Depth in camera space increases with distance (+Y is away from camera).
+      // A small positive bias brings thin finishing surfaces, cladding, and decals
+      // slightly forward in depth sorting relative to their backing walls.
+      // Scaling by maxDim * 0.0015 ensures uniform depth offset regardless of model units (mm, m, in).
+      final double scaledBias = tri.depthBias > 0.0
+          ? (tri.depthBias >= 10.0 ? 1.0 : tri.depthBias) * (maxDim * 0.0015)
+          : 0.0;
+      final depth = (avgDepth * 0.65 + maxDepth * 0.35) - scaledBias;
 
       // Multi-source lighting calculation:
       // Determine effective normal facing toward the camera (two-sided lighting)
