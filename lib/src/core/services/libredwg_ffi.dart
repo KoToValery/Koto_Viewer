@@ -33,12 +33,16 @@ class LibreDwgFfi {
         // Preload libredwg.so then load libkoto_dwg.so
         try {
           DynamicLibrary.open('libredwg.so');
-        } catch (e) {
+        } on ArgumentError catch (e) {
+          debugPrint('LibreDwgFfi note: libredwg.so preload: $e');
+        } on Exception catch (e) {
           debugPrint('LibreDwgFfi note: libredwg.so preload: $e');
         }
         try {
           _lib = DynamicLibrary.open('libkoto_dwg.so');
-        } catch (_) {
+        } on ArgumentError catch (_) {
+          _lib = DynamicLibrary.open('libredwg.so');
+        } on Exception catch (_) {
           _lib = DynamicLibrary.open('libredwg.so');
         }
       } else if (Platform.isWindows) {
@@ -55,7 +59,11 @@ class LibreDwgFfi {
               'koto_convert_dwg_to_dxf',
             );
       }
-    } catch (e) {
+    } on ArgumentError catch (e) {
+      debugPrint('LibreDwgFfi init note (native library not loaded): $e');
+    } on UnsupportedError catch (e) {
+      debugPrint('LibreDwgFfi init note (unsupported platform/operation): $e');
+    } on Exception catch (e) {
       debugPrint('LibreDwgFfi init note (native library not loaded): $e');
     }
   }

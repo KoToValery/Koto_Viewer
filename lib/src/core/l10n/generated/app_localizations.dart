@@ -949,6 +949,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not decode PSD composite image.'**
   String get couldNotDecodePsd;
+
+  /// Error message when custom folder picking fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error picking folder: {error}'**
+  String errorPickingFolder(String error);
+
+  /// Notification message when user selects an unsupported file
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a supported CAD, PCB, 3D, Vector, or Document file.'**
+  String get pleaseSelectSupportedFile;
+
+  /// Error message when opening system file picker fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open file picker: {error}'**
+  String couldNotOpenFilePicker(String error);
+
+  /// Error message when native sharing fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error sharing file: {error}'**
+  String errorSharingFile(String error);
 }
 
 class _AppLocalizationsDelegate

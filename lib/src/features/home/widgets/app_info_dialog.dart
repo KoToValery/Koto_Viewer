@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/errors/error_log_dialog.dart';
@@ -37,7 +38,13 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
           _isLoading = false;
         });
       }
-    } catch (_) {
+    } on PlatformException catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (_) {
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -50,7 +57,11 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
     final uri = Uri.parse('https://github.com/KoToValery/Koto_Viewer');
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {}
+    } on PlatformException catch (_) {
+      // Failed to launch URL
+    } on Exception catch (_) {
+      // Failed to launch URL
+    }
   }
 
   @override
@@ -100,7 +111,7 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                       child: Image.asset(
                         'assets/icons/app_icon.png',
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (_, _, _) => Container(
                           color: theme.colorScheme.primary,
                           child: const Icon(Icons.architecture_rounded, color: Colors.white, size: 30),
                         ),

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
+import '../errors/app_error_handler.dart';
 
 /// Dart client for the native Android SAF (Storage Access Framework) channel.
 ///
@@ -82,12 +83,24 @@ class AndroidSafService {
         final decoded = Uri.decodeComponent(current);
         if (decoded == current) break;
         current = decoded;
-      } catch (_) {
+      } on FormatException catch (_) {
         try {
           final decoded = Uri.decodeFull(current);
           if (decoded == current) break;
           current = decoded;
-        } catch (_) {
+        } on FormatException catch (_) {
+          break;
+        } on ArgumentError catch (_) {
+          break;
+        }
+      } on ArgumentError catch (_) {
+        try {
+          final decoded = Uri.decodeFull(current);
+          if (decoded == current) break;
+          current = decoded;
+        } on FormatException catch (_) {
+          break;
+        } on ArgumentError catch (_) {
           break;
         }
       }
@@ -212,7 +225,9 @@ class AndroidSafService {
       }
 
       return providerFallbackName(safUri);
-    } catch (_) {
+    } on FormatException catch (_) {
+      return 'Custom Folder';
+    } on Exception catch (_) {
       return 'Custom Folder';
     }
   }
@@ -225,7 +240,9 @@ class AndroidSafService {
         'getFolderDisplayName',
         {'uri': safTreeUri},
       );
-    } catch (_) {
+    } on PlatformException catch (_) {
+      return null;
+    } on Exception catch (_) {
       return null;
     }
   }
@@ -239,8 +256,11 @@ class AndroidSafService {
         {'uris': safTreeUris},
       );
       return res ?? {};
-    } catch (e) {
-      debugPrint('AndroidSafService.getFolderDisplayNames error: $e');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'AndroidSafService.getFolderDisplayNames.platform');
+      return {};
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'AndroidSafService.getFolderDisplayNames');
       return {};
     }
   }

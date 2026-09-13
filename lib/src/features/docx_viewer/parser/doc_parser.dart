@@ -19,7 +19,7 @@ class DocParser {
         bytes[3] == 0x04) {
       try {
         return DocxParser.parse(bytes);
-      } catch (_) {}
+      } on Exception catch (_) {}
     }
 
     // 2. Check for RTF signature: {\rtf
@@ -53,10 +53,12 @@ class DocParser {
     String rawString;
     try {
       rawString = utf8.decode(bytes);
-    } catch (_) {
+    } on FormatException catch (_) {
       try {
         rawString = _decodeCp1251(bytes);
-      } catch (_) {
+      } on FormatException catch (_) {
+        rawString = latin1.decode(bytes);
+      } on Exception catch (_) {
         rawString = latin1.decode(bytes);
       }
     }
@@ -503,10 +505,12 @@ class DocParser {
     String decoded;
     try {
       decoded = utf8.decode(bytes);
-    } catch (_) {
+    } on FormatException catch (_) {
       try {
         decoded = _decodeCp1251(bytes);
-      } catch (_) {
+      } on FormatException catch (_) {
+        decoded = latin1.decode(bytes);
+      } on Exception catch (_) {
         decoded = latin1.decode(bytes);
       }
     }

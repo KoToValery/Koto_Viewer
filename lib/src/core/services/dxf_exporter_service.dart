@@ -20,7 +20,7 @@ class DxfExporterService {
     String content;
     try {
       content = utf8.decode(bytes);
-    } catch (_) {
+    } on FormatException catch (_) {
       content = latin1.decode(bytes);
     }
 

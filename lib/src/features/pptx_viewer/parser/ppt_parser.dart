@@ -19,7 +19,7 @@ class PptParser {
         bytes[3] == 0x04) {
       try {
         return PptxParser.parse(bytes);
-      } catch (_) {}
+      } on Exception catch (_) {}
     }
 
     // 2. Check for OLE Compound File signature
@@ -164,7 +164,7 @@ class PptParser {
     String decoded;
     try {
       decoded = utf8.decode(bytes);
-    } catch (_) {
+    } on FormatException catch (_) {
       decoded = latin1.decode(bytes);
     }
 

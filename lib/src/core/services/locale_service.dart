@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Represents a language option in the application language picker.
@@ -59,7 +60,9 @@ class LocaleService {
       } else {
         currentLocaleNotifier.value = null; // System default
       }
-    } catch (_) {
+    } on PlatformException catch (_) {
+      currentLocaleNotifier.value = null;
+    } on Exception catch (_) {
       currentLocaleNotifier.value = null;
     }
   }
@@ -74,7 +77,8 @@ class LocaleService {
       } else {
         await prefs.setString(_keySelectedLocale, locale.languageCode);
       }
-    } catch (_) {}
+    } on PlatformException catch (_) {
+    } on Exception catch (_) {}
   }
 
   /// Returns whether the specified language code is currently active.

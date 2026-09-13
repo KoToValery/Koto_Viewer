@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/errors/app_error_handler.dart';
 import '../../../core/services/local_server_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -54,7 +55,17 @@ class _LocalNetworkShareDialogState extends State<LocalNetworkShareDialog> {
       } else {
         throw Exception('Failed to start server');
       }
-    } catch (e) {
+    } on SocketException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkShareDialog._startServer.socket');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _isStarting = false;
+          _errorMessage = e.message;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocalNetworkShareDialog._startServer');
       if (mounted) {
         setState(() {
           _hasError = true;

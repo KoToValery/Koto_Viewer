@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/errors/app_error_handler.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/file_source_service.dart';
@@ -1843,7 +1845,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (dir != null && dir.existsSync()) {
         return dir.path;
       }
-    } catch (_) {}
+    } on FileSystemException catch (_) {
+      return null;
+    } on Exception catch (_) {
+      return null;
+    }
     return null;
   }
 
@@ -1909,11 +1915,21 @@ class _HomeScreenState extends State<HomeScreen> {
         await _loadFiles();
         return true;
       }
-    } catch (e) {
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickCustomFolder.platform');
       if (mounted) {
+        final l10n = context.l10n;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error picking folder: $e')));
+        ).showSnackBar(SnackBar(content: Text(l10n.errorPickingFolder(e.message ?? e.toString()))));
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickCustomFolder');
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.errorPickingFolder(e.toString()))));
       }
     }
 
@@ -1935,9 +1951,9 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!FileSourceService.isSupportedFile(filePath)) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Text(
-                  'Please select a supported CAD, PCB, 3D, Vector, or Document file.',
+                  context.l10n.pleaseSelectSupportedFile,
                 ),
                 backgroundColor: Colors.orange,
               ),
@@ -1947,10 +1963,20 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         await _openFileScreen(filePath);
       }
-    } catch (e) {
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickAndOpenFile.platform');
       if (mounted) {
+        final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open file picker: $e')),
+          SnackBar(content: Text(l10n.couldNotOpenFilePicker(e.message ?? e.toString()))),
+        );
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickAndOpenFile');
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.couldNotOpenFilePicker(e.toString()))),
         );
       }
     }

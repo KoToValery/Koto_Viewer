@@ -1,8 +1,9 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
+import '../errors/app_error_handler.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -75,11 +76,25 @@ class DocToPdfConverterService {
       } else {
         document = DocParser.parse(bytes);
       }
-    } catch (e) {
+    } on ArchiveException catch (e) {
+      // If docx archive fails, try fallback DocParser
+      try {
+        document = DocParser.parse(bytes);
+      } on Exception catch (inner) {
+        throw DocConversionException('Failed to parse Word document: $e', cause: inner);
+      }
+    } on FormatException catch (e) {
+      // If docx parser format fails, try fallback DocParser
+      try {
+        document = DocParser.parse(bytes);
+      } on Exception catch (inner) {
+        throw DocConversionException('Failed to parse Word document: $e', cause: inner);
+      }
+    } on Exception catch (e) {
       // If docx parser fails, try fallback DocParser
       try {
         document = DocParser.parse(bytes);
-      } catch (inner) {
+      } on Exception catch (inner) {
         throw DocConversionException('Failed to parse Word document: $e', cause: inner);
       }
     }
@@ -110,7 +125,7 @@ class DocToPdfConverterService {
         italic: fontItalic,
         boldItalic: fontBoldItalic,
       );
-    } catch (_) {
+    } on Exception catch (_) {
       // Graceful fallback if offline without cached fonts
       theme = pw.ThemeData.base();
     }
@@ -403,7 +418,11 @@ class DocToPdfConverterService {
       if (await cacheDir.exists()) {
         await cacheDir.delete(recursive: true);
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DocToPdfConverterService.clearCache: FileSystemException');
+      debugPrint('DocToPdfConverterService: Error clearing cache: $e');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DocToPdfConverterService.clearCache');
       debugPrint('DocToPdfConverterService: Error clearing cache: $e');
     }
   }

@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/errors/app_error_handler.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 import '../../../core/services/native_share_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
@@ -87,27 +90,33 @@ class ShareOptionsSheet extends StatelessWidget {
   }
 
   Future<void> _shareWithAll(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+
     Navigator.pop(context);
 
     try {
       final file = File(filePath);
       if (await file.exists()) {
-        final box = context.findRenderObject() as RenderBox?;
-        final origin = box != null
-            ? box.localToGlobal(Offset.zero) & box.size
-            : null;
-
         await Share.shareXFiles(
           [XFile(filePath)],
           subject: filePath.split(Platform.pathSeparator).last,
           sharePositionOrigin: origin,
         );
       } else if (context.mounted) {
-        _showError(context, 'File does not exist');
+        _showError(context, context.l10n.fileNotFoundOrInaccessible);
       }
-    } catch (e) {
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._shareFileNative.platform');
       if (context.mounted) {
-        _showError(context, 'Error sharing file: $e');
+        _showError(context, context.l10n.errorSharingFile(e.message ?? e.toString()));
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._shareFileNative');
+      if (context.mounted) {
+        _showError(context, context.l10n.errorSharingFile(e.toString()));
       }
     }
   }

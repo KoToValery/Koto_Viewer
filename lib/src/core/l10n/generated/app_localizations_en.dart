@@ -500,4 +500,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get couldNotDecodePsd => 'Could not decode PSD composite image.';
+
+  @override
+  String errorPickingFolder(String error) {
+    return 'Error picking folder: $error';
+  }
+
+  @override
+  String get pleaseSelectSupportedFile =>
+      'Please select a supported CAD, PCB, 3D, Vector, or Document file.';
+
+  @override
+  String couldNotOpenFilePicker(String error) {
+    return 'Could not open file picker: $error';
+  }
+
+  @override
+  String errorSharingFile(String error) {
+    return 'Error sharing file: $error';
+  }
 }

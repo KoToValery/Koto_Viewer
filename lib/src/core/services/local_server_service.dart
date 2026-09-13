@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/services.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
+import '../errors/app_error_handler.dart';
 
 /// LAN HTTP server for sharing one PDF or DXF file.
 /// Uses an IPv4 address and port only, without tokens or mDNS.
@@ -109,7 +111,17 @@ class LocalServerService {
       print('KotoView server started: $_serverUrl');
 
       return _serverUrl;
-    } catch (e, stackTrace) {
+    } on SocketException catch (e, stackTrace) {
+      AppErrorHandler.recordError(e, stackTrace, context: 'LocalServerService.startServer: SocketException');
+      // ignore: avoid_print
+      print('Failed to start KotoView server: $e');
+      // ignore: avoid_print
+      print(stackTrace);
+
+      await stopServer();
+      return null;
+    } on Exception catch (e, stackTrace) {
+      AppErrorHandler.recordError(e, stackTrace, context: 'LocalServerService.startServer');
       // ignore: avoid_print
       print('Failed to start KotoView server: $e');
       // ignore: avoid_print
@@ -221,7 +233,9 @@ class LocalServerService {
           port,
           shared: true,
         );
-      } catch (e) {
+      } on SocketException catch (e) {
+        lastError = e;
+      } on Exception catch (e) {
         lastError = e;
       }
     }
@@ -236,7 +250,9 @@ class LocalServerService {
       if (_isUsableLanIpv4(wifiIp)) {
         return wifiIp;
       }
-    } catch (_) {
+    } on PlatformException catch (_) {
+      // Fall back to listing interfaces.
+    } on Exception catch (_) {
       // Fall back to listing interfaces.
     }
 
@@ -253,7 +269,9 @@ class LocalServerService {
           }
         }
       }
-    } catch (_) {
+    } on SocketException catch (_) {
+      return null;
+    } on Exception catch (_) {
       return null;
     }
 
@@ -328,7 +346,11 @@ class LocalServerService {
     if (server != null) {
       try {
         await server.close(force: true);
-      } catch (_) {
+      } on SocketException catch (_) {
+        // The server may already be closed.
+      } on HttpException catch (_) {
+        // The server may already be closed.
+      } on Exception catch (_) {
         // The server may already be closed.
       }
     }

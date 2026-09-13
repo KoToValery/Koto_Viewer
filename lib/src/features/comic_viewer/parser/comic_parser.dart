@@ -73,7 +73,18 @@ class ComicParser {
       receivePort.close();
       isolate?.kill(priority: Isolate.immediate);
       rethrow;
-    } catch (e) {
+    } on IsolateSpawnException {
+      receivePort.close();
+      isolate?.kill(priority: Isolate.immediate);
+      // In-process fallback if isolate spawn fails on any restricted platform
+      final bytes = await file.readAsBytes();
+      return parseFromBytes(
+        bytes,
+        fileName: filePath.split(Platform.pathSeparator).last,
+        filePath: filePath,
+        onProgress: onProgress,
+      );
+    } on Exception {
       receivePort.close();
       isolate?.kill(priority: Isolate.immediate);
       // In-process fallback if isolate spawn fails on any restricted platform
@@ -382,7 +393,7 @@ void _parseWorker(_ParseWorkerRequest request) {
     );
 
     sendPort.send(comic);
-  } catch (e) {
+  } on Exception catch (e) {
     sendPort.send('ERROR: $e');
   }
 }

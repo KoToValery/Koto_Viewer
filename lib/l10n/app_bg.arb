@@ -147,5 +147,9 @@
   "dicomParseError": "Грешка при анализ на DICOM: {error}",
   "errorLoadingDicom": "Грешка при зареждане на DICOM изследване: {error}",
   "errorLoadingEbook": "Грешка при зареждане на електронна книга: {error}",
-  "couldNotDecodePsd": "Неуспешно декодиране на PSD композитно изображение."
+  "couldNotDecodePsd": "Неуспешно декодиране на PSD композитно изображение.",
+  "errorPickingFolder": "Грешка при избор на папка: {error}",
+  "pleaseSelectSupportedFile": "Моля, изберете поддържан CAD, PCB, 3D, векторен или текстов файл.",
+  "couldNotOpenFilePicker": "Неуспешно отваряне на диалога за избор на файл: {error}",
+  "errorSharingFile": "Грешка при споделяне на файл: {error}"
 }

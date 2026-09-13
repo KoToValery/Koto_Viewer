@@ -78,7 +78,9 @@ class PptxParser {
         }
       }
       return map;
-    } catch (_) {
+    } on FormatException catch (_) {
+      return {};
+    } on Exception catch (_) {
       return {};
     }
   }
@@ -197,7 +199,9 @@ class PptxParser {
       if (bytes == null || (bytes as List).isEmpty) return null;
 
       return PptxImage(bytes: Uint8List.fromList(bytes as List<int>));
-    } catch (_) {
+    } on FormatException catch (_) {
+      return null;
+    } on Exception catch (_) {
       return null;
     }
   }

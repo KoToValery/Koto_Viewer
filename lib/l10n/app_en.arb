@@ -442,5 +442,30 @@
   "couldNotDecodePsd": "Could not decode PSD composite image.",
   "@couldNotDecodePsd": {
     "description": "Error message when PSD composite decoding fails"
+  },
+  "errorPickingFolder": "Error picking folder: {error}",
+  "@errorPickingFolder": {
+    "description": "Error message when custom folder picking fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "pleaseSelectSupportedFile": "Please select a supported CAD, PCB, 3D, Vector, or Document file.",
+  "@pleaseSelectSupportedFile": {
+    "description": "Notification message when user selects an unsupported file"
+  },
+  "couldNotOpenFilePicker": "Could not open file picker: {error}",
+  "@couldNotOpenFilePicker": {
+    "description": "Error message when opening system file picker fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorSharingFile": "Error sharing file: {error}",
+  "@errorSharingFile": {
+    "description": "Error message when native sharing fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
   }
 }

@@ -118,6 +118,10 @@ void main() {
       expect(l10n.errorLoadingDicom('corrupt'), equals('Error loading DICOM study: corrupt'));
       expect(l10n.errorLoadingEbook('damaged'), equals('Error loading e-book: damaged'));
       expect(l10n.couldNotDecodePsd, equals('Could not decode PSD composite image.'));
+      expect(l10n.errorPickingFolder('denied'), equals('Error picking folder: denied'));
+      expect(l10n.pleaseSelectSupportedFile, equals('Please select a supported CAD, PCB, 3D, Vector, or Document file.'));
+      expect(l10n.couldNotOpenFilePicker('error'), equals('Could not open file picker: error'));
+      expect(l10n.errorSharingFile('failed'), equals('Error sharing file: failed'));
     });
 
     testWidgets('Bulgarian strings and parameters resolve correctly', (tester) async {
@@ -191,6 +195,10 @@ void main() {
       expect(l10n.errorLoadingDicom('corrupt'), equals('Грешка при зареждане на DICOM изследване: corrupt'));
       expect(l10n.errorLoadingEbook('damaged'), equals('Грешка при зареждане на електронна книга: damaged'));
       expect(l10n.couldNotDecodePsd, equals('Неуспешно декодиране на PSD композитно изображение.'));
+      expect(l10n.errorPickingFolder('denied'), equals('Грешка при избор на папка: denied'));
+      expect(l10n.pleaseSelectSupportedFile, equals('Моля, изберете поддържан CAD, PCB, 3D, векторен или текстов файл.'));
+      expect(l10n.couldNotOpenFilePicker('error'), equals('Неуспешно отваряне на диалога за избор на файл: error'));
+      expect(l10n.errorSharingFile('failed'), equals('Грешка при споделяне на файл: failed'));
 
       // Test category labels in Bulgarian
       expect(FileCategory.all.localizedLabel(buildCtx), equals('Всички'));

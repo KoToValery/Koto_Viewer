@@ -28,13 +28,18 @@ class IntentService {
   Future<String?> _getInitialFilePath() async {
     try {
       final String? path = await _channel.invokeMethod<String>('getInitialFilePath');
-      return path;
-    } catch (_) {
-      try {
-        return await _channel.invokeMethod<String>('getInitialPdfPath');
-      } catch (_) {
-        return null;
-      }
+      if (path != null && path.isNotEmpty) return path;
+    } on PlatformException catch (_) {
+      // Fallback to legacy method name
+    } on Exception catch (_) {
+      // Fallback to legacy method name
+    }
+    try {
+      return await _channel.invokeMethod<String>('getInitialPdfPath');
+    } on PlatformException catch (_) {
+      return null;
+    } on Exception catch (_) {
+      return null;
     }
   }
 

@@ -128,7 +128,8 @@ class AppErrorHandler {
     buffer.writeln('Timestamp: ${DateTime.now().toIso8601String()}');
     try {
       buffer.writeln('Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
-    } catch (_) {}
+    } on UnsupportedError catch (_) {
+    } on Exception catch (_) {}
     buffer.writeln('Total recorded errors: ${_errors.length}');
     buffer.writeln('================================\n');
 

@@ -504,4 +504,23 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get couldNotDecodePsd =>
       'Неуспешно декодиране на PSD композитно изображение.';
+
+  @override
+  String errorPickingFolder(String error) {
+    return 'Грешка при избор на папка: $error';
+  }
+
+  @override
+  String get pleaseSelectSupportedFile =>
+      'Моля, изберете поддържан CAD, PCB, 3D, векторен или текстов файл.';
+
+  @override
+  String couldNotOpenFilePicker(String error) {
+    return 'Неуспешно отваряне на диалога за избор на файл: $error';
+  }
+
+  @override
+  String errorSharingFile(String error) {
+    return 'Грешка при споделяне на файл: $error';
+  }
 }

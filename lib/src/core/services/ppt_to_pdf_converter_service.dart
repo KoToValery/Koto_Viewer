@@ -1,8 +1,9 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
+import '../errors/app_error_handler.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -76,10 +77,31 @@ class PptToPdfConverterService {
       } else {
         presentation = PptParser.parse(bytes);
       }
-    } catch (e) {
+    } on ArchiveException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PptToPdfConverterService: PptxParser ArchiveException fallback to PptParser');
       try {
         presentation = PptParser.parse(bytes);
-      } catch (inner) {
+      } on FormatException catch (inner) {
+        throw PptConversionException('Failed to parse PowerPoint presentation: $e', cause: inner);
+      } on Exception catch (inner) {
+        throw PptConversionException('Failed to parse PowerPoint presentation: $e', cause: inner);
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PptToPdfConverterService: FormatException fallback to PptParser');
+      try {
+        presentation = PptParser.parse(bytes);
+      } on FormatException catch (inner) {
+        throw PptConversionException('Failed to parse PowerPoint presentation: $e', cause: inner);
+      } on Exception catch (inner) {
+        throw PptConversionException('Failed to parse PowerPoint presentation: $e', cause: inner);
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PptToPdfConverterService: Exception fallback to PptParser');
+      try {
+        presentation = PptParser.parse(bytes);
+      } on FormatException catch (inner) {
+        throw PptConversionException('Failed to parse PowerPoint presentation: $e', cause: inner);
+      } on Exception catch (inner) {
         throw PptConversionException('Failed to parse PowerPoint presentation: $e', cause: inner);
       }
     }
@@ -110,7 +132,7 @@ class PptToPdfConverterService {
         italic: fontItalic,
         boldItalic: fontBoldItalic,
       );
-    } catch (_) {
+    } on Exception catch (_) {
       theme = pw.ThemeData.base();
     }
 
@@ -154,7 +176,7 @@ class PptToPdfConverterService {
                     child: pw.Image(pdfImage, fit: pw.BoxFit.contain),
                   ),
                 );
-              } catch (_) {
+              } on Exception catch (_) {
                 // Skip images that can't be decoded
               }
             }
@@ -390,7 +412,11 @@ class PptToPdfConverterService {
       if (await cacheDir.exists()) {
         await cacheDir.delete(recursive: true);
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PptToPdfConverterService.clearCache: FileSystemException');
+      debugPrint('PptToPdfConverterService: Error clearing cache: $e');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PptToPdfConverterService.clearCache');
       debugPrint('PptToPdfConverterService: Error clearing cache: $e');
     }
   }

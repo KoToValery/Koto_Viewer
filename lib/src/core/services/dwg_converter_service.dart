@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import '../errors/app_error_handler.dart';
 import 'libredwg_ffi.dart';
 
 /// Exception thrown when DWG to DXF conversion fails.
@@ -61,7 +61,11 @@ class DwgConverterService {
       combined.setRange(0, headerBytes.length, headerBytes);
       combined.setRange(headerBytes.length, combined.length, bytes);
       await dxfFile.writeAsBytes(combined, flush: true);
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService._injectLayerStatesIntoDxf.fs');
+      debugPrint('DwgConverterService: Failed to inject layer states: $e');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService._injectLayerStatesIntoDxf');
       debugPrint('DwgConverterService: Failed to inject layer states: $e');
     }
   }
@@ -202,7 +206,11 @@ class DwgConverterService {
                   await _injectLayerStatesIntoDxf(outResultFile, encodedStates.join(';'));
                 }
               }
-            } catch (e) {
+            } on ProcessException catch (e, stack) {
+              AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.dwglayers.process');
+              debugPrint('DwgConverterService: dwglayers process error: $e');
+            } on Exception catch (e, stack) {
+              AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.dwglayers');
               debugPrint('DwgConverterService: dwglayers extraction error: $e');
             }
           }
@@ -217,19 +225,36 @@ class DwgConverterService {
           );
           result = processResult.exitCode != 0 ? processResult.exitCode : -1;
         }
-      } catch (e) {
+      } on ProcessException catch (e, stack) {
+        AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.cli.process');
+        debugPrint('DwgConverterService: Windows CLI process error: $e');
+        result = -1;
+      } on FileSystemException catch (e, stack) {
+        AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.cli.fs');
+        debugPrint('DwgConverterService: Windows CLI file error: $e');
+        result = -1;
+      } on Exception catch (e, stack) {
+        AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.cli');
         debugPrint('DwgConverterService: Windows CLI conversion error: $e');
         result = -1;
       } finally {
         if (tempInputFile != null && await tempInputFile.exists()) {
           try {
             await tempInputFile.delete();
-          } catch (_) {}
+          } on FileSystemException catch (_) {
+            // Best effort temp cleanup
+          } on Exception catch (_) {
+            // Best effort temp cleanup
+          }
         }
         if (tempOutputFile != null && await tempOutputFile.exists()) {
           try {
             await tempOutputFile.delete();
-          } catch (_) {}
+          } on FileSystemException catch (_) {
+            // Best effort temp cleanup
+          } on Exception catch (_) {
+            // Best effort temp cleanup
+          }
         }
       }
     }
@@ -248,7 +273,11 @@ class DwgConverterService {
       if (await targetDxfFile.exists()) {
         try {
           await targetDxfFile.delete();
-        } catch (_) {}
+        } on FileSystemException catch (_) {
+          // Best effort target cleanup
+        } on Exception catch (_) {
+          // Best effort target cleanup
+        }
       }
       throw DwgConversionException(
         'Failed to convert DWG file to DXF format.',
@@ -274,7 +303,11 @@ class DwgConverterService {
       if (await cacheDir.exists()) {
         await cacheDir.delete(recursive: true);
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.clearCache.fs');
+      debugPrint('DwgConverterService: Error clearing cache: $e');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.clearCache');
       debugPrint('DwgConverterService: Error clearing cache: $e');
     }
   }
@@ -299,10 +332,18 @@ class DwgConverterService {
           try {
             await entity.delete();
             debugPrint('DwgConverterService: Deleted cache for $baseName');
-          } catch (_) {}
+          } on FileSystemException catch (_) {
+            // Best effort cache file deletion
+          } on Exception catch (_) {
+            // Best effort cache file deletion
+          }
         }
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.clearCacheForFile.fs');
+      debugPrint('DwgConverterService: Error clearing cache for $dwgPath: $e');
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DwgConverterService.clearCacheForFile');
       debugPrint('DwgConverterService: Error clearing cache for $dwgPath: $e');
     }
   }
