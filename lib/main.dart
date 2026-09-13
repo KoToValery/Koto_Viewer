@@ -6,6 +6,7 @@ import 'src/core/theme/app_theme.dart';
 import 'src/core/services/intent_service.dart';
 import 'src/core/services/local_server_service.dart';
 import 'src/core/services/coordinate_system_service.dart';
+import 'src/core/services/dwg_converter_service.dart';
 import 'src/core/services/file_opener_service.dart';
 import 'src/core/services/locale_service.dart';
 import 'src/core/l10n/l10n_extensions.dart';
@@ -18,6 +19,11 @@ void main(List<String> args) {
 
     await CoordinateSystemService.init();
     await LocaleService.init();
+
+    // Startup background cleanup for orphaned DWG temp files and cache pruning
+    unawaited(DwgConverterService.cleanupStaleTempFiles(isStartup: true));
+    unawaited(DwgConverterService.pruneCache());
+
     String? initialFile;
     if (args.isNotEmpty && File(args.first).existsSync()) {
       initialFile = args.first;
