@@ -390,4 +390,21 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get woffNotSupported =>
       'Прегледът на WOFF/WOFF2 не се поддържа. Моля, първо конвертирайте в TTF или OTF.';
+
+  @override
+  String errorLoading3dModel(String error) {
+    return 'Грешка при зареждане на 3D модел: $error';
+  }
+
+  @override
+  String get failedToParse3dMesh => 'Неуспешно разчитане на 3D геометрията.';
+
+  @override
+  String get retry => 'Опитай отново';
+
+  @override
+  String get bimStoreysAndCategories => 'BIM етажи и категории';
+
+  @override
+  String get properties3d => '3D Свойства';
 }

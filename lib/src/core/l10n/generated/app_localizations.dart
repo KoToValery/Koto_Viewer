@@ -799,6 +799,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'WOFF/WOFF2 preview is not supported. Please convert to TTF or OTF first.'**
   String get woffNotSupported;
+
+  /// Error message when loading 3D model fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading 3D model: {error}'**
+  String errorLoading3dModel(String error);
+
+  /// Error message when 3D geometry is empty or invalid
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to parse 3D mesh.'**
+  String get failedToParse3dMesh;
+
+  /// Generic Retry button label
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// Tooltip for BIM storeys and categories button
+  ///
+  /// In en, this message translates to:
+  /// **'BIM Storeys & Categories'**
+  String get bimStoreysAndCategories;
+
+  /// Tooltip for 3D model properties button
+  ///
+  /// In en, this message translates to:
+  /// **'3D Properties'**
+  String get properties3d;
 }
 
 class _AppLocalizationsDelegate

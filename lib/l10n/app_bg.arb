@@ -122,5 +122,10 @@
   "errorReadingWordDocument": "Грешка при четене на Word документ: {error}",
   "errorReadingTextFile": "Грешка при четене на текстов файл: {error}",
   "resumedReadingPosition": "Възобновена позиция на четене",
-  "woffNotSupported": "Прегледът на WOFF/WOFF2 не се поддържа. Моля, първо конвертирайте в TTF или OTF."
+  "woffNotSupported": "Прегледът на WOFF/WOFF2 не се поддържа. Моля, първо конвертирайте в TTF или OTF.",
+  "errorLoading3dModel": "Грешка при зареждане на 3D модел: {error}",
+  "failedToParse3dMesh": "Неуспешно разчитане на 3D геометрията.",
+  "retry": "Опитай отново",
+  "bimStoreysAndCategories": "BIM етажи и категории",
+  "properties3d": "3D Свойства"
 }

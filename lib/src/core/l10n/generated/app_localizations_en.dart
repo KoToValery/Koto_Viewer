@@ -387,4 +387,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get woffNotSupported =>
       'WOFF/WOFF2 preview is not supported. Please convert to TTF or OTF first.';
+
+  @override
+  String errorLoading3dModel(String error) {
+    return 'Error loading 3D model: $error';
+  }
+
+  @override
+  String get failedToParse3dMesh => 'Failed to parse 3D mesh.';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get bimStoreysAndCategories => 'BIM Storeys & Categories';
+
+  @override
+  String get properties3d => '3D Properties';
 }

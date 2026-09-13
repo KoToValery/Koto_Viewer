@@ -18,6 +18,8 @@ import 'parser/three_mf_parser.dart';
 import 'widgets/ifc_bim_sheet.dart';
 import 'rendering/cad_3d_camera.dart';
 import 'rendering/cad_3d_mesh_painter.dart';
+import 'package:archive/archive.dart';
+import '../../core/errors/app_error_handler.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
 import '../../core/l10n/l10n_extensions.dart';
 
@@ -70,10 +72,13 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     try {
       final file = File(widget.filePath);
       if (!await file.exists()) {
-        setState(() {
-          _errorMessage = 'File not found: ${widget.filePath}';
-          _isLoading = false;
-        });
+        if (mounted) {
+          final l10n = AppLocalizations.of(context);
+          setState(() {
+            _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+            _isLoading = false;
+          });
+        }
         return;
       }
 
@@ -105,13 +110,16 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         // Fallback: try FBX -> STEP -> STL -> OBJ
         try {
           mesh = await FbxParser.parseFromFile(widget.filePath);
-        } catch (_) {
+        } on Exception {
+          // FBX fallback failed, try STEP
           try {
             mesh = await StepParser.parseFromFile(widget.filePath);
-          } catch (_) {
+          } on Exception {
+            // STEP fallback failed, try STL
             try {
               mesh = await StlParser.parseFromFile(widget.filePath);
-            } catch (_) {
+            } on Exception {
+              // STL fallback failed, try OBJ
               mesh = await ObjParser.parseFromFile(widget.filePath);
             }
           }
@@ -137,11 +145,44 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'Dxf3DViewer._loadModel.fs');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = 'Error loading 3D Model: $e';
+          _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _isLoading = false;
+        });
+      }
+    } on ArchiveException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'Dxf3DViewer._loadModel.archive');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorLoading3dModel(e.message) ?? 'Error loading 3D model: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'Dxf3DViewer._loadModel.format');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorLoading3dModel(e.message) ?? 'Error loading 3D model: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'Dxf3DViewer._loadModel');
+      await RecentFilesService.removeRecentFile(widget.filePath);
+      if (mounted) {
+        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorLoading3dModel(cleanMsg) ?? 'Error loading 3D model: $cleanMsg';
           _isLoading = false;
         });
       }
@@ -401,8 +442,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     if (_isLoading) {
-      final l10n = context.l10n;
       return ViewerLoadingScreen(
         fileName: _fileName,
         fileSizeBytes: _fileSizeBytes,
@@ -630,7 +671,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                     color: const Color(0xFF00E5FF),
-                    tooltip: 'BIM Storeys & Categories',
+                    tooltip: l10n.bimStoreysAndCategories,
                     onPressed: _openBimSheet,
                   ),
 
@@ -639,7 +680,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   icon: const Icon(Icons.info_outline, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: '3D Properties',
+                  tooltip: l10n.properties3d,
                   onPressed: _showMetricsSheet,
                 ),
 
@@ -648,7 +689,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   icon: const Icon(Icons.share_outlined, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Share',
+                  tooltip: l10n.share,
                   onPressed: _shareFile,
                 ),
               ],
@@ -659,13 +700,13 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           if (_isLoading) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Loading 3D Model & Mesh...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(l10n.loading3dModel),
                 ],
               ),
             );
@@ -681,7 +722,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
                     const SizedBox(height: 16),
                     Text(
-                      _errorMessage ?? 'Failed to parse 3D mesh.',
+                      _errorMessage ?? l10n.failedToParse3dMesh,
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white70),
                     ),
@@ -689,7 +730,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     ElevatedButton.icon(
                       onPressed: _load3DModel,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
+                      label: Text(l10n.retry),
                     ),
                   ],
                 ),

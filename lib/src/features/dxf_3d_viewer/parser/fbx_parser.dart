@@ -266,10 +266,12 @@ class FbxParser {
           final compressedData = bytes.sublist(dataStart, math.min(nextOffset, bytes.length));
           try {
             arrayBytes = Uint8List.fromList(zlib.decode(compressedData));
-          } catch (_) {
+          } on FormatException {
+            // Standard zlib failed, retry with archive package ZLibDecoder
             try {
               arrayBytes = Uint8List.fromList(ZLibDecoder().decodeBytes(compressedData));
-            } catch (_) {
+            } on FormatException {
+              // Retry without checksum verification
               arrayBytes = Uint8List.fromList(ZLibDecoder().decodeBytes(compressedData, verify: false));
             }
           }

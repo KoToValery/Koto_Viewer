@@ -294,5 +294,20 @@
   "resumedReadingPosition": "Resumed reading position",
   "@resumedReadingPosition": { "description": "Toast message indicating resumed reading position" },
   "woffNotSupported": "WOFF/WOFF2 preview is not supported. Please convert to TTF or OTF first.",
-  "@woffNotSupported": { "description": "Error message when opening unsupported font format" }
+  "@woffNotSupported": { "description": "Error message when opening unsupported font format" },
+  "errorLoading3dModel": "Error loading 3D model: {error}",
+  "@errorLoading3dModel": {
+    "description": "Error message when loading 3D model fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "failedToParse3dMesh": "Failed to parse 3D mesh.",
+  "@failedToParse3dMesh": { "description": "Error message when 3D geometry is empty or invalid" },
+  "retry": "Retry",
+  "@retry": { "description": "Generic Retry button label" },
+  "bimStoreysAndCategories": "BIM Storeys & Categories",
+  "@bimStoreysAndCategories": { "description": "Tooltip for BIM storeys and categories button" },
+  "properties3d": "3D Properties",
+  "@properties3d": { "description": "Tooltip for 3D model properties button" }
 }

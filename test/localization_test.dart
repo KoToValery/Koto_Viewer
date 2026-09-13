@@ -93,6 +93,11 @@ void main() {
       expect(l10n.errorReadingTextFile('fail'), equals('Error reading text file: fail'));
       expect(l10n.resumedReadingPosition, equals('Resumed reading position'));
       expect(l10n.woffNotSupported, equals('WOFF/WOFF2 preview is not supported. Please convert to TTF or OTF first.'));
+      expect(l10n.errorLoading3dModel('fail'), equals('Error loading 3D model: fail'));
+      expect(l10n.failedToParse3dMesh, equals('Failed to parse 3D mesh.'));
+      expect(l10n.retry, equals('Retry'));
+      expect(l10n.bimStoreysAndCategories, equals('BIM Storeys & Categories'));
+      expect(l10n.properties3d, equals('3D Properties'));
     });
 
     testWidgets('Bulgarian strings and parameters resolve correctly', (tester) async {
@@ -141,6 +146,11 @@ void main() {
       expect(l10n.errorReadingTextFile('fail'), equals('Грешка при четене на текстов файл: fail'));
       expect(l10n.resumedReadingPosition, equals('Възобновена позиция на четене'));
       expect(l10n.woffNotSupported, equals('Прегледът на WOFF/WOFF2 не се поддържа. Моля, първо конвертирайте в TTF или OTF.'));
+      expect(l10n.errorLoading3dModel('fail'), equals('Грешка при зареждане на 3D модел: fail'));
+      expect(l10n.failedToParse3dMesh, equals('Неуспешно разчитане на 3D геометрията.'));
+      expect(l10n.retry, equals('Опитай отново'));
+      expect(l10n.bimStoreysAndCategories, equals('BIM етажи и категории'));
+      expect(l10n.properties3d, equals('3D Свойства'));
 
       // Test category labels in Bulgarian
       expect(FileCategory.all.localizedLabel(buildCtx), equals('Всички'));
