@@ -909,7 +909,7 @@ END-ISO-10303-21;
       expect(roofs.length, equals(7));
     });
 
-    test('Verify SM.ifc chimney corner bridging and thin cladding displacement if test file exists', () {
+    test('Verify SM.ifc chimney corner bridging, cladding depth bias, and watertight fascia without gaps if test file exists', () {
       final file = File(r'C:\Users\KoTo\Dropbox\test_files\SM.ifc');
       if (!file.existsSync()) return;
 
@@ -926,7 +926,7 @@ END-ISO-10303-21;
       }
       expect(bridgedCount, greaterThanOrEqualTo(4));
 
-      // 2. Cladding Slab 278 & Fascia Slab 288 have warm timber color and depthBias: 100.0
+      // 2. Cladding Slab 278 & Fascia Slab 288 have warm timber color, depthBias: 100.0, and watertight bounds
       final s278 = model.elements.firstWhere((e) => e.id == 278);
       expect(s278.color, equals(const Color(0xFFB57E4C)));
       expect(s278.triangles.every((t) => t.depthBias == 100.0), isTrue);
@@ -934,6 +934,13 @@ END-ISO-10303-21;
       final s288 = model.elements.firstWhere((e) => e.id == 288);
       expect(s288.color, equals(const Color(0xFFB57E4C)));
       expect(s288.triangles.every((t) => t.depthBias == 100.0), isTrue);
+      // Watertight bounds: no torn edges (exact original CAD Z range 2850 to 3400)
+      expect(s288.bounds.min.z, closeTo(2850.0, 0.01));
+      expect(s288.bounds.max.z, closeTo(3400.0, 0.01));
+
+      // 3. Slab 268 (white terrace floor) has buried interface faces pruned against Slab 288
+      final s268 = model.elements.firstWhere((e) => e.id == 268);
+      expect(s268.triangles.length, equals(52));
     });
   });
 }

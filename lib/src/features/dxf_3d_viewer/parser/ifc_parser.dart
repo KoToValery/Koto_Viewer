@@ -650,16 +650,10 @@ class _IfcGeometrySolver {
           final double triDepthBias = math.max(t.depthBias, claddingDepthBias);
           final Color? triColor = claddingColor ?? chimneyColor ?? t.color;
 
-          // Physically displace thin cladding outward along the face normal (12mm)
-          // to prevent Z-fighting and ensure it never merges with backing walls/slabs.
-          final Vector3 offset = isThinCladding && t.normal.lengthSquared > 0.5
-              ? t.normal * 12.0
-              : Vector3.zero;
-
           triangles.add(Triangle3D(
-            v0: t.v0 + offset,
-            v1: t.v1 + offset,
-            v2: t.v2 + offset,
+            v0: t.v0,
+            v1: t.v1,
+            v2: t.v2,
             normal: t.normal,
             color: triColor,
             isDoubleSided: makeDoubleSided,
@@ -847,20 +841,20 @@ class _IfcGeometrySolver {
     }
   }
 
-  /// Cleans up internal coincident touching faces between connected walls at joints and corners.
-  /// When two walls meet at an L-junction, miter, or T-junction, the internal touching faces
-  /// are buried inside the wall mass and should not be drawn. Eliminating them prevents
-  /// depth-sorting artifacts (e.g. dark vertical strips at corners) in 3D rendering.
+  /// Cleans up internal coincident touching faces between connected structural elements (walls, slabs, columns) at joints and corners.
+  /// When two elements meet at a junction or fascia boundary, the internal touching faces
+  /// are buried inside the solid mass and should not be drawn. Eliminating them prevents
+  /// depth-sorting artifacts (e.g. dark vertical strips at corners, white bleed-through) in 3D rendering.
   void _cleanWallJunctions(List<IfcElement> elements) {
-    final walls = elements.where((e) => e.category == 'Wall').toList();
-    if (walls.length < 2) return;
+    final structural = elements.where((e) => e.category == 'Wall' || e.category == 'Slab' || e.category == 'Column').toList();
+    if (structural.length < 2) return;
 
     final Map<int, Set<int>> toRemoveByElementId = {};
 
-    for (int i = 0; i < walls.length; i++) {
-      final w1 = walls[i];
-      for (int j = i + 1; j < walls.length; j++) {
-        final w2 = walls[j];
+    for (int i = 0; i < structural.length; i++) {
+      final w1 = structural[i];
+      for (int j = i + 1; j < structural.length; j++) {
+        final w2 = structural[j];
 
         // Quick 3D bounding box overlap check with 5mm tolerance
         const double tol = 5.0;
