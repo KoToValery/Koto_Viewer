@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../../core/errors/app_error_handler.dart';
 
 enum LocationPermissionState {
   granted,
@@ -34,8 +35,14 @@ class LocationCompassService {
       } else {
         return LocationPermissionState.denied;
       }
-    } catch (e) {
-      debugPrint('Location permission check error: $e');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.checkPermission.platform');
+      return LocationPermissionState.unsupported;
+    } on TimeoutException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.checkPermission.timeout');
+      return LocationPermissionState.unsupported;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.checkPermission');
       return LocationPermissionState.unsupported;
     }
   }
@@ -64,8 +71,14 @@ class LocationCompassService {
       } else {
         return LocationPermissionState.denied;
       }
-    } catch (e) {
-      debugPrint('Location permission request error: $e');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.requestPermission.platform');
+      return LocationPermissionState.unsupported;
+    } on TimeoutException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.requestPermission.timeout');
+      return LocationPermissionState.unsupported;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.requestPermission');
       return LocationPermissionState.unsupported;
     }
   }
@@ -82,8 +95,14 @@ class LocationCompassService {
           timeLimit: Duration(seconds: 10),
         ),
       );
-    } catch (e) {
-      debugPrint('Error getting current position: $e');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.getCurrentPosition.platform');
+      return null;
+    } on TimeoutException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.getCurrentPosition.timeout');
+      return null;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.getCurrentPosition');
       return null;
     }
   }
@@ -97,8 +116,11 @@ class LocationCompassService {
           distanceFilter: 3, // Update every 3 meters
         ),
       );
-    } catch (e) {
-      debugPrint('Error getting position stream: $e');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.getPositionStream.platform');
+      return null;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.getPositionStream');
       return null;
     }
   }
@@ -130,8 +152,11 @@ class LocationCompassService {
                 heading: event.heading!,
                 accuracy: event.accuracy,
               ));
-    } catch (e) {
-      debugPrint('Error getting filtered compass stream: $e');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.getFilteredCompassStream.platform');
+      return null;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.getFilteredCompassStream');
       return null;
     }
   }
@@ -141,8 +166,11 @@ class LocationCompassService {
     try {
       return getFilteredCompassStream(minDeltaDegrees: minDeltaDegrees)
           ?.map((data) => data.heading);
-    } catch (e) {
-      debugPrint('Error getting compass stream: $e');
+    } on PlatformException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.getCompassStream.platform');
+      return null;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'LocationCompassService.getCompassStream');
       return null;
     }
   }

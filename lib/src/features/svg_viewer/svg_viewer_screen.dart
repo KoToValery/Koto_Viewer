@@ -4,6 +4,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/errors/app_error_handler.dart';
+import '../../core/l10n/l10n_extensions.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/recent_files_service.dart';
 
@@ -121,10 +123,13 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
     try {
       final file = File(widget.filePath);
       if (!await file.exists()) {
-        setState(() {
-          _errorMessage = 'File not found: ${widget.filePath}';
-          _isLoading = false;
-        });
+        final l10n = mounted ? AppLocalizations.of(context) : null;
+        if (mounted) {
+          setState(() {
+            _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found: ${widget.filePath}';
+            _isLoading = false;
+          });
+        }
         return;
       }
 
@@ -143,27 +148,61 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       );
       await RecentFilesService.addRecentFile(pdfItem);
 
-        if (mounted) {
-          setState(() {
-            _svgContent = content;
-            _metadata = metadata;
-            _isLoading = false;
-          });
-
-          debugPrint('[SVG_VIEWER] Loaded "${widget.filePath}": ${metadata.summary}, viewBox=${metadata.viewBox}, size=${metadata.width}x${metadata.height}');
-
-          if (!_viewportSize.isEmpty) {
-            _hasFittedInitial = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _fitToScreen();
-            });
-          }
-        }
-    } catch (e) {
-      await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error loading SVG: $e';
+          _svgContent = content;
+          _metadata = metadata;
+          _isLoading = false;
+        });
+
+        debugPrint('[SVG_VIEWER] Loaded "${widget.filePath}": ${metadata.summary}, viewBox=${metadata.viewBox}, size=${metadata.width}x${metadata.height}');
+
+        if (!_viewportSize.isEmpty) {
+          _hasFittedInitial = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _fitToScreen();
+          });
+        }
+      }
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'SvgViewer._loadSvgFile.fs');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore cleanup failure
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'SvgViewer._loadSvgFile.format');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore cleanup failure
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorLoadingSvg(e.message) ?? 'Error loading SVG: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'SvgViewer._loadSvgFile');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore cleanup failure
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorLoadingSvg(e.toString()) ?? 'Error loading SVG: $e';
           _isLoading = false;
         });
       }

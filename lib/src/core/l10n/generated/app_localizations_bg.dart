@@ -450,4 +450,39 @@ class AppLocalizationsBg extends AppLocalizations {
   String errorReadingPcb(String error) {
     return 'Грешка при четене на платка (PCB): $error';
   }
+
+  @override
+  String errorReadingCdr(String error) {
+    return 'Грешка при четене на CorelDRAW файл: $error';
+  }
+
+  @override
+  String couldNotExportPng(String error) {
+    return 'Неуспешен експорт на PNG: $error';
+  }
+
+  @override
+  String printError(String error) {
+    return 'Грешка при печат: $error';
+  }
+
+  @override
+  String errorReadingEps(String error) {
+    return 'Грешка при четене на EPS файл: $error';
+  }
+
+  @override
+  String errorLoadingSvg(String error) {
+    return 'Грешка при зареждане на SVG: $error';
+  }
+
+  @override
+  String errorLoadingRoute(String error) {
+    return 'Грешка при зареждане на маршрут: $error';
+  }
+
+  @override
+  String centeredOnWaypoint(String name) {
+    return 'Центрирано върху: $name';
+  }
 }

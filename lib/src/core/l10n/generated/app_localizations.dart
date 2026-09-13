@@ -883,6 +883,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error reading PCB project: {error}'**
   String errorReadingPcb(String error);
+
+  /// Error message when reading CorelDRAW file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading CorelDRAW file: {error}'**
+  String errorReadingCdr(String error);
+
+  /// Error message when PNG export fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export PNG: {error}'**
+  String couldNotExportPng(String error);
+
+  /// Error message when printing fails
+  ///
+  /// In en, this message translates to:
+  /// **'Print error: {error}'**
+  String printError(String error);
+
+  /// Error message when reading EPS file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading EPS file: {error}'**
+  String errorReadingEps(String error);
+
+  /// Error message when loading SVG file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading SVG: {error}'**
+  String errorLoadingSvg(String error);
+
+  /// Error message when loading GPS route file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load route file: {error}'**
+  String errorLoadingRoute(String error);
+
+  /// Snackbar notification when map is centered on a waypoint
+  ///
+  /// In en, this message translates to:
+  /// **'Centered on: {name}'**
+  String centeredOnWaypoint(String name);
 }
 
 class _AppLocalizationsDelegate

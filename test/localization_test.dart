@@ -107,6 +107,13 @@ void main() {
       expect(l10n.printPreviewUnavailable('printer offline'), equals('Print preview unavailable: printer offline'));
       expect(l10n.errorReadingHpgl('bad cmd'), equals('Error reading HPGL plotter file: bad cmd'));
       expect(l10n.errorReadingPcb('bad header'), equals('Error reading PCB project: bad header'));
+      expect(l10n.errorReadingCdr('bad container'), equals('Error reading CorelDRAW file: bad container'));
+      expect(l10n.couldNotExportPng('write error'), equals('Could not export PNG: write error'));
+      expect(l10n.printError('offline'), equals('Print error: offline'));
+      expect(l10n.errorReadingEps('invalid header'), equals('Error reading EPS file: invalid header'));
+      expect(l10n.errorLoadingSvg('xml error'), equals('Error loading SVG: xml error'));
+      expect(l10n.errorLoadingRoute('bad gpx'), equals('Could not load route file: bad gpx'));
+      expect(l10n.centeredOnWaypoint('Peak A'), equals('Centered on: Peak A'));
     });
 
     testWidgets('Bulgarian strings and parameters resolve correctly', (tester) async {
@@ -169,6 +176,13 @@ void main() {
       expect(l10n.printPreviewUnavailable('printer offline'), equals('Прегледът за печат е недостъпен: printer offline'));
       expect(l10n.errorReadingHpgl('bad cmd'), equals('Грешка при четене на HPGL плотерен файл: bad cmd'));
       expect(l10n.errorReadingPcb('bad header'), equals('Грешка при четене на платка (PCB): bad header'));
+      expect(l10n.errorReadingCdr('bad container'), equals('Грешка при четене на CorelDRAW файл: bad container'));
+      expect(l10n.couldNotExportPng('write error'), equals('Неуспешен експорт на PNG: write error'));
+      expect(l10n.printError('offline'), equals('Грешка при печат: offline'));
+      expect(l10n.errorReadingEps('invalid header'), equals('Грешка при четене на EPS файл: invalid header'));
+      expect(l10n.errorLoadingSvg('xml error'), equals('Грешка при зареждане на SVG: xml error'));
+      expect(l10n.errorLoadingRoute('bad gpx'), equals('Грешка при зареждане на маршрут: bad gpx'));
+      expect(l10n.centeredOnWaypoint('Връх А'), equals('Центрирано върху: Връх А'));
 
       // Test category labels in Bulgarian
       expect(FileCategory.all.localizedLabel(buildCtx), equals('Всички'));

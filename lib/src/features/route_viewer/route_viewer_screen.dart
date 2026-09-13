@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/errors/app_error_handler.dart';
+import '../../core/l10n/l10n_extensions.dart';
 
 import 'models/geo_route_models.dart';
 import 'parser/geojson_parser.dart';
@@ -83,7 +86,14 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
     try {
       final file = File(widget.filePath);
       if (!await file.exists()) {
-        throw Exception('File not found at path: ${widget.filePath}');
+        final l10n = mounted ? AppLocalizations.of(context) : null;
+        if (mounted) {
+          setState(() {
+            _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found: ${widget.filePath}';
+            _isLoading = false;
+          });
+        }
+        return;
       }
 
       final lower = widget.filePath.toLowerCase();
@@ -118,10 +128,39 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
           _fitRouteBounds();
         });
       }
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile.fs');
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = 'Could not load route file: $e';
+          _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _isLoading = false;
+        });
+      }
+    } on ArchiveException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile.archive');
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorLoadingRoute(e.message) ?? 'Could not load route file: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile.format');
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorLoadingRoute(e.message) ?? 'Could not load route file: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'RouteViewer._loadRouteFile');
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorLoadingRoute(e.toString()) ?? 'Could not load route file: $e';
           _isLoading = false;
         });
       }
@@ -137,14 +176,16 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
         ),
       );
-    } catch (_) {}
+    } on Exception catch (_) {
+      // Ignore map camera layout exceptions during rapid viewport resizing
+    }
   }
 
   void _centerOnWaypoint(GeoWaypoint wpt) {
     _mapController.move(wpt.toLatLng(), 15.0);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Centered on: ${wpt.name}'),
+        content: Text(context.l10n.centeredOnWaypoint(wpt.name)),
         duration: const Duration(seconds: 2),
       ),
     );

@@ -368,5 +368,54 @@
     "placeholders": {
       "error": { "type": "String" }
     }
+  },
+  "errorReadingCdr": "Error reading CorelDRAW file: {error}",
+  "@errorReadingCdr": {
+    "description": "Error message when reading CorelDRAW file fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "couldNotExportPng": "Could not export PNG: {error}",
+  "@couldNotExportPng": {
+    "description": "Error message when PNG export fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "printError": "Print error: {error}",
+  "@printError": {
+    "description": "Error message when printing fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorReadingEps": "Error reading EPS file: {error}",
+  "@errorReadingEps": {
+    "description": "Error message when reading EPS file fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorLoadingSvg": "Error loading SVG: {error}",
+  "@errorLoadingSvg": {
+    "description": "Error message when loading SVG file fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "errorLoadingRoute": "Could not load route file: {error}",
+  "@errorLoadingRoute": {
+    "description": "Error message when loading GPS route file fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "centeredOnWaypoint": "Centered on: {name}",
+  "@centeredOnWaypoint": {
+    "description": "Snackbar notification when map is centered on a waypoint",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
   }
 }

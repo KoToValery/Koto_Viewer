@@ -447,4 +447,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String errorReadingPcb(String error) {
     return 'Error reading PCB project: $error';
   }
+
+  @override
+  String errorReadingCdr(String error) {
+    return 'Error reading CorelDRAW file: $error';
+  }
+
+  @override
+  String couldNotExportPng(String error) {
+    return 'Could not export PNG: $error';
+  }
+
+  @override
+  String printError(String error) {
+    return 'Print error: $error';
+  }
+
+  @override
+  String errorReadingEps(String error) {
+    return 'Error reading EPS file: $error';
+  }
+
+  @override
+  String errorLoadingSvg(String error) {
+    return 'Error loading SVG: $error';
+  }
+
+  @override
+  String errorLoadingRoute(String error) {
+    return 'Could not load route file: $error';
+  }
+
+  @override
+  String centeredOnWaypoint(String name) {
+    return 'Centered on: $name';
+  }
 }

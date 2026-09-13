@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/errors/app_error_handler.dart';
 import '../../core/services/recent_files_service.dart';
 import 'models/cdr_document.dart';
 import 'parser/cdr_parser.dart';
@@ -56,7 +57,14 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
     try {
       final file = File(widget.filePath);
       if (!await file.exists()) {
-        throw Exception('File not found: ${widget.filePath}');
+        final l10n = mounted ? AppLocalizations.of(context) : null;
+        if (mounted) {
+          setState(() {
+            _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found: ${widget.filePath}';
+            _isLoading = false;
+          });
+        }
+        return;
       }
 
       _fileSizeBytes = await file.length();
@@ -70,11 +78,45 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
-      await RecentFilesService.removeRecentFile(widget.filePath);
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._loadCdrFile.fs');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore cleanup error
+      }
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = 'Error reading CorelDRAW file:\n$e';
+          _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._loadCdrFile.format');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore cleanup error
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorReadingCdr(e.message) ?? 'Error reading CorelDRAW file:\n${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._loadCdrFile');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore cleanup error
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorReadingCdr(e.toString()) ?? 'Error reading CorelDRAW file:\n$e';
           _isLoading = false;
         });
       }
@@ -207,7 +249,9 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
         [XFile(widget.filePath, name: _fileName, mimeType: 'application/vnd.corel-draw')],
         text: _fileName,
       );
-    } catch (_) {}
+    } on Exception catch (_) {
+      // Ignore share sheet dismiss
+    }
   }
 
   Future<void> _exportAndSharePng() async {
@@ -223,10 +267,18 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
         [XFile(pngPath, name: '${baseName}_preview.png', mimeType: 'image/png')],
         text: 'Exported from $_fileName',
       );
-    } catch (e) {
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._exportAndSharePng.fs');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not export PNG: $e')),
+          SnackBar(content: Text(context.l10n.couldNotExportPng(e.message))),
+        );
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._exportAndSharePng');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.couldNotExportPng(e.toString()))),
         );
       }
     }
@@ -239,10 +291,11 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
         onLayout: (format) async => _document!.imageBytes,
         name: _fileName,
       );
-    } catch (e) {
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'CdrViewer._printDocument');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Print error: $e')),
+          SnackBar(content: Text(context.l10n.printError(e.toString()))),
         );
       }
     }

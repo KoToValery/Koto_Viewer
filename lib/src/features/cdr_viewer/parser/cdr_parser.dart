@@ -36,8 +36,10 @@ class CdrParser {
     final Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes, verify: false);
-    } catch (e) {
-      throw FormatException('Failed to decompress CorelDRAW archive: $e');
+    } on ArchiveException catch (e) {
+      throw FormatException('Failed to decompress CorelDRAW archive: ${e.message}');
+    } on FormatException catch (e) {
+      throw FormatException('Failed to decompress CorelDRAW archive: ${e.message}');
     }
 
     // Locate preview thumbnail image
@@ -108,7 +110,11 @@ class CdrParser {
         if (pageElem != null) {
           pageCount = int.tryParse(pageElem.innerText.trim()) ?? 1;
         }
-      } catch (_) {}
+      } on FormatException catch (_) {
+        // Corrupted XML encoding or malformed XML structure; fallback to default metadata
+      } on Exception catch (_) {
+        // Metadata extraction error ignored
+      }
     }
 
     // Extract image dimensions

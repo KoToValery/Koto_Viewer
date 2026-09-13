@@ -136,5 +136,12 @@
   "fitScreen": "Побиране в екрана",
   "printPreviewUnavailable": "Прегледът за печат е недостъпен: {error}",
   "errorReadingHpgl": "Грешка при четене на HPGL плотерен файл: {error}",
-  "errorReadingPcb": "Грешка при четене на платка (PCB): {error}"
+  "errorReadingPcb": "Грешка при четене на платка (PCB): {error}",
+  "errorReadingCdr": "Грешка при четене на CorelDRAW файл: {error}",
+  "couldNotExportPng": "Неуспешен експорт на PNG: {error}",
+  "printError": "Грешка при печат: {error}",
+  "errorReadingEps": "Грешка при четене на EPS файл: {error}",
+  "errorLoadingSvg": "Грешка при зареждане на SVG: {error}",
+  "errorLoadingRoute": "Грешка при зареждане на маршрут: {error}",
+  "centeredOnWaypoint": "Центрирано върху: {name}"
 }

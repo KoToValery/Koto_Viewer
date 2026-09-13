@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/errors/app_error_handler.dart';
+import '../../core/l10n/l10n_extensions.dart';
 import '../../core/services/recent_files_service.dart';
 import 'models/eps_models.dart';
 import 'parser/eps_parser.dart';
@@ -56,7 +58,14 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
     try {
       final file = File(widget.filePath);
       if (!await file.exists()) {
-        throw Exception('File not found: ${widget.filePath}');
+        final l10n = mounted ? AppLocalizations.of(context) : null;
+        if (mounted) {
+          setState(() {
+            _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found: ${widget.filePath}';
+            _isLoading = false;
+          });
+        }
+        return;
       }
 
       _fileSizeBytes = await file.length();
@@ -75,11 +84,45 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
           _fitToScreen();
         });
       }
-    } catch (e) {
-      await RecentFilesService.removeRecentFile(widget.filePath);
+    } on FileSystemException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'EpsViewer._loadEpsFile.fs');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = 'Error reading EPS file: $e';
+          _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _isLoading = false;
+        });
+      }
+    } on FormatException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'EpsViewer._loadEpsFile.format');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorReadingEps(e.message) ?? 'Error reading EPS file: ${e.message}';
+          _isLoading = false;
+        });
+      }
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'EpsViewer._loadEpsFile');
+      try {
+        await RecentFilesService.removeRecentFile(widget.filePath);
+      } on Exception catch (_) {
+        // Ignore recent files cleanup failure
+      }
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _errorMessage = l10n?.errorReadingEps(e.toString()) ?? 'Error reading EPS file: $e';
           _isLoading = false;
         });
       }
