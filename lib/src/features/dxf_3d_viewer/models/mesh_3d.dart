@@ -132,6 +132,24 @@ class Triangle3D {
   double get signedVolume => v0.dot(v1.cross(v2)) / 6.0;
 }
 
+/// Represents a cohesive group or element inside a 3D Mesh (e.g. an IFC element, CAD layer, or submesh).
+class ElementMeshGroup {
+  final String id;
+  final String category;
+  final BoundingBox3D bounds;
+  final List<Triangle3D> triangles;
+
+  ElementMeshGroup({
+    required this.id,
+    this.category = '',
+    BoundingBox3D? bounds,
+    required this.triangles,
+  }) : bounds = bounds ??
+            BoundingBox3D.fromPoints(
+              triangles.expand((t) => [t.v0, t.v1, t.v2]).toList(),
+            );
+}
+
 /// Representation of a complete 3D Mesh.
 class Mesh3D {
   final String name;
@@ -139,6 +157,7 @@ class Mesh3D {
   final BoundingBox3D bounds;
   final double surfaceArea;
   final double volume;
+  final List<ElementMeshGroup>? groups;
 
   Mesh3D({
     required this.name,
@@ -146,6 +165,7 @@ class Mesh3D {
     BoundingBox3D? bounds,
     double? surfaceArea,
     double? volume,
+    this.groups,
   })  : bounds = bounds ?? _computeBounds(triangles),
         surfaceArea = surfaceArea ?? _computeSurfaceArea(triangles),
         volume = volume ?? _computeVolume(triangles);

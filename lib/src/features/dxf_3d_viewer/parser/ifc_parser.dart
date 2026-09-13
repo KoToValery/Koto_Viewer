@@ -713,6 +713,12 @@ class _IfcGeometrySolver {
       // Bridge corner gaps between connected walls (e.g. 4-sided chimneys and corner miters)
       _bridgeConnectedWallCorners(elements, connectedWallPairs);
 
+      // Clean up coincident contact faces between thin cladding/finishes and backing structural walls
+      _cleanCladdingWallInterfaces(elements);
+
+      // Pre-tessellate large planar architectural surfaces in background isolate
+      _preTessellateLargeSurfaces(elements);
+
     // Filter out layers that do not contain any elements
     final usedLayers = elements.map((e) => e.layer.trim()).where((l) => l.isNotEmpty).toSet();
     if (usedLayers.isNotEmpty) {
@@ -1199,6 +1205,203 @@ class _IfcGeometrySolver {
           );
         }
       }
+    }
+  }
+
+  /// Cleans up coincident contact faces between thin cladding/finishing elements and backing structural walls.
+  /// Prunes the buried back-faces of cladding (facing inward towards the wall) and assigns a negative depth bias
+  /// to the backing wall front-faces so the cladding stably renders in front without z-fighting.
+  void _cleanCladdingWallInterfaces(List<IfcElement> elements) {
+    final claddings = elements.where((e) => e.triangles.any((t) => t.depthBias > 0.5)).toList();
+    final walls = elements.where((e) => e.category == 'Wall' || e.category == 'Slab' || e.category == 'Column').toList();
+    if (claddings.isEmpty || walls.isEmpty) return;
+
+    final Map<int, Set<int>> toRemoveCladdingTriangles = {};
+    final Map<int, Set<int>> wallBiasedTriangles = {};
+
+    for (final clad in claddings) {
+      final dims = [clad.bounds.sizeX, clad.bounds.sizeY, clad.bounds.sizeZ]..sort();
+      final bool isMeters = dims[2] < 50.0;
+      final double tol = isMeters ? 0.005 : 5.0; // 5mm tolerance
+
+      for (final wall in walls) {
+        if (clad.id == wall.id) continue;
+
+        // Bounding box overlap check
+        if (clad.bounds.max.x < wall.bounds.min.x - tol || clad.bounds.min.x > wall.bounds.max.x + tol) continue;
+        if (clad.bounds.max.y < wall.bounds.min.y - tol || clad.bounds.min.y > wall.bounds.max.y + tol) continue;
+        if (clad.bounds.max.z < wall.bounds.min.z - tol || clad.bounds.min.z > wall.bounds.max.z + tol) continue;
+
+        for (int ci = 0; ci < clad.triangles.length; ci++) {
+          final tc = clad.triangles[ci];
+
+          for (int wi = 0; wi < wall.triangles.length; wi++) {
+            final tw = wall.triangles[wi];
+
+            // 1. Buried back-face of cladding:
+            // Opposing normal to wall's outward normal: tc.normal.dot(tw.normal) < -0.90
+            if (tc.normal.dot(tw.normal) < -0.90) {
+              final distPlane = ((tc.v0 - tw.v0).dot(tw.normal)).abs();
+              if (distPlane < tol) {
+                final cCenter = (tc.v0 + tc.v1 + tc.v2) * (1.0 / 3.0);
+                if (_isPointInsideBounds(cCenter, wall.bounds, tol)) {
+                  toRemoveCladdingTriangles.putIfAbsent(clad.id, () => {}).add(ci);
+                  wallBiasedTriangles.putIfAbsent(wall.id, () => {}).add(wi);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Apply removals to cladding
+    for (final entry in toRemoveCladdingTriangles.entries) {
+      final idx = elements.indexWhere((e) => e.id == entry.key);
+      if (idx != -1) {
+        final el = elements[idx];
+        final kept = <Triangle3D>[];
+        for (int i = 0; i < el.triangles.length; i++) {
+          if (!entry.value.contains(i)) {
+            kept.add(el.triangles[i]);
+          }
+        }
+        elements[idx] = IfcElement(
+          id: el.id,
+          globalId: el.globalId,
+          name: el.name,
+          ifcType: el.ifcType,
+          category: el.category,
+          storeyName: el.storeyName,
+          layer: el.layer,
+          color: el.color,
+          triangles: kept,
+          properties: el.properties,
+        );
+      }
+    }
+
+    // Apply negative depth bias (-1.0) to covered wall faces so they sort strictly behind cladding
+    for (final entry in wallBiasedTriangles.entries) {
+      final idx = elements.indexWhere((e) => e.id == entry.key);
+      if (idx != -1) {
+        final el = elements[idx];
+        final updated = <Triangle3D>[];
+        for (int i = 0; i < el.triangles.length; i++) {
+          final t = el.triangles[i];
+          if (entry.value.contains(i)) {
+            updated.add(Triangle3D(
+              v0: t.v0,
+              v1: t.v1,
+              v2: t.v2,
+              normal: t.normal,
+              color: t.color,
+              isDoubleSided: t.isDoubleSided,
+              depthBias: -1.0,
+            ));
+          } else {
+            updated.add(t);
+          }
+        }
+        elements[idx] = IfcElement(
+          id: el.id,
+          globalId: el.globalId,
+          name: el.name,
+          ifcType: el.ifcType,
+          category: el.category,
+          storeyName: el.storeyName,
+          layer: el.layer,
+          color: el.color,
+          triangles: updated,
+          properties: el.properties,
+        );
+      }
+    }
+  }
+
+  /// Pre-tessellates large planar architectural surfaces (e.g. walls, slabs, roofs)
+  /// directly in the background isolate so that the UI thread receives an already-tessellated mesh
+  /// and avoids first-frame lag.
+  void _preTessellateLargeSurfaces(List<IfcElement> elements) {
+    if (elements.isEmpty) return;
+
+    double minX = double.infinity, maxX = -double.infinity;
+    double minY = double.infinity, maxY = -double.infinity;
+    double minZ = double.infinity, maxZ = -double.infinity;
+    for (final el in elements) {
+      final b = el.bounds;
+      if (b.min.x < minX) minX = b.min.x;
+      if (b.max.x > maxX) maxX = b.max.x;
+      if (b.min.y < minY) minY = b.min.y;
+      if (b.max.y > maxY) maxY = b.max.y;
+      if (b.min.z < minZ) minZ = b.min.z;
+      if (b.max.z > maxZ) maxZ = b.max.z;
+    }
+    final double maxDim = math.max(maxX - minX, math.max(maxY - minY, maxZ - minZ));
+    if (maxDim <= 0) return;
+
+    final double threshold = math.min(1000.0, maxDim * 0.15);
+    final double maxEdgeLen = math.min(600.0, maxDim * 0.08);
+    final double maxEdgeLenSq = maxEdgeLen * maxEdgeLen;
+    final double thresholdSq = threshold * threshold;
+
+    for (int i = 0; i < elements.length; i++) {
+      final el = elements[i];
+      bool hasLarge = false;
+      for (final t in el.triangles) {
+        if ((t.v1 - t.v0).lengthSquared > thresholdSq ||
+            (t.v2 - t.v1).lengthSquared > thresholdSq ||
+            (t.v0 - t.v2).lengthSquared > thresholdSq) {
+          hasLarge = true;
+          break;
+        }
+      }
+      if (!hasLarge) continue;
+
+      final newTris = <Triangle3D>[];
+      for (final t in el.triangles) {
+        _subdivideSingle(t, maxEdgeLenSq, 0, newTris);
+      }
+
+      elements[i] = IfcElement(
+        id: el.id,
+        globalId: el.globalId,
+        name: el.name,
+        ifcType: el.ifcType,
+        category: el.category,
+        storeyName: el.storeyName,
+        layer: el.layer,
+        color: el.color,
+        triangles: newTris,
+        properties: el.properties,
+      );
+    }
+  }
+
+  static void _subdivideSingle(Triangle3D tri, double maxEdgeLenSq, int depth, List<Triangle3D> out) {
+    if (depth >= 5) {
+      out.add(tri);
+      return;
+    }
+    final e01 = (tri.v1 - tri.v0).lengthSquared;
+    final e12 = (tri.v2 - tri.v1).lengthSquared;
+    final e20 = (tri.v0 - tri.v2).lengthSquared;
+    if (e01 <= maxEdgeLenSq && e12 <= maxEdgeLenSq && e20 <= maxEdgeLenSq) {
+      out.add(tri);
+      return;
+    }
+    if (e01 >= e12 && e01 >= e20) {
+      final mid = (tri.v0 + tri.v1) * 0.5;
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
+    } else if (e12 >= e01 && e12 >= e20) {
+      final mid = (tri.v1 + tri.v2) * 0.5;
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
+    } else {
+      final mid = (tri.v2 + tri.v0) * 0.5;
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
     }
   }
 

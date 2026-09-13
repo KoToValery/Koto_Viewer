@@ -7,6 +7,7 @@ import 'package:kotoview/src/features/dxf_3d_viewer/models/mesh_3d.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/stl_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/obj_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/glb_gltf_parser.dart';
+import 'package:kotoview/src/features/dxf_3d_viewer/models/ifc_model.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/parser/ifc_parser.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/rendering/cad_3d_camera.dart';
 import 'package:kotoview/src/features/dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
@@ -479,6 +480,83 @@ END-20;
       final mesh = Mesh3D(
         name: 'WallWithCladding',
         triangles: [wallTri, claddingTri],
+      );
+
+      final camera = Cad3DCamera();
+      final painter = Cad3DMeshPainter(
+        mesh: mesh,
+        camera: camera,
+        shadingMode: Cad3DShadingMode.cadShadedEdges,
+        theme: Cad3DTheme.darkCad,
+      );
+
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+      expect(() => painter.paint(canvas, const Size(800, 600)), returnsNormally);
+      final picture = recorder.endRecording();
+      expect(picture, isNotNull);
+    });
+
+    test('IfcModel toMesh3D creates hierarchical ElementMeshGroups', () {
+      final tri = Triangle3D(
+        v0: const Vector3(0, 0, 0),
+        v1: const Vector3(100, 0, 0),
+        v2: const Vector3(0, 100, 0),
+      );
+      final element = IfcElement(
+        id: 101,
+        globalId: 'guid101',
+        name: 'Wall 1',
+        ifcType: 'IFCWALL',
+        category: 'Wall',
+        storeyName: 'Level 1',
+        color: const Color(0xFFFFFFFF),
+        triangles: [tri],
+      );
+      final model = IfcModel(
+        projectName: 'TestModel',
+        schema: 'IFC2X3',
+        elements: [element],
+        storeys: [const IfcStorey(id: 1, name: 'Level 1', elevation: 0.0, elementIds: [101])],
+        categories: {'Wall'},
+      );
+
+      final mesh = model.toMesh3D();
+      expect(mesh.groups, isNotNull);
+      expect(mesh.groups!.length, 1);
+      expect(mesh.groups!.first.id, '101');
+      expect(mesh.groups!.first.category, 'Wall');
+      expect(mesh.groups!.first.triangles.length, 1);
+      expect(mesh.groups!.first.bounds.sizeX, 100.0);
+    });
+
+    test('Cad3DMeshPainter performs hierarchical bounding box culling on ElementMeshGroups', () {
+      final visibleTri = Triangle3D(
+        v0: const Vector3(-50, -50, 0),
+        v1: const Vector3(50, -50, 0),
+        v2: const Vector3(0, 50, 0),
+      );
+      final offscreenTri = Triangle3D(
+        v0: const Vector3(50000, 50000, 50000),
+        v1: const Vector3(51000, 50000, 50000),
+        v2: const Vector3(50000, 51000, 50000),
+      );
+
+      final groupVisible = ElementMeshGroup(
+        id: 'visibleGroup',
+        category: 'Wall',
+        triangles: [visibleTri],
+      );
+      final groupOffscreen = ElementMeshGroup(
+        id: 'offscreenGroup',
+        category: 'Wall',
+        triangles: [offscreenTri],
+      );
+
+      final mesh = Mesh3D(
+        name: 'CullingTestMesh',
+        triangles: [visibleTri, offscreenTri],
+        groups: [groupVisible, groupOffscreen],
       );
 
       final camera = Cad3DCamera();

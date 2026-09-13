@@ -101,8 +101,8 @@ class Cad3DMeshPainter extends CustomPainter {
     final keyHalf = (keyLight + const Vector3(0.0, -1.0, 0.0)).normalized();
     final List<_RenderTriangle> renderList = [];
 
-    // Retrieve display triangles (smoothly subdivided for large triangles > 1500mm to eliminate painter's depth-sorting bleed-through)
-    final displayTriangles = _getDisplayTriangles(mesh);
+    // Retrieve display triangles (with hierarchical element group frustum culling when groups are present)
+    final displayTriangles = _getActiveDisplayTriangles(mesh, center, size, modelScale, margin: 50.0);
     final int totalTris = displayTriangles.length;
     const int stride = 1;
 
@@ -493,6 +493,61 @@ class Cad3DMeshPainter extends CustomPainter {
       _subdivideSingle(Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
       _subdivideSingle(Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
     }
+  }
+
+  List<Triangle3D> _getActiveDisplayTriangles(
+    Mesh3D mesh,
+    Vector3 center,
+    Size size,
+    double modelScale, {
+    double margin = 50.0,
+  }) {
+    if (mesh.groups != null && mesh.groups!.isNotEmpty) {
+      final active = <Triangle3D>[];
+      for (final group in mesh.groups!) {
+        if (_isBoxVisible(group.bounds, center, camera, size, modelScale, margin)) {
+          active.addAll(group.triangles);
+        }
+      }
+      return active;
+    }
+    return _getDisplayTriangles(mesh);
+  }
+
+  static bool _isBoxVisible(
+    BoundingBox3D b,
+    Vector3 center,
+    Cad3DCamera camera,
+    Size size,
+    double modelScale,
+    double margin,
+  ) {
+    final corners = [
+      Vector3(b.min.x, b.min.y, b.min.z),
+      Vector3(b.max.x, b.min.y, b.min.z),
+      Vector3(b.min.x, b.max.y, b.min.z),
+      Vector3(b.max.x, b.max.y, b.min.z),
+      Vector3(b.min.x, b.min.y, b.max.z),
+      Vector3(b.max.x, b.min.y, b.max.z),
+      Vector3(b.min.x, b.max.y, b.max.z),
+      Vector3(b.max.x, b.max.y, b.max.z),
+    ];
+
+    double minScreenX = double.infinity, maxScreenX = -double.infinity;
+    double minScreenY = double.infinity, maxScreenY = -double.infinity;
+
+    for (final c in corners) {
+      final tv = camera.transformPoint(c - center);
+      final p = camera.projectToScreen(tv, size, modelScale);
+      if (p.dx < minScreenX) minScreenX = p.dx;
+      if (p.dx > maxScreenX) maxScreenX = p.dx;
+      if (p.dy < minScreenY) minScreenY = p.dy;
+      if (p.dy > maxScreenY) maxScreenY = p.dy;
+    }
+
+    if (maxScreenX < -margin || minScreenX > size.width + margin) return false;
+    if (maxScreenY < -margin || minScreenY > size.height + margin) return false;
+    return true;
   }
 
   @override

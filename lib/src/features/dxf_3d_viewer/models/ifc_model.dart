@@ -140,6 +140,7 @@ class IfcModel {
   /// Converts the visible elements of the IFC model into a renderable 3D Mesh.
   Mesh3D toMesh3D() {
     final List<Triangle3D> visibleTriangles = [];
+    final List<ElementMeshGroup> visibleGroups = [];
     final List<Vector3> framingPoints = [];
 
     for (final element in elements) {
@@ -148,6 +149,13 @@ class IfcModel {
       if (element.layer.isNotEmpty && hiddenLayers.contains(element.layer)) continue;
 
       visibleTriangles.addAll(element.triangles);
+      visibleGroups.add(ElementMeshGroup(
+        id: '${element.id}',
+        category: element.category,
+        bounds: element.bounds,
+        triangles: element.triangles,
+      ));
+
       if (element.category != 'Site') {
         for (final t in element.triangles) {
           framingPoints.add(t.v0);
@@ -165,6 +173,7 @@ class IfcModel {
       name: projectName,
       triangles: visibleTriangles,
       bounds: bounds,
+      groups: visibleGroups,
     );
   }
 
