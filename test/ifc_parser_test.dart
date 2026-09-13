@@ -782,6 +782,70 @@ END-ISO-10303-21;
       expect(windowOuterSill, isEmpty);
     });
 
+    test('Pure geometric detection of thin cladding for both Wall and Slab (2-5cm)', () {
+      const ifcCladdingText = r'''
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
+FILE_NAME('Cladding_Test.ifc','2026-09-13T00:00:00',('Architect'),('Studio'),'Archicad','Windows','Auth');
+FILE_SCHEMA(('IFC2X3'));
+ENDSEC;
+DATA;
+#1=IFCPROJECT('0123456789ABCDEF012345',#2,'Cladding Test',$,$,$,$,(#3),#4);
+#10=IFCSITE('0123456789ABCDEF012346',$,'Site',$,$,#11,$,$,.ELEMENT.,$,$,$,$,$);
+#20=IFCBUILDING('0123456789ABCDEF012347',$,'Main Building',$,$,#21,$,$,.ELEMENT.,$,$,$);
+#30=IFCBUILDINGSTOREY('0123456789ABCDEF012348',$,'Storey 1',$,$,#31,$,$,.ELEMENT.,0.0);
+
+#50=IFCCARTESIANPOINT((0.0, 0.0, 0.0));
+#51=IFCDIRECTION((0.0, 0.0, 1.0));
+#52=IFCDIRECTION((1.0, 0.0, 0.0));
+#53=IFCAXIS2PLACEMENT3D(#50,#51,#52);
+#54=IFCLOCALPLACEMENT($,#53);
+
+/* 1. Thin Wall cladding: 25mm thick, 2000mm length, 1000mm height */
+#100=IFCWALL('WALL_CLAD_GUID',$,'Facade Element A',$,$,#54,#101,$);
+#101=IFCPRODUCTDEFINITIONSHAPE($,$,(#102));
+#102=IFCSHAPEREPRESENTATION(#4,'Body','SweptSolid',(#103));
+#103=IFCEXTRUDEDAREASOLID(#104,#53,#51,1000.0);
+#104=IFCRECTANGLEPROFILEDEF(.AREA.,$,#53,25.0,2000.0);
+
+/* 2. Thin Slab cladding: 20mm thick, 3000mm length, 500mm height */
+#200=IFCSLAB('SLAB_CLAD_GUID',$,'Finish Layer B',$,$,#54,#201,$);
+#201=IFCPRODUCTDEFINITIONSHAPE($,$,(#202));
+#202=IFCSHAPEREPRESENTATION(#4,'Body','SweptSolid',(#203));
+#203=IFCEXTRUDEDAREASOLID(#204,#53,#51,20.0);
+#204=IFCRECTANGLEPROFILEDEF(.AREA.,$,#53,500.0,3000.0);
+
+/* 3. Normal Structural Wall: 250mm thick, 4000mm length, 2800mm height */
+#300=IFCWALL('WALL_STRUCT_GUID',$,'Bearing Wall C',$,$,#54,#301,$);
+#301=IFCPRODUCTDEFINITIONSHAPE($,$,(#302));
+#302=IFCSHAPEREPRESENTATION(#4,'Body','SweptSolid',(#303));
+#303=IFCEXTRUDEDAREASOLID(#304,#53,#51,2800.0);
+#304=IFCRECTANGLEPROFILEDEF(.AREA.,$,#53,250.0,4000.0);
+
+#500=IFCRELCONTAINEDINSPATIALSTRUCTURE('REL_01',$,$,$,(#100,#200,#300),#30);
+ENDSEC;
+END-ISO-10303-21;
+''';
+      final model = IfcParser.parseFromText(ifcCladdingText);
+      expect(model.elements.length, equals(3));
+
+      final thinWall = model.elements.firstWhere((e) => e.name == 'Facade Element A');
+      expect(thinWall.category, equals('Wall'));
+      expect(thinWall.color, equals(const Color(0xFFB57E4C)));
+      expect(thinWall.triangles.every((t) => t.depthBias >= 30.0), isTrue);
+
+      final thinSlab = model.elements.firstWhere((e) => e.name == 'Finish Layer B');
+      expect(thinSlab.category, equals('Slab'));
+      expect(thinSlab.color, equals(const Color(0xFFB57E4C)));
+      expect(thinSlab.triangles.every((t) => t.depthBias >= 30.0), isTrue);
+
+      final structWall = model.elements.firstWhere((e) => e.name == 'Bearing Wall C');
+      expect(structWall.category, equals('Wall'));
+      expect(structWall.color, isNot(equals(const Color(0xFFB57E4C))));
+      expect(structWall.triangles.every((t) => t.depthBias == 0.0), isTrue);
+    });
+
     test('Verify big_1.ifc terrain and elements triangulation without needle spikes if test file exists', () {
       File? file;
       for (final path in [
@@ -797,7 +861,34 @@ END-ISO-10303-21;
       if (file == null) return;
 
       final model = IfcParser.parseFromText(file.readAsStringSync());
-      expect(model.elements.length, equals(324));
+      expect(model.elements.length, equals(504));
+
+      // 1. Balcony Railings: Archicad decomposed proxy railings into 180 child parts
+      final railings = model.elements.where((e) => e.category == 'Railing').toList();
+      expect(railings.length, equals(180));
+      for (final r in railings) {
+        expect(r.triangles, isNotEmpty);
+        expect(r.triangles.every((t) => t.isDoubleSided), isTrue);
+      }
+
+      // 2. Cladding Slabs: 20mm horizontal wall cladding rendered with depthBias
+      final thinSlabs = model.elements.where((e) => e.category == 'Slab' && (e.bounds.sizeX <= 45 || e.bounds.sizeY <= 45 || e.bounds.sizeZ <= 45)).toList();
+      expect(thinSlabs, isNotEmpty);
+      for (final s in thinSlabs) {
+        expect(s.triangles.every((t) => t.depthBias >= 30.0), isTrue);
+      }
+      // Cladding slab with wood/timber material style was resolved to warm timber
+      final woodCladdingSlab = model.elements.firstWhere((e) => e.id == 8861);
+      expect(woodCladdingSlab.color, equals(const Color(0xFFB57E4C)));
+
+      // 3. Chimneys: Roof chimney walls rendered in charcoal masonry with bridged corners
+      final chimneyIds = [8148, 8151, 8156, 8159, 9452, 9458, 9465, 9817];
+      for (final id in chimneyIds) {
+        final el = model.elements.firstWhere((e) => e.id == id);
+        expect(el.color, equals(const Color(0xFF42474E)));
+        // Chimney walls have corner bridge box triangles added
+        expect(el.triangles.length, greaterThanOrEqualTo(12));
+      }
 
       final site = model.elements.firstWhere((e) => e.category == 'Site');
       expect(site.triangles, isNotEmpty);

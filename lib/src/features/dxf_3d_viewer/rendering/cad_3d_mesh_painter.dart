@@ -164,7 +164,7 @@ class Cad3DMeshPainter extends CustomPainter {
       // (like pitched roof slopes or exterior walls) from falsely sorting in front of interior elements.
       final avgDepth = (tv0.y + tv1.y + tv2.y) / 3.0;
       final maxDepth = math.max(tv0.y, math.max(tv1.y, tv2.y));
-      final depth = avgDepth * 0.65 + maxDepth * 0.35;
+      final depth = (avgDepth * 0.65 + maxDepth * 0.35) - tri.depthBias;
 
 
       // Multi-source lighting calculation:
@@ -475,16 +475,16 @@ class Cad3DMeshPainter extends CustomPainter {
     }
     if (e01 >= e12 && e01 >= e20) {
       final mid = (tri.v0 + tri.v1) * 0.5;
-      _subdivideSingle(Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
-      _subdivideSingle(Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
     } else if (e12 >= e01 && e12 >= e20) {
       final mid = (tri.v1 + tri.v2) * 0.5;
-      _subdivideSingle(Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
-      _subdivideSingle(Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: mid, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
     } else {
       final mid = (tri.v2 + tri.v0) * 0.5;
-      _subdivideSingle(Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
-      _subdivideSingle(Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: tri.v0, v1: tri.v1, v2: mid, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
+      _subdivideSingle(Triangle3D(v0: mid, v1: tri.v1, v2: tri.v2, color: tri.color, isDoubleSided: tri.isDoubleSided, normal: tri.normal, depthBias: tri.depthBias), maxEdgeLenSq, depth + 1, out);
     }
   }
 

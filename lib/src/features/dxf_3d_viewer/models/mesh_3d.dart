@@ -102,6 +102,7 @@ class Triangle3D {
   final Vector3 normal;
   final Color? color;
   final bool isDoubleSided;
+  final double depthBias;
 
   Triangle3D({
     required this.v0,
@@ -110,6 +111,7 @@ class Triangle3D {
     Vector3? normal,
     this.color,
     this.isDoubleSided = false,
+    this.depthBias = 0.0,
   }) : normal = normal ?? _calculateNormal(v0, v1, v2);
 
   static Vector3 _calculateNormal(Vector3 a, Vector3 b, Vector3 c) {

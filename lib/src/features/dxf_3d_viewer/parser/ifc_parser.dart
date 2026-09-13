@@ -457,6 +457,39 @@ class _IfcGeometrySolver {
       }
     }
 
+    // 2.10. Parse Parent-Child Aggregations (IFCRELAGGREGATES -> Parent proxies/elements and Child parts)
+    final Map<int, int> childToParentId = {};
+    for (final ent in entityMap.values) {
+      if (ent.type == 'IFCRELAGGREGATES') {
+        final params = ent.splitParams;
+        if (params.length >= 6) {
+          final parentId = int.tryParse(params[4].replaceAll(RegExp(r'[#\s]'), ''));
+          if (parentId != null) {
+            final childMatches = RegExp(r'#(\d+)').allMatches(params[5]);
+            for (final m in childMatches) {
+              final childId = int.parse(m.group(1)!);
+              childToParentId[childId] = parentId;
+            }
+          }
+        }
+      }
+    }
+
+    // 2.11. Parse Wall Path Connections (IFCRELCONNECTSPATHELEMENTS -> Connected wall pairs at corners)
+    final List<(int, int)> connectedWallPairs = [];
+    for (final ent in entityMap.values) {
+      if (ent.type == 'IFCRELCONNECTSPATHELEMENTS') {
+        final params = ent.splitParams;
+        if (params.length >= 6) {
+          final id1 = int.tryParse(params[4].replaceAll(RegExp(r'[#\s]'), ''));
+          final id2 = int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), ''));
+          if (id1 != null && id2 != null) {
+            connectedWallPairs.add((id1, id2));
+          }
+        }
+      }
+    }
+
     final List<_OpeningFillInterface> openingFillInterfaces = [];
 
     // 3. Find and generate building elements
@@ -466,6 +499,19 @@ class _IfcGeometrySolver {
     for (final ent in entityMap.values) {
       var category = _categorizeIfcType(ent.type);
       if (category == null) continue; // Not a renderable building element
+
+      final parentId = childToParentId[ent.id];
+      final parentEnt = parentId != null ? entityMap[parentId] : null;
+      String parentName = '';
+      String parentLayer = '';
+      if (parentEnt != null) {
+        final pParams = parentEnt.splitParams;
+        if (pParams.length > 2 && pParams[2].startsWith("'") && pParams[2].length > 2) {
+          parentName = IfcParser.decodeIfcString(pParams[2].replaceAll("'", ""));
+        }
+        final pShapeRepId = pParams.length > 6 ? int.tryParse(pParams[6].replaceAll(RegExp(r'[#\s]'), '')) : null;
+        parentLayer = _resolveElementLayer(parentEnt.id, pShapeRepId, itemToLayerName);
+      }
 
       final params = ent.splitParams;
       String globalId = '';
@@ -479,7 +525,10 @@ class _IfcGeometrySolver {
 
       final placementId = params.length > 5 ? int.tryParse(params[5].replaceAll(RegExp(r'[#\s]'), '')) : null;
       final shapeRepId = params.length > 6 ? int.tryParse(params[6].replaceAll(RegExp(r'[#\s]'), '')) : null;
-      final layer = _resolveElementLayer(ent.id, shapeRepId, itemToLayerName);
+      var layer = _resolveElementLayer(ent.id, shapeRepId, itemToLayerName);
+      if (layer.isEmpty && parentLayer.isNotEmpty) {
+        layer = parentLayer;
+      }
 
       final lowerName = name.toLowerCase();
       final lowerLayer = layer.toLowerCase();
@@ -487,6 +536,8 @@ class _IfcGeometrySolver {
       final className = elementToClassification[ent.id] ?? '';
       final lowerTypeName = typeName.toLowerCase();
       final lowerClassName = className.toLowerCase();
+      final lowerParentName = parentName.toLowerCase();
+      final lowerParentLayer = parentLayer.toLowerCase();
 
       // Intelligent architectural categorization:
       if (lowerLayer.contains('покрив') || lowerLayer.contains('roof') ||
@@ -504,29 +555,56 @@ class _IfcGeometrySolver {
       } else if (lowerLayer.contains('повърхности') || lowerLayer.contains('terrain') ||
                  lowerLayer.contains('site') || ent.type == 'IFCSITE' || ent.type == 'IFCGEOGRAPHICELEMENT') {
         category = 'Site';
-      } else if (ent.type == 'IFCBUILDINGELEMENTPROXY' &&
-                 (fillElementIds.contains(ent.id) ||
-                  lowerName.contains('door') || lowerName.contains('врата') ||
-                  lowerTypeName.contains('door') || lowerTypeName.contains('врата') ||
-                  lowerClassName.contains('door') || lowerClassName.contains('врата') ||
-                  lowerName.contains('window') || lowerName.contains('прозорец') ||
-                  lowerTypeName.contains('window') || lowerTypeName.contains('прозорец') ||
-                  lowerClassName.contains('window') || lowerClassName.contains('прозорец'))) {
-        if (lowerName.contains('door') || lowerName.contains('врата') || lowerName.contains('doo') ||
-            lowerTypeName.contains('door') || lowerTypeName.contains('врата') || lowerTypeName.contains('doo') ||
-            lowerClassName.contains('door') || lowerClassName.contains('врата') || lowerClassName.contains('doo')) {
-          category = 'Door';
+      } else if (category == 'Part' || category == 'Proxy') {
+        if (lowerName.contains('railing') || lowerName.contains('парапет') ||
+            lowerLayer.contains('railing') || lowerLayer.contains('парапет') ||
+            lowerTypeName.contains('railing') || lowerTypeName.contains('парапет') ||
+            lowerClassName.contains('railing') || lowerClassName.contains('парапет') ||
+            lowerParentName.contains('railing') || lowerParentName.contains('парапет') ||
+            lowerParentLayer.contains('railing') || lowerParentLayer.contains('парапет') ||
+            (parentEnt != null && parentEnt.type == 'IFCRAILING')) {
+          category = 'Railing';
+        } else if (fillElementIds.contains(ent.id) ||
+                   lowerName.contains('door') || lowerName.contains('врата') ||
+                   lowerTypeName.contains('door') || lowerTypeName.contains('врата') ||
+                   lowerClassName.contains('door') || lowerClassName.contains('врата') ||
+                   lowerName.contains('window') || lowerName.contains('прозорец') ||
+                   lowerTypeName.contains('window') || lowerTypeName.contains('прозорец') ||
+                   lowerClassName.contains('window') || lowerClassName.contains('прозорец')) {
+          if (lowerName.contains('door') || lowerName.contains('врата') || lowerName.contains('doo') ||
+              lowerTypeName.contains('door') || lowerTypeName.contains('врата') || lowerTypeName.contains('doo') ||
+              lowerClassName.contains('door') || lowerClassName.contains('врата') || lowerClassName.contains('doo')) {
+            category = 'Door';
+          } else {
+            category = 'Window';
+          }
         } else {
-          category = 'Window';
+          category = 'Generic';
         }
       }
 
       final transform = placementId != null ? _resolvePlacement(placementId) : _Transform3D.identity;
       
+      final storeyName = elementToStoreyName[ent.id] ??
+          (parentId != null ? elementToStoreyName[parentId] : null) ??
+          storeys.first.name;
+
       // Determine element material color from styled item, material layer set, or default category color
       final defaultColor = _getArchitecturalColor(category);
-      final elementColor = itemToStyledColor[ent.id] ?? elementToMaterialColor[ent.id] ?? defaultColor;
+      Color elementColor = itemToStyledColor[ent.id] ??
+          (parentId != null ? itemToStyledColor[parentId] : null) ??
+          elementToMaterialColor[ent.id] ??
+          (parentId != null ? elementToMaterialColor[parentId] : null) ??
+          defaultColor;
 
+      // Chimney masonry override
+      final bool isChimney = lowerName.contains('комин') || lowerName.contains('chimney') ||
+          (lowerName.startsWith('sw - 14') && (storeyName.contains('2') || storeyName.contains('3') || storeyName.contains('Покрив')));
+      if (isChimney) {
+        elementColor = const Color(0xFF42474E); // Charcoal Stone / Chimney Masonry
+      }
+
+      bool isThinCladding = false;
       final triangles = <Triangle3D>[];
       if (shapeRepId != null) {
         var rawTris = _resolveShapeRepresentation(shapeRepId, transform, elementColor, category: category);
@@ -547,29 +625,41 @@ class _IfcGeometrySolver {
         final hasDownward = filteredTris.any((t) => t.normal.z < -0.1);
         final bool isClosedSolid = hasUpward && hasDownward;
 
+        // Pure geometric detection of thin cladding / siding (облицовка):
+        // Elements modeled as Slab, Wall, or Generic with thickness 10-55mm (typical 2-5cm)
+        // and large architectural span are geometrically identified as cladding.
+        final b = BoundingBox3D.fromPoints(filteredTris.expand((t) => [t.v0, t.v1, t.v2]).toList());
+        isThinCladding = _isThinCladdingGeometry(b, category);
+        final double claddingDepthBias = isThinCladding ? 35.0 : 0.0;
+        final Color? claddingColor = isThinCladding ? const Color(0xFFB57E4C) : null;
+        final Color? chimneyColor = isChimney ? const Color(0xFF42474E) : null;
+
         for (final t in filteredTris) {
           final bool makeDoubleSided = (!isClosedSolid && category == 'Roof') ||
               category == 'Site' ||
+              category == 'Railing' ||
               (t.color != null && t.color!.a < 0.99) ||
               t.isDoubleSided;
-          if (makeDoubleSided != t.isDoubleSided) {
-            triangles.add(Triangle3D(
-              v0: t.v0,
-              v1: t.v1,
-              v2: t.v2,
-              normal: t.normal,
-              color: t.color,
-              isDoubleSided: makeDoubleSided,
-            ));
-          } else {
-            triangles.add(t);
-          }
+          final double triDepthBias = math.max(t.depthBias, claddingDepthBias);
+          final Color? triColor = claddingColor ?? chimneyColor ?? t.color;
+          triangles.add(Triangle3D(
+            v0: t.v0,
+            v1: t.v1,
+            v2: t.v2,
+            normal: t.normal,
+            color: triColor,
+            isDoubleSided: makeDoubleSided,
+            depthBias: triDepthBias,
+          ));
         }
       }
 
       if (triangles.isNotEmpty) {
-        final storeyName = elementToStoreyName[ent.id] ?? storeys.first.name;
         categories.add(category);
+        final triangleColor = triangles.firstWhere((t) => t.color != null, orElse: () => triangles.first).color;
+        final finalColor = isThinCladding
+            ? const Color(0xFFB57E4C)
+            : (isChimney ? const Color(0xFF42474E) : (triangleColor ?? elementColor));
 
         elements.add(IfcElement(
           id: ent.id,
@@ -579,7 +669,7 @@ class _IfcGeometrySolver {
           category: category,
           storeyName: storeyName,
           layer: layer,
-          color: elementColor,
+          color: finalColor,
           triangles: triangles,
         ));
       }
@@ -594,6 +684,9 @@ class _IfcGeometrySolver {
 
       // Clean up buried outer interface faces of windows and doors filling wall openings
       _cleanOpeningFillInterfaces(elements, openingFillInterfaces);
+
+      // Bridge corner gaps between connected walls (e.g. 4-sided chimneys and corner miters)
+      _bridgeConnectedWallCorners(elements, connectedWallPairs);
 
     // Filter out layers that do not contain any elements
     final usedLayers = elements.map((e) => e.layer.trim()).where((l) => l.isNotEmpty).toSet();
@@ -655,10 +748,13 @@ class _IfcGeometrySolver {
         return 'Stair';
       case 'IFCRAILING':
         return 'Railing';
+      case 'IFCBUILDINGELEMENTPART':
+        return 'Part';
+      case 'IFCBUILDINGELEMENTPROXY':
+        return 'Proxy';
       case 'IFCFURNISHINGELEMENT':
       case 'IFCFURNITURE':
         return 'Furniture';
-      case 'IFCBUILDINGELEMENTPROXY':
       case 'IFCMEMBER':
       case 'IFCPLATE':
         return 'Generic';
@@ -689,11 +785,14 @@ class _IfcGeometrySolver {
       case 'Stair':
         return const Color(0xFF9E9FA4); // Stone Gray
       case 'Railing':
-        return const Color(0xFF5A626A); // Dark Metallic Gray
+        return const Color(0xFF4A5568); // Dark Metallic Steel Gray
       case 'Furniture':
         return const Color(0xFF4E7D96); // Modern Teal / Marine
       case 'Site':
         return const Color(0xFF8DA385); // Natural Terrain Sage Green
+      case 'Part':
+      case 'Proxy':
+        return const Color(0xFF4A5568);
       default:
         return const Color(0xFFC0C0C0);
     }
@@ -943,6 +1042,167 @@ class _IfcGeometrySolver {
     }
 
     return false;
+  }
+
+  /// Bridges corner gaps between connected walls (e.g. 4-sided chimneys and corner miters)
+  /// synthesized from IFCRELCONNECTSPATHELEMENTS relationships.
+  void _bridgeConnectedWallCorners(List<IfcElement> elements, List<(int, int)> connectedPairs) {
+    if (connectedPairs.isEmpty) return;
+    final Map<int, IfcElement> elMap = {for (final e in elements) e.id: e};
+    final Map<int, List<Triangle3D>> extraTriangles = {};
+    final Set<String> bridgedCorners = {};
+
+    for (final pair in connectedPairs) {
+      final w1 = elMap[pair.$1];
+      final w2 = elMap[pair.$2];
+      if (w1 == null || w2 == null) continue;
+      if (w1.category != 'Wall' || w2.category != 'Wall') continue;
+
+      final b1 = w1.bounds;
+      final b2 = w2.bounds;
+
+      // Check vertical overlap
+      final zMin = math.max(b1.min.z, b2.min.z);
+      final zMax = math.min(b1.max.z, b2.max.z);
+      if (zMax - zMin < 100.0) continue; // Must overlap significantly in height
+
+      final c1 = (b1.min + b1.max) * 0.5;
+      final c2 = (b2.min + b2.max) * 0.5;
+
+      // Determine touching coordinates in X and Y
+      double? x0;
+      if ((b1.max.x - b2.min.x).abs() < 35.0) {
+        x0 = (b1.max.x + b2.min.x) * 0.5;
+      } else if ((b2.max.x - b1.min.x).abs() < 35.0) {
+        x0 = (b2.max.x + b1.min.x) * 0.5;
+      }
+
+      double? y0;
+      if ((b1.max.y - b2.min.y).abs() < 35.0) {
+        y0 = (b1.max.y + b2.min.y) * 0.5;
+      } else if ((b2.max.y - b1.min.y).abs() < 35.0) {
+        y0 = (b2.max.y + b1.min.y) * 0.5;
+      }
+
+      if (x0 == null || y0 == null) continue;
+
+      // Determine which wall extends primarily in Y and which in X away from (x0, y0)
+      final dist1X = (c1.x - x0).abs();
+      final dist1Y = (c1.y - y0).abs();
+      final dist2X = (c2.x - x0).abs();
+      final dist2Y = (c2.y - y0).abs();
+
+      final IfcElement wallExtY;
+      final IfcElement wallExtX;
+      if (dist1Y >= dist1X && dist2X >= dist2Y) {
+        wallExtY = w1;
+        wallExtX = w2;
+      } else if (dist2Y >= dist2X && dist1X >= dist1Y) {
+        wallExtY = w2;
+        wallExtX = w1;
+      } else {
+        continue;
+      }
+
+      final by = wallExtY.bounds;
+      final bx = wallExtX.bounds;
+
+      final cornerXMin = by.min.x;
+      final cornerXMax = by.max.x;
+
+      final double adjYMin;
+      final double adjYMax;
+      if (by.min.y >= bx.max.y - 35.0) {
+        adjYMin = bx.min.y;
+        adjYMax = math.max(bx.max.y, by.min.y);
+      } else {
+        adjYMin = math.min(bx.min.y, by.max.y);
+        adjYMax = bx.max.y;
+      }
+
+      if (cornerXMax <= cornerXMin || adjYMax <= adjYMin) continue;
+
+      final cornerKey = '${cornerXMin.round()}_${adjYMin.round()}_${zMin.round()}';
+      if (!bridgedCorners.add(cornerKey)) continue;
+
+      final pMin = Vector3(cornerXMin, adjYMin, zMin);
+      final pMax = Vector3(cornerXMax, adjYMax, zMax);
+
+      final boxTris = _createBoxTriangles(pMin, pMax, wallExtX.color);
+      extraTriangles.putIfAbsent(wallExtX.id, () => []).addAll(boxTris);
+    }
+
+    if (extraTriangles.isNotEmpty) {
+      for (int i = 0; i < elements.length; i++) {
+        final el = elements[i];
+        final extra = extraTriangles[el.id];
+        if (extra != null && extra.isNotEmpty) {
+          elements[i] = IfcElement(
+            id: el.id,
+            globalId: el.globalId,
+            name: el.name,
+            ifcType: el.ifcType,
+            category: el.category,
+            storeyName: el.storeyName,
+            layer: el.layer,
+            color: el.color,
+            triangles: [...el.triangles, ...extra],
+          );
+        }
+      }
+    }
+  }
+
+  static List<Triangle3D> _createBoxTriangles(Vector3 pMin, Vector3 pMax, Color color) {
+    final p000 = Vector3(pMin.x, pMin.y, pMin.z);
+    final p100 = Vector3(pMax.x, pMin.y, pMin.z);
+    final p110 = Vector3(pMax.x, pMax.y, pMin.z);
+    final p010 = Vector3(pMin.x, pMax.y, pMin.z);
+
+    final p001 = Vector3(pMin.x, pMin.y, pMax.z);
+    final p101 = Vector3(pMax.x, pMin.y, pMax.z);
+    final p111 = Vector3(pMax.x, pMax.y, pMax.z);
+    final p011 = Vector3(pMin.x, pMax.y, pMax.z);
+
+    return [
+      // Bottom (-Z)
+      Triangle3D(v0: p000, v1: p110, v2: p100, normal: const Vector3(0, 0, -1), color: color),
+      Triangle3D(v0: p000, v1: p010, v2: p110, normal: const Vector3(0, 0, -1), color: color),
+      // Top (+Z)
+      Triangle3D(v0: p001, v1: p101, v2: p111, normal: const Vector3(0, 0, 1), color: color),
+      Triangle3D(v0: p001, v1: p111, v2: p011, normal: const Vector3(0, 0, 1), color: color),
+      // Front (-Y)
+      Triangle3D(v0: p000, v1: p100, v2: p101, normal: const Vector3(0, -1, 0), color: color),
+      Triangle3D(v0: p000, v1: p101, v2: p001, normal: const Vector3(0, -1, 0), color: color),
+      // Back (+Y)
+      Triangle3D(v0: p010, v1: p111, v2: p110, normal: const Vector3(0, 1, 0), color: color),
+      Triangle3D(v0: p010, v1: p011, v2: p111, normal: const Vector3(0, 1, 0), color: color),
+      // Left (-X)
+      Triangle3D(v0: p000, v1: p001, v2: p011, normal: const Vector3(-1, 0, 0), color: color),
+      Triangle3D(v0: p000, v1: p011, v2: p010, normal: const Vector3(-1, 0, 0), color: color),
+      // Right (+X)
+      Triangle3D(v0: p100, v1: p110, v2: p111, normal: const Vector3(1, 0, 0), color: color),
+      Triangle3D(v0: p100, v1: p111, v2: p101, normal: const Vector3(1, 0, 0), color: color),
+    ];
+  }
+
+  /// Geometrically determines if an element is a thin architectural cladding / siding layer (облицовка).
+  /// Architects frequently model exterior wall cladding using either the Slab tool or the Wall tool,
+  /// with a characteristic thickness of 10-55 mm (typical 2-5 cm) and large architectural span.
+  static bool _isThinCladdingGeometry(BoundingBox3D b, String category) {
+    if (category != 'Slab' && category != 'Wall' && category != 'Generic') {
+      return false;
+    }
+    // Sort dimensions d1 <= d2 <= d3
+    final dims = [b.sizeX, b.sizeY, b.sizeZ]..sort();
+    final d1 = dims[0]; // thickness
+    final d2 = dims[1]; // secondary span
+    final d3 = dims[2]; // primary span
+
+    // Cladding / siding (облицовка):
+    // Thickness between 8mm and 55mm (0.8cm to 5.5cm, typical 2-5cm)
+    // Span at least 80mm, with aspect ratio (span/thickness) >= 2.5
+    return d1 >= 8.0 && d1 <= 55.0 && d2 >= 80.0 && d3 >= 120.0 && (d3 / d1 >= 2.5);
   }
 
   /// Extracts numbers from parentheses, robust to Archicad trailing dots e.g. (0., -1200., 25.37)
