@@ -791,23 +791,43 @@ class DxfPainter extends CustomPainter {
   /// scale factors if specified in the style definition.
   ///
   /// Text heights are rendered 1:1 with CAD drawing units.
-  double _getEffectiveTextHeight(
+  @visibleForTesting
+  static double getEffectiveTextHeight(
     double entityHeight,
     String? styleName,
     DxfDocument document,
   ) {
+    if (entityHeight <= 0) {
+      if (styleName != null && document.textStyles.containsKey(styleName)) {
+        final style = document.textStyles[styleName]!;
+        if (style.heightScale > 0 && (style.heightScale - 1.0).abs() > 0.05) {
+          return style.heightScale;
+        }
+      }
+      return 2.5;
+    }
+
     double effectiveHeight = entityHeight;
 
-    // Apply text style scale factor if style exists and has explicit custom scaling
-    if (styleName != null && document.textStyles.containsKey(styleName)) {
+    // Apply Archicad text style scale factor (characteristic ~2.0x) ONLY for Archicad-originated drawings
+    if (document.isArchicadOrigin &&
+        styleName != null &&
+        document.textStyles.containsKey(styleName)) {
       final style = document.textStyles[styleName]!;
-      if ((style.heightScale - 1.0).abs() > 0.05 && style.heightScale > 0) {
+      if (style.heightScale >= 1.95 && style.heightScale <= 2.05) {
         effectiveHeight *= style.heightScale;
       }
     }
 
     return effectiveHeight;
   }
+
+  double _getEffectiveTextHeight(
+    double entityHeight,
+    String? styleName,
+    DxfDocument document,
+  ) =>
+      getEffectiveTextHeight(entityHeight, styleName, document);
 
   /// Resolves the most appropriate font family from the CAD text style definition.
   String _resolveFontFamily(String? styleName) {

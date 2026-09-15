@@ -110,9 +110,16 @@ set(LIBREDWG_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libredwg/bin")
 if(EXISTS "${LIBREDWG_BIN_DIR}/dwg2dxf.exe")
   install(FILES
     "${LIBREDWG_BIN_DIR}/dwg2dxf.exe"
+    "${LIBREDWG_BIN_DIR}/dwglayers.exe"
     "${LIBREDWG_BIN_DIR}/libredwg-0.dll"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
+  if(EXISTS "${LIBREDWG_BIN_DIR}/libssp-0.dll")
+    install(FILES
+      "${LIBREDWG_BIN_DIR}/libssp-0.dll"
+      DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+      COMPONENT Runtime)
+  endif()
 endif()
 
 # Copy the native assets provided by the build.dart from all packages.

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../errors/app_error_handler.dart';
 import 'libredwg_ffi.dart';
+import 'universal_encoding_service.dart';
 
 /// Exception thrown when DWG to DXF conversion fails.
 class DwgConversionException implements Exception {
@@ -21,6 +22,7 @@ class DwgConversionException implements Exception {
 /// Service to handle DWG -> DXF conversion and cache management.
 class DwgConverterService {
   static const String _cacheFolder = 'dwg_cache';
+  static const String _cacheVersion = '_v5';
 
   /// Locates the bundled or installed dwg2dxf executable on Windows.
   static String? _findWindowsDwg2DxfExe() {
@@ -43,11 +45,22 @@ class DwgConverterService {
 
   /// Locates the bundled or installed dwglayers executable on Windows.
   static String? _findWindowsDwgLayersExe() {
-    final dwg2dxf = _findWindowsDwg2DxfExe();
-    if (dwg2dxf == null) return null;
-    final dwglayers = dwg2dxf.replaceAll('dwg2dxf.exe', 'dwglayers.exe');
-    if (File(dwglayers).existsSync()) {
-      return dwglayers;
+    if (!Platform.isWindows) return null;
+
+    final candidates = [
+      // 1. Next to the running executable (e.g. build/windows/x64/runner/Debug/dwglayers.exe or Release)
+      '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}dwglayers.exe',
+      // 2. Next to dwg2dxf if found
+      if (_findWindowsDwg2DxfExe() != null)
+        _findWindowsDwg2DxfExe()!.replaceAll('dwg2dxf.exe', 'dwglayers.exe'),
+      // 3. In windows/libredwg/bin directory (dev environment)
+      '${Directory.current.path}${Platform.pathSeparator}windows${Platform.pathSeparator}libredwg${Platform.pathSeparator}bin${Platform.pathSeparator}dwglayers.exe',
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate != null && File(candidate).existsSync()) {
+        return candidate;
+      }
     }
     return null;
   }
@@ -174,7 +187,7 @@ class DwgConverterService {
 
     // Cache file name includes size, modified timestamp, and engine version for cache validation
     final cachedFileName =
-        '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}_v3.dxf';
+        '${baseName}_${stat.size}_${stat.modified.millisecondsSinceEpoch}$_cacheVersion.dxf';
     final targetDxfPath =
         '${cacheDir.path}${Platform.pathSeparator}$cachedFileName';
     final targetDxfFile = File(targetDxfPath);
@@ -238,9 +251,14 @@ class DwgConverterService {
           final layersExe = _findWindowsDwgLayersExe();
           if (layersExe != null) {
             try {
-              final layersRes = await Process.run(layersExe, ['-f', effectiveInputPath]);
-              if (layersRes.exitCode == 0 && layersRes.stdout is String) {
-                final lines = LineSplitter.split(layersRes.stdout as String);
+              final layersRes = await Process.run(
+                layersExe,
+                ['-f', effectiveInputPath],
+                stdoutEncoding: null,
+              );
+              if (layersRes.exitCode == 0 && layersRes.stdout is List<int>) {
+                final decodedOutput = UniversalEncodingService.decodeBytes(layersRes.stdout as List<int>);
+                final lines = LineSplitter.split(decodedOutput);
                 final List<String> encodedStates = [];
                 for (final line in lines) {
                   final match = RegExp(r'^([ f])([+\-])([ l])\s+(.+)$').firstMatch(line.trimRight());
@@ -252,7 +270,8 @@ class DwgConverterService {
                       final flag = isFrozen
                           ? (isOff ? 'f-' : 'f+')
                           : (isOff ? '-' : '+');
-                      encodedStates.add('$layerName=$flag');
+                      final safeName = Uri.encodeComponent(layerName);
+                      encodedStates.add('$safeName=$flag');
                     }
                   }
                 }
@@ -343,6 +362,12 @@ class DwgConverterService {
         } on Exception catch (_) {
           // Best effort target cleanup
         }
+      }
+      if (result == -1073741515 || result == 3221225781) {
+        throw DwgConversionException(
+          'Missing DLL (libssp-0.dll or libredwg-0.dll not found). Ensure all files from the application folder are copied.',
+          errorCode: result,
+        );
       }
       throw DwgConversionException(
         'Failed to convert DWG file to DXF format.',

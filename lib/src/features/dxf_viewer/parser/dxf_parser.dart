@@ -102,11 +102,18 @@ class DxfParser {
         for (final part in parts) {
           final eqIdx = part.indexOf('=');
           if (eqIdx > 0) {
-            final name = part.substring(0, eqIdx).trim();
+            final rawName = part.substring(0, eqIdx).trim();
             final flag = part.substring(eqIdx + 1).trim();
             final isFrozen = flag.startsWith('f');
             final isOff = flag.endsWith('-');
+            String name = rawName;
+            try {
+              name = Uri.decodeComponent(rawName);
+            } catch (_) {}
             authenticDwgLayerStates[name] = (isFrozen: isFrozen, isOff: isOff);
+            if (rawName != name) {
+              authenticDwgLayerStates[rawName] = (isFrozen: isFrozen, isOff: isOff);
+            }
             final decoded = _cleanCadText(name);
             if (decoded != name) {
               authenticDwgLayerStates[decoded] = (isFrozen: isFrozen, isOff: isOff);
