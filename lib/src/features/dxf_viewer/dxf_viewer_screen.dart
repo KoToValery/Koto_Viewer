@@ -1889,7 +1889,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                                   ),
                                 ],
                               ),
-                            ),
+                            );
                           },
                         );
                       },
