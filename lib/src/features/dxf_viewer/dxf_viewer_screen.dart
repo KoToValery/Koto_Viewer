@@ -572,6 +572,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
               !_measurement!.isAreaClosed) {
             pts = List<Offset>.from(_measurement!.areaPoints);
           }
+          if (pts.length >= 3 && _isNearFirstAreaPoint(cadPt, pts)) {
+            _measurement = DxfMeasurement(
+              tool: DxfMeasureTool.area,
+              areaPoints: pts,
+              isAreaClosed: true,
+            );
+            break;
+          }
           pts.add(cadPt);
           _measurement = DxfMeasurement(
             tool: DxfMeasureTool.area,
@@ -793,6 +801,35 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     }
   }
 
+  bool _isNearFirstAreaPoint(Offset cadPt, List<Offset> points) {
+    if (points.isEmpty) return false;
+    final clickScreen = _cadToScreen(cadPt);
+    final firstScreen = _cadToScreen(points.first);
+    return (clickScreen - firstScreen).distance <= 18.0;
+  }
+
+  bool _closeAreaPolygonFromSecondaryClick() {
+    if (_currentMeasureTool != DxfMeasureTool.area ||
+        _measurement == null ||
+        _measurement!.tool != DxfMeasureTool.area ||
+        _measurement!.isAreaClosed ||
+        _measurement!.areaPoints.length < 3) {
+      return false;
+    }
+
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _measurement = _measurement!.copyWith(isAreaClosed: true);
+      _touchScreenPos = null;
+      _targetScreenPos = null;
+      _snappedScreenPos = null;
+      _activeMeasureSnap = null;
+      _pointerCustomTitle = null;
+      _pointerCustomSubText = null;
+    });
+    return true;
+  }
+
   void _handleMeasurePointerUp(PointerUpEvent event) {
     if (!_isMeasureMode) return;
     _activePointersCount = math.max(0, _activePointersCount - 1);
@@ -856,6 +893,11 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if ((event.buttons & kTertiaryButton) != 0) {
       _middlePanStart = event.position;
       _middlePanMatrix = _transformController.value.clone();
+      return;
+    }
+
+    if (_isMeasureMode && (event.buttons & kSecondaryButton) != 0) {
+      _closeAreaPolygonFromSecondaryClick();
       return;
     }
 
