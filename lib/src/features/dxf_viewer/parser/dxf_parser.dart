@@ -160,7 +160,7 @@ class DxfParser {
     }
 
     // Compute bounding box (filtering out origin outliers e.g. (0,0) in BGS2005 drawings)
-    final List<Rect> validBoxes = [];
+    List<Rect> validBoxes = [];
     for (final entity in entities) {
       final b = entity.getBoundingBox(blocks);
       if (b != null && b.isFinite && !b.isEmpty) {
@@ -242,6 +242,21 @@ class DxfParser {
       }
     }
 
+    final headerExtents = _readHeaderExtents(headerVars);
+    if (headerExtents != null && validBoxes.isNotEmpty) {
+      // Some DWG conversions emit a second, invalid INSERT cluster far away
+      // from the drawing. Trust header extents only when they cover a
+      // meaningful portion of the parsed geometry, since older DXFs can have
+      // stale extents.
+      final margin = math.max(headerExtents.longestSide * 0.1, 10.0);
+      final extentBoxes = validBoxes
+          .where((box) => headerExtents.inflate(margin).overlaps(box))
+          .toList();
+      if (extentBoxes.length >= 3 && extentBoxes.length * 4 >= validBoxes.length) {
+        validBoxes = extentBoxes;
+      }
+    }
+
     Rect? bounds;
     if (validBoxes.isNotEmpty) {
       List<Rect> filteredBoxes = validBoxes;
@@ -302,10 +317,42 @@ class DxfParser {
         currentVar = pair.value.trim().toUpperCase();
       } else if (currentVar != null) {
         headerVars[currentVar] = pair.value.trim();
+        if (currentVar == r'$EXTMIN' || currentVar == r'$EXTMAX') {
+          switch (pair.code) {
+            case 10:
+              headerVars['${currentVar}_X'] = pair.value.trim();
+              break;
+            case 20:
+              headerVars['${currentVar}_Y'] = pair.value.trim();
+              break;
+          }
+        }
       }
       idx++;
     }
     return idx;
+  }
+
+  static Rect? _readHeaderExtents(Map<String, String> headerVars) {
+    final minX = double.tryParse(headerVars[r'$EXTMIN_X'] ?? '');
+    final minY = double.tryParse(headerVars[r'$EXTMIN_Y'] ?? '');
+    final maxX = double.tryParse(headerVars[r'$EXTMAX_X'] ?? '');
+    final maxY = double.tryParse(headerVars[r'$EXTMAX_Y'] ?? '');
+
+    if (minX == null || minY == null || maxX == null || maxY == null) {
+      return null;
+    }
+    if (!minX.isFinite || !minY.isFinite || !maxX.isFinite || !maxY.isFinite) {
+      return null;
+    }
+
+    final extents = Rect.fromLTRB(
+      math.min(minX, maxX),
+      math.min(minY, maxY),
+      math.max(minX, maxX),
+      math.max(minY, maxY),
+    );
+    return extents.isEmpty ? null : extents;
   }
 
   /// Parses TABLES section (LAYER and LTYPE tables).
