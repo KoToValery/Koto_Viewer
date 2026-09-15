@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -59,7 +60,11 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   DxfCanvasTheme _canvasTheme = DxfCanvasTheme.darkCad;
   bool _showGrid = true;
   double _currentScale = 1.0;
+  double _renderScale = 1.0;
   Offset _currentCadCoord = Offset.zero;
+  final ValueNotifier<double> _hudScale = ValueNotifier(1.0);
+  final ValueNotifier<Offset> _hudCadCoord = ValueNotifier(Offset.zero);
+  Timer? _transformSettleTimer;
   DxfDisplaySettings _displaySettings = DxfDisplaySettingsService.settingsNotifier.value;
   DxfUnit get _effectiveUnit => _displaySettings.unitOverride ?? _document?.unit ?? DxfUnit.meters;
 
@@ -136,9 +141,12 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   @override
   void dispose() {
     _focusNode.dispose();
+    _transformSettleTimer?.cancel();
     _transformController.removeListener(_onTransformChanged);
     DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged);
     _transformController.dispose();
+    _hudScale.dispose();
+    _hudCadCoord.dispose();
     super.dispose();
   }
 
@@ -161,10 +169,31 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   void _onTransformChanged() {
     final scale = _transformController.value.getMaxScaleOnAxis();
-    if ((scale - _currentScale).abs() > 0.001) {
-      setState(() {
-        _currentScale = scale;
-      });
+    _currentScale = scale;
+    if ((scale - _hudScale.value).abs() > 0.001) {
+      _hudScale.value = scale;
+    }
+
+    // Keep navigation responsive by transforming the cached CAD layer first.
+    // Repaint scale-dependent strokes and the visible entity set only after input settles.
+    _transformSettleTimer?.cancel();
+    _transformSettleTimer = Timer(
+      const Duration(milliseconds: 140),
+      _syncCanvasAfterTransform,
+    );
+  }
+
+  void _syncCanvasAfterTransform() {
+    if (!mounted) return;
+    setState(() {
+      _renderScale = _currentScale;
+    });
+  }
+
+  void _updateHudCadCoord(Offset coord) {
+    _currentCadCoord = coord;
+    if (_hudCadCoord.value != coord) {
+      _hudCadCoord.value = coord;
     }
   }
 
@@ -467,6 +496,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     }
 
     final effectiveCad = snap != null ? snap.point : rawCadPt;
+    _updateHudCadCoord(effectiveCad);
     String? title;
     String? subText;
 
@@ -988,6 +1018,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         ? _hoveredSnap!.point
         : rawCadPoint;
 
+    _updateHudCadCoord(cadPoint);
     setState(() {
       _currentCadCoord = cadPoint;
     });
@@ -1117,6 +1148,11 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     final scenePoint = _transformController.toScene(event.localPosition);
     final cadPoint = _sceneToCad(scenePoint);
 
+    if (!_isMeasureMode) {
+      _updateHudCadCoord(cadPoint);
+      return;
+    }
+
     DxfSnapResult? snap;
     if (_isMeasureMode && _snapEnabled) {
       final fitScale = _getCadFitScale();
@@ -1151,8 +1187,10 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       );
     }
 
+    final effectiveCadPoint = snap != null ? snap.point : cadPoint;
+    _updateHudCadCoord(effectiveCadPoint);
     setState(() {
-      _currentCadCoord = snap != null ? snap.point : cadPoint;
+      _currentCadCoord = effectiveCadPoint;
       _hoveredSnap = snap;
     });
   }
@@ -1668,19 +1706,23 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                           minScale: 0.001,
                           maxScale: 1000.0,
                           boundaryMargin: const EdgeInsets.all(1000.0),
-                          child: CustomPaint(
-                            size: _viewportSize,
-                            painter: DxfPainter(
-                              document: _document!,
-                              theme: _canvasTheme,
-                              currentScale: _currentScale,
-                              measurement: _measurement,
-                              annotations: _annotations,
-                              visibleCadRect: _getVisibleCadRect(),
-                              highlightedEntity: _selectedEntity,
-                              snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
-                              showGrid: _showGrid,
-                              settings: _displaySettings,
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              size: _viewportSize,
+                              isComplex: true,
+                              willChange: false,
+                              painter: DxfPainter(
+                                document: _document!,
+                                theme: _canvasTheme,
+                                currentScale: _renderScale,
+                                measurement: _measurement,
+                                annotations: _annotations,
+                                visibleCadRect: _getVisibleCadRect(),
+                                highlightedEntity: _selectedEntity,
+                                snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
+                                showGrid: _showGrid,
+                                settings: _displaySettings,
+                              ),
                             ),
                           ),
                         ),
@@ -1781,66 +1823,76 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                   Positioned(
                     bottom: 16,
                     left: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xCC1E293B),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'X: ${DxfMath.formatCadNumber(_currentCadCoord.dx)}  Y: ${DxfMath.formatCadNumber(_currentCadCoord.dy)}  |  Zoom: ${(_currentScale * 100).toStringAsFixed(0)}%  |  ',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 10.5,
-                              fontFamily: 'monospace',
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          InkWell(
-                            onTap: () {
-                              DxfDisplaySettingsSheet.show(
-                                context: context,
-                                initialSettings: _displaySettings,
-                                onSettingsChanged: (s) {
-                                  setState(() {
-                                    _displaySettings = s;
-                                  });
-                                },
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    child: ValueListenableBuilder<Offset>(
+                      valueListenable: _hudCadCoord,
+                      builder: (context, cadCoord, _) {
+                        return ValueListenableBuilder<double>(
+                          valueListenable: _hudScale,
+                          builder: (context, scale, _) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: Colors.cyanAccent.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.4), width: 0.8),
+                                color: const Color(0xCC1E293B),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white12),
                               ),
-                              child: Text(
-                                _effectiveUnit.symbol.toUpperCase(),
-                                style: const TextStyle(
-                                  color: Color(0xFF00E5FF),
-                                  fontSize: 10.5,
-                                  fontFamily: 'monospace',
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'X: ${DxfMath.formatCadNumber(cadCoord.dx)}  Y: ${DxfMath.formatCadNumber(cadCoord.dy)}  |  Zoom: ${(scale * 100).toStringAsFixed(0)}%  |  ',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 10.5,
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () {
+                                      DxfDisplaySettingsSheet.show(
+                                        context: context,
+                                        initialSettings: _displaySettings,
+                                        onSettingsChanged: (s) {
+                                          setState(() {
+                                            _displaySettings = s;
+                                          });
+                                        },
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: Colors.cyanAccent.withValues(alpha: 0.18),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.4), width: 0.8),
+                                      ),
+                                      child: Text(
+                                        _effectiveUnit.symbol.toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Color(0xFF00E5FF),
+                                          fontSize: 10.5,
+                                          fontFamily: 'monospace',
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '  |  ${activeCrs.name}',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 10.5,
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          Text(
-                            '  |  ${activeCrs.name}',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 10.5,
-                              fontFamily: 'monospace',
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+                          },
+                        );
+                      },
                     ),
                   ),
 
