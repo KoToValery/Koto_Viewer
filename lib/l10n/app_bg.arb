@@ -136,7 +136,7 @@
   "errorLoadingDxf": "Грешка при отваряне на DXF файл: {error}",
   "failedToSaveDxf": "Грешка при запис на DXF: {error}",
   "savedDxf": "Записан DXF: {name}",
-  "errorImportingDxf": "Грешка при импортиране на DXF: {error}",
+  "errorImportingDxf": "Грешка при импортиране: {error}",
   "importedDxfSuccess": "Успешно импортирани {count} обекта от {name}",
   "fitScreen": "Побиране в екрана",
   "printPreviewUnavailable": "Прегледът за печат е недостъпен: {error}",

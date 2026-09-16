@@ -437,7 +437,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String errorImportingDxf(String error) {
-    return 'Error importing DXF: $error';
+    return 'Error importing: $error';
   }
 
   @override

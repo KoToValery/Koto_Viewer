@@ -881,7 +881,7 @@ abstract class AppLocalizations {
   /// Error message when importing DXF entities fails
   ///
   /// In en, this message translates to:
-  /// **'Error importing DXF: {error}'**
+  /// **'Error importing: {error}'**
   String errorImportingDxf(String error);
 
   /// Success message when DXF entities are imported

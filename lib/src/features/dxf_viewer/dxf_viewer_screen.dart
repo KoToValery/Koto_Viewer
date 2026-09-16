@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/models/pdf_item.dart';
 import '../../core/services/coordinate_system_service.dart';
+import '../../core/services/dwg_converter_service.dart';
 import '../../core/services/dxf_exporter_service.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
@@ -1207,34 +1208,49 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       if (result == null || result.files.single.path == null) return;
 
       final filePath = result.files.single.path!;
-      final file = File(filePath);
+      final lower = filePath.toLowerCase();
 
-      if (!filePath.toLowerCase().endsWith('.dxf')) {
+      if (!lower.endsWith('.dxf') && !lower.endsWith('.dwg')) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select a valid .dxf file to import.')),
+            const SnackBar(content: Text('Please select a valid .dxf or .dwg file to import.')),
           );
         }
         return;
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Parsing DXF for import...'),
-            duration: Duration(seconds: 1),
-          ),
-        );
+      File effectiveDxfFile;
+      if (lower.endsWith('.dwg')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Converting DWG to DXF for import...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        final convertedDxfPath = await DwgConverterService.convertDwgToDxf(filePath);
+        effectiveDxfFile = File(convertedDxfPath);
+      } else {
+        effectiveDxfFile = File(filePath);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Parsing DXF for import...'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
       }
 
-      final importedDoc = await DxfParser.parseFromFile(file);
+      final importedDoc = await DxfParser.parseFromFile(effectiveDxfFile);
       final activeCrs = CoordinateSystemService.activeSystemNotifier.value;
 
       if (!mounted) return;
 
       final action = await DxfImportDialog.show(
         context: context,
-        file: file,
+        file: File(filePath),
         currentDoc: _document!,
         importedDoc: importedDoc,
         activeCrs: activeCrs,
@@ -1285,6 +1301,17 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
           ),
         ),
       );
+    } on DwgConversionException catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._importFile.dwg');
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.errorImportingDxf(e.message)),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } on FileSystemException catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'DxfViewer._importDxf.fs');
       if (mounted) {
@@ -1438,7 +1465,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                   icon: const Icon(Icons.add_to_photos_outlined, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Import DXF',
+                  tooltip: 'Import',
                   onPressed: _document != null ? _importDxfFile : null,
                 ),
 

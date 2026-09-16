@@ -341,7 +341,7 @@
       "name": { "type": "String" }
     }
   },
-  "errorImportingDxf": "Error importing DXF: {error}",
+  "errorImportingDxf": "Error importing: {error}",
   "@errorImportingDxf": {
     "description": "Error message when importing DXF entities fails",
     "placeholders": {

@@ -46,7 +46,9 @@ class DxfImportDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final fileName = file.path.split(Platform.pathSeparator).last;
-    final fileSizeKb = (file.lengthSync() / 1024).toStringAsFixed(1);
+    final fileSizeKb = file.existsSync()
+        ? (file.lengthSync() / 1024).toStringAsFixed(1)
+        : '0.0';
 
     final currentBounds = currentDoc.bounds;
     final importedBounds = importedDoc.bounds;
@@ -84,7 +86,7 @@ class DxfImportDialog extends StatelessWidget {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Import DXF into Drawing',
+              'Import into Drawing',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
@@ -242,7 +244,7 @@ class DxfImportDialog extends StatelessWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
           icon: const Icon(Icons.add, size: 18),
-          label: const Text('Import DXF'),
+          label: const Text('Import'),
           onPressed: () => Navigator.pop(context, DxfImportAction.importOriginal),
         ),
       ],

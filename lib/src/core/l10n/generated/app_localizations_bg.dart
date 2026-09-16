@@ -440,7 +440,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String errorImportingDxf(String error) {
-    return 'Грешка при импортиране на DXF: $error';
+    return 'Грешка при импортиране: $error';
   }
 
   @override
