@@ -119,7 +119,10 @@ class FileOpenerService {
           nav,
           item,
           filePath,
-          DxfViewerScreen(filePath: resolvedPath),
+          DxfViewerScreen(
+            filePath: resolvedPath,
+            originalFilePath: filePath,
+          ),
         );
 
       case KotoFileType.dwg:
@@ -147,6 +150,7 @@ class FileOpenerService {
             DxfViewerScreen(
               filePath: convertedDxfPath,
               title: name,
+              originalFilePath: filePath,
             ),
           );
         } else {

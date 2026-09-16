@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,11 +38,13 @@ import 'widgets/dxf_measurement_overlay.dart';
 class DxfViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
+  final String? originalFilePath;
 
   const DxfViewerScreen({
     super.key,
     required this.filePath,
     this.title,
+    this.originalFilePath,
   });
 
   @override
@@ -78,6 +81,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   String? _pointerCustomTitle;
   String? _pointerCustomSubText;
   List<DxfAnnotation> _annotations = [];
+  final List<File> _importedDxfFiles = [];
   DxfEntity? _selectedEntity;
 
   // Offset Snapping Pointer State (Aiming reticle & sharp tip)
@@ -755,18 +759,42 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   Future<void> _saveAsAnnotatedDxf() async {
     if (_document == null) return;
     try {
-      final originalFile = File(widget.filePath);
+      final sourcePath = widget.originalFilePath ?? widget.filePath;
+      final originalFile = File(sourcePath);
       final dir = originalFile.parent;
-      final originalName = originalFile.uri.pathSegments.last;
-      final baseName = originalName.replaceAll(RegExp(r'\.dxf$', caseSensitive: false), '');
-      final outputFileName = '${baseName}_annotated.dxf';
-      final outputFile = File('${dir.path}/$outputFileName');
+      final displayName = widget.title ?? originalFile.uri.pathSegments.last;
+      final baseName = displayName
+          .replaceAll(RegExp(r'\.dxf$', caseSensitive: false), '')
+          .replaceAll(RegExp(r'\.dwg$', caseSensitive: false), '');
+      final suffix = _importedDxfFiles.isNotEmpty
+          ? (_annotations.isNotEmpty ? '_merged_annotated.dxf' : '_merged.dxf')
+          : '_annotated.dxf';
+      final outputFileName = '$baseName$suffix';
+      File outputFile = File('${dir.path}/$outputFileName');
 
-      await DxfExporterService.saveDxfWithAnnotations(
-        originalFile: originalFile,
-        annotations: _annotations,
-        outputFile: outputFile,
-      );
+      File effectiveBase = File(widget.filePath);
+      if (widget.filePath.toLowerCase().endsWith('.dwg')) {
+        final convertedPath = await DwgConverterService.convertDwgToDxf(widget.filePath);
+        effectiveBase = File(convertedPath);
+      }
+
+      try {
+        await DxfExporterService.exportMergedDxf(
+          baseFile: effectiveBase,
+          importedFiles: _importedDxfFiles,
+          annotations: _annotations,
+          outputFile: outputFile,
+        );
+      } on FileSystemException {
+        final docsDir = await getApplicationDocumentsDirectory();
+        outputFile = File('${docsDir.path}/$outputFileName');
+        await DxfExporterService.exportMergedDxf(
+          baseFile: effectiveBase,
+          importedFiles: _importedDxfFiles,
+          annotations: _annotations,
+          outputFile: outputFile,
+        );
+      }
 
       if (mounted) {
         final l10n = context.l10n;
@@ -1296,6 +1324,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       }
 
       setState(() {
+        _importedDxfFiles.add(effectiveDxfFile);
         _document = DxfDocument(
           layers: mergedLayers,
           blocks: mergedBlocks,
@@ -1386,12 +1415,50 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     }
   }
 
-  void _shareDxf() {
+  Future<void> _shareDxf() async {
+    String fileToShare = widget.filePath;
+
+    if (_importedDxfFiles.isNotEmpty || _annotations.isNotEmpty) {
+      try {
+        File effectiveBase = File(widget.filePath);
+        if (widget.filePath.toLowerCase().endsWith('.dwg')) {
+          final convertedPath = await DwgConverterService.convertDwgToDxf(widget.filePath);
+          effectiveBase = File(convertedPath);
+        }
+
+        final sourcePath = widget.originalFilePath ?? widget.filePath;
+        final displayName = widget.title ?? File(sourcePath).uri.pathSegments.last;
+        final baseName = displayName
+            .replaceAll(RegExp(r'\.dxf$', caseSensitive: false), '')
+            .replaceAll(RegExp(r'\.dwg$', caseSensitive: false), '');
+        final suffix = _importedDxfFiles.isNotEmpty
+            ? (_annotations.isNotEmpty ? '_merged_annotated.dxf' : '_merged.dxf')
+            : '_annotated.dxf';
+        final outputFileName = '$baseName$suffix';
+
+        final tempDir = await getTemporaryDirectory();
+        final tempOutputFile = File('${tempDir.path}/$outputFileName');
+
+        await DxfExporterService.exportMergedDxf(
+          baseFile: effectiveBase,
+          importedFiles: _importedDxfFiles,
+          annotations: _annotations,
+          outputFile: tempOutputFile,
+        );
+
+        fileToShare = tempOutputFile.path;
+      } catch (e, stack) {
+        AppErrorHandler.recordError(e, stack, context: 'DxfViewer._shareDxf.export');
+      }
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ShareOptionsSheet(filePath: widget.filePath),
+      builder: (context) => ShareOptionsSheet(filePath: fileToShare),
     );
   }
 
@@ -1530,12 +1597,12 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                 ),
 
                 // Save Annotated DXF
-                if (_annotations.isNotEmpty)
+                if (_annotations.isNotEmpty || _importedDxfFiles.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.save_as_outlined, size: 20, color: Color(0xFF00E5FF)),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Save Annotated DXF',
+                    tooltip: _importedDxfFiles.isNotEmpty ? 'Save Merged DXF' : 'Save Annotated DXF',
                     onPressed: _saveAsAnnotatedDxf,
                   ),
 
@@ -1584,6 +1651,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                   constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                   onSelected: (value) {
                     switch (value) {
+                      case 'save_merged':
+                        _saveAsAnnotatedDxf();
+                        break;
                       case 'import':
                         _importDxfFile();
                         break;
@@ -1607,6 +1677,17 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                     }
                   },
                   itemBuilder: (context) => [
+                    if (_annotations.isNotEmpty || _importedDxfFiles.isNotEmpty)
+                      PopupMenuItem(
+                        value: 'save_merged',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.save_as_outlined, size: 20),
+                            const SizedBox(width: 12),
+                            Text(_importedDxfFiles.isNotEmpty ? 'Save Merged DXF' : 'Save Annotated DXF'),
+                          ],
+                        ),
+                      ),
                     const PopupMenuItem(
                       value: 'crs',
                       child: Row(
