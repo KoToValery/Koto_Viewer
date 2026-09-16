@@ -335,6 +335,7 @@ class DxfPainter extends CustomPainter {
     required Map<String, DxfBlock> blocks,
     required Map<String, DxfLayer> layers,
     String? blockLineType,
+    double blockRotationDeg = 0.0,
   }) {
     final scale = currentScale.clamp(0.001, 10000.0);
     final layer = layers[entity.layer];
@@ -474,9 +475,23 @@ class DxfPainter extends CustomPainter {
         blockLineType: blockLineType,
       );
     } else if (entity is DxfText) {
-      _renderText(canvas, entity, strokePaint.color, toCanvas, fitScale);
+      _renderText(
+        canvas,
+        entity,
+        strokePaint.color,
+        toCanvas,
+        fitScale,
+        blockRotationDeg: blockRotationDeg,
+      );
     } else if (entity is DxfMText) {
-      _renderMText(canvas, entity, strokePaint.color, toCanvas, fitScale);
+      _renderMText(
+        canvas,
+        entity,
+        strokePaint.color,
+        toCanvas,
+        fitScale,
+        blockRotationDeg: blockRotationDeg,
+      );
     } else if (entity is DxfSolid) {
       _renderSolid(canvas, entity, fillPaint, strokePaint, toCanvas);
     } else if (entity is DxfHatch) {
@@ -489,6 +504,7 @@ class DxfPainter extends CustomPainter {
         layers: layers,
         toCanvas: toCanvas,
         fitScale: fitScale,
+        parentRotationDeg: blockRotationDeg,
       );
     } else if (entity is DxfDimension) {
       _renderDimension(canvas, entity, strokePaint, toCanvas, fitScale, blocks, layers);
@@ -869,8 +885,9 @@ class DxfPainter extends CustomPainter {
     DxfText entity,
     Color color,
     Offset Function(Offset) toCanvas,
-    double fitScale,
-  ) {
+    double fitScale, {
+    double blockRotationDeg = 0.0,
+  }) {
     if (entity.text.trim().isEmpty) return;
 
     // Apply effective text height calculation (includes text style scale)
@@ -880,11 +897,28 @@ class DxfPainter extends CustomPainter {
       document,
     );
 
+    if (effectiveHeight <= 0.0 || fitScale <= 0.0) return;
+
     // CAD Text Height specifies the Cap-Height (capital letter height).
     // In Flutter, TextStyle fontSize is the full font EM-box (~1.39x of cap-height for Arial/Roboto).
     // Scaling by 1 / 0.72 ensures capital letters render at EXACTLY entity.height drawing units.
     const double capHeightRatio = 0.72;
-    final double fontSize = math.max((effectiveHeight / capHeightRatio) * fitScale, 0.1);
+    final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
+    if (targetFontSize <= 0.0) return;
+
+    // Flutter TextPainter drops/rounds fonts with fontSize < 0.5 to zero width/height.
+    // When large CAD documents or merged drawings reduce fitScale significantly,
+    // targetFontSize in canvas coordinates can be much smaller than 0.5 px.
+    // In that case, layout the text at a standard reference size (16.0) and scale the canvas.
+    double scaleFactor = 1.0;
+    double layoutFontSize = targetFontSize;
+    if (targetFontSize < 4.0) {
+      layoutFontSize = 16.0;
+      scaleFactor = targetFontSize / 16.0;
+    } else if (targetFontSize > 400.0) {
+      layoutFontSize = 100.0;
+      scaleFactor = targetFontSize / 100.0;
+    }
 
     final String fontFamily = _resolveFontFamily(entity.style);
     final List<String> fontFallbacks = _resolveFontFallbacks(fontFamily);
@@ -894,7 +928,7 @@ class DxfPainter extends CustomPainter {
         text: entity.text,
         style: TextStyle(
           color: color,
-          fontSize: fontSize,
+          fontSize: layoutFontSize,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks,
           height: 1.0,
@@ -919,8 +953,13 @@ class DxfPainter extends CustomPainter {
       canvas.translate(pos.dx, pos.dy);
 
       // Rotate (CAD rotation is CCW, so on canvas with Y down, rotation is -angle)
-      final double rad = -entity.rotationDeg * math.pi / 180.0;
+      final double totalRot = entity.rotationDeg + blockRotationDeg;
+      final double rad = -totalRot * math.pi / 180.0;
       canvas.rotate(rad);
+
+      if (scaleFactor != 1.0) {
+        canvas.scale(scaleFactor, scaleFactor);
+      }
 
       // Horizontal alignment offset
       double ox = 0.0;
@@ -938,7 +977,7 @@ class DxfPainter extends CustomPainter {
 
       // Vertical alignment offset:
       final double baseline = textPainter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
-      final double capHeightPx = effectiveHeight * fitScale;
+      final double capHeightPx = layoutFontSize * capHeightRatio;
 
       double oy;
       switch (entity.vAlign) {
@@ -970,8 +1009,9 @@ class DxfPainter extends CustomPainter {
     DxfMText entity,
     Color color,
     Offset Function(Offset) toCanvas,
-    double fitScale,
-  ) {
+    double fitScale, {
+    double blockRotationDeg = 0.0,
+  }) {
     if (entity.cleanText.trim().isEmpty) return;
 
     // Apply effective text height calculation (includes text style scale)
@@ -981,10 +1021,27 @@ class DxfPainter extends CustomPainter {
       document,
     );
 
+    if (effectiveHeight <= 0.0 || fitScale <= 0.0) return;
+
     // CAD Text Height specifies the Cap-Height (capital letter height).
     // Scaling by 1 / 0.72 ensures capital letters render at EXACTLY entity.height drawing units.
     const double capHeightRatio = 0.72;
-    final double fontSize = math.max((effectiveHeight / capHeightRatio) * fitScale, 0.5);
+    final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
+    if (targetFontSize <= 0.0) return;
+
+    // Flutter TextPainter drops/rounds fonts with fontSize < 0.5 to zero width/height.
+    // When large CAD documents or merged drawings reduce fitScale significantly,
+    // targetFontSize in canvas coordinates can be much smaller than 0.5 px.
+    // In that case, layout the text at a standard reference size (16.0) and scale the canvas.
+    double scaleFactor = 1.0;
+    double layoutFontSize = targetFontSize;
+    if (targetFontSize < 4.0) {
+      layoutFontSize = 16.0;
+      scaleFactor = targetFontSize / 16.0;
+    } else if (targetFontSize > 400.0) {
+      layoutFontSize = 100.0;
+      scaleFactor = targetFontSize / 100.0;
+    }
 
     // Determine horizontal text alignment from MTEXT paragraph style codes or attachment point
     TextAlign align = TextAlign.left;
@@ -1011,7 +1068,7 @@ class DxfPainter extends CustomPainter {
         text: entity.cleanText,
         style: TextStyle(
           color: color,
-          fontSize: fontSize,
+          fontSize: layoutFontSize,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks,
           height: (entity.lineSpacingFactor != null && entity.lineSpacingFactor! > 0.5 && entity.lineSpacingFactor! < 3.0)
@@ -1028,7 +1085,7 @@ class DxfPainter extends CustomPainter {
     );
 
     if (entity.refWidth != null && entity.refWidth! > 0) {
-      textPainter.layout(maxWidth: entity.refWidth! * fitScale);
+      textPainter.layout(maxWidth: (entity.refWidth! * fitScale) / scaleFactor);
     } else {
       textPainter.layout();
     }
@@ -1039,12 +1096,17 @@ class DxfPainter extends CustomPainter {
     try {
       canvas.translate(pos.dx, pos.dy);
 
-      final double rad = -entity.rotationDeg * math.pi / 180.0;
+      final double totalRot = entity.rotationDeg + blockRotationDeg;
+      final double rad = -totalRot * math.pi / 180.0;
       canvas.rotate(rad);
 
       // Apply CAD MTEXT character width factor (\W<factor>;)
       if (entity.widthFactor > 0 && (entity.widthFactor - 1.0).abs() > 0.001) {
         canvas.scale(entity.widthFactor, 1.0);
+      }
+
+      if (scaleFactor != 1.0) {
+        canvas.scale(scaleFactor, scaleFactor);
       }
 
       // Attachment Point offsets (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
@@ -1056,7 +1118,7 @@ class DxfPainter extends CustomPainter {
       double oy = 0.0;
 
       final double firstBaseline = textPainter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
-      final double capHeightPx = effectiveHeight * fitScale;
+      final double capHeightPx = layoutFontSize * capHeightRatio;
 
       final lineMetrics = textPainter.computeLineMetrics();
       final double lastBaseline = lineMetrics.isNotEmpty ? lineMetrics.last.baseline : firstBaseline;
@@ -1437,6 +1499,7 @@ class DxfPainter extends CustomPainter {
     required Map<String, DxfLayer> layers,
     required Offset Function(Offset) toCanvas,
     required double fitScale,
+    double parentRotationDeg = 0.0,
   }) {
     final block = blocks[insert.blockName];
     if (block == null || block.entities.isEmpty) return;
@@ -1447,6 +1510,10 @@ class DxfPainter extends CustomPainter {
 
     final blockBaseX = block.basePoint.dx;
     final blockBaseY = block.basePoint.dy;
+
+    final double insertAvgScale = (insert.scaleX.abs() + insert.scaleY.abs()) / 2.0;
+    final double childFitScale = insertAvgScale > 0.0001 ? fitScale * insertAvgScale : fitScale;
+    final double totalBlockRot = parentRotationDeg + insert.rotationDeg;
 
     for (int r = 0; r < insert.rowCount; r++) {
       for (int c = 0; c < insert.colCount; c++) {
@@ -1495,10 +1562,11 @@ class DxfPainter extends CustomPainter {
             strokePaint: strokePaint,
             fillPaint: fillPaint,
             toCanvas: localToCanvas,
-            fitScale: fitScale,
+            fitScale: childFitScale,
             blocks: blocks,
             layers: layers,
             blockLineType: insert.lineType,
+            blockRotationDeg: totalBlockRot,
           );
         }
       }

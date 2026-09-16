@@ -1268,7 +1268,23 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
       final mergedBlocks = Map<String, DxfBlock>.from(_document!.blocks);
       for (final entry in importedDoc.blocks.entries) {
-        mergedBlocks[entry.key] = entry.value;
+        if (!mergedBlocks.containsKey(entry.key)) {
+          mergedBlocks[entry.key] = entry.value;
+        }
+      }
+
+      final mergedTextStyles = Map<String, DxfTextStyle>.from(_document!.textStyles);
+      for (final entry in importedDoc.textStyles.entries) {
+        if (!mergedTextStyles.containsKey(entry.key)) {
+          mergedTextStyles[entry.key] = entry.value;
+        }
+      }
+
+      final mergedLineTypes = Map<String, List<double>>.from(_document!.lineTypes);
+      for (final entry in importedDoc.lineTypes.entries) {
+        if (!mergedLineTypes.containsKey(entry.key)) {
+          mergedLineTypes[entry.key] = entry.value;
+        }
       }
 
       final mergedEntities = List<DxfEntity>.from(_document!.entities)..addAll(importedDoc.entities);
@@ -1285,8 +1301,10 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
           blocks: mergedBlocks,
           entities: mergedEntities,
           headerVars: _document!.headerVars,
+          textStyles: mergedTextStyles,
           bounds: mergedBounds,
           entityStats: mergedStats,
+          lineTypes: mergedLineTypes,
         );
       });
 
