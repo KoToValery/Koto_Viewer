@@ -494,6 +494,18 @@ class DxfExporterService {
             }
           } else if (p.code == 348) {
             outPairs.add(const _DxfPair(348, '0'));
+          } else if (tableName == 'LAYER' && p.code == 62) {
+            // Negative color in DXF LAYER table turns layer OFF. Force imported layers to be ON.
+            final col = int.tryParse(p.value.trim());
+            if (col != null && col < 0) {
+              outPairs.add(_DxfPair(62, '${col.abs()}'));
+            } else {
+              outPairs.add(p);
+            }
+          } else if (tableName == 'LAYER' && p.code == 70) {
+            // Ensure imported layers are thawed (clear bit 0)
+            final flags = int.tryParse(p.value.trim()) ?? 0;
+            outPairs.add(_DxfPair(70, '${flags & ~1}'));
           } else {
             outPairs.add(p);
           }
@@ -586,12 +598,19 @@ class DxfExporterService {
         ]);
 
         // 2. Add re-handled BLOCK, child entities, and ENDBLK
+        bool skipEmbedded = false;
         for (final p in currentBlock!) {
           if (p.code == 0) {
+            skipEmbedded = false;
             outBlockPairs.add(p);
             final h = nextHandleProvider();
             outBlockPairs.add(_DxfPair(5, h));
             outBlockPairs.add(_DxfPair(330, brHandle));
+          } else if (skipEmbedded) {
+            continue;
+          } else if (p.code == 101 && p.value.trim() == 'Embedded Object') {
+            skipEmbedded = true;
+            continue;
           } else if (p.code == 5 || p.code == 330 || p.code == 390 || p.code == 347 || p.code == 348) {
             continue;
           } else {
@@ -633,6 +652,8 @@ class DxfExporterService {
     bool inEntities = false;
     List<_DxfPair>? currentEntity;
 
+    String? currentParentHandle;
+
     void processCurrentEntity() {
       if (currentEntity == null || currentEntity!.isEmpty) return;
       bool isPaperSpace = false;
@@ -643,17 +664,39 @@ class DxfExporterService {
         }
       }
       if (!isPaperSpace) {
+        final entType = currentEntity![0].value.trim().toUpperCase();
+        final newHandle = nextHandleProvider();
+
+        // Multi-part entities like POLYLINE own their child VERTEX and SEQEND entities.
+        // For POLYLINE, the polyline entity itself is owned by ModelSpace.
+        // Its child VERTEX and SEQEND entities must have group 330 pointing to the POLYLINE handle.
+        String ownerHandle = modelSpaceHandle;
+        if (entType == 'POLYLINE') {
+          currentParentHandle = newHandle;
+        } else if (entType == 'VERTEX' || entType == 'SEQEND') {
+          ownerHandle = currentParentHandle ?? modelSpaceHandle;
+        } else {
+          currentParentHandle = null;
+        }
+
         for (final p in currentEntity!) {
+          if (p.code == 101 && p.value.trim() == 'Embedded Object') {
+            // Drop Civil 3D ObjectARX proxy/embedded data that causes eWrongDatabase in plain AutoCAD
+            break;
+          }
           if (p.code == 0) {
             outPairs.add(p);
-            final h = nextHandleProvider();
-            outPairs.add(_DxfPair(5, h));
-            outPairs.add(_DxfPair(330, modelSpaceHandle));
+            outPairs.add(_DxfPair(5, newHandle));
+            outPairs.add(_DxfPair(330, ownerHandle));
           } else if (p.code == 5 || p.code == 330 || p.code == 390 || p.code == 347 || p.code == 348) {
             continue;
           } else {
             outPairs.add(p);
           }
+        }
+
+        if (entType == 'SEQEND') {
+          currentParentHandle = null;
         }
       }
       currentEntity = null;
