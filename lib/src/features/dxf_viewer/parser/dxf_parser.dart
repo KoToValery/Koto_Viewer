@@ -1130,6 +1130,8 @@ class DxfParser {
         break;
 
       case 'TEXT':
+      case 'ATTDEF':
+      case 'ATTRIB':
         String text = '';
         double ix = 0, iy = 0;
         double? ax, ay;
@@ -1138,11 +1140,16 @@ class DxfParser {
         int hAlign = 0;
         int vAlign = 0;
         String? style;
+        int flags = 0;
+        String tag = '';
 
         for (final p in entityPairs) {
           switch (p.code) {
             case 1:
               text = p.value;
+              break;
+            case 2:
+              tag = p.value;
               break;
             case 10:
               ix = p.doubleValue;
@@ -1162,16 +1169,29 @@ class DxfParser {
             case 50:
               rotation = p.doubleValue;
               break;
+            case 70:
+              flags = p.intValue;
+              break;
             case 72:
               hAlign = p.intValue;
               break;
             case 73:
+            case 74: // In ATTDEF / ATTRIB, code 74 is vertical alignment
               vAlign = p.intValue;
               break;
             case 7:
               style = p.value.trim();
               break;
           }
+        }
+
+        // In ATTDEF / ATTRIB: bit 1 (0x1) specifies invisible attribute
+        if ((entityType == 'ATTDEF' || entityType == 'ATTRIB') && (flags & 1) != 0) {
+          break;
+        }
+
+        if (text.isEmpty && tag.isNotEmpty && entityType == 'ATTDEF') {
+          text = tag;
         }
 
         final clean = _cleanCadText(text);

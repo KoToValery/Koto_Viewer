@@ -673,7 +673,16 @@ class DxfExporterService {
         String ownerHandle = modelSpaceHandle;
         if (entType == 'POLYLINE') {
           currentParentHandle = newHandle;
-        } else if (entType == 'VERTEX' || entType == 'SEQEND') {
+        } else if (entType == 'INSERT') {
+          bool hasAttribs = false;
+          for (final p in currentEntity!) {
+            if (p.code == 66 && p.value.trim() == '1') {
+              hasAttribs = true;
+              break;
+            }
+          }
+          currentParentHandle = hasAttribs ? newHandle : null;
+        } else if (entType == 'VERTEX' || entType == 'ATTRIB' || entType == 'SEQEND') {
           ownerHandle = currentParentHandle ?? modelSpaceHandle;
         } else {
           currentParentHandle = null;
