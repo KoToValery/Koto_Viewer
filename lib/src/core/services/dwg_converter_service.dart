@@ -22,7 +22,7 @@ class DwgConversionException implements Exception {
 /// Service to handle DWG -> DXF conversion and cache management.
 class DwgConverterService {
   static const String _cacheFolder = 'dwg_cache';
-  static const String _cacheVersion = '_v5';
+  static const String _cacheVersion = '_v6';
 
   /// Locates the bundled or installed dwg2dxf executable on Windows.
   static String? _findWindowsDwg2DxfExe() {
@@ -58,7 +58,7 @@ class DwgConverterService {
     ];
 
     for (final candidate in candidates) {
-      if (candidate != null && File(candidate).existsSync()) {
+      if (File(candidate).existsSync()) {
         return candidate;
       }
     }

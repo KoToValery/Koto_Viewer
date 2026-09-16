@@ -993,7 +993,7 @@ class DxfParser {
         final bool isClosed = (flags & 1) != 0;
         final bool is3D = (flags & 8) != 0;
 
-        final List<DxfPolylineVertex> vertices = [];
+        final List<DxfPolylineVertex> rawVertices = [];
         // Read subsequent VERTEX entities until SEQEND
         while (idx < total) {
           if (pairs[idx].code == 0) {
@@ -1008,6 +1008,7 @@ class DxfParser {
             } else if (nextType == 'VERTEX') {
               idx++;
               double vx = 0, vy = 0, vBulge = 0;
+              int vFlags = 0;
               while (idx < total && pairs[idx].code != 0) {
                 final vp = pairs[idx];
                 switch (vp.code) {
@@ -1020,16 +1021,39 @@ class DxfParser {
                   case 42:
                     vBulge = vp.doubleValue;
                     break;
+                  case 70:
+                    vFlags = vp.intValue;
+                    break;
                 }
                 idx++;
               }
-              vertices.add(DxfPolylineVertex(x: vx, y: vy, bulge: vBulge));
+              rawVertices.add(DxfPolylineVertex(
+                x: vx,
+                y: vy,
+                bulge: vBulge,
+                flags: vFlags,
+              ));
             } else {
               break;
             }
           } else {
             idx++;
           }
+        }
+
+        // Handle Spline-fit / Curve-fit polyline filtering:
+        // When AutoCAD exports a spline-fit 2D polyline (flags & 4 != 0, or vertices with flag 8),
+        // it outputs both the evaluated spline curve vertices (vertex flags & 8 != 0)
+        // and the frame-control points (vertex flags & 16 != 0).
+        // Drawing both creates parasitic straight lines/polygon cage connecting back to the curve.
+        // Unless SPLFRAME is enabled (default off), only the spline-fit vertices should be displayed.
+        final bool hasSplineVertices = rawVertices.any((v) => (v.flags & 8) != 0);
+        final List<DxfPolylineVertex> vertices;
+        if (hasSplineVertices) {
+          vertices = rawVertices.where((v) => (v.flags & 8) != 0).toList();
+        } else {
+          final nonFrame = rawVertices.where((v) => (v.flags & 16) == 0).toList();
+          vertices = nonFrame.isNotEmpty ? nonFrame : rawVertices;
         }
 
         entity = DxfPolyline(

@@ -10,6 +10,7 @@ class DxfPolylineVertex {
   final double bulge;
   final double startWidth;
   final double endWidth;
+  final int flags;
 
   const DxfPolylineVertex({
     required this.x,
@@ -17,6 +18,7 @@ class DxfPolylineVertex {
     this.bulge = 0.0,
     this.startWidth = 0.0,
     this.endWidth = 0.0,
+    this.flags = 0,
   });
 
   Offset get offset => Offset(x, y);
@@ -532,10 +534,22 @@ class DxfMText extends DxfEntity {
         maxLineLength = line.length;
       }
     }
-    final double width = (refWidth != null && refWidth! > 0
-        ? refWidth!
-        : (maxLineLength * height * 0.65).clamp(height * 2, double.infinity)) * widthFactor;
-    final totalHeight = height * linesList.length * (lineSpacingFactor != null ? lineSpacingFactor! * 1.35 : 1.35);
+    final double estimatedSingleLineWidth =
+        (maxLineLength * height * 0.75).clamp(height, double.infinity) * widthFactor;
+    // In AutoCAD DXF, group code 41 (refWidth) specifies the reference column/wrap width.
+    // If the actual text is shorter than refWidth, the text does not stretch to refWidth;
+    // only if estimatedSingleLineWidth exceeds refWidth does the text wrap within refWidth.
+    final double width = (refWidth != null && refWidth! > 0)
+        ? math.min(estimatedSingleLineWidth, refWidth!)
+        : estimatedSingleLineWidth;
+
+    int wrapCount = 1;
+    if (refWidth != null && refWidth! > 0 && estimatedSingleLineWidth > refWidth!) {
+      wrapCount = (estimatedSingleLineWidth / refWidth!).ceil();
+    }
+    final totalHeight = height *
+        (linesList.length * wrapCount) *
+        (lineSpacingFactor != null && lineSpacingFactor! > 0 ? lineSpacingFactor! * 1.35 : 1.35);
 
     // Adjust origin by attachment point (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
     double ox = 0.0;
