@@ -278,6 +278,62 @@ EOF
       final mergedDoc = await DxfParser.parseFromFile(outputFile);
       expect(mergedDoc.totalEntities, equals(kartalaDoc.totalEntities + vpDoc.totalEntities));
       expect(mergedDoc.layers.length, greaterThanOrEqualTo(kartalaDoc.layers.length));
+
+      // Verify handle uniqueness and $HANDSEED across the entire merged DXF
+      final lines = await outputFile.readAsLines();
+      final seenHandles = <String>{};
+      int maxHandle = 0;
+      int? handseed;
+      bool isHandseedNext = false;
+
+      for (int i = 0; i < lines.length - 1; i += 2) {
+        final code = int.tryParse(lines[i].trim());
+        final val = lines[i + 1].trim();
+        if (code == 9 && val.toUpperCase() == r'$HANDSEED') {
+          isHandseedNext = true;
+        } else if (code == 5) {
+          if (isHandseedNext) {
+            handseed = int.tryParse(val, radix: 16);
+            isHandseedNext = false;
+            continue;
+          }
+          expect(seenHandles.contains(val.toUpperCase()), isFalse,
+              reason: 'Handle $val must be unique across the DXF file');
+          seenHandles.add(val.toUpperCase());
+          final hVal = int.tryParse(val, radix: 16);
+          if (hVal != null && hVal > maxHandle) {
+            maxHandle = hVal;
+          }
+        }
+      }
+
+      if (handseed != null) {
+        expect(handseed, greaterThan(maxHandle),
+            reason: '\$HANDSEED ($handseed) must be strictly greater than maxHandle ($maxHandle)');
+      }
+
+      // Also update the user's Dropbox test file kartala_merged.dxf
+      final dropboxMergedFile = File(r'C:\Users\Creator\Dropbox\test_files\kartala_merged.dxf');
+      if (dropboxMergedFile.parent.existsSync()) {
+        await outputFile.copy(dropboxMergedFile.path);
+      }
+
+      // If AutoCAD 2020 accoreconsole.exe is available on the machine, verify it opens with exitCode 0
+      final acadConsolePath = r'C:\Program Files\Autodesk\AutoCAD 2020\accoreconsole.exe';
+      if (File(acadConsolePath).existsSync()) {
+        final quitScript = File('${tempDir.path}/quit.scr');
+        await quitScript.writeAsString('QUIT\r\n');
+
+        final process = await Process.run(acadConsolePath, [
+          '/i',
+          outputFile.path,
+          '/s',
+          quitScript.path,
+        ]);
+
+        expect(process.exitCode, equals(0),
+            reason: 'AutoCAD accoreconsole failed to load merged DXF: ${process.stdout}');
+      }
     });
   });
 }

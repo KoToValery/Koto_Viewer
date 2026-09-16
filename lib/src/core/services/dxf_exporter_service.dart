@@ -1,6 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 import '../../features/dxf_viewer/models/dxf_models.dart';
+import 'universal_encoding_service.dart';
+
+class _DxfPair {
+  final int code;
+  final String value;
+  const _DxfPair(this.code, this.value);
+}
 
 /// Service responsible for exporting DXF files, including merging imported DXF drawings
 /// (entities, blocks, layers, styles, and line types) and user-added annotations (LEADER + MTEXT)
@@ -35,351 +42,642 @@ class DxfExporterService {
     }
 
     final baseBytes = await baseFile.readAsBytes();
-    String baseContent;
-    try {
-      baseContent = utf8.decode(baseBytes);
-    } on FormatException catch (_) {
-      baseContent = latin1.decode(baseBytes);
-    }
-
+    final baseContent = UniversalEncodingService.decodeBytes(baseBytes);
     final le = baseContent.contains('\r\n') ? '\r\n' : '\n';
-    String normalizeLe(String text) {
-      if (le == '\r\n') {
-        return text.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n');
-      } else {
-        return text.replaceAll('\r\n', '\n');
+
+    final basePairs = _parsePairs(baseContent);
+
+    // 1. Analyze base drawing handles and $HANDSEED
+    int maxHandle = 0;
+    int handseedIndex = -1;
+    for (int i = 0; i < basePairs.length; i++) {
+      final pair = basePairs[i];
+      if (pair.code == 9 && pair.value.trim().toUpperCase() == r'$HANDSEED') {
+        handseedIndex = i + 1;
+      } else if (pair.code == 5) {
+        final h = int.tryParse(pair.value.trim(), radix: 16);
+        if (h != null && h > maxHandle) {
+          maxHandle = h;
+        }
       }
     }
 
-    final endSecRegex = RegExp(r'^\s*0\r?\n\s*ENDSEC\s*$', multiLine: true);
+    int nextHandle = maxHandle + 1;
+    if (handseedIndex != -1 && handseedIndex < basePairs.length) {
+      final hs = int.tryParse(basePairs[handseedIndex].value.trim(), radix: 16);
+      if (hs != null && hs > nextHandle) {
+        nextHandle = hs;
+      }
+    }
 
-    // Track existing definitions in baseContent to avoid duplicate keys
-    final existingLayers = _extractTableNames(baseContent, 'LAYER');
-    final existingStyles = _extractTableNames(baseContent, 'STYLE');
-    final existingLtypes = _extractTableNames(baseContent, 'LTYPE');
-    final existingBlocks = _extractBlockNames(baseContent);
+    // 2. Locate base *MODEL_SPACE BLOCK_RECORD handle and table handles
+    String modelSpaceHandle = '19';
+    String layerTableHandle = '2';
+    String styleTableHandle = '3';
+    String ltypeTableHandle = '5';
+    String blockRecordTableHandle = '1';
+    String? basePlotStyleHandle;
+    String? baseMaterialHandle;
 
-    final extraBlocksBuffer = StringBuffer();
-    final extraEntitiesBuffer = StringBuffer();
-    final extraLayersBuffer = StringBuffer();
-    final extraStylesBuffer = StringBuffer();
-    final extraLtypesBuffer = StringBuffer();
+    final existingLayers = <String>{};
+    final existingStyles = <String>{};
+    final existingLtypes = <String>{};
+    final existingBlockRecords = <String>{};
 
-    // 1. Extract from all imported DXF files
+    bool inTables = false;
+    String? currentTable;
+    String? currentEntryType;
+    String? curBrHandle;
+
+    for (int i = 0; i < basePairs.length; i++) {
+      final p = basePairs[i];
+      if (p.code == 2 &&
+          p.value.trim().toUpperCase() == 'TABLES' &&
+          i > 0 &&
+          basePairs[i - 1].code == 0 &&
+          basePairs[i - 1].value.trim().toUpperCase() == 'SECTION') {
+        inTables = true;
+      } else if (inTables && p.code == 0 && p.value.trim().toUpperCase() == 'ENDSEC') {
+        inTables = false;
+        currentTable = null;
+        currentEntryType = null;
+      } else if (inTables) {
+        if (p.code == 2 &&
+            i > 0 &&
+            basePairs[i - 1].code == 0 &&
+            basePairs[i - 1].value.trim().toUpperCase() == 'TABLE') {
+          currentTable = p.value.trim().toUpperCase();
+          currentEntryType = null;
+          // Look ahead for table handle (code 5)
+          for (int j = i + 1; j < i + 10 && j < basePairs.length; j++) {
+            if (basePairs[j].code == 5) {
+              final h = basePairs[j].value.trim();
+              if (currentTable == 'LAYER') layerTableHandle = h;
+              if (currentTable == 'STYLE') styleTableHandle = h;
+              if (currentTable == 'LTYPE') ltypeTableHandle = h;
+              if (currentTable == 'BLOCK_RECORD') blockRecordTableHandle = h;
+              break;
+            }
+          }
+        } else if (p.code == 0 && p.value.trim().toUpperCase() == 'ENDTAB') {
+          currentTable = null;
+          currentEntryType = null;
+        } else if (currentTable != null) {
+          if (p.code == 0) {
+            currentEntryType = p.value.trim().toUpperCase();
+            if (currentTable == 'BLOCK_RECORD') curBrHandle = null;
+          } else if (p.code == 5 && currentTable == 'BLOCK_RECORD' && curBrHandle == null) {
+            curBrHandle = p.value.trim();
+          } else if (p.code == 390 && currentTable == 'LAYER' && basePlotStyleHandle == null) {
+            basePlotStyleHandle = p.value.trim();
+          } else if (p.code == 347 && currentTable == 'LAYER' && baseMaterialHandle == null) {
+            baseMaterialHandle = p.value.trim();
+          } else if (p.code == 2) {
+            final name = p.value.trim().toUpperCase();
+            if (currentTable == 'LAYER' && currentEntryType == 'LAYER') {
+              existingLayers.add(name);
+            } else if (currentTable == 'STYLE' && currentEntryType == 'STYLE') {
+              existingStyles.add(name);
+            } else if (currentTable == 'LTYPE' && currentEntryType == 'LTYPE') {
+              existingLtypes.add(name);
+            } else if (currentTable == 'BLOCK_RECORD' && currentEntryType == 'BLOCK_RECORD') {
+              existingBlockRecords.add(name);
+              if (name == '*MODEL_SPACE' && curBrHandle != null) {
+                modelSpaceHandle = curBrHandle;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Extract and re-index definitions & entities from imported DXF files
+    final newBlockRecordPairs = <_DxfPair>[];
+    final newLayerPairs = <_DxfPair>[];
+    final newStylePairs = <_DxfPair>[];
+    final newLtypePairs = <_DxfPair>[];
+    final newBlockPairs = <_DxfPair>[];
+    final newEntityPairs = <_DxfPair>[];
+
     for (final impFile in importedFiles) {
       if (!await impFile.exists()) continue;
-      final bytes = await impFile.readAsBytes();
-      String impContent;
-      try {
-        impContent = utf8.decode(bytes);
-      } on FormatException catch (_) {
-        impContent = latin1.decode(bytes);
-      }
+      final impBytes = await impFile.readAsBytes();
+      final impContent = UniversalEncodingService.decodeBytes(impBytes);
+      final impPairs = _parsePairs(impContent);
 
       // A) Extract TABLES (LAYER, STYLE, LTYPE)
-      _extractTableEntries(
-        source: impContent,
+      _extractTableFromPairs(
+        pairs: impPairs,
         tableName: 'LAYER',
         existingNames: existingLayers,
-        buffer: extraLayersBuffer,
-      );
-      _extractTableEntries(
-        source: impContent,
-        tableName: 'STYLE',
-        existingNames: existingStyles,
-        buffer: extraStylesBuffer,
-      );
-      _extractTableEntries(
-        source: impContent,
-        tableName: 'LTYPE',
-        existingNames: existingLtypes,
-        buffer: extraLtypesBuffer,
+        targetTableHandle: layerTableHandle,
+        defaultPlotStyleHandle: basePlotStyleHandle,
+        defaultMaterialHandle: baseMaterialHandle,
+        nextHandleProvider: () => (nextHandle++).toRadixString(16).toUpperCase(),
+        outPairs: newLayerPairs,
       );
 
-      // B) Extract non-model-space BLOCKS
-      final impBlocksRegex = RegExp(r'^\s*0\r?\n\s*SECTION\r?\n\s*2\r?\n\s*BLOCKS\s*$', multiLine: true);
-      final impBlkStart = impBlocksRegex.firstMatch(impContent);
-      if (impBlkStart != null) {
-        final impBlkEnd = endSecRegex.firstMatch(impContent.substring(impBlkStart.end));
-        if (impBlkEnd != null) {
-          final blocksText = impContent.substring(impBlkStart.end, impBlkStart.end + impBlkEnd.start);
-          final blockEntryRegex = RegExp(
-            r'(^\s*0\r?\n\s*BLOCK\r?\n[\s\S]*?^\s*0\r?\n\s*ENDBLK(?:\r?\n(?!\s*0\r?\n)[^\r\n]*)*\r?\n?)',
-            multiLine: true,
-          );
-          for (final m in blockEntryRegex.allMatches(blocksText)) {
-            final chunk = m.group(1)!;
-            final nameMatch = RegExp(r'^\s*2\r?\n\s*([^\r\n]+)', multiLine: true).firstMatch(chunk);
-            final bName = nameMatch?.group(1)?.trim().toUpperCase() ?? '';
-            if (bName.isEmpty ||
-                bName.startsWith('*MODEL_SPACE') ||
-                bName.startsWith('*PAPER_SPACE') ||
-                existingBlocks.contains(bName)) {
-              continue;
+      _extractTableFromPairs(
+        pairs: impPairs,
+        tableName: 'STYLE',
+        existingNames: existingStyles,
+        targetTableHandle: styleTableHandle,
+        nextHandleProvider: () => (nextHandle++).toRadixString(16).toUpperCase(),
+        outPairs: newStylePairs,
+      );
+
+      _extractTableFromPairs(
+        pairs: impPairs,
+        tableName: 'LTYPE',
+        existingNames: existingLtypes,
+        targetTableHandle: ltypeTableHandle,
+        nextHandleProvider: () => (nextHandle++).toRadixString(16).toUpperCase(),
+        outPairs: newLtypePairs,
+      );
+
+      // B) Extract non-model-space BLOCKS and generate BLOCK_RECORD entries
+      _extractBlocksFromPairs(
+        pairs: impPairs,
+        existingBlockRecords: existingBlockRecords,
+        blockRecordTableHandle: blockRecordTableHandle,
+        nextHandleProvider: () => (nextHandle++).toRadixString(16).toUpperCase(),
+        outBlockRecordPairs: newBlockRecordPairs,
+        outBlockPairs: newBlockPairs,
+      );
+
+      // C) Extract model-space ENTITIES
+      _extractEntitiesFromPairs(
+        pairs: impPairs,
+        modelSpaceHandle: modelSpaceHandle,
+        nextHandleProvider: () => (nextHandle++).toRadixString(16).toUpperCase(),
+        outPairs: newEntityPairs,
+      );
+    }
+
+    // 4. Build annotation entities and ensure MARKUP layer exists
+    if (annotations.isNotEmpty) {
+      if (!existingLayers.contains('MARKUP')) {
+        final markupHandle = (nextHandle++).toRadixString(16).toUpperCase();
+        newLayerPairs.addAll([
+          const _DxfPair(0, 'LAYER'),
+          _DxfPair(5, markupHandle),
+          _DxfPair(330, layerTableHandle),
+          const _DxfPair(100, 'AcDbSymbolTableRecord'),
+          const _DxfPair(100, 'AcDbLayerTableRecord'),
+          const _DxfPair(2, 'MARKUP'),
+          const _DxfPair(70, '0'),
+          const _DxfPair(62, '1'),
+          const _DxfPair(6, 'Continuous'),
+          if (basePlotStyleHandle != null) _DxfPair(390, basePlotStyleHandle),
+          if (baseMaterialHandle != null) ...[
+            _DxfPair(347, baseMaterialHandle),
+            const _DxfPair(348, '0'),
+          ],
+        ]);
+        existingLayers.add('MARKUP');
+      }
+
+      for (final anno in annotations) {
+        final tipX = anno.arrowTipCad.dx.toStringAsFixed(4);
+        final tipY = anno.arrowTipCad.dy.toStringAsFixed(4);
+        final textX = anno.textPosCad.dx.toStringAsFixed(4);
+        final textY = anno.textPosCad.dy.toStringAsFixed(4);
+        final h = (anno.textHeight ?? defaultTextHeight).toStringAsFixed(4);
+        final sanitizedText = anno.text.replaceAll('\\', '\\\\').replaceAll('\n', r'\P');
+
+        int aciColor = 1; // default Red
+        if (anno.colorValue == 0xFFFFD600) aciColor = 2; // Yellow
+        if (anno.colorValue == 0xFF00E676) aciColor = 3; // Green
+        if (anno.colorValue == 0xFF00E5FF) aciColor = 4; // Cyan
+        if (anno.colorValue == 0xFFFF4081) aciColor = 6; // Magenta
+        if (anno.colorValue == 0xFFFFFFFF) aciColor = 7; // White
+
+        final leaderHandle = (nextHandle++).toRadixString(16).toUpperCase();
+        final mtextHandle = (nextHandle++).toRadixString(16).toUpperCase();
+
+        // LEADER entity
+        newEntityPairs.addAll([
+          const _DxfPair(0, 'LEADER'),
+          _DxfPair(5, leaderHandle),
+          _DxfPair(330, modelSpaceHandle),
+          const _DxfPair(100, 'AcDbEntity'),
+          const _DxfPair(8, 'MARKUP'),
+          _DxfPair(62, '$aciColor'),
+          const _DxfPair(100, 'AcDbLeader'),
+          const _DxfPair(71, '1'),
+          const _DxfPair(72, '0'),
+          const _DxfPair(76, '2'),
+          _DxfPair(10, tipX),
+          _DxfPair(20, tipY),
+          const _DxfPair(30, '0.0'),
+          _DxfPair(10, textX),
+          _DxfPair(20, textY),
+          const _DxfPair(30, '0.0'),
+        ]);
+
+        // MTEXT entity
+        newEntityPairs.addAll([
+          const _DxfPair(0, 'MTEXT'),
+          _DxfPair(5, mtextHandle),
+          _DxfPair(330, modelSpaceHandle),
+          const _DxfPair(100, 'AcDbEntity'),
+          const _DxfPair(8, 'MARKUP'),
+          _DxfPair(62, '$aciColor'),
+          const _DxfPair(100, 'AcDbMText'),
+          _DxfPair(10, textX),
+          _DxfPair(20, textY),
+          const _DxfPair(30, '0.0'),
+          _DxfPair(40, h),
+          const _DxfPair(71, '1'),
+          _DxfPair(1, sanitizedText),
+        ]);
+      }
+    }
+
+    // 5. Assemble merged DXF pair list
+    final outPairs = <_DxfPair>[];
+    String? curSection;
+    String? curTableInOutput;
+    bool insertedBlocks = false;
+    bool insertedEntities = false;
+
+    int idx = 0;
+    while (idx < basePairs.length) {
+      final p = basePairs[idx];
+
+      // Track sections
+      if (p.code == 2 &&
+          idx > 0 &&
+          basePairs[idx - 1].code == 0 &&
+          basePairs[idx - 1].value.trim().toUpperCase() == 'SECTION') {
+        curSection = p.value.trim().toUpperCase();
+      } else if (p.code == 0 && p.value.trim().toUpperCase() == 'ENDSEC') {
+        // Fallback insertion before ENDSEC of TABLES if BLOCK_RECORD table didn't exist
+        if (curSection == 'TABLES' && newBlockRecordPairs.isNotEmpty) {
+          outPairs.addAll([
+            const _DxfPair(0, 'TABLE'),
+            const _DxfPair(2, 'BLOCK_RECORD'),
+            _DxfPair(5, blockRecordTableHandle),
+            const _DxfPair(100, 'AcDbSymbolTable'),
+            ...newBlockRecordPairs,
+            const _DxfPair(0, 'ENDTAB'),
+          ]);
+          newBlockRecordPairs.clear();
+        }
+
+        // Insert blocks before ENDSEC of BLOCKS
+        if (curSection == 'BLOCKS' && newBlockPairs.isNotEmpty) {
+          outPairs.addAll(newBlockPairs);
+          newBlockPairs.clear();
+          insertedBlocks = true;
+        }
+
+        // Insert entities before ENDSEC of ENTITIES
+        if (curSection == 'ENTITIES' && newEntityPairs.isNotEmpty) {
+          outPairs.addAll(newEntityPairs);
+          newEntityPairs.clear();
+          insertedEntities = true;
+        }
+
+        curSection = null;
+        curTableInOutput = null;
+      }
+
+      // Track tables
+      if (curSection == 'TABLES') {
+        if (p.code == 2 &&
+            idx > 0 &&
+            basePairs[idx - 1].code == 0 &&
+            basePairs[idx - 1].value.trim().toUpperCase() == 'TABLE') {
+          curTableInOutput = p.value.trim().toUpperCase();
+        } else if (p.code == 0 && p.value.trim().toUpperCase() == 'ENDTAB') {
+          if (curTableInOutput == 'BLOCK_RECORD' && newBlockRecordPairs.isNotEmpty) {
+            outPairs.addAll(newBlockRecordPairs);
+            newBlockRecordPairs.clear();
+          } else if (curTableInOutput == 'LAYER' && newLayerPairs.isNotEmpty) {
+            outPairs.addAll(newLayerPairs);
+            newLayerPairs.clear();
+          } else if (curTableInOutput == 'STYLE' && newStylePairs.isNotEmpty) {
+            outPairs.addAll(newStylePairs);
+            newStylePairs.clear();
+          } else if (curTableInOutput == 'LTYPE' && newLtypePairs.isNotEmpty) {
+            outPairs.addAll(newLtypePairs);
+            newLtypePairs.clear();
+          }
+          curTableInOutput = null;
+        }
+      }
+
+      // Update $HANDSEED to guarantee it exceeds all newly assigned handles
+      if (p.code == 9 && p.value.trim().toUpperCase() == r'$HANDSEED') {
+        outPairs.add(p);
+        final finalHandseed = (nextHandle + 16).toRadixString(16).toUpperCase();
+        outPairs.add(_DxfPair(5, finalHandseed));
+        idx += 2;
+        continue;
+      }
+
+      // If base file had no BLOCKS section, insert it before ENTITIES section
+      if (newBlockPairs.isNotEmpty &&
+          !insertedBlocks &&
+          p.code == 0 &&
+          p.value.trim().toUpperCase() == 'SECTION' &&
+          idx + 1 < basePairs.length &&
+          basePairs[idx + 1].code == 2 &&
+          basePairs[idx + 1].value.trim().toUpperCase() == 'ENTITIES') {
+        outPairs.addAll([
+          const _DxfPair(0, 'SECTION'),
+          const _DxfPair(2, 'BLOCKS'),
+          ...newBlockPairs,
+          const _DxfPair(0, 'ENDSEC'),
+        ]);
+        newBlockPairs.clear();
+        insertedBlocks = true;
+      }
+
+      // If base file had no ENTITIES section, insert it before EOF
+      if (newEntityPairs.isNotEmpty &&
+          !insertedEntities &&
+          p.code == 0 &&
+          p.value.trim().toUpperCase() == 'EOF') {
+        outPairs.addAll([
+          const _DxfPair(0, 'SECTION'),
+          const _DxfPair(2, 'ENTITIES'),
+          ...newEntityPairs,
+          const _DxfPair(0, 'ENDSEC'),
+        ]);
+        newEntityPairs.clear();
+        insertedEntities = true;
+      }
+
+      outPairs.add(p);
+      idx++;
+    }
+
+    // 6. Write cleanly to outputFile with constant streaming
+    final sink = outputFile.openWrite(encoding: utf8);
+    try {
+      for (final pair in outPairs) {
+        sink.write('${pair.code}$le${pair.value}$le');
+      }
+      await sink.flush();
+    } finally {
+      await sink.close();
+    }
+
+    return outputFile;
+  }
+
+  static List<_DxfPair> _parsePairs(String content) {
+    final lines = const LineSplitter().convert(content);
+    final pairs = <_DxfPair>[];
+    int i = 0;
+    while (i < lines.length) {
+      final line = lines[i].trim();
+      if (line.isEmpty) {
+        i++;
+        continue;
+      }
+      final code = int.tryParse(line);
+      if (code != null) {
+        final val = (i + 1 < lines.length) ? lines[i + 1] : '';
+        pairs.add(_DxfPair(code, val));
+        i += 2;
+      } else {
+        i++;
+      }
+    }
+    return pairs;
+  }
+
+  static void _extractTableFromPairs({
+    required List<_DxfPair> pairs,
+    required String tableName,
+    required Set<String> existingNames,
+    required String targetTableHandle,
+    required String Function() nextHandleProvider,
+    required List<_DxfPair> outPairs,
+    String? defaultPlotStyleHandle,
+    String? defaultMaterialHandle,
+  }) {
+    bool inTargetTable = false;
+    List<_DxfPair>? currentEntry;
+
+    void processCurrentEntry() {
+      if (currentEntry == null || currentEntry!.isEmpty) return;
+      String entryName = '';
+      for (final p in currentEntry!) {
+        if (p.code == 2) {
+          entryName = p.value.trim().toUpperCase();
+          break;
+        }
+      }
+      if (entryName.isNotEmpty && !existingNames.contains(entryName)) {
+        existingNames.add(entryName);
+        final newHandle = nextHandleProvider();
+        bool saw390 = false;
+        bool saw347 = false;
+        for (final p in currentEntry!) {
+          if (p.code == 5) {
+            outPairs.add(_DxfPair(5, newHandle));
+          } else if (p.code == 330) {
+            outPairs.add(_DxfPair(330, targetTableHandle));
+          } else if (p.code == 390) {
+            saw390 = true;
+            if (defaultPlotStyleHandle != null) {
+              outPairs.add(_DxfPair(390, defaultPlotStyleHandle));
             }
-            extraBlocksBuffer.write(chunk);
-            existingBlocks.add(bName);
+          } else if (p.code == 347) {
+            saw347 = true;
+            if (defaultMaterialHandle != null) {
+              outPairs.add(_DxfPair(347, defaultMaterialHandle));
+            }
+          } else if (p.code == 348) {
+            outPairs.add(const _DxfPair(348, '0'));
+          } else {
+            outPairs.add(p);
+          }
+        }
+        if (tableName == 'LAYER') {
+          if (!saw390 && defaultPlotStyleHandle != null) {
+            outPairs.add(_DxfPair(390, defaultPlotStyleHandle));
+          }
+          if (!saw347 && defaultMaterialHandle != null) {
+            outPairs.add(_DxfPair(347, defaultMaterialHandle));
+            outPairs.add(const _DxfPair(348, '0'));
+          }
+        }
+      }
+      currentEntry = null;
+    }
+
+    for (int i = 0; i < pairs.length; i++) {
+      final p = pairs[i];
+      if (p.code == 2 &&
+          p.value.trim().toUpperCase() == tableName &&
+          i > 0 &&
+          pairs[i - 1].code == 0 &&
+          pairs[i - 1].value.trim().toUpperCase() == 'TABLE') {
+        inTargetTable = true;
+      } else if (inTargetTable && p.code == 0 && p.value.trim().toUpperCase() == 'ENDTAB') {
+        inTargetTable = false;
+        processCurrentEntry();
+      } else if (inTargetTable) {
+        if (p.code == 0 && p.value.trim().toUpperCase() == tableName) {
+          processCurrentEntry();
+          currentEntry = [p];
+        } else if (currentEntry != null) {
+          currentEntry!.add(p);
+        }
+      }
+    }
+  }
+
+  static void _extractBlocksFromPairs({
+    required List<_DxfPair> pairs,
+    required Set<String> existingBlockRecords,
+    required String blockRecordTableHandle,
+    required String Function() nextHandleProvider,
+    required List<_DxfPair> outBlockRecordPairs,
+    required List<_DxfPair> outBlockPairs,
+  }) {
+    bool inBlocks = false;
+    List<_DxfPair>? currentBlock;
+
+    void processCurrentBlock() {
+      if (currentBlock == null || currentBlock!.isEmpty) return;
+      String blockName = '';
+      bool sawBegin = false;
+      for (final p in currentBlock!) {
+        if (p.code == 100 && p.value.trim() == 'AcDbBlockBegin') {
+          sawBegin = true;
+        } else if (sawBegin && p.code == 2) {
+          blockName = p.value.trim().toUpperCase();
+          break;
+        }
+      }
+      if (blockName.isEmpty) {
+        for (final p in currentBlock!) {
+          if (p.code == 2) {
+            blockName = p.value.trim().toUpperCase();
+            break;
           }
         }
       }
 
-      // C) Extract ENTITIES
-      final impEntitiesRegex = RegExp(r'^\s*0\r?\n\s*SECTION\r?\n\s*2\r?\n\s*ENTITIES\s*$', multiLine: true);
-      final impEntStart = impEntitiesRegex.firstMatch(impContent);
-      if (impEntStart != null) {
-        final impEntEnd = endSecRegex.firstMatch(impContent.substring(impEntStart.end));
-        if (impEntEnd != null) {
-          final chunk = impContent.substring(impEntStart.end, impEntStart.end + impEntEnd.start);
-          extraEntitiesBuffer.write(chunk);
+      if (blockName.isNotEmpty &&
+          !blockName.startsWith('*MODEL_SPACE') &&
+          !blockName.startsWith('*PAPER_SPACE') &&
+          !existingBlockRecords.contains(blockName)) {
+        existingBlockRecords.add(blockName);
+        final brHandle = nextHandleProvider();
+
+        // 1. Add BLOCK_RECORD entry
+        outBlockRecordPairs.addAll([
+          const _DxfPair(0, 'BLOCK_RECORD'),
+          _DxfPair(5, brHandle),
+          _DxfPair(330, blockRecordTableHandle),
+          const _DxfPair(100, 'AcDbSymbolTableRecord'),
+          const _DxfPair(100, 'AcDbBlockTableRecord'),
+          _DxfPair(2, blockName),
+          const _DxfPair(70, '0'),
+          const _DxfPair(280, '1'),
+          const _DxfPair(281, '0'),
+        ]);
+
+        // 2. Add re-handled BLOCK, child entities, and ENDBLK
+        for (final p in currentBlock!) {
+          if (p.code == 0) {
+            outBlockPairs.add(p);
+            final h = nextHandleProvider();
+            outBlockPairs.add(_DxfPair(5, h));
+            outBlockPairs.add(_DxfPair(330, brHandle));
+          } else if (p.code == 5 || p.code == 330 || p.code == 390 || p.code == 347 || p.code == 348) {
+            continue;
+          } else {
+            outBlockPairs.add(p);
+          }
+        }
+      }
+      currentBlock = null;
+    }
+
+    for (int i = 0; i < pairs.length; i++) {
+      final p = pairs[i];
+      if (p.code == 2 &&
+          p.value.trim().toUpperCase() == 'BLOCKS' &&
+          i > 0 &&
+          pairs[i - 1].code == 0 &&
+          pairs[i - 1].value.trim().toUpperCase() == 'SECTION') {
+        inBlocks = true;
+      } else if (inBlocks && p.code == 0 && p.value.trim().toUpperCase() == 'ENDSEC') {
+        inBlocks = false;
+        processCurrentBlock();
+      } else if (inBlocks) {
+        if (p.code == 0 && p.value.trim().toUpperCase() == 'BLOCK') {
+          processCurrentBlock();
+          currentBlock = [p];
+        } else if (currentBlock != null) {
+          currentBlock!.add(p);
         }
       }
     }
-
-    // 2. Build annotation entities
-    if (annotations.isNotEmpty) {
-      final annoBuffer = _buildAnnotationEntitiesBuffer(annotations, defaultTextHeight);
-      extraEntitiesBuffer.write(annoBuffer.toString());
-    }
-
-    // 3. Assemble merged DXF content
-    var resultContent = baseContent;
-
-    // A) Insert extra table entries into TABLES
-    resultContent = _insertIntoTable(resultContent, 'LAYER', normalizeLe(extraLayersBuffer.toString()), le);
-    resultContent = _insertIntoTable(resultContent, 'STYLE', normalizeLe(extraStylesBuffer.toString()), le);
-    resultContent = _insertIntoTable(resultContent, 'LTYPE', normalizeLe(extraLtypesBuffer.toString()), le);
-
-    // B) Insert extra blocks into BLOCKS section
-    final extraBlocksStr = normalizeLe(extraBlocksBuffer.toString());
-    if (extraBlocksStr.trim().isNotEmpty) {
-      final bSectionRegex = RegExp(r'^\s*0\r?\n\s*SECTION\r?\n\s*2\r?\n\s*BLOCKS\s*$', multiLine: true);
-      final bStart = bSectionRegex.firstMatch(resultContent);
-      if (bStart != null) {
-        final bEnd = endSecRegex.firstMatch(resultContent.substring(bStart.end));
-        if (bEnd != null) {
-          final insertIdx = bStart.end + bEnd.start;
-          resultContent = resultContent.substring(0, insertIdx) +
-              extraBlocksStr +
-              resultContent.substring(insertIdx);
-        }
-      } else {
-        // If base content had no BLOCKS section, create it before ENTITIES
-        final eSectionRegex = RegExp(r'^\s*0\r?\n\s*SECTION\r?\n\s*2\r?\n\s*ENTITIES\s*$', multiLine: true);
-        final eStart = eSectionRegex.firstMatch(resultContent);
-        if (eStart != null) {
-          final blocksSection = '0${le}SECTION${le}2${le}BLOCKS$le$extraBlocksStr' '0${le}ENDSEC$le';
-          resultContent = resultContent.substring(0, eStart.start) +
-              blocksSection +
-              resultContent.substring(eStart.start);
-        }
-      }
-    }
-
-    // C) Insert extra entities into ENTITIES section
-    final extraEntitiesStr = normalizeLe(extraEntitiesBuffer.toString());
-    if (extraEntitiesStr.trim().isNotEmpty) {
-      final eSectionRegex = RegExp(r'^\s*0\r?\n\s*SECTION\r?\n\s*2\r?\n\s*ENTITIES\s*$', multiLine: true);
-      final eStart = eSectionRegex.firstMatch(resultContent);
-      if (eStart != null) {
-        final eEnd = endSecRegex.firstMatch(resultContent.substring(eStart.end));
-        if (eEnd != null) {
-          final insertIdx = eStart.end + eEnd.start;
-          resultContent = resultContent.substring(0, insertIdx) +
-              extraEntitiesStr +
-              resultContent.substring(insertIdx);
-        }
-      } else {
-        final fallbackBuffer = StringBuffer();
-        _insertFallback(resultContent, extraEntitiesStr, fallbackBuffer);
-        resultContent = fallbackBuffer.toString();
-      }
-    }
-
-    await outputFile.writeAsString(resultContent, encoding: utf8);
-    return outputFile;
   }
 
-  static Set<String> _extractTableNames(String content, String tableName) {
-    final result = <String>{};
-    final tStartRegex = RegExp(r'^\s*0\r?\n\s*TABLE\r?\n\s*2\r?\n\s*' + tableName + r'\s*$', multiLine: true);
-    final tStart = tStartRegex.firstMatch(content);
-    if (tStart == null) return result;
-    final endTabRegex = RegExp(r'^\s*0\r?\n\s*ENDTAB\s*$', multiLine: true);
-    final tEnd = endTabRegex.firstMatch(content.substring(tStart.end));
-    if (tEnd == null) return result;
-
-    final tableText = content.substring(tStart.end, tStart.end + tEnd.start);
-    final nameRegex = RegExp(r'^\s*2\r?\n\s*([^\r\n]+)', multiLine: true);
-    for (final m in nameRegex.allMatches(tableText)) {
-      result.add(m.group(1)!.trim().toUpperCase());
-    }
-    return result;
-  }
-
-  static void _extractTableEntries({
-    required String source,
-    required String tableName,
-    required Set<String> existingNames,
-    required StringBuffer buffer,
+  static void _extractEntitiesFromPairs({
+    required List<_DxfPair> pairs,
+    required String modelSpaceHandle,
+    required String Function() nextHandleProvider,
+    required List<_DxfPair> outPairs,
   }) {
-    final tStartRegex = RegExp(r'^\s*0\r?\n\s*TABLE\r?\n\s*2\r?\n\s*' + tableName + r'\s*$', multiLine: true);
-    final tStart = tStartRegex.firstMatch(source);
-    if (tStart == null) return;
-    final endTabRegex = RegExp(r'^\s*0\r?\n\s*ENDTAB\s*$', multiLine: true);
-    final tEnd = endTabRegex.firstMatch(source.substring(tStart.end));
-    if (tEnd == null) return;
+    bool inEntities = false;
+    List<_DxfPair>? currentEntity;
 
-    final tableText = source.substring(tStart.end, tStart.end + tEnd.start);
-    final entryRegex = RegExp(
-      r'(^\s*0\r?\n\s*' + tableName + r'\r?\n[\s\S]*?)(?=^\s*0\r?\n\s*' + tableName + r'\r?\n|^\s*0\r?\n\s*ENDTAB|$)',
-      multiLine: true,
-    );
-    for (final m in entryRegex.allMatches(tableText)) {
-      final chunk = m.group(1)!;
-      final nameMatch = RegExp(r'^\s*2\r?\n\s*([^\r\n]+)', multiLine: true).firstMatch(chunk);
-      final name = nameMatch?.group(1)?.trim().toUpperCase() ?? '';
-      if (name.isNotEmpty && !existingNames.contains(name)) {
-        buffer.write(chunk);
-        existingNames.add(name);
+    void processCurrentEntity() {
+      if (currentEntity == null || currentEntity!.isEmpty) return;
+      bool isPaperSpace = false;
+      for (final p in currentEntity!) {
+        if (p.code == 67 && p.value.trim() == '1') {
+          isPaperSpace = true;
+          break;
+        }
       }
+      if (!isPaperSpace) {
+        for (final p in currentEntity!) {
+          if (p.code == 0) {
+            outPairs.add(p);
+            final h = nextHandleProvider();
+            outPairs.add(_DxfPair(5, h));
+            outPairs.add(_DxfPair(330, modelSpaceHandle));
+          } else if (p.code == 5 || p.code == 330 || p.code == 390 || p.code == 347 || p.code == 348) {
+            continue;
+          } else {
+            outPairs.add(p);
+          }
+        }
+      }
+      currentEntity = null;
     }
-  }
 
-  static String _insertIntoTable(String content, String tableName, String extraEntries, String le) {
-    if (extraEntries.trim().isEmpty) return content;
-    final tStartRegex = RegExp(r'^\s*0\r?\n\s*TABLE\r?\n\s*2\r?\n\s*' + tableName + r'\s*$', multiLine: true);
-    final tStart = tStartRegex.firstMatch(content);
-    if (tStart == null) return content;
-    final endTabRegex = RegExp(r'^\s*0\r?\n\s*ENDTAB\s*$', multiLine: true);
-    final tEnd = endTabRegex.firstMatch(content.substring(tStart.end));
-    if (tEnd == null) return content;
-
-    final insertIdx = tStart.end + tEnd.start;
-    return content.substring(0, insertIdx) + extraEntries + content.substring(insertIdx);
-  }
-
-  static Set<String> _extractBlockNames(String content) {
-    final result = <String>{};
-    final bStartRegex = RegExp(r'^\s*0\r?\n\s*SECTION\r?\n\s*2\r?\n\s*BLOCKS\s*$', multiLine: true);
-    final bStart = bStartRegex.firstMatch(content);
-    if (bStart == null) return result;
-    final endSecRegex = RegExp(r'^\s*0\r?\n\s*ENDSEC\s*$', multiLine: true);
-    final bEnd = endSecRegex.firstMatch(content.substring(bStart.end));
-    if (bEnd == null) return result;
-
-    final blocksText = content.substring(bStart.end, bStart.end + bEnd.start);
-    final blockEntryRegex = RegExp(r'^\s*0\r?\n\s*BLOCK\r?\n[\s\S]*?^\s*2\r?\n\s*([^\r\n]+)', multiLine: true);
-    for (final m in blockEntryRegex.allMatches(blocksText)) {
-      result.add(m.group(1)!.trim().toUpperCase());
-    }
-    return result;
-  }
-
-  static StringBuffer _buildAnnotationEntitiesBuffer(List<DxfAnnotation> annotations, double defaultTextHeight) {
-    final entitiesBuffer = StringBuffer();
-    for (final anno in annotations) {
-      final tipX = anno.arrowTipCad.dx.toStringAsFixed(4);
-      final tipY = anno.arrowTipCad.dy.toStringAsFixed(4);
-      final textX = anno.textPosCad.dx.toStringAsFixed(4);
-      final textY = anno.textPosCad.dy.toStringAsFixed(4);
-      final h = (anno.textHeight ?? defaultTextHeight).toStringAsFixed(4);
-
-      final sanitizedText = anno.text.replaceAll('\\', '\\\\').replaceAll('\n', '\\P');
-
-      int aciColor = 1; // default Red
-      if (anno.colorValue == 0xFFFFD600) aciColor = 2; // Yellow
-      if (anno.colorValue == 0xFF00E676) aciColor = 3; // Green
-      if (anno.colorValue == 0xFF00E5FF) aciColor = 4; // Cyan
-      if (anno.colorValue == 0xFFFF4081) aciColor = 6; // Magenta
-      if (anno.colorValue == 0xFFFFFFFF) aciColor = 7; // White
-
-      // A) LEADER Entity
-      entitiesBuffer.writeln('0');
-      entitiesBuffer.writeln('LEADER');
-      entitiesBuffer.writeln('5');
-      entitiesBuffer.writeln(DateTime.now().microsecondsSinceEpoch.toRadixString(16));
-      entitiesBuffer.writeln('100');
-      entitiesBuffer.writeln('AcDbLeader');
-      entitiesBuffer.writeln('8');
-      entitiesBuffer.writeln('MARKUP');
-      entitiesBuffer.writeln('62');
-      entitiesBuffer.writeln('$aciColor');
-      entitiesBuffer.writeln('71');
-      entitiesBuffer.writeln('1'); // Arrowhead enabled
-      entitiesBuffer.writeln('72');
-      entitiesBuffer.writeln('0'); // Straight line segments
-      entitiesBuffer.writeln('76');
-      entitiesBuffer.writeln('2'); // 2 vertices
-      entitiesBuffer.writeln('10');
-      entitiesBuffer.writeln(tipX);
-      entitiesBuffer.writeln('20');
-      entitiesBuffer.writeln(tipY);
-      entitiesBuffer.writeln('30');
-      entitiesBuffer.writeln('0.0');
-      entitiesBuffer.writeln('10');
-      entitiesBuffer.writeln(textX);
-      entitiesBuffer.writeln('20');
-      entitiesBuffer.writeln(textY);
-      entitiesBuffer.writeln('30');
-      entitiesBuffer.writeln('0.0');
-
-      // B) MTEXT Entity attached to leader
-      entitiesBuffer.writeln('0');
-      entitiesBuffer.writeln('MTEXT');
-      entitiesBuffer.writeln('5');
-      entitiesBuffer.writeln((DateTime.now().microsecondsSinceEpoch + 1).toRadixString(16));
-      entitiesBuffer.writeln('100');
-      entitiesBuffer.writeln('AcDbMText');
-      entitiesBuffer.writeln('8');
-      entitiesBuffer.writeln('MARKUP');
-      entitiesBuffer.writeln('62');
-      entitiesBuffer.writeln('$aciColor');
-      entitiesBuffer.writeln('10');
-      entitiesBuffer.writeln(textX);
-      entitiesBuffer.writeln('20');
-      entitiesBuffer.writeln(textY);
-      entitiesBuffer.writeln('30');
-      entitiesBuffer.writeln('0.0');
-      entitiesBuffer.writeln('40');
-      entitiesBuffer.writeln(h);
-      entitiesBuffer.writeln('71');
-      entitiesBuffer.writeln('1'); // Top-left attachment
-      entitiesBuffer.writeln('1');
-      entitiesBuffer.writeln(sanitizedText);
-    }
-    return entitiesBuffer;
-  }
-
-  static void _insertFallback(String content, String entitiesStr, StringBuffer buffer) {
-    final eofIndex = content.lastIndexOf('0\nEOF');
-    final eofIndexCrLf = content.lastIndexOf('0\r\nEOF');
-    if (eofIndex != -1) {
-      buffer.write(content.substring(0, eofIndex));
-      buffer.writeln('0');
-      buffer.writeln('SECTION');
-      buffer.writeln('2');
-      buffer.writeln('ENTITIES');
-      buffer.write(entitiesStr);
-      buffer.writeln('0');
-      buffer.writeln('ENDSEC');
-      buffer.write('0\nEOF\n');
-    } else if (eofIndexCrLf != -1) {
-      buffer.write(content.substring(0, eofIndexCrLf));
-      buffer.write('0\r\nSECTION\r\n2\r\nENTITIES\r\n');
-      buffer.write(entitiesStr.replaceAll('\n', '\r\n'));
-      buffer.write('0\r\nENDSEC\r\n0\r\nEOF\r\n');
-    } else {
-      buffer.write(content);
-      buffer.writeln();
-      buffer.writeln('0');
-      buffer.writeln('SECTION');
-      buffer.writeln('2');
-      buffer.writeln('ENTITIES');
-      buffer.write(entitiesStr);
-      buffer.writeln('0');
-      buffer.writeln('ENDSEC');
-      buffer.writeln('0');
-      buffer.writeln('EOF');
+    for (int i = 0; i < pairs.length; i++) {
+      final p = pairs[i];
+      if (p.code == 2 &&
+          p.value.trim().toUpperCase() == 'ENTITIES' &&
+          i > 0 &&
+          pairs[i - 1].code == 0 &&
+          pairs[i - 1].value.trim().toUpperCase() == 'SECTION') {
+        inEntities = true;
+      } else if (inEntities && p.code == 0 && p.value.trim().toUpperCase() == 'ENDSEC') {
+        inEntities = false;
+        processCurrentEntity();
+      } else if (inEntities) {
+        if (p.code == 0) {
+          processCurrentEntity();
+          currentEntity = [p];
+        } else if (currentEntity != null) {
+          currentEntity!.add(p);
+        }
+      }
     }
   }
 }
