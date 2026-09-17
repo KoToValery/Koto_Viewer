@@ -173,18 +173,60 @@ class DocxImageBlock extends DocxBlock {
   });
 }
 
+/// A 2D vector path with optional fill and stroke for authentic DOCX shape rendering.
+class DocxVectorPath {
+  final List<Offset> points;
+  final bool isClosed;
+  final Color? fillColor;
+  final Color? strokeColor;
+  final double strokeWidth;
+
+  const DocxVectorPath({
+    required this.points,
+    this.isClosed = false,
+    this.fillColor,
+    this.strokeColor,
+    this.strokeWidth = 1.0,
+  });
+}
+
+/// Composite logo representation consisting of vector shapes and optional bitmap image overlay.
+class DocxHeaderLogo {
+  final List<DocxVectorPath> vectorPaths;
+  final Uint8List? imageBytes;
+  final Rect? imageRect;
+  final double widthPt;
+  final double heightPt;
+
+  const DocxHeaderLogo({
+    this.vectorPaths = const [],
+    this.imageBytes,
+    this.imageRect,
+    this.widthPt = 65.0,
+    this.heightPt = 42.0,
+  });
+}
+
 /// Header Box with Company Logo + Text + Divider Rule.
 class DocxHeaderBox extends DocxBlock {
   final Uint8List? logoBytes;
   final double? logoWidthPt;
   final double? logoHeightPt;
   final List<String> headerLines;
+  final DocxHeaderLogo? headerLogo;
+  final bool hasDivider;
+  final Color dividerColor;
+  final double dividerHeightPt;
 
   const DocxHeaderBox({
     this.logoBytes,
     this.logoWidthPt,
     this.logoHeightPt,
     this.headerLines = const [],
+    this.headerLogo,
+    this.hasDivider = false,
+    this.dividerColor = const Color(0xFFCCCCCC),
+    this.dividerHeightPt = 1.5,
   });
 }
 

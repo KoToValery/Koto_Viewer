@@ -32,7 +32,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   double _zoomScale = 1.0;
   bool _hasCalculatedInitialFit = false;
   bool _isZoomBarExpanded = false;
-  bool _isSinglePageMode = false;
+  bool _isSinglePageMode = true;
   bool _isSinglePageZoomed = false;
   TapDownDetails? _continuousDoubleTapDetails;
   bool _isFullscreen = false;
@@ -632,7 +632,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                         ),
                         if (_document != null && _document!.pages.isNotEmpty)
                           Text(
-                            'Page ${_currentPageIndex + 1} of ${_document!.pages.length} • ${_isSinglePageMode ? "Single Page" : "Continuous"}',
+                            '${context.l10n.pageIndicator(_currentPageIndex + 1, _document!.pages.length)} • ${_isSinglePageMode ? context.l10n.singlePageLabel : context.l10n.continuousLabel}',
                             style: TextStyle(
                               fontSize: 11.5,
                               color: theme.textTheme.bodySmall?.color,
@@ -666,8 +666,8 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                             size: 20,
                           ),
                           tooltip: _isSinglePageMode
-                              ? 'Single Page Mode (Tap for Continuous)'
-                              : 'Continuous Mode (Tap for Single Page)',
+                              ? context.l10n.singlePageModeTooltip
+                              : context.l10n.continuousModeTooltip,
                           onPressed: () {
                             setState(() {
                               _isSinglePageMode = !_isSinglePageMode;
@@ -1055,11 +1055,50 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     return widgets;
   }
 
+  Widget _buildCompositeLogoWidget(DocxHeaderLogo logo) {
+    final scaledW = logo.widthPt * _zoomScale;
+    final scaledH = logo.heightPt * _zoomScale;
+    final scaleRatio = logo.heightPt > 0 ? (scaledH / logo.heightPt) : _zoomScale;
+
+    return SizedBox(
+      width: scaledW,
+      height: scaledH,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // 1. Vector background / polygon shapes
+          if (logo.vectorPaths.isNotEmpty)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _DocxLogoCustomPainter(
+                  vectorPaths: logo.vectorPaths,
+                  scale: scaleRatio,
+                ),
+              ),
+            ),
+
+          // 2. Embedded PNG overlay at exact rect
+          if (logo.imageBytes != null && logo.imageRect != null)
+            Positioned(
+              left: logo.imageRect!.left * scaleRatio,
+              top: logo.imageRect!.top * scaleRatio,
+              width: logo.imageRect!.width * scaleRatio,
+              height: logo.imageRect!.height * scaleRatio,
+              child: Image.memory(
+                logo.imageBytes!,
+                fit: BoxFit.fill,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeaderBoxWidget(DocxHeaderBox headerBox, ThemeData theme, bool isDark) {
     final textColor = isDark ? Colors.white70 : const Color(0xFF1E293B);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: 12.0 * _zoomScale),
+      padding: EdgeInsets.only(bottom: 10.0 * _zoomScale),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1067,7 +1106,12 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Logo
-              if (headerBox.logoBytes != null)
+              if (headerBox.headerLogo != null)
+                Padding(
+                  padding: EdgeInsets.only(right: 14.0 * _zoomScale),
+                  child: _buildCompositeLogoWidget(headerBox.headerLogo!),
+                )
+              else if (headerBox.logoBytes != null)
                 Padding(
                   padding: EdgeInsets.only(right: 14.0 * _zoomScale),
                   child: Image.memory(
@@ -1083,23 +1127,43 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
-                  children: headerBox.headerLines.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final line = entry.value;
-                    final isMainTitle = index == 0;
-                    return Padding(
-                      padding: EdgeInsets.symmetric(vertical: 1.5 * _zoomScale),
-                      child: Text(
-                        line,
-                        style: TextStyle(
-                          fontSize: (isMainTitle ? 13.0 : 10.5) * _zoomScale,
-                          fontWeight: isMainTitle ? FontWeight.bold : FontWeight.w500,
-                          color: textColor,
-                          letterSpacing: 0.2,
+                  children: [
+                    if (headerBox.headerLines.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 1.5 * _zoomScale),
+                        child: Text(
+                          headerBox.headerLines.first,
+                          style: TextStyle(
+                            fontSize: 13.0 * _zoomScale,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
-                    );
-                  }).toList(),
+                    // Shaded stripe under company title
+                    if (headerBox.hasDivider) ...[
+                      SizedBox(height: 2.0 * _zoomScale),
+                      Container(
+                        height: (headerBox.dividerHeightPt * _zoomScale).clamp(0.5, 3.0),
+                        color: headerBox.dividerColor,
+                      ),
+                      SizedBox(height: 3.0 * _zoomScale),
+                    ],
+                    if (headerBox.headerLines.length > 1)
+                      ...headerBox.headerLines.skip(1).map((line) => Padding(
+                            padding: EdgeInsets.symmetric(vertical: 1.5 * _zoomScale),
+                            child: Text(
+                              line,
+                              style: TextStyle(
+                                fontSize: 10.5 * _zoomScale,
+                                fontWeight: FontWeight.w500,
+                                color: textColor,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          )),
+                  ],
                 ),
               ),
             ],
@@ -1176,7 +1240,14 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
       }
 
       if (paragraph.runs.isEmpty) {
-        content = SizedBox(height: (isInsideCell ? 0.0 : 12.0) * _zoomScale);
+        if (paragraph.bottomBorder != null) {
+          content = const SizedBox.shrink();
+        } else {
+          final baseHeight = paragraph.lineSpacing != null
+              ? (12.0 * paragraph.lineSpacing!)
+              : (isInsideCell ? 0.0 : 14.0);
+          content = SizedBox(height: baseHeight * _zoomScale);
+        }
       } else {
         // Prepend first-line indent if present
         if (paragraph.indentFirstLine > 0 && !paragraph.isBullet && spans.isNotEmpty) {
@@ -1268,7 +1339,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           content,
-          SizedBox(height: 2.0 * _zoomScale),
+          if (paragraph.runs.isNotEmpty) SizedBox(height: 2.0 * _zoomScale),
           Container(
             height: (paragraph.bottomBorder!.width * _zoomScale).clamp(0.5, 4.0),
             color: paragraph.bottomBorder!.color,
@@ -1849,6 +1920,59 @@ class DocxSinglePageItemState extends State<DocxSinglePageItem> with SingleTicke
         ),
       ),
     );
+  }
+}
+
+/// Custom painter to render composite vector logo paths with fills and strokes.
+class _DocxLogoCustomPainter extends CustomPainter {
+  final List<DocxVectorPath> vectorPaths;
+  final double scale;
+
+  _DocxLogoCustomPainter({
+    required this.vectorPaths,
+    required this.scale,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(scale);
+
+    for (final vp in vectorPaths) {
+      if (vp.points.isEmpty) continue;
+      final path = Path();
+      path.moveTo(vp.points.first.dx, vp.points.first.dy);
+      for (int i = 1; i < vp.points.length; i++) {
+        path.lineTo(vp.points[i].dx, vp.points[i].dy);
+      }
+      if (vp.isClosed) {
+        path.close();
+      }
+
+      if (vp.fillColor != null && vp.fillColor!.a > 0) {
+        final fillPaint = Paint()
+          ..color = vp.fillColor!
+          ..style = PaintingStyle.fill;
+        canvas.drawPath(path, fillPaint);
+      }
+
+      if (vp.strokeColor != null && vp.strokeWidth > 0) {
+        final strokePaint = Paint()
+          ..color = vp.strokeColor!
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = vp.strokeWidth.clamp(0.5, 4.0)
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round;
+        canvas.drawPath(path, strokePaint);
+      }
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _DocxLogoCustomPainter oldDelegate) {
+    return oldDelegate.scale != scale || oldDelegate.vectorPaths != vectorPaths;
   }
 }
 

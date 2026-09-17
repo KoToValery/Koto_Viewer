@@ -341,7 +341,7 @@
       "name": { "type": "String" }
     }
   },
-  "errorImportingDxf": "Error importing: {error}",
+  "errorImportingDxf": "Error importing DXF: {error}",
   "@errorImportingDxf": {
     "description": "Error message when importing DXF entities fails",
     "placeholders": {
@@ -477,5 +477,33 @@
     "placeholders": {
       "error": { "type": "String" }
     }
+  },
+  "singlePageModeTooltip": "Single Page Mode (Tap for Continuous)",
+  "@singlePageModeTooltip": {
+    "description": "Tooltip for toggling to continuous mode from single page mode"
+  },
+  "continuousModeTooltip": "Continuous Mode (Tap for Single Page)",
+  "@continuousModeTooltip": {
+    "description": "Tooltip for toggling to single page mode from continuous mode"
+  },
+  "singlePageLabel": "Single Page",
+  "@singlePageLabel": {
+    "description": "Label for single page mode"
+  },
+  "continuousLabel": "Continuous",
+  "@continuousLabel": {
+    "description": "Label for continuous scroll mode"
+  },
+  "viewMode": "View Mode:",
+  "@viewMode": {
+    "description": "Label for view mode row"
+  },
+  "singlePageSwipe": "Single Page (Swipe)",
+  "@singlePageSwipe": {
+    "description": "Label for single page swipe mode"
+  },
+  "continuousScroll": "Continuous Scroll",
+  "@continuousScroll": {
+    "description": "Label for continuous scroll mode"
   }
 }

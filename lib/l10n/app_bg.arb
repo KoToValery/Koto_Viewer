@@ -136,7 +136,7 @@
   "errorLoadingDxf": "Грешка при отваряне на DXF файл: {error}",
   "failedToSaveDxf": "Грешка при запис на DXF: {error}",
   "savedDxf": "Записан DXF: {name}",
-  "errorImportingDxf": "Грешка при импортиране: {error}",
+  "errorImportingDxf": "Грешка при импортиране на DXF: {error}",
   "importedDxfSuccess": "Успешно импортирани {count} обекта от {name}",
   "fitScreen": "Побиране в екрана",
   "printPreviewUnavailable": "Прегледът за печат е недостъпен: {error}",
@@ -156,5 +156,12 @@
   "errorPickingFolder": "Грешка при избор на папка: {error}",
   "pleaseSelectSupportedFile": "Моля, изберете поддържан CAD, PCB, 3D, векторен или текстов файл.",
   "couldNotOpenFilePicker": "Неуспешно отваряне на диалога за избор на файл: {error}",
-  "errorSharingFile": "Грешка при споделяне на файл: {error}"
+  "errorSharingFile": "Грешка при споделяне на файл: {error}",
+  "singlePageModeTooltip": "Режим единична страница (Докоснете за непрекъснат)",
+  "continuousModeTooltip": "Непрекъснат режим (Докоснете за единична страница)",
+  "singlePageLabel": "Единична страница",
+  "continuousLabel": "Непрекъснато",
+  "viewMode": "Режим на преглед:",
+  "singlePageSwipe": "Единична страница (Плъзгане)",
+  "continuousScroll": "Непрекъснато превъртане"
 }

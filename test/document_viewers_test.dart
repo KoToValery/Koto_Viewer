@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -5,6 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:archive/archive.dart';
 import 'package:kotoview/src/core/models/pdf_item.dart';
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
+import 'package:kotoview/src/core/l10n/generated/app_localizations_en.dart';
+import 'package:kotoview/src/core/l10n/generated/app_localizations_bg.dart';
 import 'package:kotoview/src/features/docx_viewer/models/docx_models.dart';
 import 'package:kotoview/src/features/docx_viewer/parser/docx_parser.dart';
 
@@ -439,4 +443,105 @@ void main() {
       expect(lines[2], contains('4725134.55'));
     });
   });
+
+  group('DOCX Header Box, Vector Logo, and Empty Lines Preservation Tests', () {
+    test('Empty paragraphs (<w:p/> from Enter key) are preserved as blank lines', () {
+      const xmlStr = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Line 1</w:t></w:r></w:p>
+    <w:p><w:pPr><w:rPr><w:sz w:val="24"/></w:rPr></w:pPr></w:p>
+    <w:p><w:r><w:t>Line 2 after blank line</w:t></w:r></w:p>
+  </w:body>
+</w:document>''';
+      final archive = Archive();
+      final xmlBytes = utf8.encode(xmlStr);
+      archive.addFile(ArchiveFile('word/document.xml', xmlBytes.length, xmlBytes));
+      final docxBytes = Uint8List.fromList(ZipEncoder().encode(archive)!);
+
+      final doc = DocxParser.parse(docxBytes);
+      expect(doc.blocks.length, equals(3));
+      final p1 = doc.blocks[0] as DocxParagraph;
+      final pBlank = doc.blocks[1] as DocxParagraph;
+      final p2 = doc.blocks[2] as DocxParagraph;
+      expect(p1.runs.first.text, equals('Line 1'));
+      expect(pBlank.runs, isEmpty);
+      expect(p2.runs.first.text, equals('Line 2 after blank line'));
+    });
+
+    test('DocxHeaderBox correctly retains logo and divider settings', () {
+      final headerBox = DocxHeaderBox(
+        headerLines: ['COMPANY NAME', 'Sofia, Bulgaria'],
+        logoBytes: Uint8List.fromList([1, 2, 3]),
+        headerLogo: DocxHeaderLogo(
+          widthPt: 40,
+          heightPt: 40,
+          imageBytes: Uint8List.fromList([1, 2, 3]),
+          vectorPaths: [
+            DocxVectorPath(
+              points: [const Offset(0, 0), const Offset(10, 0), const Offset(10, 10)],
+              fillColor: const Color(0xFF000000),
+              strokeColor: const Color(0xFF000000),
+              strokeWidth: 1.0,
+              isClosed: true,
+            ),
+          ],
+        ),
+        hasDivider: true,
+        dividerColor: const Color(0xFFCCCCCC),
+        dividerHeightPt: 1.5,
+      );
+
+      expect(headerBox.headerLines, contains('COMPANY NAME'));
+      expect(headerBox.hasDivider, isTrue);
+      expect(headerBox.dividerHeightPt, equals(1.5));
+      expect(headerBox.headerLogo?.vectorPaths.length, equals(1));
+      expect(headerBox.headerLogo?.vectorPaths.first.points.length, equals(3));
+      expect(headerBox.headerLogo?.vectorPaths.first.isClosed, isTrue);
+    });
+
+    test('Parses real-world zapiska.docx if available', () {
+      final file = File(r'C:\Users\Creator\Dropbox\test_files\zapiska.docx');
+      if (!file.existsSync()) return;
+
+      final bytes = file.readAsBytesSync();
+      final doc = DocxParser.parse(bytes);
+      expect(doc.pages.isNotEmpty, isTrue);
+      // Verify empty lines are preserved
+      final blankParas = doc.blocks.whereType<DocxParagraph>().where((p) => p.runs.isEmpty).toList();
+      expect(blankParas.length, greaterThanOrEqualTo(10));
+      // Verify header box was detected
+      final headerParas = doc.blocks
+          .whereType<DocxParagraph>()
+          .where((p) => p.headerBox != null)
+          .toList();
+      expect(headerParas.length, equals(1));
+      final hb = headerParas.first.headerBox!;
+      expect(hb.hasDivider, isTrue);
+      expect(hb.headerLogo, isNotNull);
+      expect(hb.headerLogo!.vectorPaths.isNotEmpty, isTrue);
+    });
+
+    test('Localization keys for view modes exist in English and Bulgarian', () {
+      final en = AppLocalizationsEn();
+      final bg = AppLocalizationsBg();
+
+      expect(en.singlePageModeTooltip, isNotEmpty);
+      expect(en.continuousModeTooltip, isNotEmpty);
+      expect(en.singlePageLabel, equals('Single Page'));
+      expect(en.continuousLabel, equals('Continuous'));
+      expect(en.viewMode, equals('View Mode:'));
+      expect(en.singlePageSwipe, equals('Single Page (Swipe)'));
+      expect(en.continuousScroll, equals('Continuous Scroll'));
+
+      expect(bg.singlePageModeTooltip, isNotEmpty);
+      expect(bg.continuousModeTooltip, isNotEmpty);
+      expect(bg.singlePageLabel, equals('Единична страница'));
+      expect(bg.continuousLabel, equals('Непрекъснато'));
+      expect(bg.viewMode, equals('Режим на преглед:'));
+      expect(bg.singlePageSwipe, equals('Единична страница (Плъзгане)'));
+      expect(bg.continuousScroll, equals('Непрекъснато превъртане'));
+    });
+  });
 }
+

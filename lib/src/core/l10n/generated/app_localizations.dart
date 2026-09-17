@@ -881,7 +881,7 @@ abstract class AppLocalizations {
   /// Error message when importing DXF entities fails
   ///
   /// In en, this message translates to:
-  /// **'Error importing: {error}'**
+  /// **'Error importing DXF: {error}'**
   String errorImportingDxf(String error);
 
   /// Success message when DXF entities are imported
@@ -1003,6 +1003,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error sharing file: {error}'**
   String errorSharingFile(String error);
+
+  /// Tooltip for toggling to continuous mode from single page mode
+  ///
+  /// In en, this message translates to:
+  /// **'Single Page Mode (Tap for Continuous)'**
+  String get singlePageModeTooltip;
+
+  /// Tooltip for toggling to single page mode from continuous mode
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous Mode (Tap for Single Page)'**
+  String get continuousModeTooltip;
+
+  /// Label for single page mode
+  ///
+  /// In en, this message translates to:
+  /// **'Single Page'**
+  String get singlePageLabel;
+
+  /// Label for continuous scroll mode
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous'**
+  String get continuousLabel;
+
+  /// Label for view mode row
+  ///
+  /// In en, this message translates to:
+  /// **'View Mode:'**
+  String get viewMode;
+
+  /// Label for single page swipe mode
+  ///
+  /// In en, this message translates to:
+  /// **'Single Page (Swipe)'**
+  String get singlePageSwipe;
+
+  /// Label for continuous scroll mode
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous Scroll'**
+  String get continuousScroll;
 }
 
 class _AppLocalizationsDelegate

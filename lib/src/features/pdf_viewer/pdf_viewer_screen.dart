@@ -413,7 +413,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   _buildInfoRow('Total Pages:', '$_pageCount pages'),
                   _buildInfoRow('Current Page:', 'Page $_currentPage of $_pageCount'),
                   _buildInfoRow('File Size:', formattedSize),
-                  _buildInfoRow('View Mode:', _isSinglePageMode ? 'Single Page (Swipe)' : 'Continuous Scroll'),
+                  _buildInfoRow(context.l10n.viewMode, _isSinglePageMode ? context.l10n.singlePageSwipe : context.l10n.continuousScroll),
                   _buildInfoRow('File Path:', widget.filePath),
                 ],
               ),
@@ -725,7 +725,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   ),
                   if (_pageCount > 0)
                     Text(
-                      'Page $_currentPage of $_pageCount • ${_isReflowMode ? "Reading Mode (Reflow)" : (_isSinglePageMode ? "Single Page" : "Continuous")}',
+                      '${context.l10n.pageIndicator(_currentPage, _pageCount)} • ${_isReflowMode ? "Reading Mode (Reflow)" : (_isSinglePageMode ? context.l10n.singlePageLabel : context.l10n.continuousLabel)}',
                       style: TextStyle(
                         fontSize: 11.5,
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
@@ -772,8 +772,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                             size: 20,
                           ),
                           tooltip: _isSinglePageMode
-                              ? 'Single Page Mode (Tap for Continuous)'
-                              : 'Continuous Mode (Tap for Single Page)',
+                              ? context.l10n.singlePageModeTooltip
+                              : context.l10n.continuousModeTooltip,
                           onPressed: _toggleViewMode,
                         ),
 

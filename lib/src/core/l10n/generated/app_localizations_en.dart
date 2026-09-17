@@ -437,7 +437,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String errorImportingDxf(String error) {
-    return 'Error importing: $error';
+    return 'Error importing DXF: $error';
   }
 
   @override
@@ -534,4 +534,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String errorSharingFile(String error) {
     return 'Error sharing file: $error';
   }
+
+  @override
+  String get singlePageModeTooltip => 'Single Page Mode (Tap for Continuous)';
+
+  @override
+  String get continuousModeTooltip => 'Continuous Mode (Tap for Single Page)';
+
+  @override
+  String get singlePageLabel => 'Single Page';
+
+  @override
+  String get continuousLabel => 'Continuous';
+
+  @override
+  String get viewMode => 'View Mode:';
+
+  @override
+  String get singlePageSwipe => 'Single Page (Swipe)';
+
+  @override
+  String get continuousScroll => 'Continuous Scroll';
 }

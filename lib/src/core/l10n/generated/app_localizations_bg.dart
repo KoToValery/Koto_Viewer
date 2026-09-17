@@ -440,7 +440,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String errorImportingDxf(String error) {
-    return 'Грешка при импортиране: $error';
+    return 'Грешка при импортиране на DXF: $error';
   }
 
   @override
@@ -538,4 +538,27 @@ class AppLocalizationsBg extends AppLocalizations {
   String errorSharingFile(String error) {
     return 'Грешка при споделяне на файл: $error';
   }
+
+  @override
+  String get singlePageModeTooltip =>
+      'Режим единична страница (Докоснете за непрекъснат)';
+
+  @override
+  String get continuousModeTooltip =>
+      'Непрекъснат режим (Докоснете за единична страница)';
+
+  @override
+  String get singlePageLabel => 'Единична страница';
+
+  @override
+  String get continuousLabel => 'Непрекъснато';
+
+  @override
+  String get viewMode => 'Режим на преглед:';
+
+  @override
+  String get singlePageSwipe => 'Единична страница (Плъзгане)';
+
+  @override
+  String get continuousScroll => 'Непрекъснато превъртане';
 }

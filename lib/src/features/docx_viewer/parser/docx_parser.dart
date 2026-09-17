@@ -446,6 +446,209 @@ class DocxParser {
     );
   }
 
+  static DocxHeaderBox? _parseHeaderBox(
+    xml.XmlElement pElement,
+    Map<String, String> relsMap,
+    Map<String, Uint8List> imagesMap,
+  ) {
+    final txbxElements = pElement.findAllElements('w:txbxContent');
+    final wgp = pElement.findAllElements('wpg:wgp').firstOrNull;
+
+    Uint8List? logoBytes;
+    for (final blip in pElement.findAllElements('a:blip')) {
+      final rId = blip.getAttribute('r:embed');
+      if (rId != null && relsMap.containsKey(rId)) {
+        final target = relsMap[rId]!;
+        if (imagesMap.containsKey(target) || imagesMap.containsKey('word/$target')) {
+          logoBytes = imagesMap[target] ?? imagesMap['word/$target'];
+        }
+      }
+    }
+    for (final imgData in pElement.findAllElements('v:imagedata')) {
+      final rId = imgData.getAttribute('r:id');
+      if (rId != null && relsMap.containsKey(rId)) {
+        final target = relsMap[rId]!;
+        if (imagesMap.containsKey(target) || imagesMap.containsKey('word/$target')) {
+          logoBytes ??= imagesMap[target] ?? imagesMap['word/$target'];
+        }
+      }
+    }
+
+    if (txbxElements.isEmpty && logoBytes == null && wgp == null) {
+      return null;
+    }
+
+    final List<String> headerLines = [];
+    for (final txbx in txbxElements) {
+      for (final p in txbx.findAllElements('w:p')) {
+        final text = p.findAllElements('w:t').map((e) => e.innerText).join();
+        if (text.trim().isNotEmpty && !headerLines.contains(text.trim())) {
+          headerLines.add(text.trim());
+        }
+      }
+    }
+
+    DocxHeaderLogo? headerLogo;
+    bool hasDivider = false;
+
+    if (wgp != null) {
+      final grpSpPr = wgp.findElements('wpg:grpSpPr').firstOrNull;
+      final xfrm = grpSpPr?.findElements('a:xfrm').firstOrNull;
+      final ext = xfrm?.findElements('a:ext').firstOrNull;
+      final chExt = xfrm?.findElements('a:chExt').firstOrNull;
+
+      final coordW = double.tryParse(chExt?.getAttribute('cx') ?? '') ?? 8569.0;
+      final coordH = double.tryParse(chExt?.getAttribute('cy') ?? '') ?? 843.0;
+      final extW = double.tryParse(ext?.getAttribute('cx') ?? '') ?? 5328285.0;
+      final extH = double.tryParse(ext?.getAttribute('cy') ?? '') ?? 535305.0;
+
+      // 1 pt = 12700 EMUs
+      final groupWidthPt = extW / 12700.0;
+      final groupHeightPt = extH / 12700.0;
+      final scaleX = coordW > 0 ? (groupWidthPt / coordW) : 0.0489;
+      final scaleY = coordH > 0 ? (groupHeightPt / coordH) : 0.05;
+
+      final List<DocxVectorPath> vectorPaths = [];
+      Rect? imageRect;
+      double maxLogoX = 0.0;
+      double maxLogoY = 0.0;
+
+      for (final child in wgp.children.whereType<xml.XmlElement>()) {
+        final local = child.name.local;
+
+        // 1. Picture shape
+        if (local == 'pic' || child.findAllElements('pic:pic').isNotEmpty) {
+          final pic = local == 'pic' ? child : child.findAllElements('pic:pic').first;
+          final spPr = pic.findElements('pic:spPr').firstOrNull;
+          final pXfrm = spPr?.findElements('a:xfrm').firstOrNull;
+          if (pXfrm != null) {
+            final off = pXfrm.findElements('a:off').firstOrNull;
+            final pExt = pXfrm.findElements('a:ext').firstOrNull;
+            final offX = (double.tryParse(off?.getAttribute('x') ?? '') ?? 0) * scaleX;
+            final offY = (double.tryParse(off?.getAttribute('y') ?? '') ?? 0) * scaleY;
+            final w = (double.tryParse(pExt?.getAttribute('cx') ?? '') ?? 0) * scaleX;
+            final h = (double.tryParse(pExt?.getAttribute('cy') ?? '') ?? 0) * scaleY;
+            imageRect = Rect.fromLTWH(offX, offY, w, h);
+            if (offX + w > maxLogoX) maxLogoX = offX + w;
+            if (offY + h > maxLogoY) maxLogoY = offY + h;
+          }
+        }
+
+        // 2. Shape (wsp)
+        if (local == 'wsp' || child.findAllElements('wps:wsp').isNotEmpty) {
+          final wsp = local == 'wsp' ? child : child.findAllElements('wps:wsp').first;
+          final spPr = wsp.findElements('wps:spPr').firstOrNull;
+
+          // Check if divider line
+          final prstGeom = spPr?.findElements('a:prstGeom').firstOrNull;
+          if (prstGeom?.getAttribute('prst') == 'rect') {
+            final xf = spPr?.findElements('a:xfrm').firstOrNull;
+            final e = xf?.findElements('a:ext').firstOrNull;
+            final cy = double.tryParse(e?.getAttribute('cy') ?? '') ?? 0;
+            final cx = double.tryParse(e?.getAttribute('cx') ?? '') ?? 0;
+            if (cy < 200 && cx > 1000) {
+              hasDivider = true;
+              continue;
+            }
+          }
+
+          // Check custom geometry
+          final custGeom = spPr?.findElements('a:custGeom').firstOrNull;
+          if (custGeom != null) {
+            final xf = spPr?.findElements('a:xfrm').firstOrNull;
+            final off = xf?.findElements('a:off').firstOrNull;
+            final offX = double.tryParse(off?.getAttribute('x') ?? '') ?? 0;
+            final offY = double.tryParse(off?.getAttribute('y') ?? '') ?? 0;
+
+            final pathElem = custGeom.findAllElements('a:path').firstOrNull;
+            if (pathElem != null) {
+              final pts = <Offset>[];
+              for (final cmd in pathElem.children.whereType<xml.XmlElement>()) {
+                final pt = cmd.findElements('a:pt').firstOrNull;
+                if (pt != null) {
+                  final px = (offX + (double.tryParse(pt.getAttribute('x') ?? '') ?? 0)) * scaleX;
+                  final py = (offY + (double.tryParse(pt.getAttribute('y') ?? '') ?? 0)) * scaleY;
+                  pts.add(Offset(px, py));
+                  if (px > maxLogoX) maxLogoX = px;
+                  if (py > maxLogoY) maxLogoY = py;
+                }
+              }
+
+              final isClosed = pathElem.findElements('a:close').isNotEmpty;
+
+              Color? fill;
+              final solidFill = spPr?.findElements('a:solidFill').firstOrNull;
+              if (solidFill != null) {
+                final srgb = solidFill.findElements('a:srgbClr').firstOrNull;
+                final hex = srgb?.getAttribute('val');
+                if (hex != null) {
+                  final alphaElem = srgb?.findElements('a:alpha').firstOrNull;
+                  final alphaVal = double.tryParse(alphaElem?.getAttribute('val') ?? '');
+                  final alpha = alphaVal != null ? (alphaVal / 100000.0 * 255).round().clamp(0, 255) : 255;
+                  final rgb = int.tryParse(hex, radix: 16) ?? 0xCCCCCC;
+                  fill = Color((alpha << 24) | (rgb & 0xFFFFFF));
+                }
+              }
+
+              Color? stroke;
+              double strokeW = 1.0;
+              final ln = spPr?.findElements('a:ln').firstOrNull;
+              if (ln != null) {
+                final srgb = ln.findAllElements('a:srgbClr').firstOrNull;
+                final hex = srgb?.getAttribute('val');
+                if (hex != null) {
+                  final rgb = int.tryParse(hex, radix: 16) ?? 0;
+                  stroke = Color(0xFF000000 | rgb);
+                }
+                final wAttr = double.tryParse(ln.getAttribute('w') ?? '');
+                if (wAttr != null && wAttr > 0) {
+                  strokeW = (wAttr / 12700.0).clamp(0.5, 3.0);
+                }
+              }
+
+              if (pts.isNotEmpty) {
+                vectorPaths.add(DocxVectorPath(
+                  points: pts,
+                  isClosed: isClosed,
+                  fillColor: fill,
+                  strokeColor: stroke,
+                  strokeWidth: strokeW,
+                ));
+              }
+            }
+          }
+        }
+      }
+
+      if (vectorPaths.isNotEmpty || logoBytes != null) {
+        final logoW = maxLogoX > 0 ? (maxLogoX + 4.0) : 65.0;
+        final logoH = maxLogoY > 0 ? (maxLogoY + 2.0) : 42.0;
+        headerLogo = DocxHeaderLogo(
+          vectorPaths: vectorPaths,
+          imageBytes: logoBytes,
+          imageRect: imageRect,
+          widthPt: logoW,
+          heightPt: logoH,
+        );
+      }
+    }
+
+    if (logoBytes == null && headerLines.isEmpty && headerLogo == null) {
+      return null;
+    }
+
+    return DocxHeaderBox(
+      logoBytes: logoBytes,
+      logoWidthPt: headerLogo?.widthPt ?? 70.0,
+      logoHeightPt: headerLogo?.heightPt ?? 45.0,
+      headerLines: headerLines,
+      headerLogo: headerLogo,
+      hasDivider: hasDivider,
+      dividerColor: const Color(0xFFCCCCCC),
+      dividerHeightPt: 1.5,
+    );
+  }
+
   static DocxParagraph? _parseParagraph(
     xml.XmlElement pElement,
     Map<String, _DocxParsedStyle> stylesMap,
@@ -640,59 +843,38 @@ class DocxParser {
     final picts = pElement.findAllElements('w:pict');
 
     if (drawings.isNotEmpty || picts.isNotEmpty) {
-      // 1. Check if it's a Header Box with Image + Textbox
-      final txbxElements = pElement.findAllElements('w:txbxContent');
-      Uint8List? logoBytes;
+      headerBox = _parseHeaderBox(pElement, relsMap, imagesMap);
 
-      for (final blip in pElement.findAllElements('a:blip')) {
-        final rId = blip.getAttribute('r:embed');
-        if (rId != null && relsMap.containsKey(rId)) {
-          final target = relsMap[rId]!;
-          if (imagesMap.containsKey(target) || imagesMap.containsKey('word/$target')) {
-            logoBytes = imagesMap[target] ?? imagesMap['word/$target'];
+      // Check for Horizontal Rule Bar (<v:rect fillcolor="#ccc"> or <wps:wsp>)
+      if (headerBox == null) {
+        for (final rect in pElement.findAllElements('v:rect')) {
+          final style = rect.getAttribute('style') ?? '';
+          if (style.contains('width:') &&
+              (style.contains('height:2') ||
+                  style.contains('height:1') ||
+                  style.contains('height:3') ||
+                  style.contains('height:2.4'))) {
+            bottomBorder = const DocxBorder(
+              hasBorder: true,
+              color: Color(0xFFCCCCCC),
+              width: 2.0,
+            );
           }
         }
-      }
-      for (final imgData in pElement.findAllElements('v:imagedata')) {
-        final rId = imgData.getAttribute('r:id');
-        if (rId != null && relsMap.containsKey(rId)) {
-          final target = relsMap[rId]!;
-          if (imagesMap.containsKey(target) || imagesMap.containsKey('word/$target')) {
-            logoBytes ??= imagesMap[target] ?? imagesMap['word/$target'];
-          }
-        }
-      }
-
-      if (txbxElements.isNotEmpty || logoBytes != null) {
-        final List<String> headerLines = [];
-        for (final txbx in txbxElements) {
-          for (final p in txbx.findAllElements('w:p')) {
-            final text = p.findAllElements('w:t').map((e) => e.innerText).join();
-            if (text.trim().isNotEmpty && !headerLines.contains(text.trim())) {
-              headerLines.add(text.trim());
+        for (final wsp in pElement.findAllElements('wps:wsp')) {
+          final prst = wsp.findAllElements('a:prstGeom').firstOrNull?.getAttribute('prst');
+          if (prst == 'rect') {
+            final ext = wsp.findAllElements('a:ext').firstOrNull;
+            final cy = double.tryParse(ext?.getAttribute('cy') ?? '') ?? 0;
+            final cx = double.tryParse(ext?.getAttribute('cx') ?? '') ?? 0;
+            if (cy > 0 && cy < 100000 && cx > 1000000) {
+              bottomBorder = const DocxBorder(
+                hasBorder: true,
+                color: Color(0xFFCCCCCC),
+                width: 2.0,
+              );
             }
           }
-        }
-
-        if (logoBytes != null || headerLines.isNotEmpty) {
-          headerBox = DocxHeaderBox(
-            logoBytes: logoBytes,
-            logoWidthPt: 85.0,
-            logoHeightPt: 65.0,
-            headerLines: headerLines,
-          );
-        }
-      }
-
-      // 2. Check for Horizontal Rule Bar (<v:rect fillcolor="#ccc"> or <wps:wsp>)
-      for (final rect in pElement.findAllElements('v:rect')) {
-        final style = rect.getAttribute('style') ?? '';
-        if (style.contains('width:') && (style.contains('height:2') || style.contains('height:1') || style.contains('height:3'))) {
-          bottomBorder = const DocxBorder(
-            hasBorder: true,
-            color: Color(0xFFCCCCCC),
-            width: 2.0,
-          );
         }
       }
     }
@@ -743,12 +925,8 @@ class DocxParser {
       }
     }
 
-    // Filter out completely empty paragraphs unless they have spacing or borders
-    if (runs.isEmpty && headerBox == null && bottomBorder == null && !isPageBreak) {
-      if (spaceBefore == 0 && spaceAfter == 0) {
-        return null;
-      }
-    }
+    // In Microsoft Word, an empty paragraph (<w:p/> or empty runs) represents an authentic
+    // blank line created with Enter. We preserve it with its authentic line height.
 
     return DocxParagraph(
       runs: runs,
