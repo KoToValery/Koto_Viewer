@@ -505,5 +505,27 @@
   "continuousScroll": "Continuous Scroll",
   "@continuousScroll": {
     "description": "Label for continuous scroll mode"
+  },
+  "archiveFilesCount": "Archive Files ({count})",
+  "@archiveFilesCount": {
+    "description": "Header for archive files list",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "openArchiveFile": "Open",
+  "@openArchiveFile": {
+    "description": "Button or label to open a file from archive"
+  },
+  "unsupportedArchiveFormat": "Direct preview is not supported for this file format.",
+  "@unsupportedArchiveFormat": {
+    "description": "Notice when a file inside archive cannot be opened directly"
+  },
+  "extractingFile": "Opening {name}...",
+  "@extractingFile": {
+    "description": "Message while extracting and opening a file from archive",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
   }
 }

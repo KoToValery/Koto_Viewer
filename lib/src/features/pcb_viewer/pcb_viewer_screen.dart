@@ -3,9 +3,12 @@ import 'dart:math' as math;
 import 'package:archive/archive.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/l10n/l10n_extensions.dart';
+import '../../core/models/pdf_item.dart';
+import '../../core/services/file_opener_service.dart';
 import '../../core/services/recent_files_service.dart';
 import 'models/pcb_models.dart';
 import 'parser/gerber_parser.dart';
@@ -880,8 +883,12 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                       const Icon(Icons.folder_zip_outlined, color: Color(0xFF059669)),
                       const SizedBox(width: 10),
                       Text(
-                        'Archive Files (${_project!.archiveFiles.length})',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        context.l10n.archiveFilesCount(_project!.archiveFiles.length),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
                       ),
                     ],
                   ),
@@ -893,21 +900,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                     itemCount: _project!.archiveFiles.length,
                     separatorBuilder: (context, index) => const Divider(height: 1),
                     itemBuilder: (context, index) {
-                      final file = _project!.archiveFiles[index];
-                      return ListTile(
-                        leading: Icon(
-                          _getFileIcon(file.fileName),
-                          color: theme.colorScheme.primary,
-                        ),
-                        title: Text(
-                          file.fileName,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-                        ),
-                        trailing: Text(
-                          file.formattedSize,
-                          style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
-                        ),
-                      );
+                      return _buildArchiveFileItemWidget(_project!.archiveFiles[index], theme);
                     },
                   ),
                 ),
@@ -919,19 +912,239 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     );
   }
 
+  Future<void> _openArchiveFile(PcbArchiveFileItem file) async {
+    final pdfItem = PdfItem.fromPath(file.fileName);
+    if (pdfItem.fileType == KotoFileType.other || pdfItem.fileType == KotoFileType.zip) {
+      _showUnsupportedSnackbar(file);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.extractingFile(file.fileName)),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final baseName = file.fileName.split(RegExp(r'[\\/]')).last;
+      final tempFile = File('${tempDir.path}/koto_extracted/$baseName');
+      await tempFile.parent.create(recursive: true);
+      await tempFile.writeAsBytes(file.bytes);
+
+      if (!mounted) return;
+      await FileOpenerService.openFile(
+        context: context,
+        filePath: tempFile.path,
+      );
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PcbViewer._openArchiveFile');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening ${file.fileName}: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showUnsupportedSnackbar(PcbArchiveFileItem file) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.unsupportedArchiveFormat),
+        action: SnackBarAction(
+          label: 'Share',
+          onPressed: () {
+            Share.shareXFiles([XFile.fromData(file.bytes, name: file.fileName)]);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArchiveFileItemWidget(PcbArchiveFileItem file, ThemeData theme) {
+    final pdfItem = PdfItem.fromPath(file.fileName);
+    final isSupported = pdfItem.fileType != KotoFileType.other && pdfItem.fileType != KotoFileType.zip;
+    final typeLabel = isSupported ? _getFileTypeLabel(pdfItem.fileType) : null;
+
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isSupported
+              ? theme.colorScheme.primary.withValues(alpha: 0.12)
+              : theme.colorScheme.onSurface.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          _getFileIcon(file.fileName),
+          color: isSupported ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+          size: 22,
+        ),
+      ),
+      title: Text(
+        file.fileName,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13.5,
+          color: theme.colorScheme.onSurface,
+        ),
+      ),
+      subtitle: Row(
+        children: [
+          Text(
+            file.formattedSize,
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (typeLabel != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                typeLabel,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+      trailing: isSupported
+          ? IconButton(
+              icon: Icon(Icons.open_in_new, size: 20, color: theme.colorScheme.primary),
+              tooltip: context.l10n.openArchiveFile,
+              onPressed: () => _openArchiveFile(file),
+            )
+          : IconButton(
+              icon: Icon(Icons.share_outlined, size: 20, color: theme.colorScheme.onSurfaceVariant),
+              tooltip: 'Share',
+              onPressed: () {
+                Share.shareXFiles([XFile.fromData(file.bytes, name: file.fileName)]);
+              },
+            ),
+      onTap: isSupported ? () => _openArchiveFile(file) : () => _showUnsupportedSnackbar(file),
+    );
+  }
+
   IconData _getFileIcon(String name) {
     final lower = name.toLowerCase();
-    if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.bmp')) {
+    if (lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.bmp') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.ico')) {
       return Icons.image_outlined;
     }
     if (lower.endsWith('.pdf')) return Icons.picture_as_pdf_outlined;
+    if (lower.endsWith('.docx') || lower.endsWith('.doc') || lower.endsWith('.rtf')) {
+      return Icons.description_outlined;
+    }
     if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv') || lower.contains('bom')) {
       return Icons.table_chart_outlined;
     }
-    if (lower.endsWith('.gbr') || lower.endsWith('.gtl') || lower.endsWith('.gbl') || lower.endsWith('.drl')) {
+    if (lower.endsWith('.txt') || lower.endsWith('.log')) {
+      return Icons.article_outlined;
+    }
+    if (lower.endsWith('.md') || lower.endsWith('.markdown')) {
+      return Icons.text_snippet_outlined;
+    }
+    if (lower.endsWith('.dxf') || lower.endsWith('.dwg')) {
+      return Icons.architecture_outlined;
+    }
+    if (lower.endsWith('.step') ||
+        lower.endsWith('.stp') ||
+        lower.endsWith('.iges') ||
+        lower.endsWith('.igs') ||
+        lower.endsWith('.stl') ||
+        lower.endsWith('.obj') ||
+        lower.endsWith('.ifc')) {
+      return Icons.view_in_ar_outlined;
+    }
+    if (lower.endsWith('.gbr') ||
+        lower.endsWith('.gtl') ||
+        lower.endsWith('.gbl') ||
+        lower.endsWith('.drl') ||
+        lower.endsWith('.kicad_sch') ||
+        lower.endsWith('.kicad_pcb')) {
       return Icons.memory_outlined;
     }
+    if (lower.endsWith('.epub') || lower.endsWith('.fb2')) {
+      return Icons.auto_stories_outlined;
+    }
+    if (lower.endsWith('.gpx') ||
+        lower.endsWith('.kml') ||
+        lower.endsWith('.kmz') ||
+        lower.endsWith('.geojson')) {
+      return Icons.route_outlined;
+    }
     return Icons.insert_drive_file_outlined;
+  }
+
+  String _getFileTypeLabel(KotoFileType type) {
+    switch (type) {
+      case KotoFileType.pdf:
+        return 'PDF';
+      case KotoFileType.docx:
+      case KotoFileType.rtf:
+        return 'Word Document';
+      case KotoFileType.xlsx:
+        return 'Spreadsheet';
+      case KotoFileType.csv:
+        return 'CSV Data';
+      case KotoFileType.txt:
+        return 'Text File';
+      case KotoFileType.md:
+        return 'Markdown';
+      case KotoFileType.dxf:
+      case KotoFileType.dwg:
+        return 'CAD Drawing';
+      case KotoFileType.image:
+        return 'Image';
+      case KotoFileType.step:
+      case KotoFileType.iges:
+      case KotoFileType.ifc:
+      case KotoFileType.fbx:
+      case KotoFileType.threeMf:
+        return '3D Model';
+      case KotoFileType.kicad:
+        return 'KiCad Circuit';
+      case KotoFileType.code:
+        return 'Code / Config';
+      case KotoFileType.epub:
+      case KotoFileType.fb2:
+        return 'E-Book';
+      case KotoFileType.gpx:
+      case KotoFileType.kml:
+      case KotoFileType.kmz:
+      case KotoFileType.geojson:
+        return 'GPS Route';
+      case KotoFileType.font:
+        return 'Font';
+      case KotoFileType.svg:
+        return 'SVG Vector';
+      case KotoFileType.plt:
+        return 'HPGL Plot';
+      case KotoFileType.dicom:
+        return 'DICOM Medical';
+      default:
+        return 'File';
+    }
   }
 
   Widget _buildInfoRow(String label, String value) {
@@ -964,7 +1177,9 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+        backgroundColor: (_project != null && _project!.layers.isNotEmpty)
+            ? (isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B))
+            : theme.scaffoldBackgroundColor,
         appBar: AppBar(
           backgroundColor: theme.colorScheme.surface,
           elevation: 0,
@@ -1522,8 +1737,12 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
               const Icon(Icons.folder_zip_outlined, size: 20, color: Color(0xFF059669)),
               const SizedBox(width: 10),
               Text(
-                'Archive Files (${files.length})',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                context.l10n.archiveFilesCount(files.length),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
             ],
           ),
@@ -1535,12 +1754,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
             itemCount: files.length,
             separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {
-              final file = files[index];
-              return ListTile(
-                leading: Icon(_getFileIcon(file.fileName), color: theme.colorScheme.primary),
-                title: Text(file.fileName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                trailing: Text(file.formattedSize, style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color)),
-              );
+              return _buildArchiveFileItemWidget(files[index], theme);
             },
           ),
         ),

@@ -83,6 +83,17 @@ class PdfItem {
     this.pageCount = 0,
   });
 
+  factory PdfItem.fromPath(String path, {int sizeInBytes = 0, DateTime? lastOpened, int pageCount = 0}) {
+    final name = path.split(Platform.pathSeparator).last.split('/').last;
+    return PdfItem(
+      path: path,
+      name: name,
+      sizeInBytes: sizeInBytes,
+      lastOpened: lastOpened ?? DateTime.now(),
+      pageCount: pageCount,
+    );
+  }
+
   KotoFileType get fileType {
     final lower = name.toLowerCase();
     if (lower.endsWith('.pdf')) return KotoFileType.pdf;
@@ -108,7 +119,7 @@ class PdfItem {
     if (lower.endsWith('.csv') || lower.endsWith('.tsv')) return KotoFileType.csv;
     if (lower.endsWith('.txt') || lower.endsWith('.log')) return KotoFileType.txt;
     if (lower.endsWith('.md') || lower.endsWith('.markdown')) return KotoFileType.md;
-    if (lower.endsWith('.docx')) return KotoFileType.docx;
+    if (lower.endsWith('.docx') || lower.endsWith('.doc')) return KotoFileType.docx;
     if (lower.endsWith('.pptx') || lower.endsWith('.ppsx') || lower.endsWith('.ppt') || lower.endsWith('.pps')) return KotoFileType.pptx;
     if (lower.endsWith('.rtf')) return KotoFileType.rtf;
     if (lower.endsWith('.eps')) return KotoFileType.eps;

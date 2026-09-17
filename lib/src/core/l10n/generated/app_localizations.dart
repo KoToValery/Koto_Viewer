@@ -1045,6 +1045,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continuous Scroll'**
   String get continuousScroll;
+
+  /// Header for archive files list
+  ///
+  /// In en, this message translates to:
+  /// **'Archive Files ({count})'**
+  String archiveFilesCount(int count);
+
+  /// Button or label to open a file from archive
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get openArchiveFile;
+
+  /// Notice when a file inside archive cannot be opened directly
+  ///
+  /// In en, this message translates to:
+  /// **'Direct preview is not supported for this file format.'**
+  String get unsupportedArchiveFormat;
+
+  /// Message while extracting and opening a file from archive
+  ///
+  /// In en, this message translates to:
+  /// **'Opening {name}...'**
+  String extractingFile(String name);
 }
 
 class _AppLocalizationsDelegate

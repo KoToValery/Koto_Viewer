@@ -555,4 +555,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get continuousScroll => 'Continuous Scroll';
+
+  @override
+  String archiveFilesCount(int count) {
+    return 'Archive Files ($count)';
+  }
+
+  @override
+  String get openArchiveFile => 'Open';
+
+  @override
+  String get unsupportedArchiveFormat =>
+      'Direct preview is not supported for this file format.';
+
+  @override
+  String extractingFile(String name) {
+    return 'Opening $name...';
+  }
 }

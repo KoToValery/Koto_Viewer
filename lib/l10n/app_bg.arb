@@ -163,5 +163,9 @@
   "continuousLabel": "Непрекъснато",
   "viewMode": "Режим на преглед:",
   "singlePageSwipe": "Единична страница (Плъзгане)",
-  "continuousScroll": "Непрекъснато превъртане"
+  "continuousScroll": "Непрекъснато превъртане",
+  "archiveFilesCount": "Файлове в архива ({count})",
+  "openArchiveFile": "Отвори",
+  "unsupportedArchiveFormat": "Не се поддържа директен преглед за този файлов формат.",
+  "extractingFile": "Отваряне на {name}..."
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -1135,6 +1136,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         panAxis: PanAxis.free,
         boundaryMargin: const EdgeInsets.all(36.0),
         scrollByMouseWheel: 0.2,
+        onePassRenderingSizeThreshold: 3000,
+        maxImageBytesCachedOnMemory: 200 * 1024 * 1024,
         loadingBannerBuilder: (context, bytesDownloaded, totalBytes) => const SizedBox.shrink(),
         onViewerReady: (document, controller) {
           setState(() {
@@ -1452,6 +1455,47 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
             pageNumber: widget.pageNumber,
             maximumDpi: 300,
             alignment: Alignment.center,
+            pageSizeCallback: (size, page, rotationOverride) {
+              final swapWH = ((rotationOverride ?? page.rotation).index - page.rotation.index) & 1 == 1;
+              final w = swapWH ? page.height : page.width;
+              final h = swapWH ? page.width : page.height;
+
+              // Target crisp high-definition render size (matching 300 DPI print quality / native scan resolution).
+              // For standard A4 (595x842 pt), 300 DPI produces ~2480x3508 pixels.
+              // We target between 2400.0 and 3200.0 pixels on the longer page edge.
+              final double longEdge = math.max(w, h);
+              final double targetLongEdge = math.min(3200.0, math.max(2400.0, longEdge * 3.5));
+              final double scale = (targetLongEdge / longEdge).clamp(2.0, 4.5);
+              return Size(w * scale, h * scale);
+            },
+            decorationBuilder: (context, pageSize, page, pageImage) {
+              return Align(
+                alignment: Alignment.center,
+                child: AspectRatio(
+                  aspectRatio: pageSize.width / pageSize.height,
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: pageImage == null ? Colors.white : Colors.transparent,
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(2, 2)),
+                          ],
+                        ),
+                      ),
+                      if (pageImage != null && pageImage.image != null)
+                        RawImage(
+                          image: pageImage.image,
+                          width: pageImage.width,
+                          height: pageImage.height,
+                          fit: BoxFit.fill,
+                          filterQuality: FilterQuality.medium,
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),

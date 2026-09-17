@@ -561,4 +561,21 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get continuousScroll => 'Непрекъснато превъртане';
+
+  @override
+  String archiveFilesCount(int count) {
+    return 'Файлове в архива ($count)';
+  }
+
+  @override
+  String get openArchiveFile => 'Отвори';
+
+  @override
+  String get unsupportedArchiveFormat =>
+      'Не се поддържа директен преглед за този файлов формат.';
+
+  @override
+  String extractingFile(String name) {
+    return 'Отваряне на $name...';
+  }
 }
