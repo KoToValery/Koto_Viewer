@@ -117,7 +117,14 @@ class PdfItem {
     if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return KotoFileType.xlsx;
     if (lower.endsWith('.ipynb')) return KotoFileType.jupyter;
     if (lower.endsWith('.csv') || lower.endsWith('.tsv')) return KotoFileType.csv;
-    if (lower.endsWith('.txt') || lower.endsWith('.log')) return KotoFileType.txt;
+    if (lower.endsWith('.txt') ||
+        lower.endsWith('.log') ||
+        lower.endsWith('.rpt') ||
+        lower.endsWith('.drc') ||
+        lower.endsWith('.d356') ||
+        lower.endsWith('.net')) {
+      return KotoFileType.txt;
+    }
     if (lower.endsWith('.md') || lower.endsWith('.markdown')) return KotoFileType.md;
     if (lower.endsWith('.docx') || lower.endsWith('.doc')) return KotoFileType.docx;
     if (lower.endsWith('.pptx') || lower.endsWith('.ppsx') || lower.endsWith('.ppt') || lower.endsWith('.pps')) return KotoFileType.pptx;

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
+import '../../kicad_viewer/parser/kicad_pcb_parser.dart';
 import '../models/pcb_models.dart';
 import '../services/pcb_pad_numbering_service.dart';
 import 'gerber_parser.dart';
@@ -34,6 +35,12 @@ class PcbArchiveParser {
     final List<PcbBomEntry> bomEntries = [];
     final List<PcbImageItem> images = [];
     final List<PcbArchiveFileItem> archiveFiles = [];
+    final List<PcbArchiveFileItem> model3DFiles = [];
+    final List<PcbArchiveFileItem> schematicFiles = [];
+    final List<PcbArchiveFileItem> documentFiles = [];
+    final List<PcbArchiveFileItem> reportFiles = [];
+    final List<PcbArchiveFileItem> assemblyFiles = [];
+    final List<PcbArchiveFileItem> sourceCadFiles = [];
 
     double minX = double.infinity;
     double minY = double.infinity;
@@ -63,85 +70,120 @@ class PcbArchiveParser {
           : Uint8List(0);
       if (fileBytes.isEmpty) continue;
 
-      archiveFiles.add(PcbArchiveFileItem(
+      final category = classifyFile(rawName, fileBytes);
+      final archiveItem = PcbArchiveFileItem(
         fileName: rawName,
         sizeInBytes: fileBytes.length,
         bytes: fileBytes,
-      ));
+        category: category,
+      );
+      archiveFiles.add(archiveItem);
 
-      // 0. Preview Images (Proteus / Altium 3D exports or standalone photo/renders)
-      if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.bmp')) {
-        images.add(PcbImageItem(fileName: baseName, bytes: fileBytes));
-        continue;
+      switch (category) {
+        case PcbFileCategory.image:
+          images.add(PcbImageItem(fileName: baseName, bytes: fileBytes));
+          break;
+
+        case PcbFileCategory.model3D:
+          model3DFiles.add(archiveItem);
+          break;
+
+        case PcbFileCategory.schematic:
+          schematicFiles.add(archiveItem);
+          break;
+
+        case PcbFileCategory.bom:
+          final parsedBom = parseBom(fileBytes, baseName);
+          if (parsedBom.isNotEmpty) {
+            bomEntries.addAll(parsedBom);
+          }
+          break;
+
+        case PcbFileCategory.assembly:
+          assemblyFiles.add(archiveItem);
+          break;
+
+        case PcbFileCategory.document:
+          documentFiles.add(archiveItem);
+          break;
+
+        case PcbFileCategory.sourceCad:
+          sourceCadFiles.add(archiveItem);
+          break;
+
+        case PcbFileCategory.report:
+          reportFiles.add(archiveItem);
+          break;
+
+        case PcbFileCategory.gerber2D:
+          if (!lower.endsWith('.gbrjob')) {
+            try {
+              final doc = GerberParser.parse(fileBytes, fileName: baseName);
+              if (doc.commands.isNotEmpty || doc.drillHoles.isNotEmpty) {
+                updateGlobalBounds(doc.boundingBox);
+                final order = _getLayerZOrder(doc.layerType);
+                final isAuxiliaryLayer = lower.contains('assembly') ||
+                    lower.contains('assy') ||
+                    lower.contains('paste') ||
+                    lower.contains('pos') ||
+                    lower.contains('placement') ||
+                    lower.contains('centroid') ||
+                    lower.contains('mask') ||
+                    lower.contains('soldermask');
+                layers.add(
+                  PcbLayerItem(
+                    fileName: baseName,
+                    type: doc.layerType,
+                    document: doc,
+                    order: order,
+                    isVisible: !isAuxiliaryLayer,
+                  ),
+                );
+              }
+            } catch (_) {}
+          }
+          break;
+
+        case PcbFileCategory.drill:
+          try {
+            final doc = DrillParser.parse(fileBytes, fileName: baseName);
+            if (doc.drillHoles.isNotEmpty) {
+              updateGlobalBounds(doc.boundingBox);
+              layers.add(
+                PcbLayerItem(
+                  fileName: baseName,
+                  type: PcbLayerType.drill,
+                  document: doc,
+                  order: 80,
+                ),
+              );
+            }
+          } catch (_) {}
+          break;
+
+        case PcbFileCategory.other:
+          break;
       }
+    }
 
-      // 1. Bill of Materials (BOM) & Pick and Place
-      if (lower.contains('bom') ||
-          lower.contains('bill of material') ||
-          lower.contains('parts') ||
-          lower.endsWith('.bom') ||
-          (lower.endsWith('.csv') && !lower.contains('gerber'))) {
-        final parsedBom = parseBom(fileBytes, baseName);
-        if (parsedBom.isNotEmpty) {
-          bomEntries.addAll(parsedBom);
-        }
-        continue;
-      }
-
-      // 2. Gerber RS-274X / X2 Layers (Copper, Mask, Silk, Outline, Drill drawings)
-      if (_isGerberFileName(lower) || _isGerberContent(fileBytes)) {
+    // Fallback: If no Gerber layers found, check if a KiCad PCB file is present
+    if (layers.isEmpty) {
+      final kicadPcb = sourceCadFiles.where((f) => f.fileName.toLowerCase().endsWith('.kicad_pcb')).firstOrNull;
+      if (kicadPcb != null) {
         try {
-          final doc = GerberParser.parse(fileBytes, fileName: baseName);
+          final doc = KicadPcbParser.parse(kicadPcb.bytes, fileName: kicadPcb.fileName.split('/').last);
           if (doc.commands.isNotEmpty || doc.drillHoles.isNotEmpty) {
             updateGlobalBounds(doc.boundingBox);
-            final order = _getLayerZOrder(doc.layerType);
-            final isAuxiliaryLayer = lower.contains('assembly') ||
-                lower.contains('assy') ||
-                lower.contains('paste') ||
-                lower.contains('pos') ||
-                lower.contains('placement') ||
-                lower.contains('centroid') ||
-                lower.contains('mask') ||
-                lower.contains('soldermask');
             layers.add(
               PcbLayerItem(
-                fileName: baseName,
+                fileName: kicadPcb.fileName.split('/').last,
                 type: doc.layerType,
                 document: doc,
-                order: order,
-                isVisible: !isAuxiliaryLayer,
+                order: 50,
               ),
             );
           }
-        } on FormatException catch (_) {
-          // Skip unparseable Gerber layer
-        } on Exception catch (_) {
-          // Ignore general parse failure for individual Gerber layer
-        }
-        continue;
-      }
-
-      // 3. CNC Drill Files (Excellon / NC Drill)
-      if (_isDrillFileName(lower) || _isDrillContent(fileBytes)) {
-        try {
-          final doc = DrillParser.parse(fileBytes, fileName: baseName);
-          if (doc.drillHoles.isNotEmpty) {
-            updateGlobalBounds(doc.boundingBox);
-            layers.add(
-              PcbLayerItem(
-                fileName: baseName,
-                type: PcbLayerType.drill,
-                document: doc,
-                order: 80,
-              ),
-            );
-          }
-        } on FormatException catch (_) {
-          // Skip unparseable drill file
-        } on Exception catch (_) {
-          // Ignore general parse failure for individual drill file
-        }
-        continue;
+        } catch (_) {}
       }
     }
 
@@ -164,11 +206,160 @@ class PcbArchiveParser {
       bomEntries: bomEntries,
       images: images,
       archiveFiles: archiveFiles,
+      model3DFiles: model3DFiles,
+      schematicFiles: schematicFiles,
+      documentFiles: documentFiles,
+      reportFiles: reportFiles,
+      assemblyFiles: assemblyFiles,
+      sourceCadFiles: sourceCadFiles,
       boundingBox: globalBoundingBox,
       viewSide: PcbViewSide.top,
     );
 
     return PcbPadNumberingService.assignPadNumbers(project);
+  }
+
+  /// Classifies an archive file into its logical [PcbFileCategory] based on path, extension, and content.
+  static PcbFileCategory classifyFile(String fullPath, [Uint8List? bytes]) {
+    final cleanPath = fullPath.replaceAll('\\', '/').toLowerCase();
+    final fileName = cleanPath.split('/').last;
+
+    // Skip OS metadata
+    if (fileName.startsWith('__macosx') || fileName.startsWith('.') || fileName.endsWith('.ds_store')) {
+      return PcbFileCategory.other;
+    }
+
+    // 1. Images
+    if (_isImageFileName(fileName)) {
+      return PcbFileCategory.image;
+    }
+
+    // 2. 3D Models
+    if (_is3DModelFileName(fileName)) {
+      return PcbFileCategory.model3D;
+    }
+
+    // 3. Schematics (KiCad schematic, Eagle schematic, or PDF/SVG schematic)
+    if (_isSchematicFileName(fileName, cleanPath)) {
+      return PcbFileCategory.schematic;
+    }
+
+    // 4. Drill files
+    if (_isDrillFileName(fileName) || (bytes != null && _isDrillContent(bytes))) {
+      return PcbFileCategory.drill;
+    }
+
+    // 5. Gerber files
+    if (_isGerberFileName(fileName) ||
+        fileName.endsWith('.gbrjob') ||
+        (bytes != null && _isGerberContent(bytes))) {
+      return PcbFileCategory.gerber2D;
+    }
+
+    // 6. Assembly / Pick and Place (CPL / Centroid / Position / Netlist)
+    if (cleanPath.contains('assembly') ||
+        cleanPath.contains('assy') ||
+        cleanPath.contains('cpl') ||
+        cleanPath.contains('pos') ||
+        cleanPath.contains('pick') ||
+        cleanPath.contains('placement') ||
+        cleanPath.contains('centroid') ||
+        fileName.endsWith('.d356') ||
+        fileName.endsWith('.ipc')) {
+      return PcbFileCategory.assembly;
+    }
+
+    // 7. BOM (Bill of Materials)
+    if (cleanPath.contains('bom') ||
+        cleanPath.contains('bill of material') ||
+        cleanPath.contains('bill_of_material') ||
+        cleanPath.contains('parts_list') ||
+        fileName.endsWith('.bom')) {
+      return PcbFileCategory.bom;
+    }
+
+    // Generic CSV/Excel tables default to BOM if not categorized above
+    if (fileName.endsWith('.csv') ||
+        fileName.endsWith('.xlsx') ||
+        fileName.endsWith('.xls') ||
+        fileName.endsWith('.tsv')) {
+      return PcbFileCategory.bom;
+    }
+
+    // 8. Documentation (PDFs, SVGs)
+    if (fileName.endsWith('.pdf') || fileName.endsWith('.svg')) {
+      return PcbFileCategory.document;
+    }
+
+    // 9. Source CAD Project
+    if (fileName.endsWith('.kicad_pcb') ||
+        fileName.endsWith('.kicad_pro') ||
+        fileName.endsWith('.kicad_prl') ||
+        fileName.endsWith('.kicad_sym') ||
+        fileName.endsWith('.kicad_mod') ||
+        fileName.endsWith('.kicad_dru') ||
+        fileName.endsWith('.brd') ||
+        fileName.endsWith('.pcbdoc') ||
+        fileName.endsWith('.prjpcb')) {
+      return PcbFileCategory.sourceCad;
+    }
+
+    // 10. Reports & text notes
+    if (fileName.endsWith('.rpt') ||
+        fileName.endsWith('.drc') ||
+        fileName.endsWith('.log') ||
+        fileName.endsWith('.txt') ||
+        fileName.endsWith('.md') ||
+        fileName.endsWith('.htm') ||
+        fileName.endsWith('.html') ||
+        fileName.endsWith('.xml') ||
+        cleanPath.contains('readme')) {
+      return PcbFileCategory.report;
+    }
+
+    return PcbFileCategory.other;
+  }
+
+  static bool _is3DModelFileName(String name) {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.step') ||
+        lower.endsWith('.stp') ||
+        lower.endsWith('.p21') ||
+        lower.endsWith('.stl') ||
+        lower.endsWith('.obj') ||
+        lower.endsWith('.gltf') ||
+        lower.endsWith('.glb') ||
+        lower.endsWith('.3mf') ||
+        lower.endsWith('.iges') ||
+        lower.endsWith('.igs') ||
+        lower.endsWith('.wrl') ||
+        lower.endsWith('.vrml');
+  }
+
+  static bool _isSchematicFileName(String name, String fullPath) {
+    final lower = name.toLowerCase();
+    final lowerPath = fullPath.toLowerCase();
+    if (lower.endsWith('.kicad_sch') || lower.endsWith('.sch') || lower.endsWith('.schdoc')) {
+      return true;
+    }
+    if (lower.endsWith('.pdf') || lower.endsWith('.svg')) {
+      return lowerPath.contains('schematic') ||
+          lowerPath.contains('sch_') ||
+          lowerPath.contains('-sch') ||
+          lowerPath.contains('diagram') ||
+          lowerPath.contains('circuit');
+    }
+    return false;
+  }
+
+  static bool _isImageFileName(String name) {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.bmp') ||
+        lower.endsWith('.gif');
   }
 
 

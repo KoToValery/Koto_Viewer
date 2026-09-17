@@ -300,15 +300,38 @@ class PcbImageItem {
   });
 }
 
+/// Smart Classification for Files inside a PCB / CAD Production ZIP Archive.
+enum PcbFileCategory {
+  gerber2D('PCB Layers (Gerber)', Icons.layers_outlined, Color(0xFF10B981)),
+  drill('CNC Drill Holes', Icons.adjust_outlined, Color(0xFF06B6D4)),
+  model3D('3D CAD Models', Icons.view_in_ar_outlined, Color(0xFF3B82F6)),
+  schematic('Schematics & Circuits', Icons.schema_outlined, Color(0xFF8B5CF6)),
+  image('Images & 3D Renders', Icons.image_outlined, Color(0xFFEC4899)),
+  bom('Bill of Materials (BOM)', Icons.list_alt_outlined, Color(0xFFF59E0B)),
+  assembly('Assembly & Placement (CPL)', Icons.precision_manufacturing_outlined, Color(0xFFEAB308)),
+  document('Documentation & Drawings', Icons.picture_as_pdf_outlined, Color(0xFFEF4444)),
+  sourceCad('Source CAD Project', Icons.architecture_outlined, Color(0xFF6366F1)),
+  report('Reports & Notes', Icons.description_outlined, Color(0xFF64748B)),
+  other('Other Files', Icons.insert_drive_file_outlined, Color(0xFF94A3B8));
+
+  final String displayName;
+  final IconData icon;
+  final Color color;
+
+  const PcbFileCategory(this.displayName, this.icon, this.color);
+}
+
 class PcbArchiveFileItem {
   final String fileName;
   final int sizeInBytes;
   final Uint8List bytes;
+  final PcbFileCategory category;
 
   const PcbArchiveFileItem({
     required this.fileName,
     required this.sizeInBytes,
     required this.bytes,
+    this.category = PcbFileCategory.other,
   });
 
   String get formattedSize {
@@ -328,6 +351,12 @@ class PcbProject {
   final List<PcbBomEntry> bomEntries;
   final List<PcbImageItem> images;
   final List<PcbArchiveFileItem> archiveFiles;
+  final List<PcbArchiveFileItem> model3DFiles;
+  final List<PcbArchiveFileItem> schematicFiles;
+  final List<PcbArchiveFileItem> documentFiles;
+  final List<PcbArchiveFileItem> reportFiles;
+  final List<PcbArchiveFileItem> assemblyFiles;
+  final List<PcbArchiveFileItem> sourceCadFiles;
   final PcbBoundingBox boundingBox;
   PcbViewSide viewSide;
 
@@ -338,6 +367,12 @@ class PcbProject {
     this.bomEntries = const [],
     this.images = const [],
     this.archiveFiles = const [],
+    this.model3DFiles = const [],
+    this.schematicFiles = const [],
+    this.documentFiles = const [],
+    this.reportFiles = const [],
+    this.assemblyFiles = const [],
+    this.sourceCadFiles = const [],
     required this.boundingBox,
     this.viewSide = PcbViewSide.top,
   });
@@ -347,6 +382,9 @@ class PcbProject {
   int get totalComponents => bomEntries.fold(0, (sum, e) => sum + e.quantity);
   int get totalImages => images.length;
   int get totalArchiveFiles => archiveFiles.length;
+  int get total3DModels => model3DFiles.length;
+  int get totalSchematics => schematicFiles.length;
+  int get totalDocuments => documentFiles.length;
   bool get hasPadNumbers => layers.any((l) => l.document.hasPadNumbers);
 
   PcbLayerItem? get edgeCutsLayer =>

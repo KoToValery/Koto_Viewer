@@ -31,6 +31,20 @@ class PcbViewerScreen extends StatefulWidget {
   State<PcbViewerScreen> createState() => _PcbViewerScreenState();
 }
 
+enum PcbViewerMode {
+  board2D('2D Board', Icons.layers_outlined),
+  model3D('3D Model', Icons.view_in_ar_outlined),
+  schematics('Schematics', Icons.schema_outlined),
+  images('Images', Icons.image_outlined),
+  bom('BOM & Parts', Icons.list_alt_rounded),
+  docs('Docs & Reports', Icons.picture_as_pdf_outlined),
+  allFiles('All Files', Icons.folder_zip_outlined);
+
+  final String label;
+  final IconData icon;
+  const PcbViewerMode(this.label, this.icon);
+}
+
 class _PcbViewerScreenState extends State<PcbViewerScreen> {
   bool _isLoading = true;
   String? _errorMessage;
@@ -42,6 +56,9 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
   bool _showPadNumbers = true;
   int _selectedImageIndex = 0;
   String _bomSearchQuery = '';
+  String _archiveSearchQuery = '';
+  PcbFileCategory? _archiveFilterCategory;
+  PcbViewerMode _activeMode = PcbViewerMode.board2D;
 
   final TransformationController _transformController = TransformationController();
 
@@ -141,6 +158,21 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         setState(() {
           _project = project;
           _isLoading = false;
+          if (project.layers.isNotEmpty) {
+            _activeMode = PcbViewerMode.board2D;
+          } else if (project.model3DFiles.isNotEmpty) {
+            _activeMode = PcbViewerMode.model3D;
+          } else if (project.schematicFiles.isNotEmpty) {
+            _activeMode = PcbViewerMode.schematics;
+          } else if (project.images.isNotEmpty) {
+            _activeMode = PcbViewerMode.images;
+          } else if (project.bomEntries.isNotEmpty) {
+            _activeMode = PcbViewerMode.bom;
+          } else if (project.documentFiles.isNotEmpty || project.reportFiles.isNotEmpty) {
+            _activeMode = PcbViewerMode.docs;
+          } else {
+            _activeMode = PcbViewerMode.allFiles;
+          }
         });
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -847,70 +879,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     );
   }
 
-  void _showArchiveFilesSheet() {
-    if (_project == null || _project!.archiveFiles.isEmpty) return;
-    final theme = Theme.of(context);
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: theme.colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.4,
-          maxChildSize: 0.95,
-          expand: false,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                const SizedBox(height: 12),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.folder_zip_outlined, color: Color(0xFF059669)),
-                      const SizedBox(width: 10),
-                      Text(
-                        context.l10n.archiveFilesCount(_project!.archiveFiles.length),
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.separated(
-                    controller: scrollController,
-                    itemCount: _project!.archiveFiles.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      return _buildArchiveFileItemWidget(_project!.archiveFiles[index], theme);
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
 
   Future<void> _openArchiveFile(PcbArchiveFileItem file) async {
     final pdfItem = PdfItem.fromPath(file.fileName);
@@ -1198,145 +1167,38 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(44),
-            child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark ? Colors.white10 : Colors.black12,
-                  ),
+          actions: [
+            if (_activeMode == PcbViewerMode.board2D && _project != null && _project!.layers.isNotEmpty) ...[
+              IconButton(
+                icon: const Icon(Icons.layers_outlined, size: 20),
+                tooltip: 'PCB Layers (${_project?.visibleLayers ?? 0}/${_project?.totalLayers ?? 0})',
+                onPressed: _showLayersSheet,
+              ),
+              _buildThemeMenu(theme),
+              IconButton(
+                icon: Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
+                tooltip: '1mm Measurement Grid',
+                onPressed: () => setState(() => _showGrid = !_showGrid),
+              ),
+              if (_project!.hasPadNumbers)
+                IconButton(
+                  icon: Icon(_showPadNumbers ? Icons.tag : Icons.tag_outlined, size: 20),
+                  tooltip: 'Toggle Pad Numbers',
+                  onPressed: () => setState(() => _showPadNumbers = !_showPadNumbers),
                 ),
-              ),
-              child: Row(
-                children: [
-                  const Spacer(),
-
-                  // Layers Drawer Button (only if project has layers)
-                  if (_project != null && _project!.layers.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.layers_outlined, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'PCB Layers (${_project?.visibleLayers ?? 0}/${_project?.totalLayers ?? 0})',
-                      onPressed: _showLayersSheet,
-                    ),
-
-                  // Images Button (if project has images)
-                  if (_project != null && _project!.images.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.image_outlined, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'Images (${_project!.images.length})',
-                      onPressed: _showImagesSheet,
-                    ),
-
-                  // BOM Button (if project has BOM)
-                  if (_project != null && _project!.bomEntries.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.list_alt_rounded, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'Bill of Materials (${_project!.bomEntries.length})',
-                      onPressed: _showBomSheet,
-                    ),
-
-                  // Archive Files Button (if multiple files in archive)
-                  if (_project != null && _project!.archiveFiles.length > 1)
-                    IconButton(
-                      icon: const Icon(Icons.folder_zip_outlined, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'Archive Contents (${_project!.archiveFiles.length})',
-                      onPressed: _showArchiveFilesSheet,
-                    ),
-
-                  // Theme Menu (only if layers exist)
-                  if (_project != null && _project!.layers.isNotEmpty)
-                    PopupMenuButton<PcbTheme>(
-                      icon: const Icon(Icons.palette_outlined, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'PCB Canvas Theme',
-                      onSelected: (t) => setState(() => _pcbTheme = t),
-                      itemBuilder: (context) => PcbTheme.values.map((t) {
-                        return PopupMenuItem<PcbTheme>(
-                          value: t,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: t.substrate,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: t.copper, width: 1.5),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(t.label),
-                              if (_pcbTheme == t) ...[
-                                const Spacer(),
-                                Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                              ],
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                  // Grid Toggle (only if layers exist)
-                  if (_project != null && _project!.layers.isNotEmpty)
-                    IconButton(
-                      icon: Icon(
-                        _showGrid ? Icons.grid_on : Icons.grid_off,
-                        size: 20,
-                        color: _showGrid ? theme.colorScheme.primary : null,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: '1mm PCB Measurement Grid',
-                      onPressed: () => setState(() => _showGrid = !_showGrid),
-                    ),
-
-                  // Pad Numbers Toggle (only if authentic pad numbers exist from standard)
-                  if (_project != null && _project!.layers.isNotEmpty && _project!.hasPadNumbers)
-                    IconButton(
-                      icon: Icon(
-                        _showPadNumbers ? Icons.tag : Icons.tag_outlined,
-                        size: 20,
-                        color: _showPadNumbers ? theme.colorScheme.primary : null,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'Toggle Pad Numbers',
-                      onPressed: () => setState(() => _showPadNumbers = !_showPadNumbers),
-                    ),
-
-                  // Information Sheet
-                  IconButton(
-                    icon: const Icon(Icons.info_outline, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Board / Archive Properties',
-                    onPressed: _showInfoSheet,
-                  ),
-
-                  // Share
-                  IconButton(
-                    icon: const Icon(Icons.share_outlined, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Share',
-                    onPressed: _shareFile,
-                  ),
-                ],
-              ),
+            ],
+            IconButton(
+              icon: const Icon(Icons.info_outline, size: 20),
+              tooltip: 'Board / Archive Properties',
+              onPressed: _showInfoSheet,
             ),
-          ),
+            IconButton(
+              icon: const Icon(Icons.share_outlined, size: 20),
+              tooltip: 'Share',
+              onPressed: _shareFile,
+            ),
+          ],
+          bottom: _buildAppBarBottom(theme, isDark),
         ),
         body: LayoutBuilder(
           builder: (context, constraints) {
@@ -1386,125 +1248,361 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
               return const SizedBox.shrink();
             }
 
-            // Standalone Archive View (when no CAD Gerber/Drill layers exist)
-            if (_project!.layers.isEmpty) {
-              if (_project!.images.isNotEmpty) {
+            switch (_activeMode) {
+              case PcbViewerMode.board2D:
+                return _build2DCanvasView(theme);
+              case PcbViewerMode.model3D:
+                return _buildModel3DView(theme);
+              case PcbViewerMode.schematics:
+                return _buildSchematicsView(theme);
+              case PcbViewerMode.images:
                 return _buildImageGalleryView(theme);
-              } else if (_project!.bomEntries.isNotEmpty) {
+              case PcbViewerMode.bom:
                 return _buildDirectBomView(theme);
-              } else {
+              case PcbViewerMode.docs:
+                return _buildDocsView(theme);
+              case PcbViewerMode.allFiles:
                 return _buildArchiveFileExplorerView(theme);
-              }
             }
+          },
+        ),
+      ),
+    );
+  }
 
-            final double canvasW = math.max(50.0, (_project!.boundingBox.widthMm * 10.0) + 48.0);
-            final double canvasH = math.max(50.0, (_project!.boundingBox.heightMm * 10.0) + 48.0);
+  List<PcbViewerMode> get _availableModes {
+    if (_project == null) return const [];
+    final modes = <PcbViewerMode>[];
+    if (_project!.layers.isNotEmpty) modes.add(PcbViewerMode.board2D);
+    if (_project!.model3DFiles.isNotEmpty) modes.add(PcbViewerMode.model3D);
+    if (_project!.schematicFiles.isNotEmpty) modes.add(PcbViewerMode.schematics);
+    if (_project!.images.isNotEmpty) modes.add(PcbViewerMode.images);
+    if (_project!.bomEntries.isNotEmpty || _project!.assemblyFiles.isNotEmpty) modes.add(PcbViewerMode.bom);
+    if (_project!.documentFiles.isNotEmpty || _project!.reportFiles.isNotEmpty) modes.add(PcbViewerMode.docs);
+    if (_project!.archiveFiles.length > 1) modes.add(PcbViewerMode.allFiles);
+    return modes;
+  }
 
-            return Stack(
+  PreferredSizeWidget? _buildAppBarBottom(ThemeData theme, bool isDark) {
+    final modes = _availableModes;
+    if (modes.length <= 1) {
+      if (_project != null && _project!.layers.isNotEmpty) {
+        return PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.black12,
+                ),
+              ),
+            ),
+            child: Row(
               children: [
-                // Interactive Canvas with Mouse Pan and Wheel Zoom
-                Listener(
-                  onPointerSignal: _handlePointerSignal,
-                  onPointerMove: _handlePointerPan,
-                  child: InteractiveViewer(
-                    transformationController: _transformController,
-                    minScale: 0.002,
-                    maxScale: 2000.0,
-                    boundaryMargin: const EdgeInsets.all(2500.0),
-                    child: Center(
-                      child: CustomPaint(
-                        size: Size(canvasW, canvasH),
-                        painter: PcbMultiLayerPainter(
-                          project: _project!,
-                          theme: _pcbTheme,
-                          showGrid: _showGrid,
-                          showPadNumbers: _showPadNumbers,
-                          scaleFactor: 10.0,
-                        ),
-                      ),
-                    ),
-                  ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.layers_outlined, size: 20),
+                  tooltip: 'PCB Layers (${_project?.visibleLayers ?? 0}/${_project?.totalLayers ?? 0})',
+                  onPressed: _showLayersSheet,
                 ),
-
-                // Top Floating Side Switcher (TOP / BOTTOM / ALL)
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface.withValues(alpha: 0.94),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
-                      ],
-                    ),
-                    child: SegmentedButton<PcbViewSide>(
-                      segments: const [
-                        ButtonSegment(
-                          value: PcbViewSide.top,
-                          label: Text('TOP', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                          icon: Icon(Icons.flip_to_front, size: 14),
-                        ),
-                        ButtonSegment(
-                          value: PcbViewSide.bottom,
-                          label: Text('BOTTOM', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                          icon: Icon(Icons.flip_to_back, size: 14),
-                        ),
-                        ButtonSegment(
-                          value: PcbViewSide.composite,
-                          label: Text('ALL', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                          icon: Icon(Icons.view_carousel_outlined, size: 14),
-                        ),
-                      ],
-                      selected: {_project!.viewSide},
-                      onSelectionChanged: (newSet) {
-                        setState(() {
-                          _project!.viewSide = newSet.first;
-                        });
-                      },
-                      style: ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                  ),
+                _buildThemeMenu(theme),
+                IconButton(
+                  icon: Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
+                  tooltip: '1mm Measurement Grid',
+                  onPressed: () => setState(() => _showGrid = !_showGrid),
                 ),
-
-                // Floating Zoom Controls
-                Positioned(
-                  bottom: 24,
-                  right: 20,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildFloatingButton(
-                        icon: Icons.add,
-                        tooltip: 'Zoom In (+)',
-                        onTap: _zoomIn,
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildFloatingButton(
-                        icon: Icons.remove,
-                        tooltip: 'Zoom Out (-)',
-                        onTap: _zoomOut,
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildFloatingButton(
-                        icon: Icons.fit_screen_outlined,
-                        tooltip: 'Fit Board to View (Center)',
-                        onTap: _fitToScreen,
-                        theme: theme,
-                      ),
-                    ],
+                if (_project!.hasPadNumbers)
+                  IconButton(
+                    icon: Icon(_showPadNumbers ? Icons.tag : Icons.tag_outlined, size: 20),
+                    tooltip: 'Toggle Pad Numbers',
+                    onPressed: () => setState(() => _showPadNumbers = !_showPadNumbers),
                   ),
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 20),
+                  tooltip: 'Board Properties',
+                  onPressed: _showInfoSheet,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  tooltip: 'Share',
+                  onPressed: _shareFile,
                 ),
               ],
+            ),
+          ),
+        );
+      }
+      return null;
+    }
+
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(48),
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          border: Border(
+            bottom: BorderSide(
+              color: isDark ? Colors.white10 : Colors.black12,
+            ),
+          ),
+        ),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          itemCount: modes.length,
+          separatorBuilder: (context, index) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final mode = modes[index];
+            final isSelected = mode == _activeMode;
+            final count = _getModeCount(mode);
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => setState(() => _activeMode = mode),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                      : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03)),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      mode.icon,
+                      size: 17,
+                      color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      mode.label,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    if (count > 0) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? theme.colorScheme.primary
+                              : (isDark ? Colors.white12 : Colors.black12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             );
           },
         ),
       ),
+    );
+  }
+
+  int _getModeCount(PcbViewerMode mode) {
+    if (_project == null) return 0;
+    switch (mode) {
+      case PcbViewerMode.board2D:
+        return _project!.layers.length;
+      case PcbViewerMode.model3D:
+        return _project!.model3DFiles.length;
+      case PcbViewerMode.schematics:
+        return _project!.schematicFiles.length;
+      case PcbViewerMode.images:
+        return _project!.images.length;
+      case PcbViewerMode.bom:
+        return _project!.bomEntries.length;
+      case PcbViewerMode.docs:
+        return _project!.documentFiles.length + _project!.reportFiles.length;
+      case PcbViewerMode.allFiles:
+        return _project!.archiveFiles.length;
+    }
+  }
+
+  Widget _buildThemeMenu(ThemeData theme) {
+    return PopupMenuButton<PcbTheme>(
+      icon: const Icon(Icons.palette_outlined, size: 20),
+      tooltip: 'PCB Canvas Theme',
+      onSelected: (t) => setState(() => _pcbTheme = t),
+      itemBuilder: (context) => PcbTheme.values.map((t) {
+        return PopupMenuItem<PcbTheme>(
+          value: t,
+          child: Row(
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: t.substrate,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: t.copper, width: 1.5),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(t.label),
+              if (_pcbTheme == t) ...[
+                const Spacer(),
+                Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _build2DCanvasView(ThemeData theme) {
+    if (_project == null || _project!.layers.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.layers_clear_outlined, size: 48, color: Colors.white38),
+            const SizedBox(height: 16),
+            const Text(
+              'No 2D Gerber or CAD layers available in this project.',
+              style: TextStyle(color: Colors.white70),
+            ),
+            if (_availableModes.length > 1) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                icon: const Icon(Icons.folder_zip_outlined),
+                label: const Text('View Archive Files'),
+                onPressed: () => setState(() => _activeMode = PcbViewerMode.allFiles),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    final double canvasW = math.max(50.0, (_project!.boundingBox.widthMm * 10.0) + 48.0);
+    final double canvasH = math.max(50.0, (_project!.boundingBox.heightMm * 10.0) + 48.0);
+
+    return Stack(
+      children: [
+        // Interactive Canvas with Mouse Pan and Wheel Zoom
+        Listener(
+          onPointerSignal: _handlePointerSignal,
+          onPointerMove: _handlePointerPan,
+          child: InteractiveViewer(
+            transformationController: _transformController,
+            minScale: 0.002,
+            maxScale: 2000.0,
+            boundaryMargin: const EdgeInsets.all(2500.0),
+            child: Center(
+              child: CustomPaint(
+                size: Size(canvasW, canvasH),
+                painter: PcbMultiLayerPainter(
+                  project: _project!,
+                  theme: _pcbTheme,
+                  showGrid: _showGrid,
+                  showPadNumbers: _showPadNumbers,
+                  scaleFactor: 10.0,
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Top Floating Side Switcher (TOP / BOTTOM / ALL)
+        Positioned(
+          top: 16,
+          left: 16,
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
+              ],
+            ),
+            child: SegmentedButton<PcbViewSide>(
+              segments: const [
+                ButtonSegment(
+                  value: PcbViewSide.top,
+                  label: Text('TOP', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  icon: Icon(Icons.flip_to_front, size: 14),
+                ),
+                ButtonSegment(
+                  value: PcbViewSide.bottom,
+                  label: Text('BOTTOM', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  icon: Icon(Icons.flip_to_back, size: 14),
+                ),
+                ButtonSegment(
+                  value: PcbViewSide.composite,
+                  label: Text('ALL', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  icon: Icon(Icons.view_carousel_outlined, size: 14),
+                ),
+              ],
+              selected: {_project!.viewSide},
+              onSelectionChanged: (newSet) {
+                setState(() {
+                  _project!.viewSide = newSet.first;
+                });
+              },
+              style: ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+        ),
+
+        // Floating Zoom Controls
+        Positioned(
+          bottom: 24,
+          right: 20,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildFloatingButton(
+                icon: Icons.add,
+                tooltip: 'Zoom In (+)',
+                onTap: _zoomIn,
+                theme: theme,
+              ),
+              const SizedBox(height: 8),
+              _buildFloatingButton(
+                icon: Icons.remove,
+                tooltip: 'Zoom Out (-)',
+                onTap: _zoomOut,
+                theme: theme,
+              ),
+              const SizedBox(height: 8),
+              _buildFloatingButton(
+                icon: Icons.fit_screen_outlined,
+                tooltip: 'Fit Board to View (Center)',
+                onTap: _fitToScreen,
+                theme: theme,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1724,39 +1822,521 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     );
   }
 
+  Widget _buildModel3DView(ThemeData theme) {
+    if (_project == null || _project!.model3DFiles.isEmpty) return const SizedBox.shrink();
+    final models = _project!.model3DFiles;
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.view_in_ar_rounded, color: Color(0xFF3B82F6), size: 28),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '3D CAD Models (${models.length})',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Interactive 3D board assembly and mechanical models',
+                    style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        ...models.map((model) {
+          final ext = model.fileName.split('.').last.toUpperCase();
+          final baseName = model.fileName.replaceAll('\\', '/').split('/').last;
+          return Card(
+            elevation: 2,
+            margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF2563EB), Color(0xFF38BDF8)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.view_in_ar, color: Colors.white, size: 28),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              baseName,
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    ext,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  model.formattedSize,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          icon: const Icon(Icons.open_in_full_rounded, size: 18),
+                          label: const Text('Open in 3D CAD Viewer', style: TextStyle(fontWeight: FontWeight.bold)),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _openArchiveFile(model),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton.outlined(
+                        icon: const Icon(Icons.share_outlined, size: 18),
+                        tooltip: 'Share File',
+                        onPressed: () {
+                          Share.shareXFiles([XFile.fromData(model.bytes, name: baseName)]);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildSchematicsView(ThemeData theme) {
+    if (_project == null || _project!.schematicFiles.isEmpty) return const SizedBox.shrink();
+    final schematics = _project!.schematicFiles;
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.schema_rounded, color: Color(0xFF8B5CF6), size: 28),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Circuit Schematics (${schematics.length})',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Electrical schematics, diagrams and netlists',
+                    style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        ...schematics.map((sch) {
+          final isPdf = sch.fileName.toLowerCase().endsWith('.pdf');
+          final isKicad = sch.fileName.toLowerCase().endsWith('.kicad_sch');
+          final baseName = sch.fileName.replaceAll('\\', '/').split('/').last;
+
+          return Card(
+            elevation: 2,
+            margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: (isPdf ? Colors.redAccent : const Color(0xFF8B5CF6)).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          isPdf ? Icons.picture_as_pdf_outlined : Icons.schema_outlined,
+                          color: isPdf ? Colors.redAccent : const Color(0xFF8B5CF6),
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              baseName,
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: (isPdf ? Colors.red : const Color(0xFF8B5CF6)).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    isPdf ? 'PDF Schematic' : (isKicad ? 'KiCad Schematic' : 'Schematic'),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: isPdf ? Colors.red[700] : const Color(0xFF8B5CF6),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  sch.formattedSize,
+                                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          icon: Icon(isPdf ? Icons.visibility_outlined : Icons.schema_outlined, size: 18),
+                          label: Text(
+                            isPdf ? 'Open PDF Schematic' : 'View KiCad Schematic',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: isPdf ? const Color(0xFFDC2626) : const Color(0xFF7C3AED),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _openArchiveFile(sch),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton.outlined(
+                        icon: const Icon(Icons.share_outlined, size: 18),
+                        tooltip: 'Share',
+                        onPressed: () {
+                          Share.shareXFiles([XFile.fromData(sch.bytes, name: baseName)]);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildDocsView(ThemeData theme) {
+    if (_project == null) return const SizedBox.shrink();
+    final docs = _project!.documentFiles;
+    final reports = _project!.reportFiles;
+    final allDocs = [...docs, ...reports];
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.description_outlined, color: Color(0xFFEF4444), size: 28),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Documentation & Reports (${allDocs.length})',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Fabrication drawings, drill maps, manufacturing reports and notes',
+                    style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        ...allDocs.map((doc) {
+          final isPdf = doc.fileName.toLowerCase().endsWith('.pdf');
+          final isRpt = doc.fileName.toLowerCase().endsWith('.rpt');
+          final baseName = doc.fileName.replaceAll('\\', '/').split('/').last;
+
+          return Card(
+            elevation: 1.5,
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              leading: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: (isPdf ? Colors.redAccent : (isRpt ? Colors.teal : Colors.blueGrey))
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isPdf
+                      ? Icons.picture_as_pdf_outlined
+                      : (isRpt ? Icons.assessment_outlined : Icons.description_outlined),
+                  color: isPdf ? Colors.redAccent : (isRpt ? Colors.teal : Colors.blueGrey),
+                  size: 24,
+                ),
+              ),
+              title: Text(
+                baseName,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              subtitle: Text(
+                '${doc.formattedSize} • ${doc.fileName}',
+                style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurfaceVariant),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: IconButton.filledTonal(
+                icon: const Icon(Icons.open_in_new, size: 18),
+                tooltip: 'Open',
+                onPressed: () => _openArchiveFile(doc),
+              ),
+              onTap: () => _openArchiveFile(doc),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Widget _buildArchiveFileExplorerView(ThemeData theme) {
-    final files = _project!.archiveFiles;
+    final allFiles = _project!.archiveFiles;
+
+    final filteredFiles = allFiles.where((file) {
+      if (_archiveFilterCategory != null && file.category != _archiveFilterCategory) {
+        return false;
+      }
+      if (_archiveSearchQuery.isNotEmpty &&
+          !file.fileName.toLowerCase().contains(_archiveSearchQuery.toLowerCase())) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    final categories = PcbFileCategory.values.where((cat) {
+      return allFiles.any((f) => f.category == cat);
+    }).toList();
 
     return Column(
       children: [
+        // Search bar & Count
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           color: theme.colorScheme.surface,
-          child: Row(
+          child: Column(
             children: [
-              const Icon(Icons.folder_zip_outlined, size: 20, color: Color(0xFF059669)),
-              const SizedBox(width: 10),
-              Text(
-                context.l10n.archiveFilesCount(files.length),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: theme.colorScheme.onSurface,
+              Row(
+                children: [
+                  const Icon(Icons.folder_zip_outlined, size: 22, color: Color(0xFF059669)),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Archive Explorer (${allFiles.length} files)',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${filteredFiles.length} shown',
+                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search files in archive...',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _archiveSearchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => setState(() => _archiveSearchQuery = ''),
+                        )
+                      : null,
+                  isDense: true,
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
+                onChanged: (v) => setState(() => _archiveSearchQuery = v.trim()),
               ),
             ],
           ),
         ),
-        const Divider(height: 1),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: files.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              return _buildArchiveFileItemWidget(files[index], theme);
-            },
+
+        // Category Filter Chips
+        if (categories.length > 1)
+          Container(
+            height: 44,
+            color: theme.colorScheme.surface,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: FilterChip(
+                    selected: _archiveFilterCategory == null,
+                    label: Text('All (${allFiles.length})'),
+                    onSelected: (_) => setState(() => _archiveFilterCategory = null),
+                  ),
+                ),
+                ...categories.map((cat) {
+                  final count = allFiles.where((f) => f.category == cat).length;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: FilterChip(
+                      selected: _archiveFilterCategory == cat,
+                      avatar: Icon(cat.icon, size: 14, color: cat.color),
+                      label: Text('${cat.displayName} ($count)'),
+                      onSelected: (selected) {
+                        setState(() {
+                          _archiveFilterCategory = selected ? cat : null;
+                        });
+                      },
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
+        const Divider(height: 1),
+
+        // Files List
+        Expanded(
+          child: filteredFiles.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.search_off, size: 48, color: theme.colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 12),
+                      Text('No files match the filter',
+                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: filteredFiles.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    return _buildArchiveFileItemWidget(filteredFiles[index], theme);
+                  },
+                ),
         ),
       ],
     );

@@ -139,6 +139,12 @@ class PcbPadNumberingService {
       bomEntries: project.bomEntries,
       images: project.images,
       archiveFiles: project.archiveFiles,
+      model3DFiles: project.model3DFiles,
+      schematicFiles: project.schematicFiles,
+      documentFiles: project.documentFiles,
+      reportFiles: project.reportFiles,
+      assemblyFiles: project.assemblyFiles,
+      sourceCadFiles: project.sourceCadFiles,
       viewSide: project.viewSide,
     );
   }
