@@ -332,6 +332,8 @@ class PcbArchiveParser {
         lower.endsWith('.3mf') ||
         lower.endsWith('.iges') ||
         lower.endsWith('.igs') ||
+        lower.endsWith('.ifc') ||
+        lower.endsWith('.fbx') ||
         lower.endsWith('.wrl') ||
         lower.endsWith('.vrml');
   }

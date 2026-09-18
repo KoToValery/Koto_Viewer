@@ -218,6 +218,52 @@ M02*
       expect(project.boundingBox.widthMm > 0, true);
       expect(project.boundingBox.heightMm > 0, true);
     });
+
+    test('parseZip parses mixed archive containing IFC 3D model, PDF document, and JPG image', () {
+      final archive = Archive();
+
+      // 1. IFC 3D BIM Model
+      const mockIfc = 'ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((\'ViewDefinition [CoordinationView]\'),\'2;1\');\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n';
+      archive.addFile(ArchiveFile('Building_Design.ifc', mockIfc.length, utf8.encode(mockIfc)));
+
+      // 2. PDF Document
+      const mockPdf = '%PDF-1.4\n%mock pdf content\n%%EOF';
+      archive.addFile(ArchiveFile('Specifications.pdf', mockPdf.length, utf8.encode(mockPdf)));
+
+      // 3. JPG Image
+      final mockJpg = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0xFF, 0xD9]);
+      archive.addFile(ArchiveFile('Facade_Render.jpg', mockJpg.length, mockJpg));
+
+      final encoder = ZipEncoder();
+      final zipBytes = Uint8List.fromList(encoder.encode(archive)!);
+
+      final project = PcbArchiveParser.parseZip(
+        zipBytes,
+        archiveName: 'Project_Package.zip',
+        filePath: r'C:\Projects\Project_Package.zip',
+      );
+
+      expect(project.projectName, 'Project_Package');
+      expect(project.layers.isEmpty, true);
+
+      // 3D Model (.ifc)
+      expect(project.model3DFiles.length, 1);
+      expect(project.model3DFiles.first.fileName, 'Building_Design.ifc');
+      expect(project.model3DFiles.first.category, PcbFileCategory.model3D);
+
+      // Document (.pdf)
+      expect(project.documentFiles.length, 1);
+      expect(project.documentFiles.first.fileName, 'Specifications.pdf');
+      expect(project.documentFiles.first.category, PcbFileCategory.document);
+
+      // Image (.jpg)
+      expect(project.images.length, 1);
+      expect(project.images.first.fileName, 'Facade_Render.jpg');
+
+      // Archive Files (All 3)
+      expect(project.archiveFiles.length, 3);
+    });
   });
 }
+
 
