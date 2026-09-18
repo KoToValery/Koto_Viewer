@@ -20,8 +20,9 @@ class AppInfoDialog extends StatefulWidget {
 }
 
 class _AppInfoDialogState extends State<AppInfoDialog> {
-  PackageInfo? _packageInfo;
-  bool _isLoading = true;
+  static PackageInfo? _cachedPackageInfo;
+  PackageInfo? _packageInfo = _cachedPackageInfo;
+  bool _isLoading = _cachedPackageInfo == null;
 
   @override
   void initState() {
@@ -32,6 +33,7 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
   Future<void> _loadPackageInfo() async {
     try {
       final info = await PackageInfo.fromPlatform();
+      _cachedPackageInfo = info;
       if (mounted) {
         setState(() {
           _packageInfo = info;
@@ -69,11 +71,9 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final versionText = _isLoading
-        ? 'Loading version...'
-        : _packageInfo != null
-            ? 'v${_packageInfo!.version} (Build ${_packageInfo!.buildNumber})'
-            : 'v1.0.0';
+    final versionText = _packageInfo != null
+        ? 'v${_packageInfo!.version}${_packageInfo!.buildNumber.isNotEmpty ? ' (Build ${_packageInfo!.buildNumber})' : ''}'
+        : (_isLoading ? 'Loading version...' : 'v1.0.0');
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -211,18 +211,36 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildFeatureCard(
                       icon: Icons.view_in_ar_rounded,
                       title: '3D CAD Models & BIM',
-                      formats: ['STEP (.stp)', 'IGES (.igs)', 'STL', 'IFC (BIM)', 'OBJ', 'GLTF / GLB'],
+                      formats: ['STEP (.stp, .p21)', 'IGES (.igs)', 'STL', 'IFC (BIM)', 'OBJ', 'GLTF / GLB', 'FBX', '3MF'],
                       description: 'GPU-accelerated 3D orbital camera, wireframe/shaded modes, and BIM building elements inspector.',
                       color: const Color(0xFF7C3AED),
                       isDark: isDark,
                     ),
                     const SizedBox(height: 8),
                     _buildFeatureCard(
+                      icon: Icons.medical_services_rounded,
+                      title: 'Medical Imaging & Healthcare',
+                      formats: ['DICOM (.dcm, .dicom)', 'DICOMDIR'],
+                      description: 'Diagnostic medical viewer with window level presets (CT Bone, Lung, Soft Tissue, Brain), multi-frame playback, and metadata inspector.',
+                      color: const Color(0xFF0EA5E9),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFeatureCard(
                       icon: Icons.memory_rounded,
                       title: 'PCB Electronics & Manufacturing',
-                      formats: ['Gerber RS-274X', 'Excellon Drill', 'ZIP Archives (Altium, KiCad, Eagle, EasyEDA)'],
+                      formats: ['Gerber RS-274X', 'Excellon Drill', 'KiCad (.kicad_pcb, .kicad_sch)', 'ZIP Archives (Altium, Eagle, EasyEDA)'],
                       description: 'Composite multi-layer board stackup, drill hole mapping, solder mask toggles, and standardized copper colors.',
                       color: const Color(0xFF059669),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFeatureCard(
+                      icon: Icons.terrain_rounded,
+                      title: 'GIS, GPS & Route Maps',
+                      formats: ['GPX', 'KML', 'KMZ', 'GeoJSON'],
+                      description: 'Interactive maps with track profiling, waypoints, elevation charts, and GPS navigation telemetry.',
+                      color: const Color(0xFF10B981),
                       isDark: isDark,
                     ),
                     const SizedBox(height: 8),
@@ -236,11 +254,47 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     ),
                     const SizedBox(height: 8),
                     _buildFeatureCard(
+                      icon: Icons.image_rounded,
+                      title: 'Raster Images & Photos',
+                      formats: ['PNG', 'JPG / JPEG', 'WEBP', 'GIF', 'BMP', 'Photoshop (.psd, .psb)', 'ICO'],
+                      description: 'High-resolution photo viewing with smooth pinch-zoom and layered PSD/ICO previews.',
+                      color: const Color(0xFFEC4899),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFeatureCard(
                       icon: Icons.description_rounded,
                       title: 'Office & Text Documents',
-                      formats: ['PDF', 'Word (.docx)', 'Excel (.xlsx)', 'PowerPoint (.pptx, .ppt)', 'Markdown (.md)', 'TXT'],
-                      description: 'Fast hardware-accelerated PDF engine, formatted Word XML, Excel spreadsheet grid, and presentation slides.',
+                      formats: ['PDF', 'Word (.docx, .doc)', 'Excel (.xlsx, .xls)', 'PowerPoint (.pptx, .ppt)', 'CSV / TSV', 'Jupyter (.ipynb)', 'Markdown (.md)', 'TXT', 'RTF'],
+                      description: 'Hardware-accelerated PDF engine, formatted Word XML, Excel spreadsheet grid with formulas, interactive Jupyter cells, and presentation slides.',
                       color: const Color(0xFFD97706),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFeatureCard(
+                      icon: Icons.menu_book_rounded,
+                      title: 'E-Books & Digital Comics',
+                      formats: ['EPUB', 'FB2 (.fb2, .fb2.zip)', 'CBZ', 'CBR', 'CBT'],
+                      description: 'Digital book reader with chapter navigation, reflowable text layout, and comic archive strip viewer.',
+                      color: const Color(0xFF8B5CF6),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFeatureCard(
+                      icon: Icons.code_rounded,
+                      title: 'Source Code & Developer Files',
+                      formats: ['Dart', 'Python', 'C/C++', 'JS/TS', 'Java', 'Kotlin', 'Swift', 'Rust', 'Go', 'SQL', 'Docker', 'YAML', 'JSON'],
+                      description: 'Syntax-highlighted code viewer for 30+ programming and configuration languages with line numbering and code structure.',
+                      color: const Color(0xFF6366F1),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFeatureCard(
+                      icon: Icons.font_download_rounded,
+                      title: 'Typography & Motion',
+                      formats: ['TTF', 'OTF', 'WOFF', 'WOFF2', 'Lottie (.lottie)'],
+                      description: 'Interactive font specimen typography previews, glyph tables, and smooth vector Lottie animation playback.',
+                      color: const Color(0xFF14B8A6),
                       isDark: isDark,
                     ),
                     const SizedBox(height: 16),

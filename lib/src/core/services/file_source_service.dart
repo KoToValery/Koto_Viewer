@@ -239,7 +239,7 @@ class FileSourceService {
     // GIS / Maps
     'gpx', 'kml', 'kmz', 'geojson',
     // Fonts & Medical
-    'ttf', 'otf', 'dcm', 'dicom',
+    'ttf', 'otf', 'woff', 'woff2', 'dcm', 'dicom',
     // Code files
     'dart', 'js', 'mjs', 'ts', 'tsx', 'py', 'pyw', 'java', 'kt', 'kts', 'swift',
     'cpp', 'cc', 'cxx', 'c', 'h', 'hpp', 'cs', 'go', 'rs', 'php', 'rb',

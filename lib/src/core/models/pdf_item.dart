@@ -8,8 +8,10 @@ enum FileCategory {
   cad2d,
   cad3d,
   pcb,
+  medical,
   routes,
   documents,
+  images,
 }
 
 extension FileCategoryExtension on FileCategory {
@@ -24,10 +26,14 @@ extension FileCategoryExtension on FileCategory {
         return l10n.categoryCad3d;
       case FileCategory.pcb:
         return l10n.categoryPcb;
+      case FileCategory.medical:
+        return l10n.categoryMedical;
       case FileCategory.routes:
         return l10n.categoryRoutes;
       case FileCategory.documents:
         return l10n.categoryDocuments;
+      case FileCategory.images:
+        return l10n.categoryImages;
     }
   }
 
@@ -41,10 +47,14 @@ extension FileCategoryExtension on FileCategory {
         return '3D Models';
       case FileCategory.pcb:
         return 'PCB & Hardware';
+      case FileCategory.medical:
+        return 'Medical (DICOM)';
       case FileCategory.routes:
         return 'Routes & Maps';
       case FileCategory.documents:
         return 'Documents';
+      case FileCategory.images:
+        return 'Images';
     }
   }
 
@@ -58,10 +68,14 @@ extension FileCategoryExtension on FileCategory {
         return '3D';
       case FileCategory.pcb:
         return 'PCB';
+      case FileCategory.medical:
+        return 'Medical';
       case FileCategory.routes:
         return 'Routes';
       case FileCategory.documents:
         return 'Docs';
+      case FileCategory.images:
+        return 'Images';
     }
   }
 }
@@ -316,6 +330,8 @@ class PdfItem {
     if (is3d) return FileCategory.cad3d;
     if (isCad || isPlotter || isSvg || isEps || isCdr) return FileCategory.cad2d;
     if (isPcb) return FileCategory.pcb;
+    if (isDicom) return FileCategory.medical;
+    if (isImage) return FileCategory.images;
     return FileCategory.documents;
   }
 

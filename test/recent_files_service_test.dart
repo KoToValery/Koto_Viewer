@@ -102,5 +102,19 @@ void main() {
       expect(recent.length, equals(25));
       expect(recent.first.path, equals('/test/file_29.pdf'));
     });
+
+    test('addRecentFile ignores image files to prevent flooding recent list', () async {
+      final imageItem = PdfItem(
+        path: '/test/photo.jpg',
+        name: 'photo.jpg',
+        sizeInBytes: 1024 * 1024,
+        lastOpened: DateTime.now(),
+      );
+
+      await RecentFilesService.addRecentFile(imageItem);
+
+      final recent = await RecentFilesService.getRecentFiles();
+      expect(recent, isEmpty);
+    });
   });
 }

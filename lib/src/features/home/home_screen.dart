@@ -1560,7 +1560,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<FileCategory, int> _categoryCounts = {};
   bool _isLoading = true;
   FileSourceMode _currentMode = FileSourceMode.recent;
-  SortOption _currentSort = SortOption.date;
   String? _customFolderPath;
   List<String> _customFolderList = [];
   Map<String, String> _customFolderNames = {};
@@ -1618,7 +1617,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
 
     final mode = await FileSourceService.getSourceMode();
-    final sort = await FileSourceService.getSortOption();
     final customPath = await FileSourceService.getCustomFolderPath();
     final customFolders = await FileSourceService.getCustomFolderList();
     final customFolderNames = await FileSourceService.getCustomFolderNames();
@@ -1628,7 +1626,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) {
       setState(() {
         _currentMode = mode;
-        _currentSort = sort;
         _customFolderPath = customPath;
         _customFolderList = customFolders;
         _customFolderNames = customFolderNames;
@@ -1825,11 +1822,6 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
-  }
-
-  Future<void> _switchSort(SortOption newSort) async {
-    await FileSourceService.setSortOption(newSort);
-    await _loadFiles();
   }
 
   Future<String?> _getDownloadDirectoryPath() async {
@@ -2362,10 +2354,14 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.view_in_ar_rounded;
       case FileCategory.pcb:
         return Icons.memory_rounded;
+      case FileCategory.medical:
+        return Icons.medical_services_rounded;
       case FileCategory.routes:
         return Icons.terrain_rounded;
       case FileCategory.documents:
         return Icons.description_rounded;
+      case FileCategory.images:
+        return Icons.image_rounded;
     }
   }
 
@@ -2502,7 +2498,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (_currentMode == FileSourceMode.recent) {
       titleText = l10n.recentFiles;
-      subtitleText = 'Recently opened files (PDF, DXF, DWG)';
+      subtitleText = l10n.recentlyOpenedSubtitle;
     } else if (_currentMode == FileSourceMode.custom) {
       if (_customFolderPath != null && _customFolderPath!.isNotEmpty) {
         titleText = _getFolderName(_customFolderPath!);
@@ -2692,63 +2688,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 8),
             _buildCategoryDropdown(theme),
-            PopupMenuButton<SortOption>(
-              initialValue: _currentSort,
-              onSelected: _switchSort,
-              tooltip: l10n.sortBy,
-              icon: const Icon(Icons.sort, size: 20),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: SortOption.date,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.date_range,
-                        color: _currentSort == SortOption.date
-                            ? theme.colorScheme.primary
-                            : Colors.grey,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        l10n.sortByDate,
-                        style: TextStyle(
-                          fontWeight: _currentSort == SortOption.date
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: SortOption.name,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.sort_by_alpha,
-                        color: _currentSort == SortOption.name
-                            ? theme.colorScheme.primary
-                            : Colors.grey,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        l10n.sortByName,
-                        style: TextStyle(
-                          fontWeight: _currentSort == SortOption.name
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
 
             if (_currentMode == FileSourceMode.custom) ...[
               // Toggle subfolders
@@ -2861,7 +2800,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 12,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -2872,36 +2813,87 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            const Expanded(
-              child: Text('KoToViewer', overflow: TextOverflow.ellipsis),
+            const Flexible(
+              child: Text(
+                'KoToViewer',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.translate_rounded),
-            tooltip: l10n.language,
-            onPressed: () => LanguageSelectionDialog.show(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.public_rounded),
-            tooltip: l10n.coordinateSettings,
-            onPressed: _showCoordinateSettings,
-          ),
-          IconButton(
             icon: const Icon(Icons.favorite, color: Color(0xFF7C3AED)),
             tooltip: l10n.supportDeveloper,
+            visualDensity: VisualDensity.compact,
             onPressed: _showSupportDeveloperDialog,
           ),
           IconButton(
             icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
             tooltip: l10n.toggleTheme,
+            visualDensity: VisualDensity.compact,
             onPressed: () => widget.onToggleTheme(!widget.isDarkMode),
           ),
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: l10n.about,
-            onPressed: _showAboutDialog,
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More options',
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            onSelected: (value) {
+              if (value == 'coords') {
+                _showCoordinateSettings();
+              } else if (value == 'lang') {
+                LanguageSelectionDialog.show(context);
+              } else if (value == 'about') {
+                _showAboutDialog();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'coords',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.public_rounded,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(l10n.coordinateSettings),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'lang',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.translate_rounded,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(l10n.language),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'about',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(l10n.about),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -3036,7 +3028,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ? Icons.view_in_ar_outlined
                                       : _selectedCategory == FileCategory.pcb
                                           ? Icons.memory_outlined
-                                          : Icons.description_outlined,
+                                          : _selectedCategory == FileCategory.medical
+                                              ? Icons.medical_services_outlined
+                                              : _selectedCategory == FileCategory.routes
+                                                  ? Icons.terrain_outlined
+                                                  : _selectedCategory == FileCategory.images
+                                                      ? Icons.image_outlined
+                                                      : Icons.description_outlined,
                           size: 64,
                           color: theme.textTheme.bodyMedium?.color?.withValues(
                             alpha: 0.4,

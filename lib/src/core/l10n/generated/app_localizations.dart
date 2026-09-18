@@ -302,11 +302,29 @@ abstract class AppLocalizations {
   /// **'Routes & Maps'**
   String get categoryRoutes;
 
+  /// Subtitle below Recent Files header
+  ///
+  /// In en, this message translates to:
+  /// **'Recently opened files'**
+  String get recentlyOpenedSubtitle;
+
   /// Documents category
   ///
   /// In en, this message translates to:
   /// **'Documents'**
   String get categoryDocuments;
+
+  /// Medical DICOM files category
+  ///
+  /// In en, this message translates to:
+  /// **'Medical (DICOM)'**
+  String get categoryMedical;
+
+  /// Images & Photos files category
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get categoryImages;
 
   /// Default file loading title
   ///

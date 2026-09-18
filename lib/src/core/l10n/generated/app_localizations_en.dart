@@ -111,7 +111,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryRoutes => 'Routes & Maps';
 
   @override
+  String get recentlyOpenedSubtitle => 'Recently opened files';
+
+  @override
   String get categoryDocuments => 'Documents';
+
+  @override
+  String get categoryMedical => 'Medical (DICOM)';
+
+  @override
+  String get categoryImages => 'Images';
 
   @override
   String get loadingFile => 'Loading file...';

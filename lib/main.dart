@@ -147,6 +147,20 @@ class _KotoViewAppState extends State<KotoViewApp> with WidgetsBindingObserver {
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          localeResolutionCallback: (deviceLocale, supportedLocales) {
+            if (locale != null) return locale;
+            if (deviceLocale != null) {
+              for (final supported in supportedLocales) {
+                if (supported.languageCode == deviceLocale.languageCode) {
+                  return supported;
+                }
+              }
+            }
+            if (deviceLocale?.languageCode == 'bg') {
+              return const Locale('bg');
+            }
+            return const Locale('en');
+          },
           home: HomeScreen(
             onToggleTheme: _toggleTheme,
             isDarkMode: _isDarkMode,

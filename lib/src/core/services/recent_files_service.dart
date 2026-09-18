@@ -19,11 +19,17 @@ class RecentFilesService {
 
     return jsonList
         .map((item) => PdfItem.fromJson(item))
+        .where((item) => !item.isImage)
         .toList()
       ..sort((a, b) => b.lastOpened.compareTo(a.lastOpened));
   }
 
   static Future<void> addRecentFile(PdfItem newItem) async {
+    // Exclude photos/images from recent files list to avoid flooding it
+    if (newItem.isImage) {
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     List<PdfItem> currentList = await getRecentFiles();
 

@@ -37,7 +37,10 @@
   "categoryCad3d": "3D Модели",
   "categoryPcb": "PCB Платки",
   "categoryRoutes": "Маршрути",
+  "recentlyOpenedSubtitle": "Последно отваряни файлове",
   "categoryDocuments": "Документи",
+  "categoryMedical": "Медицински (DICOM)",
+  "categoryImages": "Снимки",
 
   "loadingFile": "Зареждане на файл...",
   "loadingPdf": "Зареждане на PDF документ...",

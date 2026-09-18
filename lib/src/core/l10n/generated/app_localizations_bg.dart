@@ -111,7 +111,16 @@ class AppLocalizationsBg extends AppLocalizations {
   String get categoryRoutes => 'Маршрути';
 
   @override
+  String get recentlyOpenedSubtitle => 'Последно отваряни файлове';
+
+  @override
   String get categoryDocuments => 'Документи';
+
+  @override
+  String get categoryMedical => 'Медицински (DICOM)';
+
+  @override
+  String get categoryImages => 'Снимки';
 
   @override
   String get loadingFile => 'Зареждане на файл...';
