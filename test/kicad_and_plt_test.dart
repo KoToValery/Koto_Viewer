@@ -5,6 +5,7 @@ import 'package:kotoview/src/core/models/pdf_item.dart';
 import 'package:kotoview/src/features/kicad_viewer/parser/s_expression_parser.dart';
 import 'package:kotoview/src/features/kicad_viewer/parser/kicad_pcb_parser.dart';
 import 'package:kotoview/src/features/kicad_viewer/parser/kicad_sch_parser.dart';
+import 'package:kotoview/src/features/pcb_viewer/models/pcb_models.dart';
 import 'package:kotoview/src/features/hpgl_viewer/models/hpgl_models.dart';
 import 'package:kotoview/src/features/hpgl_viewer/parser/hpgl_parser.dart';
 
@@ -109,6 +110,45 @@ void main() {
 
       expect(doc.commands.length, equals(3)); // 1 wire line + 1 junction + 1 symbol indicator
       expect(doc.boundingBox.widthMm, greaterThan(25.0));
+    });
+
+    test('KicadSchParser parses lib_symbols, component shapes, pins, properties, and labels', () {
+      const complexSchContent = '''(kicad_sch (version 20211123) (generator "eeschema")
+  (lib_symbols
+    (symbol "Device:R"
+      (symbol "R_0_1"
+        (rectangle (start -1.0 -2.5) (end 1.0 2.5))
+      )
+      (symbol "R_1_1"
+        (pin passive line (at 0 3.5 270) (length 1.0) (name "~") (number "1"))
+        (pin passive line (at 0 -3.5 90) (length 1.0) (name "~") (number "2"))
+      )
+    )
+  )
+  (wire (pts (xy 100.0 50.0) (xy 100.0 53.5)))
+  (junction (at 100.0 50.0))
+  (symbol (lib_id "Device:R") (at 100.0 50.0 0)
+    (property "Reference" "R1" (at 102.0 48.0 0))
+    (property "Value" "10k" (at 102.0 52.0 0))
+  )
+  (global_label "VCC_3V3" (at 100.0 40.0 0))
+  (text "Power Supply Subsystem" (at 80.0 30.0 0))
+)''';
+
+      final bytes = Uint8List.fromList(utf8.encode(complexSchContent));
+      final doc = KicadSchParser.parse(bytes, fileName: 'power_stage.kicad_sch');
+
+      expect(doc.commands.length, greaterThanOrEqualTo(10));
+      // Verify text commands exist
+      final textCmds = doc.commands.where((c) => c.type == PcbCommandType.text).toList();
+      expect(textCmds.any((c) => c.text == 'R1'), isTrue);
+      expect(textCmds.any((c) => c.text == '10k'), isTrue);
+      expect(textCmds.any((c) => c.text == 'VCC_3V3'), isTrue);
+      expect(textCmds.any((c) => c.text == 'Power Supply Subsystem'), isTrue);
+
+      // Verify pin lines exist
+      final lineCmds = doc.commands.where((c) => c.type == PcbCommandType.line).toList();
+      expect(lineCmds.length, greaterThanOrEqualTo(6)); // 1 wire + 4 rect lines + 2 pin lines
     });
   });
 

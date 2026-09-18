@@ -63,11 +63,13 @@ class SvgMetadata {
 class SvgViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
+  final bool addToRecent;
 
   const SvgViewerScreen({
     super.key,
     required this.filePath,
     this.title,
+    this.addToRecent = true,
   });
 
   @override
@@ -140,13 +142,15 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
       final metadata = _parseSvgMetadata(content);
 
       // Record in recent files
-      final pdfItem = PdfItem(
-        path: widget.filePath,
-        name: _fileName,
-        sizeInBytes: _fileSizeBytes,
-        lastOpened: DateTime.now(),
-      );
-      await RecentFilesService.addRecentFile(pdfItem);
+      if (widget.addToRecent) {
+        final pdfItem = PdfItem(
+          path: widget.filePath,
+          name: _fileName,
+          sizeInBytes: _fileSizeBytes,
+          lastOpened: DateTime.now(),
+        );
+        await RecentFilesService.addRecentFile(pdfItem);
+      }
 
       if (mounted) {
         setState(() {

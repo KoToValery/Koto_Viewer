@@ -39,12 +39,14 @@ class DxfViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
   final String? originalFilePath;
+  final bool addToRecent;
 
   const DxfViewerScreen({
     super.key,
     required this.filePath,
     this.title,
     this.originalFilePath,
+    this.addToRecent = true,
   });
 
   @override
@@ -283,6 +285,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   }
 
   Future<void> _saveToRecentFiles() async {
+    if (!widget.addToRecent) return;
     try {
       final pdfItem = PdfItem(
         path: widget.filePath,

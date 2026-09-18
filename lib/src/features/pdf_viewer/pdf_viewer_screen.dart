@@ -23,8 +23,14 @@ import 'widgets/pdf_reflow_view.dart';
 class PdfViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
+  final bool addToRecent;
 
-  const PdfViewerScreen({super.key, required this.filePath, this.title});
+  const PdfViewerScreen({
+    super.key,
+    required this.filePath,
+    this.title,
+    this.addToRecent = true,
+  });
 
   @override
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
@@ -129,13 +135,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             _fileSizeBytes = size;
           });
         }
-        final pdfItem = PdfItem(
-          path: widget.filePath,
-          name: _fileName,
-          sizeInBytes: size,
-          lastOpened: DateTime.now(),
-        );
-        await RecentFilesService.addRecentFile(pdfItem);
+        if (widget.addToRecent) {
+          final pdfItem = PdfItem(
+            path: widget.filePath,
+            name: _fileName,
+            sizeInBytes: size,
+            lastOpened: DateTime.now(),
+          );
+          await RecentFilesService.addRecentFile(pdfItem);
+        }
       }
 
       // Check saved reading progress
@@ -551,12 +559,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     if (_isSinglePageMode) {
       final controller = _pageTransformControllers[_currentPage];
       if (controller != null) {
-        final newZoom = (_currentZoom * 1.25).clamp(1.0, 4.0);
+        final newZoom = (_currentZoom * 1.25).clamp(1.0, 6.0);
         _setSinglePageZoom(controller, newZoom);
       }
     } else {
       if (!_pdfController.isReady) return;
-      final newZoom = (_currentZoom * 1.25).clamp(0.3, 4.0);
+      final newZoom = (_currentZoom * 1.25).clamp(0.3, 6.0);
       _onZoomSliderChanged(newZoom);
     }
   }
@@ -565,12 +573,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     if (_isSinglePageMode) {
       final controller = _pageTransformControllers[_currentPage];
       if (controller != null) {
-        final newZoom = (_currentZoom / 1.25).clamp(1.0, 4.0);
+        final newZoom = (_currentZoom / 1.25).clamp(1.0, 6.0);
         _setSinglePageZoom(controller, newZoom);
       }
     } else {
       if (!_pdfController.isReady) return;
-      final newZoom = (_currentZoom / 1.25).clamp(0.3, 4.0);
+      final newZoom = (_currentZoom / 1.25).clamp(0.3, 6.0);
       _onZoomSliderChanged(newZoom);
     }
   }
@@ -1222,9 +1230,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
               ),
               child: Slider(
-                value: _currentZoom.clamp(_isSinglePageMode ? 1.0 : 0.3, 4.0),
+                value: _currentZoom.clamp(_isSinglePageMode ? 1.0 : 0.3, 6.0),
                 min: _isSinglePageMode ? 1.0 : 0.3,
-                max: 4.0,
+                max: 6.0,
                 onChanged: _onZoomSliderChanged,
               ),
             ),
@@ -1446,7 +1454,7 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
         panEnabled: _panEnabled,
         scaleEnabled: true,
         minScale: 1.0,
-        maxScale: 4.0,
+        maxScale: 6.0,
         boundaryMargin: const EdgeInsets.all(80.0),
         child: Center(
           child: PdfPageView(
@@ -1462,10 +1470,10 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
 
               // Target crisp high-definition render size (matching 300 DPI print quality / native scan resolution).
               // For standard A4 (595x842 pt), 300 DPI produces ~2480x3508 pixels.
-              // We target between 2400.0 and 3200.0 pixels on the longer page edge.
+              // We target between 2400.0 and 4200.0 pixels on the longer page edge for sharp zoom up to 600%.
               final double longEdge = math.max(w, h);
-              final double targetLongEdge = math.min(3200.0, math.max(2400.0, longEdge * 3.5));
-              final double scale = (targetLongEdge / longEdge).clamp(2.0, 4.5);
+              final double targetLongEdge = math.min(4200.0, math.max(2400.0, longEdge * 4.5));
+              final double scale = (targetLongEdge / longEdge).clamp(2.0, 6.0);
               return Size(w * scale, h * scale);
             },
             decorationBuilder: (context, pageSize, page, pageImage) {

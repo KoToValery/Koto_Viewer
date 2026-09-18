@@ -271,6 +271,32 @@ class PcbMultiLayerPainter extends CustomPainter {
             canvas.drawPath(path, regionPaint);
           }
           break;
+
+        case PcbCommandType.text:
+          if (cmd.text != null && cmd.text!.isNotEmpty) {
+            final pos = mapPoint(cmd.p1);
+            final fontSizePx = math.max(7.0, (cmd.fontSize ?? 1.5) * scaleFactor);
+            final textPainter = TextPainter(
+              text: TextSpan(
+                text: cmd.text,
+                style: TextStyle(
+                  color: cmdColor,
+                  fontSize: fontSizePx,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout();
+
+            canvas.save();
+            canvas.translate(pos.dx, pos.dy);
+            if (cmd.rotation != null && cmd.rotation != 0) {
+              canvas.rotate(-cmd.rotation!);
+            }
+            textPainter.paint(canvas, Offset(0, -textPainter.height / 2.0));
+            canvas.restore();
+          }
+          break;
       }
     }
 

@@ -48,6 +48,7 @@ class FileOpenerService {
     required String filePath,
     NavigatorState? navigator,
     ScaffoldMessengerState? messenger,
+    bool addToRecent = true,
   }) async {
     final nav = navigator ?? Navigator.of(context);
     final scaffoldMessenger = messenger ?? ScaffoldMessenger.maybeOf(context);
@@ -111,7 +112,11 @@ class FileOpenerService {
           nav,
           item,
           filePath,
-          PdfViewerScreen(filePath: resolvedPath),
+          PdfViewerScreen(
+            filePath: resolvedPath,
+            addToRecent: addToRecent,
+          ),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.dxf:
@@ -122,7 +127,9 @@ class FileOpenerService {
           DxfViewerScreen(
             filePath: resolvedPath,
             originalFilePath: filePath,
+            addToRecent: addToRecent,
           ),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.dwg:
@@ -151,7 +158,9 @@ class FileOpenerService {
               filePath: convertedDxfPath,
               title: name,
               originalFilePath: filePath,
+              addToRecent: addToRecent,
             ),
+            addToRecent: addToRecent,
           );
         } else {
           await RecentFilesService.removeRecentFile(filePath);
@@ -174,7 +183,11 @@ class FileOpenerService {
           nav,
           item,
           filePath,
-          SvgViewerScreen(filePath: resolvedPath),
+          SvgViewerScreen(
+            filePath: resolvedPath,
+            addToRecent: addToRecent,
+          ),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.stl:
@@ -190,7 +203,11 @@ class FileOpenerService {
           nav,
           item,
           filePath,
-          Dxf3DViewerScreen(filePath: resolvedPath),
+          Dxf3DViewerScreen(
+            filePath: resolvedPath,
+            addToRecent: addToRecent,
+          ),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.xlsx:
@@ -199,6 +216,7 @@ class FileOpenerService {
           item,
           filePath,
           XlsxViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.txt:
@@ -207,6 +225,7 @@ class FileOpenerService {
           item,
           filePath,
           TextViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.csv:
@@ -215,6 +234,7 @@ class FileOpenerService {
           item,
           filePath,
           CsvViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.jupyter:
@@ -223,6 +243,7 @@ class FileOpenerService {
           item,
           filePath,
           JupyterViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.md:
@@ -231,6 +252,7 @@ class FileOpenerService {
           item,
           filePath,
           MarkdownViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.docx:
@@ -240,6 +262,7 @@ class FileOpenerService {
           item,
           filePath,
           DocxViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.pptx:
@@ -267,7 +290,9 @@ class FileOpenerService {
             PdfViewerScreen(
               filePath: convertedPdfPath,
               title: name,
+              addToRecent: addToRecent,
             ),
+            addToRecent: addToRecent,
           );
         } else {
           await RecentFilesService.removeRecentFile(filePath);
@@ -290,6 +315,7 @@ class FileOpenerService {
           item,
           filePath,
           EpsViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.cdr:
@@ -298,6 +324,7 @@ class FileOpenerService {
           item,
           filePath,
           CdrViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.gbr:
@@ -308,6 +335,7 @@ class FileOpenerService {
           item,
           filePath,
           PcbViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.zip:
@@ -318,6 +346,7 @@ class FileOpenerService {
             item,
             filePath,
             DicomViewerScreen(filePath: resolvedPath),
+            addToRecent: addToRecent,
           );
         }
         return await _pushViewer(
@@ -325,6 +354,7 @@ class FileOpenerService {
           item,
           filePath,
           PcbViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.plt:
@@ -333,6 +363,7 @@ class FileOpenerService {
           item,
           filePath,
           HpglViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.cbz:
@@ -343,6 +374,7 @@ class FileOpenerService {
           item,
           filePath,
           ComicViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.epub:
@@ -352,6 +384,7 @@ class FileOpenerService {
           item,
           filePath,
           EbookViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.gpx:
@@ -363,6 +396,7 @@ class FileOpenerService {
           item,
           filePath,
           RouteViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.code:
@@ -371,6 +405,7 @@ class FileOpenerService {
           item,
           filePath,
           CodeViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.lottie:
@@ -379,6 +414,7 @@ class FileOpenerService {
           item,
           filePath,
           LottieViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.font:
@@ -387,6 +423,7 @@ class FileOpenerService {
           item,
           filePath,
           FontViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.dicom:
@@ -395,6 +432,7 @@ class FileOpenerService {
           item,
           filePath,
           DicomViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.image:
@@ -405,6 +443,7 @@ class FileOpenerService {
           item,
           filePath,
           ImageViewerScreen(filePath: resolvedPath),
+          addToRecent: addToRecent,
         );
 
       case KotoFileType.other:
@@ -434,7 +473,11 @@ class FileOpenerService {
             nav,
             item,
             filePath,
-            PdfViewerScreen(filePath: resolvedPath),
+            PdfViewerScreen(
+              filePath: resolvedPath,
+              addToRecent: addToRecent,
+            ),
+            addToRecent: addToRecent,
           );
         } else {
           await RecentFilesService.removeRecentFile(filePath);
@@ -456,15 +499,18 @@ class FileOpenerService {
     NavigatorState navigator,
     PdfItem item,
     String originalFilePath,
-    Widget screen,
-  ) async {
+    Widget screen, {
+    bool addToRecent = true,
+  }) async {
     try {
       final bool? success = await navigator.push<bool>(
         MaterialPageRoute(builder: (_) => screen),
       );
 
       if (success != false) {
-        await RecentFilesService.addRecentFile(item);
+        if (addToRecent) {
+          await RecentFilesService.addRecentFile(item);
+        }
         return true;
       } else {
         await RecentFilesService.removeRecentFile(originalFilePath);

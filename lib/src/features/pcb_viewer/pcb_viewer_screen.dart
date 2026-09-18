@@ -906,6 +906,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
       await FileOpenerService.openFile(
         context: context,
         filePath: tempFile.path,
+        addToRecent: false,
       );
     } catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'PcbViewer._openArchiveFile');
@@ -1146,7 +1147,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: (_project != null && _project!.layers.isNotEmpty)
+        backgroundColor: (_activeMode == PcbViewerMode.board2D && _project != null && _project!.layers.isNotEmpty)
             ? (isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B))
             : theme.scaffoldBackgroundColor,
         appBar: AppBar(
@@ -1210,13 +1211,16 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
             }
 
             if (_isLoading) {
-              return const Center(
+              return Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(color: Color(0xFF059669)),
-                    SizedBox(height: 16),
-                    Text('Analyzing and Combining PCB Layers...', style: TextStyle(color: Colors.white70)),
+                    const CircularProgressIndicator(color: Color(0xFF059669)),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Analyzing and Combining PCB Layers...',
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    ),
                   ],
                 ),
               );
@@ -1231,7 +1235,11 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                     children: [
                       const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
                       const SizedBox(height: 16),
-                      Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                      Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: theme.colorScheme.onSurface),
+                      ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: _loadPcbFile,
@@ -1663,7 +1671,9 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         // Main Image Area with Interactive Pan & Zoom
         Expanded(
           child: Container(
-            color: Colors.black87,
+            color: theme.brightness == Brightness.dark
+                ? const Color(0xFF121212)
+                : const Color(0xFFF1F5F9),
             child: InteractiveViewer(
               minScale: 0.2,
               maxScale: 10.0,
@@ -1672,12 +1682,12 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                 child: Image.memory(
                   currentImg.bytes,
                   fit: BoxFit.contain,
-                  errorBuilder: (ctx, err, stack) => const Column(
+                  errorBuilder: (ctx, err, stack) => Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                      SizedBox(height: 12),
-                      Text('Could not load image', style: TextStyle(color: Colors.white70)),
+                      Icon(Icons.broken_image, size: 64, color: theme.colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 12),
+                      Text('Could not load image', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -1742,7 +1752,11 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
               const SizedBox(width: 10),
               Text(
                 'Bill of Materials (${bom.length} items, ${_project!.totalComponents} parts)',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
             ],
           ),
@@ -1751,9 +1765,11 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           color: theme.colorScheme.surface,
           child: TextField(
+            style: TextStyle(color: theme.colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: 'Search designator, value, package (e.g. R1, 10k)...',
-              prefixIcon: const Icon(Icons.search, size: 20),
+              hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              prefixIcon: Icon(Icons.search, size: 20, color: theme.colorScheme.onSurfaceVariant),
               isDense: true,
               filled: true,
               fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
@@ -1769,54 +1785,81 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         ),
         const Divider(height: 1),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: filteredBom.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final item = filteredBom[index];
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                title: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(6),
+          child: filteredBom.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.search_off, size: 48, color: theme.colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No components match "$_bomSearchQuery"',
+                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                       ),
-                      child: Text(
-                        item.designator,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onPrimaryContainer,
-                        ),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: filteredBom.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final item = filteredBom[index];
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      title: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              item.designator,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item.value.isNotEmpty ? item.value : item.description,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            '×${item.quantity}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item.value.isNotEmpty ? item.value : item.description,
-                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Text(
-                      '×${item.quantity}',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                      subtitle: item.footprint.isNotEmpty
+                          ? Text(
+                              'Package: ${item.footprint}${item.description.isNotEmpty ? " • ${item.description}" : ""}',
+                              style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurfaceVariant),
+                            )
+                          : (item.description.isNotEmpty
+                              ? Text(
+                                  item.description,
+                                  style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurfaceVariant),
+                                )
+                              : null),
+                    );
+                  },
                 ),
-                subtitle: item.footprint.isNotEmpty
-                    ? Text(
-                        'Package: ${item.footprint}${item.description.isNotEmpty ? " • ${item.description}" : ""}',
-                        style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
-                      )
-                    : null,
-              );
-            },
-          ),
         ),
       ],
     );
@@ -1846,7 +1889,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                 children: [
                   Text(
                     '3D CAD Models (${models.length})',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1863,6 +1906,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
           final ext = model.fileName.split('.').last.toUpperCase();
           final baseName = model.fileName.replaceAll('\\', '/').split('/').last;
           return Card(
+            color: theme.colorScheme.surface,
             elevation: 2,
             margin: const EdgeInsets.only(bottom: 16),
             shape: RoundedRectangleBorder(
@@ -1898,7 +1942,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                           children: [
                             Text(
                               baseName,
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1992,7 +2036,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                 children: [
                   Text(
                     'Circuit Schematics (${schematics.length})',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -2011,6 +2055,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
           final baseName = sch.fileName.replaceAll('\\', '/').split('/').last;
 
           return Card(
+            color: theme.colorScheme.surface,
             elevation: 2,
             margin: const EdgeInsets.only(bottom: 16),
             shape: RoundedRectangleBorder(
@@ -2046,7 +2091,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                           children: [
                             Text(
                               baseName,
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -2143,7 +2188,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                 children: [
                   Text(
                     'Documentation & Reports (${allDocs.length})',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -2162,6 +2207,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
           final baseName = doc.fileName.replaceAll('\\', '/').split('/').last;
 
           return Card(
+            color: theme.colorScheme.surface,
             elevation: 1.5,
             margin: const EdgeInsets.only(bottom: 12),
             shape: RoundedRectangleBorder(
@@ -2190,7 +2236,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
               ),
               title: Text(
                 baseName,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface),
               ),
               subtitle: Text(
                 '${doc.formattedSize} • ${doc.fileName}',
@@ -2243,7 +2289,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                   const SizedBox(width: 10),
                   Text(
                     'Archive Explorer (${allFiles.length} files)',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface),
                   ),
                   const Spacer(),
                   Text(
@@ -2254,9 +2300,11 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
               ),
               const SizedBox(height: 8),
               TextField(
+                style: TextStyle(color: theme.colorScheme.onSurface),
                 decoration: InputDecoration(
                   hintText: 'Search files in archive...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
+                  hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                  prefixIcon: Icon(Icons.search, size: 20, color: theme.colorScheme.onSurfaceVariant),
                   suffixIcon: _archiveSearchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 18),

@@ -30,8 +30,14 @@ import '../../core/l10n/l10n_extensions.dart';
 class Dxf3DViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
+  final bool addToRecent;
 
-  const Dxf3DViewerScreen({super.key, required this.filePath, this.title});
+  const Dxf3DViewerScreen({
+    super.key,
+    required this.filePath,
+    this.title,
+    this.addToRecent = true,
+  });
 
   @override
   State<Dxf3DViewerScreen> createState() => _Dxf3DViewerScreenState();
@@ -195,13 +201,15 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       }
 
       // Record in recent files
-      final pdfItem = PdfItem(
-        path: widget.filePath,
-        name: _fileName,
-        sizeInBytes: _fileSizeBytes,
-        lastOpened: DateTime.now(),
-      );
-      await RecentFilesService.addRecentFile(pdfItem);
+      if (widget.addToRecent) {
+        final pdfItem = PdfItem(
+          path: widget.filePath,
+          name: _fileName,
+          sizeInBytes: _fileSizeBytes,
+          lastOpened: DateTime.now(),
+        );
+        await RecentFilesService.addRecentFile(pdfItem);
+      }
 
       if (mounted) {
         setState(() {

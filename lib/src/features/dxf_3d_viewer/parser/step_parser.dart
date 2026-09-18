@@ -175,6 +175,8 @@ class StepParser {
         []; // (fromRepId, toRepId, transformId)
     final Map<int, Color> rgbMap = {}; // Colour ID -> Color
     final Map<int, Color> itemColorMap = {}; // Item ID -> Color
+    final Map<int, int> curveBasisMap = {}; // Curve ID -> Basis Curve ID
+    final Map<int, (int, double)> cylindricalSurfaceMap = {}; // Surf ID -> (Placement ID, radius)
     final Map<int, String> entityParamsMap = {};
 
     String? rootProductName;
@@ -266,6 +268,22 @@ class StepParser {
                 : 1.0;
             circleMap[ent.id] = (pId, r);
           }
+        } else if (type == 'TRIMMED_CURVE' || type == 'SURFACE_CURVE' || type == 'SEAM_CURVE') {
+          final idMatch = RegExp(r'#(\d+)').firstMatch(params);
+          if (idMatch != null) {
+            curveBasisMap[ent.id] = int.tryParse(idMatch.group(1)!) ?? 0;
+          }
+        } else if (type == 'CYLINDRICAL_SURFACE') {
+          const fp = r'[-+]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][-+]?[0-9]+)?';
+          final pMatch = RegExp(r'#(\d+)').firstMatch(params);
+          final rMatch = RegExp(r',\s*(' + fp + r')\s*\)?$').firstMatch(params);
+          if (pMatch != null) {
+            final pId = int.tryParse(pMatch.group(1)!) ?? 0;
+            final r = rMatch != null
+                ? (double.tryParse(rMatch.group(1)!) ?? 1.0)
+                : 1.0;
+            cylindricalSurfaceMap[ent.id] = (pId, r);
+          }
         } else if (type == 'EDGE_CURVE') {
           final idMatches = RegExp(r'#(\d+)').allMatches(params).toList();
           final senseMatch = RegExp(r'\.(T|F)\.').firstMatch(params);
@@ -304,7 +322,7 @@ class StepParser {
             faceBoundMap[ent.id] = int.tryParse(idMatch.group(1)!) ?? 0;
           }
         } else if (type == 'ADVANCED_FACE' || type == 'FACE_SURFACE') {
-          final boundsMatch = RegExp(r'\((.*?)\)').firstMatch(params);
+          final boundsMatch = RegExp(r'\((.*?)\)', dotAll: true).firstMatch(params);
           final loopIds = <int>[];
           if (boundsMatch != null) {
             final bIds = RegExp(r'#(\d+)')
@@ -497,6 +515,15 @@ class StepParser {
       final oEdgeIds = edgeLoopMap[loopId];
       if (oEdgeIds == null || oEdgeIds.isEmpty) return [];
 
+      int resolveBasisCurve(int id) {
+        var cur = id;
+        final visited = <int>{};
+        while (curveBasisMap.containsKey(cur) && visited.add(cur)) {
+          cur = curveBasisMap[cur]!;
+        }
+        return cur;
+      }
+
       final pts = <Vector3>[];
       for (final oeId in oEdgeIds) {
         final oe = orientedEdgeMap[oeId];
@@ -507,14 +534,17 @@ class StepParser {
         if (ec == null) continue;
         final startV = ec.$1;
         final endV = ec.$2;
-        final curveId = ec.$3;
+        final rawCurveId = ec.$3;
+        final sameSense = ec.$4;
+        final curveId = resolveBasisCurve(rawCurveId);
 
-        final startPt = pointMap[vertexMap[startV]];
-        final endPt = pointMap[vertexMap[endV]];
+        final effOrientation = (orientation == sameSense);
+        final startPt = pointMap[vertexMap[startV]] ?? pointMap[startV];
+        final endPt = pointMap[vertexMap[endV]] ?? pointMap[endV];
         if (startPt == null || endPt == null) continue;
 
-        final vFrom = orientation ? startPt : endPt;
-        final vTo = orientation ? endPt : startPt;
+        final vFrom = effOrientation ? startPt : endPt;
+        final vTo = effOrientation ? endPt : startPt;
 
         // Sample CIRCLE arcs for smooth cylindrical curves
         final circleData = circleMap[curveId];
@@ -533,7 +563,7 @@ class StepParser {
 
             if ((vFrom - vTo).lengthSquared <= 1e-6) {
               // Full circle with single vertex
-              const fullSamples = 16;
+              const fullSamples = 24;
               for (int s = 0; s < fullSamples; s++) {
                 final ang = (s / fullSamples) * 2 * math.pi;
                 pts.add(
@@ -551,7 +581,7 @@ class StepParser {
               var a1 = math.atan2(dTo.dot(y), dTo.dot(x));
 
               var diff = a1 - a0;
-              if (!orientation) {
+              if (!effOrientation) {
                 while (diff > 0) {
                   diff -= 2 * math.pi;
                 }
@@ -570,7 +600,7 @@ class StepParser {
               if (pts.isEmpty || (pts.last - vFrom).lengthSquared > 1e-8) {
                 pts.add(vFrom);
               }
-              const samples = 4;
+              const samples = 8;
               for (int s = 1; s < samples; s++) {
                 final t = s / samples;
                 final ang = a0 + diff * t;
@@ -602,10 +632,15 @@ class StepParser {
       final face = faceMap[faceId];
       if (face == null) return [];
       final loopIds = face.$1;
+      final surfId = face.$2;
       if (loopIds.isEmpty) return [];
 
       final faceColor = itemColorMap[faceId] ?? defaultColor;
       final result = <Triangle3D>[];
+
+      final isCylindrical = cylindricalSurfaceMap.containsKey(surfId);
+      final cylData = isCylindrical ? cylindricalSurfaceMap[surfId] : null;
+      final cylPlacement = cylData != null ? placementMap[cylData.$1] : null;
 
       for (final rawLoopId in loopIds) {
         final loopId = faceBoundMap[rawLoopId] ?? rawLoopId;
@@ -614,6 +649,58 @@ class StepParser {
 
         final worldPts = pts.map((p) => transform.transformPoint(p)).toList();
         final n = worldPts.length;
+
+        // If face is on a CYLINDRICAL_SURFACE with top and bottom rim points:
+        if (isCylindrical && cylPlacement != null && n >= 6) {
+          final axisW = (transform.transformPoint(cylPlacement.origin + cylPlacement.axis) -
+                  transform.transformPoint(cylPlacement.origin))
+              .normalized();
+          final origW = transform.transformPoint(cylPlacement.origin);
+
+          // Project points to height along cylinder axis
+          final heights = worldPts.map((p) => (p - origW).dot(axisW)).toList();
+          final minH = heights.reduce(math.min);
+          final maxH = heights.reduce(math.max);
+
+          if ((maxH - minH) > 1e-4) {
+            final midH = (minH + maxH) / 2.0;
+            final botPts = <Vector3>[];
+            final topPts = <Vector3>[];
+
+            for (int i = 0; i < n; i++) {
+              if (heights[i] < midH) {
+                botPts.add(worldPts[i]);
+              } else {
+                topPts.add(worldPts[i]);
+              }
+            }
+
+            if (botPts.length >= 2 && topPts.length >= 2) {
+              // Match orientation of topPts to botPts if reversed along loop
+              final d00 = (botPts.first - topPts.first).lengthSquared;
+              final d0N = (botPts.first - topPts.last).lengthSquared;
+              final orderedTop = d0N < d00 ? topPts.reversed.toList() : topPts;
+
+              final steps = math.max(botPts.length, orderedTop.length);
+              for (int i = 0; i < steps - 1; i++) {
+                final b0 = botPts[math.min(i, botPts.length - 1)];
+                final b1 = botPts[math.min(i + 1, botPts.length - 1)];
+                final t0 = orderedTop[math.min(i, orderedTop.length - 1)];
+                final t1 = orderedTop[math.min(i + 1, orderedTop.length - 1)];
+
+                if ((b0 - b1).lengthSquared > 1e-8 && (t0 - t1).lengthSquared > 1e-8) {
+                  result.add(Triangle3D(v0: b0, v1: b1, v2: t1, color: faceColor, isDoubleSided: true));
+                  result.add(Triangle3D(v0: b0, v1: t1, v2: t0, color: faceColor, isDoubleSided: true));
+                } else if ((b0 - b1).lengthSquared > 1e-8) {
+                  result.add(Triangle3D(v0: b0, v1: b1, v2: t0, color: faceColor, isDoubleSided: true));
+                } else if ((t0 - t1).lengthSquared > 1e-8) {
+                  result.add(Triangle3D(v0: b0, v1: t1, v2: t0, color: faceColor, isDoubleSided: true));
+                }
+              }
+              continue; // Cylindrical face triangulated successfully!
+            }
+          }
+        }
 
         if (n == 3) {
           final p0 = worldPts[0];

@@ -54,6 +54,7 @@ enum PcbCommandType {
   arc,
   flash,
   region,
+  text,
 }
 
 /// Vector element or flash pad.
@@ -72,6 +73,9 @@ class PcbCommand {
   final String? pinNumber;
   final String? netName;
   final String? componentRef;
+  final String? text;
+  final double? fontSize;
+  final double? rotation;
 
   const PcbCommand.line({
     required this.p1,
@@ -87,7 +91,10 @@ class PcbCommand {
         regionContours = null,
         pinNumber = null,
         netName = null,
-        componentRef = null;
+        componentRef = null,
+        text = null,
+        fontSize = null,
+        rotation = null;
 
   const PcbCommand.arc({
     required this.p1,
@@ -103,7 +110,10 @@ class PcbCommand {
         regionContours = null,
         pinNumber = null,
         netName = null,
-        componentRef = null;
+        componentRef = null,
+        text = null,
+        fontSize = null,
+        rotation = null;
 
   const PcbCommand.flash({
     required this.p1,
@@ -119,7 +129,10 @@ class PcbCommand {
         startAngle = null,
         endAngle = null,
         regionPoints = null,
-        regionContours = null;
+        regionContours = null,
+        text = null,
+        fontSize = null,
+        rotation = null;
 
   const PcbCommand.region({
     this.regionPoints,
@@ -133,6 +146,28 @@ class PcbCommand {
         startAngle = null,
         endAngle = null,
         aperture = null,
+        pinNumber = null,
+        netName = null,
+        componentRef = null,
+        text = null,
+        fontSize = null,
+        rotation = null;
+
+  const PcbCommand.text({
+    required this.p1,
+    required this.text,
+    this.fontSize = 1.5,
+    this.rotation = 0.0,
+    this.isDark = true,
+  })  : type = PcbCommandType.text,
+        p2 = null,
+        center = null,
+        radius = null,
+        startAngle = null,
+        endAngle = null,
+        aperture = null,
+        regionPoints = null,
+        regionContours = null,
         pinNumber = null,
         netName = null,
         componentRef = null;

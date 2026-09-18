@@ -10,6 +10,16 @@ class RecentFilesService {
   /// Notifier that triggers whenever recent files are added, removed, or cleared.
   static final ValueNotifier<int> recentFilesNotifier = ValueNotifier<int>(0);
 
+  /// Checks whether a file path points to a temporary extracted archive file.
+  /// Used to ensure only the parent archive (ZIP/PCB) is preserved in Recent Files.
+  static bool isArchiveExtractedPath(String path) {
+    final lower = path.toLowerCase().replaceAll(r'\', '/');
+    return lower.contains('/koto_extracted/') ||
+        lower.contains('/extracted_') ||
+        lower.contains('koto_dicom_') ||
+        lower.contains('/zip_temp/');
+  }
+
   static Future<List<PdfItem>> getRecentFiles() async {
     final prefs = await SharedPreferences.getInstance();
     final List<String>? jsonList = prefs.getStringList(_keyRecentFiles) ??
@@ -17,16 +27,29 @@ class RecentFilesService {
 
     if (jsonList == null) return [];
 
-    return jsonList
-        .map((item) => PdfItem.fromJson(item))
-        .where((item) => !item.isImage)
+    final rawList = jsonList.map((item) => PdfItem.fromJson(item)).toList();
+    final filtered = rawList
+        .where((item) => !item.isImage && !isArchiveExtractedPath(item.path))
         .toList()
       ..sort((a, b) => b.lastOpened.compareTo(a.lastOpened));
+
+    // If any legacy extracted subfiles were purged, persist the sanitized list
+    if (rawList.length != filtered.length) {
+      final sanitizedJson = filtered.map((item) => item.toJson()).toList();
+      await prefs.setStringList(_keyRecentFiles, sanitizedJson);
+    }
+
+    return filtered;
   }
 
   static Future<void> addRecentFile(PdfItem newItem) async {
     // Exclude photos/images from recent files list to avoid flooding it
     if (newItem.isImage) {
+      return;
+    }
+
+    // Exclude files extracted from archives so only the main archive remains in Recent Files
+    if (isArchiveExtractedPath(newItem.path)) {
       return;
     }
 
