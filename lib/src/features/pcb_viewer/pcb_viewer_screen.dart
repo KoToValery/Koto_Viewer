@@ -1582,7 +1582,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
 
         // Floating Zoom Controls
         Positioned(
-          bottom: 24,
+          bottom: 24 + MediaQuery.paddingOf(context).bottom,
           right: 20,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1699,32 +1699,39 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         // Bottom Thumbnail strip if multiple images
         if (_project!.images.length > 1)
           Container(
-            height: 90,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             color: theme.colorScheme.surface,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _project!.images.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final img = _project!.images[index];
-                final isSelected = index == _selectedImageIndex;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedImageIndex = index),
-                  child: Container(
-                    width: 74,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isSelected ? theme.colorScheme.primary : Colors.grey.withValues(alpha: 0.3),
-                        width: isSelected ? 2.5 : 1.0,
-                      ),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Image.memory(img.bytes, fit: BoxFit.cover),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 90,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _project!.images.length,
+                    separatorBuilder: (context, index) => const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      final img = _project!.images[index];
+                      final isSelected = index == _selectedImageIndex;
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedImageIndex = index),
+                        child: Container(
+                          width: 74,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSelected ? theme.colorScheme.primary : Colors.grey.withValues(alpha: 0.3),
+                              width: isSelected ? 2.5 : 1.0,
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.memory(img.bytes, fit: BoxFit.cover),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ),
       ],
@@ -1800,7 +1807,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + MediaQuery.paddingOf(context).bottom),
                   itemCount: filteredBom.length,
                   separatorBuilder: (context, index) => const Divider(height: 1),
                   itemBuilder: (context, index) {
@@ -1870,7 +1877,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     final models = _project!.model3DFiles;
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.paddingOf(context).bottom),
       children: [
         Row(
           children: [
@@ -2017,7 +2024,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     final schematics = _project!.schematicFiles;
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.paddingOf(context).bottom),
       children: [
         Row(
           children: [
@@ -2169,7 +2176,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     final allDocs = [...docs, ...reports];
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.paddingOf(context).bottom),
       children: [
         Row(
           children: [
@@ -2378,7 +2385,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: EdgeInsets.fromLTRB(0, 8, 0, 8 + MediaQuery.paddingOf(context).bottom),
                   itemCount: filteredFiles.length,
                   separatorBuilder: (context, index) => const Divider(height: 1),
                   itemBuilder: (context, index) {

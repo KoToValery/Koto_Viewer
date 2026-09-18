@@ -290,7 +290,7 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
 
                 // Floating Zoom Controls (Bottom Right)
                 Positioned(
-                  bottom: widget.images.length > 1 ? 100 : 24,
+                  bottom: (widget.images.length > 1 ? 100 : 24) + MediaQuery.paddingOf(context).bottom,
                   right: 20,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -334,6 +334,8 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                     left: 0,
                     right: 0,
                     child: SafeArea(
+                      top: false,
+                      bottom: true,
                       child: Container(
                         height: 84,
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
