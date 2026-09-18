@@ -79,6 +79,8 @@
   "@categoryMedical": { "description": "Medical DICOM files category" },
   "categoryImages": "Images",
   "@categoryImages": { "description": "Images & Photos files category" },
+  "categoryVideo": "Video",
+  "@categoryVideo": { "description": "Video & Animations files category" },
 
   "loadingFile": "Loading file...",
   "@loadingFile": { "description": "Default file loading title" },
@@ -533,5 +535,19 @@
     "placeholders": {
       "name": { "type": "String" }
     }
-  }
+  },
+  "videoViewerTitle": "Video Player",
+  "@videoViewerTitle": { "description": "Title for video viewer screen" },
+  "videoLoopOn": "Loop enabled",
+  "@videoLoopOn": { "description": "Notification when video loop is enabled" },
+  "videoLoopOff": "Loop disabled",
+  "@videoLoopOff": { "description": "Notification when video loop is disabled" },
+  "presentationMode": "Start Presentation",
+  "@presentationMode": { "description": "Button to start sequential project presentation" },
+  "nextProjectItem": "Next File",
+  "@nextProjectItem": { "description": "Button to go to next item in project" },
+  "prevProjectItem": "Previous File",
+  "@prevProjectItem": { "description": "Button to go to previous item in project" },
+  "projectOverview": "Project Assets",
+  "@projectOverview": { "description": "Overview label for project assets" }
 }

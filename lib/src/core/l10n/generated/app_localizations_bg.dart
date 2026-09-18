@@ -123,6 +123,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get categoryImages => 'Снимки';
 
   @override
+  String get categoryVideo => 'Видео';
+
+  @override
   String get loadingFile => 'Зареждане на файл...';
 
   @override
@@ -587,4 +590,25 @@ class AppLocalizationsBg extends AppLocalizations {
   String extractingFile(String name) {
     return 'Отваряне на $name...';
   }
+
+  @override
+  String get videoViewerTitle => 'Видео плейър';
+
+  @override
+  String get videoLoopOn => 'Повторението е включено';
+
+  @override
+  String get videoLoopOff => 'Повторението е изключено';
+
+  @override
+  String get presentationMode => 'Старт на презентацията';
+
+  @override
+  String get nextProjectItem => 'Следващ файл';
+
+  @override
+  String get prevProjectItem => 'Предишен файл';
+
+  @override
+  String get projectOverview => 'Файлове в проекта';
 }

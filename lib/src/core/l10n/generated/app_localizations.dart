@@ -326,6 +326,12 @@ abstract class AppLocalizations {
   /// **'Images'**
   String get categoryImages;
 
+  /// Video & Animations files category
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get categoryVideo;
+
   /// Default file loading title
   ///
   /// In en, this message translates to:
@@ -1087,6 +1093,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opening {name}...'**
   String extractingFile(String name);
+
+  /// Title for video viewer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Video Player'**
+  String get videoViewerTitle;
+
+  /// Notification when video loop is enabled
+  ///
+  /// In en, this message translates to:
+  /// **'Loop enabled'**
+  String get videoLoopOn;
+
+  /// Notification when video loop is disabled
+  ///
+  /// In en, this message translates to:
+  /// **'Loop disabled'**
+  String get videoLoopOff;
+
+  /// Button to start sequential project presentation
+  ///
+  /// In en, this message translates to:
+  /// **'Start Presentation'**
+  String get presentationMode;
+
+  /// Button to go to next item in project
+  ///
+  /// In en, this message translates to:
+  /// **'Next File'**
+  String get nextProjectItem;
+
+  /// Button to go to previous item in project
+  ///
+  /// In en, this message translates to:
+  /// **'Previous File'**
+  String get prevProjectItem;
+
+  /// Overview label for project assets
+  ///
+  /// In en, this message translates to:
+  /// **'Project Assets'**
+  String get projectOverview;
 }
 
 class _AppLocalizationsDelegate

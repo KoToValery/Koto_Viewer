@@ -229,7 +229,9 @@ class FileSourceService {
     // CAD & 3D
     'dxf', 'dwg', 'svg', 'stl', 'obj', 'gltf', 'glb', 'fbx', '3mf', 'step', 'stp', 'p21', 'iges', 'igs', 'ifc',
     // Vector & Graphic
-    'eps', 'cdr', 'zip', 'psd', 'psb', 'ico', 'lottie',
+    'eps', 'cdr', 'zip', 'psd', 'psb', 'ico', 'lottie', 'kpack', 'kotopack', 'archpack',
+    // Video & Animations
+    'mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v', '3gp', 'wmv', 'flv', 'ts',
     // Raster Images
     'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp',
     // PCB & Hardware

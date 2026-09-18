@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:video_player_win/video_player_win.dart';
 import 'src/core/errors/app_error_handler.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/services/intent_service.dart';
 import 'src/core/services/local_server_service.dart';
 import 'src/core/services/coordinate_system_service.dart';
 import 'src/core/services/dwg_converter_service.dart';
+import 'src/core/services/project_bundle_service.dart';
 import 'src/core/services/file_opener_service.dart';
 import 'src/core/services/locale_service.dart';
 import 'src/core/l10n/l10n_extensions.dart';
@@ -17,12 +19,17 @@ void main(List<String> args) {
     WidgetsFlutterBinding.ensureInitialized();
     AppErrorHandler.init();
 
+    if (Platform.isWindows) {
+      WindowsVideoPlayer.registerWith();
+    }
+
     await CoordinateSystemService.init();
     await LocaleService.init();
 
-    // Startup background cleanup for orphaned DWG temp files and cache pruning
+    // Startup background cleanup for orphaned temp files and cache pruning
     unawaited(DwgConverterService.cleanupStaleTempFiles(isStartup: true));
     unawaited(DwgConverterService.pruneCache());
+    unawaited(ProjectBundleService.cleanupStaleTempFiles(isStartup: true));
 
     String? initialFile;
     if (args.isNotEmpty && File(args.first).existsSync()) {

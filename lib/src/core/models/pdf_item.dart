@@ -12,6 +12,7 @@ enum FileCategory {
   routes,
   documents,
   images,
+  video,
 }
 
 extension FileCategoryExtension on FileCategory {
@@ -34,6 +35,8 @@ extension FileCategoryExtension on FileCategory {
         return l10n.categoryDocuments;
       case FileCategory.images:
         return l10n.categoryImages;
+      case FileCategory.video:
+        return l10n.categoryVideo;
     }
   }
 
@@ -55,6 +58,8 @@ extension FileCategoryExtension on FileCategory {
         return 'Documents';
       case FileCategory.images:
         return 'Images';
+      case FileCategory.video:
+        return 'Video';
     }
   }
 
@@ -76,11 +81,13 @@ extension FileCategoryExtension on FileCategory {
         return 'Docs';
       case FileCategory.images:
         return 'Images';
+      case FileCategory.video:
+        return 'Video';
     }
   }
 }
 
-enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, gpx, kml, kmz, geojson, fbx, threeMf, lottie, font, ico, psd, code, csv, jupyter, dicom, image, other }
+enum KotoFileType { pdf, dxf, dwg, svg, stl, obj, gltf, glb, xlsx, txt, md, docx, eps, gbr, drl, kicad, plt, step, iges, ifc, pptx, rtf, zip, cdr, cbz, cbr, cbt, epub, fb2, gpx, kml, kmz, geojson, fbx, threeMf, lottie, font, ico, psd, code, csv, jupyter, dicom, image, video, project, other }
 
 class PdfItem {
   final String path;
@@ -203,6 +210,19 @@ class PdfItem {
         lower.endsWith('.bmp')) {
       return KotoFileType.image;
     }
+    if (lower.endsWith('.kpack') || lower.endsWith('.kotopack') || lower.endsWith('.archpack')) return KotoFileType.project;
+    if (lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.mkv') ||
+        lower.endsWith('.webm') ||
+        lower.endsWith('.avi') ||
+        lower.endsWith('.m4v') ||
+        lower.endsWith('.3gp') ||
+        lower.endsWith('.wmv') ||
+        lower.endsWith('.flv') ||
+        lower.endsWith('.ts')) {
+      return KotoFileType.video;
+    }
     if (lower.endsWith('.dcm') || lower.endsWith('.dicom') || lower.endsWith('dicomdir')) return KotoFileType.dicom;
     
     // --- Docker files (matched by filename, not extension) ---
@@ -282,6 +302,8 @@ class PdfItem {
   bool get isIco => fileType == KotoFileType.ico;
   bool get isPsd => fileType == KotoFileType.psd;
   bool get isImage => fileType == KotoFileType.image || isIco || isPsd;
+  bool get isVideo => fileType == KotoFileType.video;
+  bool get isProject => fileType == KotoFileType.project;
   bool get isDicom => fileType == KotoFileType.dicom;
   bool get isComic => fileType == KotoFileType.cbz || fileType == KotoFileType.cbr || fileType == KotoFileType.cbt;
   bool get isEbook => fileType == KotoFileType.epub || fileType == KotoFileType.fb2;
@@ -321,11 +343,12 @@ class PdfItem {
   bool get isKicad => fileType == KotoFileType.kicad;
   bool get isZip => fileType == KotoFileType.zip;
   bool get isPlotter => fileType == KotoFileType.plt;
-  bool get isPcb => isGerber || isDrill || isKicad || isZip;
+  bool get isPcb => isGerber || isDrill || isKicad;
   bool get isVector => isSvg || isEps || isCdr || isPcb || isPlotter;
   bool get isTextDoc => isTxt || isCsv || isJupyter || isMd || isDocx || isRtf || isPresentation || isComic || isEbook;
 
   FileCategory get category {
+    if (isVideo) return FileCategory.video;
     if (isRoute) return FileCategory.routes;
     if (is3d) return FileCategory.cad3d;
     if (isCad || isPlotter || isSvg || isEps || isCdr) return FileCategory.cad2d;

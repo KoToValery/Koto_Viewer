@@ -41,6 +41,7 @@
   "categoryDocuments": "Документи",
   "categoryMedical": "Медицински (DICOM)",
   "categoryImages": "Снимки",
+  "categoryVideo": "Видео",
 
   "loadingFile": "Зареждане на файл...",
   "loadingPdf": "Зареждане на PDF документ...",
@@ -170,5 +171,12 @@
   "archiveFilesCount": "Файлове в архива ({count})",
   "openArchiveFile": "Отвори",
   "unsupportedArchiveFormat": "Не се поддържа директен преглед за този файлов формат.",
-  "extractingFile": "Отваряне на {name}..."
+  "extractingFile": "Отваряне на {name}...",
+  "videoViewerTitle": "Видео плейър",
+  "videoLoopOn": "Повторението е включено",
+  "videoLoopOff": "Повторението е изключено",
+  "presentationMode": "Старт на презентацията",
+  "nextProjectItem": "Следващ файл",
+  "prevProjectItem": "Предишен файл",
+  "projectOverview": "Файлове в проекта"
 }

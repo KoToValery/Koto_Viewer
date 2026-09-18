@@ -123,6 +123,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryImages => 'Images';
 
   @override
+  String get categoryVideo => 'Video';
+
+  @override
   String get loadingFile => 'Loading file...';
 
   @override
@@ -581,4 +584,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String extractingFile(String name) {
     return 'Opening $name...';
   }
+
+  @override
+  String get videoViewerTitle => 'Video Player';
+
+  @override
+  String get videoLoopOn => 'Loop enabled';
+
+  @override
+  String get videoLoopOff => 'Loop disabled';
+
+  @override
+  String get presentationMode => 'Start Presentation';
+
+  @override
+  String get nextProjectItem => 'Next File';
+
+  @override
+  String get prevProjectItem => 'Previous File';
+
+  @override
+  String get projectOverview => 'Project Assets';
 }

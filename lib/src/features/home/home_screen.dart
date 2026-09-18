@@ -116,6 +116,10 @@ class FileTypeIcon extends StatelessWidget {
         return _buildJupyterIcon();
       case KotoFileType.dicom:
         return _buildDicomIcon();
+      case KotoFileType.video:
+        return _buildVideoIcon();
+      case KotoFileType.project:
+        return _buildProjectIcon();
       default:
         return _buildGenericIcon();
     }
@@ -216,6 +220,76 @@ class FileTypeIcon extends StatelessWidget {
                 fontSize: width * 0.18,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFF0EA5E9),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFECACA)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.play_circle_fill_rounded,
+              color: const Color(0xFFDC2626),
+              size: width * 0.58,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'VIDEO',
+              style: TextStyle(
+                fontSize: width * 0.16,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFDC2626),
+                letterSpacing: 0.5,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProjectIcon() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFCD34D)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.inventory_2_rounded,
+              color: const Color(0xFFD97706),
+              size: width * 0.56,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'PACK',
+              style: TextStyle(
+                fontSize: width * 0.18,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFD97706),
                 letterSpacing: 0.5,
                 height: 1,
               ),
@@ -2362,6 +2436,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.description_rounded;
       case FileCategory.images:
         return Icons.image_rounded;
+      case FileCategory.video:
+        return Icons.videocam_rounded;
     }
   }
 
@@ -3034,7 +3110,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   ? Icons.terrain_outlined
                                                   : _selectedCategory == FileCategory.images
                                                       ? Icons.image_outlined
-                                                      : Icons.description_outlined,
+                                                      : _selectedCategory == FileCategory.video
+                                                          ? Icons.videocam_outlined
+                                                          : Icons.description_outlined,
                           size: 64,
                           color: theme.textTheme.bodyMedium?.color?.withValues(
                             alpha: 0.4,

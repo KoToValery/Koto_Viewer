@@ -32,6 +32,9 @@ import '../../features/csv_viewer/csv_viewer_screen.dart';
 import '../../features/jupyter_viewer/jupyter_viewer_screen.dart';
 import '../../features/dicom_viewer/dicom_viewer_screen.dart';
 import '../../features/dicom_viewer/dicom_study_loader.dart';
+import '../../features/video_viewer/video_viewer_screen.dart';
+import '../../features/project_viewer/project_viewer_screen.dart';
+import 'project_bundle_service.dart';
 
 /// Unified service for resolving, converting, and opening all file formats
 /// supported by KotoViewer.
@@ -338,6 +341,31 @@ class FileOpenerService {
           addToRecent: addToRecent,
         );
 
+      case KotoFileType.video:
+        return await _pushViewer(
+          nav,
+          item,
+          filePath,
+          VideoViewerScreen(
+            filePath: resolvedPath,
+            title: name,
+            addToRecent: addToRecent,
+          ),
+          addToRecent: addToRecent,
+        );
+
+      case KotoFileType.project:
+        return await _pushViewer(
+          nav,
+          item,
+          filePath,
+          ProjectViewerScreen(
+            filePath: resolvedPath,
+            addToRecent: addToRecent,
+          ),
+          addToRecent: addToRecent,
+        );
+
       case KotoFileType.zip:
         // Smart ZIP routing: check if the archive contains a DICOM study
         if (DicomStudyLoader.isDicomZip(resolvedPath)) {
@@ -349,6 +377,20 @@ class FileOpenerService {
             addToRecent: addToRecent,
           );
         }
+        // Check if the archive is a Project Presentation Bundle (or contains mixed media)
+        if (ProjectBundleService.isProjectBundle(resolvedPath)) {
+          return await _pushViewer(
+            nav,
+            item,
+            filePath,
+            ProjectViewerScreen(
+              filePath: resolvedPath,
+              addToRecent: addToRecent,
+            ),
+            addToRecent: addToRecent,
+          );
+        }
+        // Otherwise treat as PCB Gerber archive
         return await _pushViewer(
           nav,
           item,
