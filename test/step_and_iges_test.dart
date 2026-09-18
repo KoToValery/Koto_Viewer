@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
@@ -241,7 +242,94 @@ END-ISO-10303-21;
       expect(mesh.bounds.sizeX, closeTo(10.0, 0.1));
       expect(mesh.bounds.sizeY, closeTo(10.0, 0.1));
     });
+
+    test('StepParser reconstructs B-Rep faces with EDGE_LOOP, ORIENTED_EDGE, and applies COLOUR_RGB', () {
+      const stepBrep = '''ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('STEP B-Rep'), '2;1');
+FILE_NAME('brep_face.step', '2026-09-18', ('Author'), ('Org'), 'Processor', 'System', '');
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));
+ENDSEC;
+DATA;
+#1 = CARTESIAN_POINT('', (0.0, 0.0, 0.0));
+#2 = CARTESIAN_POINT('', (50.0, 0.0, 0.0));
+#3 = CARTESIAN_POINT('', (50.0, 30.0, 0.0));
+#4 = CARTESIAN_POINT('', (0.0, 30.0, 0.0));
+
+#11 = VERTEX_POINT('', #1);
+#12 = VERTEX_POINT('', #2);
+#13 = VERTEX_POINT('', #3);
+#14 = VERTEX_POINT('', #4);
+
+#21 = EDGE_CURVE('', #11, #12, #30, .T.);
+#22 = EDGE_CURVE('', #12, #13, #30, .T.);
+#23 = EDGE_CURVE('', #13, #14, #30, .T.);
+#24 = EDGE_CURVE('', #14, #11, #30, .T.);
+#30 = LINE('', #1, #31);
+#31 = VECTOR('', #32, 1.0);
+#32 = DIRECTION('', (1.0, 0.0, 0.0));
+
+#41 = ORIENTED_EDGE('', *, *, #21, .T.);
+#42 = ORIENTED_EDGE('', *, *, #22, .T.);
+#43 = ORIENTED_EDGE('', *, *, #23, .T.);
+#44 = ORIENTED_EDGE('', *, *, #24, .T.);
+
+#50 = EDGE_LOOP('', (#41, #42, #43, #44));
+#60 = FACE_OUTER_BOUND('', #50, .T.);
+#70 = ADVANCED_FACE('TOP_FACE', (#60), #80, .T.);
+#80 = PLANE('', #81);
+#81 = AXIS2_PLACEMENT_3D('', #1, #82, #32);
+#82 = DIRECTION('', (0.0, 0.0, 1.0));
+
+#90 = CLOSED_SHELL('', (#70));
+#100 = MANIFOLD_SOLID_BREP('PLATE', #90);
+
+#200 = STYLED_ITEM('color', (#201), #70);
+#201 = PRESENTATION_STYLE_ASSIGNMENT((#202));
+#202 = SURFACE_STYLE_USAGE(.BOTH., #203);
+#203 = SURFACE_SIDE_STYLE('', (#204));
+#204 = SURFACE_STYLE_FILL_AREA(#205);
+#205 = FILL_AREA_STYLE('', (#206));
+#206 = FILL_AREA_STYLE_COLOUR('', #207);
+#207 = COLOUR_RGB('Green', 0.2, 0.8, 0.3);
+ENDSEC;
+END-ISO-10303-21;
+''';
+
+      final bytes = Uint8List.fromList(utf8.encode(stepBrep));
+      final mesh = StepParser.parseFromBytes(bytes, name: 'brep_face.step');
+
+      expect(mesh.triangles, isNotEmpty);
+      expect(mesh.bounds.sizeX, closeTo(50.0, 0.01));
+      expect(mesh.bounds.sizeY, closeTo(30.0, 0.01));
+      expect(mesh.triangles.first.color, isNotNull);
+      // Verify RGB color (0.2 * 255 = 51, 0.8 * 255 = 204, 0.3 * 255 = 77)
+      final col = mesh.triangles.first.color!;
+      expect((col.r * 255).round(), closeTo(51, 2));
+      expect((col.g * 255).round(), closeTo(204, 2));
+      expect((col.b * 255).round(), closeTo(77, 2));
+    });
+
+    test('StepParser parses real KiCad esp32_board.step assembly if present', () {
+      final file = File(r'H:\My Drive\RABOTNA\KiCAD\RGB_LED_esp32\esp32_board_Full_Production_Package\5_3D_Model\esp32_board.step');
+      if (!file.existsSync()) return;
+
+      final bytes = file.readAsBytesSync();
+      final mesh = StepParser.parseFromBytes(bytes, name: 'esp32_board.step');
+      expect(mesh.triangles.length, greaterThan(5000));
+
+      // Real board width 70mm, height 55mm, component height ~12mm
+      expect(mesh.bounds.sizeX, closeTo(70.0, 0.5));
+      expect(mesh.bounds.sizeY, closeTo(55.0, 0.5));
+      expect(mesh.bounds.sizeZ, closeTo(12.04, 0.5));
+
+      // Triangles have CAD colors assigned
+      final coloredTris = mesh.triangles.where((t) => t.color != null).length;
+      expect(coloredTris, greaterThan(5000));
+    });
   });
+
+
 
   group('IGES 3D Parser Tests', () {
     test('IgesParser parses 80-column records and extracts 3D triangles', () {

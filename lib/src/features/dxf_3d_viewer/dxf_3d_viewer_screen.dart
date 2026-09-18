@@ -31,11 +31,7 @@ class Dxf3DViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
 
-  const Dxf3DViewerScreen({
-    super.key,
-    required this.filePath,
-    this.title,
-  });
+  const Dxf3DViewerScreen({super.key, required this.filePath, this.title});
 
   @override
   State<Dxf3DViewerScreen> createState() => _Dxf3DViewerScreenState();
@@ -75,7 +71,11 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   }
 
   void _requestGpuRender(Size size) {
-    if (!_useGpuAcceleration || !_gpuRenderer.isReady || _mesh == null || size.isEmpty) return;
+    if (!_useGpuAcceleration ||
+        !_gpuRenderer.isReady ||
+        _mesh == null ||
+        size.isEmpty)
+      return;
     if (_isGpuRendering) {
       _pendingGpuRender = true;
       return;
@@ -86,36 +86,40 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
     final modelScale = (math.min(size.width, size.height) * 0.55) / maxDim;
 
-    _gpuRenderer.renderFrame(
-      camera: _camera,
-      viewport: size,
-      modelScale: modelScale,
-      customColor: _customModelColor,
-    ).then((img) {
-      if (!mounted) {
-        img?.dispose();
-        return;
-      }
-      if (img != null) {
-        final old = _gpuImage;
-        setState(() {
-          _gpuImage = img;
+    _gpuRenderer
+        .renderFrame(
+          camera: _camera,
+          viewport: size,
+          modelScale: modelScale,
+          customColor: _customModelColor,
+        )
+        .then((img) {
+          if (!mounted) {
+            img?.dispose();
+            return;
+          }
+          if (img != null) {
+            final old = _gpuImage;
+            setState(() {
+              _gpuImage = img;
+            });
+            old?.dispose();
+          }
+          _isGpuRendering = false;
+          if (_pendingGpuRender && _lastViewportSize != Size.zero) {
+            _requestGpuRender(_lastViewportSize);
+          }
+        })
+        .catchError((_) {
+          _isGpuRendering = false;
         });
-        old?.dispose();
-      }
-      _isGpuRendering = false;
-      if (_pendingGpuRender && _lastViewportSize != Size.zero) {
-        _requestGpuRender(_lastViewportSize);
-      }
-    }).catchError((_) {
-      _isGpuRendering = false;
-    });
   }
 
   @override
   void initState() {
     super.initState();
-    _fileName = widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
+    _fileName =
+        widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
     _load3DModel();
   }
 
@@ -131,7 +135,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         if (mounted) {
           final l10n = AppLocalizations.of(context);
           setState(() {
-            _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+            _errorMessage =
+                l10n?.fileNotFoundOrInaccessible ??
+                'File not found or cannot be accessed.';
             _isLoading = false;
           });
         }
@@ -148,7 +154,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         final ifc = await IfcParser.parseFromFile(widget.filePath);
         _ifcModel = ifc;
         mesh = ifc.toMesh3D();
-      } else if (lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.p21')) {
+      } else if (lower.endsWith('.step') ||
+          lower.endsWith('.stp') ||
+          lower.endsWith('.p21')) {
         mesh = await StepParser.parseFromFile(widget.filePath);
       } else if (lower.endsWith('.iges') || lower.endsWith('.igs')) {
         mesh = await IgesParser.parseFromFile(widget.filePath);
@@ -208,32 +216,50 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         }
       }
     } on FileSystemException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'Dxf3DViewer._loadModel.fs');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'Dxf3DViewer._loadModel.fs',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = l10n?.fileNotFoundOrInaccessible ?? 'File not found or cannot be accessed.';
+          _errorMessage =
+              l10n?.fileNotFoundOrInaccessible ??
+              'File not found or cannot be accessed.';
           _isLoading = false;
         });
       }
     } on ArchiveException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'Dxf3DViewer._loadModel.archive');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'Dxf3DViewer._loadModel.archive',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = l10n?.errorLoading3dModel(e.message) ?? 'Error loading 3D model: ${e.message}';
+          _errorMessage =
+              l10n?.errorLoading3dModel(e.message) ??
+              'Error loading 3D model: ${e.message}';
           _isLoading = false;
         });
       }
     } on FormatException catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'Dxf3DViewer._loadModel.format');
+      AppErrorHandler.recordError(
+        e,
+        stack,
+        context: 'Dxf3DViewer._loadModel.format',
+      );
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
         final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = l10n?.errorLoading3dModel(e.message) ?? 'Error loading 3D model: ${e.message}';
+          _errorMessage =
+              l10n?.errorLoading3dModel(e.message) ??
+              'Error loading 3D model: ${e.message}';
           _isLoading = false;
         });
       }
@@ -241,10 +267,15 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       AppErrorHandler.recordError(e, stack, context: 'Dxf3DViewer._loadModel');
       await RecentFilesService.removeRecentFile(widget.filePath);
       if (mounted) {
-        final cleanMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        final cleanMsg = e.toString().replaceFirst(
+          RegExp(r'^Exception:\s*'),
+          '',
+        );
         final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = l10n?.errorLoading3dModel(cleanMsg) ?? 'Error loading 3D model: $cleanMsg';
+          _errorMessage =
+              l10n?.errorLoading3dModel(cleanMsg) ??
+              'Error loading 3D model: $cleanMsg';
           _isLoading = false;
         });
       }
@@ -339,14 +370,16 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
-    if ((event.buttons & kTertiaryButton) != 0 || (event.buttons & kSecondaryMouseButton) != 0) {
+    if ((event.buttons & kTertiaryButton) != 0 ||
+        (event.buttons & kSecondaryMouseButton) != 0) {
       _mousePanStart = event.position;
     }
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
     if (_mousePanStart != null &&
-        ((event.buttons & kTertiaryButton) != 0 || (event.buttons & kSecondaryMouseButton) != 0)) {
+        ((event.buttons & kTertiaryButton) != 0 ||
+            (event.buttons & kSecondaryMouseButton) != 0)) {
       final delta = event.position - _mousePanStart!;
       _mousePanStart = event.position;
       setState(() {
@@ -425,7 +458,10 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     color: theme.colorScheme.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.analytics_outlined, color: theme.colorScheme.primary),
+                  child: Icon(
+                    Icons.analytics_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -434,11 +470,17 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                     children: [
                       const Text(
                         '3D Model • Properties',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         _fileName,
-                        style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.textTheme.bodySmall?.color,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -449,7 +491,8 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
             const Divider(height: 24),
             _buildMetricTile(
               label: '3D Dimensions (X × Y × Z):',
-              value: '${_formatDimension(bounds.sizeX)}  ×  ${_formatDimension(bounds.sizeY)}  ×  ${_formatDimension(bounds.sizeZ)}',
+              value:
+                  '${_formatDimension(bounds.sizeX)}  ×  ${_formatDimension(bounds.sizeY)}  ×  ${_formatDimension(bounds.sizeZ)}',
               icon: Icons.crop_free_rounded,
               valueOnNewLine: true,
             ),
@@ -488,7 +531,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5.0),
       child: Row(
-        crossAxisAlignment: valueOnNewLine ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment: valueOnNewLine
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.center,
         children: [
           Icon(icon, size: 18, color: Colors.grey),
           const SizedBox(width: 10),
@@ -497,19 +542,41 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       const SizedBox(height: 3),
                       Text(
                         value,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF)),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF00E5FF),
+                        ),
                       ),
                     ],
                   )
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                      Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
           ),
@@ -519,10 +586,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   }
 
   void _shareFile() {
-    Share.shareXFiles(
-      [XFile(widget.filePath)],
-      subject: _fileName,
-    );
+    Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
   void _openBimSheet() {
@@ -582,286 +646,407 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
           preferredSize: const Size.fromHeight(44),
           child: Container(
             height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.white10
+                      : Colors.black12,
                 ),
               ),
             ),
-            child: Row(
-              children: [
-                // Interaction Mode Segmented Switch: Orbit (Rotate) vs Pan (Drag)
-                Container(
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: theme.brightness == Brightness.dark ? Colors.white12 : Colors.black12,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: math.max(0.0, constraints.maxWidth - 24.0),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildModeButton(
-                        icon: Icons.threed_rotation_rounded,
-                        tooltip: '${l10n.orbitMode} (${l10n.rotateModelTooltip})',
-                        isSelected: _interactionMode == Cad3DInteractionMode.orbit,
-                        onTap: () => _setInteractionMode(Cad3DInteractionMode.orbit),
-                        theme: theme,
-                      ),
-                      _buildModeButton(
-                        icon: Icons.pan_tool_rounded,
-                        tooltip: '${l10n.dragMode} (${l10n.dragModelTooltip})',
-                        isSelected: _interactionMode == Cad3DInteractionMode.pan,
-                        onTap: () => _setInteractionMode(Cad3DInteractionMode.pan),
-                        theme: theme,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Quick Views Menu & Controls
-                PopupMenuButton<dynamic>(
-                  icon: const Icon(Icons.videocam_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Camera View',
-                  onSelected: (val) {
-                    if (val is Cad3DViewPreset) {
-                      _setViewPreset(val);
-                    } else if (val == 'toggle_invert_y') {
-                      HapticFeedback.selectionClick();
-                      setState(() {
-                        _camera.invertY = !_camera.invertY;
-                      });
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    ...Cad3DViewPreset.values.map((v) {
-                      return PopupMenuItem<dynamic>(
-                        value: v,
-                        child: Row(
-                          children: [
-                            Icon(v.icon, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 10),
-                            Text(v.label),
-                          ],
-                        ),
-                      );
-                    }),
-                    const PopupMenuDivider(),
-                    PopupMenuItem<dynamic>(
-                      value: 'toggle_invert_y',
-                      child: Row(
-                        children: [
-                          Icon(
-                            _camera.invertY ? Icons.swap_vert_rounded : Icons.swap_vert_outlined,
-                            size: 18,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 10),
-                          const Text('Invert Up/Down (Y)'),
-                          const Spacer(),
-                          if (_camera.invertY)
-                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Model Color / Material Menu
-                PopupMenuButton<Color?>(
-                  icon: const Icon(Icons.format_paint_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Model Color',
-                  onSelected: (c) {
-                    setState(() => _customModelColor = c);
-                    if (_useGpuAcceleration && _lastViewportSize != Size.zero) {
-                      _requestGpuRender(_lastViewportSize);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem<Color?>(
-                      value: null,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: _theme.defaultMeshColor,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey, width: 1),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Interaction Mode Segmented Switch: Orbit (Rotate) vs Pan (Drag)
+                        Container(
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: theme.brightness == Brightness.dark
+                                  ? Colors.white12
+                                  : Colors.black12,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          const Text('Theme Default'),
-                          if (_customModelColor == null) ...[
-                            const Spacer(),
-                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                          ],
-                        ],
-                      ),
-                    ),
-                    ...[
-                      ('CAD Blue', const Color(0xFF3B82F6)),
-                      ('Titanium Silver', const Color(0xFFCBD5E1)),
-                      ('Steel Slate', const Color(0xFF94A3B8)),
-                      ('Studio White', const Color(0xFFF8FAFC)),
-                      ('Amber Gold', const Color(0xFFF59E0B)),
-                      ('Cyber Cyan', const Color(0xFF06B6D4)),
-                      ('Emerald Green', const Color(0xFF10B981)),
-                      ('Crimson Red', const Color(0xFFEF4444)),
-                      ('Graphite Charcoal', const Color(0xFF475569)),
-                    ].map((entry) {
-                      final (name, col) = entry;
-                      return PopupMenuItem<Color?>(
-                        value: col,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 16,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                color: col,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.grey, width: 1),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildModeButton(
+                                icon: Icons.threed_rotation_rounded,
+                                tooltip:
+                                    '${l10n.orbitMode} (${l10n.rotateModelTooltip})',
+                                isSelected:
+                                    _interactionMode ==
+                                    Cad3DInteractionMode.orbit,
+                                onTap: () => _setInteractionMode(
+                                  Cad3DInteractionMode.orbit,
+                                ),
+                                theme: theme,
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(name),
-                            if (_customModelColor == col) ...[
-                              const Spacer(),
-                              Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                              _buildModeButton(
+                                icon: Icons.pan_tool_rounded,
+                                tooltip:
+                                    '${l10n.dragMode} (${l10n.dragModelTooltip})',
+                                isSelected:
+                                    _interactionMode ==
+                                    Cad3DInteractionMode.pan,
+                                onTap: () => _setInteractionMode(
+                                  Cad3DInteractionMode.pan,
+                                ),
+                                theme: theme,
+                              ),
                             ],
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        // Action Controls Row
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Quick Views Menu & Controls
+                            PopupMenuButton<dynamic>(
+                              icon: const Icon(
+                                Icons.videocam_outlined,
+                                size: 20,
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 38,
+                                minHeight: 38,
+                              ),
+                              tooltip: 'Camera View',
+                              onSelected: (val) {
+                                if (val is Cad3DViewPreset) {
+                                  _setViewPreset(val);
+                                } else if (val == 'toggle_invert_y') {
+                                  HapticFeedback.selectionClick();
+                                  setState(() {
+                                    _camera.invertY = !_camera.invertY;
+                                  });
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                ...Cad3DViewPreset.values.map((v) {
+                                  return PopupMenuItem<dynamic>(
+                                    value: v,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          v.icon,
+                                          size: 18,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text(v.label),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                                const PopupMenuDivider(),
+                                PopupMenuItem<dynamic>(
+                                  value: 'toggle_invert_y',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        _camera.invertY
+                                            ? Icons.swap_vert_rounded
+                                            : Icons.swap_vert_outlined,
+                                        size: 18,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Text('Invert Up/Down (Y)'),
+                                      const Spacer(),
+                                      if (_camera.invertY)
+                                        Icon(
+                                          Icons.check,
+                                          size: 18,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // Model Color / Material Menu
+                            PopupMenuButton<Color?>(
+                              icon: const Icon(
+                                Icons.format_paint_outlined,
+                                size: 20,
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 38,
+                                minHeight: 38,
+                              ),
+                              tooltip: 'Model Color',
+                              onSelected: (c) {
+                                setState(() => _customModelColor = c);
+                                if (_useGpuAcceleration &&
+                                    _lastViewportSize != Size.zero) {
+                                  _requestGpuRender(_lastViewportSize);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem<Color?>(
+                                  value: null,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 16,
+                                        height: 16,
+                                        decoration: BoxDecoration(
+                                          color: _theme.defaultMeshColor,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width: 1,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Text('Theme Default'),
+                                      if (_customModelColor == null) ...[
+                                        const Spacer(),
+                                        Icon(
+                                          Icons.check,
+                                          size: 18,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                ...[
+                                  ('CAD Blue', const Color(0xFF3B82F6)),
+                                  ('Titanium Silver', const Color(0xFFCBD5E1)),
+                                  ('Steel Slate', const Color(0xFF94A3B8)),
+                                  ('Studio White', const Color(0xFFF8FAFC)),
+                                  ('Amber Gold', const Color(0xFFF59E0B)),
+                                  ('Cyber Cyan', const Color(0xFF06B6D4)),
+                                  ('Emerald Green', const Color(0xFF10B981)),
+                                  ('Crimson Red', const Color(0xFFEF4444)),
+                                  (
+                                    'Graphite Charcoal',
+                                    const Color(0xFF475569),
+                                  ),
+                                ].map((entry) {
+                                  final (name, col) = entry;
+                                  return PopupMenuItem<Color?>(
+                                    value: col,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 16,
+                                          height: 16,
+                                          decoration: BoxDecoration(
+                                            color: col,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.grey,
+                                              width: 1,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text(name),
+                                        if (_customModelColor == col) ...[
+                                          const Spacer(),
+                                          Icon(
+                                            Icons.check,
+                                            size: 18,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+
+                            // Shading Mode Menu
+                            PopupMenuButton<Cad3DShadingMode>(
+                              icon: Icon(_shadingMode.icon, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 38,
+                                minHeight: 38,
+                              ),
+                              tooltip: 'Rendering Mode',
+                              onSelected: (m) =>
+                                  setState(() => _shadingMode = m),
+                              itemBuilder: (context) =>
+                                  Cad3DShadingMode.values.map((m) {
+                                    return PopupMenuItem<Cad3DShadingMode>(
+                                      value: m,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            m.icon,
+                                            size: 18,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Text(m.label),
+                                          if (_shadingMode == m) ...[
+                                            const Spacer(),
+                                            Icon(
+                                              Icons.check,
+                                              size: 18,
+                                              color: theme.colorScheme.primary,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
+
+                            // Canvas Theme Menu
+                            PopupMenuButton<Cad3DTheme>(
+                              icon: const Icon(
+                                Icons.palette_outlined,
+                                size: 20,
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 38,
+                                minHeight: 38,
+                              ),
+                              tooltip: 'Theme',
+                              onSelected: (t) => setState(() => _theme = t),
+                              itemBuilder: (context) =>
+                                  Cad3DTheme.values.map((t) {
+                                    return PopupMenuItem<Cad3DTheme>(
+                                      value: t,
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 16,
+                                            height: 16,
+                                            decoration: BoxDecoration(
+                                              color: t.background,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.grey,
+                                                width: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Text(t.label),
+                                          if (_theme == t) ...[
+                                            const Spacer(),
+                                            Icon(
+                                              Icons.check,
+                                              size: 18,
+                                              color: theme.colorScheme.primary,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
+
+                            // Hardware GPU Depth-Buffer Acceleration Toggle
+                            if (_gpuRenderer.bindings.isAvailable)
+                              IconButton(
+                                icon: Icon(
+                                  _useGpuAcceleration
+                                      ? Icons.speed_rounded
+                                      : Icons.speed_outlined,
+                                  size: 20,
+                                  color: _useGpuAcceleration
+                                      ? const Color(0xFF00E5FF)
+                                      : Colors.grey,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 38,
+                                  minHeight: 38,
+                                ),
+                                tooltip: _useGpuAcceleration
+                                    ? 'Hardware GPU Depth Buffer (Active)'
+                                    : 'Hardware GPU Depth Buffer (Off - Canvas Fallback)',
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() {
+                                    _useGpuAcceleration = !_useGpuAcceleration;
+                                    if (!_useGpuAcceleration) {
+                                      _gpuImage = null;
+                                    }
+                                  });
+                                  if (_useGpuAcceleration &&
+                                      _lastViewportSize != Size.zero) {
+                                    _requestGpuRender(_lastViewportSize);
+                                  }
+                                },
+                              ),
+
+                            // BIM Storeys & Categories (when IFC model is loaded)
+                            if (_ifcModel != null)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.apartment_rounded,
+                                  size: 20,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 38,
+                                  minHeight: 38,
+                                ),
+                                color: const Color(0xFF00E5FF),
+                                tooltip: l10n.bimStoreysAndCategories,
+                                onPressed: _openBimSheet,
+                              ),
+
+                            // 3D Model Info & Metrics
+                            IconButton(
+                              icon: const Icon(Icons.info_outline, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 38,
+                                minHeight: 38,
+                              ),
+                              tooltip: l10n.properties3d,
+                              onPressed: _showMetricsSheet,
+                            ),
+
+                            // Share
+                            IconButton(
+                              icon: const Icon(Icons.share_outlined, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 38,
+                                minHeight: 38,
+                              ),
+                              tooltip: l10n.share,
+                              onPressed: _shareFile,
+                            ),
                           ],
                         ),
-                      );
-                    }),
-                  ],
-                ),
-
-                // Shading Mode Menu
-                PopupMenuButton<Cad3DShadingMode>(
-                  icon: Icon(_shadingMode.icon, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Rendering Mode',
-                  onSelected: (m) => setState(() => _shadingMode = m),
-                  itemBuilder: (context) => Cad3DShadingMode.values.map((m) {
-                    return PopupMenuItem<Cad3DShadingMode>(
-                      value: m,
-                      child: Row(
-                        children: [
-                          Icon(m.icon, size: 18, color: theme.colorScheme.primary),
-                          const SizedBox(width: 10),
-                          Text(m.label),
-                          if (_shadingMode == m) ...[
-                            const Spacer(),
-                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                          ],
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-                // Canvas Theme Menu
-                PopupMenuButton<Cad3DTheme>(
-                  icon: const Icon(Icons.palette_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Theme',
-                  onSelected: (t) => setState(() => _theme = t),
-                  itemBuilder: (context) => Cad3DTheme.values.map((t) {
-                    return PopupMenuItem<Cad3DTheme>(
-                      value: t,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: t.background,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey, width: 1),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(t.label),
-                          if (_theme == t) ...[
-                            const Spacer(),
-                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                          ],
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-                // Hardware GPU Depth-Buffer Acceleration Toggle
-                if (_gpuRenderer.bindings.isAvailable)
-                  IconButton(
-                    icon: Icon(
-                      _useGpuAcceleration ? Icons.speed_rounded : Icons.speed_outlined,
-                      size: 20,
-                      color: _useGpuAcceleration ? const Color(0xFF00E5FF) : Colors.grey,
+                      ],
                     ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _useGpuAcceleration
-                        ? 'Hardware GPU Depth Buffer (Active)'
-                        : 'Hardware GPU Depth Buffer (Off - Canvas Fallback)',
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      setState(() {
-                        _useGpuAcceleration = !_useGpuAcceleration;
-                        if (!_useGpuAcceleration) {
-                          _gpuImage = null;
-                        }
-                      });
-                      if (_useGpuAcceleration && _lastViewportSize != Size.zero) {
-                        _requestGpuRender(_lastViewportSize);
-                      }
-                    },
                   ),
-
-                // BIM Storeys & Categories (when IFC model is loaded)
-                if (_ifcModel != null)
-                  IconButton(
-                    icon: const Icon(Icons.apartment_rounded, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    color: const Color(0xFF00E5FF),
-                    tooltip: l10n.bimStoreysAndCategories,
-                    onPressed: _openBimSheet,
-                  ),
-
-                // 3D Model Info & Metrics
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: l10n.properties3d,
-                  onPressed: _showMetricsSheet,
-                ),
-
-                // Share
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: l10n.share,
-                  onPressed: _shareFile,
-                ),
-              ],
+                );
+              },
             ),
           ),
         ),
@@ -888,7 +1073,11 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.redAccent,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       _errorMessage ?? l10n.failedToParse3dMesh,
@@ -907,7 +1096,10 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
             );
           }
 
-          final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+          final viewportSize = Size(
+            constraints.maxWidth,
+            constraints.maxHeight,
+          );
           if (_lastViewportSize != viewportSize) {
             _lastViewportSize = viewportSize;
             if (_useGpuAcceleration && _gpuRenderer.isReady && _mesh != null) {
@@ -932,10 +1124,12 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   onDoubleTap: _resetView,
                   child: MouseRegion(
                     cursor: _isInteracting
-                        ? (_isPanActive ? SystemMouseCursors.grabbing : SystemMouseCursors.move)
+                        ? (_isPanActive
+                              ? SystemMouseCursors.grabbing
+                              : SystemMouseCursors.move)
                         : (_interactionMode == Cad3DInteractionMode.pan
-                            ? SystemMouseCursors.grab
-                            : SystemMouseCursors.basic),
+                              ? SystemMouseCursors.grab
+                              : SystemMouseCursors.basic),
                     child: CustomPaint(
                       size: Size(constraints.maxWidth, constraints.maxHeight),
                       painter: Cad3DMeshPainter(
@@ -964,12 +1158,17 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                       onTap: _toggleInteractionMode,
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: const Color(0xFF00E5FF).withValues(alpha: 0.8),
+                            color: const Color(
+                              0xFF00E5FF,
+                            ).withValues(alpha: 0.8),
                             width: 1.2,
                           ),
                           boxShadow: [
@@ -983,7 +1182,11 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.pan_tool_rounded, size: 15, color: Color(0xFF00E5FF)),
+                            const Icon(
+                              Icons.pan_tool_rounded,
+                              size: 15,
+                              color: Color(0xFF00E5FF),
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               l10n.dragModeActive,
@@ -1063,16 +1266,23 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF00E5FF).withValues(alpha: 0.2) : Colors.transparent,
+            color: isSelected
+                ? const Color(0xFF00E5FF).withValues(alpha: 0.2)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(7),
             border: isSelected
-                ? Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.6), width: 1)
+                ? Border.all(
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                    width: 1,
+                  )
                 : null,
           ),
           child: Icon(
             icon,
             size: 18,
-            color: isSelected ? const Color(0xFF00E5FF) : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            color: isSelected
+                ? const Color(0xFF00E5FF)
+                : theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
       ),

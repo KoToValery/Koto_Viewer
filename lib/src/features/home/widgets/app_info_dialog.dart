@@ -88,8 +88,12 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
             Container(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                color: isDark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF1F5F9),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: Row(
                 children: [
@@ -100,7 +104,9 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.12),
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.4 : 0.12,
+                          ),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -113,7 +119,11 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => Container(
                           color: theme.colorScheme.primary,
-                          child: const Icon(Icons.architecture_rounded, color: Colors.white, size: 30),
+                          child: const Icon(
+                            Icons.architecture_rounded,
+                            color: Colors.white,
+                            size: 30,
+                          ),
                         ),
                       ),
                     ),
@@ -137,12 +147,19 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2.5,
+                              ),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.25 : 0.12),
+                                color: theme.colorScheme.primary.withValues(
+                                  alpha: isDark ? 0.25 : 0.12,
+                                ),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.5 : 0.3),
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: isDark ? 0.5 : 0.3,
+                                  ),
                                   width: 1,
                                 ),
                               ),
@@ -181,7 +198,10 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
             // Scrollable Content
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -191,19 +211,26 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.45,
-                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                        color: isDark
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFF334155),
                       ),
                     ),
                     const SizedBox(height: 16),
 
                     // Supported Formats Categories
-                    _buildSectionHeader('Supported Formats & Engines', Icons.category_rounded, theme),
+                    _buildSectionHeader(
+                      'Supported Formats & Engines',
+                      Icons.category_rounded,
+                      theme,
+                    ),
                     const SizedBox(height: 8),
                     _buildFeatureCard(
                       icon: Icons.draw_rounded,
                       title: '2D CAD & Engineering Drawings',
                       formats: ['DXF', 'DWG (LibreDWG)', 'HPGL / PLT', 'SVG'],
-                      description: 'Full AutoCAD layer control, precision snap, area hatching, and BGS 2005 / WGS 84 / UTM coordinate transformation.',
+                      description:
+                          'Full AutoCAD layer control, precision snap, area hatching, and BGS 2005 / WGS 84 / UTM coordinate transformation.',
                       color: const Color(0xFF0284C7),
                       isDark: isDark,
                     ),
@@ -211,8 +238,18 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildFeatureCard(
                       icon: Icons.view_in_ar_rounded,
                       title: '3D CAD Models & BIM',
-                      formats: ['STEP (.stp, .p21)', 'IGES (.igs)', 'STL', 'IFC (BIM)', 'OBJ', 'GLTF / GLB', 'FBX', '3MF'],
-                      description: 'GPU-accelerated 3D orbital camera, wireframe/shaded modes, and BIM building elements inspector.',
+                      formats: [
+                        'STEP (.stp, .p21)',
+                        'IGES (.igs)',
+                        'STL',
+                        'IFC (BIM)',
+                        'OBJ',
+                        'GLTF / GLB',
+                        'FBX',
+                        '3MF',
+                      ],
+                      description:
+                          'GPU-accelerated 3D orbital camera, wireframe/shaded modes, and BIM building elements inspector.',
                       color: const Color(0xFF7C3AED),
                       isDark: isDark,
                     ),
@@ -221,7 +258,8 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                       icon: Icons.medical_services_rounded,
                       title: 'Medical Imaging & Healthcare',
                       formats: ['DICOM (.dcm, .dicom)', 'DICOMDIR'],
-                      description: 'Diagnostic medical viewer with window level presets (CT Bone, Lung, Soft Tissue, Brain), multi-frame playback, and metadata inspector.',
+                      description:
+                          'Diagnostic medical viewer with window level presets (CT Bone, Lung, Soft Tissue, Brain), multi-frame playback, and metadata inspector.',
                       color: const Color(0xFF0EA5E9),
                       isDark: isDark,
                     ),
@@ -229,8 +267,14 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildFeatureCard(
                       icon: Icons.memory_rounded,
                       title: 'PCB Electronics & Manufacturing',
-                      formats: ['Gerber RS-274X', 'Excellon Drill', 'KiCad (.kicad_pcb, .kicad_sch)', 'ZIP Archives (Altium, Eagle, EasyEDA)'],
-                      description: 'Composite multi-layer board stackup, drill hole mapping, solder mask toggles, and standardized copper colors.',
+                      formats: [
+                        'Gerber RS-274X',
+                        'Excellon Drill',
+                        'KiCad (.kicad_pcb, .kicad_sch)',
+                        'ZIP Archives (Altium, Eagle, EasyEDA)',
+                      ],
+                      description:
+                          'Composite multi-layer board stackup, drill hole mapping, solder mask toggles, and standardized copper colors.',
                       color: const Color(0xFF059669),
                       isDark: isDark,
                     ),
@@ -239,7 +283,8 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                       icon: Icons.terrain_rounded,
                       title: 'GIS, GPS & Route Maps',
                       formats: ['GPX', 'KML', 'KMZ', 'GeoJSON'],
-                      description: 'Interactive maps with track profiling, waypoints, elevation charts, and GPS navigation telemetry.',
+                      description:
+                          'Interactive maps with track profiling, waypoints, elevation charts, and GPS navigation telemetry.',
                       color: const Color(0xFF10B981),
                       isDark: isDark,
                     ),
@@ -248,7 +293,8 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                       icon: Icons.brush_rounded,
                       title: 'Vector Graphics',
                       formats: ['CorelDRAW (.cdr)', 'Adobe EPS (.eps)', 'SVG'],
-                      description: 'Native RIFF and PostScript vector path rasterization and color palette extraction.',
+                      description:
+                          'Native RIFF and PostScript vector path rasterization and color palette extraction.',
                       color: const Color(0xFFEA580C),
                       isDark: isDark,
                     ),
@@ -256,8 +302,17 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildFeatureCard(
                       icon: Icons.image_rounded,
                       title: 'Raster Images & Photos',
-                      formats: ['PNG', 'JPG / JPEG', 'WEBP', 'GIF', 'BMP', 'Photoshop (.psd, .psb)', 'ICO'],
-                      description: 'High-resolution photo viewing with smooth pinch-zoom and layered PSD/ICO previews.',
+                      formats: [
+                        'PNG',
+                        'JPG / JPEG',
+                        'WEBP',
+                        'GIF',
+                        'BMP',
+                        'Photoshop (.psd, .psb)',
+                        'ICO',
+                      ],
+                      description:
+                          'High-resolution photo viewing with smooth pinch-zoom and layered PSD/ICO previews.',
                       color: const Color(0xFFEC4899),
                       isDark: isDark,
                     ),
@@ -265,8 +320,19 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildFeatureCard(
                       icon: Icons.description_rounded,
                       title: 'Office & Text Documents',
-                      formats: ['PDF', 'Word (.docx, .doc)', 'Excel (.xlsx, .xls)', 'PowerPoint (.pptx, .ppt)', 'CSV / TSV', 'Jupyter (.ipynb)', 'Markdown (.md)', 'TXT', 'RTF'],
-                      description: 'Hardware-accelerated PDF engine, formatted Word XML, Excel spreadsheet grid with formulas, interactive Jupyter cells, and presentation slides.',
+                      formats: [
+                        'PDF',
+                        'Word (.docx, .doc)',
+                        'Excel (.xlsx, .xls)',
+                        'PowerPoint (.pptx, .ppt)',
+                        'CSV / TSV',
+                        'Jupyter (.ipynb)',
+                        'Markdown (.md)',
+                        'TXT',
+                        'RTF',
+                      ],
+                      description:
+                          'Hardware-accelerated PDF engine, formatted Word XML, Excel spreadsheet grid with formulas, interactive Jupyter cells, and presentation slides.',
                       color: const Color(0xFFD97706),
                       isDark: isDark,
                     ),
@@ -274,8 +340,15 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildFeatureCard(
                       icon: Icons.menu_book_rounded,
                       title: 'E-Books & Digital Comics',
-                      formats: ['EPUB', 'FB2 (.fb2, .fb2.zip)', 'CBZ', 'CBR', 'CBT'],
-                      description: 'Digital book reader with chapter navigation, reflowable text layout, and comic archive strip viewer.',
+                      formats: [
+                        'EPUB',
+                        'FB2 (.fb2, .fb2.zip)',
+                        'CBZ',
+                        'CBR',
+                        'CBT',
+                      ],
+                      description:
+                          'Digital book reader with chapter navigation, reflowable text layout, and comic archive strip viewer.',
                       color: const Color(0xFF8B5CF6),
                       isDark: isDark,
                     ),
@@ -283,8 +356,23 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildFeatureCard(
                       icon: Icons.code_rounded,
                       title: 'Source Code & Developer Files',
-                      formats: ['Dart', 'Python', 'C/C++', 'JS/TS', 'Java', 'Kotlin', 'Swift', 'Rust', 'Go', 'SQL', 'Docker', 'YAML', 'JSON'],
-                      description: 'Syntax-highlighted code viewer for 30+ programming and configuration languages with line numbering and code structure.',
+                      formats: [
+                        'Dart',
+                        'Python',
+                        'C/C++',
+                        'JS/TS',
+                        'Java',
+                        'Kotlin',
+                        'Swift',
+                        'Rust',
+                        'Go',
+                        'SQL',
+                        'Docker',
+                        'YAML',
+                        'JSON',
+                      ],
+                      description:
+                          'Syntax-highlighted code viewer for 30+ programming and configuration languages with line numbering and code structure.',
                       color: const Color(0xFF6366F1),
                       isDark: isDark,
                     ),
@@ -292,35 +380,58 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     _buildFeatureCard(
                       icon: Icons.font_download_rounded,
                       title: 'Typography & Motion',
-                      formats: ['TTF', 'OTF', 'WOFF', 'WOFF2', 'Lottie (.lottie)'],
-                      description: 'Interactive font specimen typography previews, glyph tables, and smooth vector Lottie animation playback.',
+                      formats: [
+                        'TTF',
+                        'OTF',
+                        'WOFF',
+                        'WOFF2',
+                        'Lottie (.lottie)',
+                      ],
+                      description:
+                          'Interactive font specimen typography previews, glyph tables, and smooth vector Lottie animation playback.',
                       color: const Color(0xFF14B8A6),
                       isDark: isDark,
                     ),
                     const SizedBox(height: 16),
 
                     // License & Open Source
-                    _buildSectionHeader('Open Source & Licensing', Icons.verified_user_rounded, theme),
+                    _buildSectionHeader(
+                      'Open Source & Licensing',
+                      Icons.verified_user_rounded,
+                      theme,
+                    ),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
                         ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildBulletPoint('Licensed under GNU General Public License v3.0 (GPLv3)'),
+                          _buildBulletPoint(
+                            'Licensed under GNU General Public License v3.0 (GPLv3)',
+                          ),
                           const SizedBox(height: 4),
-                          _buildBulletPoint('100% Free and Open Source Software (FOSS)'),
+                          _buildBulletPoint(
+                            '100% Free and Open Source Software (FOSS)',
+                          ),
                           const SizedBox(height: 4),
-                          _buildBulletPoint('DWG conversion powered by GNU LibreDWG'),
+                          _buildBulletPoint(
+                            'DWG conversion powered by GNU LibreDWG',
+                          ),
                           const SizedBox(height: 4),
-                          _buildBulletPoint('No cloud dependencies • 100% Offline & Private'),
+                          _buildBulletPoint(
+                            'No cloud dependencies • 100% Offline & Private',
+                          ),
                         ],
                       ),
                     ),
@@ -333,64 +444,120 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                color: isDark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF1F5F9),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(24),
+                ),
               ),
-              child: Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      showLicensePage(
-                        context: context,
-                        applicationName: 'KoToViewer',
-                        applicationVersion: versionText,
-                        applicationIcon: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.asset('assets/icons/app_icon.png', width: 36, height: 36),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 370) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildLicensesButton(context, versionText),
+                              const SizedBox(width: 8),
+                              _buildLogsButton(context),
+                              const SizedBox(width: 8),
+                              _buildGitHubButton(),
+                            ],
+                          ),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.article_outlined, size: 16),
-                    label: const Text('Licenses', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => ErrorLogDialog.show(context),
-                    icon: const Icon(Icons.bug_report_outlined, size: 16),
-                    label: const Text('Logs', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: _openGitHub,
-                    icon: const Icon(Icons.code_rounded, size: 16),
-                    label: const Text('GitHub', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Close', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  ),
-                ],
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _buildCloseButton(context),
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      _buildLicensesButton(context, versionText),
+                      const SizedBox(width: 8),
+                      _buildLogsButton(context),
+                      const SizedBox(width: 8),
+                      _buildGitHubButton(),
+                      const Spacer(),
+                      _buildCloseButton(context),
+                    ],
+                  );
+                },
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLicensesButton(BuildContext context, String versionText) {
+    return OutlinedButton.icon(
+      onPressed: () {
+        showLicensePage(
+          context: context,
+          applicationName: 'KoToViewer',
+          applicationVersion: versionText,
+          applicationIcon: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              'assets/icons/app_icon.png',
+              width: 36,
+              height: 36,
+            ),
+          ),
+        );
+      },
+      icon: const Icon(Icons.article_outlined, size: 16),
+      label: const Text('Licenses', style: TextStyle(fontSize: 12)),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Widget _buildLogsButton(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: () => ErrorLogDialog.show(context),
+      icon: const Icon(Icons.bug_report_outlined, size: 16),
+      label: const Text('Logs', style: TextStyle(fontSize: 12)),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Widget _buildGitHubButton() {
+    return OutlinedButton.icon(
+      onPressed: _openGitHub,
+      icon: const Icon(Icons.code_rounded, size: 16),
+      label: const Text('GitHub', style: TextStyle(fontSize: 12)),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Widget _buildCloseButton(BuildContext context) {
+    return FilledButton(
+      onPressed: () => Navigator.of(context).pop(),
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: const Text(
+        'Close',
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -400,12 +567,14 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
       children: [
         Icon(icon, size: 16, color: theme.colorScheme.primary),
         const SizedBox(width: 6),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.2,
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.2,
+            ),
           ),
         ),
       ],
@@ -458,7 +627,10 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                   runSpacing: 4,
                   children: formats.map((f) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: isDark ? 0.18 : 0.08),
                         borderRadius: BorderRadius.circular(6),
@@ -496,7 +668,10 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('• ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        const Text(
+          '• ',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        ),
         Expanded(
           child: Text(
             text,
