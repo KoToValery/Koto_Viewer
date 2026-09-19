@@ -654,8 +654,8 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                           : null,
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: SvgPicture.file(
-                      File(widget.filePath),
+                    child: SvgPicture.string(
+                      _svgContent,
                       width: svgWidth,
                       height: svgHeight,
                       fit: BoxFit.contain,
@@ -666,25 +666,16 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       ),
-                      errorBuilder: (context, error, stackTrace) {
-                        debugPrint('[SVG_VIEWER] SvgPicture.file error: $error, falling back to SvgPicture.string');
-                        return SvgPicture.string(
-                          _svgContent,
-                          width: svgWidth,
-                          height: svgHeight,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, strErr, strStack) {
-                            return Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Text(
-                                  'Error rendering SVG: $strErr',
-                                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            );
-                          },
+                      errorBuilder: (context, strErr, strStack) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              'Error rendering SVG: $strErr',
+                              style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         );
                       },
                     ),

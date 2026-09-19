@@ -66,7 +66,7 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
-    _fileName = widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
+    _fileName = widget.title ?? widget.filePath.split(RegExp(r'[/\\]')).last;
     _loadRouteFile();
   }
 
@@ -208,8 +208,12 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
       return;
     }
 
+    // Request compass permission immediately during user gesture (required for iOS Safari & PWA)
+    final compassFuture = LocationCompassService.requestCompassPermission();
+
     // Request permission on-demand
     final state = await LocationCompassService.requestPermission();
+    await compassFuture;
     if (!mounted) return;
 
     if (state == LocationPermissionState.granted) {
@@ -694,7 +698,9 @@ class _RouteViewerScreenState extends State<RouteViewerScreen> with SingleTicker
           height: 80,
           child: GestureDetector(
             onTap: () {
-              if (_isCompassUnreliable) {
+              if (_currentHeading == null) {
+                LocationCompassService.requestCompassPermission();
+              } else if (_isCompassUnreliable) {
                 CompassCalibrationDialog.show(context);
               }
             },

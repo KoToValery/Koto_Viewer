@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../core/errors/app_error_handler.dart';
+import 'web_compass/web_compass.dart';
 
 enum LocationPermissionState {
   granted,
@@ -16,7 +18,7 @@ enum LocationPermissionState {
 class LocationCompassService {
   /// Check if location is permitted without prompting the user.
   static Future<LocationPermissionState> checkPermission() async {
-    if (!Platform.isAndroid && !Platform.isIOS) {
+    if (!kIsWeb && !Platform.isAndroid && !Platform.isIOS) {
       // Basic check for desktop / unsupported
       return LocationPermissionState.granted;
     }
@@ -49,7 +51,7 @@ class LocationCompassService {
 
   /// Request location permission on-demand (when user taps My Location).
   static Future<LocationPermissionState> requestPermission() async {
-    if (!Platform.isAndroid && !Platform.isIOS) {
+    if (!kIsWeb && !Platform.isAndroid && !Platform.isIOS) {
       return LocationPermissionState.granted;
     }
 
@@ -125,11 +127,24 @@ class LocationCompassService {
     }
   }
 
+  /// Request compass permission (specifically required on iOS 13+ Safari & iOS PWA).
+  /// Should be invoked directly from a user gesture (e.g. tapping the location button).
+  static Future<bool> requestCompassPermission() async {
+    if (kIsWeb) {
+      return await WebCompassPlatform.requestPermission();
+    }
+    return true;
+  }
+
   /// Stream compass events with deadband filtering to prevent jitter and excessive rebuilds.
   /// Only emits when heading changes by at least [minDeltaDegrees] (default: 2.5°).
   static Stream<CompassHeadingData>? getFilteredCompassStream({
     double minDeltaDegrees = 2.5,
   }) {
+    if (kIsWeb) {
+      return WebCompassPlatform.getCompassStream(minDeltaDegrees: minDeltaDegrees);
+    }
+
     try {
       double? lastEmittedHeading;
       return FlutterCompass.events
