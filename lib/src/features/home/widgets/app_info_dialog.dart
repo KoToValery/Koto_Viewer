@@ -271,7 +271,7 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                         'Gerber RS-274X',
                         'Excellon Drill',
                         'KiCad (.kicad_pcb, .kicad_sch)',
-                        'ZIP Archives (Altium, Eagle, EasyEDA)',
+                        'ZIP Archives (Proteus, KiCad, FreeCAD, Altium, Eagle, EasyEDA)',
                       ],
                       description:
                           'Composite multi-layer board stackup, drill hole mapping, solder mask toggles, and standardized copper colors.',

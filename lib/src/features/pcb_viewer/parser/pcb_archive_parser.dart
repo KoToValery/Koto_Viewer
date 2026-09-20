@@ -1,21 +1,116 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
+import '../../../core/errors/app_error_handler.dart';
 import '../../kicad_viewer/parser/kicad_pcb_parser.dart';
 import '../models/pcb_models.dart';
 import '../services/pcb_pad_numbering_service.dart';
 import 'gerber_parser.dart';
 import 'drill_parser.dart';
 
-/// High-performance parser for multi-layer PCB archives (.ZIP) from Proteus ARES, Altium, KiCad, Eagle, and EasyEDA.
+/// High-performance parser for multi-layer PCB archives (.ZIP) from Proteus ARES, Altium, KiCad, Eagle, FreeCAD, and EasyEDA.
 class PcbArchiveParser {
   const PcbArchiveParser._();
 
-  /// Quick heuristic to check if a byte stream is a valid ZIP archive.
+  /// Determines if a file path points to a valid PCB ZIP archive.
+  /// Checks for Gerber layers, Excellon Drills, KiCad, Altium, Proteus, FreeCAD, Eagle, BOM, or PCB elements.
+  static bool isPcbZipArchive(String filePath) {
+    try {
+      final file = File(filePath);
+      if (!file.existsSync()) return false;
+
+      final lower = filePath.toLowerCase();
+      if (!lower.endsWith('.zip')) {
+        return isPcbFileName(lower);
+      }
+
+      final inputStream = InputFileStream(filePath);
+      final archive = ZipDecoder().decodeBuffer(inputStream, verify: false);
+
+      for (final entry in archive) {
+        if (!entry.isFile) continue;
+        final rawName = entry.name.replaceAll('\\', '/');
+        final baseName = rawName.split('/').last;
+        final entryLower = baseName.toLowerCase();
+
+        // Skip OS metadata
+        if (entryLower.startsWith('__macosx') || entryLower.startsWith('.') || entryLower.endsWith('.ds_store')) {
+          continue;
+        }
+
+        // 1. Check filename and extension
+        if (isPcbFileName(entryLower)) {
+          return true;
+        }
+
+        // 2. Check 3D model filenames with board/pcb keywords
+        if (_is3DModelFileName(entryLower) &&
+            (entryLower.contains('pcb') || entryLower.contains('board') || entryLower.contains('assy') || entryLower.contains('assembly'))) {
+          return true;
+        }
+
+        // 3. Check content heuristics for ambiguous text files
+        if (entryLower.endsWith('.txt') || entryLower.endsWith('.out') || !entryLower.contains('.')) {
+          final content = entry.content;
+          if (content is List<int> && content.isNotEmpty) {
+            final sampleBytes = Uint8List.fromList(content.take(math.min(content.length, 500)).toList());
+            if (_isGerberContent(sampleBytes) || _isDrillContent(sampleBytes)) {
+              return true;
+            }
+          }
+        }
+      }
+
+      return false;
+    } on Exception catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'PcbArchiveParser.isPcbZipArchive');
+      return false;
+    }
+  }
+
+  /// Checks if an in-memory byte stream contains a PCB ZIP archive or PCB files.
   static bool isPcbZip(Uint8List bytes, {String fileName = ''}) {
     try {
       final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+      if (archive.isEmpty) return false;
+
+      if (fileName.isNotEmpty && isPcbFileName(fileName)) {
+        return true;
+      }
+
+      for (final entry in archive) {
+        if (!entry.isFile) continue;
+        final rawName = entry.name.replaceAll('\\', '/');
+        final baseName = rawName.split('/').last;
+        final entryLower = baseName.toLowerCase();
+
+        if (entryLower.startsWith('__macosx') || entryLower.startsWith('.') || entryLower.endsWith('.ds_store')) {
+          continue;
+        }
+
+        if (isPcbFileName(entryLower)) {
+          return true;
+        }
+
+        if (_is3DModelFileName(entryLower) &&
+            (entryLower.contains('pcb') || entryLower.contains('board') || entryLower.contains('assy') || entryLower.contains('assembly'))) {
+          return true;
+        }
+
+        if (entryLower.endsWith('.txt') || !entryLower.contains('.')) {
+          final content = entry.content;
+          if (content is List<int> && content.isNotEmpty) {
+            final sampleBytes = Uint8List.fromList(content.take(math.min(content.length, 500)).toList());
+            if (_isGerberContent(sampleBytes) || _isDrillContent(sampleBytes)) {
+              return true;
+            }
+          }
+        }
+      }
+
+      // Default fallback for non-empty archive when explicitly called as isPcbZip
       return archive.isNotEmpty;
     } on ArchiveException catch (_) {
       return false;
@@ -300,7 +395,25 @@ class PcbArchiveParser {
         fileName.endsWith('.kicad_dru') ||
         fileName.endsWith('.brd') ||
         fileName.endsWith('.pcbdoc') ||
-        fileName.endsWith('.prjpcb')) {
+        fileName.endsWith('.prjpcb') ||
+        fileName.endsWith('.schdoc') ||
+        fileName.endsWith('.cam') ||
+        fileName.endsWith('.camtastic') ||
+        fileName.endsWith('.ddb') ||
+        fileName.endsWith('.libpkg') ||
+        fileName.endsWith('.pcblib') ||
+        fileName.endsWith('.schlib') ||
+        fileName.endsWith('.pdsprj') ||
+        fileName.endsWith('.lyt') ||
+        fileName.endsWith('.dsn') ||
+        fileName.endsWith('.sec') ||
+        fileName.endsWith('.sdf') ||
+        fileName.endsWith('.pdswk') ||
+        fileName.endsWith('.fcstd') ||
+        fileName.endsWith('.fcstd1') ||
+        fileName.endsWith('.fcmacro') ||
+        fileName.endsWith('.lbr') ||
+        fileName.endsWith('.dru')) {
       return PcbFileCategory.sourceCad;
     }
 
@@ -318,6 +431,117 @@ class PcbArchiveParser {
     }
 
     return PcbFileCategory.other;
+  }
+
+  /// Determines if a single file name indicates a PCB / EDA / Hardware project element.
+  static bool isPcbFileName(String name) {
+    final lower = name.replaceAll('\\', '/').toLowerCase();
+    final base = lower.split('/').last;
+
+    // 1. Gerber 2D layer extensions
+    if (_isGerberFileName(base) || base.endsWith('.gbrjob')) {
+      return true;
+    }
+
+    // 2. CNC Drill files
+    if (_isDrillFileName(base)) {
+      return true;
+    }
+
+    // 3. KiCad CAD and PCB files
+    if (base.endsWith('.kicad_pcb') ||
+        base.endsWith('.kicad_sch') ||
+        base.endsWith('.kicad_pro') ||
+        base.endsWith('.kicad_prl') ||
+        base.endsWith('.kicad_dru') ||
+        base.endsWith('.kicad_sym') ||
+        base.endsWith('.kicad_mod') ||
+        base.endsWith('.kicad_wks')) {
+      return true;
+    }
+
+    // 4. Altium / Protel / CircuitMaker
+    if (base.endsWith('.pcbdoc') ||
+        base.endsWith('.schdoc') ||
+        base.endsWith('.prjpcb') ||
+        base.endsWith('.cam') ||
+        base.endsWith('.camtastic') ||
+        base.endsWith('.pcblib') ||
+        base.endsWith('.schlib') ||
+        base.endsWith('.ddb') ||
+        base.endsWith('.libpkg')) {
+      return true;
+    }
+
+    // 5. Proteus (ARES & ISIS) project files & CADCAM exports
+    if (base.endsWith('.pdsprj') ||
+        base.endsWith('.lyt') ||
+        base.endsWith('.dsn') ||
+        base.endsWith('.sec') ||
+        base.endsWith('.sdf') ||
+        base.endsWith('.pdswk') ||
+        base.contains('cadcam')) {
+      return true;
+    }
+
+    // 6. Eagle files
+    if (base.endsWith('.brd') ||
+        base.endsWith('.sch') ||
+        base.endsWith('.lbr') ||
+        base.endsWith('.dru')) {
+      return true;
+    }
+
+    // 7. FreeCAD project files
+    if (base.endsWith('.fcstd') ||
+        base.endsWith('.fcstd1') ||
+        base.endsWith('.fcmacro')) {
+      return true;
+    }
+
+    // 8. PCB Manufacturing / Assembly (Pick & Place / CPL / Centroid)
+    if (base.endsWith('.d356') ||
+        base.endsWith('.ipc') ||
+        base.endsWith('.pos') ||
+        base.endsWith('.xy') ||
+        base.contains('cpl') ||
+        base.contains('pick') ||
+        base.contains('placement') ||
+        base.contains('centroid')) {
+      return true;
+    }
+
+    // 9. BOM (Bill of Materials)
+    if (base.endsWith('.bom') ||
+        base.contains('bill of material') ||
+        base.contains('bill_of_material') ||
+        base.contains('parts_list') ||
+        (base.contains('bom') &&
+            (base.endsWith('.csv') ||
+                base.endsWith('.xlsx') ||
+                base.endsWith('.xls') ||
+                base.endsWith('.tsv') ||
+                base.endsWith('.txt')))) {
+      return true;
+    }
+
+    // 10. Proteus and EDA descriptive layer names
+    if ((base.contains('copper') ||
+            base.contains('solder') ||
+            base.contains('soldermask') ||
+            base.contains('silkscreen') ||
+            base.contains('silk') ||
+            base.contains('edge cuts') ||
+            base.contains('drill')) &&
+        (base.endsWith('.txt') ||
+            base.endsWith('.gbr') ||
+            base.endsWith('.ger') ||
+            base.endsWith('.drl') ||
+            !base.contains('.'))) {
+      return true;
+    }
+
+    return false;
   }
 
   static bool _is3DModelFileName(String name) {
@@ -364,13 +588,20 @@ class PcbArchiveParser {
         lower.endsWith('.gif');
   }
 
-
   static bool _isDrillFileName(String name) {
     final lower = name.toLowerCase();
-    return lower.endsWith('.drl') ||
+    if (lower.endsWith('.drl') ||
         lower.endsWith('.xln') ||
         lower.endsWith('.exc') ||
-        lower.endsWith('.drd');
+        lower.endsWith('.drd') ||
+        lower.endsWith('.ncd') ||
+        lower.endsWith('.tap')) {
+      return true;
+    }
+    if (lower.contains('drill') && lower.endsWith('.txt')) {
+      return true;
+    }
+    return false;
   }
 
   static bool _isDrillContent(Uint8List bytes) {
@@ -384,7 +615,7 @@ class PcbArchiveParser {
 
   static bool _isGerberFileName(String name) {
     final lower = name.toLowerCase();
-    return lower.endsWith('.gbr') ||
+    if (lower.endsWith('.gbr') ||
         lower.endsWith('.ger') ||
         lower.endsWith('.gtl') ||
         lower.endsWith('.gbl') ||
@@ -393,9 +624,6 @@ class PcbArchiveParser {
         lower.endsWith('.gto') ||
         lower.endsWith('.gbo') ||
         lower.endsWith('.gko') ||
-        lower.endsWith('.gm1') ||
-        lower.endsWith('.gm2') ||
-        lower.endsWith('.gm3') ||
         lower.endsWith('.top') ||
         lower.endsWith('.bot') ||
         lower.endsWith('.smt') ||
@@ -406,7 +634,32 @@ class PcbArchiveParser {
         lower.endsWith('.art') ||
         lower.endsWith('.pho') ||
         lower.endsWith('.cmp') ||
-        lower.endsWith('.sol');
+        lower.endsWith('.sol') ||
+        lower.endsWith('.fab') ||
+        lower.endsWith('.apr') ||
+        lower.endsWith('.rep') ||
+        lower.endsWith('.spl') ||
+        lower.endsWith('.spb') ||
+        lower.endsWith('.spt')) {
+      return true;
+    }
+
+    // Inner copper layers: .g1, .g2, .g3 ... .g9
+    if (RegExp(r'\.g\d$').hasMatch(lower)) {
+      return true;
+    }
+
+    // Mechanical layers: .gm1, .gm2 ... .gm16
+    if (RegExp(r'\.gm\d{1,2}$').hasMatch(lower)) {
+      return true;
+    }
+
+    // Proteus CADCAM Gerber files: e.g. "CADCAM Top Copper.TXT"
+    if (lower.contains('cadcam') && (lower.endsWith('.txt') || lower.endsWith('.gbr'))) {
+      return true;
+    }
+
+    return false;
   }
 
   static bool _isGerberContent(Uint8List bytes) {

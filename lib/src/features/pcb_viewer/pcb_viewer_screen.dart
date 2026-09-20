@@ -32,11 +32,11 @@ class PcbViewerScreen extends StatefulWidget {
 }
 
 enum PcbViewerMode {
-  board2D('2D Board', Icons.layers_outlined),
-  model3D('3D Model', Icons.view_in_ar_outlined),
-  schematics('Schematics', Icons.schema_outlined),
-  images('Images', Icons.image_outlined),
+  board2D('Gerbers', Icons.layers_outlined),
+  images('Photos & Renders', Icons.image_outlined),
+  model3D('3D Models', Icons.view_in_ar_outlined),
   bom('BOM & Parts', Icons.list_alt_rounded),
+  schematics('Schematics', Icons.schema_outlined),
   docs('Docs & Reports', Icons.picture_as_pdf_outlined),
   allFiles('All Files', Icons.folder_zip_outlined);
 
@@ -160,14 +160,14 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
           _isLoading = false;
           if (project.layers.isNotEmpty) {
             _activeMode = PcbViewerMode.board2D;
-          } else if (project.model3DFiles.isNotEmpty) {
-            _activeMode = PcbViewerMode.model3D;
-          } else if (project.schematicFiles.isNotEmpty) {
-            _activeMode = PcbViewerMode.schematics;
           } else if (project.images.isNotEmpty) {
             _activeMode = PcbViewerMode.images;
+          } else if (project.model3DFiles.isNotEmpty) {
+            _activeMode = PcbViewerMode.model3D;
           } else if (project.bomEntries.isNotEmpty) {
             _activeMode = PcbViewerMode.bom;
+          } else if (project.schematicFiles.isNotEmpty) {
+            _activeMode = PcbViewerMode.schematics;
           } else if (project.documentFiles.isNotEmpty || project.reportFiles.isNotEmpty) {
             _activeMode = PcbViewerMode.docs;
           } else {
@@ -177,11 +177,6 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _fitToScreen();
-          if (_project?.layers.isEmpty == true && _project?.bomEntries.isNotEmpty == true) {
-            _showBomSheet();
-          } else if (_project?.layers.isEmpty == true && _project?.images.isNotEmpty == true) {
-            _showImagesSheet();
-          }
         });
       }
     } on FileSystemException catch (e, stack) {
@@ -1282,10 +1277,10 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     if (_project == null) return const [];
     final modes = <PcbViewerMode>[];
     if (_project!.layers.isNotEmpty) modes.add(PcbViewerMode.board2D);
-    if (_project!.model3DFiles.isNotEmpty) modes.add(PcbViewerMode.model3D);
-    if (_project!.schematicFiles.isNotEmpty) modes.add(PcbViewerMode.schematics);
     if (_project!.images.isNotEmpty) modes.add(PcbViewerMode.images);
+    if (_project!.model3DFiles.isNotEmpty) modes.add(PcbViewerMode.model3D);
     if (_project!.bomEntries.isNotEmpty || _project!.assemblyFiles.isNotEmpty) modes.add(PcbViewerMode.bom);
+    if (_project!.schematicFiles.isNotEmpty) modes.add(PcbViewerMode.schematics);
     if (_project!.documentFiles.isNotEmpty || _project!.reportFiles.isNotEmpty) modes.add(PcbViewerMode.docs);
     if (_project!.archiveFiles.length > 1) modes.add(PcbViewerMode.allFiles);
     return modes;

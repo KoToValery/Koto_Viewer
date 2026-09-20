@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -262,6 +263,90 @@ M02*
 
       // Archive Files (All 3)
       expect(project.archiveFiles.length, 3);
+    });
+
+    test('isPcbZipArchive and classifyFile accurately detect Proteus, KiCad, FreeCAD, and Altium archives', () async {
+      final tempDir = await Directory.systemTemp.createTemp('koto_eda_test_');
+
+      try {
+        // 1. Proteus ARES archive (CADCAM *.txt, .pdsprj, BOM, 3D render)
+        final proteusZipPath = '${tempDir.path}${Platform.pathSeparator}Proteus_Device.zip';
+        final proteusArchive = Archive();
+        proteusArchive.addFile(ArchiveFile('Device - CADCAM Top Copper.TXT', 10, utf8.encode('%FSLAX24Y24*%')));
+        proteusArchive.addFile(ArchiveFile('Device - CADCAM Bottom Copper.TXT', 10, utf8.encode('%FSLAX24Y24*%')));
+        proteusArchive.addFile(ArchiveFile('Device - CADCAM Drill.TXT', 10, utf8.encode('M48\nMETRIC,TZ\nT01C0.8\n%')));
+        proteusArchive.addFile(ArchiveFile('Device.pdsprj', 20, utf8.encode('Proteus Project Data')));
+        proteusArchive.addFile(ArchiveFile('bom_parts.csv', 15, utf8.encode('Designator,Value\nR1,10k')));
+        proteusArchive.addFile(ArchiveFile('render_top.png', 10, Uint8List.fromList([1, 2, 3])));
+        proteusArchive.addFile(ArchiveFile('board_model.step', 25, utf8.encode('ISO-10303-21;')));
+        await File(proteusZipPath).writeAsBytes(ZipEncoder().encode(proteusArchive)!);
+
+        expect(PcbArchiveParser.isPcbZipArchive(proteusZipPath), isTrue);
+
+        // 2. KiCad archive (.kicad_pcb, .kicad_sch, 3D STEP, BOM, renders)
+        final kicadZipPath = '${tempDir.path}${Platform.pathSeparator}KiCad_Project.zip';
+        final kicadArchive = Archive();
+        kicadArchive.addFile(ArchiveFile('mainboard.kicad_pcb', 30, utf8.encode('(kicad_pcb (version 20211014))')));
+        kicadArchive.addFile(ArchiveFile('mainboard.kicad_sch', 20, utf8.encode('(kicad_sch (version 20211123))')));
+        kicadArchive.addFile(ArchiveFile('mainboard.kicad_pro', 15, utf8.encode('{"meta": {}}')));
+        kicadArchive.addFile(ArchiveFile('mainboard-BOM.csv', 15, utf8.encode('Id,Designator,Footprint\n1,C1,0603')));
+        kicadArchive.addFile(ArchiveFile('pcb_render.jpg', 10, Uint8List.fromList([4, 5, 6])));
+        kicadArchive.addFile(ArchiveFile('mainboard.step', 35, utf8.encode('ISO-10303-21;')));
+        await File(kicadZipPath).writeAsBytes(ZipEncoder().encode(kicadArchive)!);
+
+        expect(PcbArchiveParser.isPcbZipArchive(kicadZipPath), isTrue);
+
+        // 3. FreeCAD PCB archive (.fcstd, board.step, photos)
+        final freecadZipPath = '${tempDir.path}${Platform.pathSeparator}FreeCAD_Board.zip';
+        final freecadArchive = Archive();
+        freecadArchive.addFile(ArchiveFile('pcb_design.fcstd', 50, utf8.encode('FreeCAD binary data')));
+        freecadArchive.addFile(ArchiveFile('pcb_board.step', 40, utf8.encode('ISO-10303-21; STEP CAD')));
+        freecadArchive.addFile(ArchiveFile('assembled_photo.png', 10, Uint8List.fromList([7, 8, 9])));
+        await File(freecadZipPath).writeAsBytes(ZipEncoder().encode(freecadArchive)!);
+
+        expect(PcbArchiveParser.isPcbZipArchive(freecadZipPath), isTrue);
+
+        // 4. Altium archive (.pcbdoc, .schdoc, .gtl, .gbl, .drl, BOM)
+        final altiumZipPath = '${tempDir.path}${Platform.pathSeparator}Altium_Hardware.zip';
+        final altiumArchive = Archive();
+        altiumArchive.addFile(ArchiveFile('Motherboard.PcbDoc', 40, utf8.encode('Altium PCB binary')));
+        altiumArchive.addFile(ArchiveFile('Motherboard.SchDoc', 30, utf8.encode('Altium Sch binary')));
+        altiumArchive.addFile(ArchiveFile('Motherboard.GTL', 20, utf8.encode('%FSLAX24Y24*%')));
+        altiumArchive.addFile(ArchiveFile('Motherboard.DRL', 15, utf8.encode('M48\n')));
+        altiumArchive.addFile(ArchiveFile('Bill of Materials.xlsx', 25, utf8.encode('Excel BOM')));
+        altiumArchive.addFile(ArchiveFile('3D_Board.step', 30, utf8.encode('ISO-10303-21;')));
+        altiumArchive.addFile(ArchiveFile('top_photo.webp', 10, Uint8List.fromList([10, 11])));
+        await File(altiumZipPath).writeAsBytes(ZipEncoder().encode(altiumArchive)!);
+
+        expect(PcbArchiveParser.isPcbZipArchive(altiumZipPath), isTrue);
+
+        // 5. Non-PCB Presentation ZIP (Videos, facade photos, pdf presentation) -> MUST BE FALSE for PCB
+        final nonPcbZipPath = '${tempDir.path}${Platform.pathSeparator}Architecture_Presentation.zip';
+        final nonPcbArchive = Archive();
+        nonPcbArchive.addFile(ArchiveFile('01_Walkthrough.mp4', 50, Uint8List.fromList([1, 2, 3])));
+        nonPcbArchive.addFile(ArchiveFile('02_Render.jpg', 30, Uint8List.fromList([4, 5])));
+        nonPcbArchive.addFile(ArchiveFile('03_FloorPlan.pdf', 20, Uint8List.fromList([6, 7])));
+        await File(nonPcbZipPath).writeAsBytes(ZipEncoder().encode(nonPcbArchive)!);
+
+        expect(PcbArchiveParser.isPcbZipArchive(nonPcbZipPath), isFalse);
+      } finally {
+        try {
+          if (await tempDir.exists()) {
+            await tempDir.delete(recursive: true);
+          }
+        } catch (_) {}
+      }
+    });
+
+    test('classifyFile recognizes FreeCAD, Proteus, Altium and Eagle project types', () {
+      expect(PcbArchiveParser.classifyFile('board.fcstd'), PcbFileCategory.sourceCad);
+      expect(PcbArchiveParser.classifyFile('circuit.pdsprj'), PcbFileCategory.sourceCad);
+      expect(PcbArchiveParser.classifyFile('layout.lyt'), PcbFileCategory.sourceCad);
+      expect(PcbArchiveParser.classifyFile('project.pcbdoc'), PcbFileCategory.sourceCad);
+      expect(PcbArchiveParser.classifyFile('project.cam'), PcbFileCategory.sourceCad);
+      expect(PcbArchiveParser.classifyFile('board.brd'), PcbFileCategory.sourceCad);
+      expect(PcbArchiveParser.classifyFile('parts_bom.csv'), PcbFileCategory.bom);
+      expect(PcbArchiveParser.classifyFile('assembly_cpl.csv'), PcbFileCategory.assembly);
     });
   });
 }

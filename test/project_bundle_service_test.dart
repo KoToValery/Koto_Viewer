@@ -114,6 +114,19 @@ void main() {
       expect(await file.exists(), isTrue);
       expect(file.path.endsWith('02_Flythrough.mp4'), isTrue);
     });
+
+    test('isProjectBundle returns false for PCB ZIP archives containing mixed 3D/BOM/image media', () async {
+      final pcbZipPath = '${tempDir.path}${Platform.pathSeparator}PCB_Board_Production.zip';
+      final pcbArchive = Archive();
+      pcbArchive.addFile(ArchiveFile('Top_Layer.gtl', 20, Uint8List.fromList([1, 2, 3])));
+      pcbArchive.addFile(ArchiveFile('Holes.drl', 15, Uint8List.fromList([4, 5])));
+      pcbArchive.addFile(ArchiveFile('pcb_model.step', 50, Uint8List.fromList([6, 7, 8])));
+      pcbArchive.addFile(ArchiveFile('pcb_render.png', 30, Uint8List.fromList([9, 10])));
+      pcbArchive.addFile(ArchiveFile('bom.csv', 25, Uint8List.fromList([11, 12])));
+      await File(pcbZipPath).writeAsBytes(ZipEncoder().encode(pcbArchive)!);
+
+      expect(ProjectBundleService.isProjectBundle(pcbZipPath), isFalse);
+    });
   });
 
   group('KotoFileType and Category Extensions', () {

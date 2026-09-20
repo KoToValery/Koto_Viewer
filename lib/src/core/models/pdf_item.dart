@@ -343,7 +343,7 @@ class PdfItem {
   bool get isKicad => fileType == KotoFileType.kicad;
   bool get isZip => fileType == KotoFileType.zip;
   bool get isPlotter => fileType == KotoFileType.plt;
-  bool get isPcb => isGerber || isDrill || isKicad;
+  bool get isPcb => isGerber || isDrill || isKicad || isZip;
   bool get isVector => isSvg || isEps || isCdr || isPcb || isPlotter;
   bool get isTextDoc => isTxt || isCsv || isJupyter || isMd || isDocx || isRtf || isPresentation || isComic || isEbook;
 

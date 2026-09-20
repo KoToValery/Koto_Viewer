@@ -19,6 +19,7 @@ import '../../features/markdown_viewer/markdown_viewer_screen.dart';
 import '../../features/docx_viewer/docx_viewer_screen.dart';
 import '../../features/eps_viewer/eps_viewer_screen.dart';
 import '../../features/pcb_viewer/pcb_viewer_screen.dart';
+import '../../features/pcb_viewer/parser/pcb_archive_parser.dart';
 import '../../features/hpgl_viewer/hpgl_viewer_screen.dart';
 import '../../features/cdr_viewer/cdr_viewer_screen.dart';
 import '../../features/comic_viewer/comic_viewer_screen.dart';
@@ -367,7 +368,8 @@ class FileOpenerService {
         );
 
       case KotoFileType.zip:
-        // Smart ZIP routing: check if the archive contains a DICOM study
+        // Smart ZIP routing:
+        // 1. Check if the archive contains a DICOM study
         if (DicomStudyLoader.isDicomZip(resolvedPath)) {
           return await _pushViewer(
             nav,
@@ -377,25 +379,25 @@ class FileOpenerService {
             addToRecent: addToRecent,
           );
         }
-        // Check if the archive is a Project Presentation Bundle (or contains mixed media)
-        if (ProjectBundleService.isProjectBundle(resolvedPath)) {
+        // 2. Check if Gerber or specific PCB formats are detected (Proteus, KiCad, FreeCAD, Altium, Eagle, etc.)
+        if (PcbArchiveParser.isPcbZipArchive(resolvedPath)) {
           return await _pushViewer(
             nav,
             item,
             filePath,
-            ProjectViewerScreen(
-              filePath: resolvedPath,
-              addToRecent: addToRecent,
-            ),
+            PcbViewerScreen(filePath: resolvedPath),
             addToRecent: addToRecent,
           );
         }
-        // Otherwise treat as PCB Gerber archive
+        // 3. All other ZIP archives are treated as Presentation bundles
         return await _pushViewer(
           nav,
           item,
           filePath,
-          PcbViewerScreen(filePath: resolvedPath),
+          ProjectViewerScreen(
+            filePath: resolvedPath,
+            addToRecent: addToRecent,
+          ),
           addToRecent: addToRecent,
         );
 

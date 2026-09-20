@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import '../errors/app_error_handler.dart';
 import '../models/pdf_item.dart';
+import '../../features/pcb_viewer/parser/pcb_archive_parser.dart';
 
 /// Categories of items within a project presentation bundle.
 enum ProjectItemCategory {
@@ -206,7 +207,8 @@ class ProjectBundleService {
   }
 
   /// Determines if a ZIP archive should be opened as a Project Presentation Bundle.
-  /// Returns false if it is a DICOM or PCB Gerber archive.
+  /// If Gerber or specific PCB formats are detected, returns false (so it loads as PCB view).
+  /// All other ZIP files are considered Presentation bundles.
   static bool isProjectBundle(String archivePath) {
     try {
       final file = File(archivePath);
@@ -217,46 +219,12 @@ class ProjectBundleService {
         return true;
       }
 
-      final inputStream = InputFileStream(archivePath);
-      final archive = ZipDecoder().decodeBuffer(inputStream, verify: false);
-
-      int gerberCount = 0;
-      int mediaOrCadCount = 0;
-
-      for (final entry in archive) {
-        if (!entry.isFile) continue;
-        final name = entry.name.toLowerCase();
-        if (name.startsWith('__macosx') || name.startsWith('.') || name.endsWith('.ds_store')) {
-          continue;
-        }
-
-        // Check for media, CAD, or presentation files
-        final cat = classifyCategory(name);
-        if (cat != ProjectItemCategory.other) {
-          mediaOrCadCount++;
-        }
-
-        // Check for PCB Gerber layers
-        if (name.endsWith('.gbr') ||
-            name.endsWith('.gtl') ||
-            name.endsWith('.gbl') ||
-            name.endsWith('.gts') ||
-            name.endsWith('.gbs') ||
-            name.endsWith('.gto') ||
-            name.endsWith('.gbo') ||
-            name.endsWith('.drl') ||
-            name.endsWith('.xln') ||
-            name.endsWith('.kicad_pcb')) {
-          gerberCount++;
-        }
-      }
-
-      // If it has Gerber files and NO presentation media, it's a PCB archive
-      if (gerberCount > 0 && mediaOrCadCount == 0) {
+      // If Gerber or specific PCB formats are detected, it is loaded in PCB view
+      if (PcbArchiveParser.isPcbZipArchive(archivePath)) {
         return false;
       }
 
-      // If it contains presentation media/CAD, or is general ZIP, open as project bundle
+      // All other ZIP archives are treated as Presentation bundles
       return true;
     } on Exception catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'ProjectBundleService.isProjectBundle');
