@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show PointMode;
 import 'package:flutter/material.dart';
 import '../models/dxf_color_table.dart';
 import '../models/dxf_display_settings.dart';
@@ -99,9 +100,11 @@ class DxfPainter extends CustomPainter {
       _drawGrid(canvas, size);
     }
 
-    // 2. Draw Entities (Render all document entities directly so no lines or text ever disappear upon zooming in)
-    final Iterable<DxfEntity> entitiesToDraw = (document.entities.length > 30000 && visibleCadRect != null && document.spatialIndex != null)
-        ? document.spatialIndex!.query(visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.5))
+    // 2. Draw Entities (Query Quadtree spatial index with a smooth 15% viewport buffer for drawings >5000 entities)
+    final Iterable<DxfEntity> entitiesToDraw = (document.entities.length > 5000 && visibleCadRect != null && document.spatialIndex != null)
+        ? document.spatialIndex!.query(
+            visibleCadRect!.inflate(math.min(visibleCadRect!.width, visibleCadRect!.height) * 0.15 + 10.0),
+          )
         : document.entities;
 
     for (final entity in entitiesToDraw) {
@@ -273,6 +276,11 @@ class DxfPainter extends CustomPainter {
     if (pattern == null) {
       canvas.drawPath(path, paint);
     } else {
+      final double pathScreenDim = path.getBounds().longestSide * currentScale;
+      if (pathScreenDim < 3.5) {
+        canvas.drawPath(path, paint);
+        return;
+      }
       final scale = currentScale.clamp(0.001, 10000.0);
       final double ltScale = (entityLineTypeScale != null && entityLineTypeScale > 0)
           ? entityLineTypeScale
@@ -311,6 +319,11 @@ class DxfPainter extends CustomPainter {
     if (pattern == null) {
       canvas.drawLine(p1, p2, paint);
     } else {
+      final double lenScreen = (p2 - p1).distance * currentScale;
+      if (lenScreen < 3.5) {
+        canvas.drawLine(p1, p2, paint);
+        return;
+      }
       final scale = currentScale.clamp(0.001, 10000.0);
       final double ltScale = (entityLineTypeScale != null && entityLineTypeScale > 0)
           ? entityLineTypeScale
@@ -400,6 +413,14 @@ class DxfPainter extends CustomPainter {
     } else if (entity is DxfCircle) {
       final center = toCanvas(entity.center);
       final r = entity.radius * fitScale;
+      final double rScreen = r * scale;
+      if (rScreen < 0.6) {
+        final ptPaint = Paint()
+          ..color = strokePaint.color
+          ..strokeWidth = math.max(0.8, strokePaint.strokeWidth);
+        canvas.drawPoints(PointMode.points, [center], ptPaint);
+        return;
+      }
       final path = Path()..addOval(Rect.fromCircle(center: center, radius: r));
       final double effectiveStroke = math.min(strokePaint.strokeWidth, math.max(0.0001, r * 0.45));
       final circlePaint = Paint()
@@ -538,10 +559,38 @@ class DxfPainter extends CustomPainter {
     final double r = arc.radius;
     if (r <= 0) return;
 
+    final double rCanvas = arc.radius * fitScale;
+    final double rScreen = rCanvas * currentScale;
+
+    // Sub-pixel Culling & Dynamic LOD for Arcs:
+    if (rScreen < 0.6) {
+      final pCenter = toCanvas(arc.center);
+      canvas.drawPoints(PointMode.points, [pCenter], paint);
+      return;
+    }
+    if (rScreen < 2.0) {
+      final double startRad = arc.startAngleDeg * math.pi / 180.0;
+      final double endRad = arc.endAngleDeg * math.pi / 180.0;
+      final p1 = toCanvas(Offset(cx + r * math.cos(startRad), cy + r * math.sin(startRad)));
+      final p2 = toCanvas(Offset(cx + r * math.cos(endRad), cy + r * math.sin(endRad)));
+      _drawStrokeLine(
+        canvas,
+        p1,
+        p2,
+        paint,
+        lineType,
+        layerLineType,
+        entityLineTypeScale: entityLineTypeScale,
+        blockLineType: blockLineType,
+      );
+      return;
+    }
+
     double sweep = arc.endAngleDeg - arc.startAngleDeg;
     if (sweep <= 0) sweep += 360.0;
 
-    final int segments = (48 * (sweep / 360.0)).clamp(8, 64).toInt();
+    final int maxSegs = rScreen < 8.0 ? 8 : (rScreen < 25.0 ? 16 : 48);
+    final int segments = (maxSegs * (sweep / 360.0)).clamp(4, maxSegs).toInt();
     final double step = (sweep * math.pi / 180.0) / segments;
     final double startRad = arc.startAngleDeg * math.pi / 180.0;
 
@@ -563,7 +612,6 @@ class DxfPainter extends CustomPainter {
       path.lineTo(canvasPoint.dx, canvasPoint.dy);
     }
 
-    final double rCanvas = arc.radius * fitScale;
     final double effectiveStroke = math.min(paint.strokeWidth, math.max(0.0001, rCanvas * 0.45));
     final arcPaint = Paint()
       ..color = paint.color
@@ -906,6 +954,13 @@ class DxfPainter extends CustomPainter {
     final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
     if (targetFontSize <= 0.0) return;
 
+    // Sub-pixel Text LOD: Text smaller than 2.8 screen pixels is unreadable noise.
+    // Bypassing TextPainter shaping and layout eliminates hundreds of ms of lag on full views.
+    final double screenFontSize = targetFontSize * currentScale;
+    if (screenFontSize < 2.8) {
+      return;
+    }
+
     // Flutter TextPainter drops/rounds fonts with fontSize < 0.5 to zero width/height.
     // When large CAD documents or merged drawings reduce fitScale significantly,
     // targetFontSize in canvas coordinates can be much smaller than 0.5 px.
@@ -1028,6 +1083,13 @@ class DxfPainter extends CustomPainter {
     const double capHeightRatio = 0.72;
     final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
     if (targetFontSize <= 0.0) return;
+
+    // Sub-pixel Text LOD: Text smaller than 2.8 screen pixels is unreadable noise.
+    // Bypassing TextPainter shaping and layout eliminates hundreds of ms of lag on full views.
+    final double screenFontSize = targetFontSize * currentScale;
+    if (screenFontSize < 2.8) {
+      return;
+    }
 
     // Flutter TextPainter drops/rounds fonts with fontSize < 0.5 to zero width/height.
     // When large CAD documents or merged drawings reduce fitScale significantly,
@@ -1233,7 +1295,14 @@ class DxfPainter extends CustomPainter {
     final bool isPureSolid = hatch.isSolid && !hasExplicitPatternLines;
 
     if (!isPureSolid) {
-      _renderHatchPatternLines(canvas, path, hatch, strokePaint, toCanvas, fitScale);
+      final bounds = path.getBounds();
+      final double boundsScreenDim = bounds.longestSide * currentScale;
+      // Sub-pixel Hatch LOD: If hatch bounding box on screen is under 3.5 px,
+      // pattern lines would simply merge into sub-pixel noise.
+      // Skipping pattern lines avoids thousands of expensive clipPath operations on full views.
+      if (boundsScreenDim >= 3.5) {
+        _renderHatchPatternLines(canvas, path, hatch, strokePaint, toCanvas, fitScale);
+      }
     }
   }
 
@@ -1247,6 +1316,8 @@ class DxfPainter extends CustomPainter {
   ) {
     final bounds = clipPath.getBounds();
     if (bounds.isEmpty || bounds.width <= 0 || bounds.height <= 0) return;
+    final double boundsScreenDim = bounds.longestSide * currentScale;
+    if (boundsScreenDim < 3.5) return;
 
     final fallbackOrigin = hatch.boundaryPaths.isNotEmpty && hatch.boundaryPaths.first.isNotEmpty
         ? hatch.boundaryPaths.first.first
@@ -1504,6 +1575,32 @@ class DxfPainter extends CustomPainter {
     final block = blocks[insert.blockName];
     if (block == null || block.entities.isEmpty) return;
 
+    final double insertAvgScale = (insert.scaleX.abs() + insert.scaleY.abs()) / 2.0;
+
+    // Sub-pixel Block Culling: If block has multiple entities and its overall size on screen
+    // is smaller than 1.5 pixels, draw a single representative point instead of transforming all child entities.
+    if (block.entities.length > 2) {
+      final blockBounds = block.getBounds(blocks);
+      if (blockBounds != null) {
+        final double maxDimCad = math.max(blockBounds.width, blockBounds.height) * insertAvgScale;
+        final double maxDimScreen = maxDimCad * fitScale * currentScale;
+        if (maxDimScreen < 1.5) {
+          final pos = toCanvas(insert.insertPoint);
+          final ptPaint = Paint()
+            ..color = (insert.colorIndex != null || insert.trueColor != null)
+                ? DxfColorTable.resolveColor(
+                    colorIndex: insert.colorIndex,
+                    trueColor: insert.trueColor,
+                    isDarkBackground: theme.isDark,
+                  )
+                : (theme.isDark ? Colors.white38 : Colors.black45)
+            ..strokeWidth = 1.0;
+          canvas.drawPoints(PointMode.points, [pos], ptPaint);
+          return;
+        }
+      }
+    }
+
     final rad = insert.rotationDeg * math.pi / 180.0;
     final cosA = math.cos(rad);
     final sinA = math.sin(rad);
@@ -1511,7 +1608,6 @@ class DxfPainter extends CustomPainter {
     final blockBaseX = block.basePoint.dx;
     final blockBaseY = block.basePoint.dy;
 
-    final double insertAvgScale = (insert.scaleX.abs() + insert.scaleY.abs()) / 2.0;
     final double childFitScale = insertAvgScale > 0.0001 ? fitScale * insertAvgScale : fitScale;
     final double totalBlockRot = parentRotationDeg + insert.rotationDeg;
 

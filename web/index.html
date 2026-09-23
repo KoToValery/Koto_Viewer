@@ -35,6 +35,125 @@
 </head>
 
 <body>
+  <!-- iOS WebKit DeviceOrientation & Compass Bridge -->
+  <script>
+    (function() {
+      window._compassListeners = [];
+      window._compassHeading = null;
+      window._compassPermissionGranted = false;
+      var _isListening = false;
+      var _requestPending = false;
+
+      function onOrientationChange(e) {
+        var heading = null;
+        if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
+          heading = e.webkitCompassHeading;
+        } else if (typeof e.alpha === 'number' && !isNaN(e.alpha)) {
+          heading = (360.0 - e.alpha) % 360.0;
+        }
+
+        if (heading !== null) {
+          heading = (heading % 360.0 + 360.0) % 360.0;
+          window._compassHeading = heading;
+          for (var i = 0; i < window._compassListeners.length; i++) {
+            try {
+              window._compassListeners[i](heading);
+            } catch (err) {
+              console.error('Compass listener error:', err);
+            }
+          }
+        }
+      }
+
+      function attachOrientationListener() {
+        if (_isListening) return;
+        _isListening = true;
+        window.addEventListener('deviceorientation', onOrientationChange, true);
+        if ('ondeviceorientationabsolute' in window) {
+          window.addEventListener('deviceorientationabsolute', onOrientationChange, true);
+        }
+      }
+
+      window.requestCompassPermission = async function() {
+        if (window._compassPermissionGranted) {
+          attachOrientationListener();
+          return true;
+        }
+
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+          if (_requestPending) return false;
+          _requestPending = true;
+          try {
+            var state = await DeviceOrientationEvent.requestPermission();
+            console.log('DeviceOrientationEvent.requestPermission state:', state);
+            if (state === 'granted') {
+              window._compassPermissionGranted = true;
+              attachOrientationListener();
+              _requestPending = false;
+              return true;
+            }
+            _requestPending = false;
+            return false;
+          } catch (err) {
+            console.warn('DeviceOrientationEvent.requestPermission error:', err);
+            _requestPending = false;
+            return false;
+          }
+        } else {
+          window._compassPermissionGranted = true;
+          attachOrientationListener();
+          return true;
+        }
+      };
+
+      window.addCompassListener = function(callback) {
+        if (typeof callback === 'function') {
+          if (window._compassListeners.indexOf(callback) === -1) {
+            window._compassListeners.push(callback);
+          }
+          if (window._compassHeading !== null) {
+            try { callback(window._compassHeading); } catch (_) {}
+          }
+        }
+        if (typeof DeviceOrientationEvent === 'undefined' ||
+            typeof DeviceOrientationEvent.requestPermission !== 'function' ||
+            window._compassPermissionGranted) {
+          attachOrientationListener();
+        }
+      };
+
+      window.removeCompassListener = function(callback) {
+        var idx = window._compassListeners.indexOf(callback);
+        if (idx !== -1) {
+          window._compassListeners.splice(idx, 1);
+        }
+        if (window._compassListeners.length === 0) {
+          _isListening = false;
+          window.removeEventListener('deviceorientation', onOrientationChange, true);
+          if ('ondeviceorientationabsolute' in window) {
+            window.removeEventListener('deviceorientationabsolute', onOrientationChange, true);
+          }
+        }
+      };
+
+      function onFirstUserInteraction() {
+        window.removeEventListener('click', onFirstUserInteraction, true);
+        window.removeEventListener('touchend', onFirstUserInteraction, true);
+        window.removeEventListener('pointerup', onFirstUserInteraction, true);
+
+        if (!window._compassPermissionGranted &&
+            typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+          window.requestCompassPermission();
+        }
+      }
+
+      window.addEventListener('click', onFirstUserInteraction, true);
+      window.addEventListener('touchend', onFirstUserInteraction, true);
+      window.addEventListener('pointerup', onFirstUserInteraction, true);
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 

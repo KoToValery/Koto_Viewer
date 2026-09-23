@@ -107,12 +107,28 @@ class DxfBlock {
   final String name;
   final Offset basePoint;
   final List<DxfEntity> entities;
+  Rect? _cachedBounds;
+  bool _boundsComputed = false;
 
-  const DxfBlock({
+  DxfBlock({
     required this.name,
     this.basePoint = Offset.zero,
     this.entities = const [],
   });
+
+  /// Lazily computes and caches CAD bounding box of all block entities.
+  Rect? getBounds(Map<String, DxfBlock> blocks) {
+    if (_boundsComputed) return _cachedBounds;
+    _boundsComputed = true;
+    Rect? b;
+    for (final e in entities) {
+      final eb = e.getBoundingBox(blocks);
+      if (eb != null && eb.isFinite) {
+        b = b == null ? eb : b.expandToInclude(eb);
+      }
+    }
+    return _cachedBounds = b;
+  }
 }
 
 /// Abstract base class for all DXF Entities.

@@ -223,7 +223,16 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         return;
       }
 
-      _fileSizeBytes = await file.length();
+      if (widget.originalFilePath != null) {
+        final origFile = File(widget.originalFilePath!);
+        if (await origFile.exists()) {
+          _fileSizeBytes = await origFile.length();
+        } else {
+          _fileSizeBytes = await file.length();
+        }
+      } else {
+        _fileSizeBytes = await file.length();
+      }
       final doc = await DxfParser.parseFromFile(file);
 
       if (mounted) {
@@ -249,7 +258,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         });
       }
       try {
-        await RecentFilesService.removeRecentFile(widget.filePath);
+        await RecentFilesService.removeRecentFile(widget.originalFilePath ?? widget.filePath);
       } on Exception catch (_) {
         // Ignore recent files cleanup failure
       }
@@ -263,7 +272,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         });
       }
       try {
-        await RecentFilesService.removeRecentFile(widget.filePath);
+        await RecentFilesService.removeRecentFile(widget.originalFilePath ?? widget.filePath);
       } on Exception catch (_) {
         // Ignore recent files cleanup failure
       }
@@ -277,7 +286,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         });
       }
       try {
-        await RecentFilesService.removeRecentFile(widget.filePath);
+        await RecentFilesService.removeRecentFile(widget.originalFilePath ?? widget.filePath);
       } on Exception catch (_) {
         // Ignore recent files cleanup failure
       }
@@ -288,7 +297,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if (!widget.addToRecent) return;
     try {
       final pdfItem = PdfItem(
-        path: widget.filePath,
+        path: widget.originalFilePath ?? widget.filePath,
         name: _fileName,
         sizeInBytes: _fileSizeBytes,
         lastOpened: DateTime.now(),
