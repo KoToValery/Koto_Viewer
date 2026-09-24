@@ -146,16 +146,14 @@ class KcadService {
     try {
       final parentDir = currentCacheFile.parent;
       final currentName = currentCacheFile.path.split(RegExp(r'[/\\]')).last;
-      final separatorIdx = currentName.indexOf('_');
-      if (separatorIdx <= 0) return;
-      final basePrefix = currentName.substring(0, separatorIdx + 1);
+      final match = RegExp(r'^(.*)_\d+_\d+_v\d+\.kcad$', caseSensitive: false).firstMatch(currentName);
+      if (match == null) return;
+      final basePrefix = '${match.group(1)}_';
 
       parentDir.list().listen((entity) {
-        if (entity is File &&
-            entity.path.endsWith('.kcad') &&
-            entity.path != currentCacheFile.path) {
+        if (entity is File && entity.path.endsWith('.kcad')) {
           final name = entity.path.split(RegExp(r'[/\\]')).last;
-          if (name.startsWith(basePrefix)) {
+          if (name != currentName && name.startsWith(basePrefix)) {
             try {
               entity.deleteSync();
               debugPrint('KcadService: Evicted stale cache version -> ${entity.path}');
@@ -170,8 +168,12 @@ class KcadService {
 
   /// Loads [file] directly as KCAD if it has `.kcad` extension.
   static Future<DxfDocument> loadKcadFile(File file) async {
+    final sw = Stopwatch()..start();
     final bytes = await file.readAsBytes();
-    return compute(_kcadReadIsolate, bytes);
+    final doc = await compute(_kcadReadIsolate, bytes);
+    sw.stop();
+    debugPrint('KcadService: Loaded binary file in ${sw.elapsedMilliseconds} ms (${doc.entities.length} entities) -> ${file.path}');
+    return doc;
   }
 
   /// Exports [document] directly to a standalone `.kcad` file at [outputPath].

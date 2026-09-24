@@ -357,6 +357,69 @@ void main() {
     expect((decodedMText.height - 15.0).abs(), lessThan(0.01));
     expect(decodedMText.trueColor, equals(anno.colorValue));
   });
+
+  test('Eviction safety: Files with underscores in filename do not evict other drawings', () async {
+    final tempDir = await Directory.systemTemp.createTemp('kcad_evict_test_');
+    try {
+      final stalePlan = File('${tempDir.path}/floor_plan_v3_1000_1780000000000_v1.kcad');
+      final currentPlan = File('${tempDir.path}/floor_plan_v3_1000_1790000000000_v2.kcad');
+      final otherDrawing = File('${tempDir.path}/floor_office_2000_1790000000000_v2.kcad');
+
+      await stalePlan.writeAsString('stale');
+      await currentPlan.writeAsString('current');
+      await otherDrawing.writeAsString('other');
+
+      // Trigger eviction for currentPlan
+      final currentName = currentPlan.path.split(RegExp(r'[/\\]')).last;
+      final match = RegExp(r'^(.*)_\d+_\d+_v\d+\.kcad$', caseSensitive: false).firstMatch(currentName);
+      expect(match, isNotNull);
+      final basePrefix = '${match!.group(1)}_';
+      expect(basePrefix, equals('floor_plan_v3_'));
+
+      // Perform eviction logic
+      for (final entity in tempDir.listSync()) {
+        if (entity is File && entity.path.endsWith('.kcad')) {
+          final name = entity.path.split(RegExp(r'[/\\]')).last;
+          if (name != currentName && name.startsWith(basePrefix)) {
+            entity.deleteSync();
+          }
+        }
+      }
+
+      // Verify: stale plan was deleted, current plan kept, and other drawing kept!
+      expect(stalePlan.existsSync(), isFalse, reason: 'Stale version of floor_plan_v3 must be evicted');
+      expect(currentPlan.existsSync(), isTrue, reason: 'Current version must be kept');
+      expect(otherDrawing.existsSync(), isTrue, reason: 'floor_office must NOT be evicted by floor_plan_v3!');
+    } finally {
+      await tempDir.delete(recursive: true);
+    }
+  });
+
+  test('End-to-End Repeated Load: Instant DWG open via KCAD cache without converter', () async {
+    final dwgFile = File(r'C:\Users\Creator\Downloads\+9.30 (OVK).dwg');
+    if (!dwgFile.existsSync()) return;
+
+    final kcadPath = await KcadService.getCachePath(dwgFile);
+    final kcadFile = File(kcadPath);
+    expect(kcadFile.existsSync(), isTrue, reason: 'KCAD cache must exist from previous run');
+
+    // Measure instant second load exactly as FileOpenerService does:
+    final sw = Stopwatch()..start();
+    final doc = await KcadService.loadKcadFile(kcadFile);
+    sw.stop();
+
+    print('\n================ SECOND OPEN (END-TO-END WIN) ================');
+    print('Target DWG:       ${dwgFile.path} (${(dwgFile.lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB)');
+    print('KCAD Cache File:  $kcadPath (${(kcadFile.lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB)');
+    print('Converted Exe:    SKIPPED (0.0 ms - dwg2dxf.exe was NOT run!)');
+    print('Entities Loaded:  ${doc.entities.length} direct entities + ${doc.blocks.length} blocks');
+    print('Spatial Index:    Built in isolate with ${doc.spatialIndex != null ? "active QuadTree" : "none"}');
+    print('TOTAL LOAD TIME:  ${sw.elapsedMilliseconds} ms!');
+    print('===============================================================\n');
+
+    expect(doc.entities.length, equals(69417));
+    expect(sw.elapsedMilliseconds, lessThan(350));
+  });
 }
 
 

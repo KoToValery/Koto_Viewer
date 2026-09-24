@@ -1362,7 +1362,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       }
 
       File effectiveDxfFile;
+      File? originalSourceFile;
       if (lower.endsWith('.dwg')) {
+        originalSourceFile = File(filePath);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -1385,7 +1387,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         }
       }
 
-      final importedDoc = await DxfParser.parseFromFile(effectiveDxfFile);
+      final importedDoc = await DxfParser.parseFromFile(effectiveDxfFile, originalFile: originalSourceFile);
       final activeCrs = CoordinateSystemService.activeSystemNotifier.value;
 
       if (!mounted) return;
