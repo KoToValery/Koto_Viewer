@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
 import '../models/dxf_models.dart';
 
 /// Internal fast growing binary buffer for KCAD serialization.
@@ -303,7 +302,7 @@ class KcadWriter {
       buf.writeUint32(st.getId(l.name));
       buf.writeInt32(l.colorIndex);
       buf.writeUint8(l.trueColor != null ? 1 : 0);
-      if (l.trueColor != null) buf.writeInt32(l.trueColor!);
+      if (l.trueColor != null) buf.writeUint32(l.trueColor!);
       buf.writeUint8(l.isVisible ? 1 : 0);
       buf.writeUint8(l.isFrozen ? 1 : 0);
       buf.writeUint8(l.lineweight != null ? 1 : 0);
@@ -576,7 +575,7 @@ class KcadWriter {
     buf.writeUint8(flags);
     buf.writeUint32(st.getId(e.layer));
     if ((flags & 1) != 0) buf.writeInt32(e.colorIndex!);
-    if ((flags & 2) != 0) buf.writeInt32(e.trueColor!);
+    if ((flags & 2) != 0) buf.writeUint32(e.trueColor!);
     if ((flags & 4) != 0) buf.writeUint32(st.getId(e.lineType!));
     if ((flags & 8) != 0) buf.writeFloat32(e.lineWeight!);
     if ((flags & 16) != 0) buf.writeFloat32(e.lineTypeScale!);

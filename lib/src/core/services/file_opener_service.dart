@@ -11,6 +11,7 @@ import 'recent_files_service.dart';
 
 import '../../features/pdf_viewer/pdf_viewer_screen.dart';
 import '../../features/dxf_viewer/dxf_viewer_screen.dart';
+import '../../features/dxf_viewer/binary/kcad_service.dart';
 import '../../features/svg_viewer/svg_viewer_screen.dart';
 import '../../features/dxf_3d_viewer/dxf_3d_viewer_screen.dart';
 import '../../features/xlsx_viewer/xlsx_viewer_screen.dart';
@@ -35,7 +36,6 @@ import '../../features/dicom_viewer/dicom_viewer_screen.dart';
 import '../../features/dicom_viewer/dicom_study_loader.dart';
 import '../../features/video_viewer/video_viewer_screen.dart';
 import '../../features/project_viewer/project_viewer_screen.dart';
-import 'project_bundle_service.dart';
 
 /// Unified service for resolving, converting, and opening all file formats
 /// supported by KotoViewer.
@@ -137,6 +137,24 @@ class FileOpenerService {
         );
 
       case KotoFileType.dwg:
+        final dwgFile = File(resolvedPath);
+        final kcadPath = await KcadService.getCachePath(dwgFile);
+        if (await File(kcadPath).exists() && await File(kcadPath).length() > 16) {
+          debugPrint('FileOpenerService: Instant DWG open via KCAD cache! -> $kcadPath');
+          return await _pushViewer(
+            nav,
+            item,
+            filePath,
+            DxfViewerScreen(
+              filePath: kcadPath,
+              title: name,
+              originalFilePath: filePath,
+              addToRecent: addToRecent,
+            ),
+            addToRecent: addToRecent,
+          );
+        }
+
         String? convertedDxfPath;
         String? conversionError;
         try {

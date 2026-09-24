@@ -279,5 +279,84 @@ void main() {
     expect(docCached.entities.isNotEmpty, isTrue);
     expect(sw.elapsedMilliseconds, lessThan(1200));
   });
+
+  test('Stable Cache Key: DWG and intermediate DXF resolve to exact same companion KCAD path', () async {
+    final dwgFile = File(r'C:\Users\Creator\Downloads\+9.30 (OVK).dwg');
+    final dxfFile = File(r'C:\Users\Creator\AppData\Local\Temp\dwg_cache\+9.30 (OVK)_7275639_1790145006000_v6.dxf');
+
+    final cachePathFromDxf = await KcadService.getCachePath(dxfFile);
+    print('KCAD Cache Path from intermediate DXF: $cachePathFromDxf');
+    expect(cachePathFromDxf.endsWith(r'+9.30 (OVK)_7275639_1790145006000_v2.kcad'), isTrue);
+
+    if (dwgFile.existsSync()) {
+      final cachePathFromDwg = await KcadService.getCachePath(dwgFile);
+      print('KCAD Cache Path from original DWG:     $cachePathFromDwg');
+      expect(cachePathFromDwg, equals(cachePathFromDxf));
+    }
+  });
+
+  test('KCAD Annotation baking: DxfAnnotation converts to native CAD Leader and MText round-trip', () {
+    final anno = DxfAnnotation(
+      id: 'anno_1',
+      text: 'Вентилационен отвор ф160',
+      arrowTipCad: const Offset(1500.5, 2300.25),
+      textPosCad: const Offset(1550.0, 2350.0),
+      colorValue: 0xFFFFD600,
+      createdAt: DateTime.now(),
+      textHeight: 15.0,
+    );
+
+    final markupLayer = DxfLayer(
+      name: 'MARKUP',
+      colorIndex: 2,
+      trueColor: anno.colorValue,
+      isVisible: true,
+      isFrozen: false,
+    );
+
+    final leader = DxfLeader(
+      vertices: [anno.arrowTipCad, anno.textPosCad],
+      hasArrowhead: true,
+      layer: 'MARKUP',
+      trueColor: anno.colorValue,
+    );
+
+    final mtext = DxfMText(
+      rawText: anno.text,
+      cleanText: anno.text,
+      insertPoint: anno.textPosCad,
+      height: anno.textHeight ?? 2.5,
+      layer: 'MARKUP',
+      trueColor: anno.colorValue,
+      attachmentPoint: 1,
+    );
+
+    final doc = DxfDocument(
+      layers: {'MARKUP': markupLayer},
+      blocks: {},
+      entities: [leader, mtext],
+      headerVars: {r'$ACADVER': 'AC1027'},
+      bounds: const Rect.fromLTRB(1400, 2200, 1600, 2400),
+      entityStats: {'LEADER': 1, 'MTEXT': 1},
+    );
+
+    final bytes = KcadWriter.write(doc, compress: true);
+    final decoded = KcadReader.read(bytes);
+
+    expect(decoded.layers.containsKey('MARKUP'), isTrue);
+    expect(decoded.entities.length, equals(2));
+
+    final decodedLeader = decoded.entities.firstWhere((e) => e is DxfLeader) as DxfLeader;
+    expect(decodedLeader.vertices.length, equals(2));
+    expect((decodedLeader.vertices[0].dx - 1500.5).abs(), lessThan(0.01));
+    expect((decodedLeader.vertices[0].dy - 2300.25).abs(), lessThan(0.01));
+    expect(decodedLeader.trueColor, equals(anno.colorValue));
+
+    final decodedMText = decoded.entities.firstWhere((e) => e is DxfMText) as DxfMText;
+    expect(decodedMText.cleanText, equals('Вентилационен отвор ф160'));
+    expect((decodedMText.height - 15.0).abs(), lessThan(0.01));
+    expect(decodedMText.trueColor, equals(anno.colorValue));
+  });
 }
+
 

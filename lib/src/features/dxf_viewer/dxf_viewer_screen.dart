@@ -117,11 +117,13 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     });
   }
 
+  String get _annotationsPrefKey => widget.originalFilePath ?? widget.filePath;
+
   Future<void> _saveAnnotationsToPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = _annotations.map((a) => a.toJson()).toList();
-      await prefs.setString('dxf_annotations_${widget.filePath}', jsonEncode(jsonList));
+      await prefs.setString('dxf_annotations_$_annotationsPrefKey', jsonEncode(jsonList));
     } on Exception catch (_) {
       // Ignore preference write failure
     }
@@ -130,7 +132,11 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   Future<void> _loadSavedAnnotations() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('dxf_annotations_${widget.filePath}');
+      var raw = prefs.getString('dxf_annotations_$_annotationsPrefKey');
+      if (raw == null && widget.originalFilePath != null) {
+        // Fallback to widget.filePath for backward compatibility with existing saved annotations
+        raw = prefs.getString('dxf_annotations_${widget.filePath}');
+      }
       if (raw != null) {
         final list = (jsonDecode(raw) as List<dynamic>)
             .map((e) => DxfAnnotation.fromJson(e as Map<String, dynamic>))
@@ -224,17 +230,19 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         return;
       }
 
+      File? origFile;
       if (widget.originalFilePath != null) {
-        final origFile = File(widget.originalFilePath!);
+        origFile = File(widget.originalFilePath!);
         if (await origFile.exists()) {
           _fileSizeBytes = await origFile.length();
         } else {
           _fileSizeBytes = await file.length();
+          origFile = null;
         }
       } else {
         _fileSizeBytes = await file.length();
       }
-      final doc = await DxfParser.parseFromFile(file);
+      final doc = await DxfParser.parseFromFile(file, originalFile: origFile);
 
       if (mounted) {
         setState(() {
@@ -858,12 +866,62 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     try {
       final baseName = (widget.title ?? widget.filePath.split(Platform.pathSeparator).last)
           .replaceAll(RegExp(r'\.(dxf|dwg|kcad)$', caseSensitive: false), '');
-      final outputFileName = '${baseName}_fast.kcad';
+      final suffix = _annotations.isNotEmpty ? '_annotated.kcad' : '_fast.kcad';
+      final outputFileName = '$baseName$suffix';
 
       final dir = await getApplicationDocumentsDirectory();
       final outputFile = File('${dir.path}/$outputFileName');
 
-      await KcadService.exportKcadFile(_document!, outputFile.path);
+      var docToExport = _document!;
+      if (_annotations.isNotEmpty) {
+        final newLayers = Map<String, DxfLayer>.from(docToExport.layers);
+        if (!newLayers.containsKey('MARKUP')) {
+          newLayers['MARKUP'] = DxfLayer(
+            name: 'MARKUP',
+            colorIndex: 2,
+            trueColor: 0xFFFFD600,
+            isVisible: true,
+            isFrozen: false,
+          );
+        }
+
+        final addedEntities = <DxfEntity>[];
+        for (final anno in _annotations) {
+          addedEntities.add(DxfLeader(
+            vertices: [anno.arrowTipCad, anno.textPosCad],
+            hasArrowhead: true,
+            layer: 'MARKUP',
+            trueColor: anno.colorValue,
+          ));
+          addedEntities.add(DxfMText(
+            rawText: anno.text,
+            cleanText: anno.text,
+            insertPoint: anno.textPosCad,
+            height: anno.textHeight ?? 2.5,
+            layer: 'MARKUP',
+            trueColor: anno.colorValue,
+            attachmentPoint: 1,
+          ));
+        }
+
+        final allEntities = List<DxfEntity>.from(docToExport.entities)..addAll(addedEntities);
+        final stats = Map<String, int>.from(docToExport.entityStats);
+        stats['LEADER'] = (stats['LEADER'] ?? 0) + _annotations.length;
+        stats['MTEXT'] = (stats['MTEXT'] ?? 0) + _annotations.length;
+
+        docToExport = DxfDocument(
+          layers: newLayers,
+          blocks: docToExport.blocks,
+          entities: allEntities,
+          headerVars: docToExport.headerVars,
+          textStyles: docToExport.textStyles,
+          bounds: docToExport.bounds,
+          entityStats: stats,
+          lineTypes: docToExport.lineTypes,
+        );
+      }
+
+      await KcadService.exportKcadFile(docToExport, outputFile.path);
 
       if (mounted) {
         final sizeMb = (await outputFile.length()) / (1024 * 1024);

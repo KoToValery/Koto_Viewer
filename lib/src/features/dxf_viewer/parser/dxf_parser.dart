@@ -29,14 +29,14 @@ class DxfParser {
   /// If a compiled .kcad binary cache exists, it is loaded in ~400ms instead of ~4-8 seconds.
   /// For files >64KB without cache, file I/O, Cyrillic decoding, entity parsing, and QuadTree spatial indexing
   /// run completely in a background Isolate worker thread without blocking the UI.
-  static Future<DxfDocument> parseFromFile(File file) async {
+  static Future<DxfDocument> parseFromFile(File file, {File? originalFile}) async {
     // 0. Direct KCAD binary loading:
     if (file.path.toLowerCase().endsWith('.kcad')) {
       return KcadService.loadKcadFile(file);
     }
 
     // 1. Transparent KCAD binary cache check:
-    final cachedDoc = await KcadService.tryLoadCachedKcad(file);
+    final cachedDoc = await KcadService.tryLoadCachedKcad(file, originalFile: originalFile);
     if (cachedDoc != null) {
       return cachedDoc;
     }
@@ -52,7 +52,7 @@ class DxfParser {
     }
 
     // 2. Cache binary in the background for all subsequent loads:
-    unawaited(KcadService.saveKcadCache(file, doc));
+    unawaited(KcadService.saveKcadCache(file, doc, originalFile: originalFile));
 
     return doc;
   }

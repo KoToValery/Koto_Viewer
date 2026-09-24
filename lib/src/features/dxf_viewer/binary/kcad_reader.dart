@@ -189,7 +189,7 @@ class KcadReader {
       final name = stringTable[bodyReader.readUint32()];
       final colorIndex = bodyReader.readInt32();
       final hasTrueColor = bodyReader.readUint8() != 0;
-      final trueColor = hasTrueColor ? bodyReader.readInt32() : null;
+      final trueColor = hasTrueColor ? bodyReader.readUint32() : null;
       final isVisible = bodyReader.readUint8() != 0;
       final isFrozen = bodyReader.readUint8() != 0;
       final hasLineweight = bodyReader.readUint8() != 0;
@@ -303,7 +303,7 @@ class KcadReader {
     final flags = reader.readUint8();
     final layer = stringTable[reader.readUint32()];
     final colorIndex = (flags & 1) != 0 ? reader.readInt32() : null;
-    final trueColor = (flags & 2) != 0 ? reader.readInt32() : null;
+    final trueColor = (flags & 2) != 0 ? reader.readUint32() : null;
     final lineType = (flags & 4) != 0 ? stringTable[reader.readUint32()] : null;
     final lineWeight = (flags & 8) != 0
         ? (isV2 ? reader.readFloat32() : reader.readFloat64())
