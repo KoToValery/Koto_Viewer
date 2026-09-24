@@ -635,7 +635,7 @@ class _SvgViewerScreenState extends State<SvgViewerScreen> {
                   minScale: 0.002,
                   maxScale: 2000.0,
                   constrained: false,
-                  boundaryMargin: const EdgeInsets.all(2500.0),
+                  boundaryMargin: const EdgeInsets.all(double.infinity),
                   child: Container(
                     width: svgWidth,
                     height: svgHeight,

@@ -169,7 +169,7 @@ class _PcbImageZoomDialogState extends State<PcbImageZoomDialog> {
                         transformationController: _transformController,
                         minScale: 0.2,
                         maxScale: 30.0,
-                        boundaryMargin: const EdgeInsets.all(1500),
+                        boundaryMargin: const EdgeInsets.all(double.infinity),
                         child: Center(
                           child: Image.memory(
                             currentImg.bytes,

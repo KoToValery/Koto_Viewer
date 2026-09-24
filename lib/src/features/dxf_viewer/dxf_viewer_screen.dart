@@ -1843,7 +1843,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                           scaleEnabled: true,
                           minScale: 0.001,
                           maxScale: 1000.0,
-                          boundaryMargin: const EdgeInsets.all(1000.0),
+                          boundaryMargin: const EdgeInsets.all(double.infinity),
                           child: RepaintBoundary(
                             child: CustomPaint(
                               size: _viewportSize,

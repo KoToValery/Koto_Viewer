@@ -455,7 +455,7 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
                   transformationController: _transformController,
                   minScale: 0.002,
                   maxScale: 2000.0,
-                  boundaryMargin: const EdgeInsets.all(2500.0),
+                  boundaryMargin: const EdgeInsets.all(double.infinity),
                   child: Center(
                     child: CustomPaint(
                       size: Size(canvasW, canvasH),
