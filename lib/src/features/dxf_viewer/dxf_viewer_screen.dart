@@ -23,6 +23,7 @@ import '../home/widgets/share_options_sheet.dart';
 import 'models/dxf_display_settings.dart';
 import 'models/dxf_models.dart';
 import 'parser/dxf_parser.dart';
+import 'binary/kcad_service.dart';
 import 'rendering/dxf_math.dart';
 import 'rendering/dxf_painter.dart';
 import 'rendering/dxf_snap_helper.dart';
@@ -185,7 +186,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     // Repaint scale-dependent strokes and the visible entity set only after input settles.
     _transformSettleTimer?.cancel();
     _transformSettleTimer = Timer(
-      const Duration(milliseconds: 140),
+      const Duration(milliseconds: 80),
       _syncCanvasAfterTransform,
     );
   }
@@ -844,6 +845,49 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(l10n.failedToSaveDxf(e.toString())),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportKcad() async {
+    if (_document == null) return;
+    try {
+      final baseName = (widget.title ?? widget.filePath.split(Platform.pathSeparator).last)
+          .replaceAll(RegExp(r'\.(dxf|dwg|kcad)$', caseSensitive: false), '');
+      final outputFileName = '${baseName}_fast.kcad';
+
+      final dir = await getApplicationDocumentsDirectory();
+      final outputFile = File('${dir.path}/$outputFileName');
+
+      await KcadService.exportKcadFile(_document!, outputFile.path);
+
+      if (mounted) {
+        final sizeMb = (await outputFile.length()) / (1024 * 1024);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved fast KCAD: $outputFileName (${sizeMb.toStringAsFixed(2)} MB)'),
+            backgroundColor: const Color(0xFF1B2433),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Share',
+              textColor: const Color(0xFF00E5FF),
+              onPressed: () {
+                Share.shareXFiles([XFile(outputFile.path)], subject: outputFileName);
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'DxfViewer._exportKcad');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save KCAD: $e'),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1683,12 +1727,25 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                       case 'share':
                         _shareDxf();
                         break;
+                      case 'export_kcad':
+                        _exportKcad();
+                        break;
                       case 'print':
                         _printDxf();
                         break;
                     }
                   },
                   itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'export_kcad',
+                      child: Row(
+                        children: [
+                          Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 20),
+                          SizedBox(width: 12),
+                          Text('Export as Fast KCAD'),
+                        ],
+                      ),
+                    ),
                     if (_annotations.isNotEmpty || _importedDxfFiles.isNotEmpty)
                       PopupMenuItem(
                         value: 'save_merged',

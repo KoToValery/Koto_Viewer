@@ -1,0 +1,283 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
+import 'package:kotoview/src/features/dxf_viewer/parser/dxf_parser.dart';
+import 'package:kotoview/src/features/dxf_viewer/binary/kcad_writer.dart';
+import 'package:kotoview/src/features/dxf_viewer/binary/kcad_reader.dart';
+
+import 'package:kotoview/src/features/dxf_viewer/binary/kcad_service.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('KCAD Binary Format: Complete Round-Trip Verification', () {
+    final layer0 = DxfLayer(name: '0', colorIndex: 7);
+    final layerWalls = DxfLayer(name: 'WALLS', colorIndex: 1, lineweight: 0.35, isThick: true);
+    final layerText = DxfLayer(name: 'TEXT_LAYER', colorIndex: 3, lineType: 'DASHED');
+
+    final testBlock = DxfBlock(
+      name: 'DOOR_BLK',
+      basePoint: const Offset(10, 20),
+      entities: [
+        const DxfLine(
+          p1: Offset(0, 0),
+          p2: Offset(50, 0),
+          layer: 'WALLS',
+          colorIndex: 1,
+        ),
+        const DxfCircle(
+          center: Offset(50, 0),
+          radius: 25,
+          layer: 'WALLS',
+        ),
+      ],
+    );
+
+    final entities = <DxfEntity>[
+      const DxfLine(
+        p1: Offset(100.5, 200.25),
+        p2: Offset(300.75, 400.125),
+        layer: 'WALLS',
+        colorIndex: 1,
+        trueColor: 0x00FF0000,
+        lineWeight: 0.35,
+      ),
+      const DxfPoint(
+        point: Offset(50, 60),
+        layer: '0',
+      ),
+      const DxfCircle(
+        center: Offset(150, 250),
+        radius: 42.5,
+        layer: '0',
+        colorIndex: 7,
+      ),
+      const DxfArc(
+        center: Offset(200, 300),
+        radius: 50,
+        startAngleDeg: 45,
+        endAngleDeg: 135,
+        layer: 'WALLS',
+      ),
+      const DxfEllipse(
+        center: Offset(300, 400),
+        majorAxisEndOffset: Offset(60, 0),
+        minorRatio: 0.5,
+        layer: 'WALLS',
+      ),
+      const DxfLwPolyline(
+        vertices: [
+          DxfPolylineVertex(x: 10, y: 10, bulge: 0.5),
+          DxfPolylineVertex(x: 20, y: 10),
+          DxfPolylineVertex(x: 20, y: 20),
+          DxfPolylineVertex(x: 10, y: 20),
+        ],
+        isClosed: true,
+        elevation: 5.0,
+        layer: 'WALLS',
+      ),
+      const DxfText(
+        text: 'Hello KCAD! Привет CAD!',
+        insertPoint: Offset(500, 600),
+        height: 12.5,
+        rotationDeg: 30,
+        layer: 'TEXT_LAYER',
+      ),
+      const DxfMText(
+        rawText: r'\A1;Line 1\PLine 2',
+        cleanText: 'Line 1\nLine 2',
+        insertPoint: Offset(700, 800),
+        height: 15.0,
+        refWidth: 200.0,
+        layer: 'TEXT_LAYER',
+      ),
+      const DxfSolid(
+        p0: Offset(1, 1),
+        p1: Offset(10, 1),
+        p2: Offset(10, 10),
+        p3: Offset(1, 10),
+        layer: 'WALLS',
+      ),
+      const DxfHatch(
+        boundaryPaths: [
+          [Offset(0, 0), Offset(100, 0), Offset(100, 100), Offset(0, 100)],
+        ],
+        patternName: 'ANSI31',
+        isSolid: false,
+        patternAngle: 45,
+        patternScale: 2.0,
+        layer: 'WALLS',
+      ),
+      const DxfInsert(
+        blockName: 'DOOR_BLK',
+        insertPoint: Offset(1000, 2000),
+        scaleX: 1.5,
+        scaleY: 1.5,
+        rotationDeg: 90,
+        layer: 'WALLS',
+      ),
+      const DxfDimension(
+        dimType: 0,
+        defPoint1: Offset(10, 10),
+        defPoint2: Offset(100, 10),
+        textPoint: Offset(55, 20),
+        textOverride: '90 mm',
+        layer: 'WALLS',
+      ),
+      const DxfLeader(
+        vertices: [Offset(10, 10), Offset(20, 20), Offset(30, 20)],
+        hasArrowhead: true,
+        layer: 'WALLS',
+      ),
+    ];
+
+    final originalDoc = DxfDocument(
+      layers: {'0': layer0, 'WALLS': layerWalls, 'TEXT_LAYER': layerText},
+      blocks: {'DOOR_BLK': testBlock},
+      entities: entities,
+      headerVars: {r'$ACADVER': 'AC1027', r'$INSUNITS': '4'},
+      bounds: const Rect.fromLTRB(0, 0, 2000, 3000),
+      entityStats: {'LINE': 1, 'POINT': 1, 'CIRCLE': 1},
+      lineTypes: {
+        'DASHED': [10.0, -5.0],
+      },
+    );
+
+    // 1. Serialize to KCAD binary
+    final binary = KcadWriter.write(originalDoc, compress: true);
+    expect(binary.isNotEmpty, isTrue);
+
+    // 2. Deserialize from KCAD binary
+    final decodedDoc = KcadReader.read(binary);
+
+    // 3. Verify Document Metadata & Tables
+    expect(decodedDoc.bounds, equals(originalDoc.bounds));
+    expect(decodedDoc.layers.length, equals(3));
+    expect(decodedDoc.layers['WALLS']?.colorIndex, equals(1));
+    expect(decodedDoc.layers['WALLS']?.isThick, isTrue);
+    expect(decodedDoc.layers['TEXT_LAYER']?.lineType, equals('DASHED'));
+    expect(decodedDoc.lineTypes['DASHED'], equals([10.0, -5.0]));
+    expect(decodedDoc.headerVars[r'$ACADVER'], equals('AC1027'));
+
+    // 4. Verify Blocks
+    expect(decodedDoc.blocks.containsKey('DOOR_BLK'), isTrue);
+    final decodedBlock = decodedDoc.blocks['DOOR_BLK']!;
+    expect(decodedBlock.entities.length, equals(2));
+    expect(decodedBlock.entities[0], isA<DxfLine>());
+    expect((decodedBlock.entities[0] as DxfLine).p2.dx, equals(50));
+
+    // 5. Verify Entities
+    expect(decodedDoc.entities.length, equals(entities.length));
+
+    // Line
+    final line = decodedDoc.entities[0] as DxfLine;
+    expect(line.p1.dx, closeTo(100.5, 0.01));
+    expect(line.p1.dy, closeTo(200.25, 0.01));
+    expect(line.p2.dx, closeTo(300.75, 0.01));
+    expect(line.p2.dy, closeTo(400.125, 0.01));
+    expect(line.layer, equals('WALLS'));
+    expect(line.trueColor, equals(0x00FF0000));
+
+    // Circle
+    final circle = decodedDoc.entities[2] as DxfCircle;
+    expect(circle.center.dx, closeTo(150, 0.01));
+    expect(circle.center.dy, closeTo(250, 0.01));
+    expect(circle.radius, closeTo(42.5, 0.01));
+
+    // Arc
+    final arc = decodedDoc.entities[3] as DxfArc;
+    expect(arc.startAngleDeg, closeTo(45, 0.01));
+    expect(arc.endAngleDeg, closeTo(135, 0.01));
+
+    // Text & Unicode (Cyrillic)
+    final text = decodedDoc.entities[6] as DxfText;
+    expect(text.text, equals('Hello KCAD! Привет CAD!'));
+    expect(text.rotationDeg, closeTo(30, 0.01));
+
+    // MText
+    final mtext = decodedDoc.entities[7] as DxfMText;
+    expect(mtext.cleanText, equals('Line 1\nLine 2'));
+    expect(mtext.refWidth, equals(200.0));
+
+    // Insert
+    final insert = decodedDoc.entities[10] as DxfInsert;
+    expect(insert.blockName, equals('DOOR_BLK'));
+    expect(insert.scaleX, equals(1.5));
+    expect(insert.rotationDeg, equals(90));
+
+    // Dimension
+    final dim = decodedDoc.entities[11] as DxfDimension;
+    expect(dim.textOverride, equals('90 mm'));
+
+    // Spatial Index
+    expect(decodedDoc.spatialIndex, isNotNull);
+    final queried = decodedDoc.spatialIndex!.query(const Rect.fromLTWH(0, 0, 500, 500));
+    expect(queried.isNotEmpty, isTrue);
+  });
+
+  test('Benchmark KCAD vs 61.7MB DXF on real OVK drawing', () async {
+    final dxfPath = r'C:\Users\Creator\AppData\Local\Temp\dwg_cache\+9.30 (OVK)_7275639_1790145006000_v6.dxf';
+    final dxfFile = File(dxfPath);
+    if (!dxfFile.existsSync()) {
+      print('OVK test DXF file not found, skipping benchmark');
+      return;
+    }
+
+    final int dxfSize = dxfFile.lengthSync();
+    print('\n================ KCAD VS DXF BENCHMARK ================');
+    print('Original DXF size: ${(dxfSize / 1024 / 1024).toStringAsFixed(2)} MB ($dxfSize bytes)');
+
+    // 1. Measure DXF Cold Parse
+    final swDxf = Stopwatch()..start();
+    final doc = await DxfParser.parseFromFile(dxfFile);
+    swDxf.stop();
+    print('DXF Parse Time: ${swDxf.elapsedMilliseconds} ms (${doc.entities.length} entities)');
+
+    // 2. Measure KCAD Write
+    final swKcadWrite = Stopwatch()..start();
+    final kcadCompressed = KcadWriter.write(doc, compress: true);
+    swKcadWrite.stop();
+
+    final kcadUncompressed = KcadWriter.write(doc, compress: false);
+
+    print('KCAD Serialization Time: ${swKcadWrite.elapsedMilliseconds} ms');
+    print('KCAD Uncompressed Size: ${(kcadUncompressed.length / 1024 / 1024).toStringAsFixed(2)} MB');
+    print('KCAD Compressed Size: ${(kcadCompressed.length / 1024 / 1024).toStringAsFixed(2)} MB');
+    print('Compression Ratio: ${(dxfSize / kcadCompressed.length).toStringAsFixed(1)}x smaller than DXF!');
+
+    // 3. Measure KCAD Read
+    final swKcadRead = Stopwatch()..start();
+    final kcadDoc = KcadReader.read(kcadCompressed);
+    swKcadRead.stop();
+
+    print('KCAD Load & Parse Time: ${swKcadRead.elapsedMilliseconds} ms');
+    print('SPEEDUP: ${(swDxf.elapsedMilliseconds / swKcadRead.elapsedMilliseconds).toStringAsFixed(1)}x FASTER!');
+
+    // 4. Verify entities match
+    expect(kcadDoc.entities.length, equals(doc.entities.length));
+    expect(kcadDoc.blocks.length, equals(doc.blocks.length));
+    expect(kcadDoc.layers.length, equals(doc.layers.length));
+    print('Round-trip verification successful: 100% entity and table count match!');
+    print('========================================================\n');
+
+    // Save cache explicitly to disk for the next test
+    await KcadService.saveKcadCache(dxfFile, doc);
+  });
+
+  test('Transparent KCAD caching via DxfParser.parseFromFile', () async {
+    final dxfPath = r'C:\Users\Creator\AppData\Local\Temp\dwg_cache\+9.30 (OVK)_7275639_1790145006000_v6.dxf';
+    final dxfFile = File(dxfPath);
+    if (!dxfFile.existsSync()) return;
+
+    // First call may have already populated or will populate cache
+    // Let's call parseFromFile which hits the KCAD cache
+    final sw = Stopwatch()..start();
+    final docCached = await DxfParser.parseFromFile(dxfFile);
+    sw.stop();
+    print('DxfParser.parseFromFile (Cached Hit) Time: ${sw.elapsedMilliseconds} ms (${docCached.entities.length} entities)');
+    expect(docCached.entities.isNotEmpty, isTrue);
+    expect(sw.elapsedMilliseconds, lessThan(1200));
+  });
+}
+

@@ -515,7 +515,8 @@ class DwgConverterService {
       int prunedCount = 0;
 
       await for (final entity in cacheDir.list()) {
-        if (entity is File && entity.path.endsWith('.dxf')) {
+        if (entity is File &&
+            (entity.path.endsWith('.dxf') || entity.path.endsWith('.kcad'))) {
           try {
             final stat = await entity.stat();
             if (now.difference(stat.modified) > maxAge) {

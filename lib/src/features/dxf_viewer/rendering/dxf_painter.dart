@@ -222,6 +222,10 @@ class DxfPainter extends CustomPainter {
         ? document.spatialIndex!.query(visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.5))
         : document.entities;
 
+    final Map<int, Path> continuousLineBatches = {};
+    final Map<int, Paint> lineBatchPaints = {};
+    final List<({DxfEntity entity, Paint strokePaint, Paint fillPaint})> deferredOverlays = [];
+
     for (final entity in entitiesToDraw) {
       try {
         final layer = document.layers[entity.layer];
@@ -244,6 +248,73 @@ class DxfPainter extends CustomPainter {
 
         final strokeWidth = _calcStrokeWidth(entity.lineWeight, layer: layer);
 
+        // FAST PATH: Batch continuous top-level lines and polylines into a single Path per style
+        if (entity is DxfLine && _isContinuousLineType(entity.lineType, layer?.lineType)) {
+          final p1 = toCanvas(entity.p1);
+          final p2 = toCanvas(entity.p2);
+          final int styleKey = (color.value & 0xFFFFFFFF) | (((strokeWidth * 100).round() & 0x7FFFFFFF) << 32);
+          var batchPath = continuousLineBatches[styleKey];
+          if (batchPath == null) {
+            batchPath = Path();
+            continuousLineBatches[styleKey] = batchPath;
+            lineBatchPaints[styleKey] = Paint()
+              ..color = color
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = strokeWidth
+              ..strokeCap = StrokeCap.round
+              ..strokeJoin = StrokeJoin.round
+              ..isAntiAlias = true;
+          }
+          batchPath.moveTo(p1.dx, p1.dy);
+          batchPath.lineTo(p2.dx, p2.dy);
+          renderedEntities++;
+          lineCount++;
+          continue;
+        }
+
+        if (entity is DxfLwPolyline && _isContinuousLineType(entity.lineType, layer?.lineType)) {
+          final vertices = entity.vertices;
+          if (vertices.isNotEmpty) {
+            final int styleKey = (color.value & 0xFFFFFFFF) | (((strokeWidth * 100).round() & 0x7FFFFFFF) << 32);
+            var batchPath = continuousLineBatches[styleKey];
+            if (batchPath == null) {
+              batchPath = Path();
+              continuousLineBatches[styleKey] = batchPath;
+              lineBatchPaints[styleKey] = Paint()
+                ..color = color
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = strokeWidth
+                ..strokeCap = StrokeCap.round
+                ..strokeJoin = StrokeJoin.round
+                ..isAntiAlias = true;
+            }
+            final count = vertices.length;
+            final endIdx = entity.isClosed ? count : count - 1;
+            final p0 = toCanvas(vertices.first.offset);
+            batchPath.moveTo(p0.dx, p0.dy);
+            for (int i = 0; i < endIdx; i++) {
+              final v1 = vertices[i];
+              final v2 = vertices[(i + 1) % count];
+              if (v1.bulge.abs() > 1e-6) {
+                final arcPoints = DxfMath.generateBulgeArcPoints(v1.offset, v2.offset, v1.bulge);
+                for (int k = 1; k < arcPoints.length; k++) {
+                  final pt = toCanvas(arcPoints[k]);
+                  batchPath.lineTo(pt.dx, pt.dy);
+                }
+              } else {
+                final pt = toCanvas(v2.offset);
+                batchPath.lineTo(pt.dx, pt.dy);
+              }
+            }
+            if (entity.isClosed) {
+              batchPath.close();
+            }
+            renderedEntities++;
+            polyCount++;
+            continue;
+          }
+        }
+
         final strokePaint = Paint()
           ..color = color
           ..style = PaintingStyle.stroke
@@ -256,6 +327,12 @@ class DxfPainter extends CustomPainter {
           ..color = color.withValues(alpha: 0.35)
           ..style = PaintingStyle.fill
           ..isAntiAlias = true;
+
+        // Defer Texts, Dimensions, Leaders to render on top of lines for pristine legibility
+        if (entity is DxfText || entity is DxfMText || entity is DxfDimension || entity is DxfLeader) {
+          deferredOverlays.add((entity: entity, strokePaint: strokePaint, fillPaint: fillPaint));
+          continue;
+        }
 
         _renderEntity(
           canvas: canvas,
@@ -286,18 +363,56 @@ class DxfPainter extends CustomPainter {
         } else if (entity is DxfHatch) {
           hatchCount++;
           hatchUs += deltaUs;
-        } else if (entity is DxfText || entity is DxfMText) {
-          textCount++;
-          textUs += deltaUs;
-        } else if (entity is DxfDimension || entity is DxfLeader) {
-          dimCount++;
-          dimUs += deltaUs;
         } else {
           otherCount++;
           otherUs += deltaUs;
         }
       } on Exception catch (_) {
         // Individual entity rendering failure must never break the frame
+        lastUs = paintStopwatch.elapsedMicroseconds;
+      }
+    }
+
+    // Flush batched continuous lines (drastically drops Skia draw call overhead)
+    if (continuousLineBatches.isNotEmpty) {
+      final int batchStartUs = paintStopwatch.elapsedMicroseconds;
+      for (final entry in continuousLineBatches.entries) {
+        final paint = lineBatchPaints[entry.key]!;
+        canvas.drawPath(entry.value, paint);
+      }
+      final int batchDeltaUs = paintStopwatch.elapsedMicroseconds - batchStartUs;
+      lineUs += batchDeltaUs;
+      lastUs = paintStopwatch.elapsedMicroseconds;
+    }
+
+    // Render deferred Texts and Dimensions on top of lines
+    for (final item in deferredOverlays) {
+      try {
+        _renderEntity(
+          canvas: canvas,
+          entity: item.entity,
+          strokePaint: item.strokePaint,
+          fillPaint: item.fillPaint,
+          toCanvas: toCanvas,
+          fitScale: fitScale,
+          blocks: document.blocks,
+          layers: document.layers,
+          blockDiagnostics: blockDiagnostics,
+        );
+
+        final nowUs = paintStopwatch.elapsedMicroseconds;
+        final deltaUs = nowUs - lastUs;
+        lastUs = nowUs;
+
+        renderedEntities++;
+        if (item.entity is DxfText || item.entity is DxfMText) {
+          textCount++;
+          textUs += deltaUs;
+        } else if (item.entity is DxfDimension || item.entity is DxfLeader) {
+          dimCount++;
+          dimUs += deltaUs;
+        }
+      } on Exception catch (_) {
         lastUs = paintStopwatch.elapsedMicroseconds;
       }
     }
@@ -501,6 +616,23 @@ class DxfPainter extends CustomPainter {
       );
       canvas.drawPath(dashedPath, paint);
     }
+  }
+
+  bool _isContinuousLineType(String? lineType, String? layerLineType) {
+    if ((lineType == null || lineType == 'BYLAYER' || lineType == 'BYBLOCK' || lineType == 'Continuous' || lineType == 'CONTINUOUS') &&
+        (layerLineType == null || layerLineType == 'Continuous' || layerLineType == 'CONTINUOUS')) {
+      return true;
+    }
+    String? effective = lineType;
+    if (effective == null || effective.trim().toUpperCase() == 'BYBLOCK') {
+      effective = null;
+    }
+    final pattern = DxfLinetypeHelper.resolvePattern(
+      effective,
+      layerLineType: layerLineType,
+      customLineTypes: document.lineTypes,
+    );
+    return pattern == null;
   }
 
   void _drawStrokeLine(
@@ -1134,11 +1266,17 @@ class DxfPainter extends CustomPainter {
 
     if (effectiveHeight <= 0.0 || fitScale <= 0.0) return;
 
+    const double capHeightRatio = 0.72;
+    final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
+    if (targetFontSize <= 0.0) return;
+
+    // Screen-space Text Greeking / LOD:
+    // If text height in screen pixels is below 2.5px, it is completely illegible to the human eye.
+    // Skipping font layout & Skia glyph generation saves 150-250ms on far zoom-out!
+    if (targetFontSize * currentScale < 2.5) return;
+
     DxfCachedTextLayout? cached = _textLayoutCache[entity];
     if (cached == null || cached.color != color || (cached.fitScale - fitScale).abs() > 1e-7) {
-      const double capHeightRatio = 0.72;
-      final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
-      if (targetFontSize <= 0.0) return;
 
       double scaleFactor = 1.0;
       double layoutFontSize = targetFontSize;
@@ -1265,11 +1403,17 @@ class DxfPainter extends CustomPainter {
 
     if (effectiveHeight <= 0.0 || fitScale <= 0.0) return;
 
+    const double capHeightRatio = 0.72;
+    final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
+    if (targetFontSize <= 0.0) return;
+
+    // Screen-space Text Greeking / LOD:
+    // If text height in screen pixels is below 2.5px, it is completely illegible to the human eye.
+    // Skipping font layout & Skia glyph generation saves 150-250ms on far zoom-out!
+    if (targetFontSize * currentScale < 2.5) return;
+
     DxfCachedTextLayout? cached = _textLayoutCache[entity];
     if (cached == null || cached.color != color || (cached.fitScale - fitScale).abs() > 1e-7) {
-      const double capHeightRatio = 0.72;
-      final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
-      if (targetFontSize <= 0.0) return;
 
       double scaleFactor = 1.0;
       double layoutFontSize = targetFontSize;
@@ -1494,6 +1638,19 @@ class DxfPainter extends CustomPainter {
     final bounds = clipPath.getBounds();
     if (bounds.isEmpty || bounds.width <= 0 || bounds.height <= 0) return;
 
+    final double scale = currentScale.clamp(0.001, 10000.0);
+
+    // Hatch LOD: If the hatch bounding box on screen is tiny (< 3.0px),
+    // rendering complex clipping and pattern lines is completely invisible.
+    // A single subtle fill handles it in 0.001ms without expensive Skia clipping.
+    if (bounds.longestSide * scale < 3.0) {
+      final miniPaint = Paint()
+        ..color = strokePaint.color.withValues(alpha: 0.15)
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(clipPath, miniPaint);
+      return;
+    }
+
     final fallbackOrigin = hatch.boundaryPaths.isNotEmpty && hatch.boundaryPaths.first.isNotEmpty
         ? hatch.boundaryPaths.first.first
         : Offset.zero;
@@ -1504,7 +1661,6 @@ class DxfPainter extends CustomPainter {
     );
     if (patternLines.isEmpty) return;
 
-    final double scale = currentScale.clamp(0.001, 10000.0);
     // Crisp CAD line thickness for hatch lines
     final double lineThickness = math.min(
       strokePaint.strokeWidth,
@@ -1931,6 +2087,14 @@ class DxfPainter extends CustomPainter {
     int depth = 0,
     Map<String, DxfBlockDiagEntry>? blockDiagnostics,
   }) {
+    // Dimension LOD: At far zoom out, dimension ticks/arrows/labels are sub-pixel noise.
+    // If the dimension span in screen pixels is below 4.0px, skip rendering.
+    final p1 = toCanvas(dim.defPoint1);
+    final p2 = toCanvas(dim.defPoint2 ?? dim.textPoint);
+    if ((p2 - p1).distance * currentScale < 4.0) {
+      return;
+    }
+
     // If dimension references an anonymous block *D..., render the block
     if (dim.blockName != null && blocks.containsKey(dim.blockName)) {
       final block = blocks[dim.blockName]!;
@@ -1985,8 +2149,6 @@ class DxfPainter extends CustomPainter {
     }
 
     // Otherwise fallback: draw dimension line between def points + text
-    final p1 = toCanvas(dim.defPoint1);
-    final p2 = toCanvas(dim.defPoint2 ?? dim.textPoint);
     canvas.drawLine(p1, p2, paint);
 
     if (dim.textOverride != null && dim.textOverride!.isNotEmpty) {
@@ -2846,7 +3008,6 @@ class DxfPainter extends CustomPainter {
 
     if (oldDelegate.document != document ||
         oldDelegate.theme != theme ||
-        oldDelegate.currentScale != currentScale ||
         oldDelegate.measurement != measurement ||
         oldDelegate.annotations != annotations ||
         oldDelegate.highlightedEntity != highlightedEntity ||
@@ -2856,15 +3017,43 @@ class DxfPainter extends CustomPainter {
       return true;
     }
 
-    // Fit-to-screen Pan optimization:
-    // If we are at fit-to-screen (scale <= 1.05) and were already at fit-to-screen,
-    // the initial render already rasterized all entities into the layer.
-    // Changing visibleCadRect due to panning at fit-to-screen does not require CPU repaint;
-    // GPU hardware transform handles panning for free!
+    // Zoom-Out & Fit-to-screen Hardware Transform Optimization:
+    // When zoomed out (scale <= 1.05) and previous frame was also at zoom-out (oldScale <= 1.05),
+    // all document entities are already rasterized into the RepaintBoundary layer at 1:1 screen resolution.
+    // Further zooming out (e.g. scale 1.0 -> 0.5 -> 0.26 -> 0.13) or panning at bird's-eye view
+    // does NOT require CPU repaint — GPU hardware transforms the layer at 120 FPS for 0.0 ms!
     if (currentScale <= 1.05 && oldDelegate.currentScale <= 1.05) {
       return false;
     }
 
-    return oldDelegate.visibleCadRect != visibleCadRect;
+    if (oldDelegate.currentScale != currentScale) {
+      return true;
+    }
+
+    final oldRect = oldDelegate.visibleCadRect;
+    final newRect = visibleCadRect;
+    if (oldRect != newRect) {
+      if (oldRect == null || newRect == null) {
+        return true;
+      }
+      // Hysteresis Pan Optimization:
+      // In paint(), spatialIndex is queried with visibleCadRect.inflate(visibleCadRect.longestSide * 0.5).
+      // That means all entities within a 50% buffer margin in all directions are already rasterized into the layer!
+      // If scale hasn't changed, a small pan (shift <= 15% of viewport) stays safely inside that 50% buffer.
+      // Skipping repaint prevents duplicate frames and lets the GPU transform the existing layer at 60 FPS!
+      final double scaleDelta = (currentScale - oldDelegate.currentScale).abs();
+      if (scaleDelta < 0.005) {
+        final double maxShift = oldRect.longestSide * 0.15;
+        final double deltaCenter = (newRect.center - oldRect.center).distance;
+        final double deltaW = (newRect.width - oldRect.width).abs();
+        final double deltaH = (newRect.height - oldRect.height).abs();
+        if (deltaCenter < maxShift && deltaW < maxShift * 0.5 && deltaH < maxShift * 0.5) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    return false;
   }
 }

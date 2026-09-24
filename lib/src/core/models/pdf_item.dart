@@ -123,7 +123,7 @@ class PdfItem {
     if (lower.endsWith('.cbz')) return KotoFileType.cbz;
     if (lower.endsWith('.cbr')) return KotoFileType.cbr;
     if (lower.endsWith('.cbt')) return KotoFileType.cbt;
-    if (lower.endsWith('.dxf')) return KotoFileType.dxf;
+    if (lower.endsWith('.dxf') || lower.endsWith('.kcad')) return KotoFileType.dxf;
     if (lower.endsWith('.dwg')) return KotoFileType.dwg;
     if (lower.endsWith('.svg')) return KotoFileType.svg;
     if (lower.endsWith('.stl')) return KotoFileType.stl;

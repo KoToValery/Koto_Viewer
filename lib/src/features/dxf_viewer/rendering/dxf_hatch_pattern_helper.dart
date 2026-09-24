@@ -8,6 +8,8 @@ import '../models/dxf_models.dart';
 class DxfHatchPatternHelper {
   const DxfHatchPatternHelper._();
 
+  static final Expando<List<DxfHatchPatternLine>> _resolvedCache = Expando();
+
   /// Resolves the list of pattern lines to render for [hatch].
   /// If the hatch contains embedded pattern lines from the CAD export, they are returned directly.
   /// Otherwise, standard pattern definitions are resolved by pattern name, with angle and scale applied.
@@ -21,11 +23,16 @@ class DxfHatchPatternHelper {
       return hatch.patternLines!;
     }
 
+    final cached = _resolvedCache[hatch];
+    if (cached != null) return cached;
+
     final name = hatch.patternName.trim().toUpperCase();
     final double scale = (hatch.patternScale > 0 ? hatch.patternScale : 1.0) * defaultScale;
     final double angleDeg = hatch.patternAngle;
 
-    return _generateFallbackPattern(name, angleDeg, scale, fallbackOrigin);
+    final resolved = _generateFallbackPattern(name, angleDeg, scale, fallbackOrigin);
+    _resolvedCache[hatch] = resolved;
+    return resolved;
   }
 
   static List<DxfHatchPatternLine> _generateFallbackPattern(
