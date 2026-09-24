@@ -1614,6 +1614,14 @@ class DxfPainter extends CustomPainter {
   ) {
     if (hatch.boundaryPaths.isEmpty) return;
 
+    // Fast viewport bounds check: If hatch is outside visible CAD rectangle, skip entirely
+    if (visibleCadRect != null) {
+      final box = hatch.getBoundingBox(const {});
+      if (box != null && !visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.05).overlaps(box)) {
+        return;
+      }
+    }
+
     final path = Path()..fillType = PathFillType.evenOdd;
     for (final loop in hatch.boundaryPaths) {
       if (loop.isEmpty) continue;
@@ -1662,12 +1670,16 @@ class DxfPainter extends CustomPainter {
 
     final double scale = currentScale.clamp(0.001, 10000.0);
 
-    // Hatch LOD: If the hatch bounding box on screen is tiny (< 3.0px),
-    // rendering complex clipping and pattern lines is completely invisible.
-    // A single subtle fill handles it in 0.001ms without expensive Skia clipping.
-    if (bounds.longestSide * scale < 3.0) {
+    // Adaptive Hatch LOD:
+    // When the drawing is zoomed out (scale < 1.25) or the hatch area on screen is small (< 8.0px),
+    // drawing dense pattern lines creates severe Moiré visual noise and wastes 100+ ms on Skia clipPath.
+    // Replace with a subtle elegant tint (AutoCAD adaptive hatch style) for 0.001ms instantaneous rendering!
+    if (scale < 1.25 || bounds.longestSide * scale < 8.0) {
+      if (hatch.isSolid || hatch.transparency != null) {
+        return;
+      }
       final miniPaint = Paint()
-        ..color = strokePaint.color.withValues(alpha: 0.15)
+        ..color = strokePaint.color.withValues(alpha: 0.12)
         ..style = PaintingStyle.fill;
       canvas.drawPath(clipPath, miniPaint);
       return;
