@@ -72,6 +72,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   final ValueNotifier<double> _hudScale = ValueNotifier(1.0);
   final ValueNotifier<Offset> _hudCadCoord = ValueNotifier(Offset.zero);
   Timer? _transformSettleTimer;
+  Timer? _wheelSettleTimer;
+  bool _isGestureActive = false;
+  bool _isWheelScrolling = false;
   DxfDisplaySettings _displaySettings = DxfDisplaySettingsService.settingsNotifier.value;
   DxfUnit get _effectiveUnit => _displaySettings.unitOverride ?? _document?.unit ?? DxfUnit.meters;
 
@@ -156,6 +159,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   void dispose() {
     _focusNode.dispose();
     _transformSettleTimer?.cancel();
+    _wheelSettleTimer?.cancel();
     _transformController.removeListener(_onTransformChanged);
     DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged);
     _transformController.dispose();
@@ -188,17 +192,23 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       _hudScale.value = scale;
     }
 
-    // Keep navigation responsive by transforming the cached CAD layer first.
+    // Keep navigation responsive by transforming the cached CAD layer on the GPU first.
+    // While actively zooming via wheel, dragging, or middle-mouse panning,
+    // skip scheduling CPU repaints so InteractiveViewer transforms the texture layer at 144 FPS.
+    if (_isGestureActive || _isWheelScrolling || _middlePanStart != null) {
+      return;
+    }
+
     // Repaint scale-dependent strokes and the visible entity set only after input settles.
     _transformSettleTimer?.cancel();
     _transformSettleTimer = Timer(
-      const Duration(milliseconds: 80),
+      const Duration(milliseconds: 100),
       _syncCanvasAfterTransform,
     );
   }
 
   void _syncCanvasAfterTransform() {
-    if (!mounted) return;
+    if (!mounted || _isGestureActive || _isWheelScrolling || _middlePanStart != null) return;
     setState(() {
       _renderScale = _currentScale;
     });
@@ -420,13 +430,17 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final marginX = (right - left) * 0.1;
       final marginY = (top - bottom) * 0.1;
 
-      return Rect.fromLTRB(
+      final rect = Rect.fromLTRB(
         left - marginX,
         bottom - marginY,
         right + marginX,
         top + marginY,
       );
-    } on Exception catch (_) {
+
+      // Clamp to document bounds (with 5% buffer) so it never queries beyond drawing extents
+      final maxDocExtent = _document!.bounds.inflate(_document!.bounds.longestSide * 0.05 + 10.0);
+      return rect.intersect(maxDocExtent);
+    } catch (_) {
       return null;
     }
   }
@@ -1053,12 +1067,15 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
-      final delta = event.scrollDelta.dy;
-      if (delta < 0) {
-        _zoomBy(1.20, focalPoint: event.localPosition);
-      } else if (delta > 0) {
-        _zoomBy(1 / 1.20, focalPoint: event.localPosition);
-      }
+      _isGestureActive = false;
+      _isWheelScrolling = true;
+      _transformSettleTimer?.cancel();
+      _wheelSettleTimer?.cancel();
+      _wheelSettleTimer = Timer(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
+        _isWheelScrolling = false;
+        _syncCanvasAfterTransform();
+      });
     }
   }
 
@@ -1066,6 +1083,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if ((event.buttons & kTertiaryButton) != 0) {
       _middlePanStart = event.position;
       _middlePanMatrix = _transformController.value.clone();
+      _transformSettleTimer?.cancel();
+      _wheelSettleTimer?.cancel();
       return;
     }
 
@@ -1098,6 +1117,10 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     if (_middlePanStart != null) {
       _middlePanStart = null;
       _middlePanMatrix = null;
+      if (!_isWheelScrolling && !_isGestureActive) {
+        _transformSettleTimer?.cancel();
+        _transformSettleTimer = Timer(const Duration(milliseconds: 100), _syncCanvasAfterTransform);
+      }
       return;
     }
 
@@ -1939,11 +1962,11 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                 children: [
                   // Interactive CAD Canvas with Touch/Mouse Wheel/Middle Pan Listener
                   Listener(
-                    onPointerSignal: _handlePointerSignal,
                     onPointerDown: _handleGeneralPointerDown,
                     onPointerMove: _handleGeneralPointerMove,
                     onPointerUp: _handleGeneralPointerUp,
                     onPointerCancel: _handleGeneralPointerCancel,
+                    onPointerSignal: _handlePointerSignal,
                     child: MouseRegion(
                       onHover: _handlePointerHover,
                       child: GestureDetector(
@@ -1958,9 +1981,35 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                           transformationController: _transformController,
                           panEnabled: !_isMeasureMode || _isMultiTouchGesture,
                           scaleEnabled: true,
+                          scaleFactor: 350.0,
+                          trackpadScrollCausesScale: true,
                           minScale: 0.001,
                           maxScale: 1000.0,
                           boundaryMargin: const EdgeInsets.all(double.infinity),
+                          onInteractionStart: (details) {
+                            if (!_isWheelScrolling) {
+                              _isGestureActive = true;
+                              _transformSettleTimer?.cancel();
+                              _wheelSettleTimer?.cancel();
+                            }
+                          },
+                          onInteractionUpdate: (details) {
+                            if (!_isWheelScrolling) {
+                              _transformSettleTimer?.cancel();
+                            }
+                          },
+                          onInteractionEnd: (details) {
+                            if (!_isWheelScrolling) {
+                              _isGestureActive = false;
+                              if (_middlePanStart == null) {
+                                _transformSettleTimer?.cancel();
+                                _transformSettleTimer = Timer(
+                                  const Duration(milliseconds: 100),
+                                  _syncCanvasAfterTransform,
+                                );
+                              }
+                            }
+                          },
                           child: RepaintBoundary(
                             child: CustomPaint(
                               size: _viewportSize,

@@ -218,8 +218,8 @@ class DxfPainter extends CustomPainter {
     }
 
     // 2. Draw Entities (Render all document entities directly so no lines or text ever disappear upon zooming in)
-    final Iterable<DxfEntity> entitiesToDraw = (document.entities.length > 30000 && visibleCadRect != null && document.spatialIndex != null)
-        ? document.spatialIndex!.query(visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.5))
+    final Iterable<DxfEntity> entitiesToDraw = (visibleCadRect != null && document.spatialIndex != null)
+        ? document.spatialIndex!.query(visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.20))
         : document.entities;
 
     final Map<int, Path> continuousLineBatches = {};
@@ -1270,10 +1270,21 @@ class DxfPainter extends CustomPainter {
     final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
     if (targetFontSize <= 0.0) return;
 
+    // Fast viewport bounds check: If text position is outside visible CAD rectangle, skip layout
+    if (visibleCadRect != null) {
+      final pt = ((entity.hAlign != 0 || entity.vAlign != 0) && entity.alignPoint != null)
+          ? entity.alignPoint!
+          : entity.insertPoint;
+      final margin = math.max(entity.height * 4.0, visibleCadRect!.longestSide * 0.05);
+      if (!visibleCadRect!.inflate(margin).contains(pt)) {
+        return;
+      }
+    }
+
     // Screen-space Text Greeking / LOD:
-    // If text height in screen pixels is below 2.5px, it is completely illegible to the human eye.
-    // Skipping font layout & Skia glyph generation saves 150-250ms on far zoom-out!
-    if (targetFontSize * currentScale < 2.5) return;
+    // If text height in screen pixels is below 4.5px, it is completely illegible to the human eye.
+    // Skipping font layout & Skia glyph generation saves 150-250ms!
+    if (targetFontSize * currentScale < 4.5) return;
 
     DxfCachedTextLayout? cached = _textLayoutCache[entity];
     if (cached == null || cached.color != color || (cached.fitScale - fitScale).abs() > 1e-7) {
@@ -1407,10 +1418,21 @@ class DxfPainter extends CustomPainter {
     final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
     if (targetFontSize <= 0.0) return;
 
+    // Fast viewport bounds check: If MText position is outside visible CAD rectangle, skip layout
+    if (visibleCadRect != null) {
+      final double approxW = (entity.refWidth != null && entity.refWidth! > 0)
+          ? entity.refWidth!
+          : entity.height * 10.0;
+      final double margin = math.max(approxW, math.max(entity.height * 4.0, visibleCadRect!.longestSide * 0.05));
+      if (!visibleCadRect!.inflate(margin).contains(entity.insertPoint)) {
+        return;
+      }
+    }
+
     // Screen-space Text Greeking / LOD:
-    // If text height in screen pixels is below 2.5px, it is completely illegible to the human eye.
-    // Skipping font layout & Skia glyph generation saves 150-250ms on far zoom-out!
-    if (targetFontSize * currentScale < 2.5) return;
+    // If text height in screen pixels is below 4.5px, it is completely illegible to the human eye.
+    // Skipping font layout & Skia glyph generation saves 150-250ms!
+    if (targetFontSize * currentScale < 4.5) return;
 
     DxfCachedTextLayout? cached = _textLayoutCache[entity];
     if (cached == null || cached.color != color || (cached.fitScale - fitScale).abs() > 1e-7) {
@@ -2087,11 +2109,23 @@ class DxfPainter extends CustomPainter {
     int depth = 0,
     Map<String, DxfBlockDiagEntry>? blockDiagnostics,
   }) {
+    // Fast viewport bounds check: If dimension def points and text point are outside visible CAD rectangle, skip
+    if (visibleCadRect != null) {
+      final margin = visibleCadRect!.longestSide * 0.05;
+      final searchBox = visibleCadRect!.inflate(margin);
+      final p1Cad = dim.defPoint1;
+      final p2Cad = dim.defPoint2 ?? dim.textPoint;
+      final ptCad = dim.textPoint;
+      if (!searchBox.contains(p1Cad) && !searchBox.contains(p2Cad) && !searchBox.contains(ptCad)) {
+        return;
+      }
+    }
+
     // Dimension LOD: At far zoom out, dimension ticks/arrows/labels are sub-pixel noise.
-    // If the dimension span in screen pixels is below 4.0px, skip rendering.
+    // If the dimension span in screen pixels is below 8.0px, skip rendering.
     final p1 = toCanvas(dim.defPoint1);
     final p2 = toCanvas(dim.defPoint2 ?? dim.textPoint);
-    if ((p2 - p1).distance * currentScale < 4.0) {
+    if ((p2 - p1).distance * currentScale < 8.0) {
       return;
     }
 
@@ -3037,13 +3071,13 @@ class DxfPainter extends CustomPainter {
         return true;
       }
       // Hysteresis Pan Optimization:
-      // In paint(), spatialIndex is queried with visibleCadRect.inflate(visibleCadRect.longestSide * 0.5).
-      // That means all entities within a 50% buffer margin in all directions are already rasterized into the layer!
-      // If scale hasn't changed, a small pan (shift <= 15% of viewport) stays safely inside that 50% buffer.
-      // Skipping repaint prevents duplicate frames and lets the GPU transform the existing layer at 60 FPS!
+      // In paint(), spatialIndex is queried with visibleCadRect.inflate(visibleCadRect.longestSide * 0.20).
+      // That means all entities within a 20% buffer margin in all directions are already rasterized into the layer!
+      // If scale hasn't changed, a small pan (shift <= 10% of viewport) stays safely inside that 20% buffer.
+      // Skipping repaint prevents duplicate frames and lets the GPU transform the existing layer at 120 FPS!
       final double scaleDelta = (currentScale - oldDelegate.currentScale).abs();
       if (scaleDelta < 0.005) {
-        final double maxShift = oldRect.longestSide * 0.15;
+        final double maxShift = oldRect.longestSide * 0.10;
         final double deltaCenter = (newRect.center - oldRect.center).distance;
         final double deltaW = (newRect.width - oldRect.width).abs();
         final double deltaH = (newRect.height - oldRect.height).abs();
