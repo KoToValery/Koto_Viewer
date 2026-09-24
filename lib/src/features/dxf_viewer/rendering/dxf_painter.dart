@@ -2598,9 +2598,21 @@ class DxfPainter extends CustomPainter {
 
       final double dist = m.distance!;
       final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
+      final delta = p2 - p1;
+      final lineLen = delta.distance;
+      Offset normal;
+      if (lineLen > 1e-4) {
+        final u = delta / lineLen;
+        normal = Offset(-u.dy, u.dx);
+        if (normal.dy > 0 || (normal.dy == 0 && normal.dx < 0)) {
+          normal = -normal;
+        }
+      } else {
+        normal = const Offset(0, -1);
+      }
       _drawBadge(
         canvas: canvas,
-        center: mid + Offset(0, (-14.0 * mScale) / scale),
+        center: mid + normal * ((18.0 * mScale) / scale),
         text: 'L: ${DxfMath.formatDistance(dist, unit: effectiveUnit)} m',
         accentColor: const Color(0xFFFF5252),
         mScale: mScale,
@@ -3011,14 +3023,17 @@ class DxfPainter extends CustomPainter {
       canvas.drawRRect(rrect, bgPaint);
       canvas.drawRRect(rrect, borderBubble);
 
-      final double textLeft = bubbleRect.left + padH;
-      final double textTop = bubbleRect.top + padV;
-      textPainter.paint(canvas, Offset(textLeft, textTop));
+      final double totalTextH = textPainter.height + (subPainter != null ? subPainter.height + (2.0 / scale) : 0.0);
+      final double startY = bubbleRect.top + (bubbleRect.height - totalTextH) / 2.0;
+
+      final double textLeft = bubbleRect.left + (bubbleRect.width - textPainter.width) / 2.0;
+      textPainter.paint(canvas, Offset(textLeft, startY));
 
       if (subPainter != null) {
+        final double subLeft = bubbleRect.left + (bubbleRect.width - subPainter.width) / 2.0;
         subPainter.paint(
           canvas,
-          Offset(textLeft, textTop + textPainter.height + (2.0 / scale)),
+          Offset(subLeft, startY + textPainter.height + (2.0 / scale)),
         );
       }
     } on Exception catch (_) {

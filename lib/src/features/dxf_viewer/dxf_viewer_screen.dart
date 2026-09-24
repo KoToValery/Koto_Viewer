@@ -34,6 +34,7 @@ import 'widgets/dxf_import_dialog.dart';
 import 'widgets/dxf_info_sheet.dart';
 import 'widgets/dxf_layer_sheet.dart';
 import 'widgets/dxf_measure_pointer_painter.dart';
+import 'widgets/dxf_measurement_canvas_painter.dart';
 import 'widgets/dxf_measurement_overlay.dart';
 
 class DxfViewerScreen extends StatefulWidget {
@@ -458,7 +459,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   void _handleMeasurePointerDown(PointerDownEvent event) {
     if (!_isMeasureMode || _document == null) return;
     _activePointersCount++;
-    if (_activePointersCount > 1) {
+    if (_activePointersCount == 1 || event.kind == PointerDeviceKind.mouse) {
+      _isMultiTouchGesture = false;
+    } else if (_activePointersCount > 1) {
       // Multi-touch: mark gesture as multi-touch zoom/pan, cancel single finger measurement
       _isMultiTouchGesture = true;
       setState(() {
@@ -501,7 +504,10 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       final toleranceCad = 22.0 / (fitScale * _currentScale.clamp(0.0001, 10000.0));
       Offset? basePoint;
       if (_currentMeasureTool == DxfMeasureTool.distance) {
-        basePoint = (_measurement != null && _measurement!.tool == DxfMeasureTool.distance && _measurement!.p2Cad == null)
+        basePoint = (_measurement != null &&
+                _measurement!.tool == DxfMeasureTool.distance &&
+                _measurement!.p1Cad != null &&
+                _measurement!.p2Cad == null)
             ? _measurement!.p1Cad
             : null;
       } else if (_currentMeasureTool == DxfMeasureTool.area) {
@@ -542,7 +548,10 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     switch (_currentMeasureTool) {
       case DxfMeasureTool.distance:
-        title = (_measurement != null && _measurement!.tool == DxfMeasureTool.distance && _measurement!.p2Cad == null)
+        title = (_measurement != null &&
+                _measurement!.tool == DxfMeasureTool.distance &&
+                _measurement!.p1Cad != null &&
+                _measurement!.p2Cad == null)
             ? '2nd Point'
             : '1st Point';
         break;
@@ -621,6 +630,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         case DxfMeasureTool.distance:
           if (_measurement == null ||
               _measurement!.tool != DxfMeasureTool.distance ||
+              _measurement!.p1Cad == null ||
               _measurement!.p2Cad != null) {
             _measurement = DxfMeasurement(
               tool: DxfMeasureTool.distance,
@@ -939,6 +949,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
       if (mounted) {
         final sizeMb = (await outputFile.length()) / (1024 * 1024);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Saved fast KCAD: $outputFileName (${sizeMb.toStringAsFixed(2)} MB)'),
@@ -1999,6 +2010,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                             }
                           },
                           onInteractionEnd: (details) {
+                            _activePointersCount = 0;
+                            _isMultiTouchGesture = false;
                             if (!_isWheelScrolling) {
                               _isGestureActive = false;
                               if (_middlePanStart == null) {
@@ -2019,8 +2032,8 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                                 document: _document!,
                                 theme: _canvasTheme,
                                 currentScale: _renderScale,
-                                measurement: _measurement,
-                                annotations: _annotations,
+                                measurement: null, // Rendered crisply on screen-space overlay above InteractiveViewer
+                                annotations: const [], // Rendered crisply on screen-space overlay above InteractiveViewer
                                 visibleCadRect: _getVisibleCadRect(),
                                 highlightedEntity: _selectedEntity,
                                 snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
@@ -2033,6 +2046,29 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                       ),
                     ),
                   ),
+
+                  // Crisp Screen-Space Measurement & Markup Overlay (Vector-sharp, never blurry, centered)
+                  if ((_isMeasureMode && _measurement != null) || _annotations.isNotEmpty)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedBuilder(
+                          animation: _transformController,
+                          builder: (context, _) {
+                            return CustomPaint(
+                              painter: DxfMeasurementCanvasPainter(
+                                measurement: _isMeasureMode ? _measurement : null,
+                                unit: _effectiveUnit,
+                                cadToScreen: _cadToScreen,
+                                candidateCadPoint: (_snapEnabled && (_hoveredSnap != null || _activeMeasureSnap != null))
+                                    ? (_hoveredSnap?.point ?? _activeMeasureSnap?.point)
+                                    : (_touchScreenPos != null ? _currentCadCoord : null),
+                                annotations: _annotations,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
 
                   // Offset Snapping Pointer Overlay (Sharp tip 56px above finger with magnetism halo)
                   if (_isMeasureMode && _touchScreenPos != null && _targetScreenPos != null)
@@ -2048,6 +2084,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                             p1CadCoord: _measurement?.p1Cad,
                             isSettingSecondPoint: _measurement != null &&
                                 _measurement!.tool == DxfMeasureTool.distance &&
+                                _measurement!.p1Cad != null &&
                                 _measurement!.p2Cad == null,
                             tool: _currentMeasureTool,
                             customTitle: _pointerCustomTitle,

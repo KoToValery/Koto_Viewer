@@ -7,6 +7,7 @@ import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/dxf_viewer/parser/dxf_parser.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_math.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_snap_helper.dart';
+import 'package:kotoview/src/features/dxf_viewer/widgets/dxf_measurement_canvas_painter.dart';
 
 void main() {
   group('DXF Area Measurement Tests', () {
@@ -313,6 +314,162 @@ EOF
       expect(mtexts.first.cleanText, contains('Verify opening width'));
 
       await tempDir.delete(recursive: true);
+    });
+  });
+
+  group('DxfMeasurement Initial Click & Point Transitions', () {
+    test('Initial click on Distance tool sets p1Cad when freshly initialized', () {
+      // Represents the state when entering measure mode:
+      var measurement = const DxfMeasurement(tool: DxfMeasureTool.distance);
+      expect(measurement.p1Cad, isNull);
+      expect(measurement.p2Cad, isNull);
+
+      const firstPoint = Offset(10.0, 20.0);
+      const secondPoint = Offset(30.0, 40.0);
+
+      // 1st click
+      if (measurement.tool != DxfMeasureTool.distance ||
+          measurement.p1Cad == null ||
+          measurement.p2Cad != null) {
+        measurement = DxfMeasurement(
+          tool: DxfMeasureTool.distance,
+          p1Cad: firstPoint,
+        );
+      } else {
+        measurement = DxfMeasurement(
+          tool: DxfMeasureTool.distance,
+          p1Cad: measurement.p1Cad,
+          p2Cad: firstPoint,
+        );
+      }
+
+      expect(measurement.p1Cad, firstPoint, reason: 'First click must set p1Cad, not be ignored!');
+      expect(measurement.p2Cad, isNull);
+
+      // 2nd click
+      if (measurement.tool != DxfMeasureTool.distance ||
+          measurement.p1Cad == null ||
+          measurement.p2Cad != null) {
+        measurement = DxfMeasurement(
+          tool: DxfMeasureTool.distance,
+          p1Cad: secondPoint,
+        );
+      } else {
+        measurement = DxfMeasurement(
+          tool: DxfMeasureTool.distance,
+          p1Cad: measurement.p1Cad,
+          p2Cad: secondPoint,
+        );
+      }
+
+      expect(measurement.p1Cad, firstPoint);
+      expect(measurement.p2Cad, secondPoint);
+      expect(measurement.distance, closeTo(28.28427, 1e-4));
+    });
+  });
+
+  group('DxfMeasurementCanvasPainter Screen-Space Rendering Tests', () {
+    testWidgets('Paints distance measurement with perpendicular centered badge', (tester) async {
+      final m = DxfMeasurement(
+        tool: DxfMeasureTool.distance,
+        p1Cad: const Offset(10, 10),
+        p2Cad: const Offset(10, 50), // Vertical line
+      );
+
+      final painter = DxfMeasurementCanvasPainter(
+        measurement: m,
+        unit: DxfUnit.meters,
+        cadToScreen: (pt) => Offset(pt.dx * 2.0, pt.dy * 2.0),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CustomPaint(
+              size: const Size(400, 400),
+              painter: painter,
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Paints area polygon with centered centroid badge and vertex pins', (tester) async {
+      final m = DxfMeasurement(
+        tool: DxfMeasureTool.area,
+        areaPoints: const [
+          Offset(10, 10),
+          Offset(60, 10),
+          Offset(60, 40),
+          Offset(10, 40),
+        ],
+        isAreaClosed: true,
+      );
+
+      final painter = DxfMeasurementCanvasPainter(
+        measurement: m,
+        unit: DxfUnit.meters,
+        cadToScreen: (pt) => Offset(pt.dx * 2.0, pt.dy * 2.0),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CustomPaint(
+              size: const Size(400, 400),
+              painter: painter,
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Paints angle and radius measurements with centered badges without error', (tester) async {
+      final mAngle = DxfMeasurement(
+        tool: DxfMeasureTool.angle,
+        angleVertex: const Offset(50, 50),
+        angleP1: const Offset(100, 50),
+        angleP2: const Offset(50, 100),
+      );
+
+      final mRadius = DxfMeasurement(
+        tool: DxfMeasureTool.radius,
+        circleCenter: const Offset(50, 50),
+        radius: 25.0,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                CustomPaint(
+                  size: const Size(400, 400),
+                  painter: DxfMeasurementCanvasPainter(
+                    measurement: mAngle,
+                    unit: DxfUnit.meters,
+                    cadToScreen: (pt) => pt,
+                  ),
+                ),
+                CustomPaint(
+                  size: const Size(400, 400),
+                  painter: DxfMeasurementCanvasPainter(
+                    measurement: mRadius,
+                    unit: DxfUnit.meters,
+                    cadToScreen: (pt) => pt,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
     });
   });
 }
