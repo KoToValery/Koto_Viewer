@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/dxf_color_table.dart';
 import '../models/dxf_display_settings.dart';
@@ -36,8 +37,101 @@ enum DxfCanvasTheme {
   });
 }
 
+/// Statistics collected during a paint() call for performance profiling and regression testing.
+class DxfPaintStats {
+  final double totalMs;
+  final int totalEntities;
+  final int renderedEntities;
+  final int insertCount;
+  final double insertMs;
+  final int lineCount;
+  final double lineMs;
+  final int polyCount;
+  final double polyMs;
+  final int hatchCount;
+  final double hatchMs;
+  final int textCount;
+  final double textMs;
+  final int dimCount;
+  final double dimMs;
+  final double otherMs;
+  final double scale;
+
+  const DxfPaintStats({
+    required this.totalMs,
+    required this.totalEntities,
+    required this.renderedEntities,
+    required this.insertCount,
+    required this.insertMs,
+    required this.lineCount,
+    required this.lineMs,
+    required this.polyCount,
+    required this.polyMs,
+    required this.hatchCount,
+    required this.hatchMs,
+    required this.textCount,
+    required this.textMs,
+    required this.dimCount,
+    required this.dimMs,
+    required this.otherMs,
+    required this.scale,
+  });
+
+  @override
+  String toString() {
+    return 'DxfPaintStats(total: ${totalMs.toStringAsFixed(1)}ms, '
+        'entities: $renderedEntities/$totalEntities, '
+        'inserts: ${insertMs.toStringAsFixed(1)}ms ($insertCount), '
+        'lines: ${lineMs.toStringAsFixed(1)}ms ($lineCount), '
+        'polylines: ${polyMs.toStringAsFixed(1)}ms ($polyCount), '
+        'hatches: ${hatchMs.toStringAsFixed(1)}ms ($hatchCount), '
+        'texts: ${textMs.toStringAsFixed(1)}ms ($textCount), '
+        'dims: ${dimMs.toStringAsFixed(1)}ms ($dimCount), '
+        'other: ${otherMs.toStringAsFixed(1)}ms, '
+        'scale: ${scale.toStringAsFixed(2)})';
+  }
+}
+
+/// Diagnostic info for Phase 0A profiling of block definitions and instances.
+class DxfBlockDiagEntry {
+  final String name;
+  int instanceCount = 0;
+  int childEntityCount = 0;
+  final Map<String, int> childTypeCounts = {};
+  int maxDepth = 0;
+  int totalMicroseconds = 0;
+
+  DxfBlockDiagEntry(this.name);
+}
+
+/// Cached layout metrics for DxfText and DxfMText to avoid redundant TextPainter.layout()
+class DxfCachedTextLayout {
+  final TextPainter painter;
+  final double ox;
+  final double oy;
+  final double scaleFactor;
+  final Color color;
+  final double fitScale;
+
+  const DxfCachedTextLayout({
+    required this.painter,
+    required this.ox,
+    required this.oy,
+    required this.scaleFactor,
+    required this.color,
+    required this.fitScale,
+  });
+}
+
 /// CustomPainter for rendering entire DXF drawing.
 class DxfPainter extends CustomPainter {
+  static int _paintCallCount = 0;
+  static int get paintCallCount => _paintCallCount;
+  static bool debugLogRepaintReasons = false;
+  static bool debugCollectBlockDiagnostics = false;
+  static DxfPaintStats? lastStats;
+  static final Expando<DxfCachedTextLayout> _textLayoutCache = Expando<DxfCachedTextLayout>();
+
   final DxfDocument document;
   final DxfCanvasTheme theme;
   final double currentScale;
@@ -65,6 +159,30 @@ class DxfPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty || size.width <= 0 || size.height <= 0) return;
+
+    _paintCallCount++;
+    final paintStopwatch = Stopwatch()..start();
+    int lastUs = paintStopwatch.elapsedMicroseconds;
+
+    int insertCount = 0;
+    int lineCount = 0;
+    int polyCount = 0;
+    int hatchCount = 0;
+    int textCount = 0;
+    int dimCount = 0;
+    int otherCount = 0;
+    int renderedEntities = 0;
+
+    int insertUs = 0;
+    int lineUs = 0;
+    int polyUs = 0;
+    int hatchUs = 0;
+    int textUs = 0;
+    int dimUs = 0;
+    int otherUs = 0;
+
+    final Map<String, DxfBlockDiagEntry>? blockDiagnostics =
+        debugCollectBlockDiagnostics ? <String, DxfBlockDiagEntry>{} : null;
 
     final double docW = math.max(document.width, 1.0);
     final double docH = math.max(document.height, 1.0);
@@ -148,9 +266,39 @@ class DxfPainter extends CustomPainter {
           fitScale: fitScale,
           blocks: document.blocks,
           layers: document.layers,
+          blockDiagnostics: blockDiagnostics,
         );
+
+        final nowUs = paintStopwatch.elapsedMicroseconds;
+        final deltaUs = nowUs - lastUs;
+        lastUs = nowUs;
+
+        renderedEntities++;
+        if (entity is DxfInsert) {
+          insertCount++;
+          insertUs += deltaUs;
+        } else if (entity is DxfLine) {
+          lineCount++;
+          lineUs += deltaUs;
+        } else if (entity is DxfLwPolyline || entity is DxfPolyline) {
+          polyCount++;
+          polyUs += deltaUs;
+        } else if (entity is DxfHatch) {
+          hatchCount++;
+          hatchUs += deltaUs;
+        } else if (entity is DxfText || entity is DxfMText) {
+          textCount++;
+          textUs += deltaUs;
+        } else if (entity is DxfDimension || entity is DxfLeader) {
+          dimCount++;
+          dimUs += deltaUs;
+        } else {
+          otherCount++;
+          otherUs += deltaUs;
+        }
       } on Exception catch (_) {
         // Individual entity rendering failure must never break the frame
+        lastUs = paintStopwatch.elapsedMicroseconds;
       }
     }
 
@@ -188,6 +336,75 @@ class DxfPainter extends CustomPainter {
       } on Exception catch (_) {
         // Measurement overlay rendering failure ignored
       }
+    }
+
+    final totalUs = paintStopwatch.elapsedMicroseconds;
+    final totalMs = totalUs / 1000.0;
+    final insertMs = insertUs / 1000.0;
+    final lineMs = lineUs / 1000.0;
+    final polyMs = polyUs / 1000.0;
+    final hatchMs = hatchUs / 1000.0;
+    final textMs = textUs / 1000.0;
+    final dimMs = dimUs / 1000.0;
+    final otherMs = math.max(otherUs / 1000.0, totalMs - (insertMs + lineMs + polyMs + hatchMs + textMs + dimMs));
+
+    final stats = DxfPaintStats(
+      totalMs: totalMs,
+      totalEntities: document.entities.length,
+      renderedEntities: renderedEntities,
+      insertCount: insertCount,
+      insertMs: insertMs,
+      lineCount: lineCount,
+      lineMs: lineMs,
+      polyCount: polyCount,
+      polyMs: polyMs,
+      hatchCount: hatchCount,
+      hatchMs: hatchMs,
+      textCount: textCount,
+      textMs: textMs,
+      dimCount: dimCount,
+      dimMs: dimMs,
+      otherMs: otherMs,
+      scale: currentScale,
+    );
+    lastStats = stats;
+
+    debugPrint('[DxfPainter #$_paintCallCount] FINISHED in ${totalMs.toStringAsFixed(1)}ms | rendered $renderedEntities/${document.entities.length} entities | scale=${currentScale.toStringAsFixed(2)}');
+    debugPrint('  -> Inserts: ${insertMs.toStringAsFixed(1)}ms ($insertCount)');
+    debugPrint('  -> Polylines: ${polyMs.toStringAsFixed(1)}ms ($polyCount)');
+    debugPrint('  -> Lines: ${lineMs.toStringAsFixed(1)}ms ($lineCount)');
+    debugPrint('  -> Hatches: ${hatchMs.toStringAsFixed(1)}ms ($hatchCount)');
+    debugPrint('  -> Texts: ${textMs.toStringAsFixed(1)}ms ($textCount)');
+    debugPrint('  -> Dims: ${dimMs.toStringAsFixed(1)}ms ($dimCount)');
+    debugPrint('  -> Other: ${otherMs.toStringAsFixed(1)}ms ($otherCount)');
+
+    if (blockDiagnostics != null && blockDiagnostics.isNotEmpty) {
+      final sortedBlocks = blockDiagnostics.values.toList()
+        ..sort((a, b) => b.instanceCount.compareTo(a.instanceCount));
+      final int totalInstances = sortedBlocks.fold(0, (sum, b) => sum + b.instanceCount);
+      final int maxRecDepth = sortedBlocks.fold(0, (maxD, b) => math.max(maxD, b.maxDepth));
+      debugPrint('══════════════ [Phase 0A Block Diagnostics] ══════════════');
+      debugPrint('Unique block definitions used: ${sortedBlocks.length}');
+      debugPrint('Total block instances rendered: $totalInstances | Max recursion depth: $maxRecDepth');
+      debugPrint('Top 15 most frequent blocks:');
+      for (int i = 0; i < math.min(15, sortedBlocks.length); i++) {
+        final b = sortedBlocks[i];
+        final typeBreakdown = b.childTypeCounts.entries
+            .map((e) => '${e.key}: ${e.value}')
+            .join(', ');
+        debugPrint('  #${i + 1} "${b.name}": ${b.instanceCount} instances | ${b.childEntityCount} children ($typeBreakdown) [depth: ${b.maxDepth}]');
+      }
+      final sortedByTime = blockDiagnostics.values.toList()
+        ..sort((a, b) => b.totalMicroseconds.compareTo(a.totalMicroseconds));
+      debugPrint('Top 15 slowest blocks (by CPU time):');
+      for (int i = 0; i < math.min(15, sortedByTime.length); i++) {
+        final b = sortedByTime[i];
+        final typeBreakdown = b.childTypeCounts.entries
+            .map((e) => '${e.key}: ${e.value}')
+            .join(', ');
+        debugPrint('  #${i + 1} "${b.name}": ${(b.totalMicroseconds / 1000.0).toStringAsFixed(1)}ms | ${b.instanceCount} instances | ${b.childEntityCount} children ($typeBreakdown) [depth: ${b.maxDepth}]');
+      }
+      debugPrint('═══════════════════════════════════════════════════════════');
     }
   }
 
@@ -336,6 +553,10 @@ class DxfPainter extends CustomPainter {
     required Map<String, DxfLayer> layers,
     String? blockLineType,
     double blockRotationDeg = 0.0,
+    int depth = 0,
+    Map<String, DxfBlockDiagEntry>? blockDiagnostics,
+    DxfAffineMatrix? parentMatrix,
+    Offset? parentBasePoint,
   }) {
     final scale = currentScale.clamp(0.001, 10000.0);
     final layer = layers[entity.layer];
@@ -505,9 +726,23 @@ class DxfPainter extends CustomPainter {
         toCanvas: toCanvas,
         fitScale: fitScale,
         parentRotationDeg: blockRotationDeg,
+        depth: depth,
+        blockDiagnostics: blockDiagnostics,
+        parentMatrix: parentMatrix,
+        parentBasePoint: parentBasePoint,
       );
     } else if (entity is DxfDimension) {
-      _renderDimension(canvas, entity, strokePaint, toCanvas, fitScale, blocks, layers);
+      _renderDimension(
+        canvas,
+        entity,
+        strokePaint,
+        toCanvas,
+        fitScale,
+        blocks,
+        layers,
+        depth: depth,
+        blockDiagnostics: blockDiagnostics,
+      );
     } else if (entity is DxfLeader) {
       _renderLeader(
         canvas,
@@ -899,67 +1134,43 @@ class DxfPainter extends CustomPainter {
 
     if (effectiveHeight <= 0.0 || fitScale <= 0.0) return;
 
-    // CAD Text Height specifies the Cap-Height (capital letter height).
-    // In Flutter, TextStyle fontSize is the full font EM-box (~1.39x of cap-height for Arial/Roboto).
-    // Scaling by 1 / 0.72 ensures capital letters render at EXACTLY entity.height drawing units.
-    const double capHeightRatio = 0.72;
-    final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
-    if (targetFontSize <= 0.0) return;
+    DxfCachedTextLayout? cached = _textLayoutCache[entity];
+    if (cached == null || cached.color != color || (cached.fitScale - fitScale).abs() > 1e-7) {
+      const double capHeightRatio = 0.72;
+      final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
+      if (targetFontSize <= 0.0) return;
 
-    // Flutter TextPainter drops/rounds fonts with fontSize < 0.5 to zero width/height.
-    // When large CAD documents or merged drawings reduce fitScale significantly,
-    // targetFontSize in canvas coordinates can be much smaller than 0.5 px.
-    // In that case, layout the text at a standard reference size (16.0) and scale the canvas.
-    double scaleFactor = 1.0;
-    double layoutFontSize = targetFontSize;
-    if (targetFontSize < 4.0) {
-      layoutFontSize = 16.0;
-      scaleFactor = targetFontSize / 16.0;
-    } else if (targetFontSize > 400.0) {
-      layoutFontSize = 100.0;
-      scaleFactor = targetFontSize / 100.0;
-    }
-
-    final String fontFamily = _resolveFontFamily(entity.style);
-    final List<String> fontFallbacks = _resolveFontFallbacks(fontFamily);
-
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: entity.text,
-        style: TextStyle(
-          color: color,
-          fontSize: layoutFontSize,
-          fontFamily: fontFamily,
-          fontFamilyFallback: fontFallbacks,
-          height: 1.0,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-      textHeightBehavior: const TextHeightBehavior(
-        applyHeightToFirstAscent: false,
-        applyHeightToLastDescent: false,
-      ),
-    );
-    textPainter.layout();
-
-    final pos = toCanvas(
-      ((entity.hAlign != 0 || entity.vAlign != 0) && entity.alignPoint != null)
-          ? entity.alignPoint!
-          : entity.insertPoint,
-    );
-
-    canvas.save();
-    try {
-      canvas.translate(pos.dx, pos.dy);
-
-      // Rotate (CAD rotation is CCW, so on canvas with Y down, rotation is -angle)
-      final double totalRot = entity.rotationDeg + blockRotationDeg;
-      final double rad = -totalRot * math.pi / 180.0;
-      canvas.rotate(rad);
-
-      if (scaleFactor != 1.0) {
-        canvas.scale(scaleFactor, scaleFactor);
+      double scaleFactor = 1.0;
+      double layoutFontSize = targetFontSize;
+      if (targetFontSize < 4.0) {
+        layoutFontSize = 16.0;
+        scaleFactor = targetFontSize / 16.0;
+      } else if (targetFontSize > 400.0) {
+        layoutFontSize = 100.0;
+        scaleFactor = targetFontSize / 100.0;
       }
+
+      final String fontFamily = _resolveFontFamily(entity.style);
+      final List<String> fontFallbacks = _resolveFontFallbacks(fontFamily);
+
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: entity.text,
+          style: TextStyle(
+            color: color,
+            fontSize: layoutFontSize,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            height: 1.0,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textHeightBehavior: const TextHeightBehavior(
+          applyHeightToFirstAscent: false,
+          applyHeightToLastDescent: false,
+        ),
+      );
+      textPainter.layout();
 
       // Horizontal alignment offset
       double ox = 0.0;
@@ -998,7 +1209,38 @@ class DxfPainter extends CustomPainter {
           }
       }
 
-      textPainter.paint(canvas, Offset(ox, oy));
+      cached = DxfCachedTextLayout(
+        painter: textPainter,
+        ox: ox,
+        oy: oy,
+        scaleFactor: scaleFactor,
+        color: color,
+        fitScale: fitScale,
+      );
+      _textLayoutCache[entity] = cached;
+    }
+
+    final pos = toCanvas(
+      ((entity.hAlign != 0 || entity.vAlign != 0) && entity.alignPoint != null)
+          ? entity.alignPoint!
+          : entity.insertPoint,
+    );
+
+    canvas.save();
+    try {
+      canvas.translate(pos.dx, pos.dy);
+
+      final double totalRot = entity.rotationDeg + blockRotationDeg;
+      if (totalRot != 0.0) {
+        final double rad = -totalRot * math.pi / 180.0;
+        canvas.rotate(rad);
+      }
+
+      if (cached.scaleFactor != 1.0) {
+        canvas.scale(cached.scaleFactor, cached.scaleFactor);
+      }
+
+      cached.painter.paint(canvas, Offset(cached.ox, cached.oy));
     } finally {
       canvas.restore();
     }
@@ -1023,97 +1265,69 @@ class DxfPainter extends CustomPainter {
 
     if (effectiveHeight <= 0.0 || fitScale <= 0.0) return;
 
-    // CAD Text Height specifies the Cap-Height (capital letter height).
-    // Scaling by 1 / 0.72 ensures capital letters render at EXACTLY entity.height drawing units.
-    const double capHeightRatio = 0.72;
-    final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
-    if (targetFontSize <= 0.0) return;
+    DxfCachedTextLayout? cached = _textLayoutCache[entity];
+    if (cached == null || cached.color != color || (cached.fitScale - fitScale).abs() > 1e-7) {
+      const double capHeightRatio = 0.72;
+      final double targetFontSize = (effectiveHeight / capHeightRatio) * fitScale;
+      if (targetFontSize <= 0.0) return;
 
-    // Flutter TextPainter drops/rounds fonts with fontSize < 0.5 to zero width/height.
-    // When large CAD documents or merged drawings reduce fitScale significantly,
-    // targetFontSize in canvas coordinates can be much smaller than 0.5 px.
-    // In that case, layout the text at a standard reference size (16.0) and scale the canvas.
-    double scaleFactor = 1.0;
-    double layoutFontSize = targetFontSize;
-    if (targetFontSize < 4.0) {
-      layoutFontSize = 16.0;
-      scaleFactor = targetFontSize / 16.0;
-    } else if (targetFontSize > 400.0) {
-      layoutFontSize = 100.0;
-      scaleFactor = targetFontSize / 100.0;
-    }
+      double scaleFactor = 1.0;
+      double layoutFontSize = targetFontSize;
+      if (targetFontSize < 4.0) {
+        layoutFontSize = 16.0;
+        scaleFactor = targetFontSize / 16.0;
+      } else if (targetFontSize > 400.0) {
+        layoutFontSize = 100.0;
+        scaleFactor = targetFontSize / 100.0;
+      }
 
-    // Determine horizontal text alignment from MTEXT paragraph style codes or attachment point
-    TextAlign align = TextAlign.left;
-    final rawLower = entity.rawText.toLowerCase();
-    if (rawLower.contains(r'\pqc;') || rawLower.contains(r'\qc;')) {
-      align = TextAlign.center;
-    } else if (rawLower.contains(r'\pqr;') || rawLower.contains(r'\qr;')) {
-      align = TextAlign.right;
-    } else if (entity.attachmentPoint == 2 ||
-        entity.attachmentPoint == 5 ||
-        entity.attachmentPoint == 8) {
-      align = TextAlign.center;
-    } else if (entity.attachmentPoint == 3 ||
-        entity.attachmentPoint == 6 ||
-        entity.attachmentPoint == 9) {
-      align = TextAlign.right;
-    }
+      // Determine horizontal text alignment from MTEXT paragraph style codes or attachment point
+      TextAlign align = TextAlign.left;
+      final rawLower = entity.rawText.toLowerCase();
+      if (rawLower.contains(r'\pqc;') || rawLower.contains(r'\qc;')) {
+        align = TextAlign.center;
+      } else if (rawLower.contains(r'\pqr;') || rawLower.contains(r'\qr;')) {
+        align = TextAlign.right;
+      } else if (entity.attachmentPoint == 2 ||
+          entity.attachmentPoint == 5 ||
+          entity.attachmentPoint == 8) {
+        align = TextAlign.center;
+      } else if (entity.attachmentPoint == 3 ||
+          entity.attachmentPoint == 6 ||
+          entity.attachmentPoint == 9) {
+        align = TextAlign.right;
+      }
 
-    final String fontFamily = _resolveFontFamily(entity.style);
-    final List<String> fontFallbacks = _resolveFontFallbacks(fontFamily);
+      final String fontFamily = _resolveFontFamily(entity.style);
+      final List<String> fontFallbacks = _resolveFontFallbacks(fontFamily);
 
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: entity.cleanText,
-        style: TextStyle(
-          color: color,
-          fontSize: layoutFontSize,
-          fontFamily: fontFamily,
-          fontFamilyFallback: fontFallbacks,
-          height: (entity.lineSpacingFactor != null && entity.lineSpacingFactor! > 0.5 && entity.lineSpacingFactor! < 3.0)
-              ? entity.lineSpacingFactor!
-              : 1.0,
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: entity.cleanText,
+          style: TextStyle(
+            color: color,
+            fontSize: layoutFontSize,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            height: (entity.lineSpacingFactor != null && entity.lineSpacingFactor! > 0.5 && entity.lineSpacingFactor! < 3.0)
+                ? entity.lineSpacingFactor!
+                : 1.0,
+          ),
         ),
-      ),
-      textDirection: TextDirection.ltr,
-      textAlign: align,
-      textHeightBehavior: const TextHeightBehavior(
-        applyHeightToFirstAscent: false,
-        applyHeightToLastDescent: false,
-      ),
-    );
+        textDirection: TextDirection.ltr,
+        textAlign: align,
+        textHeightBehavior: const TextHeightBehavior(
+          applyHeightToFirstAscent: false,
+          applyHeightToLastDescent: false,
+        ),
+      );
 
-    if (entity.refWidth != null && entity.refWidth! > 0) {
-      textPainter.layout(maxWidth: (entity.refWidth! * fitScale) / scaleFactor);
-    } else {
-      textPainter.layout();
-    }
-
-    final pos = toCanvas(entity.insertPoint);
-
-    canvas.save();
-    try {
-      canvas.translate(pos.dx, pos.dy);
-
-      final double totalRot = entity.rotationDeg + blockRotationDeg;
-      final double rad = -totalRot * math.pi / 180.0;
-      canvas.rotate(rad);
-
-      // Apply CAD MTEXT character width factor (\W<factor>;)
-      if (entity.widthFactor > 0 && (entity.widthFactor - 1.0).abs() > 0.001) {
-        canvas.scale(entity.widthFactor, 1.0);
+      if (entity.refWidth != null && entity.refWidth! > 0) {
+        textPainter.layout(maxWidth: (entity.refWidth! * fitScale) / scaleFactor);
+      } else {
+        textPainter.layout();
       }
 
-      if (scaleFactor != 1.0) {
-        canvas.scale(scaleFactor, scaleFactor);
-      }
-
-      // Attachment Point offsets (1=TL, 2=TC, 3=TR, 4=ML, 5=MC, 6=MR, 7=BL, 8=BC, 9=BR)
-      // In AutoCAD, MTEXT attachment points:
-      // Top (1,2,3): Top of capital letters is at pos.dy
-      // Middle (4,5,6): Center of text is at pos.dy
-      // Bottom (7,8,9): Alphabetic baseline of last line is at pos.dy
       double ox = 0.0;
       double oy = 0.0;
 
@@ -1163,7 +1377,39 @@ class DxfPainter extends CustomPainter {
           break;
       }
 
-      textPainter.paint(canvas, Offset(ox, oy));
+      cached = DxfCachedTextLayout(
+        painter: textPainter,
+        ox: ox,
+        oy: oy,
+        scaleFactor: scaleFactor,
+        color: color,
+        fitScale: fitScale,
+      );
+      _textLayoutCache[entity] = cached;
+    }
+
+    final pos = toCanvas(entity.insertPoint);
+
+    canvas.save();
+    try {
+      canvas.translate(pos.dx, pos.dy);
+
+      final double totalRot = entity.rotationDeg + blockRotationDeg;
+      if (totalRot != 0.0) {
+        final double rad = -totalRot * math.pi / 180.0;
+        canvas.rotate(rad);
+      }
+
+      // Apply CAD MTEXT character width factor (\W<factor>;)
+      if (entity.widthFactor > 0 && (entity.widthFactor - 1.0).abs() > 0.001) {
+        canvas.scale(entity.widthFactor, 1.0);
+      }
+
+      if (cached.scaleFactor != 1.0) {
+        canvas.scale(cached.scaleFactor, cached.scaleFactor);
+      }
+
+      cached.painter.paint(canvas, Offset(cached.ox, cached.oy));
     } finally {
       canvas.restore();
     }
@@ -1500,75 +1746,176 @@ class DxfPainter extends CustomPainter {
     required Offset Function(Offset) toCanvas,
     required double fitScale,
     double parentRotationDeg = 0.0,
+    int depth = 0,
+    Map<String, DxfBlockDiagEntry>? blockDiagnostics,
+    DxfAffineMatrix? parentMatrix,
+    Offset? parentBasePoint,
   }) {
     final block = blocks[insert.blockName];
     if (block == null || block.entities.isEmpty) return;
 
-    final rad = insert.rotationDeg * math.pi / 180.0;
-    final cosA = math.cos(rad);
-    final sinA = math.sin(rad);
+    final int startUs = blockDiagnostics != null ? DateTime.now().microsecondsSinceEpoch : 0;
 
-    final blockBaseX = block.basePoint.dx;
-    final blockBaseY = block.basePoint.dy;
+    if (blockDiagnostics != null) {
+      final entry = blockDiagnostics.putIfAbsent(
+        insert.blockName,
+        () {
+          final e = DxfBlockDiagEntry(insert.blockName);
+          e.childEntityCount = block.entities.length;
+          for (final child in block.entities) {
+            final t = child.runtimeType.toString().replaceFirst('Dxf', '');
+            e.childTypeCounts[t] = (e.childTypeCounts[t] ?? 0) + 1;
+          }
+          return e;
+        },
+      );
+      entry.instanceCount += (insert.rowCount * insert.colCount);
+      if (depth > entry.maxDepth) {
+        entry.maxDepth = depth;
+      }
+    }
 
+    final double blockBaseX = block.basePoint.dx;
+    final double blockBaseY = block.basePoint.dy;
     final double insertAvgScale = (insert.scaleX.abs() + insert.scaleY.abs()) / 2.0;
     final double childFitScale = insertAvgScale > 0.0001 ? fitScale * insertAvgScale : fitScale;
     final double totalBlockRot = parentRotationDeg + insert.rotationDeg;
+    final compiled = block.compiled;
 
     for (int r = 0; r < insert.rowCount; r++) {
       for (int c = 0; c < insert.colCount; c++) {
         final double offsetX = insert.insertPoint.dx + c * insert.colSpacing;
         final double offsetY = insert.insertPoint.dy + r * insert.rowSpacing;
 
-        Offset localToCanvas(Offset childCadPoint) {
-          final lx = (childCadPoint.dx - blockBaseX) * insert.scaleX;
-          final ly = (childCadPoint.dy - blockBaseY) * insert.scaleY;
-          final rx = lx * cosA - ly * sinA;
-          final ry = lx * sinA + ly * cosA;
-          return toCanvas(Offset(offsetX + rx, offsetY + ry));
+        // Compute 2D Affine Transformation Matrix to Canvas coordinates
+        final DxfAffineMatrix matrix;
+        if (parentMatrix == null) {
+          matrix = DxfAffineMatrix.forInsert(
+            scaleX: insert.scaleX,
+            scaleY: insert.scaleY,
+            rotationDeg: insert.rotationDeg,
+            canvasOrigin: toCanvas(Offset(offsetX, offsetY)),
+            fitScale: fitScale,
+          );
+        } else {
+          final localChildMatrix = DxfAffineMatrix.forNestedInsert(
+            insertPoint: Offset(offsetX, offsetY),
+            parentBasePoint: parentBasePoint ?? Offset.zero,
+            scaleX: insert.scaleX,
+            scaleY: insert.scaleY,
+            rotationDeg: insert.rotationDeg,
+          );
+          matrix = parentMatrix.multiply(localChildMatrix);
         }
 
-        for (final child in block.entities) {
-          final childLayer = layers[child.layer];
-          if (childLayer != null && (!childLayer.isVisible || childLayer.isFrozen)) continue;
+        // Ultra-Fast Path: Batch render pre-compiled geometry subpaths
+        if (compiled.subpaths.isNotEmpty) {
+          final Float64List matrix4 = matrix.toFloat64List();
 
-          final childColor = DxfColorTable.resolveColor(
-            colorIndex: child.colorIndex ?? insert.colorIndex,
-            trueColor: child.trueColor ?? insert.trueColor,
-            layerColor: childLayer != null
-                ? DxfColorTable.resolveColor(
-                    colorIndex: childLayer.colorIndex,
-                    trueColor: childLayer.trueColor,
-                    isDarkBackground: theme.isDark,
-                  )
-                : null,
-            isDarkBackground: theme.isDark,
-          );
+          for (int i = 0; i < compiled.subpaths.length; i++) {
+            final subpath = compiled.subpaths[i];
+            final childLayer = layers[subpath.layer];
+            if (childLayer != null && (!childLayer.isVisible || childLayer.isFrozen)) {
+              continue;
+            }
 
-          final strokePaint = Paint()
-            ..color = childColor
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = _calcStrokeWidth(child.lineWeight, layer: childLayer)
-            ..strokeCap = StrokeCap.round
-            ..strokeJoin = StrokeJoin.round;
+            final effectiveColorIndex = subpath.colorIndex ?? insert.colorIndex;
+            final effectiveTrueColor = subpath.trueColor ?? insert.trueColor;
+            final effectiveLineWeight = subpath.lineWeight ?? insert.lineWeight;
 
-          final fillPaint = Paint()
-            ..color = childColor.withValues(alpha: 0.35)
-            ..style = PaintingStyle.fill;
+            final childColor = DxfColorTable.resolveColor(
+              colorIndex: effectiveColorIndex,
+              trueColor: effectiveTrueColor,
+              layerColor: childLayer != null
+                  ? DxfColorTable.resolveColor(
+                      colorIndex: childLayer.colorIndex,
+                      trueColor: childLayer.trueColor,
+                      isDarkBackground: theme.isDark,
+                    )
+                  : null,
+              isDarkBackground: theme.isDark,
+            );
 
-          _renderEntity(
-            canvas: canvas,
-            entity: child,
-            strokePaint: strokePaint,
-            fillPaint: fillPaint,
-            toCanvas: localToCanvas,
-            fitScale: childFitScale,
-            blocks: blocks,
-            layers: layers,
-            blockLineType: insert.lineType,
-            blockRotationDeg: totalBlockRot,
-          );
+            final strokeWidth = _calcStrokeWidth(effectiveLineWeight, layer: childLayer);
+
+            final strokePaint = Paint()
+              ..color = childColor
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = strokeWidth
+              ..strokeCap = StrokeCap.round
+              ..strokeJoin = StrokeJoin.round
+              ..isAntiAlias = true;
+
+            final screenPath = subpath.path.transform(matrix4);
+            canvas.drawPath(screenPath, strokePaint);
+          }
+
+          if (compiled.isOnlyGeometry) {
+            continue;
+          }
         }
+
+        // Other non-line entities (polylines, circles, arcs, texts, hatches, nested inserts)
+        if (compiled.otherEntities.isNotEmpty) {
+          Offset localToCanvas(Offset childCadPoint) {
+            final lx = childCadPoint.dx - blockBaseX;
+            final ly = childCadPoint.dy - blockBaseY;
+            return matrix.transform(lx, ly);
+          }
+
+          for (final child in compiled.otherEntities) {
+            final childLayer = layers[child.layer];
+            if (childLayer != null && (!childLayer.isVisible || childLayer.isFrozen)) continue;
+
+            final childColor = DxfColorTable.resolveColor(
+              colorIndex: child.colorIndex ?? insert.colorIndex,
+              trueColor: child.trueColor ?? insert.trueColor,
+              layerColor: childLayer != null
+                  ? DxfColorTable.resolveColor(
+                      colorIndex: childLayer.colorIndex,
+                      trueColor: childLayer.trueColor,
+                      isDarkBackground: theme.isDark,
+                    )
+                  : null,
+              isDarkBackground: theme.isDark,
+            );
+
+            final strokePaint = Paint()
+              ..color = childColor
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = _calcStrokeWidth(child.lineWeight, layer: childLayer)
+              ..strokeCap = StrokeCap.round
+              ..strokeJoin = StrokeJoin.round;
+
+            final fillPaint = Paint()
+              ..color = childColor.withValues(alpha: 0.35)
+              ..style = PaintingStyle.fill;
+
+            _renderEntity(
+              canvas: canvas,
+              entity: child,
+              strokePaint: strokePaint,
+              fillPaint: fillPaint,
+              toCanvas: localToCanvas,
+              fitScale: childFitScale,
+              blocks: blocks,
+              layers: layers,
+              blockLineType: insert.lineType,
+              blockRotationDeg: totalBlockRot,
+              depth: depth + 1,
+              blockDiagnostics: blockDiagnostics,
+              parentMatrix: matrix,
+              parentBasePoint: block.basePoint,
+            );
+          }
+        }
+      }
+    }
+
+    if (blockDiagnostics != null) {
+      final diagEntry = blockDiagnostics[insert.blockName];
+      if (diagEntry != null) {
+        diagEntry.totalMicroseconds += (DateTime.now().microsecondsSinceEpoch - startUs);
       }
     }
   }
@@ -1580,8 +1927,10 @@ class DxfPainter extends CustomPainter {
     Offset Function(Offset) toCanvas,
     double fitScale,
     Map<String, DxfBlock> blocks,
-    Map<String, DxfLayer> layers,
-  ) {
+    Map<String, DxfLayer> layers, {
+    int depth = 0,
+    Map<String, DxfBlockDiagEntry>? blockDiagnostics,
+  }) {
     // If dimension references an anonymous block *D..., render the block
     if (dim.blockName != null && blocks.containsKey(dim.blockName)) {
       final block = blocks[dim.blockName]!;
@@ -1628,6 +1977,8 @@ class DxfPainter extends CustomPainter {
           fitScale: fitScale,
           blocks: blocks,
           layers: layers,
+          depth: depth + 1,
+          blockDiagnostics: blockDiagnostics,
         );
       }
       return;
@@ -1639,21 +1990,51 @@ class DxfPainter extends CustomPainter {
     canvas.drawLine(p1, p2, paint);
 
     if (dim.textOverride != null && dim.textOverride!.isNotEmpty) {
-      final scale = currentScale.clamp(0.001, 10000.0);
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: dim.textOverride,
-          style: TextStyle(
-            color: paint.color,
-            fontSize: (11.0 * settings.measurementScale) / scale,
-            fontWeight: FontWeight.w600,
+      final double dimLen = (dim.defPoint2 != null)
+          ? (dim.defPoint2! - dim.defPoint1).distance
+          : 0.0;
+      final double dimHeight = (dimLen > 0 ? dimLen * 0.04 : 20.0).clamp(2.5, 250.0);
+      const double capHeightRatio = 0.72;
+      final double targetFontSize = (dimHeight / capHeightRatio) * fitScale * settings.measurementScale;
+      if (targetFontSize > 0.0) {
+        double scaleFactor = 1.0;
+        double layoutFontSize = targetFontSize;
+        if (targetFontSize < 4.0) {
+          layoutFontSize = 16.0;
+          scaleFactor = targetFontSize / 16.0;
+        } else if (targetFontSize > 400.0) {
+          layoutFontSize = 100.0;
+          scaleFactor = targetFontSize / 100.0;
+        }
+
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: dim.textOverride,
+            style: TextStyle(
+              color: paint.color,
+              fontSize: layoutFontSize,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      final tp = toCanvas(dim.textPoint);
-      textPainter.paint(canvas, Offset(tp.dx - textPainter.width / 2, tp.dy - textPainter.height / 2));
+          textDirection: TextDirection.ltr,
+        );
+        textPainter.layout();
+        final tp = toCanvas(dim.textPoint);
+
+        canvas.save();
+        try {
+          canvas.translate(tp.dx, tp.dy);
+          if (scaleFactor != 1.0) {
+            canvas.scale(scaleFactor, scaleFactor);
+          }
+          textPainter.paint(
+            canvas,
+            Offset(-textPainter.width / 2.0, -textPainter.height / 2.0),
+          );
+        } finally {
+          canvas.restore();
+        }
+      }
     }
   }
 
@@ -2439,15 +2820,51 @@ class DxfPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant DxfPainter oldDelegate) {
-    return oldDelegate.document != document ||
+    if (debugLogRepaintReasons) {
+      if (oldDelegate.document != document) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: document changed');
+      } else if (oldDelegate.theme != theme) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: theme changed');
+      } else if (oldDelegate.currentScale != currentScale) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: currentScale changed (${oldDelegate.currentScale} -> $currentScale)');
+      } else if (oldDelegate.measurement != measurement) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: measurement changed');
+      } else if (oldDelegate.annotations != annotations) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: annotations changed');
+      } else if (oldDelegate.highlightedEntity != highlightedEntity) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: highlightedEntity changed');
+      } else if (oldDelegate.snapResult != snapResult) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: snapResult changed');
+      } else if (oldDelegate.showGrid != showGrid) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: showGrid changed');
+      } else if (oldDelegate.settings != settings) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: settings changed');
+      } else if (oldDelegate.visibleCadRect != visibleCadRect) {
+        debugPrint('[DxfPainter.shouldRepaint] Reason: visibleCadRect changed (${oldDelegate.visibleCadRect} -> $visibleCadRect)');
+      }
+    }
+
+    if (oldDelegate.document != document ||
         oldDelegate.theme != theme ||
         oldDelegate.currentScale != currentScale ||
         oldDelegate.measurement != measurement ||
         oldDelegate.annotations != annotations ||
-        oldDelegate.visibleCadRect != visibleCadRect ||
         oldDelegate.highlightedEntity != highlightedEntity ||
         oldDelegate.snapResult != snapResult ||
         oldDelegate.showGrid != showGrid ||
-        oldDelegate.settings != settings;
+        oldDelegate.settings != settings) {
+      return true;
+    }
+
+    // Fit-to-screen Pan optimization:
+    // If we are at fit-to-screen (scale <= 1.05) and were already at fit-to-screen,
+    // the initial render already rasterized all entities into the layer.
+    // Changing visibleCadRect due to panning at fit-to-screen does not require CPU repaint;
+    // GPU hardware transform handles panning for free!
+    if (currentScale <= 1.05 && oldDelegate.currentScale <= 1.05) {
+      return false;
+    }
+
+    return oldDelegate.visibleCadRect != visibleCadRect;
   }
 }

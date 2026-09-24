@@ -102,13 +102,242 @@ class DxfLayer {
   }
 }
 
+/// Pre-compiled line segment relative to block base point for ultra-fast rendering.
+class DxfCompiledLine {
+  final double lx1, ly1;
+  final double lx2, ly2;
+  final String layer;
+  final int? colorIndex;
+  final int? trueColor;
+  final double? lineWeight;
+  final String? lineType;
+  final double? lineTypeScale;
+
+  const DxfCompiledLine({
+    required this.lx1,
+    required this.ly1,
+    required this.lx2,
+    required this.ly2,
+    required this.layer,
+    this.colorIndex,
+    this.trueColor,
+    this.lineWeight,
+    this.lineType,
+    this.lineTypeScale,
+  });
+}
+
+/// A pre-compiled group of homogeneous continuous geometry (lines, arcs, circles, polylines)
+/// within a CAD block sharing the same layer, color, and line weight.
+class DxfCompiledSubpath {
+  final String layer;
+  final int? colorIndex;
+  final int? trueColor;
+  final double? lineWeight;
+  final Path path;
+
+  const DxfCompiledSubpath({
+    required this.layer,
+    this.colorIndex,
+    this.trueColor,
+    this.lineWeight,
+    required this.path,
+  });
+}
+
+/// Compiled representation of a CAD Block definition for ultra-fast batch rendering.
+class DxfCompiledBlock {
+  final DxfBlock block;
+  final List<DxfCompiledSubpath> subpaths;
+  final List<DxfCompiledLine> lines;
+  final List<DxfEntity> otherEntities;
+  final bool isOnlyGeometry;
+  final bool isOnlyLines;
+  final bool hasSingleLayer;
+  final String? singleLayer;
+  final bool isHomogeneousContinuousLines;
+  final Path? linePath;
+
+  DxfCompiledBlock({
+    required this.block,
+    required this.subpaths,
+    required this.lines,
+    required this.otherEntities,
+    required this.isOnlyGeometry,
+    required this.isOnlyLines,
+    required this.hasSingleLayer,
+    this.singleLayer,
+    required this.isHomogeneousContinuousLines,
+    this.linePath,
+  });
+
+  factory DxfCompiledBlock.fromBlock(DxfBlock block) {
+    final lines = <DxfCompiledLine>[];
+    final other = <DxfEntity>[];
+    final baseX = block.basePoint.dx;
+    final baseY = block.basePoint.dy;
+
+    String? commonLayer;
+    bool hasSingleLayer = true;
+    bool allContinuous = true;
+
+    final subpathMap = <String, Path>{};
+    final subpathMeta = <String, ({String layer, int? colorIndex, int? trueColor, double? lineWeight})>{};
+
+    bool isContinuous(String? lineType) {
+      if (lineType == null) return true;
+      final lt = lineType.trim().toUpperCase();
+      return lt.isEmpty || lt == 'CONTINUOUS' || lt == 'BYLAYER' || lt == 'BYBLOCK';
+    }
+
+    void addToSubpath(String layer, int? colorIndex, int? trueColor, double? lineWeight, void Function(Path p) addGeom) {
+      final key = '${layer}_${colorIndex}_${trueColor}_$lineWeight';
+      final p = subpathMap.putIfAbsent(key, () {
+        subpathMeta[key] = (layer: layer, colorIndex: colorIndex, trueColor: trueColor, lineWeight: lineWeight);
+        return Path();
+      });
+      addGeom(p);
+    }
+
+    for (final e in block.entities) {
+      if (commonLayer == null) {
+        commonLayer = e.layer;
+      } else if (commonLayer != e.layer) {
+        hasSingleLayer = false;
+      }
+
+      if (e is DxfLine) {
+        final continuous = isContinuous(e.lineType);
+        if (!continuous) {
+          allContinuous = false;
+        }
+
+        final lx1 = e.p1.dx - baseX;
+        final ly1 = e.p1.dy - baseY;
+        final lx2 = e.p2.dx - baseX;
+        final ly2 = e.p2.dy - baseY;
+
+        lines.add(DxfCompiledLine(
+          lx1: lx1,
+          ly1: ly1,
+          lx2: lx2,
+          ly2: ly2,
+          layer: e.layer,
+          colorIndex: e.colorIndex,
+          trueColor: e.trueColor,
+          lineWeight: e.lineWeight,
+          lineType: e.lineType,
+          lineTypeScale: e.lineTypeScale,
+        ));
+
+        if (continuous) {
+          addToSubpath(e.layer, e.colorIndex, e.trueColor, e.lineWeight, (p) {
+            p.moveTo(lx1, ly1);
+            p.lineTo(lx2, ly2);
+          });
+        } else {
+          other.add(e);
+        }
+      } else if (e is DxfArc && isContinuous(e.lineType) && e.radius > 0) {
+        final cx = e.center.dx - baseX;
+        final cy = e.center.dy - baseY;
+        final r = e.radius;
+        double sweep = e.endAngleDeg - e.startAngleDeg;
+        if (sweep <= 0) sweep += 360.0;
+        final int segments = (36 * (sweep / 360.0)).clamp(6, 48).toInt();
+        final double step = (sweep * math.pi / 180.0) / segments;
+        final double startRad = e.startAngleDeg * math.pi / 180.0;
+
+        addToSubpath(e.layer, e.colorIndex, e.trueColor, e.lineWeight, (p) {
+          p.moveTo(cx + r * math.cos(startRad), cy + r * math.sin(startRad));
+          for (int s = 1; s <= segments; s++) {
+            final double rad = startRad + s * step;
+            p.lineTo(cx + r * math.cos(rad), cy + r * math.sin(rad));
+          }
+        });
+      } else if (e is DxfCircle && isContinuous(e.lineType) && e.radius > 0) {
+        final cx = e.center.dx - baseX;
+        final cy = e.center.dy - baseY;
+        final r = e.radius;
+        addToSubpath(e.layer, e.colorIndex, e.trueColor, e.lineWeight, (p) {
+          p.addOval(Rect.fromCircle(center: Offset(cx, cy), radius: r));
+        });
+      } else if (e is DxfLwPolyline && isContinuous(e.lineType) && e.vertices.isNotEmpty) {
+        addToSubpath(e.layer, e.colorIndex, e.trueColor, e.lineWeight, (p) {
+          final v0 = e.vertices.first;
+          p.moveTo(v0.x - baseX, v0.y - baseY);
+          for (int i = 0; i < e.vertices.length; i++) {
+            final v1 = e.vertices[i];
+            final isLast = (i == e.vertices.length - 1);
+            if (isLast && !e.isClosed) break;
+            final v2 = e.vertices[(i + 1) % e.vertices.length];
+            if (v1.bulge.abs() > 1e-6) {
+              final arcPoints = DxfMath.generateBulgeArcPoints(v1.offset, v2.offset, v1.bulge);
+              for (int k = 1; k < arcPoints.length; k++) {
+                p.lineTo(arcPoints[k].dx - baseX, arcPoints[k].dy - baseY);
+              }
+            } else {
+              p.lineTo(v2.x - baseX, v2.y - baseY);
+            }
+          }
+          if (e.isClosed) {
+            p.close();
+          }
+        });
+      } else {
+        other.add(e);
+      }
+    }
+
+    final subpaths = <DxfCompiledSubpath>[];
+    for (final entry in subpathMap.entries) {
+      final meta = subpathMeta[entry.key]!;
+      subpaths.add(DxfCompiledSubpath(
+        layer: meta.layer,
+        colorIndex: meta.colorIndex,
+        trueColor: meta.trueColor,
+        lineWeight: meta.lineWeight,
+        path: entry.value,
+      ));
+    }
+
+    final isOnlyLines = other.isEmpty && subpaths.every((s) => true);
+    final isOnlyGeometry = other.isEmpty;
+    final isHomogeneousContinuousLines = isOnlyLines && hasSingleLayer && allContinuous;
+
+    Path? linePath;
+    if (lines.isNotEmpty && hasSingleLayer && allContinuous) {
+      linePath = Path();
+      for (int i = 0; i < lines.length; i++) {
+        final l = lines[i];
+        linePath.moveTo(l.lx1, l.ly1);
+        linePath.lineTo(l.lx2, l.ly2);
+      }
+    }
+
+    return DxfCompiledBlock(
+      block: block,
+      subpaths: subpaths,
+      lines: lines,
+      otherEntities: other,
+      isOnlyGeometry: isOnlyGeometry,
+      isOnlyLines: isOnlyLines,
+      hasSingleLayer: hasSingleLayer,
+      singleLayer: commonLayer,
+      isHomogeneousContinuousLines: isHomogeneousContinuousLines,
+      linePath: linePath,
+    );
+  }
+}
+
 /// Representation of a CAD Block definition (reusable group of entities).
 class DxfBlock {
   final String name;
   final Offset basePoint;
   final List<DxfEntity> entities;
+  late final DxfCompiledBlock compiled = DxfCompiledBlock.fromBlock(this);
 
-  const DxfBlock({
+  DxfBlock({
     required this.name,
     this.basePoint = Offset.zero,
     this.entities = const [],

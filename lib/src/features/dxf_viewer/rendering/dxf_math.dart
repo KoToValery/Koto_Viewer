@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/dxf_models.dart';
 
@@ -374,5 +375,112 @@ class DxfMath {
       final int d = decimals ?? (unit != DxfUnit.meters ? 2 : 3);
       return '${areaM2.toStringAsFixed(d)} m²';
     }
+  }
+}
+
+/// Fast 2D Affine Transformation Matrix for CAD entities and blocks.
+/// Represents the transformation:
+///   [ cx ]   [ m00  m01  m02 ] [ lx ]
+///   [ cy ] = [ m10  m11  m12 ] [ ly ]
+///   [  1 ]   [  0    0    1  ] [  1 ]
+class DxfAffineMatrix {
+  final double m00, m01, m02;
+  final double m10, m11, m12;
+
+  const DxfAffineMatrix({
+    required this.m00,
+    required this.m01,
+    required this.m02,
+    required this.m10,
+    required this.m11,
+    required this.m12,
+  });
+
+  /// Identity matrix.
+  static const DxfAffineMatrix identity = DxfAffineMatrix(
+    m00: 1.0, m01: 0.0, m02: 0.0,
+    m10: 0.0, m11: 1.0, m12: 0.0,
+  );
+
+  /// Creates a matrix mapping block local coordinates (relative to block basePoint)
+  /// directly to Canvas screen pixels:
+  factory DxfAffineMatrix.forInsert({
+    required double scaleX,
+    required double scaleY,
+    required double rotationDeg,
+    required Offset canvasOrigin, // toCanvas(insertPoint)
+    required double fitScale,
+  }) {
+    final rad = rotationDeg * math.pi / 180.0;
+    final c = math.cos(rad);
+    final s = math.sin(rad);
+
+    return DxfAffineMatrix(
+      m00: scaleX * c * fitScale,
+      m01: -scaleY * s * fitScale,
+      m02: canvasOrigin.dx,
+      m10: -scaleX * s * fitScale,
+      m11: -scaleY * c * fitScale,
+      m12: canvasOrigin.dy,
+    );
+  }
+
+  /// Creates a local 2D affine matrix for a nested insert inside a parent block:
+  factory DxfAffineMatrix.forNestedInsert({
+    required Offset insertPoint,
+    required Offset parentBasePoint,
+    required double scaleX,
+    required double scaleY,
+    required double rotationDeg,
+  }) {
+    final rad = rotationDeg * math.pi / 180.0;
+    final c = math.cos(rad);
+    final s = math.sin(rad);
+
+    return DxfAffineMatrix(
+      m00: scaleX * c,
+      m01: -scaleY * s,
+      m02: insertPoint.dx - parentBasePoint.dx,
+      m10: scaleX * s,
+      m11: scaleY * c,
+      m12: insertPoint.dy - parentBasePoint.dy,
+    );
+  }
+
+  /// Evaluates transformed position on Canvas for block-relative point (lx, ly).
+  @pragma('vm:prefer-inline')
+  Offset transform(double lx, double ly) {
+    return Offset(
+      m00 * lx + m01 * ly + m02,
+      m10 * lx + m11 * ly + m12,
+    );
+  }
+
+  /// Composes this matrix (parent) with a child matrix: M_composed = this * child
+  DxfAffineMatrix multiply(DxfAffineMatrix child) {
+    return DxfAffineMatrix(
+      m00: m00 * child.m00 + m01 * child.m10,
+      m01: m00 * child.m01 + m01 * child.m11,
+      m02: m00 * child.m02 + m01 * child.m12 + m02,
+      m10: m10 * child.m00 + m11 * child.m10,
+      m11: m10 * child.m01 + m11 * child.m11,
+      m12: m10 * child.m02 + m11 * child.m12 + m12,
+    );
+  }
+
+  /// Static 16-element Float64List reused to avoid heap allocation during Path.transform.
+  static final Float64List _storage = Float64List(16)
+    ..[10] = 1.0
+    ..[15] = 1.0;
+
+  /// Returns 4x4 matrix in column-major order for Skia Path.transform() or Canvas.transform().
+  Float64List toFloat64List() {
+    _storage[0] = m00;
+    _storage[1] = m10;
+    _storage[4] = m01;
+    _storage[5] = m11;
+    _storage[12] = m02;
+    _storage[13] = m12;
+    return _storage;
   }
 }
