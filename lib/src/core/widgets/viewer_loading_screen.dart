@@ -7,7 +7,7 @@ import '../l10n/l10n_extensions.dart';
 class ViewerLoadingScreen extends StatelessWidget {
   final String fileName;
   final int? fileSizeBytes;
-  final IconData icon;
+  final IconData? icon;
   final Color accentColor;
   final String? loadingTitle;
   final String? statusMessage;
@@ -19,7 +19,7 @@ class ViewerLoadingScreen extends StatelessWidget {
     super.key,
     required this.fileName,
     this.fileSizeBytes,
-    required this.icon,
+    this.icon,
     required this.accentColor,
     this.loadingTitle,
     this.statusMessage,
@@ -67,32 +67,34 @@ class ViewerLoadingScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Glowing Format Icon
-                Container(
-                  width: 76,
-                  height: 76,
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: accentColor.withValues(alpha: 0.4),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: accentColor.withValues(alpha: 0.28),
-                        blurRadius: 28,
-                        spreadRadius: 2,
+                // Glowing Format Icon (optional)
+                if (icon != null) ...[
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: accentColor.withValues(alpha: 0.4),
+                        width: 2,
                       ),
-                    ],
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withValues(alpha: 0.28),
+                          blurRadius: 28,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      icon,
+                      color: accentColor,
+                      size: 38,
+                    ),
                   ),
-                  child: Icon(
-                    icon,
-                    color: accentColor,
-                    size: 38,
-                  ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
+                ],
 
                 // File Name
                 Text(

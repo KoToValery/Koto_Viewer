@@ -70,6 +70,27 @@ void main() {
       await tester.pump();
       expect(cancelled, isTrue);
     });
+
+    testWidgets('Renders cleanly without icon when icon is null (e.g. DWG loading)', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ViewerLoadingScreen(
+            fileName: 'FloorPlan_Level2.dwg',
+            fileSizeBytes: 8388608,
+            accentColor: Color(0xFFFF9800),
+            loadingTitle: 'Конвертиране на DWG...',
+            statusMessage: 'Анализиране на CAD слоеве...',
+          ),
+        ),
+      );
+
+      expect(find.text('FloorPlan_Level2.dwg'), findsOneWidget);
+      expect(find.text('8.0 MB'), findsOneWidget);
+      expect(find.text('Конвертиране на DWG...'), findsOneWidget);
+      expect(find.text('Анализиране на CAD слоеве...'), findsOneWidget);
+      expect(find.byIcon(Icons.architecture_rounded), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    });
   });
 
   group('FBX and 3D / Ebook File Type Tests', () {

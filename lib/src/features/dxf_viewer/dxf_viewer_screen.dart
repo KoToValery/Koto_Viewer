@@ -1689,12 +1689,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      final isDwg = _fileName.toLowerCase().endsWith('.dwg');
+      final isDwg = _fileName.toLowerCase().endsWith('.dwg') ||
+          (widget.originalFilePath?.toLowerCase().endsWith('.dwg') ?? false) ||
+          widget.filePath.toLowerCase().endsWith('.dwg');
       final l10n = context.l10n;
       return ViewerLoadingScreen(
         fileName: _fileName,
         fileSizeBytes: _fileSizeBytes > 0 ? _fileSizeBytes : null,
-        icon: Icons.architecture_rounded,
+        icon: isDwg ? null : Icons.architecture_rounded,
         accentColor: const Color(0xFFFF9800),
         loadingTitle: isDwg ? l10n.convertingDwg : l10n.loadingCad,
         statusMessage: l10n.statusAnalyzingCad,
