@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:archive/archive_io.dart';
 import '../../../core/errors/app_error_handler.dart';
+import '../../../core/services/zip_archive_service.dart';
 import '../../kicad_viewer/parser/kicad_pcb_parser.dart';
 import '../models/pcb_models.dart';
 import '../services/pcb_pad_numbering_service.dart';
@@ -26,8 +27,9 @@ class PcbArchiveParser {
         return isPcbFileName(lower);
       }
 
-      final inputStream = InputFileStream(filePath);
-      final archive = ZipDecoder().decodeBuffer(inputStream, verify: false);
+      // Use ZipArchiveService to avoid FormatException on non-UTF-8 entry names
+      // (e.g. CP866 DOS Cyrillic). It also fixes mojibake in the entry names.
+      final archive = ZipArchiveService.openFromPath(filePath);
 
       for (final entry in archive) {
         if (!entry.isFile) continue;
@@ -73,7 +75,7 @@ class PcbArchiveParser {
   /// Checks if an in-memory byte stream contains a PCB ZIP archive or PCB files.
   static bool isPcbZip(Uint8List bytes, {String fileName = ''}) {
     try {
-      final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+      final archive = ZipArchiveService.openFromBytes(bytes);
       if (archive.isEmpty) return false;
 
       if (fileName.isNotEmpty && isPcbFileName(fileName)) {
@@ -125,7 +127,7 @@ class PcbArchiveParser {
     required String archiveName,
     required String filePath,
   }) {
-    final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+    final archive = ZipArchiveService.openFromBytes(bytes);
     final List<PcbLayerItem> layers = [];
     final List<PcbBomEntry> bomEntries = [];
     final List<PcbImageItem> images = [];

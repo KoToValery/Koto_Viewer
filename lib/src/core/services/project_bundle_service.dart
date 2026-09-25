@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:archive/archive_io.dart';
 import '../errors/app_error_handler.dart';
 import '../models/pdf_item.dart';
+import 'zip_archive_service.dart';
 import '../../features/pcb_viewer/parser/pcb_archive_parser.dart';
 
 /// Categories of items within a project presentation bundle.
@@ -246,8 +246,9 @@ class ProjectBundleService {
         ? rawBaseName.substring(0, rawBaseName.lastIndexOf('.'))
         : rawBaseName;
 
-    final inputStream = InputFileStream(archivePath);
-    final archive = ZipDecoder().decodeBuffer(inputStream, verify: false);
+    // Use ZipArchiveService to avoid FormatException on non-UTF-8 entry names
+    // and to correctly decode CP866/CP1251/other legacy encodings.
+    final archive = ZipArchiveService.openFromPath(archivePath);
 
     final List<ProjectFileEntry> files = [];
     int totalSize = 0;
@@ -346,8 +347,9 @@ class ProjectBundleService {
 
     onProgress?.call(0.1);
 
-    final inputStream = InputFileStream(archivePath);
-    final archive = ZipDecoder().decodeBuffer(inputStream, verify: false);
+    // Use ZipArchiveService to avoid FormatException on non-UTF-8 entry names
+    // and to correctly decode CP866/CP1251/other legacy encodings.
+    final archive = ZipArchiveService.openFromPath(archivePath);
 
     onProgress?.call(0.4);
 
