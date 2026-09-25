@@ -33,7 +33,6 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
   int _lineCount = 0;
   
   bool _isSearchOpen = false;
-  bool _showLineNumbers = true;
   bool _wordWrap = false;
   bool _isFormatted = false;
   bool _hideSecrets = true;
@@ -320,11 +319,6 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
           tooltip: 'Search',
         ),
         IconButton(
-          icon: Icon(_showLineNumbers ? Icons.format_list_numbered : Icons.format_list_bulleted),
-          onPressed: () => setState(() => _showLineNumbers = !_showLineNumbers),
-          tooltip: 'Toggle Line Numbers',
-        ),
-        IconButton(
           icon: Icon(_wordWrap ? Icons.wrap_text : Icons.subject),
           onPressed: () => setState(() => _wordWrap = !_wordWrap),
           tooltip: 'Toggle Word Wrap',
@@ -510,41 +504,6 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
         if (_searchMatches.isNotEmpty) searchOverlay,
       ],
     );
-
-    if (_showLineNumbers) {
-      final lines = _displayContent.split('\n');
-      final lineNumbers = lines.asMap().keys.map((i) => '${i + 1}').join('\n');
-
-      final lineNumbersWidget = Container(
-        padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
-        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF0F0F0),
-        child: Text(
-          lineNumbers,
-          style: textStyle.copyWith(
-            color: isDark ? Colors.white54 : Colors.black54,
-          ),
-          textAlign: TextAlign.right,
-        ),
-      );
-
-      if (_wordWrap) {
-        content = Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            lineNumbersWidget,
-            Expanded(child: content),
-          ],
-        );
-      } else {
-        content = Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            lineNumbersWidget,
-            content,
-          ],
-        );
-      }
-    }
 
     if (_wordWrap) {
       return SingleChildScrollView(

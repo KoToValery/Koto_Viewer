@@ -44,10 +44,10 @@ class TextReflowView extends StatefulWidget {
   });
 
   @override
-  State<TextReflowView> createState() => _TextReflowViewState();
+  State<TextReflowView> createState() => TextReflowViewState();
 }
 
-class _TextReflowViewState extends State<TextReflowView> {
+class TextReflowViewState extends State<TextReflowView> {
   late List<TextReflowChapter> _chapters;
   int _currentChapterIndex = 0;
   int _currentMiniPageIndex = 0;
@@ -220,7 +220,7 @@ class _TextReflowViewState extends State<TextReflowView> {
     );
   }
 
-  void _showSettingsSheet() {
+  void showSettingsSheet() {
     final theme = widget.settings.theme;
 
     showModalBottomSheet(
@@ -507,7 +507,7 @@ class _TextReflowViewState extends State<TextReflowView> {
     );
   }
 
-  void _showTocSheet() {
+  void showTocSheet() {
     if (_chapters.isEmpty) return;
     final theme = widget.settings.theme;
 
@@ -638,42 +638,7 @@ class _TextReflowViewState extends State<TextReflowView> {
             });
           }
 
-          return Stack(
-            children: [
-              // Main Reading Content
-              isPaginated ? _buildPaginatedView(theme) : _buildContinuousView(theme),
-
-              // Floating Quick Settings & TOC Controls
-              Positioned(
-                bottom: 24 + MediaQuery.paddingOf(context).bottom,
-                right: 16,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_chapters.length > 1) ...[
-                      FloatingActionButton.small(
-                        heroTag: 'txt_reflow_toc_btn',
-                        backgroundColor: theme.surfaceColor,
-                        foregroundColor: theme.accentColor,
-                        tooltip: 'Table of Contents',
-                        onPressed: _showTocSheet,
-                        child: const Icon(Icons.format_list_bulleted, size: 18),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    FloatingActionButton.small(
-                      heroTag: 'txt_reflow_settings_btn',
-                      backgroundColor: theme.surfaceColor,
-                      foregroundColor: theme.accentColor,
-                      tooltip: 'Reading Settings',
-                      onPressed: _showSettingsSheet,
-                      child: const Icon(Icons.tune, size: 18),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
+          return isPaginated ? _buildPaginatedView(theme) : _buildContinuousView(theme);
         },
       ),
     );

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -42,14 +44,20 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   int? _resumedChapter;
   int? _resumedMiniPage;
   double? _resumedFraction;
+  final GlobalKey<TextReflowViewState> _reflowKey = GlobalKey<TextReflowViewState>();
 
   // Options
-  bool _showLineNumbers = false; // User requested to default off
   bool _isMonospace = true;
   bool _isWordWrap = true;
   double _fontSize = 13.5;
-  bool _isZoomBarExpanded = false;
   bool _isFullscreen = false;
+
+  // Pinch-to-zoom & Gesture scaling
+  final Map<int, Offset> _activePointers = {};
+  double _baseFontSize = 13.5;
+  double? _initialPinchDistance;
+  bool _showZoomIndicator = false;
+  Timer? _zoomIndicatorTimer;
 
   // Bookmarks & Reading Progress
   List<BookmarkItem> _bookmarks = [];
@@ -107,6 +115,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
 
   @override
   void dispose() {
+    _zoomIndicatorTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _saveReadingProgress();
     _verticalScrollController.dispose();
@@ -638,13 +647,105 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     );
   }
 
+  void _onPinchUpdate(double scale) {
+    final newSize = (_baseFontSize * scale).clamp(8.0, 34.0);
+    if ((newSize - _fontSize).abs() >= 0.1) {
+      setState(() {
+        _fontSize = newSize;
+        _showZoomIndicator = true;
+      });
+      _scheduleHideZoomIndicator();
+    }
+  }
+
+  void _onPointerDown(PointerDownEvent event) {
+    _activePointers[event.pointer] = event.position;
+    if (_activePointers.length == 2) {
+      final points = _activePointers.values.toList();
+      _initialPinchDistance = (points[0] - points[1]).distance;
+      _baseFontSize = _fontSize;
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (_activePointers.containsKey(event.pointer)) {
+      _activePointers[event.pointer] = event.position;
+    }
+    if (_activePointers.length >= 2 &&
+        _initialPinchDistance != null &&
+        _initialPinchDistance! > 20) {
+      final points = _activePointers.values.toList();
+      final currentDistance = (points[0] - points[1]).distance;
+      final scale = currentDistance / _initialPinchDistance!;
+      _onPinchUpdate(scale);
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    _activePointers.remove(event.pointer);
+    if (_activePointers.length < 2) {
+      _initialPinchDistance = null;
+    }
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    _activePointers.remove(event.pointer);
+    if (_activePointers.length < 2) {
+      _initialPinchDistance = null;
+    }
+  }
+
+  void _onPointerPanZoomStart(PointerPanZoomStartEvent event) {
+    _baseFontSize = _fontSize;
+  }
+
+  void _onPointerPanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    if (event.scale != 1.0) {
+      final newSize = (_baseFontSize * event.scale).clamp(8.0, 34.0);
+      if ((newSize - _fontSize).abs() >= 0.1) {
+        setState(() {
+          _fontSize = newSize;
+          _showZoomIndicator = true;
+        });
+        _scheduleHideZoomIndicator();
+      }
+    }
+  }
+
+  void _onPointerPanZoomEnd(PointerPanZoomEndEvent event) {
+    _scheduleHideZoomIndicator();
+  }
+
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent && HardwareKeyboard.instance.isControlPressed) {
+      final delta = event.scrollDelta.dy;
+      final change = delta < 0 ? 1.0 : -1.0;
+      final newSize = (_fontSize + change).clamp(8.0, 34.0);
+      if (newSize != _fontSize) {
+        setState(() {
+          _fontSize = newSize;
+          _showZoomIndicator = true;
+        });
+        _scheduleHideZoomIndicator();
+      }
+    }
+  }
+
+  void _scheduleHideZoomIndicator() {
+    _zoomIndicatorTimer?.cancel();
+    _zoomIndicatorTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _showZoomIndicator = false;
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
-    final gutterBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF1F5F9);
-    final lineGutterColor = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
 
     final fontStyle = _isMonospace
         ? GoogleFonts.firaCode(fontSize: _fontSize, height: 1.45)
@@ -737,6 +838,24 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     onPressed: _toggleReflowMode,
                   ),
 
+                  // If in Reflow Mode, show the two eBook reader controls in top toolbar:
+                  if (_isReflowMode) ...[
+                    IconButton(
+                      icon: const Icon(Icons.format_list_bulleted, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: 'Table of Contents',
+                      onPressed: () => _reflowKey.currentState?.showTocSheet(),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.tune, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: 'Reading Settings',
+                      onPressed: () => _reflowKey.currentState?.showSettingsSheet(),
+                    ),
+                  ],
+
                   // Bookmark button
                   IconButton(
                     icon: const Icon(Icons.bookmark_add_outlined, size: 20),
@@ -759,41 +878,35 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     onPressed: _showBookmarksSheet,
                   ),
 
-                  // Monospace Toggle
-                  IconButton(
-                    icon: Icon(_isMonospace ? Icons.font_download : Icons.font_download_outlined, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _isMonospace ? 'Switch to Proportional Font' : 'Switch to Monospace Font',
-                    onPressed: () => setState(() => _isMonospace = !_isMonospace),
-                  ),
+                  // Raw text controls (only when NOT in Reflow Mode)
+                  if (!_isReflowMode) ...[
+                    // Monospace Toggle
+                    IconButton(
+                      icon: Icon(_isMonospace ? Icons.font_download : Icons.font_download_outlined, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: _isMonospace ? 'Switch to Proportional Font' : 'Switch to Monospace Font',
+                      onPressed: () => setState(() => _isMonospace = !_isMonospace),
+                    ),
 
-                  // Word Wrap Toggle (Fit to Screen)
-                  IconButton(
-                    icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _isWordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
-                    onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
-                  ),
+                    // Word Wrap Toggle (Fit to Screen)
+                    IconButton(
+                      icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: _isWordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
+                      onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
+                    ),
 
-                  // Copy All
-                  IconButton(
-                    icon: const Icon(Icons.copy_all_outlined, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Copy All',
-                    onPressed: _copyAllText,
-                  ),
-
-                  // Line Numbers Toggle
-                  IconButton(
-                    icon: Icon(_showLineNumbers ? Icons.format_list_numbered : Icons.format_list_numbered_rtl, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _showLineNumbers ? 'Hide Line Numbers' : 'Show Line Numbers',
-                    onPressed: () => setState(() => _showLineNumbers = !_showLineNumbers),
-                  ),
+                    // Copy All
+                    IconButton(
+                      icon: const Icon(Icons.copy_all_outlined, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: 'Copy All',
+                      onPressed: _copyAllText,
+                    ),
+                  ],
 
                   // Fullscreen
                   IconButton(
@@ -905,6 +1018,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     Expanded(
                       child: _isReflowMode
                           ? TextReflowView(
+                              key: _reflowKey,
                               fullText: _fullText,
                               fileName: _fileName,
                               filePath: widget.filePath,
@@ -930,19 +1044,26 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                               initialMiniPage: _resumedMiniPage,
                               initialFraction: _resumedFraction,
                             )
-                          : Stack(
+                          : Listener(
+                              onPointerDown: _onPointerDown,
+                              onPointerMove: _onPointerMove,
+                              onPointerUp: _onPointerUp,
+                              onPointerCancel: _onPointerCancel,
+                              onPointerPanZoomStart: _onPointerPanZoomStart,
+                              onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
+                              onPointerPanZoomEnd: _onPointerPanZoomEnd,
+                              onPointerSignal: _onPointerSignal,
+                              child: Stack(
                               children: [
                                 _isWordWrap
                                     ? ListView.builder(
                                         controller: _verticalScrollController,
-                                        padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
+                                        padding: EdgeInsets.fromLTRB(0, 8, 0, 24 + MediaQuery.paddingOf(context).bottom),
                                         itemCount: currentLines.length,
                                         itemBuilder: (context, index) => _buildLineItem(
                                           index,
                                           currentLines[index],
                                           fontStyle,
-                                          lineGutterColor,
-                                          gutterBg,
                                         ),
                                       )
                                     : Scrollbar(
@@ -955,26 +1076,20 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                             width: 2500, // Wide canvas for unified horizontal scroll
                                             child: ListView.builder(
                                               controller: _verticalScrollController,
-                                              padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
+                                              padding: EdgeInsets.fromLTRB(0, 8, 0, 24 + MediaQuery.paddingOf(context).bottom),
                                               itemCount: currentLines.length,
                                               itemBuilder: (context, index) => _buildLineItem(
                                                 index,
                                                 currentLines[index],
                                                 fontStyle,
-                                                lineGutterColor,
-                                                gutterBg,
                                               ),
                                             ),
                                           ),
                                         ),
                                       ),
 
-                                // Floating Zoom Slider Controls
-                                Positioned(
-                                  bottom: 20 + MediaQuery.paddingOf(context).bottom,
-                                  right: 20,
-                                  child: _buildZoomControls(theme),
-                                ),
+                                // Transient Zoom Indicator HUD
+                                _buildZoomIndicatorHud(theme),
 
                                 if (_isFullscreen)
                                   Positioned(
@@ -989,6 +1104,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                   ),
                               ],
                             ),
+                          ),
                     ),
                   ],
                 ),
@@ -999,8 +1115,6 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     int index,
     String lineText,
     TextStyle fontStyle,
-    Color lineGutterColor,
-    Color gutterBg,
   ) {
     final isCurrentMatch = _matchedLineIndices.isNotEmpty &&
         _currentMatchIndex >= 0 &&
@@ -1026,158 +1140,85 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
               ? const Color(0xFFFFD54F).withValues(alpha: 0.2)
               : lineBgColor,
       padding: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_showLineNumbers) ...[
-            Container(
-              width: 48,
-              alignment: Alignment.topRight,
-              padding: const EdgeInsets.only(right: 12),
-              child: Text(
-                '${index + 1}',
-                style: GoogleFonts.firaCode(
-                  fontSize: (_fontSize * 0.82).clamp(8.0, 24.0),
-                  color: lineGutterColor,
-                  fontWeight: isCurrentMatch ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ),
-            Container(
-              width: 1,
-              height: _fontSize * 1.5,
-              color: gutterBg,
-            ),
-            const SizedBox(width: 10),
-          ],
-          Expanded(
-            child: SelectableText(
-              lineText.isEmpty ? ' ' : lineText,
-              style: fontStyle,
-            ),
-          ),
-        ],
+      child: SelectableText(
+        lineText.isEmpty ? ' ' : lineText,
+        style: fontStyle,
       ),
     );
   }
 
-  Widget _buildZoomControls(ThemeData theme) {
-    if (!_isZoomBarExpanded) {
-      return FloatingActionButton.small(
-        heroTag: 'text_zoom_btn',
-        onPressed: () => setState(() => _isZoomBarExpanded = true),
-        backgroundColor: theme.colorScheme.surface,
-        child: Icon(Icons.text_increase, color: theme.colorScheme.primary, size: 20),
-      );
-    }
-
+  Widget _buildZoomIndicatorHud(ThemeData theme) {
     final double zoomPercent = (_fontSize / 13.5) * 100.0;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3)),
-        ],
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Zoom Out (Decrease Font)
-          IconButton(
-            icon: const Icon(Icons.remove, size: 18),
-            tooltip: 'Smaller Font (-)',
-            padding: const EdgeInsets.all(6),
-            constraints: const BoxConstraints(),
-            onPressed: () {
-              setState(() {
-                _fontSize = (_fontSize - 1.5).clamp(8.0, 34.0);
-              });
-            },
-          ),
-
-          // Zoom Slider
-          SizedBox(
-            width: 110,
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 3,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-              ),
-              child: Slider(
-                value: _fontSize.clamp(8.0, 34.0),
-                min: 8.0,
-                max: 34.0,
-                onChanged: (val) {
-                  setState(() {
-                    _fontSize = val;
-                  });
-                },
-              ),
-            ),
-          ),
-
-          // Zoom In (Increase Font)
-          IconButton(
-            icon: const Icon(Icons.add, size: 18),
-            tooltip: 'Larger Font (+)',
-            padding: const EdgeInsets.all(6),
-            constraints: const BoxConstraints(),
-            onPressed: () {
-              setState(() {
-                _fontSize = (_fontSize + 1.5).clamp(8.0, 34.0);
-              });
-            },
-          ),
-
-          const SizedBox(width: 4),
-
-          // Percentage Badge (Tap to reset 100% / 13.5pt)
-          InkWell(
-            onTap: () => setState(() => _fontSize = 13.5),
-            borderRadius: BorderRadius.circular(12),
+    return Positioned(
+      bottom: 24 + MediaQuery.paddingOf(context).bottom,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: AnimatedOpacity(
+          opacity: _showZoomIndicator ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 200),
+          child: IgnorePointer(
+            ignoring: !_showZoomIndicator,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${zoomPercent.toStringAsFixed(0)}%',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
+                color: theme.colorScheme.surface.withValues(alpha: 0.94),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
                 ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.format_size, size: 16, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${zoomPercent.toStringAsFixed(0)}%  (${_fontSize.toStringAsFixed(1)} pt)',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _fontSize = 13.5;
+                        _showZoomIndicator = true;
+                      });
+                      _scheduleHideZoomIndicator();
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Reset',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-
-          const SizedBox(width: 4),
-
-          // Fit Screen / Word Wrap toggle
-          IconButton(
-            icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 18),
-            tooltip: _isWordWrap ? 'Word Wrap ON (Fit Screen)' : 'Word Wrap OFF',
-            padding: const EdgeInsets.all(6),
-            constraints: const BoxConstraints(),
-            onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
-          ),
-
-          // Minimize
-          IconButton(
-            icon: const Icon(Icons.close, size: 16),
-            tooltip: 'Minimize Controls',
-            padding: const EdgeInsets.all(6),
-            constraints: const BoxConstraints(),
-            onPressed: () => setState(() => _isZoomBarExpanded = false),
-          ),
-        ],
+        ),
       ),
     );
   }
