@@ -36,12 +36,17 @@ import 'widgets/dxf_layer_sheet.dart';
 import 'widgets/dxf_measure_pointer_painter.dart';
 import 'widgets/dxf_measurement_canvas_painter.dart';
 import 'widgets/dxf_measurement_overlay.dart';
+import '../../core/services/project_bundle_service.dart';
+import '../project_viewer/widgets/project_presentation_bar.dart';
 
 class DxfViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
   final String? originalFilePath;
   final bool addToRecent;
+  final ProjectBundleInfo? projectBundle;
+  final int? currentProjectIndex;
+  final void Function(int newIndex)? onSwitchProjectItem;
 
   const DxfViewerScreen({
     super.key,
@@ -49,6 +54,9 @@ class DxfViewerScreen extends StatefulWidget {
     this.title,
     this.originalFilePath,
     this.addToRecent = true,
+    this.projectBundle,
+    this.currentProjectIndex,
+    this.onSwitchProjectItem,
   });
 
   @override
@@ -1175,6 +1183,23 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   void _handleKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent) {
+      if (widget.projectBundle != null) {
+        final currentIndex = widget.currentProjectIndex ?? 0;
+        final total = widget.projectBundle!.files.length;
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+            event.logicalKey == LogicalKeyboardKey.pageDown) {
+          if (currentIndex < total - 1 && widget.onSwitchProjectItem != null) {
+            widget.onSwitchProjectItem!(currentIndex + 1);
+            return;
+          }
+        } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+            event.logicalKey == LogicalKeyboardKey.pageUp) {
+          if (currentIndex > 0 && widget.onSwitchProjectItem != null) {
+            widget.onSwitchProjectItem!(currentIndex - 1);
+            return;
+          }
+        }
+      }
       if (event.logicalKey == LogicalKeyboardKey.f3) {
         setState(() {
           _snapEnabled = !_snapEnabled;
@@ -2354,12 +2379,30 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                       ],
                     ),
                   ),
+
+                  // Presentation Mode Switcher Bar (shown when opened from a project bundle)
+                  if (widget.projectBundle != null)
+                    Positioned(
+                      bottom: 24,
+                      left: 0,
+                      right: 0,
+                      child: Center(child: _buildProjectSwitchBar()),
+                    ),
                 ],
               );
             },
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildProjectSwitchBar() {
+    return ProjectPresentationBar(
+      projectBundle: widget.projectBundle!,
+      currentIndex: widget.currentProjectIndex ?? 0,
+      onSwitchProjectItem: widget.onSwitchProjectItem,
+      onExit: () => Navigator.of(context).pop(),
     );
   }
 

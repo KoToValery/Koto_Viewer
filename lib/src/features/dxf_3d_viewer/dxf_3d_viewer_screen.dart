@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/models/pdf_item.dart';
+import '../../core/services/project_bundle_service.dart';
+import '../project_viewer/widgets/project_presentation_bar.dart';
 import '../../core/services/recent_files_service.dart';
 import 'models/ifc_model.dart';
 import 'models/mesh_3d.dart';
@@ -31,12 +33,18 @@ class Dxf3DViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
   final bool addToRecent;
+  final ProjectBundleInfo? projectBundle;
+  final int? currentProjectIndex;
+  final void Function(int newIndex)? onSwitchProjectItem;
 
   const Dxf3DViewerScreen({
     super.key,
     required this.filePath,
     this.title,
     this.addToRecent = true,
+    this.projectBundle,
+    this.currentProjectIndex,
+    this.onSwitchProjectItem,
   });
 
   @override
@@ -1252,6 +1260,22 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   ],
                 ),
               ),
+
+              // Presentation Mode Switcher Bar
+              if (widget.projectBundle != null)
+                Positioned(
+                  bottom: 24,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: ProjectPresentationBar(
+                      projectBundle: widget.projectBundle!,
+                      currentIndex: widget.currentProjectIndex ?? 0,
+                      onSwitchProjectItem: widget.onSwitchProjectItem,
+                      onExit: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ),
             ],
           );
         },

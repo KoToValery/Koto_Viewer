@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -13,6 +15,9 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/l10n/generated/app_localizations.dart';
 import '../../core/services/recent_files_service.dart';
+import '../../core/services/project_bundle_service.dart';
+import '../project_viewer/widgets/project_presentation_bar.dart';
+import '../../core/l10n/l10n_extensions.dart';
 
 class _IcoFrame {
   final int width;
@@ -29,10 +34,16 @@ class _IcoFrame {
 /// Interactive Image Viewer Screen supporting PNG, JPG, JPEG, WEBP, GIF, BMP, ICO, and PSD.
 class ImageViewerScreen extends StatefulWidget {
   final String filePath;
+  final ProjectBundleInfo? projectBundle;
+  final int? currentProjectIndex;
+  final void Function(int newIndex)? onSwitchProjectItem;
 
   const ImageViewerScreen({
     super.key,
     required this.filePath,
+    this.projectBundle,
+    this.currentProjectIndex,
+    this.onSwitchProjectItem,
   });
 
   @override
@@ -42,6 +53,11 @@ class ImageViewerScreen extends StatefulWidget {
 class _ImageViewerScreenState extends State<ImageViewerScreen> {
   bool _isLoading = true;
   String? _error;
+
+  // Presentation Mode State
+  bool _showControls = true;
+  Timer? _hideControlsTimer;
+  final FocusNode _focusNode = FocusNode();
 
   // Formats
   bool _isIco = false;
@@ -86,13 +102,66 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.projectBundle != null) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      _scheduleControlsHiding();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _focusNode.requestFocus();
+      });
+    }
     _loadImage();
   }
 
   @override
   void dispose() {
+    _hideControlsTimer?.cancel();
+    _focusNode.dispose();
+    if (widget.projectBundle != null) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     _transformationController.dispose();
     super.dispose();
+  }
+
+  void _scheduleControlsHiding() {
+    _hideControlsTimer?.cancel();
+    _hideControlsTimer = Timer(const Duration(milliseconds: 3500), () {
+      if (mounted) {
+        setState(() {
+          _showControls = false;
+        });
+      }
+    });
+  }
+
+  void _toggleControls() {
+    setState(() {
+      _showControls = !_showControls;
+    });
+    if (_showControls) {
+      _scheduleControlsHiding();
+    }
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent && widget.projectBundle != null) {
+      final currentIndex = widget.currentProjectIndex ?? 0;
+      final total = widget.projectBundle!.files.length;
+      if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+          event.logicalKey == LogicalKeyboardKey.pageDown ||
+          event.logicalKey == LogicalKeyboardKey.space) {
+        if (currentIndex < total - 1 && widget.onSwitchProjectItem != null) {
+          widget.onSwitchProjectItem!(currentIndex + 1);
+        }
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+          event.logicalKey == LogicalKeyboardKey.pageUp) {
+        if (currentIndex > 0 && widget.onSwitchProjectItem != null) {
+          widget.onSwitchProjectItem!(currentIndex - 1);
+        }
+      } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   Future<void> _loadImage() async {
@@ -297,7 +366,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
     if (_transformationController.value != Matrix4.identity()) {
       _resetZoom();
     } else {
-      _transformationController.value = Matrix4.identity()..scale(2.5, 2.5);
+      _transformationController.value = Matrix4.identity()..scaleByDouble(2.5, 2.5, 1.0, 1.0);
     }
   }
 
@@ -526,6 +595,14 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Presentation mode: fullscreen, black background, no AppBar
+    if (widget.projectBundle != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: _buildBody(),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -539,7 +616,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             ),
             if (_imageWidth != null && _imageHeight != null)
               Text(
-                '${_imageWidth}×$_imageHeight • $_formatLabel • $_formattedFileSize',
+                '$_imageWidth×$_imageHeight • $_formatLabel • $_formattedFileSize',
                 style: TextStyle(
                   fontSize: 11,
                   color: isDark ? Colors.white70 : Colors.black54,
@@ -856,74 +933,199 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
   }
 
   Widget _buildInteractiveImageView(Uint8List imageBytes) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: _buildBackgroundContainer(
-            child: GestureDetector(
-              onDoubleTap: _handleDoubleTap,
-              child: InteractiveViewer(
-                transformationController: _transformationController,
-                minScale: 0.05,
-                maxScale: 30.0,
-                boundaryMargin: const EdgeInsets.all(300),
-                child: Center(
-                  child: Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.identity()
-                      ..rotateZ(_rotationQuarterTurns * (math.pi / 2.0))
-                      ..scaleByDouble(
-                        _flipHorizontal ? -1.0 : 1.0,
-                        _flipVertical ? -1.0 : 1.0,
-                        1.0,
-                        1.0,
+    final isPresentation = widget.projectBundle != null;
+
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: isPresentation,
+      onKeyEvent: (node, event) {
+        _handleKeyEvent(event);
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: isPresentation ? _toggleControls : null,
+        onDoubleTap: _handleDoubleTap,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Background & Image - Clean full screen, NOT floating
+            Positioned.fill(
+              child: _buildBackgroundContainer(
+                child: InteractiveViewer(
+                  transformationController: _transformationController,
+                  minScale: isPresentation ? 1.0 : 0.8,
+                  maxScale: 25.0,
+                  boundaryMargin: isPresentation ? EdgeInsets.zero : const EdgeInsets.all(40),
+                  child: Center(
+                    child: Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.identity()
+                        ..rotateZ(_rotationQuarterTurns * (math.pi / 2.0))
+                        ..scaleByDouble(
+                          _flipHorizontal ? -1.0 : 1.0,
+                          _flipVertical ? -1.0 : 1.0,
+                          1.0,
+                          1.0,
+                        ),
+                      child: Image.memory(
+                        imageBytes,
+                        fit: BoxFit.contain,
+                        filterQuality: _pixelated ? FilterQuality.none : FilterQuality.high,
+                        errorBuilder: (_, error, _) {
+                          return Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Text('Failed to render image: $error'),
+                          );
+                        },
                       ),
-                    child: Image.memory(
-                      imageBytes,
-                      fit: BoxFit.contain,
-                      filterQuality: _pixelated ? FilterQuality.none : FilterQuality.high,
-                      errorBuilder: (_, error, _) {
-                        return Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Text('Failed to render image: $error'),
-                        );
-                      },
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
 
-        // Floating Zoom and Reset Controls
-        Positioned(
-          bottom: 24,
-          right: 20,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildFloatingBtn(
-                icon: Icons.add,
-                tooltip: 'Zoom In (+)',
-                onTap: _zoomIn,
+            // In presentation mode: Top Action Bar & Bottom Presentation Switcher Bar
+            if (isPresentation) ...[
+              // Top Bar with back button and file name
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedOpacity(
+                  opacity: _showControls ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 250),
+                  child: IgnorePointer(
+                    ignoring: !_showControls,
+                    child: Container(
+                      padding: EdgeInsets.only(
+                        top: MediaQuery.paddingOf(context).top + 8,
+                        left: 12,
+                        right: 12,
+                        bottom: 12,
+                      ),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.black87, Colors.transparent],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+                            tooltip: 'Back to Project',
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _fileName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (_imageWidth != null && _imageHeight != null)
+                                  Text(
+                                    '$_imageWidth×$_imageHeight • $_formatLabel • $_formattedFileSize',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          // Rotate 90
+                          IconButton(
+                            icon: const Icon(Icons.rotate_right_rounded, color: Colors.white70, size: 24),
+                            tooltip: 'Rotate 90°',
+                            onPressed: () {
+                              _rotate90();
+                              _scheduleControlsHiding();
+                            },
+                          ),
+                          // Reset zoom / transform
+                          IconButton(
+                            icon: const Icon(Icons.fit_screen_outlined, color: Colors.white70, size: 24),
+                            tooltip: 'Reset View',
+                            onPressed: () {
+                              _resetTransform();
+                              _scheduleControlsHiding();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              _buildFloatingBtn(
-                icon: Icons.remove,
-                tooltip: 'Zoom Out (-)',
-                onTap: _zoomOut,
+
+              // Bottom Presentation Bar
+              Positioned(
+                bottom: MediaQuery.paddingOf(context).bottom + 20,
+                left: 0,
+                right: 0,
+                child: AnimatedOpacity(
+                  opacity: _showControls ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 250),
+                  child: IgnorePointer(
+                    ignoring: !_showControls,
+                    child: Center(
+                      child: ProjectPresentationBar(
+                        projectBundle: widget.projectBundle!,
+                        currentIndex: widget.currentProjectIndex ?? 0,
+                        onSwitchProjectItem: (newIndex) {
+                          _scheduleControlsHiding();
+                          widget.onSwitchProjectItem?.call(newIndex);
+                        },
+                        onExit: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              _buildFloatingBtn(
-                icon: Icons.fit_screen_outlined,
-                tooltip: 'Reset View',
-                onTap: _resetTransform,
+            ] else ...[
+              // Standard Floating Zoom and Reset Controls (Non-presentation)
+              Positioned(
+                bottom: 24,
+                right: 20,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildFloatingBtn(
+                      icon: Icons.add,
+                      tooltip: 'Zoom In (+)',
+                      onTap: _zoomIn,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFloatingBtn(
+                      icon: Icons.remove,
+                      tooltip: 'Zoom Out (-)',
+                      onTap: _zoomOut,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFloatingBtn(
+                      icon: Icons.fit_screen_outlined,
+                      tooltip: 'Reset View',
+                      onTap: _resetTransform,
+                    ),
+                  ],
+                ),
               ),
             ],
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -1218,6 +1420,10 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
   }
 
   Widget _buildBackgroundContainer({required Widget child}) {
+    // In presentation mode, always use a clean black background
+    if (widget.projectBundle != null) {
+      return Container(color: Colors.black, child: child);
+    }
     if (_bgMode == 1) {
       // Dark
       return Container(color: Colors.black, child: child);

@@ -6,6 +6,12 @@ import '../../core/models/pdf_item.dart';
 import '../../core/services/file_opener_service.dart';
 import '../../core/services/project_bundle_service.dart';
 import '../video_viewer/video_viewer_screen.dart';
+import '../dxf_viewer/dxf_viewer_screen.dart';
+import '../pdf_viewer/pdf_viewer_screen.dart';
+import '../dxf_3d_viewer/dxf_3d_viewer_screen.dart';
+import '../dxf_viewer/binary/kcad_service.dart';
+import '../image_viewer/image_viewer_screen.dart';
+import '../../core/services/dwg_converter_service.dart';
 
 /// Architectural Presentation Hub Screen for ZIP and .kpack project bundles.
 /// Displays categorized project deliverables (Videos, DWG/DXF, 3D, PDF, Renders)
@@ -131,7 +137,15 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
 
     if (!File(extractedPath).existsSync()) return;
 
-    // Route to appropriate viewer
+    // Helper to switch project items from child viewers
+    void switchItem(int newIndex) {
+      Navigator.of(context).pop();
+      if (newIndex >= 0 && newIndex < _bundle!.files.length) {
+        _openProjectItem(_bundle!.files[newIndex], newIndex);
+      }
+    }
+
+    // Route to appropriate viewer with full presentation context
     if (item.category == ProjectItemCategory.video || item.fileType == KotoFileType.video) {
       await Navigator.of(context).push(
         MaterialPageRoute(
@@ -141,12 +155,85 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
             addToRecent: false,
             projectBundle: _bundle,
             currentProjectIndex: index,
-            onSwitchProjectItem: (newIndex) {
-              Navigator.of(context).pop();
-              if (newIndex >= 0 && newIndex < _bundle!.files.length) {
-                _openProjectItem(_bundle!.files[newIndex], newIndex);
-              }
-            },
+            onSwitchProjectItem: switchItem,
+          ),
+        ),
+      );
+    } else if (item.category == ProjectItemCategory.image || item.fileType == KotoFileType.image ||
+               item.fileType == KotoFileType.ico || item.fileType == KotoFileType.psd) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ImageViewerScreen(
+            filePath: extractedPath,
+            projectBundle: _bundle,
+            currentProjectIndex: index,
+            onSwitchProjectItem: switchItem,
+          ),
+        ),
+      );
+    } else if (item.category == ProjectItemCategory.drawing &&
+               (item.fileType == KotoFileType.dxf || item.fileType == KotoFileType.dwg)) {
+      String dxfPath = extractedPath;
+      String? origPath;
+      if (item.fileType == KotoFileType.dwg) {
+        // Convert DWG -> DXF or use cached KCAD
+        final kcadPath = await KcadService.getCachePath(File(extractedPath));
+        if (await File(kcadPath).exists() && await File(kcadPath).length() > 16) {
+          dxfPath = kcadPath;
+          origPath = extractedPath;
+        } else {
+          final converted = await DwgConverterService.convertDwgToDxf(extractedPath);
+          if (converted.isNotEmpty) {
+            dxfPath = converted;
+            origPath = extractedPath;
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Could not convert DWG file'), backgroundColor: Colors.red),
+              );
+            }
+            return;
+          }
+        }
+      }
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DxfViewerScreen(
+            filePath: dxfPath,
+            title: item.fileName,
+            originalFilePath: origPath,
+            addToRecent: false,
+            projectBundle: _bundle,
+            currentProjectIndex: index,
+            onSwitchProjectItem: switchItem,
+          ),
+        ),
+      );
+    } else if (item.fileType == KotoFileType.pdf ||
+               (item.category == ProjectItemCategory.drawing && item.fileType == KotoFileType.pdf)) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PdfViewerScreen(
+            filePath: extractedPath,
+            title: item.fileName,
+            addToRecent: false,
+            projectBundle: _bundle,
+            currentProjectIndex: index,
+            onSwitchProjectItem: switchItem,
+          ),
+        ),
+      );
+    } else if (item.category == ProjectItemCategory.model3d) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => Dxf3DViewerScreen(
+            filePath: extractedPath,
+            title: item.fileName,
+            addToRecent: false,
+            projectBundle: _bundle,
+            currentProjectIndex: index,
+            onSwitchProjectItem: switchItem,
           ),
         ),
       );

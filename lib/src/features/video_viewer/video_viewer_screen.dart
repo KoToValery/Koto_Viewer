@@ -6,6 +6,7 @@ import 'package:video_player/video_player.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/l10n/l10n_extensions.dart';
 import '../../core/services/project_bundle_service.dart';
+import '../project_viewer/widgets/project_presentation_bar.dart';
 
 /// Full-screen high-performance video player designed for architectural presentations.
 /// Supports MP4, MOV, MKV, WebM, AVI, etc. with immersive mode, looping,
@@ -637,56 +638,13 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
   }
 
   Widget _buildProjectSwitchBar() {
-    final bundle = widget.projectBundle!;
-    final currentIndex = widget.currentProjectIndex ?? 0;
-    final total = bundle.files.length;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Previous item
-          IconButton(
-            icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
-            tooltip: context.l10n.prevProjectItem,
-            onPressed: currentIndex > 0 && widget.onSwitchProjectItem != null
-                ? () => widget.onSwitchProjectItem!(currentIndex - 1)
-                : null,
-          ),
-          // Project name and counter
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  bundle.projectName,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '${currentIndex + 1} / $total',
-                  style: const TextStyle(color: Colors.amberAccent, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          // Next item
-          IconButton(
-            icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
-            tooltip: context.l10n.nextProjectItem,
-            onPressed: currentIndex < total - 1 && widget.onSwitchProjectItem != null
-                ? () => widget.onSwitchProjectItem!(currentIndex + 1)
-                : null,
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: ProjectPresentationBar(
+        projectBundle: widget.projectBundle!,
+        currentIndex: widget.currentProjectIndex ?? 0,
+        onSwitchProjectItem: widget.onSwitchProjectItem,
+        onExit: () => Navigator.of(context).pop(),
       ),
     );
   }

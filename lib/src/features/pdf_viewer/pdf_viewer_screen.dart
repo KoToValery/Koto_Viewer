@@ -8,6 +8,8 @@ import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/models/pdf_item.dart';
+import '../../core/services/project_bundle_service.dart';
+import '../project_viewer/widgets/project_presentation_bar.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
 import '../home/widgets/share_options_sheet.dart';
@@ -24,12 +26,18 @@ class PdfViewerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
   final bool addToRecent;
+  final ProjectBundleInfo? projectBundle;
+  final int? currentProjectIndex;
+  final void Function(int newIndex)? onSwitchProjectItem;
 
   const PdfViewerScreen({
     super.key,
     required this.filePath,
     this.title,
     this.addToRecent = true,
+    this.projectBundle,
+    this.currentProjectIndex,
+    this.onSwitchProjectItem,
   });
 
   @override
@@ -904,6 +912,22 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 loadingTitle: _isPresentation ? l10n.loadingPresentation : l10n.loadingPdf,
                 statusMessage: l10n.statusPreparingPages,
                 onCancel: () => Navigator.of(context).pop(false),
+              ),
+            ),
+
+          // Project Presentation Switcher Bar
+          if (widget.projectBundle != null)
+            Positioned(
+              bottom: 20 + MediaQuery.paddingOf(context).bottom,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ProjectPresentationBar(
+                  projectBundle: widget.projectBundle!,
+                  currentIndex: widget.currentProjectIndex ?? 0,
+                  onSwitchProjectItem: widget.onSwitchProjectItem,
+                  onExit: () => Navigator.of(context).pop(),
+                ),
               ),
             ),
         ],
