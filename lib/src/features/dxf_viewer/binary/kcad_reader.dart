@@ -10,55 +10,58 @@ import 'kcad_writer.dart';
 class _KcadBinaryReader {
   final Uint8List buffer;
   final ByteData byteData;
-  int _offset = 0;
+  int offset = 0;
 
   _KcadBinaryReader(this.buffer) : byteData = ByteData.sublistView(buffer);
 
-  int get offset => _offset;
-  int get remaining => buffer.length - _offset;
+  int get remaining => buffer.length - offset;
 
-  int readUint8() => byteData.getUint8(_offset++);
-  int readInt8() => byteData.getInt8(_offset++);
+  void skip(int bytes) {
+    offset += bytes;
+  }
+
+  int readUint8() => byteData.getUint8(offset++);
+  int readInt8() => byteData.getInt8(offset++);
 
   int readUint16() {
-    final v = byteData.getUint16(_offset, Endian.little);
-    _offset += 2;
+    final v = byteData.getUint16(offset, Endian.little);
+    offset += 2;
     return v;
   }
 
   int readInt16() {
-    final v = byteData.getInt16(_offset, Endian.little);
-    _offset += 2;
+    final v = byteData.getInt16(offset, Endian.little);
+    offset += 2;
     return v;
   }
 
   int readUint32() {
-    final v = byteData.getUint32(_offset, Endian.little);
-    _offset += 4;
+    final v = byteData.getUint32(offset, Endian.little);
+    offset += 4;
     return v;
   }
 
   int readInt32() {
-    final v = byteData.getInt32(_offset, Endian.little);
-    _offset += 4;
+    final v = byteData.getInt32(offset, Endian.little);
+    offset += 4;
     return v;
   }
 
   int readInt64() {
-    final v = byteData.getInt64(_offset, Endian.little);
-    _offset += 8;
+    final v = byteData.getInt64(offset, Endian.little);
+    offset += 8;
     return v;
   }
 
   double readFloat64() {
-    final v = byteData.getFloat64(_offset, Endian.little);
-    _offset += 8;
+    final v = byteData.getFloat64(offset, Endian.little);
+    offset += 8;
     return v;
   }
 
   double readFloat32() {
-    final v = byteData.getFloat32(_offset, Endian.little);
-    _offset += 4;
+    final v = byteData.getFloat32(offset, Endian.little);
+    offset += 4;
     return v;
   }
 
@@ -71,8 +74,8 @@ class _KcadBinaryReader {
   }
 
   Uint8List readBytes(int length) {
-    final slice = Uint8List.sublistView(buffer, _offset, _offset + length);
-    _offset += length;
+    final slice = Uint8List.sublistView(buffer, offset, offset + length);
+    offset += length;
     return slice;
   }
 }
@@ -85,6 +88,8 @@ class _EntityBaseData {
   final String? lineType;
   final double? lineWeight;
   final double? lineTypeScale;
+  final bool isPaperSpace;
+  final String layoutName;
 
   const _EntityBaseData({
     required this.layer,
@@ -93,6 +98,8 @@ class _EntityBaseData {
     this.lineType,
     this.lineWeight,
     this.lineTypeScale,
+    this.isPaperSpace = false,
+    this.layoutName = 'Model',
   });
 }
 
@@ -117,7 +124,7 @@ class KcadReader {
 
     // 2. Read Header
     final version = headerReader.readUint16();
-    if (version != 1 && version != 2) {
+    if (version < 1 || version > 5) {
       throw FormatException('Unsupported KCAD version: $version');
     }
 
@@ -235,6 +242,35 @@ class KcadReader {
       entityStats[k] = v;
     }
 
+    // DimStyles (v4+)
+    final Map<String, DxfDimStyle> dimStyles = {};
+    if (version >= 4) {
+      final dimStyleCount = bodyReader.readCount();
+      for (int i = 0; i < dimStyleCount; i++) {
+        final name = stringTable[bodyReader.readUint32()];
+        final dimScale = bodyReader.readFloat32();
+        final dimAsz = bodyReader.readFloat32();
+        final dimExo = bodyReader.readFloat32();
+        final dimExe = bodyReader.readFloat32();
+        final dimTxt = bodyReader.readFloat32();
+        final dimTsz = bodyReader.readFloat32();
+        final dimGap = bodyReader.readFloat32();
+        final hasBlk = bodyReader.readUint8() != 0;
+        final dimBlk = hasBlk ? stringTable[bodyReader.readUint32()] : null;
+        dimStyles[name] = DxfDimStyle(
+          name: name,
+          dimScale: dimScale,
+          dimAsz: dimAsz,
+          dimExo: dimExo,
+          dimExe: dimExe,
+          dimTxt: dimTxt,
+          dimTsz: dimTsz,
+          dimGap: dimGap,
+          dimBlk: dimBlk,
+        );
+      }
+    }
+
     // 6. Read Blocks
     final blockCount = isV2 ? bodyReader.readCount() : bodyReader.readUint32();
     final Map<String, DxfBlock> blocks = {};
@@ -243,10 +279,13 @@ class KcadReader {
       final baseX = bodyReader.readFloat64();
       final baseY = bodyReader.readFloat64();
       final entityCount = isV2 ? bodyReader.readCount() : bodyReader.readUint32();
-      final blockEntities = List<DxfEntity>.filled(entityCount, const DxfLine(p1: Offset.zero, p2: Offset.zero));
+      final blockEntities = <DxfEntity>[];
       for (int e = 0; e < entityCount; e++) {
         // Block entities are decoded with local origin (0, 0)
-        blockEntities[e] = _readEntity(stringTable, bodyReader, isV2, 0.0, 0.0);
+        final entity = _readEntity(stringTable, bodyReader, version, 0.0, 0.0);
+        if (entity != null) {
+          blockEntities.add(entity);
+        }
       }
       blocks[blockName] = DxfBlock(
         name: blockName,
@@ -262,15 +301,18 @@ class KcadReader {
     final bottom = bodyReader.readFloat64();
     final bounds = Rect.fromLTRB(left, top, right, bottom);
 
-    // Reference Origin for Root Entities (Version 2)
+    // Reference Origin for Root Entities (Version 2 & 3)
     final double originX = bounds.left;
     final double originY = bounds.top;
 
     // 8. Read Root Entities
     final rootEntityCount = isV2 ? bodyReader.readCount() : bodyReader.readUint32();
-    final entities = List<DxfEntity>.filled(rootEntityCount, const DxfLine(p1: Offset.zero, p2: Offset.zero));
+    final entities = <DxfEntity>[];
     for (int i = 0; i < rootEntityCount; i++) {
-      entities[i] = _readEntity(stringTable, bodyReader, isV2, originX, originY);
+      final entity = _readEntity(stringTable, bodyReader, version, originX, originY);
+      if (entity != null) {
+        entities.add(entity);
+      }
     }
 
     // 9. Construct DxfDocument and Spatial Index
@@ -283,6 +325,7 @@ class KcadReader {
       bounds: bounds,
       entityStats: entityStats,
       lineTypes: lineTypes,
+      dimStyles: dimStyles,
     );
 
     doc.spatialIndex = DxfQuadTree.build(doc.entities, doc.blocks, doc.bounds);
@@ -312,6 +355,11 @@ class KcadReader {
         ? (isV2 ? reader.readFloat32() : reader.readFloat64())
         : null;
 
+    final isPaperSpace = (flags & 32) != 0;
+    final layoutName = (flags & 64) != 0
+        ? stringTable[reader.readUint32()]
+        : (isPaperSpace ? 'Layout1' : 'Model');
+
     return _EntityBaseData(
       layer: layer,
       colorIndex: colorIndex,
@@ -319,19 +367,70 @@ class KcadReader {
       lineType: lineType,
       lineWeight: lineWeight,
       lineTypeScale: lineTypeScale,
+      isPaperSpace: isPaperSpace,
+      layoutName: layoutName,
     );
   }
 
-  static DxfEntity _readEntity(
+  static DxfEntity? _readEntity(
+    List<String> stringTable,
+    _KcadBinaryReader reader,
+    int version,
+    double ox,
+    double oy,
+  ) {
+    final typeCode = reader.readUint8();
+    final bool isV2 = version >= 2;
+    final int payloadLength;
+    final int entityEndOffset;
+
+    if (version >= 3) {
+      payloadLength = reader.readUint32();
+      entityEndOffset = reader.offset + payloadLength;
+    } else {
+      payloadLength = 0;
+      entityEndOffset = 0;
+    }
+
+    if (typeCode < 1 || typeCode > 18) {
+      if (version >= 3) {
+        // Forward compatibility: safely skip the unknown entity payload
+        reader.offset = entityEndOffset;
+        return null;
+      }
+      throw FormatException('Unknown KCAD entity type code: $typeCode');
+    }
+
+    final base = _readBase(stringTable, reader, isV2);
+    final DxfEntity entity = _readEntityPayload(
+      typeCode,
+      base,
+      stringTable,
+      reader,
+      isV2,
+      ox,
+      oy,
+      version,
+    );
+
+    if (version >= 3 && reader.offset != entityEndOffset) {
+      // Seek to the end of the entity payload in case of extra fields in a future revision
+      reader.offset = entityEndOffset;
+    }
+
+    return entity;
+  }
+
+  static DxfEntity _readEntityPayload(
+    int typeCode,
+    _EntityBaseData base,
     List<String> stringTable,
     _KcadBinaryReader reader,
     bool isV2,
     double ox,
     double oy,
+    int version,
   ) {
-    final typeCode = reader.readUint8();
-    final base = _readBase(stringTable, reader, isV2);
-
     switch (typeCode) {
       case KcadEntityType.line:
         final x1 = isV2 ? ox + reader.readFloat32() : reader.readFloat64();
@@ -347,6 +446,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.point:
@@ -360,6 +461,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.circle:
@@ -375,6 +478,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.arc:
@@ -394,6 +499,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.ellipse:
@@ -416,6 +523,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.lwPolyline:
@@ -452,6 +561,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.polyline:
@@ -490,6 +601,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.spline:
@@ -534,6 +647,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.text:
@@ -568,6 +683,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.mText:
@@ -614,6 +731,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.solid:
@@ -644,6 +763,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.hatch:
@@ -704,6 +825,8 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.insert:
@@ -718,6 +841,22 @@ class KcadReader {
         final colCount = reader.readInt32();
         final rowSpacing = isV2 ? reader.readFloat32() : reader.readFloat64();
         final colSpacing = isV2 ? reader.readFloat32() : reader.readFloat64();
+        final List<DxfAttribute> attributes = [];
+        if (version >= 5 && reader.offset < reader.buffer.length) {
+          final attrCount = reader.readCount();
+          for (int a = 0; a < attrCount; a++) {
+            final tag = stringTable[reader.readUint32()];
+            final val = stringTable[reader.readUint32()];
+            final isInv = reader.readUint8() != 0;
+            final isConst = reader.readUint8() != 0;
+            attributes.add(DxfAttribute(
+              tag: tag,
+              value: val,
+              isInvisible: isInv,
+              isConstant: isConst,
+            ));
+          }
+        }
         return DxfInsert(
           blockName: blockName,
           insertPoint: Offset(ix, iy),
@@ -729,12 +868,58 @@ class KcadReader {
           colCount: colCount,
           rowSpacing: rowSpacing,
           colSpacing: colSpacing,
+          attributes: attributes,
           layer: base.layer,
           colorIndex: base.colorIndex,
           trueColor: base.trueColor,
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
+        );
+
+      case KcadEntityType.attdef:
+        final tag = stringTable[reader.readUint32()];
+        final text = stringTable[reader.readUint32()];
+        final hasPrompt = reader.readUint8() != 0;
+        final prompt = hasPrompt ? stringTable[reader.readUint32()] : null;
+        final ix = isV2 ? ox + reader.readFloat32() : reader.readFloat64();
+        final iy = isV2 ? oy + reader.readFloat32() : reader.readFloat64();
+        final hasAlign = reader.readUint8() != 0;
+        final alignPoint = hasAlign
+            ? Offset(
+                isV2 ? ox + reader.readFloat32() : reader.readFloat64(),
+                isV2 ? oy + reader.readFloat32() : reader.readFloat64(),
+              )
+            : null;
+        final height = isV2 ? reader.readFloat32() : reader.readFloat64();
+        final rotation = isV2 ? reader.readFloat32() : reader.readFloat64();
+        final hAlign = reader.readInt32();
+        final vAlign = reader.readInt32();
+        final hasStyle = reader.readUint8() != 0;
+        final style = hasStyle ? stringTable[reader.readUint32()] : null;
+        final flags = reader.readInt32();
+        return DxfAttdef(
+          tag: tag,
+          text: text,
+          prompt: prompt,
+          insertPoint: Offset(ix, iy),
+          alignPoint: alignPoint,
+          height: height,
+          rotationDeg: rotation,
+          hAlign: hAlign,
+          vAlign: vAlign,
+          style: style,
+          flags: flags,
+          layer: base.layer,
+          colorIndex: base.colorIndex,
+          trueColor: base.trueColor,
+          lineType: base.lineType,
+          lineWeight: base.lineWeight,
+          lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.dimension:
@@ -758,19 +943,41 @@ class KcadReader {
         final textOverride = hasOverride ? stringTable[reader.readUint32()] : null;
         final hasBlock = reader.readUint8() != 0;
         final blockName = hasBlock ? stringTable[reader.readUint32()] : null;
+        Offset? p3;
+        double rotationDeg = 0.0;
+        String? styleName;
+        if (version >= 4) {
+          final hasP3 = reader.readUint8() != 0;
+          if (hasP3) {
+            p3 = Offset(
+              ox + reader.readFloat32(),
+              oy + reader.readFloat32(),
+            );
+          }
+          rotationDeg = reader.readFloat32();
+          final hasStyle = reader.readUint8() != 0;
+          if (hasStyle) {
+            styleName = stringTable[reader.readUint32()];
+          }
+        }
         return DxfDimension(
           dimType: dimType,
           defPoint1: p1,
           defPoint2: p2,
+          defPoint3: p3,
           textPoint: tp,
+          rotationDeg: rotationDeg,
           textOverride: textOverride,
           blockName: blockName,
+          styleName: styleName,
           layer: base.layer,
           colorIndex: base.colorIndex,
           trueColor: base.trueColor,
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       case KcadEntityType.leader:
@@ -791,6 +998,104 @@ class KcadReader {
           lineType: base.lineType,
           lineWeight: base.lineWeight,
           lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
+        );
+
+      case KcadEntityType.mLeader:
+        final rawText = stringTable[reader.readUint32()];
+        final cleanText = stringTable[reader.readUint32()];
+        final textHeight = reader.readFloat32();
+        final hasTextWidth = reader.readUint8() != 0;
+        final textWidth = hasTextWidth ? reader.readFloat32() : null;
+        final hasArrowhead = reader.readUint8() != 0;
+        final arrowheadSize = reader.readFloat32();
+        final doglegLength = reader.readFloat32();
+
+        final hasConn = reader.readUint8() != 0;
+        final connPoint = hasConn
+            ? Offset(
+                isV2 ? ox + reader.readFloat32() : reader.readFloat64(),
+                isV2 ? oy + reader.readFloat32() : reader.readFloat64(),
+              )
+            : null;
+
+        final hasDoglegDir = reader.readUint8() != 0;
+        final doglegDir = hasDoglegDir
+            ? Offset(reader.readFloat32(), reader.readFloat32())
+            : null;
+
+        final hasTextPos = reader.readUint8() != 0;
+        final textPos = hasTextPos
+            ? Offset(
+                isV2 ? ox + reader.readFloat32() : reader.readFloat64(),
+                isV2 ? oy + reader.readFloat32() : reader.readFloat64(),
+              )
+            : null;
+
+        final lineCount = isV2 ? reader.readCount() : reader.readUint32();
+        final leaderLines = <List<Offset>>[];
+        for (int l = 0; l < lineCount; l++) {
+          final ptCount = isV2 ? reader.readCount() : reader.readUint32();
+          final pts = List<Offset>.filled(ptCount, Offset.zero);
+          for (int p = 0; p < ptCount; p++) {
+            final x = isV2 ? ox + reader.readFloat32() : reader.readFloat64();
+            final y = isV2 ? oy + reader.readFloat32() : reader.readFloat64();
+            pts[p] = Offset(x, y);
+          }
+          leaderLines.add(pts);
+        }
+
+        return DxfMLeader(
+          leaderLines: leaderLines,
+          connectionPoint: connPoint,
+          doglegDirection: doglegDir,
+          doglegLength: doglegLength,
+          textPosition: textPos,
+          rawText: rawText,
+          cleanText: cleanText,
+          textHeight: textHeight,
+          textWidth: textWidth,
+          hasArrowhead: hasArrowhead,
+          arrowheadSize: arrowheadSize,
+          layer: base.layer,
+          colorIndex: base.colorIndex,
+          trueColor: base.trueColor,
+          lineType: base.lineType,
+          lineWeight: base.lineWeight,
+          lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
+        );
+
+      case KcadEntityType.viewport:
+        final cx = isV2 ? ox + reader.readFloat32() : reader.readFloat64();
+        final cy = isV2 ? oy + reader.readFloat32() : reader.readFloat64();
+        final width = isV2 ? reader.readFloat32() : reader.readFloat64();
+        final height = isV2 ? reader.readFloat32() : reader.readFloat64();
+        final viewCx = isV2 ? reader.readFloat32() : reader.readFloat64();
+        final viewCy = isV2 ? reader.readFloat32() : reader.readFloat64();
+        final viewHeight = isV2 ? reader.readFloat32() : reader.readFloat64();
+        final status = reader.readInt32();
+        final viewportId = reader.readInt32();
+        final twistAngleDeg = isV2 ? reader.readFloat32() : reader.readFloat64();
+        return DxfViewport(
+          center: Offset(cx, cy),
+          width: width,
+          height: height,
+          viewCenter: Offset(viewCx, viewCy),
+          viewHeight: viewHeight,
+          status: status,
+          viewportId: viewportId,
+          twistAngleDeg: twistAngleDeg,
+          layer: base.layer,
+          colorIndex: base.colorIndex,
+          trueColor: base.trueColor,
+          lineType: base.lineType,
+          lineWeight: base.lineWeight,
+          lineTypeScale: base.lineTypeScale,
+          isPaperSpace: base.isPaperSpace,
+          layoutName: base.layoutName,
         );
 
       default:

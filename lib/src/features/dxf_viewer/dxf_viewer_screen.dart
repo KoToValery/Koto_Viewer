@@ -66,6 +66,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   // View state
   DxfCanvasTheme _canvasTheme = DxfCanvasTheme.darkCad;
+  String _activeLayout = 'Model';
   bool _showGrid = true;
   double _currentScale = 1.0;
   double _renderScale = 1.0;
@@ -258,6 +259,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       if (mounted) {
         setState(() {
           _document = doc;
+          _activeLayout = 'Model';
           _isLoading = false;
         });
       }
@@ -362,11 +364,31 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     _transformController.value = newMatrix;
   }
 
+  Rect get _currentBounds {
+    if (_document == null) return const Rect.fromLTWH(0, 0, 100, 100);
+    if (_activeLayout != 'Model') {
+      return _document!.layoutBounds[_activeLayout] ?? _document!.bounds;
+    }
+    return _document!.bounds;
+  }
+
+  void _switchLayout(String layout) {
+    if (_activeLayout == layout) return;
+    setState(() {
+      _activeLayout = layout;
+      _selectedEntity = null;
+      _measurement = null;
+      _hoveredSnap = null;
+    });
+    _fitToScreen();
+  }
+
   Offset _sceneToCad(Offset scenePoint) {
     if (_document == null || _viewportSize.isEmpty) return Offset.zero;
 
-    final double docW = math.max(_document!.width, 1.0);
-    final double docH = math.max(_document!.height, 1.0);
+    final bounds = _currentBounds;
+    final double docW = math.max(bounds.width, 1.0);
+    final double docH = math.max(bounds.height, 1.0);
 
     const double padding = 32.0;
     final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
@@ -377,10 +399,10 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     final double tx = (_viewportSize.width - docW * fitScale) / 2.0;
     final double ty = (_viewportSize.height - docH * fitScale) / 2.0;
 
-    final double minX = _document!.bounds.left;
-    final double maxY = _document!.bounds.bottom > _document!.bounds.top
-        ? _document!.bounds.bottom
-        : _document!.bounds.top;
+    final double minX = bounds.left;
+    final double maxY = bounds.bottom > bounds.top
+        ? bounds.bottom
+        : bounds.top;
 
     final double cadX = minX + (scenePoint.dx - tx) / fitScale;
     final double cadY = maxY - (scenePoint.dy - ty) / fitScale;
@@ -391,14 +413,15 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
   Offset _cadToScene(Offset cadPoint) {
     if (_document == null || _viewportSize.isEmpty) return cadPoint;
     final double fitScale = _getCadFitScale();
-    final double docW = math.max(_document!.width, 1.0);
-    final double docH = math.max(_document!.height, 1.0);
+    final bounds = _currentBounds;
+    final double docW = math.max(bounds.width, 1.0);
+    final double docH = math.max(bounds.height, 1.0);
     final double tx = (_viewportSize.width - docW * fitScale) / 2.0;
     final double ty = (_viewportSize.height - docH * fitScale) / 2.0;
-    final double minX = _document!.bounds.left;
-    final double maxY = _document!.bounds.bottom > _document!.bounds.top
-        ? _document!.bounds.bottom
-        : _document!.bounds.top;
+    final double minX = bounds.left;
+    final double maxY = bounds.bottom > bounds.top
+        ? bounds.bottom
+        : bounds.top;
 
     return Offset(
       tx + (cadPoint.dx - minX) * fitScale,
@@ -438,8 +461,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         top + marginY,
       );
 
-      // Clamp to document bounds (with 5% buffer) so it never queries beyond drawing extents
-      final maxDocExtent = _document!.bounds.inflate(_document!.bounds.longestSide * 0.05 + 10.0);
+      // Clamp to current layout bounds (with 5% buffer) so it never queries beyond drawing extents
+      final bounds = _currentBounds;
+      final maxDocExtent = bounds.inflate(bounds.longestSide * 0.05 + 10.0);
       return rect.intersect(maxDocExtent);
     } catch (_) {
       return null;
@@ -448,8 +472,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   double _getCadFitScale() {
     if (_document == null || _viewportSize.isEmpty) return 1.0;
-    final double docW = math.max(_document!.width, 1.0);
-    final double docH = math.max(_document!.height, 1.0);
+    final bounds = _currentBounds;
+    final double docW = math.max(bounds.width, 1.0);
+    final double docH = math.max(bounds.height, 1.0);
     const double padding = 32.0;
     final double availW = math.max(_viewportSize.width - padding * 2, 10.0);
     final double availH = math.max(_viewportSize.height - padding * 2, 10.0);
@@ -1684,6 +1709,70 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             ),
             child: Row(
               children: [
+                // Layout Switcher Tabs (Model | Layout1 | Sheet1 ...)
+                if (_document != null && _document!.layouts.length > 1)
+                  Flexible(
+                    child: Container(
+                      height: 30,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white10
+                            : Colors.black.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: _document!.layouts.map((layout) {
+                            final isSelected = layout == _activeLayout;
+                            return InkWell(
+                              onTap: () => _switchLayout(layout),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xFFFF9800)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      layout == 'Model' ? Icons.grid_4x4 : Icons.article_outlined,
+                                      size: 13,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : (Theme.of(context).brightness == Brightness.dark
+                                              ? Colors.white70
+                                              : Colors.black87),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      layout,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : (Theme.of(context).brightness == Brightness.dark
+                                                ? Colors.white70
+                                                : Colors.black87),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+
                 const Spacer(),
 
                 // Fit to screen (Zoom Extents)
@@ -2031,6 +2120,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                               painter: DxfPainter(
                                 document: _document!,
                                 theme: _canvasTheme,
+                                activeLayout: _activeLayout,
                                 currentScale: _renderScale,
                                 measurement: null, // Rendered crisply on screen-space overlay above InteractiveViewer
                                 annotations: const [], // Rendered crisply on screen-space overlay above InteractiveViewer

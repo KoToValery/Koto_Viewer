@@ -484,3 +484,175 @@ class DxfAffineMatrix {
     return _storage;
   }
 }
+
+/// Represents an Object Coordinate System (OCS) transformation to World Coordinate System (WCS).
+/// Implements the official Autodesk DXF Arbitrary Axis Algorithm.
+class OcsTransform {
+  final double nx;
+  final double ny;
+  final double nz;
+
+  // Unit vector of OCS X-axis in WCS
+  final double xx;
+  final double xy;
+  final double xz;
+
+  // Unit vector of OCS Y-axis in WCS
+  final double yx;
+  final double yy;
+  final double yz;
+
+  final bool isIdentity;
+
+  const OcsTransform._({
+    required this.nx,
+    required this.ny,
+    required this.nz,
+    required this.xx,
+    required this.xy,
+    required this.xz,
+    required this.yx,
+    required this.yy,
+    required this.yz,
+    required this.isIdentity,
+  });
+
+  /// Identity OCS transformation where OCS matches WCS (normal is 0, 0, 1).
+  static const OcsTransform identity = OcsTransform._(
+    nx: 0.0,
+    ny: 0.0,
+    nz: 1.0,
+    xx: 1.0,
+    xy: 0.0,
+    xz: 0.0,
+    yx: 0.0,
+    yy: 1.0,
+    yz: 0.0,
+    isIdentity: true,
+  );
+
+  /// Computes OCS -> WCS transformation using the Autodesk Arbitrary Axis Algorithm.
+  factory OcsTransform.fromExtrusion(double nx, double ny, double nz) {
+    final double lenSq = nx * nx + ny * ny + nz * nz;
+    if (lenSq < 1e-12) {
+      return identity;
+    }
+
+    final double len = math.sqrt(lenSq);
+    final double unx = nx / len;
+    final double uny = ny / len;
+    final double unz = nz / len;
+
+    // Check if close to identity (0, 0, 1)
+    if (unx.abs() < 1e-6 && uny.abs() < 1e-6 && (unz - 1.0).abs() < 1e-6) {
+      return identity;
+    }
+
+    // Arbitrary Axis Algorithm:
+    // If (|nx| < 1/64) and (|ny| < 1/64), Ax = (0, 1, 0) x N
+    // Otherwise, Ax = (0, 0, 1) x N
+    final double axX;
+    final double axY;
+    final double axZ;
+
+    const double kThreshold = 1.0 / 64.0; // 0.015625
+    if (unx.abs() < kThreshold && uny.abs() < kThreshold) {
+      // (0, 1, 0) x (unx, uny, unz) = (unz, 0, -unx)
+      axX = unz;
+      axY = 0.0;
+      axZ = -unx;
+    } else {
+      // (0, 0, 1) x (unx, uny, unz) = (-uny, unx, 0)
+      axX = -uny;
+      axY = unx;
+      axZ = 0.0;
+    }
+
+    // Normalize Ax to get X_ocs
+    final double axLen = math.sqrt(axX * axX + axY * axY + axZ * axZ);
+    if (axLen < 1e-12) {
+      return identity;
+    }
+    final double uxx = axX / axLen;
+    final double uxy = axY / axLen;
+    final double uxz = axZ / axLen;
+
+    // Y_ocs = N x X_ocs
+    final double uyx = uny * uxz - unz * uxy;
+    final double uyy = unz * uxx - unx * uxz;
+    final double uyz = unx * uxy - uny * uxx;
+
+    return OcsTransform._(
+      nx: unx,
+      ny: uny,
+      nz: unz,
+      xx: uxx,
+      xy: uxy,
+      xz: uxz,
+      yx: uyx,
+      yy: uyy,
+      yz: uyz,
+      isIdentity: false,
+    );
+  }
+
+  /// Transforms an OCS point (x, y, elevation) to 2D WCS projection (Offset).
+  @pragma('vm:prefer-inline')
+  Offset toWcs2D(double ocsX, double ocsY, [double elevation = 0.0]) {
+    if (isIdentity) {
+      return Offset(ocsX, ocsY);
+    }
+    final double wx = ocsX * xx + ocsY * yx + elevation * nx;
+    final double wy = ocsX * xy + ocsY * yy + elevation * ny;
+    return Offset(wx, wy);
+  }
+
+  /// Transforms an OCS angle in degrees to WCS 2D angle in degrees [0, 360).
+  double angleToWcs(double angleDeg) {
+    if (isIdentity) {
+      double a = angleDeg % 360.0;
+      if (a < 0) a += 360.0;
+      return a;
+    }
+    final double rad = angleDeg * math.pi / 180.0;
+    final double cosA = math.cos(rad);
+    final double sinA = math.sin(rad);
+    final double vx = cosA * xx + sinA * yx;
+    final double vy = cosA * xy + sinA * yy;
+    double a = math.atan2(vy, vx) * 180.0 / math.pi;
+    if (a < 0) a += 360.0;
+    return a;
+  }
+
+  /// Transforms an arc's start and end angles from OCS to 2D WCS.
+  /// If nz < 0 (pointing in -Z direction), the arc sweep direction in XY projection
+  /// is reversed from CCW to CW, so start and end angles are swapped to keep
+  /// the CCW representation consistent with standard 2D canvas drawing.
+  ({double startAngleDeg, double endAngleDeg}) transformArcAngles(
+    double startA,
+    double endA,
+  ) {
+    if (isIdentity) {
+      return (startAngleDeg: startA, endAngleDeg: endA);
+    }
+
+    final double a1 = angleToWcs(startA);
+    final double a2 = angleToWcs(endA);
+
+    if (nz < 0) {
+      return (startAngleDeg: a2, endAngleDeg: a1);
+    } else {
+      return (startAngleDeg: a1, endAngleDeg: a2);
+    }
+  }
+
+  /// Transforms a polyline bulge factor.
+  /// If nz < 0, the orientation of curvature is inverted.
+  double transformBulge(double bulge) {
+    if (isIdentity || nz >= 0) {
+      return bulge;
+    }
+    return -bulge;
+  }
+}
+

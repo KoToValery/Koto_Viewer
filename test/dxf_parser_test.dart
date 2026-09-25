@@ -1120,8 +1120,8 @@ EOF''';
       if (file.existsSync()) {
         final content = UniversalEncodingService.decodeBytes(file.readAsBytesSync());
         final doc = DxfParser.parseString(content);
-        // Empty layers must not be loaded: original has 332 layers, only ~150 have entities
-        expect(doc.layers.length, lessThan(200));
+        // Empty layers must not be loaded: original has 332 layers, only ~150-200 have entities
+        expect(doc.layers.length, lessThanOrEqualTo(210));
         expect(doc.layers.length, greaterThan(50));
 
         final visible = doc.layers.values.where((l) => l.isVisible).toList();

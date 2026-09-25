@@ -69,7 +69,11 @@ class DxfParser {
   static DxfDocument parseString(String content) {
     final pairs = _tokenize(content);
     final doc = _parsePairs(pairs);
-    doc.spatialIndex = DxfQuadTree.build(doc.entities, doc.blocks, doc.bounds);
+    doc.spatialIndex = DxfQuadTree.build(
+      doc.entities.where((e) => !e.isPaperSpace).toList(),
+      doc.blocks,
+      doc.bounds,
+    );
     return doc;
   }
 
@@ -146,6 +150,7 @@ class DxfParser {
     }
 
     final Map<String, List<double>> lineTypes = {};
+    final Map<String, DxfDimStyle> dimStyles = {};
 
     while (idx < total) {
       final pair = pairs[idx];
@@ -160,7 +165,7 @@ class DxfParser {
         if (secName == 'HEADER') {
           idx = _parseHeaderSection(pairs, idx, headerVars);
         } else if (secName == 'TABLES') {
-          idx = _parseTablesSection(pairs, idx, layers, lineTypes, textStyles);
+          idx = _parseTablesSection(pairs, idx, layers, lineTypes, textStyles, dimStyles);
         } else if (secName == 'BLOCKS') {
           idx = _parseBlocksSection(pairs, idx, blocks);
         } else if (secName == 'ENTITIES') {
@@ -180,12 +185,22 @@ class DxfParser {
       }
     }
 
-    // Compute bounding box (filtering out origin outliers e.g. (0,0) in BGS2005 drawings)
+    // Compute bounding box (filtering out paper space entities and origin outliers)
     List<Rect> validBoxes = [];
     for (final entity in entities) {
+      if (entity.isPaperSpace) continue;
       final b = entity.getBoundingBox(blocks);
-      if (b != null && b.isFinite && !b.isEmpty) {
+      if (b != null && b.isFinite) {
         validBoxes.add(b);
+      }
+    }
+    // If drawing contains ONLY paper space entities (rare edge case), fallback to all entities
+    if (validBoxes.isEmpty) {
+      for (final entity in entities) {
+        final b = entity.getBoundingBox(blocks);
+        if (b != null && b.isFinite) {
+          validBoxes.add(b);
+        }
       }
     }
 
@@ -300,6 +315,10 @@ class DxfParser {
       for (final b in filteredBoxes) {
         bounds = bounds == null ? b : bounds.expandToInclude(b);
       }
+      if (bounds != null) {
+        if (bounds.width == 0) bounds = Rect.fromCenter(center: bounds.center, width: 1.0, height: math.max(bounds.height, 1.0));
+        if (bounds.height == 0) bounds = Rect.fromCenter(center: bounds.center, width: math.max(bounds.width, 1.0), height: 1.0);
+      }
     }
 
     // If still null or infinite, fallback
@@ -314,6 +333,7 @@ class DxfParser {
       bounds: bounds,
       entityStats: entityStats,
       lineTypes: lineTypes,
+      dimStyles: dimStyles,
     );
   }
 
@@ -376,13 +396,14 @@ class DxfParser {
     return extents.isEmpty ? null : extents;
   }
 
-  /// Parses TABLES section (LAYER and LTYPE tables).
+  /// Parses TABLES section (LAYER, LTYPE, STYLE, and DIMSTYLE tables).
   static int _parseTablesSection(
     List<_DxfPair> pairs,
     int startIdx,
     Map<String, DxfLayer> layers,
     Map<String, List<double>> lineTypes,
     Map<String, DxfTextStyle> textStyles,
+    Map<String, DxfDimStyle> dimStyles,
   ) {
     int idx = startIdx;
     final int total = pairs.length;
@@ -410,6 +431,8 @@ class DxfParser {
           idx = _parseLtypeTable(pairs, idx, lineTypes);
         } else if (tabName == 'STYLE') {
           idx = _parseStyleTable(pairs, idx, textStyles);
+        } else if (tabName == 'DIMSTYLE') {
+          idx = _parseDimStyleTable(pairs, idx, dimStyles);
         } else {
           // Skip other tables
           while (idx < total) {
@@ -419,6 +442,90 @@ class DxfParser {
             }
             idx++;
           }
+        }
+      } else {
+        idx++;
+      }
+    }
+    return idx;
+  }
+
+  /// Parses DIMSTYLE table entries.
+  static int _parseDimStyleTable(
+    List<_DxfPair> pairs,
+    int startIdx,
+    Map<String, DxfDimStyle> dimStyles,
+  ) {
+    int idx = startIdx;
+    final int total = pairs.length;
+
+    while (idx < total) {
+      final pair = pairs[idx];
+      if (pair.code == 0 && pair.value.trim().toUpperCase() == 'ENDTAB') {
+        idx++;
+        break;
+      }
+
+      if (pair.code == 0 && pair.value.trim().toUpperCase() == 'DIMSTYLE') {
+        idx++;
+        String styleName = 'STANDARD';
+        double dimScale = 1.0;
+        double dimAsz = 2.5;
+        double dimExo = 0.625;
+        double dimExe = 1.25;
+        double dimTxt = 2.5;
+        double dimTsz = 0.0;
+        double dimGap = 0.625;
+        String? dimBlk;
+
+        while (idx < total && pairs[idx].code != 0) {
+          final p = pairs[idx];
+          switch (p.code) {
+            case 2:
+              styleName = _cleanCadText(p.value.trim());
+              break;
+            case 40:
+              dimScale = p.doubleValue > 0 ? p.doubleValue : 1.0;
+              break;
+            case 41:
+              dimAsz = p.doubleValue;
+              break;
+            case 42:
+              dimExo = p.doubleValue;
+              break;
+            case 44:
+              dimExe = p.doubleValue;
+              break;
+            case 140:
+              dimTxt = p.doubleValue;
+              break;
+            case 142:
+              dimTsz = p.doubleValue;
+              break;
+            case 147:
+              dimGap = p.doubleValue;
+              break;
+            case 5:
+            case 6:
+            case 342:
+              dimBlk = p.value.trim();
+              break;
+          }
+          idx++;
+        }
+
+        if (styleName.isNotEmpty) {
+          dimStyles[styleName] = DxfDimStyle(
+            name: styleName,
+            dimScale: dimScale,
+            dimAsz: dimAsz,
+            dimExo: dimExo,
+            dimExe: dimExe,
+            dimTxt: dimTxt,
+            dimTsz: dimTsz,
+            dimGap: dimGap,
+            dimBlk: dimBlk,
+          );
         }
       } else {
         idx++;
@@ -674,6 +781,13 @@ class DxfParser {
             final (entity, nextIdx) = _parseEntity(pairs, idx);
             if (entity != null) {
               blockEntities.add(entity);
+              if (entity is DxfInsert && entity.attributes.isNotEmpty) {
+                for (final attr in entity.attributes) {
+                  if (attr.textEntity != null && !attr.isInvisible) {
+                    blockEntities.add(attr.textEntity!);
+                  }
+                }
+              }
             }
             idx = nextIdx;
           } else {
@@ -717,6 +831,14 @@ class DxfParser {
         if (entity != null) {
           entities.add(entity);
           entityStats[entity.typeName] = (entityStats[entity.typeName] ?? 0) + 1;
+          if (entity is DxfInsert && entity.attributes.isNotEmpty) {
+            for (final attr in entity.attributes) {
+              if (attr.textEntity != null && !attr.isInvisible) {
+                entities.add(attr.textEntity!);
+                entityStats['TEXT'] = (entityStats['TEXT'] ?? 0) + 1;
+              }
+            }
+          }
         }
         idx = nextIdx;
       } else {
@@ -754,6 +876,10 @@ class DxfParser {
     String? lineType;
     double? lineWeight;
     double? lineTypeScale;
+    bool isPaperSpace = false;
+    String? rawLayoutName;
+    double nx = 0.0, ny = 0.0, nz = 1.0;
+    bool hasExtrusion = false;
 
     for (final p in entityPairs) {
       switch (p.code) {
@@ -775,8 +901,37 @@ class DxfParser {
         case 370:
           lineWeight = p.doubleValue / 100.0;
           break;
+        case 67:
+          isPaperSpace = p.intValue == 1;
+          break;
+        case 410:
+          rawLayoutName = _cleanCadText(p.value.trim());
+          break;
+        case 210:
+          nx = p.doubleValue;
+          hasExtrusion = true;
+          break;
+        case 220:
+          ny = p.doubleValue;
+          hasExtrusion = true;
+          break;
+        case 230:
+          nz = p.doubleValue;
+          hasExtrusion = true;
+          break;
       }
     }
+
+    final effectivePaperSpace = entityType == 'VIEWPORT' ? true : isPaperSpace;
+    final layoutName = effectivePaperSpace
+        ? ((rawLayoutName != null && rawLayoutName.isNotEmpty && rawLayoutName != 'Model')
+            ? rawLayoutName
+            : 'Layout1')
+        : 'Model';
+
+    final ocs = hasExtrusion
+        ? OcsTransform.fromExtrusion(nx, ny, nz)
+        : OcsTransform.identity;
 
     DxfEntity? entity;
 
@@ -808,11 +963,13 @@ class DxfParser {
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
       case 'POINT':
-        double x = 0, y = 0;
+        double x = 0, y = 0, z = 0;
         for (final p in entityPairs) {
           switch (p.code) {
             case 10:
@@ -821,21 +978,27 @@ class DxfParser {
             case 20:
               y = p.doubleValue;
               break;
+            case 30:
+              z = p.doubleValue;
+              break;
           }
         }
+        final point = ocs.isIdentity ? Offset(x, y) : ocs.toWcs2D(x, y, z);
         entity = DxfPoint(
-          point: Offset(x, y),
+          point: point,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
       case 'CIRCLE':
-        double cx = 0, cy = 0, r = 0;
+        double cx = 0, cy = 0, cz = 0, r = 0;
         for (final p in entityPairs) {
           switch (p.code) {
             case 10:
@@ -844,13 +1007,17 @@ class DxfParser {
             case 20:
               cy = p.doubleValue;
               break;
+            case 30:
+              cz = p.doubleValue;
+              break;
             case 40:
               r = p.doubleValue;
               break;
           }
         }
+        final center = ocs.isIdentity ? Offset(cx, cy) : ocs.toWcs2D(cx, cy, cz);
         entity = DxfCircle(
-          center: Offset(cx, cy),
+          center: center,
           radius: r,
           layer: layer,
           colorIndex: colorIndex,
@@ -858,11 +1025,13 @@ class DxfParser {
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
       case 'ARC':
-        double cx = 0, cy = 0, r = 0, startA = 0, endA = 360;
+        double cx = 0, cy = 0, cz = 0, r = 0, startA = 0, endA = 360;
         for (final p in entityPairs) {
           switch (p.code) {
             case 10:
@@ -870,6 +1039,9 @@ class DxfParser {
               break;
             case 20:
               cy = p.doubleValue;
+              break;
+            case 30:
+              cz = p.doubleValue;
               break;
             case 40:
               r = p.doubleValue;
@@ -882,17 +1054,21 @@ class DxfParser {
               break;
           }
         }
+        final center = ocs.isIdentity ? Offset(cx, cy) : ocs.toWcs2D(cx, cy, cz);
+        final angles = ocs.transformArcAngles(startA, endA);
         entity = DxfArc(
-          center: Offset(cx, cy),
+          center: center,
           radius: r,
-          startAngleDeg: startA,
-          endAngleDeg: endA,
+          startAngleDeg: angles.startAngleDeg,
+          endAngleDeg: angles.endAngleDeg,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
@@ -935,6 +1111,8 @@ class DxfParser {
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
@@ -951,13 +1129,24 @@ class DxfParser {
 
         void flushVertex() {
           if (hasVertex) {
-            vertices.add(DxfPolylineVertex(
-              x: currentX,
-              y: currentY,
-              bulge: currentBulge,
-              startWidth: currentStartWidth,
-              endWidth: currentEndWidth,
-            ));
+            if (ocs.isIdentity) {
+              vertices.add(DxfPolylineVertex(
+                x: currentX,
+                y: currentY,
+                bulge: currentBulge,
+                startWidth: currentStartWidth,
+                endWidth: currentEndWidth,
+              ));
+            } else {
+              final pt = ocs.toWcs2D(currentX, currentY, elevation);
+              vertices.add(DxfPolylineVertex(
+                x: pt.dx,
+                y: pt.dy,
+                bulge: ocs.transformBulge(currentBulge),
+                startWidth: currentStartWidth,
+                endWidth: currentEndWidth,
+              ));
+            }
             currentBulge = 0;
             currentStartWidth = 0;
             currentEndWidth = 0;
@@ -1003,6 +1192,8 @@ class DxfParser {
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
@@ -1088,6 +1279,8 @@ class DxfParser {
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
@@ -1147,6 +1340,8 @@ class DxfParser {
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
@@ -1154,8 +1349,8 @@ class DxfParser {
       case 'ATTDEF':
       case 'ATTRIB':
         String text = '';
-        double ix = 0, iy = 0;
-        double? ax, ay;
+        double ix = 0, iy = 0, iz = 0;
+        double? ax, ay, az;
         double height = 2.5;
         double rotation = 0;
         int hAlign = 0;
@@ -1163,6 +1358,7 @@ class DxfParser {
         String? style;
         int flags = 0;
         String tag = '';
+        String? prompt;
 
         for (final p in entityPairs) {
           switch (p.code) {
@@ -1172,17 +1368,26 @@ class DxfParser {
             case 2:
               tag = p.value;
               break;
+            case 3:
+              prompt = p.value;
+              break;
             case 10:
               ix = p.doubleValue;
               break;
             case 20:
               iy = p.doubleValue;
               break;
+            case 30:
+              iz = p.doubleValue;
+              break;
             case 11:
               ax = p.doubleValue;
               break;
             case 21:
               ay = p.doubleValue;
+              break;
+            case 31:
+              az = p.doubleValue;
               break;
             case 40:
               height = p.doubleValue;
@@ -1206,32 +1411,60 @@ class DxfParser {
           }
         }
 
-        // In ATTDEF / ATTRIB: bit 1 (0x1) specifies invisible attribute
-        if ((entityType == 'ATTDEF' || entityType == 'ATTRIB') && (flags & 1) != 0) {
-          break;
-        }
-
-        if (text.isEmpty && tag.isNotEmpty && entityType == 'ATTDEF') {
-          text = tag;
-        }
+        final bool isInvisible = (flags & 1) != 0;
 
         final clean = _cleanCadText(text);
         final bool hasAlign = (hAlign != 0 || vAlign != 0) && ax != null && ay != null;
+        final Offset insertPoint = ocs.isIdentity ? Offset(ix, iy) : ocs.toWcs2D(ix, iy, iz);
+        final Offset? alignPoint = hasAlign
+            ? (ocs.isIdentity ? Offset(ax, ay) : ocs.toWcs2D(ax, ay, az ?? iz))
+            : null;
+        final double finalRotation = ocs.isIdentity ? rotation : ocs.angleToWcs(rotation);
+
+        if (entityType == 'ATTDEF') {
+          entity = DxfAttdef(
+            tag: tag,
+            text: text,
+            prompt: prompt,
+            insertPoint: insertPoint,
+            alignPoint: alignPoint,
+            height: height > 0 ? height : 2.5,
+            rotationDeg: finalRotation,
+            hAlign: hAlign,
+            vAlign: vAlign,
+            style: style,
+            flags: flags,
+            layer: layer,
+            colorIndex: colorIndex,
+            trueColor: trueColor,
+            lineType: lineType,
+            lineWeight: lineWeight,
+            lineTypeScale: lineTypeScale,
+            isPaperSpace: effectivePaperSpace,
+            layoutName: layoutName,
+          );
+          break;
+        }
+
         entity = DxfText(
           text: clean,
-          insertPoint: Offset(ix, iy),
-          alignPoint: hasAlign ? Offset(ax, ay) : null,
+          tag: tag.isNotEmpty ? tag : null,
+          insertPoint: insertPoint,
+          alignPoint: alignPoint,
           height: height > 0 ? height : 2.5,
-          rotationDeg: rotation,
+          rotationDeg: finalRotation,
           hAlign: hAlign,
           vAlign: vAlign,
           style: style,
+          isInvisible: isInvisible,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
@@ -1288,6 +1521,8 @@ class DxfParser {
         // If direction vector is given, compute rotation from it
         if (dirX != null && dirY != null && (dirX != 0 || dirY != 0)) {
           rotation = math.atan2(dirY, dirX) * 180.0 / math.pi;
+        } else if (!ocs.isIdentity) {
+          rotation = ocs.angleToWcs(rotation);
         }
 
         final rawText = textBuffer.toString();
@@ -1321,13 +1556,15 @@ class DxfParser {
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
       case '3DFACE':
       case 'SOLID':
       case 'TRACE':
-        double x0 = 0, y0 = 0, x1 = 0, y1 = 0, x2 = 0, y2 = 0, x3 = 0, y3 = 0;
+        double x0 = 0, y0 = 0, z0 = 0, x1 = 0, y1 = 0, z1 = 0, x2 = 0, y2 = 0, z2 = 0, x3 = 0, y3 = 0, z3 = 0;
         bool has3 = false;
         for (final p in entityPairs) {
           switch (p.code) {
@@ -1337,17 +1574,26 @@ class DxfParser {
             case 20:
               y0 = p.doubleValue;
               break;
+            case 30:
+              z0 = p.doubleValue;
+              break;
             case 11:
               x1 = p.doubleValue;
               break;
             case 21:
               y1 = p.doubleValue;
               break;
+            case 31:
+              z1 = p.doubleValue;
+              break;
             case 12:
               x2 = p.doubleValue;
               break;
             case 22:
               y2 = p.doubleValue;
+              break;
+            case 32:
+              z2 = p.doubleValue;
               break;
             case 13:
               x3 = p.doubleValue;
@@ -1356,23 +1602,33 @@ class DxfParser {
             case 23:
               y3 = p.doubleValue;
               break;
+            case 33:
+              z3 = p.doubleValue;
+              break;
           }
         }
         if (!has3) {
           x3 = x2;
           y3 = y2;
+          z3 = z2;
         }
+        final Offset pt0 = ocs.isIdentity ? Offset(x0, y0) : ocs.toWcs2D(x0, y0, z0);
+        final Offset pt1 = ocs.isIdentity ? Offset(x1, y1) : ocs.toWcs2D(x1, y1, z1);
+        final Offset pt2 = ocs.isIdentity ? Offset(x2, y2) : ocs.toWcs2D(x2, y2, z2);
+        final Offset pt3 = ocs.isIdentity ? Offset(x3, y3) : ocs.toWcs2D(x3, y3, z3);
         entity = DxfSolid(
-          p0: Offset(x0, y0),
-          p1: Offset(x1, y1),
-          p2: Offset(x2, y2),
-          p3: Offset(x3, y3),
+          p0: pt0,
+          p1: pt1,
+          p2: pt2,
+          p3: pt3,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
@@ -1382,7 +1638,7 @@ class DxfParser {
         double patternAngle = 0;
         double patternScale = 1;
         double? transparency;
-        final boundaryPaths = _parseHatchBoundaryPaths(entityPairs);
+        final boundaryPaths = _parseHatchBoundaryPaths(entityPairs, ocs);
         final patternLines = _parseHatchPatternLines(entityPairs);
 
         for (final p in entityPairs) {
@@ -1467,19 +1723,25 @@ class DxfParser {
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
       case 'INSERT':
         String blockName = '';
-        double ix = 0, iy = 0;
+        double ix = 0, iy = 0, iz = 0;
         double sx = 1.0, sy = 1.0, sz = 1.0;
         double rotation = 0;
         int rowCount = 1, colCount = 1;
         double rowSpacing = 0, colSpacing = 0;
+        int hasAttributes = 0;
 
         for (final p in entityPairs) {
           switch (p.code) {
+            case 66:
+              hasAttributes = p.intValue;
+              break;
             case 2:
               blockName = p.value.trim();
               break;
@@ -1488,6 +1750,9 @@ class DxfParser {
               break;
             case 20:
               iy = p.doubleValue;
+              break;
+            case 30:
+              iz = p.doubleValue;
               break;
             case 41:
               sx = p.doubleValue;
@@ -1516,32 +1781,112 @@ class DxfParser {
           }
         }
 
+        final Offset insertPoint = ocs.isIdentity ? Offset(ix, iy) : ocs.toWcs2D(ix, iy, iz);
+        double finalSx = sx != 0 ? sx : 1.0;
+        double finalSy = sy != 0 ? sy : 1.0;
+        double finalSz = sz != 0 ? sz : 1.0;
+        double finalRotation = rotation;
+
+        if (!ocs.isIdentity) {
+          if (ocs.nz < 0) {
+            finalSx = -finalSx;
+            finalRotation = -rotation;
+          } else {
+            finalRotation = ocs.angleToWcs(rotation);
+          }
+        }
+
+        final List<DxfAttribute> attributes = [];
+        if (hasAttributes == 1) {
+          while (idx < total) {
+            final p = pairs[idx];
+            if (p.code == 0) {
+              final nextType = p.value.trim().toUpperCase();
+              if (nextType == 'SEQEND') {
+                idx++;
+                while (idx < total && pairs[idx].code != 0) {
+                  idx++;
+                }
+                break;
+              } else if (nextType == 'ATTRIB') {
+                final (attribEntity, afterAttribIdx) = _parseEntity(pairs, idx);
+                idx = afterAttribIdx;
+                if (attribEntity is DxfText) {
+                  final resolvedText = DxfText(
+                    text: attribEntity.text,
+                    tag: attribEntity.tag,
+                    insertPoint: attribEntity.insertPoint,
+                    alignPoint: attribEntity.alignPoint,
+                    height: attribEntity.height,
+                    rotationDeg: attribEntity.rotationDeg,
+                    hAlign: attribEntity.hAlign,
+                    vAlign: attribEntity.vAlign,
+                    style: attribEntity.style,
+                    isInvisible: attribEntity.isInvisible,
+                    layer: (attribEntity.layer == '0' || attribEntity.layer.isEmpty) ? layer : attribEntity.layer,
+                    colorIndex: attribEntity.colorIndex ?? colorIndex,
+                    trueColor: attribEntity.trueColor ?? trueColor,
+                    lineType: attribEntity.lineType ?? lineType,
+                    lineWeight: attribEntity.lineWeight ?? lineWeight,
+                    lineTypeScale: attribEntity.lineTypeScale ?? lineTypeScale,
+                    isPaperSpace: attribEntity.isPaperSpace || effectivePaperSpace,
+                    layoutName: attribEntity.layoutName != 'Model' ? attribEntity.layoutName : layoutName,
+                  );
+                  attributes.add(DxfAttribute(
+                    tag: attribEntity.tag ?? '',
+                    value: attribEntity.text,
+                    isInvisible: attribEntity.isInvisible,
+                    insertPoint: attribEntity.insertPoint,
+                    alignPoint: attribEntity.alignPoint,
+                    height: attribEntity.height,
+                    rotationDeg: attribEntity.rotationDeg,
+                    hAlign: attribEntity.hAlign,
+                    vAlign: attribEntity.vAlign,
+                    style: attribEntity.style,
+                    textEntity: resolvedText,
+                  ));
+                }
+              } else {
+                break;
+              }
+            } else {
+              idx++;
+            }
+          }
+        }
+
         entity = DxfInsert(
           blockName: blockName,
-          insertPoint: Offset(ix, iy),
-          scaleX: sx != 0 ? sx : 1.0,
-          scaleY: sy != 0 ? sy : 1.0,
-          scaleZ: sz != 0 ? sz : 1.0,
-          rotationDeg: rotation,
+          insertPoint: insertPoint,
+          scaleX: finalSx,
+          scaleY: finalSy,
+          scaleZ: finalSz,
+          rotationDeg: finalRotation,
           colCount: colCount > 0 ? colCount : 1,
           rowCount: rowCount > 0 ? rowCount : 1,
           colSpacing: colSpacing,
           rowSpacing: rowSpacing,
+          attributes: attributes,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
       case 'DIMENSION':
         int dimType = 0;
-        double dx1 = 0, dy1 = 0, tx = 0, ty = 0;
-        double? dx2, dy2;
+        double dx1 = 0, dy1 = 0, dz1 = 0, tx = 0, ty = 0, tz = 0;
+        double? dx2, dy2, dz2;
+        double? dx3, dy3, dz3;
+        double rotation = 0;
         String? textOverride;
         String? blockName;
+        String? styleName;
 
         for (final p in entityPairs) {
           switch (p.code) {
@@ -1554,11 +1899,17 @@ class DxfParser {
             case 20:
               dy1 = p.doubleValue;
               break;
+            case 30:
+              dz1 = p.doubleValue;
+              break;
             case 11:
               tx = p.doubleValue;
               break;
             case 21:
               ty = p.doubleValue;
+              break;
+            case 31:
+              tz = p.doubleValue;
               break;
             case 13:
               dx2 = p.doubleValue;
@@ -1566,28 +1917,61 @@ class DxfParser {
             case 23:
               dy2 = p.doubleValue;
               break;
+            case 33:
+              dz2 = p.doubleValue;
+              break;
+            case 14:
+              dx3 = p.doubleValue;
+              break;
+            case 24:
+              dy3 = p.doubleValue;
+              break;
+            case 34:
+              dz3 = p.doubleValue;
+              break;
+            case 50:
+              rotation = p.doubleValue;
+              break;
             case 1:
               textOverride = p.value;
               break;
             case 2:
               blockName = p.value.trim();
               break;
+            case 3:
+              styleName = p.value.trim();
+              break;
           }
         }
 
+        final p1 = ocs.isIdentity ? Offset(dx1, dy1) : ocs.toWcs2D(dx1, dy1, dz1);
+        final tp = ocs.isIdentity ? Offset(tx, ty) : ocs.toWcs2D(tx, ty, tz);
+        final p2 = (dx2 != null && dy2 != null)
+            ? (ocs.isIdentity ? Offset(dx2, dy2) : ocs.toWcs2D(dx2, dy2, dz2 ?? 0.0))
+            : null;
+        final p3 = (dx3 != null && dy3 != null)
+            ? (ocs.isIdentity ? Offset(dx3, dy3) : ocs.toWcs2D(dx3, dy3, dz3 ?? 0.0))
+            : null;
+        final rot = ocs.isIdentity ? rotation : ocs.angleToWcs(rotation);
+
         entity = DxfDimension(
           dimType: dimType,
-          defPoint1: Offset(dx1, dy1),
-          textPoint: Offset(tx, ty),
-          defPoint2: (dx2 != null && dy2 != null) ? Offset(dx2, dy2) : null,
+          defPoint1: p1,
+          textPoint: tp,
+          defPoint2: p2,
+          defPoint3: p3,
+          rotationDeg: rot,
           textOverride: textOverride != null ? _cleanCadText(textOverride) : null,
           blockName: blockName,
+          styleName: styleName,
           layer: layer,
           colorIndex: colorIndex,
           trueColor: trueColor,
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
         );
         break;
 
@@ -1605,7 +1989,8 @@ class DxfParser {
               tempLx = p.doubleValue;
               break;
             case 20:
-              leaderVertices.add(Offset(tempLx, p.doubleValue));
+              final pt = ocs.isIdentity ? Offset(tempLx, p.doubleValue) : ocs.toWcs2D(tempLx, p.doubleValue);
+              leaderVertices.add(pt);
               break;
           }
         }
@@ -1619,6 +2004,198 @@ class DxfParser {
           lineType: lineType,
           lineWeight: lineWeight,
           lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
+        );
+        break;
+
+      case 'MULTILEADER':
+      case 'MLEADER':
+        final List<List<Offset>> leaderLines = [];
+        List<Offset>? currentLine;
+        Offset? connectionPoint;
+        Offset? doglegDirection;
+        double doglegLength = 0.0;
+        Offset? textPosition;
+        String rawText = '';
+        double textHeight = 2.5;
+        double? textWidth;
+        bool hasArrow = true;
+        double arrowSize = 2.5;
+
+        String currentContext = '';
+        double tempX = 0.0;
+        double tempLeaderX = 0.0;
+        double tempConnX = 0.0;
+        double tempDirX = 1.0;
+
+        for (final p in entityPairs) {
+          if (p.code == 300) {
+            currentContext = p.value.trim();
+          } else if (p.code == 302) {
+            currentContext = p.value.trim();
+          } else if (p.code == 304) {
+            final val = p.value.trim();
+            if (val == 'LEADER_LINE{') {
+              currentContext = 'LEADER_LINE{';
+              currentLine = <Offset>[];
+              leaderLines.add(currentLine);
+            } else if (val != '}' && val != '{') {
+              rawText = p.value;
+            }
+          }
+
+          if (currentContext == 'CONTEXT_DATA{') {
+            switch (p.code) {
+              case 10:
+                tempX = p.doubleValue;
+                break;
+              case 20:
+                final p2 = Offset(tempX, p.doubleValue);
+                textPosition = ocs.isIdentity ? p2 : ocs.toWcs2D(p2.dx, p2.dy);
+                break;
+              case 41:
+                textWidth = p.doubleValue;
+                break;
+              case 140:
+                textHeight = p.doubleValue;
+                break;
+              case 304:
+                final val = p.value.trim();
+                if (val != '}' && val != '{') {
+                  rawText = p.value;
+                }
+                break;
+            }
+          } else if (currentContext == 'LEADER{') {
+            switch (p.code) {
+              case 10:
+                tempConnX = p.doubleValue;
+                break;
+              case 20:
+                final p2 = Offset(tempConnX, p.doubleValue);
+                connectionPoint = ocs.isIdentity ? p2 : ocs.toWcs2D(p2.dx, p2.dy);
+                break;
+              case 11:
+                tempDirX = p.doubleValue;
+                break;
+              case 21:
+                final p2 = Offset(tempDirX, p.doubleValue);
+                doglegDirection = ocs.isIdentity ? p2 : ocs.toWcs2D(p2.dx, p2.dy);
+                break;
+              case 40:
+                doglegLength = p.doubleValue;
+                break;
+            }
+          } else if (currentContext == 'LEADER_LINE{') {
+            switch (p.code) {
+              case 10:
+                tempLeaderX = p.doubleValue;
+                break;
+              case 20:
+                final p2 = Offset(tempLeaderX, p.doubleValue);
+                currentLine?.add(ocs.isIdentity ? p2 : ocs.toWcs2D(p2.dx, p2.dy));
+                break;
+            }
+          }
+
+          // Global property overrides
+          switch (p.code) {
+            case 42:
+              arrowSize = p.doubleValue;
+              break;
+            case 290:
+              hasArrow = p.intValue != 0;
+              break;
+          }
+        }
+
+        final cleanText = _cleanMText(rawText);
+
+        entity = DxfMLeader(
+          leaderLines: leaderLines,
+          connectionPoint: connectionPoint,
+          doglegDirection: doglegDirection,
+          doglegLength: doglegLength,
+          textPosition: textPosition,
+          rawText: rawText,
+          cleanText: cleanText,
+          textHeight: textHeight > 0 ? textHeight : 2.5,
+          textWidth: textWidth,
+          hasArrowhead: hasArrow,
+          arrowheadSize: arrowSize > 0 ? arrowSize : 2.5,
+          layer: layer,
+          colorIndex: colorIndex,
+          trueColor: trueColor,
+          lineType: lineType,
+          lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
+          isPaperSpace: effectivePaperSpace,
+          layoutName: layoutName,
+        );
+        break;
+
+      case 'VIEWPORT':
+        double cx = 0, cy = 0;
+        double width = 0, height = 0;
+        double viewCx = 0, viewCy = 0;
+        double viewHeight = 0;
+        int status = 1;
+        int viewportId = 2;
+        double twistAngle = 0.0;
+
+        for (final p in entityPairs) {
+          switch (p.code) {
+            case 10:
+              cx = p.doubleValue;
+              break;
+            case 20:
+              cy = p.doubleValue;
+              break;
+            case 40:
+              width = p.doubleValue;
+              break;
+            case 41:
+              height = p.doubleValue;
+              break;
+            case 12:
+              viewCx = p.doubleValue;
+              break;
+            case 22:
+              viewCy = p.doubleValue;
+              break;
+            case 45:
+              viewHeight = p.doubleValue;
+              break;
+            case 68:
+              status = p.intValue;
+              break;
+            case 69:
+              viewportId = p.intValue;
+              break;
+            case 51:
+              twistAngle = p.doubleValue;
+              break;
+          }
+        }
+
+        entity = DxfViewport(
+          center: Offset(cx, cy),
+          width: width,
+          height: height,
+          viewCenter: Offset(viewCx, viewCy),
+          viewHeight: viewHeight,
+          status: status,
+          viewportId: viewportId,
+          twistAngleDeg: twistAngle,
+          layer: layer,
+          colorIndex: colorIndex,
+          trueColor: trueColor,
+          lineType: lineType,
+          lineWeight: lineWeight,
+          lineTypeScale: lineTypeScale,
+          isPaperSpace: true,
+          layoutName: layoutName,
         );
         break;
     }
@@ -1710,7 +2287,7 @@ class DxfParser {
   }
 
   /// Parses HATCH boundary path loops from entity pairs.
-  static List<List<Offset>> _parseHatchBoundaryPaths(List<_DxfPair> pairs) {
+  static List<List<Offset>> _parseHatchBoundaryPaths(List<_DxfPair> pairs, [OcsTransform ocs = OcsTransform.identity]) {
     final List<List<Offset>> paths = [];
     final int len = pairs.length;
     int i = 0;
@@ -1740,7 +2317,12 @@ class DxfParser {
 
           void flushV() {
             if (hasV) {
-              vertices.add(DxfPolylineVertex(x: vx, y: vy, bulge: vBulge));
+              if (ocs.isIdentity) {
+                vertices.add(DxfPolylineVertex(x: vx, y: vy, bulge: vBulge));
+              } else {
+                final pt = ocs.toWcs2D(vx, vy);
+                vertices.add(DxfPolylineVertex(x: pt.dx, y: pt.dy, bulge: ocs.transformBulge(vBulge)));
+              }
               vBulge = 0;
             }
           }
@@ -1816,10 +2398,12 @@ class DxfParser {
                   }
                   i++;
                 }
-                if (loopPoints.isEmpty || (loopPoints.last - Offset(x1, y1)).distanceSquared > 1e-10) {
-                  loopPoints.add(Offset(x1, y1));
+                final p1 = ocs.isIdentity ? Offset(x1, y1) : ocs.toWcs2D(x1, y1);
+                final p2 = ocs.isIdentity ? Offset(x2, y2) : ocs.toWcs2D(x2, y2);
+                if (loopPoints.isEmpty || (loopPoints.last - p1).distanceSquared > 1e-10) {
+                  loopPoints.add(p1);
                 }
-                loopPoints.add(Offset(x2, y2));
+                loopPoints.add(p2);
               } else if (edgeType == 2) {
                 // Circular arc edge: 10, 20 (center), 40 (r), 50 (startA), 51 (endA), 73 (isCCW)
                 double cx = 0, cy = 0, r = 0, startA = 0, endA = 360;
@@ -1841,17 +2425,21 @@ class DxfParser {
                   }
                   i++;
                 }
+                final center = ocs.isIdentity ? Offset(cx, cy) : ocs.toWcs2D(cx, cy);
+                final angles = ocs.transformArcAngles(startA, endA);
+                final curStartA = angles.startAngleDeg;
+                final curEndA = angles.endAngleDeg;
                 if (r > 0) {
-                  double sweep = isCCW ? (endA - startA) : (startA - endA);
+                  double sweep = isCCW ? (curEndA - curStartA) : (curStartA - curEndA);
                   if (sweep <= 0) sweep += 360.0;
                   final int segs = (32 * (sweep / 360.0)).clamp(8, 48).toInt();
                   final double step = (sweep * math.pi / 180.0) / segs;
-                  final double startRad = startA * math.pi / 180.0;
+                  final double startRad = curStartA * math.pi / 180.0;
                   final double dir = isCCW ? 1.0 : -1.0;
 
                   for (int s = 0; s <= segs; s++) {
                     final double rad = startRad + s * step * dir;
-                    final pt = Offset(cx + r * math.cos(rad), cy + r * math.sin(rad));
+                    final pt = Offset(center.dx + r * math.cos(rad), center.dy + r * math.sin(rad));
                     if (loopPoints.isEmpty || (loopPoints.last - pt).distanceSquared > 1e-10) {
                       loopPoints.add(pt);
                     }

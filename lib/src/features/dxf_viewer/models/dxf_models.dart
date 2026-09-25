@@ -39,6 +39,49 @@ class DxfTextStyle {
   });
 }
 
+/// Representation of a CAD Dimension Style (DIMSTYLE table).
+class DxfDimStyle {
+  final String name;
+  final double dimScale; // Code 40: Overall dimension scale factor (default 1.0)
+  final double dimAsz;   // Code 41: Arrow size (default 2.5)
+  final double dimExo;   // Code 42: Extension line origin offset (default 0.625)
+  final double dimExe;   // Code 44: Extension line extension (default 1.25)
+  final double dimTxt;   // Code 140: Text height (default 2.5)
+  final double dimTsz;   // Code 142: Tick size (0.0 for arrow, >0 for architectural tick)
+  final double dimGap;   // Code 147: Gap between dimension line and text (default 0.625)
+  final String? dimBlk;  // Code 342 / 2: Arrow block name
+
+  const DxfDimStyle({
+    required this.name,
+    this.dimScale = 1.0,
+    this.dimAsz = 2.5,
+    this.dimExo = 0.625,
+    this.dimExe = 1.25,
+    this.dimTxt = 2.5,
+    this.dimTsz = 0.0,
+    this.dimGap = 0.625,
+    this.dimBlk,
+  });
+
+  /// Effective arrow/tick size factoring overall scale
+  double get effectiveArrowSize => (dimTsz > 0 ? dimTsz : dimAsz) * (dimScale > 0 ? dimScale : 1.0);
+
+  /// Effective text height factoring overall scale
+  double get effectiveTextHeight => dimTxt * (dimScale > 0 ? dimScale : 1.0);
+
+  /// Effective gap factoring overall scale
+  double get effectiveGap => dimGap * (dimScale > 0 ? dimScale : 1.0);
+
+  /// Effective extension line offset
+  double get effectiveExtensionOffset => dimExo * (dimScale > 0 ? dimScale : 1.0);
+
+  /// Effective extension line extension
+  double get effectiveExtensionExtension => dimExe * (dimScale > 0 ? dimScale : 1.0);
+
+  /// Whether architectural tick is used instead of standard arrows
+  bool get isArchitecturalTick => dimTsz > 0;
+}
+
 /// Representation of a CAD Layer.
 class DxfLayer {
   final String name;
@@ -200,6 +243,15 @@ class DxfCompiledBlock {
     }
 
     for (final e in block.entities) {
+      if (e is DxfAttdef) {
+        // Variable (non-constant) ATTDEFs are templates and should not be rendered
+        // statically inside an INSERT instance. Only constant, visible ATTDEFs are drawn.
+        if (e.isConstant && !e.isInvisible) {
+          other.add(e.toTextEntity());
+        }
+        continue;
+      }
+
       if (commonLayer == null) {
         commonLayer = e.layer;
       } else if (commonLayer != e.layer) {
@@ -368,6 +420,8 @@ abstract class DxfEntity {
   final String? lineType;
   final double? lineWeight;
   final double? lineTypeScale;
+  final bool isPaperSpace;
+  final String layoutName;
 
   const DxfEntity({
     this.layer = '0',
@@ -376,6 +430,8 @@ abstract class DxfEntity {
     this.lineType,
     this.lineWeight,
     this.lineTypeScale,
+    this.isPaperSpace = false,
+    this.layoutName = 'Model',
   });
 
   /// Compute axis-aligned bounding box of this entity in CAD coordinate space.
@@ -399,6 +455,8 @@ class DxfLine extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -424,6 +482,8 @@ class DxfPoint extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -449,6 +509,8 @@ class DxfCircle extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -478,6 +540,8 @@ class DxfArc extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -548,6 +612,8 @@ class DxfEllipse extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -578,6 +644,8 @@ class DxfLwPolyline extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -619,6 +687,8 @@ class DxfPolyline extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -666,6 +736,8 @@ class DxfSpline extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -693,6 +765,7 @@ class DxfSpline extends DxfEntity {
 /// TEXT (Single-line Text) Entity.
 class DxfText extends DxfEntity {
   final String text;
+  final String? tag;
   final Offset insertPoint;
   final Offset? alignPoint;
   final double height;
@@ -700,9 +773,11 @@ class DxfText extends DxfEntity {
   final int hAlign; // 0=Left, 1=Center, 2=Right, 3=Aligned, 4=Middle, 5=Fit
   final int vAlign; // 0=Baseline, 1=Bottom, 2=Middle, 3=Top
   final String? style;
+  final bool isInvisible;
 
   const DxfText({
     required this.text,
+    this.tag,
     required this.insertPoint,
     this.alignPoint,
     this.height = 2.5,
@@ -710,12 +785,15 @@ class DxfText extends DxfEntity {
     this.hAlign = 0,
     this.vAlign = 0,
     this.style,
+    this.isInvisible = false,
     super.layer,
     super.colorIndex,
     super.trueColor,
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -762,6 +840,8 @@ class DxfMText extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -870,6 +950,8 @@ class DxfSolid extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -935,6 +1017,8 @@ class DxfHatch extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -961,6 +1045,115 @@ class DxfHatch extends DxfEntity {
   }
 }
 
+/// ATTRIBUTE Reference attached to an INSERT entity.
+class DxfAttribute {
+  final String tag;
+  final String value;
+  final String? prompt;
+  final bool isInvisible;
+  final bool isConstant;
+  final Offset insertPoint;
+  final Offset? alignPoint;
+  final double height;
+  final double rotationDeg;
+  final int hAlign;
+  final int vAlign;
+  final String? style;
+  final DxfText? textEntity;
+
+  const DxfAttribute({
+    required this.tag,
+    required this.value,
+    this.prompt,
+    this.isInvisible = false,
+    this.isConstant = false,
+    this.insertPoint = Offset.zero,
+    this.alignPoint,
+    this.height = 2.5,
+    this.rotationDeg = 0.0,
+    this.hAlign = 0,
+    this.vAlign = 0,
+    this.style,
+    this.textEntity,
+  });
+}
+
+/// ATTDEF (Attribute Definition) Entity inside a BLOCK or ENTITIES.
+class DxfAttdef extends DxfEntity {
+  final String tag;
+  final String text;
+  final String? prompt;
+  final Offset insertPoint;
+  final Offset? alignPoint;
+  final double height;
+  final double rotationDeg;
+  final int hAlign;
+  final int vAlign;
+  final String? style;
+  final int flags;
+
+  bool get isInvisible => (flags & 1) != 0;
+  bool get isConstant => (flags & 2) != 0;
+
+  const DxfAttdef({
+    required this.tag,
+    required this.text,
+    this.prompt,
+    required this.insertPoint,
+    this.alignPoint,
+    this.height = 2.5,
+    this.rotationDeg = 0.0,
+    this.hAlign = 0,
+    this.vAlign = 0,
+    this.style,
+    this.flags = 0,
+    super.layer,
+    super.colorIndex,
+    super.trueColor,
+    super.lineType,
+    super.lineWeight,
+    super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
+  });
+
+  @override
+  String get typeName => 'ATTDEF';
+
+  @override
+  Rect? getBoundingBox(Map<String, DxfBlock> blocks) {
+    if (isInvisible || !isConstant) return null;
+    return Rect.fromCenter(
+      center: alignPoint ?? insertPoint,
+      width: math.max(height * 2, 1.0),
+      height: math.max(height, 1.0),
+    );
+  }
+
+  DxfText toTextEntity() {
+    return DxfText(
+      text: text.isNotEmpty ? text : tag,
+      tag: tag,
+      insertPoint: insertPoint,
+      alignPoint: alignPoint,
+      height: height > 0 ? height : 2.5,
+      rotationDeg: rotationDeg,
+      hAlign: hAlign,
+      vAlign: vAlign,
+      style: style,
+      layer: layer,
+      colorIndex: colorIndex,
+      trueColor: trueColor,
+      lineType: lineType,
+      lineWeight: lineWeight,
+      lineTypeScale: lineTypeScale,
+      isPaperSpace: isPaperSpace,
+      layoutName: layoutName,
+      isInvisible: isInvisible,
+    );
+  }
+}
+
 /// INSERT (Block Reference) Entity.
 class DxfInsert extends DxfEntity {
   final String blockName;
@@ -973,6 +1166,7 @@ class DxfInsert extends DxfEntity {
   final int colCount;
   final double rowSpacing;
   final double colSpacing;
+  final List<DxfAttribute> attributes;
 
   const DxfInsert({
     required this.blockName,
@@ -985,13 +1179,21 @@ class DxfInsert extends DxfEntity {
     this.colCount = 1,
     this.rowSpacing = 0.0,
     this.colSpacing = 0.0,
+    this.attributes = const [],
     super.layer,
     super.colorIndex,
     super.trueColor,
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
+
+  /// Map of attribute tag to value for convenient lookup and inspection.
+  Map<String, String> get attributeMap => {
+    for (final a in attributes) a.tag: a.value,
+  };
 
   @override
   String get typeName => 'INSERT';
@@ -1037,23 +1239,31 @@ class DxfDimension extends DxfEntity {
   final int dimType;
   final Offset defPoint1;
   final Offset? defPoint2;
+  final Offset? defPoint3;
   final Offset textPoint;
+  final double rotationDeg;
   final String? textOverride;
   final String? blockName;
+  final String? styleName;
 
   const DxfDimension({
     required this.dimType,
     required this.defPoint1,
     this.defPoint2,
+    this.defPoint3,
     required this.textPoint,
+    this.rotationDeg = 0.0,
     this.textOverride,
     this.blockName,
+    this.styleName,
     super.layer,
     super.colorIndex,
     super.trueColor,
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -1082,6 +1292,12 @@ class DxfDimension extends DxfEntity {
       minY = math.min(minY, defPoint2!.dy);
       maxY = math.max(maxY, defPoint2!.dy);
     }
+    if (defPoint3 != null) {
+      minX = math.min(minX, defPoint3!.dx);
+      maxX = math.max(maxX, defPoint3!.dx);
+      minY = math.min(minY, defPoint3!.dy);
+      maxY = math.max(maxY, defPoint3!.dy);
+    }
     return Rect.fromLTRB(minX, minY, maxX, maxY);
   }
 }
@@ -1100,6 +1316,8 @@ class DxfLeader extends DxfEntity {
     super.lineType,
     super.lineWeight,
     super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
   });
 
   @override
@@ -1123,6 +1341,175 @@ class DxfLeader extends DxfEntity {
   }
 }
 
+/// MULTILEADER (MLEADER) Entity.
+class DxfMLeader extends DxfEntity {
+  /// List of leader lines (each is a list of vertices, from arrow tip to connection point).
+  final List<List<Offset>> leaderLines;
+
+  /// Connection point where leader line(s) meet the dogleg (landing shoulder).
+  final Offset? connectionPoint;
+
+  /// Direction of the dogleg / landing shoulder.
+  final Offset? doglegDirection;
+
+  /// Length of the dogleg / landing shoulder in drawing units.
+  final double doglegLength;
+
+  /// Text position / content base point.
+  final Offset? textPosition;
+
+  /// Raw text content (including AutoCAD MTEXT formatting tags if any).
+  final String rawText;
+
+  /// Cleaned text content (stripped of MTEXT tags, unicode decoded).
+  final String cleanText;
+
+  /// Text height in CAD drawing units.
+  final double textHeight;
+
+  /// Optional text reference/column width.
+  final double? textWidth;
+
+  /// Whether leader arrowheads are enabled.
+  final bool hasArrowhead;
+
+  /// Arrowhead size in drawing units.
+  final double arrowheadSize;
+
+  const DxfMLeader({
+    required this.leaderLines,
+    this.connectionPoint,
+    this.doglegDirection,
+    this.doglegLength = 0.0,
+    this.textPosition,
+    required this.rawText,
+    required this.cleanText,
+    this.textHeight = 2.5,
+    this.textWidth,
+    this.hasArrowhead = true,
+    this.arrowheadSize = 2.5,
+    super.layer,
+    super.colorIndex,
+    super.trueColor,
+    super.lineType,
+    super.lineWeight,
+    super.lineTypeScale,
+    super.isPaperSpace,
+    super.layoutName,
+  });
+
+  @override
+  String get typeName => 'MULTILEADER';
+
+  @override
+  Rect? getBoundingBox(Map<String, DxfBlock> blocks) {
+    double minX = double.infinity;
+    double maxX = -double.infinity;
+    double minY = double.infinity;
+    double maxY = -double.infinity;
+
+    void include(Offset pt) {
+      minX = math.min(minX, pt.dx);
+      maxX = math.max(maxX, pt.dx);
+      minY = math.min(minY, pt.dy);
+      maxY = math.max(maxY, pt.dy);
+    }
+
+    for (final line in leaderLines) {
+      for (final pt in line) {
+        include(pt);
+      }
+    }
+
+    if (connectionPoint != null) include(connectionPoint!);
+    if (textPosition != null) {
+      include(textPosition!);
+      final w = textWidth ?? (cleanText.length * textHeight * 0.7);
+      include(Offset(textPosition!.dx + w, textPosition!.dy + textHeight));
+    }
+
+    if (minX.isInfinite) return null;
+    return Rect.fromLTRB(minX, minY, maxX, maxY);
+  }
+}
+
+/// VIEWPORT Entity (Paper Space Viewport looking into Model Space).
+class DxfViewport extends DxfEntity {
+  /// Center point in Paper Space sheet coordinates (Codes 10, 20).
+  final Offset center;
+
+  /// Viewport width in Paper Space units (Code 40).
+  final double width;
+
+  /// Viewport height in Paper Space units (Code 41).
+  final double height;
+
+  /// Center point in Model Space WCS coordinates (Codes 12, 22).
+  final Offset viewCenter;
+
+  /// View height in Model Space drawing units (Code 45).
+  final double viewHeight;
+
+  /// Viewport status (Code 68, >0 = on/active).
+  final int status;
+
+  /// Viewport ID (Code 69, 1 = overall sheet viewport, >1 = floating model viewport).
+  final int viewportId;
+
+  /// View twist angle in degrees (Code 51).
+  final double twistAngleDeg;
+
+  const DxfViewport({
+    required this.center,
+    required this.width,
+    required this.height,
+    required this.viewCenter,
+    required this.viewHeight,
+    this.status = 1,
+    this.viewportId = 2,
+    this.twistAngleDeg = 0.0,
+    super.layer,
+    super.colorIndex,
+    super.trueColor,
+    super.lineType,
+    super.lineWeight,
+    super.lineTypeScale,
+    super.isPaperSpace = true,
+    super.layoutName = 'Layout1',
+  });
+
+  @override
+  String get typeName => 'VIEWPORT';
+
+  /// Whether this viewport is active and should render model space contents.
+  bool get isActive =>
+      status > 0 && viewportId > 1 && viewHeight > 0 && width > 0 && height > 0;
+
+  /// The rectangular boundary of this viewport on the Paper Space sheet.
+  Rect get paperRect => Rect.fromCenter(
+        center: center,
+        width: width,
+        height: height,
+      );
+
+  /// The model space area visible through this viewport.
+  Rect get modelBounds {
+    final double modelWidth =
+        viewHeight * (width / (height > 0 ? height : 1.0));
+    return Rect.fromCenter(
+      center: viewCenter,
+      width: modelWidth,
+      height: viewHeight,
+    );
+  }
+
+  /// Scale factor from Model Space units to Paper Space units (e.g. 1/50 = 0.02)
+  double get modelToPaperScale => height / (viewHeight > 0 ? viewHeight : 1.0);
+
+  @override
+  Rect getBoundingBox(Map<String, DxfBlock> blocks) => paperRect;
+}
+
 /// Full parsed DXF Document.
 class DxfDocument {
   final Map<String, DxfLayer> layers;
@@ -1133,7 +1520,19 @@ class DxfDocument {
   final Rect bounds;
   final Map<String, int> entityStats;
   final Map<String, List<double>> lineTypes;
+  final Map<String, DxfDimStyle> dimStyles;
   DxfQuadTree? spatialIndex;
+
+  /// All layout names present in this document, starting with 'Model'.
+  final List<String> layouts;
+
+  /// Entities partitioned by layout name.
+  /// 'Model' contains all model space entities (code 67 == 0).
+  /// Paper space layout names ('Layout1', etc.) contain their respective paper space entities (code 67 == 1).
+  final Map<String, List<DxfEntity>> layoutEntities;
+
+  /// Bounding rectangles for each layout.
+  final Map<String, Rect> layoutBounds;
 
   DxfDocument({
     required this.layers,
@@ -1144,12 +1543,74 @@ class DxfDocument {
     required this.bounds,
     required this.entityStats,
     this.lineTypes = const {},
+    this.dimStyles = const {},
     this.spatialIndex,
-  });
+    List<String>? layouts,
+    Map<String, List<DxfEntity>>? layoutEntities,
+    Map<String, Rect>? layoutBounds,
+  })  : layouts = layouts ?? _computeLayouts(entities),
+        layoutEntities = layoutEntities ?? _computeLayoutEntities(entities),
+        layoutBounds = layoutBounds ?? _computeLayoutBounds(entities, bounds);
+
+  static List<String> _computeLayouts(List<DxfEntity> entities) {
+    final list = <String>['Model'];
+    final seen = <String>{'Model'};
+    for (final e in entities) {
+      if (e.isPaperSpace && e.layoutName.isNotEmpty && !seen.contains(e.layoutName)) {
+        seen.add(e.layoutName);
+        list.add(e.layoutName);
+      }
+    }
+    return list;
+  }
+
+  static Map<String, List<DxfEntity>> _computeLayoutEntities(List<DxfEntity> entities) {
+    final map = <String, List<DxfEntity>>{
+      'Model': <DxfEntity>[],
+    };
+    for (final e in entities) {
+      final key = e.isPaperSpace ? e.layoutName : 'Model';
+      map.putIfAbsent(key, () => <DxfEntity>[]).add(e);
+    }
+    return map;
+  }
+
+  static Map<String, Rect> _computeLayoutBounds(List<DxfEntity> entities, Rect modelBounds) {
+    final map = <String, Rect>{
+      'Model': modelBounds,
+    };
+    final layoutBoxes = <String, List<Rect>>{};
+    for (final e in entities) {
+      if (e.isPaperSpace) {
+        final b = e.getBoundingBox(const {});
+        if (b != null && b.isFinite) {
+          layoutBoxes.putIfAbsent(e.layoutName, () => []).add(b);
+        }
+      }
+    }
+    for (final entry in layoutBoxes.entries) {
+      double minX = entry.value.first.left;
+      double minY = entry.value.first.top;
+      double maxX = entry.value.first.right;
+      double maxY = entry.value.first.bottom;
+      for (final r in entry.value) {
+        minX = math.min(minX, r.left);
+        minY = math.min(minY, r.top);
+        maxX = math.max(maxX, r.right);
+        maxY = math.max(maxY, r.bottom);
+      }
+      map[entry.key] = Rect.fromLTRB(minX, minY, maxX, maxY);
+    }
+    return map;
+  }
 
   /// Returns existing spatial index or builds a Quadtree on demand.
   DxfQuadTree get orBuildSpatialIndex =>
-      spatialIndex ??= DxfQuadTree.build(entities, blocks, bounds);
+      spatialIndex ??= DxfQuadTree.build(
+        entities.where((e) => !e.isPaperSpace).toList(),
+        blocks,
+        bounds,
+      );
 
   int get totalEntities => entities.length;
   int get totalLayers => layers.length;

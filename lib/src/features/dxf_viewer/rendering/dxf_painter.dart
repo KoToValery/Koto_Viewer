@@ -134,6 +134,7 @@ class DxfPainter extends CustomPainter {
 
   final DxfDocument document;
   final DxfCanvasTheme theme;
+  final String activeLayout;
   final double currentScale;
   final DxfMeasurement? measurement;
   final List<DxfAnnotation> annotations;
@@ -146,6 +147,7 @@ class DxfPainter extends CustomPainter {
   DxfPainter({
     required this.document,
     required this.theme,
+    this.activeLayout = 'Model',
     this.currentScale = 1.0,
     this.measurement,
     this.annotations = const [],
@@ -184,8 +186,13 @@ class DxfPainter extends CustomPainter {
     final Map<String, DxfBlockDiagEntry>? blockDiagnostics =
         debugCollectBlockDiagnostics ? <String, DxfBlockDiagEntry>{} : null;
 
-    final double docW = math.max(document.width, 1.0);
-    final double docH = math.max(document.height, 1.0);
+    final bool isPaperSpaceMode = activeLayout != 'Model';
+    final Rect targetBounds = isPaperSpaceMode
+        ? (document.layoutBounds[activeLayout] ?? document.bounds)
+        : document.bounds;
+
+    final double docW = math.max(targetBounds.width, 1.0);
+    final double docH = math.max(targetBounds.height, 1.0);
 
     const double padding = 32.0;
     final double availW = math.max(size.width - padding * 2, 10.0);
@@ -199,10 +206,10 @@ class DxfPainter extends CustomPainter {
     final double tx = (size.width - scaledW) / 2.0;
     final double ty = (size.height - scaledH) / 2.0;
 
-    final double minX = document.bounds.left;
-    final double maxY = document.bounds.bottom > document.bounds.top
-        ? document.bounds.bottom
-        : document.bounds.top;
+    final double minX = targetBounds.left;
+    final double maxY = targetBounds.bottom > targetBounds.top
+        ? targetBounds.bottom
+        : targetBounds.top;
 
     // Helper: convert CAD point (Y up) to Canvas point (Y down)
     Offset toCanvas(Offset cadPoint) {
@@ -212,15 +219,143 @@ class DxfPainter extends CustomPainter {
       );
     }
 
-    // 1. Draw subtle CAD background grid if enabled
-    if (showGrid) {
-      _drawGrid(canvas, size);
+    // 1. Draw Background & Presentation
+    if (isPaperSpaceMode) {
+      // Desk surface background
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()..color = theme.isDark ? const Color(0xFF212529) : const Color(0xFF6C757D),
+      );
+
+      // Paper Sheet with subtle drop shadow
+      final pTopLeft = toCanvas(Offset(targetBounds.left, targetBounds.top > targetBounds.bottom ? targetBounds.top : targetBounds.bottom));
+      final pBottomRight = toCanvas(Offset(targetBounds.right, targetBounds.top > targetBounds.bottom ? targetBounds.bottom : targetBounds.top));
+      final sheetRect = Rect.fromLTRB(
+        math.min(pTopLeft.dx, pBottomRight.dx),
+        math.min(pTopLeft.dy, pBottomRight.dy),
+        math.max(pTopLeft.dx, pBottomRight.dx),
+        math.max(pTopLeft.dy, pBottomRight.dy),
+      );
+
+      // Drop shadow
+      canvas.drawRect(
+        sheetRect.shift(const Offset(4, 4)),
+        Paint()..color = const Color(0x55000000),
+      );
+      // Paper Sheet (White)
+      canvas.drawRect(sheetRect, Paint()..color = Colors.white..style = PaintingStyle.fill);
+      // Sheet border
+      canvas.drawRect(
+        sheetRect,
+        Paint()
+          ..color = const Color(0xFFADB5BD)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0,
+      );
+
+      // 2. Render Active Viewports (windows looking into Model Space)
+      final layoutEntities = document.layoutEntities[activeLayout] ?? [];
+      for (final entity in layoutEntities) {
+        if (entity is DxfViewport && entity.isActive) {
+          final vp = entity;
+          final vpP1 = toCanvas(Offset(vp.paperRect.left, vp.paperRect.top));
+          final vpP2 = toCanvas(Offset(vp.paperRect.right, vp.paperRect.bottom));
+          final vpCanvasRect = Rect.fromLTRB(
+            math.min(vpP1.dx, vpP2.dx),
+            math.min(vpP1.dy, vpP2.dy),
+            math.max(vpP1.dx, vpP2.dx),
+            math.max(vpP1.dy, vpP2.dy),
+          );
+
+          canvas.save();
+          canvas.clipRect(vpCanvasRect);
+
+          // Viewport background: model space dark / light theme
+          canvas.drawRect(vpCanvasRect, Paint()..color = theme.bgColor..style = PaintingStyle.fill);
+
+          // Model space coordinate conversion through viewport
+          final double mScale = vp.height / (vp.viewHeight > 0 ? vp.viewHeight : 1.0);
+          Offset toCanvasModel(Offset modelPt) {
+            final double px = vp.center.dx + (modelPt.dx - vp.viewCenter.dx) * mScale;
+            final double py = vp.center.dy + (modelPt.dy - vp.viewCenter.dy) * mScale;
+            return toCanvas(Offset(px, py));
+          }
+
+          final double modelFitScale = fitScale * vp.modelToPaperScale;
+
+          // Render Model Space entities inside this viewport
+          final modelEntities = document.layoutEntities['Model'] ?? [];
+          for (final mEntity in modelEntities) {
+            final layer = document.layers[mEntity.layer];
+            if (layer != null && (!layer.isVisible || layer.isFrozen)) continue;
+
+            final color = DxfColorTable.resolveColor(
+              colorIndex: mEntity.colorIndex,
+              trueColor: mEntity.trueColor,
+              layerColor: layer != null
+                  ? DxfColorTable.resolveColor(
+                      colorIndex: layer.colorIndex,
+                      trueColor: layer.trueColor,
+                      isDarkBackground: theme.isDark,
+                    )
+                  : null,
+              isDarkBackground: theme.isDark,
+            );
+
+            final strokeWidth = _calcStrokeWidth(mEntity.lineWeight, layer: layer);
+            final strokePaint = Paint()
+              ..color = color
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = strokeWidth
+              ..strokeCap = StrokeCap.round
+              ..strokeJoin = StrokeJoin.round
+              ..isAntiAlias = true;
+
+            final fillPaint = Paint()
+              ..color = color.withValues(alpha: 0.35)
+              ..style = PaintingStyle.fill
+              ..isAntiAlias = true;
+
+            try {
+              _renderEntity(
+                canvas: canvas,
+                entity: mEntity,
+                strokePaint: strokePaint,
+                fillPaint: fillPaint,
+                toCanvas: toCanvasModel,
+                fitScale: modelFitScale,
+                blocks: document.blocks,
+                layers: document.layers,
+                blockDiagnostics: blockDiagnostics,
+              );
+            } on Exception catch (_) {}
+          }
+
+          canvas.restore();
+
+          // Viewport border
+          canvas.drawRect(
+            vpCanvasRect,
+            Paint()
+              ..color = const Color(0xFF495057)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.0,
+          );
+        }
+      }
+    } else {
+      // 1. Draw subtle CAD background grid if enabled
+      if (showGrid) {
+        _drawGrid(canvas, size);
+      }
     }
 
-    // 2. Draw Entities (Render all document entities directly so no lines or text ever disappear upon zooming in)
-    final Iterable<DxfEntity> entitiesToDraw = (visibleCadRect != null && document.spatialIndex != null)
-        ? document.spatialIndex!.query(visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.20))
-        : document.entities;
+    // 3. Draw Entities
+    final Iterable<DxfEntity> entitiesToDraw = isPaperSpaceMode
+        ? (document.layoutEntities[activeLayout] ?? []).where((e) => e is! DxfViewport)
+        : ((visibleCadRect != null && document.spatialIndex != null)
+            ? document.spatialIndex!.query(visibleCadRect!.inflate(visibleCadRect!.longestSide * 0.20))
+            : (document.layoutEntities['Model'] ?? document.entities.where((e) => !e.isPaperSpace)));
 
     final Map<int, Path> continuousLineBatches = {};
     final Map<int, Paint> lineBatchPaints = {};
@@ -233,6 +368,7 @@ class DxfPainter extends CustomPainter {
           continue;
         }
 
+        final bool isDarkForEntity = isPaperSpaceMode ? false : theme.isDark;
         final color = DxfColorTable.resolveColor(
           colorIndex: entity.colorIndex,
           trueColor: entity.trueColor,
@@ -240,10 +376,10 @@ class DxfPainter extends CustomPainter {
               ? DxfColorTable.resolveColor(
                   colorIndex: layer.colorIndex,
                   trueColor: layer.trueColor,
-                  isDarkBackground: theme.isDark,
+                  isDarkBackground: isDarkForEntity,
                 )
               : null,
-          isDarkBackground: theme.isDark,
+          isDarkBackground: isDarkForEntity,
         );
 
         final strokeWidth = _calcStrokeWidth(entity.lineWeight, layer: layer);
@@ -408,7 +544,7 @@ class DxfPainter extends CustomPainter {
         if (item.entity is DxfText || item.entity is DxfMText) {
           textCount++;
           textUs += deltaUs;
-        } else if (item.entity is DxfDimension || item.entity is DxfLeader) {
+        } else if (item.entity is DxfDimension || item.entity is DxfLeader || item.entity is DxfMLeader) {
           dimCount++;
           dimUs += deltaUs;
         }
@@ -836,6 +972,17 @@ class DxfPainter extends CustomPainter {
         fitScale,
         blockRotationDeg: blockRotationDeg,
       );
+    } else if (entity is DxfAttdef) {
+      if (!entity.isInvisible) {
+        _renderText(
+          canvas,
+          entity.toTextEntity(),
+          strokePaint.color,
+          toCanvas,
+          fitScale,
+          blockRotationDeg: blockRotationDeg,
+        );
+      }
     } else if (entity is DxfMText) {
       _renderMText(
         canvas,
@@ -881,6 +1028,18 @@ class DxfPainter extends CustomPainter {
         entity,
         strokePaint,
         toCanvas,
+        entity.lineType,
+        layerLineType,
+        entityLineTypeScale: entityLtScale,
+        blockLineType: blockLineType,
+      );
+    } else if (entity is DxfMLeader) {
+      _renderMLeader(
+        canvas,
+        entity,
+        strokePaint,
+        toCanvas,
+        fitScale,
         entity.lineType,
         layerLineType,
         entityLineTypeScale: entityLtScale,
@@ -1255,7 +1414,7 @@ class DxfPainter extends CustomPainter {
     double fitScale, {
     double blockRotationDeg = 0.0,
   }) {
-    if (entity.text.trim().isEmpty) return;
+    if (entity.text.trim().isEmpty || entity.isInvisible) return;
 
     // Apply effective text height calculation (includes text style scale)
     final effectiveHeight = _getEffectiveTextHeight(
@@ -2127,17 +2286,22 @@ class DxfPainter extends CustomPainter {
       final searchBox = visibleCadRect!.inflate(margin);
       final p1Cad = dim.defPoint1;
       final p2Cad = dim.defPoint2 ?? dim.textPoint;
+      final p3Cad = dim.defPoint3 ?? dim.textPoint;
       final ptCad = dim.textPoint;
-      if (!searchBox.contains(p1Cad) && !searchBox.contains(p2Cad) && !searchBox.contains(ptCad)) {
+      if (!searchBox.contains(p1Cad) &&
+          !searchBox.contains(p2Cad) &&
+          !searchBox.contains(p3Cad) &&
+          !searchBox.contains(ptCad)) {
         return;
       }
     }
 
     // Dimension LOD: At far zoom out, dimension ticks/arrows/labels are sub-pixel noise.
-    // If the dimension span in screen pixels is below 8.0px, skip rendering.
+    // If the dimension span in screen pixels is below 6.0px, skip rendering.
     final p1 = toCanvas(dim.defPoint1);
     final p2 = toCanvas(dim.defPoint2 ?? dim.textPoint);
-    if ((p2 - p1).distance * currentScale < 8.0) {
+    final p3 = dim.defPoint3 != null ? toCanvas(dim.defPoint3!) : p2;
+    if ((p2 - p1).distance * currentScale < 6.0 && (p3 - p1).distance * currentScale < 6.0) {
       return;
     }
 
@@ -2152,10 +2316,8 @@ class DxfPainter extends CustomPainter {
         // For MTEXT (dimension text), keep its own color (usually white/byblock)
         Paint entityPaint = paint;
         if (entityToDraw is! DxfMText) {
-          // Lines, solids, etc. should use dimension line color
           entityPaint = paint;
         } else {
-          // Text keeps its own color from the block definition
           final entityLayer = layers[entityToDraw.layer];
           final textColor = DxfColorTable.resolveColor(
             colorIndex: entityToDraw.colorIndex,
@@ -2194,55 +2356,376 @@ class DxfPainter extends CustomPainter {
       return;
     }
 
-    // Otherwise fallback: draw dimension line between def points + text
-    canvas.drawLine(p1, p2, paint);
+    // Generative fallback: Render complete CAD dimension geometry using DIMSTYLE
+    _renderGenerativeDimension(canvas, dim, paint, toCanvas, fitScale);
+  }
 
-    if (dim.textOverride != null && dim.textOverride!.isNotEmpty) {
-      final double dimLen = (dim.defPoint2 != null)
-          ? (dim.defPoint2! - dim.defPoint1).distance
-          : 0.0;
-      final double dimHeight = (dimLen > 0 ? dimLen * 0.04 : 20.0).clamp(2.5, 250.0);
-      const double capHeightRatio = 0.72;
-      final double targetFontSize = (dimHeight / capHeightRatio) * fitScale * settings.measurementScale;
-      if (targetFontSize > 0.0) {
-        double scaleFactor = 1.0;
-        double layoutFontSize = targetFontSize;
-        if (targetFontSize < 4.0) {
-          layoutFontSize = 16.0;
-          scaleFactor = targetFontSize / 16.0;
-        } else if (targetFontSize > 400.0) {
-          layoutFontSize = 100.0;
-          scaleFactor = targetFontSize / 100.0;
-        }
+  void _renderGenerativeDimension(
+    Canvas canvas,
+    DxfDimension dim,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+    double fitScale,
+  ) {
+    // 1. Resolve DIMSTYLE
+    final DxfDimStyle dimStyle = (dim.styleName != null ? document.dimStyles[dim.styleName] : null) ??
+        document.dimStyles['STANDARD'] ??
+        const DxfDimStyle(name: 'STANDARD');
 
-        final textPainter = TextPainter(
-          text: TextSpan(
-            text: dim.textOverride,
-            style: TextStyle(
-              color: paint.color,
-              fontSize: layoutFontSize,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        );
-        textPainter.layout();
-        final tp = toCanvas(dim.textPoint);
+    final int dimType = dim.dimType & 0x07;
 
-        canvas.save();
-        try {
-          canvas.translate(tp.dx, tp.dy);
-          if (scaleFactor != 1.0) {
-            canvas.scale(scaleFactor, scaleFactor);
-          }
-          textPainter.paint(
-            canvas,
-            Offset(-textPainter.width / 2.0, -textPainter.height / 2.0),
-          );
-        } finally {
-          canvas.restore();
-        }
+    if (dimType == 3 || dimType == 4) {
+      // Radius (4) or Diameter (3) Dimension
+      _renderRadialGenerativeDimension(canvas, dim, dimStyle, paint, toCanvas, fitScale, isDiameter: dimType == 3);
+      return;
+    }
+
+    // Linear / Aligned / Rotated Dimension (dimType 0, 1, or generic)
+    // defPoint2 (code 13, 23): extension line 1 origin
+    // defPoint3 (code 14, 24): extension line 2 origin
+    // defPoint1 (code 10, 20): dimension line location reference
+    // textPoint (code 11, 21): dimension text location
+    Offset o1 = dim.defPoint2 ?? dim.defPoint1;
+    Offset o2 = dim.defPoint3 ?? (dim.defPoint2 != null ? dim.defPoint1 : dim.textPoint);
+
+    if ((o2 - o1).distance < 1e-4) {
+      if ((dim.textPoint - o1).distance > 1e-4) {
+        o2 = dim.textPoint;
+      } else {
+        return;
       }
+    }
+
+    // Direction vector of dimension line (u) and normal (n)
+    final Offset u;
+    final Offset n;
+    if (dimType == 1 || (dim.rotationDeg == 0.0 && dim.defPoint3 == null)) {
+      final delta = o2 - o1;
+      final dist = delta.distance;
+      u = dist > 1e-6 ? Offset(delta.dx / dist, delta.dy / dist) : const Offset(1, 0);
+      n = Offset(-u.dy, u.dx);
+    } else {
+      final rad = dim.rotationDeg * (math.pi / 180.0);
+      u = Offset(math.cos(rad), math.sin(rad));
+      n = Offset(-math.sin(rad), math.cos(rad));
+    }
+
+    final pDim = ((dim.defPoint1 - o1).distance > 1e-4 && (dim.defPoint1 - o2).distance > 1e-4)
+        ? dim.defPoint1
+        : ((dim.textPoint - o1).distance > 1e-4 ? dim.textPoint : o1);
+
+    // Intersections of extension lines with dimension line
+    final double h1 = (pDim.dx - o1.dx) * n.dx + (pDim.dy - o1.dy) * n.dy;
+    final double h2 = (pDim.dx - o2.dx) * n.dx + (pDim.dy - o2.dy) * n.dy;
+    final Offset d1 = o1 + Offset(n.dx * h1, n.dy * h1);
+    final Offset d2 = o2 + Offset(n.dx * h2, n.dy * h2);
+
+    final double measuredDistance = (d2 - d1).distance;
+    if (measuredDistance < 1e-4) return;
+
+    final Offset u12 = Offset((d2.dx - d1.dx) / measuredDistance, (d2.dy - d1.dy) / measuredDistance);
+
+    // 2. Draw Extension Lines
+    final double exo = dimStyle.effectiveExtensionOffset;
+    final double exe = dimStyle.effectiveExtensionExtension;
+
+    if (h1.abs() > 1e-4) {
+      final double dir1 = h1 >= 0 ? 1.0 : -1.0;
+      final Offset vn1 = Offset(n.dx * dir1, n.dy * dir1);
+      final double startOffset = math.min(exo, h1.abs());
+      final Offset e1Start = o1 + Offset(vn1.dx * startOffset, vn1.dy * startOffset);
+      final Offset e1End = d1 + Offset(vn1.dx * exe, vn1.dy * exe);
+      canvas.drawLine(toCanvas(e1Start), toCanvas(e1End), paint);
+    }
+
+    if (h2.abs() > 1e-4) {
+      final double dir2 = h2 >= 0 ? 1.0 : -1.0;
+      final Offset vn2 = Offset(n.dx * dir2, n.dy * dir2);
+      final double startOffset = math.min(exo, h2.abs());
+      final Offset e2Start = o2 + Offset(vn2.dx * startOffset, vn2.dy * startOffset);
+      final Offset e2End = d2 + Offset(vn2.dx * exe, vn2.dy * exe);
+      canvas.drawLine(toCanvas(e2Start), toCanvas(e2End), paint);
+    }
+
+    // 3. Draw Dimension Line
+    canvas.drawLine(toCanvas(d1), toCanvas(d2), paint);
+
+    // 4. Draw Markers (Architectural Ticks or Arrows)
+    final double arrowSize = dimStyle.effectiveArrowSize;
+    if (dimStyle.isArchitecturalTick) {
+      final Offset t = Offset(
+        (u12.dx + n.dx) * 0.70710678,
+        (u12.dy + n.dy) * 0.70710678,
+      );
+      final halfT = arrowSize * 0.5;
+      final tickPaint = Paint()
+        ..color = paint.color
+        ..strokeWidth = paint.strokeWidth * 1.4
+        ..strokeCap = StrokeCap.round
+        ..isAntiAlias = true;
+
+      canvas.drawLine(
+        toCanvas(d1 - Offset(t.dx * halfT, t.dy * halfT)),
+        toCanvas(d1 + Offset(t.dx * halfT, t.dy * halfT)),
+        tickPaint,
+      );
+      canvas.drawLine(
+        toCanvas(d2 - Offset(t.dx * halfT, t.dy * halfT)),
+        toCanvas(d2 + Offset(t.dx * halfT, t.dy * halfT)),
+        tickPaint,
+      );
+    } else {
+      final double arrowLen = arrowSize;
+      final double arrowHalfWidth = arrowLen / 3.0;
+      final Offset perp = Offset(-u12.dy, u12.dx);
+      final bool arrowsInside = measuredDistance >= (arrowLen * 2.5);
+
+      if (arrowsInside) {
+        _drawArrowhead(
+          canvas,
+          tip: d1,
+          dir: Offset(-u12.dx, -u12.dy),
+          perp: perp,
+          length: arrowLen,
+          halfWidth: arrowHalfWidth,
+          toCanvas: toCanvas,
+          color: paint.color,
+        );
+        _drawArrowhead(
+          canvas,
+          tip: d2,
+          dir: u12,
+          perp: perp,
+          length: arrowLen,
+          halfWidth: arrowHalfWidth,
+          toCanvas: toCanvas,
+          color: paint.color,
+        );
+      } else {
+        _drawArrowhead(
+          canvas,
+          tip: d1,
+          dir: u12,
+          perp: perp,
+          length: arrowLen,
+          halfWidth: arrowHalfWidth,
+          toCanvas: toCanvas,
+          color: paint.color,
+        );
+        _drawArrowhead(
+          canvas,
+          tip: d2,
+          dir: Offset(-u12.dx, -u12.dy),
+          perp: perp,
+          length: arrowLen,
+          halfWidth: arrowHalfWidth,
+          toCanvas: toCanvas,
+          color: paint.color,
+        );
+        canvas.drawLine(toCanvas(d1), toCanvas(d1 - Offset(u12.dx * arrowLen, u12.dy * arrowLen)), paint);
+        canvas.drawLine(toCanvas(d2), toCanvas(d2 + Offset(u12.dx * arrowLen, u12.dy * arrowLen)), paint);
+      }
+    }
+
+    // 5. Draw Dimension Text
+    _renderDimensionText(
+      canvas: canvas,
+      dim: dim,
+      dimStyle: dimStyle,
+      measuredDistance: measuredDistance,
+      d1: d1,
+      d2: d2,
+      u12: u12,
+      n: n,
+      paint: paint,
+      toCanvas: toCanvas,
+      fitScale: fitScale,
+    );
+  }
+
+  void _renderRadialGenerativeDimension(
+    Canvas canvas,
+    DxfDimension dim,
+    DxfDimStyle dimStyle,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+    double fitScale, {
+    required bool isDiameter,
+  }) {
+    final Offset ptCirc = dim.defPoint1;
+    final Offset ptCenter = dim.defPoint2 ?? dim.textPoint;
+    final double dist = (ptCirc - ptCenter).distance;
+    final double measuredVal = isDiameter ? dist * 2.0 : dist;
+
+    // Leader from ptCenter to ptCirc
+    canvas.drawLine(toCanvas(ptCenter), toCanvas(ptCirc), paint);
+
+    // Arrowhead at circumference
+    final double arrowLen = dimStyle.effectiveArrowSize;
+    final double arrowHalfWidth = arrowLen / 3.0;
+    final Offset dir = dist > 1e-6
+        ? Offset((ptCirc.dx - ptCenter.dx) / dist, (ptCirc.dy - ptCenter.dy) / dist)
+        : const Offset(1, 0);
+    final Offset perp = Offset(-dir.dy, dir.dx);
+    _drawArrowhead(
+      canvas,
+      tip: ptCirc,
+      dir: dir,
+      perp: perp,
+      length: arrowLen,
+      halfWidth: arrowHalfWidth,
+      toCanvas: toCanvas,
+      color: paint.color,
+    );
+
+    final prefix = isDiameter ? 'Ø ' : 'R ';
+    _renderDimensionText(
+      canvas: canvas,
+      dim: dim,
+      dimStyle: dimStyle,
+      measuredDistance: measuredVal,
+      d1: ptCenter,
+      d2: ptCirc,
+      u12: dir,
+      n: perp,
+      paint: paint,
+      toCanvas: toCanvas,
+      fitScale: fitScale,
+      prefix: prefix,
+    );
+  }
+
+  void _drawArrowhead(
+    Canvas canvas, {
+    required Offset tip,
+    required Offset dir,
+    required Offset perp,
+    required double length,
+    required double halfWidth,
+    required Offset Function(Offset) toCanvas,
+    required Color color,
+  }) {
+    final Offset baseCenter = tip - Offset(dir.dx * length, dir.dy * length);
+    final Offset corner1 = baseCenter + Offset(perp.dx * halfWidth, perp.dy * halfWidth);
+    final Offset corner2 = baseCenter - Offset(perp.dx * halfWidth, perp.dy * halfWidth);
+
+    final path = Path();
+    final cTip = toCanvas(tip);
+    final c1 = toCanvas(corner1);
+    final c2 = toCanvas(corner2);
+    path.moveTo(cTip.dx, cTip.dy);
+    path.lineTo(c1.dx, c1.dy);
+    path.lineTo(c2.dx, c2.dy);
+    path.close();
+
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    canvas.drawPath(path, fillPaint);
+  }
+
+  void _renderDimensionText({
+    required Canvas canvas,
+    required DxfDimension dim,
+    required DxfDimStyle dimStyle,
+    required double measuredDistance,
+    required Offset d1,
+    required Offset d2,
+    required Offset u12,
+    required Offset n,
+    required Paint paint,
+    required Offset Function(Offset) toCanvas,
+    required double fitScale,
+    String prefix = '',
+  }) {
+    String formatDimVal(double val) {
+      if (val.abs() < 1e-4) return '0';
+      if ((val - val.roundToDouble()).abs() < 1e-3) {
+        return val.round().toString();
+      }
+      return val.toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '');
+    }
+
+    String text;
+    if (dim.textOverride != null && dim.textOverride!.isNotEmpty) {
+      if (dim.textOverride!.contains('<>')) {
+        text = dim.textOverride!.replaceAll('<>', '$prefix${formatDimVal(measuredDistance)}');
+      } else if (dim.textOverride!.trim().isEmpty || dim.textOverride == ' ') {
+        return;
+      } else {
+        text = dim.textOverride!;
+      }
+    } else {
+      text = '$prefix${formatDimVal(measuredDistance)}';
+    }
+
+    if (text.trim().isEmpty) return;
+
+    Offset textCadPos;
+    if ((dim.textPoint - dim.defPoint1).distance > 1e-4 && dim.textPoint != Offset.zero) {
+      textCadPos = dim.textPoint;
+    } else {
+      final double textOffset = dimStyle.effectiveGap + (dimStyle.effectiveTextHeight * 0.6);
+      textCadPos = Offset(
+        (d1.dx + d2.dx) * 0.5 + n.dx * textOffset,
+        (d1.dy + d2.dy) * 0.5 + n.dy * textOffset,
+      );
+    }
+
+    final double cadTextHeight = dimStyle.effectiveTextHeight > 0 ? dimStyle.effectiveTextHeight : 2.5;
+    const double capHeightRatio = 0.72;
+    final double targetFontSize = (cadTextHeight / capHeightRatio) * fitScale * settings.measurementScale;
+    if (targetFontSize < 0.5) return;
+
+    double scaleFactor = 1.0;
+    double layoutFontSize = targetFontSize;
+    if (targetFontSize < 4.0) {
+      layoutFontSize = 16.0;
+      scaleFactor = targetFontSize / 16.0;
+    } else if (targetFontSize > 400.0) {
+      layoutFontSize = 100.0;
+      scaleFactor = targetFontSize / 100.0;
+    }
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: paint.color,
+          fontSize: layoutFontSize,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+
+    final double cadAngle = math.atan2(u12.dy, u12.dx);
+    double canvasAngle = -cadAngle;
+    while (canvasAngle > math.pi / 2.0) {
+      canvasAngle -= math.pi;
+    }
+    while (canvasAngle <= -math.pi / 2.0) {
+      canvasAngle += math.pi;
+    }
+
+    final tpCanvas = toCanvas(textCadPos);
+    canvas.save();
+    try {
+      canvas.translate(tpCanvas.dx, tpCanvas.dy);
+      if (canvasAngle.abs() > 0.001) {
+        canvas.rotate(canvasAngle);
+      }
+      if (scaleFactor != 1.0) {
+        canvas.scale(scaleFactor, scaleFactor);
+      }
+      textPainter.paint(
+        canvas,
+        Offset(-textPainter.width / 2.0, -textPainter.height / 2.0),
+      );
+    } finally {
+      canvas.restore();
     }
   }
 
@@ -2275,6 +2758,149 @@ class DxfPainter extends CustomPainter {
       entityLineTypeScale: entityLineTypeScale,
       blockLineType: blockLineType,
     );
+  }
+
+  void _renderMLeader(
+    Canvas canvas,
+    DxfMLeader mleader,
+    Paint paint,
+    Offset Function(Offset) toCanvas,
+    double fitScale,
+    String? lineType,
+    String? layerLineType, {
+    double? entityLineTypeScale,
+    String? blockLineType,
+  }) {
+    final scale = currentScale.clamp(0.001, 10000.0);
+    final mScale = settings.measurementScale;
+
+    // 1. Draw Leader Lines & Arrowheads
+    for (final line in mleader.leaderLines) {
+      if (line.isEmpty) continue;
+
+      final path = Path();
+      final p0 = toCanvas(line.first);
+      path.moveTo(p0.dx, p0.dy);
+
+      for (int i = 1; i < line.length; i++) {
+        final p = toCanvas(line[i]);
+        path.lineTo(p.dx, p.dy);
+      }
+
+      // If connection point exists, connect line end to connection point
+      if (mleader.connectionPoint != null) {
+        final connCanvas = toCanvas(mleader.connectionPoint!);
+        path.lineTo(connCanvas.dx, connCanvas.dy);
+      }
+
+      _drawStrokePath(
+        canvas,
+        path,
+        paint,
+        lineType,
+        layerLineType,
+        entityLineTypeScale: entityLineTypeScale,
+        blockLineType: blockLineType,
+      );
+
+      // Draw Arrowhead at the tip (line.first)
+      if (mleader.hasArrowhead) {
+        final tip = toCanvas(line.first);
+        final Offset nextPt;
+        if (line.length > 1) {
+          nextPt = toCanvas(line[1]);
+        } else if (mleader.connectionPoint != null) {
+          nextPt = toCanvas(mleader.connectionPoint!);
+        } else {
+          nextPt = tip;
+        }
+
+        final delta = nextPt - tip;
+        final dist = delta.distance;
+        if (dist > 1e-3) {
+          final u = delta / dist;
+          final normal = Offset(-u.dy, u.dx);
+          final arrowLen = (mleader.arrowheadSize * 1.5 * fitScale * mScale).clamp(6.0, 40.0) / scale;
+          final arrowWidth = arrowLen * 0.45;
+
+          final pLeft = tip + u * arrowLen + normal * (arrowWidth / 2.0);
+          final pRight = tip + u * arrowLen - normal * (arrowWidth / 2.0);
+
+          final arrowPath = Path()
+            ..moveTo(tip.dx, tip.dy)
+            ..lineTo(pLeft.dx, pLeft.dy)
+            ..lineTo(pRight.dx, pRight.dy)
+            ..close();
+
+          final arrowPaint = Paint()
+            ..color = paint.color
+            ..style = PaintingStyle.fill
+            ..isAntiAlias = true;
+
+          canvas.drawPath(arrowPath, arrowPaint);
+        }
+      }
+    }
+
+    // 2. Draw Dogleg (Landing shoulder) if present
+    Offset textAnchor = toCanvas(mleader.textPosition ?? mleader.connectionPoint ?? Offset.zero);
+    if (mleader.connectionPoint != null && mleader.doglegLength > 0) {
+      final connCanvas = toCanvas(mleader.connectionPoint!);
+      final dir = mleader.doglegDirection ?? const Offset(1, 0);
+      final dirNorm = dir.distance > 1e-6 ? dir / dir.distance : const Offset(1, 0);
+      final shoulderEndCad = mleader.connectionPoint! + dirNorm * mleader.doglegLength;
+      final shoulderEndCanvas = toCanvas(shoulderEndCad);
+
+      canvas.drawLine(connCanvas, shoulderEndCanvas, paint);
+      if (mleader.textPosition == null) {
+        textAnchor = shoulderEndCanvas;
+      }
+    }
+
+    // 3. Render Text
+    if (mleader.cleanText.isNotEmpty) {
+      final double textH = mleader.textHeight > 0 ? mleader.textHeight : 2.5;
+      final double targetFontSize = textH * fitScale * mScale;
+      if (targetFontSize > 0.0) {
+        double scaleFactor = 1.0;
+        double layoutFontSize = targetFontSize;
+        if (targetFontSize < 4.0) {
+          layoutFontSize = 16.0;
+          scaleFactor = targetFontSize / 16.0;
+        } else if (targetFontSize > 400.0) {
+          layoutFontSize = 100.0;
+          scaleFactor = targetFontSize / 100.0;
+        }
+
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: mleader.cleanText,
+            style: TextStyle(
+              color: paint.color,
+              fontSize: layoutFontSize,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        textPainter.layout(
+          maxWidth: mleader.textWidth != null && mleader.textWidth! > 0
+              ? (mleader.textWidth! * fitScale * mScale / scaleFactor).clamp(50.0, 2000.0)
+              : double.infinity,
+        );
+
+        canvas.save();
+        try {
+          canvas.translate(textAnchor.dx, textAnchor.dy);
+          if (scaleFactor != 1.0) {
+            canvas.scale(scaleFactor, scaleFactor);
+          }
+          textPainter.paint(canvas, Offset(2.0 / scaleFactor, -textPainter.height * 0.8));
+        } finally {
+          canvas.restore();
+        }
+      }
+    }
   }
 
   void _drawSnapMarker(
@@ -3069,6 +3695,7 @@ class DxfPainter extends CustomPainter {
 
     if (oldDelegate.document != document ||
         oldDelegate.theme != theme ||
+        oldDelegate.activeLayout != activeLayout ||
         oldDelegate.measurement != measurement ||
         oldDelegate.annotations != annotations ||
         oldDelegate.highlightedEntity != highlightedEntity ||

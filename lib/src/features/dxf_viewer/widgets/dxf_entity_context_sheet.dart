@@ -180,7 +180,11 @@ class DxfEntityContextSheet extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              if (_buildEntityDetailsCard(context) != null) ...[
+                _buildEntityDetailsCard(context)!,
+              ],
 
               // Action 1: Hide this Layer
               _buildActionButton(
@@ -310,5 +314,180 @@ class DxfEntityContextSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget? _buildEntityDetailsCard(BuildContext context) {
+    if (entity is DxfInsert) {
+      final insert = entity as DxfInsert;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF131A26) : const Color(0xFFF3F5F8),
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(
+            color: isDark ? const Color(0xFF263248) : const Color(0xFFE2E6EE),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.widgets_outlined,
+                  size: 18,
+                  color: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'BLOCK: ${insert.blockName}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Pos: (${insert.insertPoint.dx.toStringAsFixed(1)}, ${insert.insertPoint.dy.toStringAsFixed(1)})'
+              '${insert.rotationDeg != 0 ? ' • Rot: ${insert.rotationDeg.toStringAsFixed(1)}°' : ''}'
+              '${(insert.scaleX != 1.0 || insert.scaleY != 1.0) ? ' • Scale: ${insert.scaleX.toStringAsFixed(2)}x' : ''}',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+            ),
+            if (insert.attributes.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Divider(
+                height: 1,
+                color: isDark ? const Color(0xFF263248) : const Color(0xFFE2E6EE),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    'ATTRIBUTES (${insert.attributes.length})',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.7,
+                      color: isDark ? Colors.white54 : Colors.black45,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 180),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: insert.attributes.map((attr) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.blueGrey.shade900 : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                attr.tag,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.blueGrey.shade200 : Colors.blueGrey.shade800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                attr.value.isNotEmpty ? attr.value : '—',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? Colors.white70 : Colors.black87,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (attr.isInvisible)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 4.0),
+                                child: Icon(
+                                  Icons.visibility_off_outlined,
+                                  size: 13,
+                                  color: isDark ? Colors.white30 : Colors.black26,
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    } else if (entity is DxfText && (entity as DxfText).tag != null) {
+      final text = entity as DxfText;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF131A26) : const Color(0xFFF3F5F8),
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(
+            color: isDark ? const Color(0xFF263248) : const Color(0xFFE2E6EE),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.blueGrey.shade900 : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                text.tag!,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.blueGrey.shade200 : Colors.blueGrey.shade800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text.text,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return null;
   }
 }

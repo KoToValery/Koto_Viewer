@@ -57,6 +57,10 @@ class _KcadBinaryBuffer {
     _offset += 4;
   }
 
+  void setUint32(int offset, int v) {
+    _byteData.setUint32(offset, v, Endian.little);
+  }
+
   void writeInt32(int v) {
     _ensureCapacity(4);
     _byteData.setInt32(_offset, v, Endian.little);
@@ -143,13 +147,16 @@ class KcadEntityType {
   static const int insert = 13;
   static const int dimension = 14;
   static const int leader = 15;
+  static const int mLeader = 16;
+  static const int viewport = 17;
+  static const int attdef = 18;
 }
 
 /// Serializes a [DxfDocument] into ultra-compact, high-performance KCAD binary format.
 class KcadWriter {
   static const List<int> magicBytes = [0x4B, 0x43, 0x41, 0x44]; // 'K', 'C', 'A', 'D'
-  /// Version 2: Relative Origin Float32 coordinates & compact count encoding.
-  static const int currentVersion = 2;
+  /// Version 5: Adds Block Attributes on DxfInsert and DxfAttdef entity support.
+  static const int currentVersion = 5;
 
   /// Flags: bit 0: isCompressed
   static const int flagCompressed = 1;
@@ -243,6 +250,10 @@ class KcadWriter {
     for (final key in doc.entityStats.keys) {
       st.getId(key);
     }
+    for (final dimStyle in doc.dimStyles.values) {
+      st.getId(dimStyle.name);
+      if (dimStyle.dimBlk != null) st.getId(dimStyle.dimBlk!);
+    }
     for (final block in doc.blocks.values) {
       st.getId(block.name);
       for (final e in block.entities) {
@@ -257,6 +268,7 @@ class KcadWriter {
   static void _collectEntityStrings(DxfEntity e, _StringTableWriter st) {
     st.getId(e.layer);
     if (e.lineType != null) st.getId(e.lineType!);
+    if (e.layoutName.isNotEmpty && e.layoutName != 'Model') st.getId(e.layoutName);
 
     if (e is DxfText) {
       st.getId(e.text);
@@ -269,9 +281,22 @@ class KcadWriter {
       st.getId(e.patternName);
     } else if (e is DxfInsert) {
       st.getId(e.blockName);
+      for (final attr in e.attributes) {
+        st.getId(attr.tag);
+        st.getId(attr.value);
+      }
+    } else if (e is DxfAttdef) {
+      st.getId(e.tag);
+      st.getId(e.text);
+      if (e.prompt != null) st.getId(e.prompt!);
+      if (e.style != null) st.getId(e.style!);
     } else if (e is DxfDimension) {
       if (e.textOverride != null) st.getId(e.textOverride!);
       if (e.blockName != null) st.getId(e.blockName!);
+      if (e.styleName != null) st.getId(e.styleName!);
+    } else if (e is DxfMLeader) {
+      st.getId(e.rawText);
+      st.getId(e.cleanText);
     }
   }
 
@@ -327,6 +352,21 @@ class KcadWriter {
       buf.writeUint32(st.getId(entry.key));
       buf.writeInt32(entry.value);
     }
+
+    // 6. DimStyles (v4+)
+    buf.writeCount(doc.dimStyles.length);
+    for (final s in doc.dimStyles.values) {
+      buf.writeUint32(st.getId(s.name));
+      buf.writeFloat32(s.dimScale);
+      buf.writeFloat32(s.dimAsz);
+      buf.writeFloat32(s.dimExo);
+      buf.writeFloat32(s.dimExe);
+      buf.writeFloat32(s.dimTxt);
+      buf.writeFloat32(s.dimTsz);
+      buf.writeFloat32(s.dimGap);
+      buf.writeUint8(s.dimBlk != null ? 1 : 0);
+      if (s.dimBlk != null) buf.writeUint32(st.getId(s.dimBlk!));
+    }
   }
 
   static void _writeBlocks(DxfDocument doc, _StringTableWriter st, _KcadBinaryBuffer buf) {
@@ -343,6 +383,28 @@ class KcadWriter {
     }
   }
 
+  static int _getEntityTypeCode(DxfEntity e) {
+    if (e is DxfLine) return KcadEntityType.line;
+    if (e is DxfPoint) return KcadEntityType.point;
+    if (e is DxfCircle) return KcadEntityType.circle;
+    if (e is DxfArc) return KcadEntityType.arc;
+    if (e is DxfEllipse) return KcadEntityType.ellipse;
+    if (e is DxfLwPolyline) return KcadEntityType.lwPolyline;
+    if (e is DxfPolyline) return KcadEntityType.polyline;
+    if (e is DxfSpline) return KcadEntityType.spline;
+    if (e is DxfText) return KcadEntityType.text;
+    if (e is DxfMText) return KcadEntityType.mText;
+    if (e is DxfSolid) return KcadEntityType.solid;
+    if (e is DxfHatch) return KcadEntityType.hatch;
+    if (e is DxfInsert) return KcadEntityType.insert;
+    if (e is DxfDimension) return KcadEntityType.dimension;
+    if (e is DxfLeader) return KcadEntityType.leader;
+    if (e is DxfMLeader) return KcadEntityType.mLeader;
+    if (e is DxfViewport) return KcadEntityType.viewport;
+    if (e is DxfAttdef) return KcadEntityType.attdef;
+    return 0;
+  }
+
   static void _writeEntity(
     DxfEntity e,
     _StringTableWriter st,
@@ -350,42 +412,56 @@ class KcadWriter {
     double ox,
     double oy,
   ) {
+    final typeCode = _getEntityTypeCode(e);
+    if (typeCode == 0) return;
+
     int baseFlags = 0;
     if (e.colorIndex != null) baseFlags |= 1;
     if (e.trueColor != null) baseFlags |= 2;
     if (e.lineType != null) baseFlags |= 4;
     if (e.lineWeight != null) baseFlags |= 8;
     if (e.lineTypeScale != null) baseFlags |= 16;
+    if (e.isPaperSpace) baseFlags |= 32;
+    if (e.layoutName.isNotEmpty && e.layoutName != 'Model') baseFlags |= 64;
 
+    buf.writeUint8(typeCode);
+    final lengthOffset = buf.length;
+    buf.writeUint32(0); // Reserve 4 bytes for entity payload length (v3 TLV framing)
+    final payloadStart = buf.length;
+
+    _writeBase(e, st, buf, baseFlags);
+    _writeEntityPayload(e, st, buf, ox, oy);
+
+    final payloadLength = buf.length - payloadStart;
+    buf.setUint32(lengthOffset, payloadLength);
+  }
+
+  static void _writeEntityPayload(
+    DxfEntity e,
+    _StringTableWriter st,
+    _KcadBinaryBuffer buf,
+    double ox,
+    double oy,
+  ) {
     if (e is DxfLine) {
-      buf.writeUint8(KcadEntityType.line);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeFloat32(e.p1.dx - ox);
       buf.writeFloat32(e.p1.dy - oy);
       buf.writeFloat32(e.p2.dx - ox);
       buf.writeFloat32(e.p2.dy - oy);
     } else if (e is DxfPoint) {
-      buf.writeUint8(KcadEntityType.point);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeFloat32(e.point.dx - ox);
       buf.writeFloat32(e.point.dy - oy);
     } else if (e is DxfCircle) {
-      buf.writeUint8(KcadEntityType.circle);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeFloat32(e.center.dx - ox);
       buf.writeFloat32(e.center.dy - oy);
       buf.writeFloat32(e.radius);
     } else if (e is DxfArc) {
-      buf.writeUint8(KcadEntityType.arc);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeFloat32(e.center.dx - ox);
       buf.writeFloat32(e.center.dy - oy);
       buf.writeFloat32(e.radius);
       buf.writeFloat32(e.startAngleDeg);
       buf.writeFloat32(e.endAngleDeg);
     } else if (e is DxfEllipse) {
-      buf.writeUint8(KcadEntityType.ellipse);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeFloat32(e.center.dx - ox);
       buf.writeFloat32(e.center.dy - oy);
       buf.writeFloat32(e.majorAxisEndOffset.dx);
@@ -394,8 +470,6 @@ class KcadWriter {
       buf.writeFloat32(e.startParam);
       buf.writeFloat32(e.endParam);
     } else if (e is DxfLwPolyline) {
-      buf.writeUint8(KcadEntityType.lwPolyline);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeUint8(e.isClosed ? 1 : 0);
       buf.writeFloat32(e.elevation);
       buf.writeCount(e.vertices.length);
@@ -408,8 +482,6 @@ class KcadWriter {
         buf.writeInt32(v.flags);
       }
     } else if (e is DxfPolyline) {
-      buf.writeUint8(KcadEntityType.polyline);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeUint8(e.isClosed ? 1 : 0);
       buf.writeUint8(e.is3D ? 1 : 0);
       buf.writeInt32(e.flags);
@@ -423,8 +495,6 @@ class KcadWriter {
         buf.writeInt32(v.flags);
       }
     } else if (e is DxfSpline) {
-      buf.writeUint8(KcadEntityType.spline);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeInt32(e.degree);
       buf.writeUint8(e.isClosed ? 1 : 0);
       buf.writeUint8(e.isRational ? 1 : 0);
@@ -447,8 +517,6 @@ class KcadWriter {
         buf.writeFloat32(w);
       }
     } else if (e is DxfText) {
-      buf.writeUint8(KcadEntityType.text);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeUint32(st.getId(e.text));
       buf.writeFloat32(e.insertPoint.dx - ox);
       buf.writeFloat32(e.insertPoint.dy - oy);
@@ -464,8 +532,6 @@ class KcadWriter {
       buf.writeUint8(e.style != null ? 1 : 0);
       if (e.style != null) buf.writeUint32(st.getId(e.style!));
     } else if (e is DxfMText) {
-      buf.writeUint8(KcadEntityType.mText);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeUint32(st.getId(e.rawText));
       buf.writeUint32(st.getId(e.cleanText));
       buf.writeFloat32(e.insertPoint.dx - ox);
@@ -486,8 +552,6 @@ class KcadWriter {
       buf.writeUint8(e.lineSpacingFactor != null ? 1 : 0);
       if (e.lineSpacingFactor != null) buf.writeFloat32(e.lineSpacingFactor!);
     } else if (e is DxfSolid) {
-      buf.writeUint8(KcadEntityType.solid);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeFloat32(e.p0.dx - ox);
       buf.writeFloat32(e.p0.dy - oy);
       buf.writeFloat32(e.p1.dx - ox);
@@ -497,8 +561,6 @@ class KcadWriter {
       buf.writeFloat32(e.p3.dx - ox);
       buf.writeFloat32(e.p3.dy - oy);
     } else if (e is DxfHatch) {
-      buf.writeUint8(KcadEntityType.hatch);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeUint32(st.getId(e.patternName));
       buf.writeUint8(e.isSolid ? 1 : 0);
       buf.writeFloat32(e.patternAngle);
@@ -529,8 +591,6 @@ class KcadWriter {
         }
       }
     } else if (e is DxfInsert) {
-      buf.writeUint8(KcadEntityType.insert);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeUint32(st.getId(e.blockName));
       buf.writeFloat32(e.insertPoint.dx - ox);
       buf.writeFloat32(e.insertPoint.dy - oy);
@@ -542,9 +602,33 @@ class KcadWriter {
       buf.writeInt32(e.colCount);
       buf.writeFloat32(e.rowSpacing);
       buf.writeFloat32(e.colSpacing);
+      buf.writeCount(e.attributes.length);
+      for (final attr in e.attributes) {
+        buf.writeUint32(st.getId(attr.tag));
+        buf.writeUint32(st.getId(attr.value));
+        buf.writeUint8(attr.isInvisible ? 1 : 0);
+        buf.writeUint8(attr.isConstant ? 1 : 0);
+      }
+    } else if (e is DxfAttdef) {
+      buf.writeUint32(st.getId(e.tag));
+      buf.writeUint32(st.getId(e.text));
+      buf.writeUint8(e.prompt != null ? 1 : 0);
+      if (e.prompt != null) buf.writeUint32(st.getId(e.prompt!));
+      buf.writeFloat32(e.insertPoint.dx - ox);
+      buf.writeFloat32(e.insertPoint.dy - oy);
+      buf.writeUint8(e.alignPoint != null ? 1 : 0);
+      if (e.alignPoint != null) {
+        buf.writeFloat32(e.alignPoint!.dx - ox);
+        buf.writeFloat32(e.alignPoint!.dy - oy);
+      }
+      buf.writeFloat32(e.height);
+      buf.writeFloat32(e.rotationDeg);
+      buf.writeInt32(e.hAlign);
+      buf.writeInt32(e.vAlign);
+      buf.writeUint8(e.style != null ? 1 : 0);
+      if (e.style != null) buf.writeUint32(st.getId(e.style!));
+      buf.writeInt32(e.flags);
     } else if (e is DxfDimension) {
-      buf.writeUint8(KcadEntityType.dimension);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeInt32(e.dimType);
       buf.writeFloat32(e.defPoint1.dx - ox);
       buf.writeFloat32(e.defPoint1.dy - oy);
@@ -559,15 +643,68 @@ class KcadWriter {
       if (e.textOverride != null) buf.writeUint32(st.getId(e.textOverride!));
       buf.writeUint8(e.blockName != null ? 1 : 0);
       if (e.blockName != null) buf.writeUint32(st.getId(e.blockName!));
+      buf.writeUint8(e.defPoint3 != null ? 1 : 0);
+      if (e.defPoint3 != null) {
+        buf.writeFloat32(e.defPoint3!.dx - ox);
+        buf.writeFloat32(e.defPoint3!.dy - oy);
+      }
+      buf.writeFloat32(e.rotationDeg);
+      buf.writeUint8(e.styleName != null ? 1 : 0);
+      if (e.styleName != null) buf.writeUint32(st.getId(e.styleName!));
     } else if (e is DxfLeader) {
-      buf.writeUint8(KcadEntityType.leader);
-      _writeBase(e, st, buf, baseFlags);
       buf.writeUint8(e.hasArrowhead ? 1 : 0);
       buf.writeCount(e.vertices.length);
       for (final v in e.vertices) {
         buf.writeFloat32(v.dx - ox);
         buf.writeFloat32(v.dy - oy);
       }
+    } else if (e is DxfMLeader) {
+      buf.writeUint32(st.getId(e.rawText));
+      buf.writeUint32(st.getId(e.cleanText));
+      buf.writeFloat32(e.textHeight);
+      buf.writeUint8(e.textWidth != null ? 1 : 0);
+      if (e.textWidth != null) buf.writeFloat32(e.textWidth!);
+      buf.writeUint8(e.hasArrowhead ? 1 : 0);
+      buf.writeFloat32(e.arrowheadSize);
+      buf.writeFloat32(e.doglegLength);
+
+      buf.writeUint8(e.connectionPoint != null ? 1 : 0);
+      if (e.connectionPoint != null) {
+        buf.writeFloat32(e.connectionPoint!.dx - ox);
+        buf.writeFloat32(e.connectionPoint!.dy - oy);
+      }
+
+      buf.writeUint8(e.doglegDirection != null ? 1 : 0);
+      if (e.doglegDirection != null) {
+        buf.writeFloat32(e.doglegDirection!.dx);
+        buf.writeFloat32(e.doglegDirection!.dy);
+      }
+
+      buf.writeUint8(e.textPosition != null ? 1 : 0);
+      if (e.textPosition != null) {
+        buf.writeFloat32(e.textPosition!.dx - ox);
+        buf.writeFloat32(e.textPosition!.dy - oy);
+      }
+
+      buf.writeCount(e.leaderLines.length);
+      for (final line in e.leaderLines) {
+        buf.writeCount(line.length);
+        for (final pt in line) {
+          buf.writeFloat32(pt.dx - ox);
+          buf.writeFloat32(pt.dy - oy);
+        }
+      }
+    } else if (e is DxfViewport) {
+      buf.writeFloat32(e.center.dx - ox);
+      buf.writeFloat32(e.center.dy - oy);
+      buf.writeFloat32(e.width);
+      buf.writeFloat32(e.height);
+      buf.writeFloat32(e.viewCenter.dx);
+      buf.writeFloat32(e.viewCenter.dy);
+      buf.writeFloat32(e.viewHeight);
+      buf.writeInt32(e.status);
+      buf.writeInt32(e.viewportId);
+      buf.writeFloat32(e.twistAngleDeg);
     }
   }
 
@@ -579,5 +716,6 @@ class KcadWriter {
     if ((flags & 4) != 0) buf.writeUint32(st.getId(e.lineType!));
     if ((flags & 8) != 0) buf.writeFloat32(e.lineWeight!);
     if ((flags & 16) != 0) buf.writeFloat32(e.lineTypeScale!);
+    if ((flags & 64) != 0) buf.writeUint32(st.getId(e.layoutName));
   }
 }
