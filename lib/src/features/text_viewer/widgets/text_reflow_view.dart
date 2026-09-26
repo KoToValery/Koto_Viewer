@@ -256,31 +256,35 @@ class TextReflowViewState extends State<TextReflowView> {
                       ),
                       const SizedBox(height: 16),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Icon(Icons.auto_stories, color: theme.accentColor, size: 22),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Reading & E-Book Settings',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                  color: textColor,
-                                ),
+                          Icon(Icons.auto_stories, color: theme.accentColor, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Reader Settings',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
                               ),
-                            ],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           TextButton.icon(
                             onPressed: () {
                               Navigator.pop(context);
                               widget.onExitReflow();
                             },
-                            icon: Icon(Icons.code, size: 18, color: theme.accentColor),
+                            icon: Icon(Icons.code, size: 16, color: theme.accentColor),
                             label: Text(
-                              'Code / Raw View',
-                              style: TextStyle(color: theme.accentColor, fontWeight: FontWeight.bold),
+                              'Raw View',
+                              style: TextStyle(color: theme.accentColor, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             ),
                           ),
                         ],
@@ -445,31 +449,37 @@ class TextReflowViewState extends State<TextReflowView> {
 
                       // Page Flow Mode: Paginated vs Continuous
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Page Flow', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
-                          SegmentedButton<TextReflowMode>(
-                            segments: const [
-                              ButtonSegment(
-                                value: TextReflowMode.paginated,
-                                label: Text('Swipe Pages'),
-                                icon: Icon(Icons.auto_stories, size: 16),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SegmentedButton<TextReflowMode>(
+                              style: const ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              ButtonSegment(
-                                value: TextReflowMode.continuous,
-                                label: Text('Continuous'),
-                                icon: Icon(Icons.view_day_outlined, size: 16),
-                              ),
-                            ],
-                            selected: {currentSettings.mode},
-                            onSelectionChanged: (set) {
-                              final updated = currentSettings.copyWith(mode: set.first);
-                              widget.onSettingsChanged(updated);
-                              if (updated.mode == TextReflowMode.paginated && _lastViewportSize != null) {
-                                _paginateChapter(_lastViewportSize!);
-                              }
-                              setSheetState(() {});
-                            },
+                              segments: const [
+                                ButtonSegment(
+                                  value: TextReflowMode.paginated,
+                                  label: Text('Pages', style: TextStyle(fontSize: 11.5)),
+                                  icon: Icon(Icons.auto_stories, size: 15),
+                                ),
+                                ButtonSegment(
+                                  value: TextReflowMode.continuous,
+                                  label: Text('Continuous', style: TextStyle(fontSize: 11.5)),
+                                  icon: Icon(Icons.view_day_outlined, size: 15),
+                                ),
+                              ],
+                              selected: {currentSettings.mode},
+                              onSelectionChanged: (set) {
+                                final updated = currentSettings.copyWith(mode: set.first);
+                                widget.onSettingsChanged(updated);
+                                if (updated.mode == TextReflowMode.paginated && _lastViewportSize != null) {
+                                  _paginateChapter(_lastViewportSize!);
+                                }
+                                setSheetState(() {});
+                              },
+                            ),
                           ),
                         ],
                       ),
@@ -477,22 +487,28 @@ class TextReflowViewState extends State<TextReflowView> {
 
                       // Line Spacing
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Line Spacing', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
-                          SegmentedButton<double>(
-                            segments: const [
-                              ButtonSegment(value: 1.4, label: Text('Tight')),
-                              ButtonSegment(value: 1.6, label: Text('Normal')),
-                              ButtonSegment(value: 1.9, label: Text('Relaxed')),
-                            ],
-                            selected: {currentSettings.lineHeight},
-                            onSelectionChanged: (set) {
-                              final updated = currentSettings.copyWith(lineHeight: set.first);
-                              widget.onSettingsChanged(updated);
-                              if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
-                              setSheetState(() {});
-                            },
+                          Text('Spacing', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SegmentedButton<double>(
+                              style: const ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              segments: const [
+                                ButtonSegment(value: 1.4, label: Text('Tight', style: TextStyle(fontSize: 11.5))),
+                                ButtonSegment(value: 1.6, label: Text('Normal', style: TextStyle(fontSize: 11.5))),
+                                ButtonSegment(value: 1.9, label: Text('Relaxed', style: TextStyle(fontSize: 11.5))),
+                              ],
+                              selected: {currentSettings.lineHeight},
+                              onSelectionChanged: (set) {
+                                final updated = currentSettings.copyWith(lineHeight: set.first);
+                                widget.onSettingsChanged(updated);
+                                if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
+                                setSheetState(() {});
+                              },
+                            ),
                           ),
                         ],
                       ),
@@ -754,7 +770,7 @@ class TextReflowViewState extends State<TextReflowView> {
                           widget.settings.horizontalPadding,
                           16,
                           widget.settings.horizontalPadding,
-                          8,
+                          18,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -808,8 +824,12 @@ class TextReflowViewState extends State<TextReflowView> {
             height: 28,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
+              color: theme.surfaceColor,
               border: Border(
-                top: BorderSide(color: theme.textColor.withValues(alpha: 0.08)),
+                top: BorderSide(
+                  color: theme.textColor.withValues(alpha: 0.14),
+                  width: 1.0,
+                ),
               ),
             ),
             child: Row(

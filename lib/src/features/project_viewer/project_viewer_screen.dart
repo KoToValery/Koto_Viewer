@@ -286,7 +286,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     });
     await ProjectBundleService.toggleFileHidden(_bundle!.archivePath, item, newHidden);
     if (mounted) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

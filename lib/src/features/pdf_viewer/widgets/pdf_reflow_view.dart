@@ -118,14 +118,19 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Reading Settings',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: currentSettings.theme.textColor,
+                        Expanded(
+                          child: Text(
+                            'Reading Settings',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: currentSettings.theme.textColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 8),
                         TextButton.icon(
                           onPressed: () {
                             Navigator.pop(context);
@@ -135,6 +140,10 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                           label: Text(
                             'Original PDF',
                             style: TextStyle(color: currentSettings.theme.accentColor, fontWeight: FontWeight.bold),
+                          ),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           ),
                         ),
                       ],
@@ -320,26 +329,32 @@ class _PdfReflowViewState extends State<PdfReflowView> {
                             color: currentSettings.theme.textColor,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        SegmentedButton<bool>(
-                          segments: const [
-                            ButtonSegment(
-                              value: false,
-                              label: Text('Swipe Pages'),
-                              icon: Icon(Icons.view_carousel_outlined, size: 16),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SegmentedButton<bool>(
+                            style: const ButtonStyle(
+                              visualDensity: VisualDensity.compact,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            ButtonSegment(
-                              value: true,
-                              label: Text('Continuous'),
-                              icon: Icon(Icons.view_stream_outlined, size: 16),
-                            ),
-                          ],
-                          selected: {currentSettings.isContinuous},
-                          onSelectionChanged: (set) {
-                            final updated = currentSettings.copyWith(isContinuous: set.first);
-                            widget.onSettingsChanged(updated);
-                            setSheetState(() {});
-                          },
+                            segments: const [
+                              ButtonSegment(
+                                value: false,
+                                label: Text('Swipe Pages', style: TextStyle(fontSize: 11.5)),
+                                icon: Icon(Icons.view_carousel_outlined, size: 15),
+                              ),
+                              ButtonSegment(
+                                value: true,
+                                label: Text('Continuous', style: TextStyle(fontSize: 11.5)),
+                                icon: Icon(Icons.view_stream_outlined, size: 15),
+                              ),
+                            ],
+                            selected: {currentSettings.isContinuous},
+                            onSelectionChanged: (set) {
+                              final updated = currentSettings.copyWith(isContinuous: set.first);
+                              widget.onSettingsChanged(updated);
+                              setSheetState(() {});
+                            },
+                          ),
                         ),
                       ],
                     ),

@@ -3145,7 +3145,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Container(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -3155,7 +3155,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
                           color: theme.colorScheme.primary.withValues(
@@ -3166,103 +3166,65 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text(
-                          l10n.homeBannerTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _pickAndOpenFile,
+                            icon: const Icon(Icons.folder_open_rounded),
+                            label: Text(
+                              l10n.browseFiles,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: theme.colorScheme.primary,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              elevation: 0,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: _pickAndOpenFile,
-                              icon: const Icon(Icons.folder_open_rounded),
-                              label: Text(
-                                l10n.browseFiles,
-                                style: const TextStyle(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: theme.colorScheme.primary,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                elevation: 0,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _showReceiveFilesDialog,
+                            icon: const Icon(Icons.cloud_upload_rounded),
+                            label: Text(
+                              l10n.uploadViaWifi,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            ElevatedButton.icon(
-                              onPressed: _showReceiveFilesDialog,
-                              icon: const Icon(Icons.cloud_upload_rounded),
-                              label: Text(
-                                l10n.uploadViaWifi,
-                                style: const TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white.withValues(alpha: 0.18),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
                               ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white.withValues(alpha: 0.18),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  side: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.35),
-                                  ),
-                                ),
-                                elevation: 0,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: BorderSide(
                                   color: Colors.white.withValues(alpha: 0.35),
                                 ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.auto_awesome_mosaic_rounded,
-                                    size: 15,
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'PDF • DWG • 3D • PCB • Office',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.95),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              elevation: 0,
                             ),
-                          ],
+                          ),
                         ),
                       ],
                     ),

@@ -810,12 +810,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                           onPressed: _toggleViewMode,
                         ),
 
-                        // Jump to Page
-                        IconButton(
-                          icon: const Icon(Icons.pin_outlined, size: 20),
-                          tooltip: 'Jump to Page',
-                          onPressed: _showJumpToPageDialog,
-                        ),
 
                         // Bookmark Toggle
                         IconButton(
@@ -830,7 +824,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
                         // Bookmarks List
                         IconButton(
-                          icon: const Icon(Icons.bookmarks_outlined, size: 20),
+                          icon: Badge(
+                            isLabelVisible: _bookmarks.isNotEmpty,
+                            label: Text('${_bookmarks.length}'),
+                            child: const Icon(Icons.bookmarks_outlined, size: 20),
+                          ),
                           tooltip: 'Saved Bookmarks',
                           onPressed: _showBookmarksSheet,
                         ),

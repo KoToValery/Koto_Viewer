@@ -823,38 +823,15 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     },
                   ),
 
-                  // Reading Mode (Reflow / Overflow / E-Book)
-                  IconButton(
-                    icon: Icon(
-                      _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
-                      size: 20,
-                      color: _isReflowMode ? _reflowSettings.theme.accentColor : null,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _isReflowMode
-                        ? 'Exit Reading Mode (Code/Log View)'
-                        : 'Reading Mode (Reflow / Overflow / E-Book)',
-                    onPressed: _toggleReflowMode,
-                  ),
-
-                  // If in Reflow Mode, show the two eBook reader controls in top toolbar:
-                  if (_isReflowMode) ...[
+                  // If in Reflow Mode, show Table of Contents
+                  if (_isReflowMode)
                     IconButton(
-                      icon: const Icon(Icons.format_list_bulleted, size: 20),
+                      icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                       tooltip: 'Table of Contents',
                       onPressed: () => _reflowKey.currentState?.showTocSheet(),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.tune, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'Reading Settings',
-                      onPressed: () => _reflowKey.currentState?.showSettingsSheet(),
-                    ),
-                  ],
 
                   // Bookmark button
                   IconButton(
@@ -877,6 +854,31 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     tooltip: 'Bookmarks',
                     onPressed: _showBookmarksSheet,
                   ),
+
+                  // Reading Mode (Reflow / Overflow / E-Book)
+                  IconButton(
+                    icon: Icon(
+                      _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
+                      size: 20,
+                      color: _isReflowMode ? _reflowSettings.theme.accentColor : null,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    tooltip: _isReflowMode
+                        ? 'Exit Reading Mode (Code/Log View)'
+                        : 'Reading Mode (Reflow / Overflow / E-Book)',
+                    onPressed: _toggleReflowMode,
+                  ),
+
+                  // If in Reflow Mode, show Reading Settings
+                  if (_isReflowMode)
+                    IconButton(
+                      icon: const Icon(Icons.tune, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: 'Reading Settings',
+                      onPressed: () => _reflowKey.currentState?.showSettingsSheet(),
+                    ),
 
                   // Raw text controls (only when NOT in Reflow Mode)
                   if (!_isReflowMode) ...[
@@ -971,7 +973,9 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     ),
                   ),
                 )
-              : Column(
+              : Stack(
+                  children: [
+                    Column(
                   children: [
                     if (!_isReflowMode && _isLogFile) _buildLogFilterBar(),
 
@@ -1091,23 +1095,25 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                                 // Transient Zoom Indicator HUD
                                 _buildZoomIndicatorHud(theme),
 
-                                if (_isFullscreen)
-                                  Positioned(
-                                    top: 20,
-                                    right: 20,
-                                    child: FloatingActionButton.small(
-                                      heroTag: 'exit_fullscreen',
-                                      onPressed: _toggleFullscreen,
-                                      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
-                                      child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
                     ),
                   ],
                 ),
+                if (_isFullscreen)
+                  Positioned(
+                    top: 20,
+                    right: 20,
+                    child: FloatingActionButton.small(
+                      heroTag: 'exit_fullscreen',
+                      onPressed: _toggleFullscreen,
+                      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+                      child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+                    ),
+                  ),
+              ],
+            ),
     );
   }
 

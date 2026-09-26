@@ -739,52 +739,64 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                       const SizedBox(height: 14),
                       // Line Spacing
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Line Spacing', style: TextStyle(fontSize: 14, color: textColor)),
-                          SegmentedButton<double>(
-                            segments: const [
-                              ButtonSegment(value: 1.4, label: Text('Tight')),
-                              ButtonSegment(value: 1.65, label: Text('Normal')),
-                              ButtonSegment(value: 1.95, label: Text('Relaxed')),
-                            ],
-                            selected: {_settings.lineHeight},
-                            onSelectionChanged: (set) {
-                              setState(() {
-                                _settings = _settings.copyWith(lineHeight: set.first);
-                              });
-                              if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
-                              setSheetState(() {});
-                            },
+                          Text('Spacing', style: TextStyle(fontSize: 14, color: textColor)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SegmentedButton<double>(
+                              style: const ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              segments: const [
+                                ButtonSegment(value: 1.4, label: Text('Tight', style: TextStyle(fontSize: 11.5))),
+                                ButtonSegment(value: 1.65, label: Text('Normal', style: TextStyle(fontSize: 11.5))),
+                                ButtonSegment(value: 1.95, label: Text('Relaxed', style: TextStyle(fontSize: 11.5))),
+                              ],
+                              selected: {_settings.lineHeight},
+                              onSelectionChanged: (set) {
+                                setState(() {
+                                  _settings = _settings.copyWith(lineHeight: set.first);
+                                });
+                                if (_lastViewportSize != null) _paginateChapter(_lastViewportSize!);
+                                setSheetState(() {});
+                              },
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 14),
                       // Reading Mode
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Page Flow', style: TextStyle(fontSize: 14, color: textColor)),
-                          SegmentedButton<EbookReadingMode>(
-                            segments: const [
-                              ButtonSegment(
-                                value: EbookReadingMode.paginated,
-                                icon: Icon(Icons.auto_stories, size: 16),
-                                label: Text('Pages'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SegmentedButton<EbookReadingMode>(
+                              style: const ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              ButtonSegment(
-                                value: EbookReadingMode.continuous,
-                                icon: Icon(Icons.view_day_outlined, size: 16),
-                                label: Text('Scroll'),
-                              ),
-                            ],
-                            selected: {_settings.readingMode},
-                            onSelectionChanged: (set) {
-                              setState(() {
-                                _settings = _settings.copyWith(readingMode: set.first);
-                              });
-                              setSheetState(() {});
-                            },
+                              segments: const [
+                                ButtonSegment(
+                                  value: EbookReadingMode.paginated,
+                                  icon: Icon(Icons.auto_stories, size: 15),
+                                  label: Text('Pages', style: TextStyle(fontSize: 11.5)),
+                                ),
+                                ButtonSegment(
+                                  value: EbookReadingMode.continuous,
+                                  icon: Icon(Icons.view_day_outlined, size: 15),
+                                  label: Text('Scroll', style: TextStyle(fontSize: 11.5)),
+                                ),
+                              ],
+                              selected: {_settings.readingMode},
+                              onSelectionChanged: (set) {
+                                setState(() {
+                                  _settings = _settings.copyWith(readingMode: set.first);
+                                });
+                                setSheetState(() {});
+                              },
+                            ),
                           ),
                         ],
                       ),
@@ -1182,7 +1194,7 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                         children: [
                           // Search Toggle
                           IconButton(
-                            icon: Icon(_isSearchOpen ? Icons.search_off : Icons.search, size: 20),
+                            icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
                             tooltip: 'Search Book',
                             onPressed: () {
                               setState(() {
@@ -1216,7 +1228,11 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
 
                           // View Bookmarks List
                           IconButton(
-                            icon: const Icon(Icons.bookmarks_outlined, size: 20),
+                            icon: Badge(
+                              isLabelVisible: _bookmarks.isNotEmpty,
+                              label: Text('${_bookmarks.length}'),
+                              child: const Icon(Icons.bookmarks_outlined, size: 20),
+                            ),
                             tooltip: 'Saved Bookmarks',
                             onPressed: _showBookmarksSheet,
                           ),
@@ -1244,11 +1260,18 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                             },
                           ),
 
-                          // Typography & Theme
+                          // Reading Settings
                           IconButton(
-                            icon: const Icon(Icons.text_format_rounded, size: 20),
-                            tooltip: 'Typography & Theme',
+                            icon: const Icon(Icons.tune, size: 20),
+                            tooltip: 'Reading Settings',
                             onPressed: _showTypographySheet,
+                          ),
+
+                          // Fullscreen
+                          IconButton(
+                            icon: const Icon(Icons.fullscreen, size: 20),
+                            tooltip: 'Fullscreen',
+                            onPressed: _toggleControls,
                           ),
 
                           // Book Info
@@ -1342,6 +1365,23 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
 
                                 if (_showControls && !_isSearchOpen)
                                   _buildBottomNavigationBar(currentTheme),
+
+                                if (!_showControls)
+                                  Positioned(
+                                    top: 20,
+                                    right: 20,
+                                    child: SafeArea(
+                                      child: Material(
+                                        color: Colors.black54,
+                                        shape: const CircleBorder(),
+                                        child: IconButton(
+                                          icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
+                                          tooltip: 'Exit Fullscreen',
+                                          onPressed: _toggleControls,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                               ],
                             );
                           },

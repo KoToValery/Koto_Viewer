@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -30,6 +31,16 @@ class ProjectPresentationBar extends StatefulWidget {
 }
 
 class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
+  String? _toastMessage;
+  bool _toastIsHidden = false;
+  Timer? _toastTimer;
+
+  @override
+  void dispose() {
+    _toastTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _toggleCurrentItemHidden(ProjectFileEntry item) async {
     final newHidden = !item.isHidden;
     setState(() {
@@ -43,18 +54,24 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            newHidden
-                ? context.l10n.fileHiddenNotification(item.fileName)
-                : context.l10n.fileIncludedNotification(item.fileName),
-          ),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+      final msg = newHidden
+          ? context.l10n.fileHiddenNotification(item.fileName)
+          : context.l10n.fileIncludedNotification(item.fileName);
+
+      _toastTimer?.cancel();
+      _toastTimer = Timer(const Duration(milliseconds: 2400), () {
+        if (mounted) {
+          setState(() {
+            _toastMessage = null;
+          });
+        }
+      });
+
+      setState(() {
+        _toastMessage = msg;
+        _toastIsHidden = newHidden;
+      });
     }
   }
 
@@ -79,7 +96,7 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
       counterText = '$visiblePos / ${visibleFiles.length}  •  ${widget.projectBundle.projectName}';
     }
 
-    return ClipRRect(
+    final barWidget = ClipRRect(
       borderRadius: BorderRadius.circular(widget.compact ? 12 : 16),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: widget.compact ? 8 : 12, sigmaY: widget.compact ? 8 : 12),
@@ -244,6 +261,63 @@ class _ProjectPresentationBarState extends State<ProjectPresentationBar> {
         ),
       ),
     );
+
+    if (_toastMessage != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xEE0F172A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _toastIsHidden ? Colors.orangeAccent : const Color(0xFF10B981),
+                width: 1.2,
+              ),
+              boxShadow: const [
+                BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2)),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _toastIsHidden ? Icons.visibility_off_rounded : Icons.check_circle_rounded,
+                  size: 15,
+                  color: _toastIsHidden ? Colors.orangeAccent : const Color(0xFF10B981),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _toastMessage!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () {
+                    _toastTimer?.cancel();
+                    setState(() => _toastMessage = null);
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Icons.close, size: 14, color: Colors.white70),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          barWidget,
+        ],
+      );
+    }
+
+    return barWidget;
   }
 
   IconData _getCategoryIcon(ProjectItemCategory category) {

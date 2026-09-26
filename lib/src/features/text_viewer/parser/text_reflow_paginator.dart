@@ -38,7 +38,7 @@ class TextReflowPaginator {
 
     final double availableWidth = math.max(160.0, viewportSize.width - (settings.horizontalPadding * 2));
     // Reserve space for top status area, header padding, and bottom discrete footer
-    final double availableHeight = math.max(200.0, viewportSize.height - 110.0);
+    final double availableHeight = math.max(180.0, viewportSize.height - 120.0);
 
     // Normalize anchor
     int safeAnchorBlock = (anchorBlockIndex ?? 0).clamp(0, chapter.blocks.length - 1);
@@ -465,7 +465,8 @@ class TextReflowPaginator {
       textAlign: settings.textAlign,
     )..layout(maxWidth: availableWidth);
 
-    final pos = painter.getPositionForOffset(Offset(availableWidth, targetHeight - _paragraphSpacing));
+    final double approxLineHeight = settings.fontSize * settings.lineHeight;
+    final pos = painter.getPositionForOffset(Offset(availableWidth, math.max(0.0, targetHeight - _paragraphSpacing - (approxLineHeight * 0.4))));
     int cutOffset = pos.offset;
 
     if (cutOffset <= 0 || cutOffset >= block.text.length) {

@@ -4,7 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/errors/app_error_handler.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import '../../../core/models/pdf_item.dart';
+import '../../../core/services/local_server_service.dart';
 import '../../../core/services/native_share_service.dart';
+import '../../../core/services/recent_files_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'local_network_share_dialog.dart';
 
@@ -138,6 +141,73 @@ class ShareOptionsSheet extends StatelessWidget {
 
     if (!success && context.mounted) {
       _showError(context, 'Error sharing via Cloud');
+    }
+  }
+
+  Future<void> _copyToUploadFolder(BuildContext context) async {
+    Navigator.pop(context);
+
+    try {
+      final sourceFile = File(filePath);
+      if (!await sourceFile.exists()) {
+        if (context.mounted) {
+          _showError(context, context.l10n.fileNotFoundOrInaccessible);
+        }
+        return;
+      }
+
+      final uploadDir = await LocalServerService.getUploadDirectory();
+      final originalName = filePath.split(Platform.pathSeparator).last;
+      var targetFile = File('${uploadDir.path}${Platform.pathSeparator}$originalName');
+
+      if (await targetFile.exists()) {
+        final lastDot = originalName.lastIndexOf('.');
+        final base = lastDot != -1 ? originalName.substring(0, lastDot) : originalName;
+        final ext = lastDot != -1 ? originalName.substring(lastDot) : '';
+        int counter = 1;
+        while (await targetFile.exists()) {
+          targetFile = File('${uploadDir.path}${Platform.pathSeparator}${base}_$counter$ext');
+          counter++;
+        }
+      }
+
+      await sourceFile.copy(targetFile.path);
+
+      try {
+        final fileSize = await targetFile.length();
+        final item = PdfItem.fromPath(targetFile.path, sizeInBytes: fileSize);
+        await RecentFilesService.addRecentFile(item);
+      } catch (e, stack) {
+        AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._copyToUploadFolder.recent');
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Copied to app folder: ${targetFile.path.split(Platform.pathSeparator).last}',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ShareOptionsSheet._copyToUploadFolder');
+      if (context.mounted) {
+        _showError(context, 'Error copying file: $e');
+      }
     }
   }
 
@@ -304,151 +374,166 @@ class ShareOptionsSheet extends StatelessWidget {
         color: theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            width: 36,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-
-          // File card — gradient accent instead of plain text
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  cardColorStart.withValues(alpha: isDark ? 0.18 : 0.08),
-                  cardColorEnd.withValues(alpha: isDark ? 0.12 : 0.05),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [cardColorStart, cardColorEnd],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(fileIcon, color: Colors.white, size: 22),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        sendLabel,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        fileName,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 12.5,
-                          color: theme.textTheme.bodyMedium?.color?.withValues(
-                            alpha: 0.7,
-                          ),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+              ),
+
+              // File card — gradient accent instead of plain text
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      cardColorStart.withValues(alpha: isDark ? 0.18 : 0.08),
+                      cardColorEnd.withValues(alpha: isDark ? 0.12 : 0.05),
                     ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [cardColorStart, cardColorEnd],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(fileIcon, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sendLabel,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            fileName,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 12.5,
+                              color: theme.textTheme.bodyMedium?.color?.withValues(
+                                alpha: 0.7,
+                              ),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Share options — each tinted with a brand color
+              _ShareOptionTile(
+                icon: Icons.email_rounded,
+                color: AppTheme.primaryColor,
+                title: 'Email',
+                subtitle: 'Gmail, Outlook and more',
+                isDark: isDark,
+                onTap: () => _shareViaEmail(context),
+              ),
+
+              const SizedBox(height: 10),
+
+              _ShareOptionTile(
+                icon: Icons.chat_bubble_rounded,
+                color: AppTheme.accentColor,
+                title: 'Message',
+                subtitle: 'Viber, WhatsApp, Messenger, Telegram',
+                isDark: isDark,
+                onTap: () => _shareViaMessaging(context),
+              ),
+
+              const SizedBox(height: 10),
+
+              _ShareOptionTile(
+                icon: Icons.cloud_upload_rounded,
+                color: AppTheme.secondaryColor,
+                title: 'Cloud',
+                subtitle: 'Google Drive, Dropbox, OneDrive',
+                isDark: isDark,
+                onTap: () => _shareViaCloud(context),
+              ),
+
+              const SizedBox(height: 10),
+
+              _ShareOptionTile(
+                icon: Icons.wifi_rounded,
+                color: const Color(0xFF9333EA), // Purple color for local network
+                title: 'Local Network',
+                subtitle: 'Share with QR code over WiFi',
+                isDark: isDark,
+                onTap: () => _shareViaLocalNetwork(context),
+              ),
+
+              const SizedBox(height: 10),
+
+              _ShareOptionTile(
+                icon: Icons.folder_copy_rounded,
+                color: const Color(0xFF0D9488), // Teal color for local copy
+                title: 'Save to App',
+                subtitle: 'Copy locally',
+                isDark: isDark,
+                onTap: () => _copyToUploadFolder(context),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Show all — text button, low visual weight on purpose
+              TextButton.icon(
+                onPressed: () => _shareWithAll(context),
+                icon: Icon(
+                  Icons.apps_rounded,
+                  size: 18,
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                ),
+                label: Text(
+                  'All Options',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.textTheme.bodyMedium?.color?.withValues(
+                      alpha: 0.6,
+                    ),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Share options — each tinted with a brand color
-          _ShareOptionTile(
-            icon: Icons.email_rounded,
-            color: AppTheme.primaryColor,
-            title: 'Email',
-            subtitle: 'Gmail, Outlook and more',
-            isDark: isDark,
-            onTap: () => _shareViaEmail(context),
-          ),
-
-          const SizedBox(height: 10),
-
-          _ShareOptionTile(
-            icon: Icons.chat_bubble_rounded,
-            color: AppTheme.accentColor,
-            title: 'Message',
-            subtitle: 'Viber, WhatsApp, Messenger, Telegram',
-            isDark: isDark,
-            onTap: () => _shareViaMessaging(context),
-          ),
-
-          const SizedBox(height: 10),
-
-          _ShareOptionTile(
-            icon: Icons.cloud_upload_rounded,
-            color: AppTheme.secondaryColor,
-            title: 'Cloud',
-            subtitle: 'Google Drive, Dropbox, OneDrive',
-            isDark: isDark,
-            onTap: () => _shareViaCloud(context),
-          ),
-
-          const SizedBox(height: 10),
-
-          _ShareOptionTile(
-            icon: Icons.wifi_rounded,
-            color: const Color(0xFF9333EA), // Purple color for local network
-            title: 'Local Network',
-            subtitle: 'Share with QR code over WiFi',
-            isDark: isDark,
-            onTap: () => _shareViaLocalNetwork(context),
-          ),
-
-          const SizedBox(height: 8),
-
-          // Show all — text button, low visual weight on purpose
-          TextButton.icon(
-            onPressed: () => _shareWithAll(context),
-            icon: Icon(
-              Icons.apps_rounded,
-              size: 18,
-              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
-            ),
-            label: Text(
-              'All Options',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withValues(
-                  alpha: 0.6,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  minimumSize: const Size(double.infinity, 0),
                 ),
-                fontWeight: FontWeight.w500,
               ),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              minimumSize: const Size(double.infinity, 0),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

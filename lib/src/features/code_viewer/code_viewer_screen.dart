@@ -1,15 +1,72 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:flutter_highlight/flutter_highlight.dart';
+import 'package:highlight/highlight.dart' show highlight, Node;
 import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import 'package:flutter_highlight/themes/atom-one-light.dart';
 import 'package:xml/xml.dart';
 import '../../core/services/universal_encoding_service.dart';
 import '../../core/l10n/l10n_extensions.dart';
 import '../../core/errors/app_error_handler.dart';
+
+/// Helper to parse highlighted code into line-by-line TextSpan groups.
+/// This enables 100% synchronized row-by-row rendering with line numbers,
+/// guaranteeing that line numbers NEVER desync, even with Word Wrap enabled.
+List<List<TextSpan>> _parseHighlightedLines({
+  required String source,
+  required String? language,
+  required Map<String, TextStyle> theme,
+}) {
+  final result = highlight.parse(
+    source,
+    language: (language != null && language != 'plaintext') ? language : null,
+    autoDetection: language == null || language.isEmpty,
+  );
+  final nodes = result.nodes ?? [];
+
+  List<List<TextSpan>> lines = [[]];
+
+  void addTextSpan(String text, TextStyle? style) {
+    if (text.isEmpty) return;
+    // Replace tabs with 4 spaces for consistent code indentation
+    final cleanText = text.replaceAll('\t', '    ');
+    final parts = cleanText.split('\n');
+    for (int i = 0; i < parts.length; i++) {
+      if (i > 0) {
+        lines.add([]);
+      }
+      if (parts[i].isNotEmpty) {
+        lines.last.add(TextSpan(text: parts[i], style: style));
+      }
+    }
+  }
+
+  void traverse(Node node, TextStyle? inheritedStyle) {
+    TextStyle? currentStyle = inheritedStyle;
+    if (node.className != null && theme.containsKey(node.className!)) {
+      currentStyle = currentStyle != null
+          ? currentStyle.merge(theme[node.className!])
+          : theme[node.className!];
+    }
+
+    if (node.value != null) {
+      addTextSpan(node.value!, currentStyle);
+    } else if (node.children != null) {
+      for (final child in node.children!) {
+        traverse(child, currentStyle);
+      }
+    }
+  }
+
+  for (final node in nodes) {
+    traverse(node, null);
+  }
+
+  return lines;
+}
 
 class CodeViewerScreen extends StatefulWidget {
   final String filePath;
@@ -40,6 +97,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _verticalController = ScrollController();
+  final ScrollController _gutterScrollController = ScrollController();
   final ScrollController _horizontalController = ScrollController();
 
   List<int> _searchMatches = [];
@@ -48,6 +106,9 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
   late String _language;
   bool _isLargeFile = false;
   bool _showAsPlainText = false;
+
+  List<List<TextSpan>> _lineSpans = [];
+  double _maxLineWidth = 600.0;
   
   bool get _isJsonOrXml => _language == 'json' || _language == 'xml';
   bool get _isEnv => _language == 'bash' && widget.filePath.toLowerCase().endsWith('.env');
@@ -63,21 +124,18 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
         : fileName.split(Platform.pathSeparator).last;
     final nameLower = name.toLowerCase();
 
-    // --- Filename-based detection (no extension) ---
-    // Dockerfile, Dockerfile.prod, Dockerfile.dev, etc.
+    // Filename-based detection (no extension)
     if (nameLower == 'dockerfile' ||
         nameLower.startsWith('dockerfile.') ||
         nameLower.endsWith('.dockerfile')) {
       return 'dockerfile';
     }
-    // docker-compose files
     if (nameLower == 'docker-compose.yml' ||
         nameLower == 'docker-compose.yaml' ||
         nameLower.startsWith('docker-compose.') &&
             (nameLower.endsWith('.yml') || nameLower.endsWith('.yaml'))) {
       return 'yaml';
     }
-    // .dockerignore
     if (nameLower == '.dockerignore') {
       return 'bash';
     }
@@ -120,15 +178,37 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
   void initState() {
     super.initState();
     _language = _detectLanguage(widget.filePath);
+    _verticalController.addListener(_syncGutterScroll);
     _loadFile();
   }
 
   @override
   void dispose() {
+    _verticalController.removeListener(_syncGutterScroll);
     _searchController.dispose();
     _verticalController.dispose();
+    _gutterScrollController.dispose();
     _horizontalController.dispose();
     super.dispose();
+  }
+
+  void _syncGutterScroll() {
+    if (!_wordWrap && _gutterScrollController.hasClients && _verticalController.hasClients) {
+      if ((_gutterScrollController.offset - _verticalController.offset).abs() > 0.5) {
+        _gutterScrollController.jumpTo(_verticalController.offset);
+      }
+    }
+  }
+
+  double get _lineHeight {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: 'Ag',
+        style: TextStyle(fontFamily: 'monospace', fontSize: _fontSize, height: 1.5),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    return painter.preferredLineHeight;
   }
 
   Future<void> _loadFile() async {
@@ -208,16 +288,83 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
       content = lines.join('\n');
     }
 
-    setState(() {
-      _displayContent = content;
-      _lineCount = _displayContent.split('\n').length;
-      _searchMatches.clear();
-      _currentMatchIndex = -1;
-    });
-    
+    _displayContent = content;
+    _lineCount = _displayContent.split('\n').length;
+    _searchMatches.clear();
+    _currentMatchIndex = -1;
+
+    _updateLineSpans();
+
     if (_searchController.text.isNotEmpty) {
       _performSearch(_searchController.text);
     }
+  }
+
+  void _updateLineSpans() {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = isDark ? atomOneDarkTheme : atomOneLightTheme;
+
+    if (_showAsPlainText || (_isLargeFile && !_showAsPlainText)) {
+      final rawLines = _displayContent.split('\n');
+      _lineSpans = rawLines.map((l) => [TextSpan(text: l.isEmpty ? ' ' : l)]).toList();
+    } else {
+      try {
+        _lineSpans = _parseHighlightedLines(
+          source: _displayContent,
+          language: _language,
+          theme: theme,
+        );
+      } catch (e, stack) {
+        AppErrorHandler.recordError(e, stack, context: 'CodeViewer._parseHighlightedLines');
+        final rawLines = _displayContent.split('\n');
+        _lineSpans = rawLines.map((l) => [TextSpan(text: l.isEmpty ? ' ' : l)]).toList();
+      }
+    }
+
+    if (_lineSpans.isEmpty) {
+      _lineSpans = [[const TextSpan(text: ' ')]];
+    }
+    _lineCount = _lineSpans.length;
+
+    _calculateMaxLineWidth();
+    setState(() {});
+  }
+
+  void _calculateMaxLineWidth() {
+    if (_lineSpans.isEmpty) {
+      _maxLineWidth = 600.0;
+      return;
+    }
+
+    int maxIndex = 0;
+    int maxLen = 0;
+    for (int i = 0; i < _lineSpans.length; i++) {
+      int len = 0;
+      for (final span in _lineSpans[i]) {
+        len += span.text?.length ?? 0;
+      }
+      if (len > maxLen) {
+        maxLen = len;
+        maxIndex = i;
+      }
+    }
+
+    final longestSpans = _lineSpans[maxIndex];
+    final defaultCodeStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: _fontSize,
+      height: 1.5,
+    );
+
+    final painter = TextPainter(
+      text: TextSpan(
+        style: defaultCodeStyle,
+        children: longestSpans.isEmpty ? const [TextSpan(text: ' ')] : longestSpans,
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    _maxLineWidth = math.max(600.0, painter.width + 64.0);
   }
 
   void _performSearch(String query) {
@@ -253,16 +400,13 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
   void _scrollToMatch() {
     if (_searchMatches.isEmpty || _currentMatchIndex < 0) return;
     final lineIndex = _searchMatches[_currentMatchIndex];
-    
-    // Estimate scroll position (rough estimation based on font size + padding)
-    final estimatedLineHeight = _fontSize * 1.5; // Rough estimate
-    final targetOffset = lineIndex * estimatedLineHeight;
-    
+    final targetOffset = lineIndex * _lineHeight;
+
     if (_verticalController.hasClients) {
       final maxScroll = _verticalController.position.maxScrollExtent;
       _verticalController.animateTo(
         targetOffset.clamp(0.0, maxScroll),
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
       );
     }
@@ -301,96 +445,17 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  Widget _buildToolbar() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.search),
-          onPressed: () {
-            setState(() {
-              _isSearchOpen = !_isSearchOpen;
-              if (!_isSearchOpen) {
-                _searchController.clear();
-                _searchMatches.clear();
-              }
-            });
-          },
-          tooltip: 'Search',
-        ),
-        IconButton(
-          icon: Icon(_wordWrap ? Icons.wrap_text : Icons.subject),
-          onPressed: () => setState(() => _wordWrap = !_wordWrap),
-          tooltip: 'Toggle Word Wrap',
-        ),
-        IconButton(
-          icon: const Icon(Icons.copy),
-          onPressed: _copyContent,
-          tooltip: 'Copy',
-        ),
-        IconButton(
-          icon: const Icon(Icons.share),
-          onPressed: _shareContent,
-          tooltip: 'Share',
-        ),
-        PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'format') {
-              setState(() {
-                _isFormatted = !_isFormatted;
-                _updateDisplayContent();
-              });
-            } else if (value == 'secrets') {
-              setState(() {
-                _hideSecrets = !_hideSecrets;
-                _updateDisplayContent();
-              });
-            } else if (value == 'text_mode') {
-              setState(() {
-                _showAsPlainText = !_showAsPlainText;
-              });
-            }
-          },
-          itemBuilder: (context) => [
-            if (_isJsonOrXml)
-              PopupMenuItem(
-                value: 'format',
-                child: Text(_isFormatted ? 'Show Raw' : 'Pretty Print'),
-              ),
-            if (_isEnv)
-              PopupMenuItem(
-                value: 'secrets',
-                child: Text(_hideSecrets ? 'Show Secrets' : 'Hide Secrets'),
-              ),
-            if (_isLargeFile)
-              PopupMenuItem(
-                value: 'text_mode',
-                child: Text(_showAsPlainText ? 'Use Syntax Highlighting' : 'View as Plain Text'),
-              ),
-            PopupMenuItem(
-              value: 'font',
-              child: StatefulBuilder(
-                builder: (context, setPopupState) => Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Font Size: ${_fontSize.toStringAsFixed(1)}'),
-                    Slider(
-                      value: _fontSize,
-                      min: 10.0,
-                      max: 20.0,
-                      onChanged: (v) {
-                        setPopupState(() => _fontSize = v);
-                        setState(() => _fontSize = v);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
+  Color? _getLineHighlightColor(int lineIndex, bool isDark) {
+    if (_searchMatches.isEmpty) return null;
+    if (_currentMatchIndex >= 0 &&
+        _currentMatchIndex < _searchMatches.length &&
+        _searchMatches[_currentMatchIndex] == lineIndex) {
+      return Colors.orange.withValues(alpha: isDark ? 0.35 : 0.25);
+    }
+    if (_searchMatches.contains(lineIndex)) {
+      return Colors.yellow.withValues(alpha: isDark ? 0.20 : 0.15);
+    }
+    return null;
   }
 
   Widget _buildSearchBar() {
@@ -429,7 +494,7 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(BoxConstraints constraints) {
     if (_isLargeFile && !_showAsPlainText) {
       return Center(
         child: Column(
@@ -441,11 +506,21 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
             const Text('Syntax highlighting might cause performance issues.'),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => setState(() => _showAsPlainText = true),
+              onPressed: () {
+                setState(() {
+                  _showAsPlainText = true;
+                  _updateLineSpans();
+                });
+              },
               child: const Text('View as Plain Text'),
             ),
             TextButton(
-              onPressed: () => setState(() => _isLargeFile = false),
+              onPressed: () {
+                setState(() {
+                  _isLargeFile = false;
+                  _updateLineSpans();
+                });
+              },
               child: const Text('Continue anyway'),
             ),
           ],
@@ -456,88 +531,310 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = isDark ? atomOneDarkTheme : atomOneLightTheme;
 
-    final textStyle = TextStyle(
+    final defaultCodeStyle = TextStyle(
       fontFamily: 'monospace',
       fontSize: _fontSize,
       height: 1.5,
+      color: theme['root']?.color ?? (isDark ? Colors.white : Colors.black87),
     );
 
-    Widget viewer;
-
-    if (_showAsPlainText) {
-      viewer = Container(
-        width: _wordWrap ? double.infinity : null,
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          _displayContent,
-          style: textStyle.copyWith(color: isDark ? Colors.white : Colors.black),
-        ),
-      );
-    } else {
-      viewer = HighlightView(
-        _displayContent,
-        language: _language,
-        theme: theme,
-        padding: const EdgeInsets.all(16),
-        textStyle: textStyle,
-      );
-    }
-
-    // Overlay search highlights
-    Widget searchOverlay = const SizedBox.shrink();
-    if (_searchMatches.isNotEmpty) {
-      searchOverlay = Positioned.fill(
-        child: CustomPaint(
-          painter: _SearchHighlightPainter(
-            matches: _searchMatches,
-            currentMatch: _searchMatches[_currentMatchIndex],
-            lineHeight: _fontSize * 1.5,
-            paddingTop: 16.0,
-          ),
-        ),
-      );
-    }
-
-    Widget content = Stack(
-      children: [
-        viewer,
-        if (_searchMatches.isNotEmpty) searchOverlay,
-      ],
+    final gutterStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: _fontSize * 0.9,
+      height: 1.5,
+      color: isDark ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF),
+      fontWeight: FontWeight.w500,
     );
+
+    final gutterBg = isDark ? const Color(0xFF21252B) : const Color(0xFFF3F4F6);
+    final dividerColor = isDark ? Colors.white10 : Colors.black12;
+
+    final digits = math.max(2, _lineCount.toString().length);
+    final gutterWidth = digits * (_fontSize * 0.65) + 20.0;
+    final lineHeight = _lineHeight;
 
     if (_wordWrap) {
-      return SingleChildScrollView(
+      // WORD WRAP ENABLED:
+      // Row-by-row synchronized line architecture.
+      // Gutter cell and wrapped code are in the exact same Row(crossAxisAlignment: CrossAxisAlignment.start).
+      // Line numbers NEVER desync, and stay pinned on the left edge.
+      return ListView.builder(
         controller: _verticalController,
-        child: content,
+        itemCount: _lineSpans.length,
+        padding: EdgeInsets.zero,
+        itemBuilder: (context, i) {
+          final highlight = _getLineHighlightColor(i, isDark);
+          return Container(
+            color: highlight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: gutterWidth,
+                  decoration: BoxDecoration(
+                    color: gutterBg,
+                    border: Border(right: BorderSide(color: dividerColor)),
+                  ),
+                  padding: const EdgeInsets.only(right: 8),
+                  alignment: Alignment.topRight,
+                  child: Text(
+                    '${i + 1}',
+                    style: gutterStyle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text.rich(
+                      TextSpan(
+                        style: defaultCodeStyle,
+                        children: _lineSpans[i].isEmpty ? const [TextSpan(text: ' ')] : _lineSpans[i],
+                      ),
+                      softWrap: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       );
     } else {
-      return SingleChildScrollView(
-        controller: _verticalController,
-        child: SingleChildScrollView(
-          controller: _horizontalController,
-          scrollDirection: Axis.horizontal,
-          child: content,
-        ),
+      // WORD WRAP DISABLED:
+      // Pinned gutter on the left (never scrolls horizontally, line numbers NEVER hidden).
+      // Code scrolls horizontally with _horizontalController.
+      // Both columns share identical line count and itemExtent: lineHeight for 100% sync.
+      final codeAvailableWidth = math.max(constraints.maxWidth - gutterWidth, _maxLineWidth);
+
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Pinned Gutter (never moves horizontally)
+          Container(
+            width: gutterWidth,
+            decoration: BoxDecoration(
+              color: gutterBg,
+              border: Border(right: BorderSide(color: dividerColor)),
+            ),
+            child: ListView.builder(
+              controller: _gutterScrollController,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _lineSpans.length,
+              itemExtent: lineHeight,
+              padding: EdgeInsets.zero,
+              itemBuilder: (context, i) {
+                final highlight = _getLineHighlightColor(i, isDark);
+                return Container(
+                  height: lineHeight,
+                  color: highlight,
+                  padding: const EdgeInsets.only(right: 8),
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${i + 1}',
+                    style: gutterStyle,
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Code area (scrolls horizontally)
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              controller: _horizontalController,
+              child: SizedBox(
+                width: codeAvailableWidth,
+                child: ListView.builder(
+                  controller: _verticalController,
+                  itemCount: _lineSpans.length,
+                  itemExtent: lineHeight,
+                  padding: EdgeInsets.zero,
+                  itemBuilder: (context, i) {
+                    final highlight = _getLineHighlightColor(i, isDark);
+                    return Container(
+                      height: lineHeight,
+                      color: highlight,
+                      padding: const EdgeInsets.only(left: 8, right: 16),
+                      alignment: Alignment.centerLeft,
+                      child: Text.rich(
+                        TextSpan(
+                          style: defaultCodeStyle,
+                          children: _lineSpans[i].isEmpty ? const [TextSpan(text: ' ')] : _lineSpans[i],
+                        ),
+                        softWrap: false,
+                        maxLines: 1,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(true),
         ),
+        // Row 1: File Name Only
         title: Text(
           _fileName,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        actions: [
-          _buildToolbar(),
-        ],
+        actions: const [],
+        // Row 2: Universal Controls Bar (horizontally scrollable, no overflow)
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF21252B) : Theme.of(context).colorScheme.surface,
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.black12,
+                ),
+              ),
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  // Search Toggle
+                  IconButton(
+                    icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+                    tooltip: _isSearchOpen ? 'Close Search' : 'Search',
+                    onPressed: () {
+                      setState(() {
+                        _isSearchOpen = !_isSearchOpen;
+                        if (!_isSearchOpen) {
+                          _searchController.clear();
+                          _searchMatches.clear();
+                          _currentMatchIndex = -1;
+                        }
+                      });
+                    },
+                  ),
+
+                  // Word Wrap Toggle (Fit to Screen)
+                  IconButton(
+                    icon: Icon(_wordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
+                    color: _wordWrap ? Theme.of(context).colorScheme.primary : null,
+                    tooltip: _wordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
+                    onPressed: () => setState(() => _wordWrap = !_wordWrap),
+                  ),
+
+                  // Copy All
+                  IconButton(
+                    icon: const Icon(Icons.copy_all_outlined, size: 20),
+                    tooltip: 'Copy All',
+                    onPressed: _copyContent,
+                  ),
+
+                  // Share
+                  IconButton(
+                    icon: const Icon(Icons.share_outlined, size: 20),
+                    tooltip: 'Share',
+                    onPressed: _shareContent,
+                  ),
+
+                  // If JSON / XML: Pretty Print / Format Toggle
+                  if (_isJsonOrXml)
+                    IconButton(
+                      icon: Icon(_isFormatted ? Icons.code_off : Icons.code, size: 20),
+                      color: _isFormatted ? Theme.of(context).colorScheme.primary : null,
+                      tooltip: _isFormatted ? 'Show Raw' : 'Pretty Print',
+                      onPressed: () {
+                        setState(() {
+                          _isFormatted = !_isFormatted;
+                          _updateDisplayContent();
+                        });
+                      },
+                    ),
+
+                  // If .env: Hide/Show Secrets Toggle
+                  if (_isEnv)
+                    IconButton(
+                      icon: Icon(_hideSecrets ? Icons.visibility_off : Icons.visibility, size: 20),
+                      color: _hideSecrets ? Theme.of(context).colorScheme.primary : null,
+                      tooltip: _hideSecrets ? 'Show Secrets' : 'Hide Secrets',
+                      onPressed: () {
+                        setState(() {
+                          _hideSecrets = !_hideSecrets;
+                          _updateDisplayContent();
+                        });
+                      },
+                    ),
+
+                  // Plain Text vs Syntax Highlighting (for large files)
+                  if (_isLargeFile)
+                    IconButton(
+                      icon: Icon(_showAsPlainText ? Icons.text_fields : Icons.code, size: 20),
+                      tooltip: _showAsPlainText ? 'Enable Syntax Highlighting' : 'View as Plain Text',
+                      onPressed: () {
+                        setState(() {
+                          _showAsPlainText = !_showAsPlainText;
+                          _updateLineSpans();
+                        });
+                      },
+                    ),
+
+                  // Font Size Slider Menu
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.format_size, size: 20),
+                    tooltip: 'Font Size (${_fontSize.toStringAsFixed(1)})',
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        enabled: false,
+                        child: StatefulBuilder(
+                          builder: (context, setPopupState) => Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Font Size: ${_fontSize.toStringAsFixed(1)}',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Slider(
+                                value: _fontSize,
+                                min: 10.0,
+                                max: 22.0,
+                                divisions: 12,
+                                onChanged: (v) {
+                                  setPopupState(() => _fontSize = v);
+                                  setState(() {
+                                    _fontSize = v;
+                                    _updateLineSpans();
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -548,12 +845,14 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                     if (_isSearchOpen) _buildSearchBar(),
                     Expanded(
                       child: Container(
-                        color: Theme.of(context).brightness == Brightness.dark
+                        color: isDark
                             ? const Color(0xFF282C34) // atomOneDark bg
                             : const Color(0xFFFAFAFA), // atomOneLight bg
                         width: double.infinity,
                         height: double.infinity,
-                        child: _buildContent(),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) => _buildContent(constraints),
+                        ),
                       ),
                     ),
                     Container(
@@ -595,46 +894,5 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
                   ],
                 ),
     );
-  }
-}
-
-class _SearchHighlightPainter extends CustomPainter {
-  final List<int> matches;
-  final int currentMatch;
-  final double lineHeight;
-  final double paddingTop;
-
-  _SearchHighlightPainter({
-    required this.matches,
-    required this.currentMatch,
-    required this.lineHeight,
-    required this.paddingTop,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    for (final match in matches) {
-      if (match == currentMatch) {
-        paint.color = Colors.orange.withValues(alpha: 0.5);
-      } else {
-        paint.color = Colors.yellow.withValues(alpha: 0.3);
-      }
-
-      final top = paddingTop + (match * lineHeight);
-      canvas.drawRect(
-        Rect.fromLTWH(0, top, size.width, lineHeight),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SearchHighlightPainter oldDelegate) {
-    return oldDelegate.matches != matches ||
-        oldDelegate.currentMatch != currentMatch ||
-        oldDelegate.lineHeight != lineHeight ||
-        oldDelegate.paddingTop != paddingTop;
   }
 }
