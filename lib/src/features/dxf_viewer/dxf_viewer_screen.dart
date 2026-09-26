@@ -2385,9 +2385,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                   // Presentation Mode Switcher Bar (shown when opened from a project bundle)
                   if (widget.projectBundle != null)
                     Positioned(
-                      bottom: 24,
-                      left: 0,
-                      right: 0,
+                      bottom: 12,
+                      left: 12,
+                      right: 68,
                       child: Center(child: _buildProjectSwitchBar()),
                     ),
                 ],
@@ -2405,6 +2405,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       currentIndex: widget.currentProjectIndex ?? 0,
       onSwitchProjectItem: widget.onSwitchProjectItem,
       onExit: () => Navigator.of(context).pop(),
+      compact: true,
     );
   }
 

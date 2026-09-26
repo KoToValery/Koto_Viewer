@@ -44,11 +44,27 @@ class PdfViewerScreen extends StatefulWidget {
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
 }
 
+/// Custom scroll physics for single-page mode that requires a slightly higher
+/// motion threshold before triggering a page swipe, allowing two-finger pinch-to-zoom
+/// gestures to register cleanly without accidental page flips.
+class SinglePageSwipeScrollPhysics extends PageScrollPhysics {
+  const SinglePageSwipeScrollPhysics({super.parent});
+
+  @override
+  SinglePageSwipeScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return SinglePageSwipeScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  double? get dragStartDistanceMotionThreshold => 28.0;
+}
+
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfController = PdfViewerController();
   late final PdfDocumentRef _documentRef;
   late PageController _singlePageController;
 
+  int _activePointers = 0;
   bool _isSinglePageMode = true;
   bool _isDarkModeView = false;
   int _pageCount = 0;
@@ -1097,62 +1113,87 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           });
         }
 
-        return PageView.builder(
-          controller: _singlePageController,
-          itemCount: document.pages.length,
-          physics: _currentZoom > 1.05
-              ? const NeverScrollableScrollPhysics()
-              : const PageScrollPhysics(),
-          onPageChanged: (index) {
-            final newPage = index + 1;
-            if (_currentPage == newPage) return;
-            final prevPage = _currentPage;
-            _pageTransformControllers[prevPage]?.value = Matrix4.identity();
-            setState(() {
-              _currentPage = newPage;
-              _currentZoom = 1.0;
-            });
-            _saveReadingProgress();
-            _checkBookmarkStatus();
+        return Listener(
+          onPointerDown: (event) {
+            _activePointers++;
+            if (_activePointers >= 2) {
+              if (_singlePageController.hasClients) {
+                // If a horizontal page drag was in progress, stop it immediately
+                // so multi-finger gestures (pinch-to-zoom) get full priority.
+                _singlePageController.position.hold(() {});
+              }
+              if (mounted) setState(() {});
+            }
           },
-          itemBuilder: (context, index) {
-            final pageNum = index + 1;
-            return PdfSinglePageItem(
-              key: ValueKey('pdf_page_$pageNum'),
-              document: document,
-              pageNumber: pageNum,
-              onZoomChanged: (zoom) {
-                if (_currentPage == pageNum && mounted) {
-                  setState(() {
-                    _currentZoom = zoom;
-                  });
-                }
-              },
-              onLeftTap: () {
-                if (_currentPage > 1 && _singlePageController.hasClients) {
-                  _singlePageController.previousPage(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                  );
-                }
-              },
-              onRightTap: () {
-                if (_currentPage < _pageCount && _singlePageController.hasClients) {
-                  _singlePageController.nextPage(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                  );
-                }
-              },
-              onCenterTap: _toggleFullscreen,
-              onControllerCreated: (controller) {
-                _pageTransformControllers[pageNum] = controller;
-              },
-              onControllerDisposed: () {
-                _pageTransformControllers.remove(pageNum);
-              },
-            );
+          onPointerUp: (event) {
+            _activePointers = math.max(0, _activePointers - 1);
+            if (_activePointers < 2 && mounted) {
+              setState(() {});
+            }
           },
+          onPointerCancel: (event) {
+            _activePointers = math.max(0, _activePointers - 1);
+            if (_activePointers < 2 && mounted) {
+              setState(() {});
+            }
+          },
+          child: PageView.builder(
+            controller: _singlePageController,
+            itemCount: document.pages.length,
+            physics: (_activePointers >= 2 || _currentZoom > 1.05)
+                ? const NeverScrollableScrollPhysics()
+                : const SinglePageSwipeScrollPhysics(),
+            onPageChanged: (index) {
+              final newPage = index + 1;
+              if (_currentPage == newPage) return;
+              final prevPage = _currentPage;
+              _pageTransformControllers[prevPage]?.value = Matrix4.identity();
+              setState(() {
+                _currentPage = newPage;
+                _currentZoom = 1.0;
+              });
+              _saveReadingProgress();
+              _checkBookmarkStatus();
+            },
+            itemBuilder: (context, index) {
+              final pageNum = index + 1;
+              return PdfSinglePageItem(
+                key: ValueKey('pdf_page_$pageNum'),
+                document: document,
+                pageNumber: pageNum,
+                onZoomChanged: (zoom) {
+                  if (_currentPage == pageNum && mounted) {
+                    setState(() {
+                      _currentZoom = zoom;
+                    });
+                  }
+                },
+                onLeftTap: () {
+                  if (_currentPage > 1 && _singlePageController.hasClients) {
+                    _singlePageController.previousPage(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
+                },
+                onRightTap: () {
+                  if (_currentPage < _pageCount && _singlePageController.hasClients) {
+                    _singlePageController.nextPage(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
+                },
+                onCenterTap: _toggleFullscreen,
+                onControllerCreated: (controller) {
+                  _pageTransformControllers[pageNum] = controller;
+                },
+                onControllerDisposed: () {
+                  _pageTransformControllers.remove(pageNum);
+                },
+              );
+            },
+          ),
         );
       },
     );
@@ -1351,6 +1392,7 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
   late final AnimationController _animController;
   Animation<Matrix4>? _matrixAnimation;
 
+  int _pointerCount = 0;
   bool _panEnabled = false;
   double _currentScale = 1.0;
   TapDownDetails? _doubleTapDetails;
@@ -1389,7 +1431,7 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
   void _onTransformChanged() {
     final scale = _transformController.value.getMaxScaleOnAxis();
     _currentScale = scale;
-    final shouldEnablePan = scale > 1.05;
+    final shouldEnablePan = scale > 1.05 || _pointerCount >= 2;
     if (shouldEnablePan != _panEnabled) {
       setState(() {
         _panEnabled = shouldEnablePan;
@@ -1468,20 +1510,50 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onDoubleTapDown: _onDoubleTapDown,
-      onDoubleTap: _onDoubleTap,
-      onTapUp: _onTapUp,
+    final isZoomed = _currentScale > 1.05;
+
+    return Listener(
+      onPointerDown: (_) {
+        _pointerCount++;
+        final shouldPan = _currentScale > 1.05 || _pointerCount >= 2;
+        if (shouldPan != _panEnabled) {
+          setState(() {
+            _panEnabled = shouldPan;
+          });
+        }
+      },
+      onPointerUp: (_) {
+        _pointerCount = math.max(0, _pointerCount - 1);
+        final shouldPan = _currentScale > 1.05 || _pointerCount >= 2;
+        if (shouldPan != _panEnabled) {
+          setState(() {
+            _panEnabled = shouldPan;
+          });
+        }
+      },
+      onPointerCancel: (_) {
+        _pointerCount = math.max(0, _pointerCount - 1);
+        final shouldPan = _currentScale > 1.05 || _pointerCount >= 2;
+        if (shouldPan != _panEnabled) {
+          setState(() {
+            _panEnabled = shouldPan;
+          });
+        }
+      },
       child: InteractiveViewer(
         transformationController: _transformController,
         panEnabled: _panEnabled,
         scaleEnabled: true,
         minScale: 1.0,
         maxScale: 6.0,
-        boundaryMargin: const EdgeInsets.all(80.0),
-        child: Center(
-          child: PdfPageView(
+        boundaryMargin: isZoomed ? const EdgeInsets.all(80.0) : EdgeInsets.zero,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onDoubleTapDown: _onDoubleTapDown,
+          onDoubleTap: _onDoubleTap,
+          onTapUp: _onTapUp,
+          child: Center(
+            child: PdfPageView(
             key: ValueKey('pdf_pv_${widget.pageNumber}'),
             document: widget.document,
             pageNumber: widget.pageNumber,
@@ -1531,7 +1603,8 @@ class PdfSinglePageItemState extends State<PdfSinglePageItem> with SingleTickerP
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 

@@ -2,10 +2,13 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/core/models/pdf_item.dart';
 import 'package:kotoview/src/core/services/project_bundle_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('ProjectBundleService Category Classification Tests', () {
     test('classifies video formats correctly', () {
       expect(ProjectBundleService.classifyCategory('walkthrough.mp4'), ProjectItemCategory.video);
@@ -59,6 +62,7 @@ void main() {
     late String zipPath;
 
     setUp(() async {
+      SharedPreferences.setMockInitialValues({});
       tempDir = await Directory.systemTemp.createTemp('koto_test_project_');
       zipPath = '${tempDir.path}${Platform.pathSeparator}Villa_Koto.zip';
 
@@ -106,6 +110,17 @@ void main() {
       final images = info.getFilesByCategory(ProjectItemCategory.image);
       expect(images.length, 1);
       expect(images.first.fileName, '03_FacadeRender.jpg');
+
+      // Verify files are initially grouped by category:
+      // Videos (Flythrough) -> Drawings (FloorPlan) -> 3D Models (Model) -> Images (FacadeRender)
+      expect(info.files[0].fileName, '02_Flythrough.mp4');
+      expect(info.files[0].category, ProjectItemCategory.video);
+      expect(info.files[1].fileName, '01_FloorPlan.pdf');
+      expect(info.files[1].category, ProjectItemCategory.drawing);
+      expect(info.files[2].fileName, '04_Model.glb');
+      expect(info.files[2].category, ProjectItemCategory.model3d);
+      expect(info.files[3].fileName, '03_FacadeRender.jpg');
+      expect(info.files[3].category, ProjectItemCategory.image);
     });
 
     test('extracts single file on-demand', () async {
@@ -113,6 +128,39 @@ void main() {
       final file = File(extracted);
       expect(await file.exists(), isTrue);
       expect(file.path.endsWith('02_Flythrough.mp4'), isTrue);
+    });
+
+    test('persists and restores custom presentation order across inspectBundle calls', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      // First inspect: default category order
+      final info1 = await ProjectBundleService.inspectBundle(zipPath);
+      expect(info1.files.first.fileName, '02_Flythrough.mp4');
+
+      // User reorders: puts FacadeRender first, then Model, then FloorPlan, then Flythrough
+      final customOrder = [
+        '03_FacadeRender.jpg',
+        '04_Model.glb',
+        '01_FloorPlan.pdf',
+        '02_Flythrough.mp4',
+      ];
+      await ProjectBundleService.savePresentationOrder(zipPath, customOrder);
+
+      // Verify loadPresentationOrder
+      final loadedOrder = await ProjectBundleService.loadPresentationOrder(zipPath);
+      expect(loadedOrder, customOrder);
+
+      // Second inspect: should restore custom order!
+      final info2 = await ProjectBundleService.inspectBundle(zipPath);
+      expect(info2.files[0].fileName, '03_FacadeRender.jpg');
+      expect(info2.files[1].fileName, '04_Model.glb');
+      expect(info2.files[2].fileName, '01_FloorPlan.pdf');
+      expect(info2.files[3].fileName, '02_Flythrough.mp4');
+
+      // Clear presentation order reverts to category order
+      await ProjectBundleService.clearPresentationOrder(zipPath);
+      final info3 = await ProjectBundleService.inspectBundle(zipPath);
+      expect(info3.files.first.fileName, '02_Flythrough.mp4');
     });
 
     test('isProjectBundle returns false for PCB ZIP archives containing mixed 3D/BOM/image media', () async {

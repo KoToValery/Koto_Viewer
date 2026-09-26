@@ -13,6 +13,7 @@ class ProjectPresentationBar extends StatelessWidget {
   final int currentIndex;
   final void Function(int newIndex)? onSwitchProjectItem;
   final VoidCallback? onExit;
+  final bool compact;
 
   const ProjectPresentationBar({
     super.key,
@@ -20,6 +21,7 @@ class ProjectPresentationBar extends StatelessWidget {
     required this.currentIndex,
     required this.onSwitchProjectItem,
     this.onExit,
+    this.compact = false,
   });
 
   @override
@@ -31,16 +33,19 @@ class ProjectPresentationBar extends StatelessWidget {
     final l10n = context.l10n;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(compact ? 12 : 16),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(sigmaX: compact ? 8 : 12, sigmaY: compact ? 8 : 12),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 480),
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          constraints: BoxConstraints(maxWidth: compact ? 300 : 480),
+          margin: EdgeInsets.symmetric(horizontal: compact ? 6 : 16),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 6 : 12,
+            vertical: compact ? 4 : 8,
+          ),
           decoration: BoxDecoration(
             color: const Color(0xCC0F172A), // Dark slate with alpha
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(compact ? 12 : 16),
             border: Border.all(color: Colors.white24, width: 1),
             boxShadow: const [
               BoxShadow(
@@ -55,16 +60,19 @@ class ProjectPresentationBar extends StatelessWidget {
             children: [
               // Previous Button
               IconButton(
-                icon: const Icon(Icons.skip_previous_rounded, size: 26),
+                icon: Icon(Icons.skip_previous_rounded, size: compact ? 20 : 26),
                 color: Colors.white,
                 disabledColor: Colors.white24,
                 tooltip: l10n.prevProjectItem,
+                visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                padding: compact ? EdgeInsets.zero : const EdgeInsets.all(8),
+                constraints: compact ? const BoxConstraints(minWidth: 30, minHeight: 30) : const BoxConstraints(),
                 onPressed: currentIndex > 0 && onSwitchProjectItem != null
                     ? () => onSwitchProjectItem!(currentIndex - 1)
                     : null,
               ),
 
-              const SizedBox(width: 8),
+              SizedBox(width: compact ? 4 : 8),
 
               // Center Project & File Info
               Flexible(
@@ -77,18 +85,18 @@ class ProjectPresentationBar extends StatelessWidget {
                         if (currentItem != null) ...[
                           Icon(
                             _getCategoryIcon(currentItem.category),
-                            size: 14,
+                            size: compact ? 12 : 14,
                             color: Colors.amberAccent,
                           ),
-                          const SizedBox(width: 6),
+                          SizedBox(width: compact ? 4 : 6),
                         ],
                         Flexible(
                           child: Text(
                             currentItem?.fileName ?? projectBundle.projectName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                              fontSize: compact ? 11 : 13,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -96,12 +104,12 @@ class ProjectPresentationBar extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: compact ? 1 : 2),
                     Text(
                       '${currentIndex + 1} / $total  •  ${projectBundle.projectName}',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 11,
+                        fontSize: compact ? 9.5 : 11,
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
@@ -111,14 +119,17 @@ class ProjectPresentationBar extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(width: 8),
+              SizedBox(width: compact ? 4 : 8),
 
               // Next Button
               IconButton(
-                icon: const Icon(Icons.skip_next_rounded, size: 26),
+                icon: Icon(Icons.skip_next_rounded, size: compact ? 20 : 26),
                 color: Colors.white,
                 disabledColor: Colors.white24,
                 tooltip: l10n.nextProjectItem,
+                visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                padding: compact ? EdgeInsets.zero : const EdgeInsets.all(8),
+                constraints: compact ? const BoxConstraints(minWidth: 30, minHeight: 30) : const BoxConstraints(),
                 onPressed: currentIndex < total - 1 && onSwitchProjectItem != null
                     ? () => onSwitchProjectItem!(currentIndex + 1)
                     : null,
@@ -126,15 +137,18 @@ class ProjectPresentationBar extends StatelessWidget {
 
               if (onExit != null) ...[
                 Container(
-                  height: 24,
+                  height: compact ? 18 : 24,
                   width: 1,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  margin: EdgeInsets.symmetric(horizontal: compact ? 2 : 4),
                   color: Colors.white24,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 22),
+                  icon: Icon(Icons.close_rounded, size: compact ? 18 : 22),
                   color: Colors.white70,
                   tooltip: 'Exit Presentation',
+                  visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                  padding: compact ? EdgeInsets.zero : const EdgeInsets.all(8),
+                  constraints: compact ? const BoxConstraints(minWidth: 26, minHeight: 26) : const BoxConstraints(),
                   onPressed: onExit,
                 ),
               ],

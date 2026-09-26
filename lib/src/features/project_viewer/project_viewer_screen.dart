@@ -9,9 +9,8 @@ import '../video_viewer/video_viewer_screen.dart';
 import '../dxf_viewer/dxf_viewer_screen.dart';
 import '../pdf_viewer/pdf_viewer_screen.dart';
 import '../dxf_3d_viewer/dxf_3d_viewer_screen.dart';
-import '../dxf_viewer/binary/kcad_service.dart';
 import '../image_viewer/image_viewer_screen.dart';
-import '../../core/services/dwg_converter_service.dart';
+import '../../core/services/project_bundle_preload_service.dart';
 
 /// Architectural Presentation Hub Screen for ZIP and .kpack project bundles.
 /// Displays categorized project deliverables (Videos, DWG/DXF, 3D, PDF, Renders)
@@ -43,6 +42,12 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     _loadBundle();
   }
 
+  @override
+  void dispose() {
+    ProjectBundlePreloadService.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadBundle() async {
     setState(() {
       _isLoading = true;
@@ -56,6 +61,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
           _bundle = info;
           _isLoading = false;
         });
+        ProjectBundlePreloadService.startPreloading(info);
       }
     } catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'ProjectViewerScreen._loadBundle');
@@ -116,17 +122,24 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     );
 
     final String extractedPath;
+    String? readyDwgPath;
     try {
       extractedPath = await ProjectBundleService.extractFile(
         _bundle!.archivePath,
         item.internalPath,
       );
+      if (item.fileType == KotoFileType.dwg) {
+        readyDwgPath = await ProjectBundlePreloadService.prioritizeAndConvert(
+          _bundle!.archivePath,
+          item,
+        );
+      }
     } catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'ProjectViewerScreen.extractFile');
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // Close dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not extract file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not open file: $e'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -176,25 +189,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
       String dxfPath = extractedPath;
       String? origPath;
       if (item.fileType == KotoFileType.dwg) {
-        // Convert DWG -> DXF or use cached KCAD
-        final kcadPath = await KcadService.getCachePath(File(extractedPath));
-        if (await File(kcadPath).exists() && await File(kcadPath).length() > 16) {
-          dxfPath = kcadPath;
-          origPath = extractedPath;
-        } else {
-          final converted = await DwgConverterService.convertDwgToDxf(extractedPath);
-          if (converted.isNotEmpty) {
-            dxfPath = converted;
-            origPath = extractedPath;
-          } else {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Could not convert DWG file'), backgroundColor: Colors.red),
-              );
-            }
-            return;
-          }
-        }
+        origPath = extractedPath;
+        dxfPath = readyDwgPath ?? extractedPath;
       }
       if (!mounted) return;
       await Navigator.of(context).push(
@@ -252,6 +248,68 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     }
   }
 
+  void _saveCurrentOrder() {
+    if (_bundle == null) return;
+    final paths = _bundle!.files.map((f) => f.internalPath).toList();
+    ProjectBundleService.savePresentationOrder(_bundle!.archivePath, paths);
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    if (_bundle == null) return;
+    setState(() {
+      if (oldIndex < newIndex) {
+        newIndex -= 1;
+      }
+      final item = _bundle!.files.removeAt(oldIndex);
+      _bundle!.files.insert(newIndex, item);
+    });
+    _saveCurrentOrder();
+  }
+
+  void _moveFilteredItem(ProjectFileEntry item, bool moveUp, List<ProjectFileEntry> currentFiltered) {
+    if (_bundle == null) return;
+    final files = _bundle!.files;
+    final currentIndex = files.indexOf(item);
+    if (currentIndex == -1) return;
+
+    final filteredIndex = currentFiltered.indexOf(item);
+    if (filteredIndex == -1) return;
+
+    if (moveUp && filteredIndex > 0) {
+      final prevItem = currentFiltered[filteredIndex - 1];
+      final targetIndex = files.indexOf(prevItem);
+      setState(() {
+        files.removeAt(currentIndex);
+        files.insert(targetIndex, item);
+      });
+      _saveCurrentOrder();
+    } else if (!moveUp && filteredIndex < currentFiltered.length - 1) {
+      final nextItem = currentFiltered[filteredIndex + 1];
+      final targetIndex = files.indexOf(nextItem);
+      setState(() {
+        files.removeAt(currentIndex);
+        final adjustedTarget = targetIndex > currentIndex ? targetIndex : targetIndex + 1;
+        files.insert(adjustedTarget, item);
+      });
+      _saveCurrentOrder();
+    }
+  }
+
+  void _groupByCategory() {
+    if (_bundle == null) return;
+    setState(() {
+      ProjectBundleService.sortFilesByCategory(_bundle!.files);
+    });
+    _saveCurrentOrder();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Файловете са групирани по категории'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -261,7 +319,12 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
       appBar: AppBar(
         title: Text(_bundle?.projectName ?? 'Project Presentation'),
         actions: [
-          if (_bundle != null && _bundle!.files.isNotEmpty)
+          if (_bundle != null && _bundle!.files.isNotEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.sort_rounded),
+              tooltip: 'Групирай по категории',
+              onPressed: _groupByCategory,
+            ),
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilledButton.icon(
@@ -274,6 +337,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                 ),
               ),
             ),
+          ],
         ],
       ),
       body: _isLoading
@@ -318,6 +382,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
       final matchesSearch = _searchQuery.isEmpty || f.fileName.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     }).toList();
+    final isAllTab = _selectedCategory == ProjectItemCategory.all && _searchQuery.isEmpty;
 
     return Column(
       children: [
@@ -346,6 +411,37 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
           ),
         ),
 
+        // Reordering info strip
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+          child: Row(
+            children: [
+              Icon(Icons.swap_vert_rounded, size: 15, color: Colors.grey.shade600),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  isAllTab
+                      ? 'Подредете с влачене или със стрелките за презентацията'
+                      : 'Преподреждане в категорията (засяга презентацията)',
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (isAllTab)
+                TextButton.icon(
+                  onPressed: _groupByCategory,
+                  icon: const Icon(Icons.sort_rounded, size: 14),
+                  label: const Text('По категории', style: TextStyle(fontSize: 11)),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
         // Files List
         Expanded(
           child: filtered.isEmpty
@@ -355,15 +451,55 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                     style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    final item = filtered[index];
-                    final originalIndex = bundle.files.indexOf(item);
-                    return _buildFileItemCard(item, originalIndex, theme, isDark);
-                  },
-                ),
+              : isAllTab
+                  ? ReorderableListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      buildDefaultDragHandles: false,
+                      onReorder: _onReorder,
+                      itemCount: filtered.length,
+                      proxyDecorator: (child, index, animation) {
+                        return Material(
+                          elevation: 6,
+                          borderRadius: BorderRadius.circular(12),
+                          shadowColor: Colors.black45,
+                          child: child,
+                        );
+                      },
+                      itemBuilder: (context, index) {
+                        final item = filtered[index];
+                        final presentationIndex = bundle.files.indexOf(item);
+                        return _buildFileItemCard(
+                          item: item,
+                          presentationIndex: presentationIndex,
+                          listIndex: index,
+                          totalInList: filtered.length,
+                          theme: theme,
+                          isDark: isDark,
+                          isReorderable: true,
+                          onMoveUp: index > 0 ? () => _moveFilteredItem(item, true, filtered) : null,
+                          onMoveDown: index < filtered.length - 1 ? () => _moveFilteredItem(item, false, filtered) : null,
+                        );
+                      },
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final item = filtered[index];
+                        final presentationIndex = bundle.files.indexOf(item);
+                        return _buildFileItemCard(
+                          item: item,
+                          presentationIndex: presentationIndex,
+                          listIndex: index,
+                          totalInList: filtered.length,
+                          theme: theme,
+                          isDark: isDark,
+                          isReorderable: false,
+                          onMoveUp: index > 0 ? () => _moveFilteredItem(item, true, filtered) : null,
+                          onMoveDown: index < filtered.length - 1 ? () => _moveFilteredItem(item, false, filtered) : null,
+                        );
+                      },
+                    ),
         ),
       ],
     );
@@ -486,15 +622,21 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     }
   }
 
-  Widget _buildFileItemCard(
-    ProjectFileEntry item,
-    int index,
-    ThemeData theme,
-    bool isDark,
-  ) {
+  Widget _buildFileItemCard({
+    required ProjectFileEntry item,
+    required int presentationIndex,
+    required int listIndex,
+    required int totalInList,
+    required ThemeData theme,
+    required bool isDark,
+    required bool isReorderable,
+    required VoidCallback? onMoveUp,
+    required VoidCallback? onMoveDown,
+  }) {
     final (iconData, iconColor) = _getFileVisuals(item);
 
     return Card(
+      key: ValueKey(item.internalPath),
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -502,36 +644,93 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         side: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade200),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(iconData, color: iconColor, size: 24),
+        contentPadding: const EdgeInsets.only(left: 10, right: 6, top: 2, bottom: 2),
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Order number badge showing presentation sequence
+            Container(
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.amber.shade700.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${presentationIndex + 1}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: Colors.amber.shade800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Category icon
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(iconData, color: iconColor, size: 22),
+            ),
+          ],
         ),
         title: Text(
           item.fileName,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Row(
           children: [
-            Text(item.formattedSize, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(width: 8),
-            Text('•', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(width: 8),
+            Text(item.formattedSize, style: const TextStyle(fontSize: 11.5, color: Colors.grey)),
+            const SizedBox(width: 6),
+            Text('•', style: const TextStyle(fontSize: 11.5, color: Colors.grey)),
+            const SizedBox(width: 6),
             Text(
               item.category.shortLabel,
-              style: TextStyle(fontSize: 12, color: iconColor, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 11.5, color: iconColor, fontWeight: FontWeight.w600),
             ),
           ],
         ),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
-        onTap: () => _openProjectItem(item, index),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_upward_rounded, size: 19),
+              tooltip: 'Премести нагоре',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: onMoveUp,
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_downward_rounded, size: 19),
+              tooltip: 'Премести надолу',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: onMoveDown,
+            ),
+            if (isReorderable)
+              ReorderableDragStartListener(
+                index: listIndex,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Icon(
+                    Icons.drag_indicator_rounded,
+                    color: isDark ? Colors.white38 : Colors.grey.shade400,
+                    size: 22,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        onTap: () => _openProjectItem(item, presentationIndex),
       ),
     );
   }

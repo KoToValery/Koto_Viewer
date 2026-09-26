@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../errors/app_error_handler.dart';
 import '../models/pdf_item.dart';
 import 'zip_archive_service.dart';
@@ -206,6 +207,101 @@ class ProjectBundleService {
     return 999999; // Default at the end
   }
 
+  /// Logical priority order of categories for initial presentation grouping:
+  /// Videos -> Plans & Drawings -> 3D Models -> Renders & Images -> Documents -> Other
+  static int getCategoryOrder(ProjectItemCategory cat) {
+    switch (cat) {
+      case ProjectItemCategory.video:
+        return 0;
+      case ProjectItemCategory.drawing:
+        return 1;
+      case ProjectItemCategory.model3d:
+        return 2;
+      case ProjectItemCategory.image:
+        return 3;
+      case ProjectItemCategory.document:
+        return 4;
+      case ProjectItemCategory.other:
+      case ProjectItemCategory.all:
+        return 5;
+    }
+  }
+
+  /// Sorts a list of project file entries so that they are grouped by category first,
+  /// then ordered by presentation number, then alphabetically by file name.
+  static void sortFilesByCategory(List<ProjectFileEntry> files) {
+    files.sort((a, b) {
+      final catA = getCategoryOrder(a.category);
+      final catB = getCategoryOrder(b.category);
+      if (catA != catB) {
+        return catA.compareTo(catB);
+      }
+      if (a.presentationOrder != b.presentationOrder) {
+        return a.presentationOrder.compareTo(b.presentationOrder);
+      }
+      return a.fileName.toLowerCase().compareTo(b.fileName.toLowerCase());
+    });
+  }
+
+  static const String _orderPrefsPrefix = 'koto_proj_bundle_order_';
+
+  static String _getOrderKey(String archivePath) {
+    final normalized = archivePath.replaceAll('\\', '/');
+    return '$_orderPrefsPrefix${normalized.hashCode}';
+  }
+
+  /// Saves the custom presentation order for an archive bundle using internal file paths.
+  static Future<void> savePresentationOrder(String archivePath, List<String> orderedInternalPaths) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _getOrderKey(archivePath);
+      await prefs.setStringList(key, orderedInternalPaths);
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ProjectBundleService.savePresentationOrder');
+    }
+  }
+
+  /// Loads the saved custom presentation order for an archive bundle, if any.
+  static Future<List<String>?> loadPresentationOrder(String archivePath) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _getOrderKey(archivePath);
+      return prefs.getStringList(key);
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ProjectBundleService.loadPresentationOrder');
+      return null;
+    }
+  }
+
+  /// Clears the saved presentation order, reverting to the default category order.
+  static Future<void> clearPresentationOrder(String archivePath) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _getOrderKey(archivePath);
+      await prefs.remove(key);
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ProjectBundleService.clearPresentationOrder');
+    }
+  }
+
+  /// Re-orders [files] in-place according to [savedOrder].
+  /// Any file paths in [savedOrder] that exist in [files] are placed first in that exact sequence.
+  /// Any remaining/new files not found in [savedOrder] are appended at the end.
+  static void applyPresentationOrder(List<ProjectFileEntry> files, List<String> savedOrder) {
+    final fileMap = {for (final f in files) f.internalPath: f};
+    final reordered = <ProjectFileEntry>[];
+    for (final path in savedOrder) {
+      final entry = fileMap.remove(path);
+      if (entry != null) {
+        reordered.add(entry);
+      }
+    }
+    // Append any files that weren't in the saved order
+    reordered.addAll(fileMap.values);
+    files.clear();
+    files.addAll(reordered);
+  }
+
   /// Determines if a ZIP archive should be opened as a Project Presentation Bundle.
   /// If Gerber or specific PCB formats are detected, returns false (so it loads as PCB view).
   /// All other ZIP files are considered Presentation bundles.
@@ -296,13 +392,14 @@ class ProjectBundleService {
       totalSize += entry.size;
     }
 
-    // Sort files: first by presentationOrder if any has numbers, then alphabetically
-    files.sort((a, b) {
-      if (a.presentationOrder != b.presentationOrder) {
-        return a.presentationOrder.compareTo(b.presentationOrder);
-      }
-      return a.fileName.toLowerCase().compareTo(b.fileName.toLowerCase());
-    });
+    // Initially group files by categories, then presentationOrder, then alphabetically
+    sortFilesByCategory(files);
+
+    // Apply saved custom presentation order if the user previously reordered this bundle
+    final savedOrder = await loadPresentationOrder(archivePath);
+    if (savedOrder != null && savedOrder.isNotEmpty) {
+      applyPresentationOrder(files, savedOrder);
+    }
 
     return ProjectBundleInfo(
       archivePath: archivePath,
