@@ -114,7 +114,7 @@ class ProjectBundlePreloadService {
           completer.complete(result);
         } catch (e) {
           completer.completeError(e);
-          debugPrint('ProjectBundlePreloadService: Failed background conversion for $nextInternalPath: $e');
+          debugPrint('ProjectBundlePreloadService: Failed background DWG conversion for $nextInternalPath: $e');
         } finally {
           _activeConversions.remove(nextInternalPath);
         }
