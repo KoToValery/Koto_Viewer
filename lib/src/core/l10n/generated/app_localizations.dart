@@ -758,6 +758,90 @@ abstract class AppLocalizations {
   /// **'Comic book archive is corrupted or unreadable.'**
   String get comicArchiveCorrupted;
 
+  /// Autoplay mode toggle or title
+  ///
+  /// In en, this message translates to:
+  /// **'Autoplay'**
+  String get comicAutoplay;
+
+  /// Tooltip to start autoplay
+  ///
+  /// In en, this message translates to:
+  /// **'Start Autoplay'**
+  String get comicAutoplayStart;
+
+  /// Tooltip to pause autoplay
+  ///
+  /// In en, this message translates to:
+  /// **'Pause Autoplay'**
+  String get comicAutoplayPause;
+
+  /// Tooltip to resume autoplay
+  ///
+  /// In en, this message translates to:
+  /// **'Resume Autoplay'**
+  String get comicAutoplayResume;
+
+  /// Tooltip to stop autoplay
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Autoplay'**
+  String get comicAutoplayStop;
+
+  /// Title for comic autoplay settings sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Autoplay Settings'**
+  String get comicAutoplaySettings;
+
+  /// Label for page duration slider
+  ///
+  /// In en, this message translates to:
+  /// **'Page Duration'**
+  String get comicAutoplayPageDuration;
+
+  /// Label for webtoon scroll speed slider
+  ///
+  /// In en, this message translates to:
+  /// **'Webtoon Scroll Speed'**
+  String get comicAutoplayScrollSpeed;
+
+  /// Seconds display format
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s'**
+  String comicAutoplaySeconds(int seconds);
+
+  /// Pixels per second scroll speed display
+  ///
+  /// In en, this message translates to:
+  /// **'{speed} px/s'**
+  String comicAutoplaySpeedPx(int speed);
+
+  /// Switch label to loop comic reading
+  ///
+  /// In en, this message translates to:
+  /// **'Loop from Beginning'**
+  String get comicAutoplayLoop;
+
+  /// Switch label to pause autoplay while zooming in
+  ///
+  /// In en, this message translates to:
+  /// **'Pause when Zoomed'**
+  String get comicAutoplayPauseOnZoom;
+
+  /// Snackbar message when reaching end of comic in autoplay
+  ///
+  /// In en, this message translates to:
+  /// **'Reached the end of the comic.'**
+  String get comicAutoplayEndReached;
+
+  /// Badge text when autoplay is paused due to zoom
+  ///
+  /// In en, this message translates to:
+  /// **'Paused (Zoomed)'**
+  String get comicAutoplayPausedForZoom;
+
   /// Error message when opening a file with unsupported format
   ///
   /// In en, this message translates to:
@@ -1225,6 +1309,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skipped in presentation'**
   String get fileSkippedInPresentation;
+
+  /// Button or menu item to check for application updates
+  ///
+  /// In en, this message translates to:
+  /// **'Check for Updates'**
+  String get checkForUpdates;
+
+  /// Status message while checking for updates
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates...'**
+  String get checkingForUpdates;
+
+  /// Dialog or snackbar title when a new version is found
+  ///
+  /// In en, this message translates to:
+  /// **'Update Available'**
+  String get updateAvailableTitle;
+
+  /// Message informing user that an update is available
+  ///
+  /// In en, this message translates to:
+  /// **'A new version of KoToViewer is available on Google Play.'**
+  String get updateAvailableMessage;
+
+  /// Button to start update process
+  ///
+  /// In en, this message translates to:
+  /// **'Update Now'**
+  String get updateNow;
+
+  /// Snackbar notifying user that flexible update is ready to install
+  ///
+  /// In en, this message translates to:
+  /// **'A new version has been downloaded. Restart the app to apply it.'**
+  String get updateDownloadedSnackbar;
+
+  /// Button label to restart and apply the downloaded update
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get restartToUpdate;
+
+  /// Notification that no updates are available
+  ///
+  /// In en, this message translates to:
+  /// **'You are using the latest version of KoToViewer.'**
+  String get appUpToDate;
+
+  /// Notification when update check fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not check for updates via Google Play.'**
+  String get updateCheckFailed;
+
+  /// Button to open application page in Google Play Store
+  ///
+  /// In en, this message translates to:
+  /// **'Open Google Play'**
+  String get openPlayStore;
+
+  /// Developer informational note in debug mode
+  ///
+  /// In en, this message translates to:
+  /// **'In debug / local build, Google Play In-App Updates require installation via Play Store (Internal Testing track or Internal App Sharing).'**
+  String get debugTestingNote;
+
+  /// Debug button to test update UI and restart flow
+  ///
+  /// In en, this message translates to:
+  /// **'Simulate Update (Debug)'**
+  String get simulateUpdate;
 }
 
 class _AppLocalizationsDelegate

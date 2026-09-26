@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/services/recent_files_service.dart';
 import '../../core/services/reading_progress_service.dart';
@@ -9,10 +11,12 @@ import '../../core/l10n/l10n_extensions.dart';
 import 'models/comic_models.dart';
 import 'parser/comic_parser.dart';
 import 'widgets/comic_page_item.dart';
+import 'widgets/comic_autoplay_bar.dart';
 
 /// Interactive Digital Comic Book & Manga Viewer Screen (.cbz, .cbr, .cbt).
 /// Features LTR Western, RTL Manga, and Continuous Vertical Webtoon reading modes,
-/// full-screen immersive canvas, thumbnail scrubbing, page jump, and metadata inspection.
+/// full-screen immersive canvas, thumbnail scrubbing, page jump, metadata inspection,
+/// and automated hands-free autoplay mode.
 class ComicViewerScreen extends StatefulWidget {
   final String filePath;
 
@@ -50,6 +54,13 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   bool _isCurrentBookmarked = false;
   List<BookmarkItem> _bookmarks = [];
 
+  // Autoplay Mode
+  bool _isAutoplayActive = false;
+  bool _isAutoplayPaused = false;
+  ComicAutoplayConfig _autoplayConfig = const ComicAutoplayConfig();
+  late final ValueNotifier<double> _autoplayProgressNotifier;
+  Timer? _autoplayTimer;
+
   late PageController _pageController;
   final ScrollController _webtoonScrollController = ScrollController();
   final ScrollController _thumbnailScrollController = ScrollController();
@@ -59,12 +70,16 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   @override
   void initState() {
     super.initState();
+    _autoplayProgressNotifier = ValueNotifier<double>(0.0);
     _pageController = PageController(initialPage: _currentPageIndex);
+    _loadAutoplayConfig();
     _loadComic();
   }
 
   @override
   void dispose() {
+    _stopAutoplay();
+    _autoplayProgressNotifier.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _saveReadingProgress();
     _pageController.dispose();
@@ -394,6 +409,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     if (_comic == null || index < 0 || index >= _comic!.pages.length) return;
     final prevIndex = _currentPageIndex;
     _pageItemControllers[prevIndex]?.resetZoom();
+    _autoplayProgressNotifier.value = 0.0;
 
     setState(() {
       _currentPageIndex = index;
@@ -421,6 +437,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
   void _goToPreviousPage() {
     if (_readingMode == ComicReadingMode.verticalContinuous) return;
+    _autoplayProgressNotifier.value = 0.0;
     if (_readingMode == ComicReadingMode.rightToLeft) {
       // In RTL (Manga), the visual left advances to next page
       if (_comic != null && _currentPageIndex < _comic!.pageCount - 1 && _pageController.hasClients) {
@@ -442,6 +459,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
   void _goToNextPage() {
     if (_readingMode == ComicReadingMode.verticalContinuous) return;
+    _autoplayProgressNotifier.value = 0.0;
     if (_readingMode == ComicReadingMode.rightToLeft) {
       // In RTL (Manga), visual right goes to previous page
       if (_currentPageIndex > 0 && _pageController.hasClients) {
@@ -459,6 +477,212 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
         );
       }
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // Autoplay Methods
+  // --------------------------------------------------------------------------
+
+  Future<void> _loadAutoplayConfig() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final interval = prefs.getDouble('koto_comic_autoplay_interval') ?? 5.0;
+      final speed = prefs.getDouble('koto_comic_autoplay_webtoon_speed') ?? 60.0;
+      final loop = prefs.getBool('koto_comic_autoplay_loop') ?? false;
+      final pauseOnZoom = prefs.getBool('koto_comic_autoplay_pause_on_zoom') ?? true;
+
+      if (mounted) {
+        setState(() {
+          _autoplayConfig = ComicAutoplayConfig(
+            intervalSeconds: interval.clamp(2.0, 30.0),
+            webtoonScrollSpeed: speed.clamp(20.0, 200.0),
+            loop: loop,
+            pauseOnZoom: pauseOnZoom,
+          );
+        });
+      }
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ComicViewer.loadAutoplayConfig');
+    }
+  }
+
+  Future<void> _saveAutoplayConfig(ComicAutoplayConfig config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('koto_comic_autoplay_interval', config.intervalSeconds);
+      await prefs.setDouble('koto_comic_autoplay_webtoon_speed', config.webtoonScrollSpeed);
+      await prefs.setBool('koto_comic_autoplay_loop', config.loop);
+      await prefs.setBool('koto_comic_autoplay_pause_on_zoom', config.pauseOnZoom);
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ComicViewer.saveAutoplayConfig');
+    }
+  }
+
+  void _startAutoplay() {
+    if (_comic == null || _comic!.pageCount <= 1) return;
+    setState(() {
+      _isAutoplayActive = true;
+      _isAutoplayPaused = false;
+      _autoplayProgressNotifier.value = 0.0;
+    });
+
+    _startAutoplayTimer();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            _readingMode == ComicReadingMode.verticalContinuous
+                ? '${context.l10n.comicAutoplayStart} (${_autoplayConfig.webtoonScrollSpeed.round()} px/s)'
+                : '${context.l10n.comicAutoplayStart} (${_autoplayConfig.intervalSeconds.round()}s)',
+          ),
+        ),
+      );
+    }
+  }
+
+  void _stopAutoplay() {
+    _autoplayTimer?.cancel();
+    _autoplayTimer = null;
+    if (mounted) {
+      setState(() {
+        _isAutoplayActive = false;
+        _isAutoplayPaused = false;
+        _autoplayProgressNotifier.value = 0.0;
+      });
+    }
+  }
+
+  void _toggleAutoplay() {
+    if (_isAutoplayActive) {
+      _toggleAutoplayPause();
+    } else {
+      _startAutoplay();
+    }
+  }
+
+  void _toggleAutoplayPause() {
+    setState(() {
+      _isAutoplayPaused = !_isAutoplayPaused;
+    });
+  }
+
+  void _startAutoplayTimer() {
+    _autoplayTimer?.cancel();
+    const tickDuration = Duration(milliseconds: 50);
+    _autoplayTimer = Timer.periodic(tickDuration, (_) => _onAutoplayTick());
+  }
+
+  void _onAutoplayTick() {
+    if (!mounted || !_isAutoplayActive || _isAutoplayPaused) return;
+
+    final isZoomed = (_readingMode == ComicReadingMode.verticalContinuous)
+        ? _currentZoomScale > 1.05
+        : (_isCurrentPageZoomed || _currentZoomScale > 1.05);
+
+    if (_autoplayConfig.pauseOnZoom && isZoomed) {
+      return;
+    }
+
+    if (_readingMode == ComicReadingMode.verticalContinuous) {
+      if (_webtoonScrollController.hasClients) {
+        final maxScroll = _webtoonScrollController.position.maxScrollExtent;
+        final currentOffset = _webtoonScrollController.offset;
+        final delta = _autoplayConfig.webtoonScrollSpeed * 0.05;
+        final nextOffset = currentOffset + delta;
+
+        if (nextOffset >= maxScroll) {
+          if (_autoplayConfig.loop) {
+            _webtoonScrollController.jumpTo(0.0);
+            _autoplayProgressNotifier.value = 0.0;
+          } else {
+            _stopAutoplay();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(context.l10n.comicAutoplayEndReached),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          }
+        } else {
+          _webtoonScrollController.jumpTo(nextOffset);
+          if (maxScroll > 0) {
+            _autoplayProgressNotifier.value = (nextOffset / maxScroll).clamp(0.0, 1.0);
+          }
+          if (_comic != null && _comic!.pageCount > 0 && maxScroll > 0) {
+            final pageFraction = nextOffset / maxScroll;
+            final estimatedPage =
+                (pageFraction * (_comic!.pageCount - 1)).round().clamp(0, _comic!.pageCount - 1);
+            if (estimatedPage != _currentPageIndex) {
+              setState(() {
+                _currentPageIndex = estimatedPage;
+              });
+              _scrollThumbnailToView(estimatedPage);
+            }
+          }
+        }
+      }
+    } else {
+      // Paged Mode (LTR / Manga RTL)
+      final intervalMs = (_autoplayConfig.intervalSeconds * 1000).toInt();
+      if (intervalMs <= 0) return;
+      final increment = 50.0 / intervalMs;
+      final newProgress = _autoplayProgressNotifier.value + increment;
+
+      if (newProgress >= 1.0) {
+        _autoplayProgressNotifier.value = 0.0;
+        if (_comic == null || _comic!.pageCount == 0) return;
+
+        if (_currentPageIndex < _comic!.pageCount - 1) {
+          final nextIndex = _currentPageIndex + 1;
+          _goToPage(nextIndex);
+        } else {
+          if (_autoplayConfig.loop) {
+            _goToPage(0);
+          } else {
+            _stopAutoplay();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(context.l10n.comicAutoplayEndReached),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          }
+        }
+      } else {
+        _autoplayProgressNotifier.value = newProgress;
+      }
+    }
+  }
+
+  void _showAutoplaySettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E24),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return ComicAutoplaySettingsSheet(
+          initialConfig: _autoplayConfig,
+          isWebtoon: _readingMode == ComicReadingMode.verticalContinuous,
+          onConfigChanged: (newConfig) {
+            setState(() => _autoplayConfig = newConfig);
+            _saveAutoplayConfig(newConfig);
+          },
+        );
+      },
+    );
   }
 
   void _zoomIn() {
@@ -719,7 +943,31 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
           RecentFilesService.removeRecentFile(widget.filePath);
         }
       },
-      child: Scaffold(
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent) {
+            if (event.logicalKey == LogicalKeyboardKey.space) {
+              _toggleAutoplay();
+              return KeyEventResult.handled;
+            } else if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+                event.logicalKey == LogicalKeyboardKey.pageDown) {
+              _goToNextPage();
+              return KeyEventResult.handled;
+            } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                event.logicalKey == LogicalKeyboardKey.pageUp) {
+              _goToPreviousPage();
+              return KeyEventResult.handled;
+            } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+              if (_isAutoplayActive) {
+                _stopAutoplay();
+                return KeyEventResult.handled;
+              }
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Scaffold(
         backgroundColor: Colors.black,
         extendBodyBehindAppBar: true,
         appBar: _showControls
@@ -820,6 +1068,21 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                             onPressed: _cycleFitMode,
                           ),
 
+                          // Autoplay Toggle
+                          IconButton(
+                            icon: Icon(
+                              _isAutoplayActive
+                                  ? (_isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_circle_filled)
+                                  : Icons.play_circle_outline,
+                              size: 20,
+                              color: _isAutoplayActive ? const Color(0xFFE11D48) : null,
+                            ),
+                            tooltip: _isAutoplayActive
+                                ? (_isAutoplayPaused ? context.l10n.comicAutoplayResume : context.l10n.comicAutoplayPause)
+                                : context.l10n.comicAutoplayStart,
+                            onPressed: _toggleAutoplay,
+                          ),
+
                           // Jump to Page
                           IconButton(
                             icon: const Icon(Icons.pin_outlined, size: 20),
@@ -894,6 +1157,72 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                           ? _buildWebtoonView()
                           : _buildPagedView(),
 
+                      // Autoplay Minimal Progress Indicator when controls are hidden
+                      if (!_showControls && _isAutoplayActive)
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: ValueListenableBuilder<double>(
+                            valueListenable: _autoplayProgressNotifier,
+                            builder: (context, progress, _) {
+                              return LinearProgressIndicator(
+                                value: progress.clamp(0.0, 1.0),
+                                minHeight: 3.5,
+                                backgroundColor: Colors.transparent,
+                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFE11D48)),
+                              );
+                            },
+                          ),
+                        ),
+
+                      // Floating Autoplay Controls Bar
+                      if (_showControls && _isAutoplayActive)
+                        Positioned(
+                          bottom: 148,
+                          left: 16,
+                          right: 16,
+                          child: Center(
+                            child: ComicAutoplayBar(
+                              isPlaying: _isAutoplayActive,
+                              isPaused: _isAutoplayPaused,
+                              isPausedForZoom: _autoplayConfig.pauseOnZoom &&
+                                  ((_readingMode == ComicReadingMode.verticalContinuous)
+                                      ? _currentZoomScale > 1.05
+                                      : (_isCurrentPageZoomed || _currentZoomScale > 1.05)),
+                              isWebtoon: _readingMode == ComicReadingMode.verticalContinuous,
+                              config: _autoplayConfig,
+                              progressNotifier: _autoplayProgressNotifier,
+                              onTogglePlayPause: _toggleAutoplayPause,
+                              onPrevious: () {
+                                _goToPreviousPage();
+                                _autoplayProgressNotifier.value = 0.0;
+                              },
+                              onNext: () {
+                                _goToNextPage();
+                                _autoplayProgressNotifier.value = 0.0;
+                              },
+                              onToggleLoop: () {
+                                final newConfig = _autoplayConfig.copyWith(loop: !_autoplayConfig.loop);
+                                setState(() => _autoplayConfig = newConfig);
+                                _saveAutoplayConfig(newConfig);
+                              },
+                              onIntervalChanged: (val) {
+                                final newConfig = _autoplayConfig.copyWith(intervalSeconds: val);
+                                setState(() => _autoplayConfig = newConfig);
+                                _saveAutoplayConfig(newConfig);
+                              },
+                              onScrollSpeedChanged: (val) {
+                                final newConfig = _autoplayConfig.copyWith(webtoonScrollSpeed: val);
+                                setState(() => _autoplayConfig = newConfig);
+                                _saveAutoplayConfig(newConfig);
+                              },
+                              onOpenSettings: _showAutoplaySettingsSheet,
+                              onClose: _stopAutoplay,
+                            ),
+                          ),
+                        ),
+
                       // Floating Zoom & Fit Bar
                       if (_showControls) _buildFloatingZoomBar(theme),
 
@@ -901,6 +1230,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                       if (_showControls) _buildBottomControlsOverlay(theme),
                     ],
                   ),
+      ),
       ),
     );
   }
@@ -1164,7 +1494,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
   Widget _buildFloatingZoomBar(ThemeData theme) {
     return Positioned(
-      bottom: 148,
+      bottom: _isAutoplayActive ? 220 : 148,
       right: 16,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

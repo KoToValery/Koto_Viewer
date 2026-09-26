@@ -356,6 +356,52 @@ class AppLocalizationsEn extends AppLocalizations {
       'Comic book archive is corrupted or unreadable.';
 
   @override
+  String get comicAutoplay => 'Autoplay';
+
+  @override
+  String get comicAutoplayStart => 'Start Autoplay';
+
+  @override
+  String get comicAutoplayPause => 'Pause Autoplay';
+
+  @override
+  String get comicAutoplayResume => 'Resume Autoplay';
+
+  @override
+  String get comicAutoplayStop => 'Stop Autoplay';
+
+  @override
+  String get comicAutoplaySettings => 'Autoplay Settings';
+
+  @override
+  String get comicAutoplayPageDuration => 'Page Duration';
+
+  @override
+  String get comicAutoplayScrollSpeed => 'Webtoon Scroll Speed';
+
+  @override
+  String comicAutoplaySeconds(int seconds) {
+    return '${seconds}s';
+  }
+
+  @override
+  String comicAutoplaySpeedPx(int speed) {
+    return '$speed px/s';
+  }
+
+  @override
+  String get comicAutoplayLoop => 'Loop from Beginning';
+
+  @override
+  String get comicAutoplayPauseOnZoom => 'Pause when Zoomed';
+
+  @override
+  String get comicAutoplayEndReached => 'Reached the end of the comic.';
+
+  @override
+  String get comicAutoplayPausedForZoom => 'Paused (Zoomed)';
+
+  @override
   String unsupportedFileFormat(String name) {
     return 'Unsupported file format: $name';
   }
@@ -659,4 +705,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fileSkippedInPresentation => 'Skipped in presentation';
+
+  @override
+  String get checkForUpdates => 'Check for Updates';
+
+  @override
+  String get checkingForUpdates => 'Checking for updates...';
+
+  @override
+  String get updateAvailableTitle => 'Update Available';
+
+  @override
+  String get updateAvailableMessage =>
+      'A new version of KoToViewer is available on Google Play.';
+
+  @override
+  String get updateNow => 'Update Now';
+
+  @override
+  String get updateDownloadedSnackbar =>
+      'A new version has been downloaded. Restart the app to apply it.';
+
+  @override
+  String get restartToUpdate => 'Restart';
+
+  @override
+  String get appUpToDate => 'You are using the latest version of KoToViewer.';
+
+  @override
+  String get updateCheckFailed =>
+      'Could not check for updates via Google Play.';
+
+  @override
+  String get openPlayStore => 'Open Google Play';
+
+  @override
+  String get debugTestingNote =>
+      'In debug / local build, Google Play In-App Updates require installation via Play Store (Internal Testing track or Internal App Sharing).';
+
+  @override
+  String get simulateUpdate => 'Simulate Update (Debug)';
 }

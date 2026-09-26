@@ -359,6 +359,52 @@ class AppLocalizationsBg extends AppLocalizations {
       'Архивът на комикса е повреден или нечетлив.';
 
   @override
+  String get comicAutoplay => 'Автоматично прелистване';
+
+  @override
+  String get comicAutoplayStart => 'Старт на автоматично прелистване';
+
+  @override
+  String get comicAutoplayPause => 'Пауза на прелистването';
+
+  @override
+  String get comicAutoplayResume => 'Възобнови прелистването';
+
+  @override
+  String get comicAutoplayStop => 'Спри автоматичното прелистване';
+
+  @override
+  String get comicAutoplaySettings => 'Настройки за автоматично прелистване';
+
+  @override
+  String get comicAutoplayPageDuration => 'Време на страница';
+
+  @override
+  String get comicAutoplayScrollSpeed => 'Скорост на Webtoon скролване';
+
+  @override
+  String comicAutoplaySeconds(int seconds) {
+    return '$seconds сек.';
+  }
+
+  @override
+  String comicAutoplaySpeedPx(int speed) {
+    return '$speed px/сек.';
+  }
+
+  @override
+  String get comicAutoplayLoop => 'Повторение от началото';
+
+  @override
+  String get comicAutoplayPauseOnZoom => 'Пауза при мащабиране';
+
+  @override
+  String get comicAutoplayEndReached => 'Достигнат е краят на комикса.';
+
+  @override
+  String get comicAutoplayPausedForZoom => 'Пауза (Мащабирано)';
+
+  @override
   String unsupportedFileFormat(String name) {
     return 'Неподдържан файлов формат: $name';
   }
@@ -664,4 +710,44 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get fileSkippedInPresentation => 'Пропуснат от презентацията';
+
+  @override
+  String get checkForUpdates => 'Проверка за нова версия';
+
+  @override
+  String get checkingForUpdates => 'Проверка за нова версия...';
+
+  @override
+  String get updateAvailableTitle => 'Налична е нова версия';
+
+  @override
+  String get updateAvailableMessage =>
+      'Налична е нова версия на KoToViewer в Google Play.';
+
+  @override
+  String get updateNow => 'Актуализиране';
+
+  @override
+  String get updateDownloadedSnackbar =>
+      'Новата версия е изтеглена. Рестартирайте приложението, за да я приложите.';
+
+  @override
+  String get restartToUpdate => 'Рестартиране';
+
+  @override
+  String get appUpToDate => 'Използвате най-новата версия на KoToViewer.';
+
+  @override
+  String get updateCheckFailed =>
+      'Неуспешна проверка за нова версия през Google Play.';
+
+  @override
+  String get openPlayStore => 'Отвори Google Play';
+
+  @override
+  String get debugTestingNote =>
+      'При дебъг / локален билд, Google Play обновяването изисква инсталация през Play Store (Вътрешен тестов канал или Internal App Sharing).';
+
+  @override
+  String get simulateUpdate => 'Симулирай обновяване (Дебъг)';
 }

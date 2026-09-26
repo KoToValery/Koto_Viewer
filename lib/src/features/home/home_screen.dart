@@ -12,6 +12,7 @@ import '../../core/services/file_source_service.dart';
 import '../../core/services/android_saf_service.dart';
 import '../../core/services/dwg_converter_service.dart';
 import '../../core/services/file_opener_service.dart';
+import '../../core/services/app_update_service.dart';
 import '../../core/widgets/coordinate_settings_dialog.dart';
 import '../../core/widgets/language_selection_dialog.dart';
 import '../../core/l10n/l10n_extensions.dart';
@@ -1648,6 +1649,17 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadFiles();
     RecentFilesService.recentFilesNotifier.addListener(_onRecentFilesChanged);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          AppUpdateService.checkForUpdateAtStartup(
+            context: context,
+            messenger: ScaffoldMessenger.maybeOf(context),
+          );
+        }
+      });
+    });
   }
 
   void _onRecentFilesChanged() {
@@ -1660,6 +1672,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     RecentFilesService.recentFilesNotifier.removeListener(_onRecentFilesChanged);
     _searchController.dispose();
+    AppUpdateService.dispose();
     super.dispose();
   }
 
@@ -2937,6 +2950,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 _showCoordinateSettings();
               } else if (value == 'lang') {
                 LanguageSelectionDialog.show(context);
+              } else if (value == 'update') {
+                AppUpdateService.checkForUpdateManually(
+                  context: context,
+                  messenger: ScaffoldMessenger.of(context),
+                );
               } else if (value == 'about') {
                 _showAboutDialog();
               }
@@ -2967,6 +2985,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(l10n.language),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'update',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.system_update_rounded,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(l10n.checkForUpdates),
                   ],
                 ),
               ),

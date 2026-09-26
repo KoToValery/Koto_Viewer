@@ -162,3 +162,67 @@ class UnsupportedComicArchiveException implements Exception {
   @override
   String toString() => message;
 }
+
+/// Configuration model for Comic Autoplay / Automated Page Turning.
+class ComicAutoplayConfig {
+  /// Duration in seconds per page in paged modes (LTR / Manga RTL).
+  final double intervalSeconds;
+
+  /// Continuous scrolling speed in pixels per second for Webtoon mode.
+  final double webtoonScrollSpeed;
+
+  /// Whether to loop back to the beginning when reaching the end of the comic.
+  final bool loop;
+
+  /// Whether to automatically pause autoplay countdown when zoomed in.
+  final bool pauseOnZoom;
+
+  const ComicAutoplayConfig({
+    this.intervalSeconds = 5.0,
+    this.webtoonScrollSpeed = 60.0,
+    this.loop = false,
+    this.pauseOnZoom = true,
+  });
+
+  ComicAutoplayConfig copyWith({
+    double? intervalSeconds,
+    double? webtoonScrollSpeed,
+    bool? loop,
+    bool? pauseOnZoom,
+  }) {
+    return ComicAutoplayConfig(
+      intervalSeconds: intervalSeconds ?? this.intervalSeconds,
+      webtoonScrollSpeed: webtoonScrollSpeed ?? this.webtoonScrollSpeed,
+      loop: loop ?? this.loop,
+      pauseOnZoom: pauseOnZoom ?? this.pauseOnZoom,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'intervalSeconds': intervalSeconds,
+    'webtoonScrollSpeed': webtoonScrollSpeed,
+    'loop': loop,
+    'pauseOnZoom': pauseOnZoom,
+  };
+
+  factory ComicAutoplayConfig.fromJson(Map<String, dynamic> json) => ComicAutoplayConfig(
+    intervalSeconds: (json['intervalSeconds'] as num?)?.toDouble() ?? 5.0,
+    webtoonScrollSpeed: (json['webtoonScrollSpeed'] as num?)?.toDouble() ?? 60.0,
+    loop: json['loop'] as bool? ?? false,
+    pauseOnZoom: json['pauseOnZoom'] as bool? ?? true,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ComicAutoplayConfig &&
+          runtimeType == other.runtimeType &&
+          intervalSeconds == other.intervalSeconds &&
+          webtoonScrollSpeed == other.webtoonScrollSpeed &&
+          loop == other.loop &&
+          pauseOnZoom == other.pauseOnZoom;
+
+  @override
+  int get hashCode => Object.hash(intervalSeconds, webtoonScrollSpeed, loop, pauseOnZoom);
+}
+

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/errors/error_log_dialog.dart';
+import '../../../core/l10n/l10n_extensions.dart';
+import '../../../core/services/app_update_service.dart';
 
 /// Modern, comprehensive App Info & About dialog with dynamic version detection.
 class AppInfoDialog extends StatefulWidget {
@@ -146,30 +148,43 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                                 letterSpacing: -0.3,
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withValues(
-                                  alpha: isDark ? 0.25 : 0.12,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: theme.colorScheme.primary.withValues(
-                                    alpha: isDark ? 0.5 : 0.3,
+                            InkWell(
+                              onTap: () {
+                                AppUpdateService.checkForUpdateManually(
+                                  context: context,
+                                  messenger: ScaffoldMessenger.of(context),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Tooltip(
+                                message: context.l10nOrNull?.checkForUpdates ??
+                                    'Check for Updates',
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2.5,
                                   ),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                versionText,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.primary,
-                                  fontFamily: 'monospace',
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary.withValues(
+                                      alpha: isDark ? 0.25 : 0.12,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: theme.colorScheme.primary.withValues(
+                                        alpha: isDark ? 0.5 : 0.3,
+                                      ),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    versionText,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.primary,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -394,6 +409,10 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
                     ),
                     const SizedBox(height: 16),
 
+                    // Google Play Updates Card
+                    _buildUpdateCard(theme, isDark),
+                    const SizedBox(height: 16),
+
                     // License & Open Source
                     _buildSectionHeader(
                       'Open Source & Licensing',
@@ -498,6 +517,151 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
     );
   }
 
+  Widget _buildUpdateCard(ThemeData theme, bool isDark) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppUpdateService.isCheckingNotifier,
+      builder: (context, isChecking, _) {
+        final l10n = context.l10nOrNull;
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: LayoutBuilder(
+            builder: (context, cardConstraints) {
+              final isCompact = cardConstraints.maxWidth < 280;
+              final button = FilledButton.tonal(
+                onPressed: isChecking
+                    ? null
+                    : () {
+                        AppUpdateService.checkForUpdateManually(
+                          context: context,
+                          messenger: ScaffoldMessenger.of(context),
+                        );
+                      },
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: isChecking
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.sync_rounded, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            l10n?.checkForUpdates ?? 'Check',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+              );
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withValues(
+                              alpha: isDark ? 0.22 : 0.12,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.system_update_rounded,
+                            color: theme.colorScheme.primary,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            l10n?.checkForUpdates ?? 'Check for Updates',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    button,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(
+                        alpha: isDark ? 0.22 : 0.12,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.system_update_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n?.checkForUpdates ?? 'Check for Updates',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Google Play Store',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.white60 : Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  button,
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildLicensesButton(BuildContext context, String versionText) {
     return OutlinedButton.icon(
       onPressed: () {
@@ -555,9 +719,9 @@ class _AppInfoDialogState extends State<AppInfoDialog> {
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
-      child: const Text(
-        'Close',
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+      child: Text(
+        context.l10nOrNull?.close ?? 'Close',
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
       ),
     );
   }

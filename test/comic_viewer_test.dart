@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/core/models/pdf_item.dart';
 import 'package:kotoview/src/features/comic_viewer/models/comic_models.dart';
 import 'package:kotoview/src/features/comic_viewer/parser/comic_parser.dart';
+import 'package:kotoview/src/features/comic_viewer/widgets/comic_autoplay_bar.dart';
 import 'package:kotoview/src/features/comic_viewer/widgets/comic_page_item.dart';
 
 void main() {
@@ -338,4 +340,262 @@ void main() {
       expect(controller!.getScale(), closeTo(1.0, 0.05));
     });
   });
+
+  group('ComicAutoplayConfig Tests', () {
+    test('Default values are correct', () {
+      const config = ComicAutoplayConfig();
+      expect(config.intervalSeconds, equals(5.0));
+      expect(config.webtoonScrollSpeed, equals(60.0));
+      expect(config.loop, isFalse);
+      expect(config.pauseOnZoom, isTrue);
+    });
+
+    test('copyWith updates properties properly', () {
+      const config = ComicAutoplayConfig();
+      final updated = config.copyWith(
+        intervalSeconds: 8.0,
+        webtoonScrollSpeed: 100.0,
+        loop: true,
+        pauseOnZoom: false,
+      );
+      expect(updated.intervalSeconds, equals(8.0));
+      expect(updated.webtoonScrollSpeed, equals(100.0));
+      expect(updated.loop, isTrue);
+      expect(updated.pauseOnZoom, isFalse);
+    });
+
+    test('Serialization to/from JSON matches', () {
+      const config = ComicAutoplayConfig(
+        intervalSeconds: 10.0,
+        webtoonScrollSpeed: 85.0,
+        loop: true,
+        pauseOnZoom: false,
+      );
+      final json = config.toJson();
+      final deserialized = ComicAutoplayConfig.fromJson(json);
+      expect(deserialized, equals(config));
+      expect(deserialized.hashCode, equals(config.hashCode));
+    });
+  });
+
+  group('ComicAutoplayBar Widget Tests', () {
+    testWidgets('Renders Play/Pause buttons and triggers callbacks', (tester) async {
+      bool playPauseToggled = false;
+      bool previousTapped = false;
+      bool nextTapped = false;
+      bool loopToggled = false;
+      bool settingsOpened = false;
+      bool closed = false;
+      double? updatedInterval;
+
+      final progressNotifier = ValueNotifier<double>(0.4);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ComicAutoplayBar(
+              isPlaying: true,
+              isPaused: false,
+              isPausedForZoom: false,
+              isWebtoon: false,
+              config: const ComicAutoplayConfig(intervalSeconds: 5.0),
+              progressNotifier: progressNotifier,
+              onTogglePlayPause: () => playPauseToggled = true,
+              onPrevious: () => previousTapped = true,
+              onNext: () => nextTapped = true,
+              onToggleLoop: () => loopToggled = true,
+              onIntervalChanged: (val) => updatedInterval = val,
+              onScrollSpeedChanged: (_) {},
+              onOpenSettings: () => settingsOpened = true,
+              onClose: () => closed = true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('5s'), findsOneWidget);
+      expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.skip_previous_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);
+
+      // Tap Pause
+      await tester.tap(find.byIcon(Icons.pause_rounded));
+      expect(playPauseToggled, isTrue);
+
+      // Tap Skip Next
+      await tester.tap(find.byIcon(Icons.skip_next_rounded));
+      expect(nextTapped, isTrue);
+
+      // Tap Skip Previous
+      await tester.tap(find.byIcon(Icons.skip_previous_rounded));
+      expect(previousTapped, isTrue);
+
+      // Tap Loop
+      await tester.tap(find.byIcon(Icons.repeat_rounded));
+      expect(loopToggled, isTrue);
+
+      // Tap Settings
+      await tester.tap(find.byIcon(Icons.tune_rounded));
+      expect(settingsOpened, isTrue);
+
+      // Tap Close
+      await tester.tap(find.byIcon(Icons.close_rounded));
+      expect(closed, isTrue);
+
+      // Tap '+' to step interval
+      await tester.tap(find.byIcon(Icons.add));
+      expect(updatedInterval, equals(6.0));
+
+      // Tap '-' to step interval
+      await tester.tap(find.byIcon(Icons.remove));
+      expect(updatedInterval, equals(4.0));
+    });
+
+    testWidgets('Shows Webtoon speed stepper and hides prev/next buttons in Webtoon mode', (tester) async {
+      double? updatedSpeed;
+      final progressNotifier = ValueNotifier<double>(0.0);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ComicAutoplayBar(
+              isPlaying: true,
+              isPaused: true,
+              isPausedForZoom: false,
+              isWebtoon: true,
+              config: const ComicAutoplayConfig(webtoonScrollSpeed: 60.0),
+              progressNotifier: progressNotifier,
+              onTogglePlayPause: () {},
+              onPrevious: () {},
+              onNext: () {},
+              onToggleLoop: () {},
+              onIntervalChanged: (_) {},
+              onScrollSpeedChanged: (val) => updatedSpeed = val,
+              onOpenSettings: () {},
+              onClose: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('60 px/s'), findsOneWidget);
+      expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.skip_previous_rounded), findsNothing);
+      expect(find.byIcon(Icons.skip_next_rounded), findsNothing);
+
+      // Tap '+' to step speed
+      await tester.tap(find.byIcon(Icons.add));
+      expect(updatedSpeed, equals(70.0));
+    });
+
+    testWidgets('Shows zoom paused indicator when isPausedForZoom is true', (tester) async {
+      final progressNotifier = ValueNotifier<double>(0.5);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ComicAutoplayBar(
+              isPlaying: true,
+              isPaused: false,
+              isPausedForZoom: true,
+              isWebtoon: false,
+              config: const ComicAutoplayConfig(),
+              progressNotifier: progressNotifier,
+              onTogglePlayPause: () {},
+              onPrevious: () {},
+              onNext: () {},
+              onToggleLoop: () {},
+              onIntervalChanged: (_) {},
+              onScrollSpeedChanged: (_) {},
+              onOpenSettings: () {},
+              onClose: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.zoom_in), findsOneWidget);
+      expect(find.text('Paused (Zoomed)'), findsOneWidget);
+    });
+  });
+
+  group('ComicAutoplaySettingsSheet Widget Tests', () {
+    testWidgets('Adjusts page duration preset chip and toggles loop', (tester) async {
+      ComicAutoplayConfig? updatedConfig;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ComicAutoplaySettingsSheet(
+              initialConfig: const ComicAutoplayConfig(intervalSeconds: 5.0, loop: false),
+              isWebtoon: false,
+              onConfigChanged: (cfg) => updatedConfig = cfg,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Autoplay Settings'), findsOneWidget);
+      expect(find.text('Page Duration'), findsOneWidget);
+      expect(find.text('Loop from Beginning'), findsOneWidget);
+      expect(find.text('Pause when Zoomed'), findsOneWidget);
+
+      // Tap preset chip '8s'
+      await tester.tap(find.text('8s'));
+      await tester.pumpAndSettle();
+      expect(updatedConfig?.intervalSeconds, equals(8.0));
+
+      // Toggle Loop switch
+      await tester.tap(find.byType(Switch).first);
+      await tester.pumpAndSettle();
+      expect(updatedConfig?.loop, isTrue);
+    });
+  });
+
+  group('Comic Autoplay Localization Tests', () {
+    test('English localization contains all autoplay strings', () {
+      final l10n = lookupAppLocalizations(const Locale('en'));
+      expect(l10n.comicAutoplay, equals('Autoplay'));
+      expect(l10n.comicAutoplayStart, equals('Start Autoplay'));
+      expect(l10n.comicAutoplayPause, equals('Pause Autoplay'));
+      expect(l10n.comicAutoplayResume, equals('Resume Autoplay'));
+      expect(l10n.comicAutoplayStop, equals('Stop Autoplay'));
+      expect(l10n.comicAutoplaySettings, equals('Autoplay Settings'));
+      expect(l10n.comicAutoplaySeconds(5), equals('5s'));
+      expect(l10n.comicAutoplaySpeedPx(60), equals('60 px/s'));
+      expect(l10n.comicAutoplayLoop, equals('Loop from Beginning'));
+      expect(l10n.comicAutoplayPauseOnZoom, equals('Pause when Zoomed'));
+      expect(l10n.comicAutoplayEndReached, equals('Reached the end of the comic.'));
+      expect(l10n.comicAutoplayPausedForZoom, equals('Paused (Zoomed)'));
+    });
+
+    test('Bulgarian localization contains translated autoplay strings', () {
+      final l10n = lookupAppLocalizations(const Locale('bg'));
+      expect(l10n.comicAutoplay, equals('Автоматично прелистване'));
+      expect(l10n.comicAutoplayStart, equals('Старт на автоматично прелистване'));
+      expect(l10n.comicAutoplayPause, equals('Пауза на прелистването'));
+      expect(l10n.comicAutoplayResume, equals('Възобнови прелистването'));
+      expect(l10n.comicAutoplayStop, equals('Спри автоматичното прелистване'));
+      expect(l10n.comicAutoplaySettings, equals('Настройки за автоматично прелистване'));
+      expect(l10n.comicAutoplaySeconds(5), equals('5 сек.'));
+      expect(l10n.comicAutoplaySpeedPx(60), equals('60 px/сек.'));
+      expect(l10n.comicAutoplayLoop, equals('Повторение от началото'));
+      expect(l10n.comicAutoplayPauseOnZoom, equals('Пауза при мащабиране'));
+      expect(l10n.comicAutoplayEndReached, equals('Достигнат е краят на комикса.'));
+      expect(l10n.comicAutoplayPausedForZoom, equals('Пауза (Мащабирано)'));
+    });
+  });
 }
+

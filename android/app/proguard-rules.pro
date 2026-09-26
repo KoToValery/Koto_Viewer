@@ -8,3 +8,9 @@
     native <methods>;
 }
 
+# Google Play In-App Updates Core library
+-keep class com.google.android.play.core.appupdate.** { *; }
+-keep class com.google.android.play.core.install.** { *; }
+-keep class com.google.android.play.core.tasks.** { *; }
+
+

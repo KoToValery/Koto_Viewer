@@ -255,6 +255,44 @@
   "@comicRarNotSupported": { "description": "Error message when legacy RAR archive is encountered" },
   "comicArchiveCorrupted": "Comic book archive is corrupted or unreadable.",
   "@comicArchiveCorrupted": { "description": "Error message when comic archive cannot be extracted" },
+  "comicAutoplay": "Autoplay",
+  "@comicAutoplay": { "description": "Autoplay mode toggle or title" },
+  "comicAutoplayStart": "Start Autoplay",
+  "@comicAutoplayStart": { "description": "Tooltip to start autoplay" },
+  "comicAutoplayPause": "Pause Autoplay",
+  "@comicAutoplayPause": { "description": "Tooltip to pause autoplay" },
+  "comicAutoplayResume": "Resume Autoplay",
+  "@comicAutoplayResume": { "description": "Tooltip to resume autoplay" },
+  "comicAutoplayStop": "Stop Autoplay",
+  "@comicAutoplayStop": { "description": "Tooltip to stop autoplay" },
+  "comicAutoplaySettings": "Autoplay Settings",
+  "@comicAutoplaySettings": { "description": "Title for comic autoplay settings sheet" },
+  "comicAutoplayPageDuration": "Page Duration",
+  "@comicAutoplayPageDuration": { "description": "Label for page duration slider" },
+  "comicAutoplayScrollSpeed": "Webtoon Scroll Speed",
+  "@comicAutoplayScrollSpeed": { "description": "Label for webtoon scroll speed slider" },
+  "comicAutoplaySeconds": "{seconds}s",
+  "@comicAutoplaySeconds": {
+    "description": "Seconds display format",
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "comicAutoplaySpeedPx": "{speed} px/s",
+  "@comicAutoplaySpeedPx": {
+    "description": "Pixels per second scroll speed display",
+    "placeholders": {
+      "speed": { "type": "int" }
+    }
+  },
+  "comicAutoplayLoop": "Loop from Beginning",
+  "@comicAutoplayLoop": { "description": "Switch label to loop comic reading" },
+  "comicAutoplayPauseOnZoom": "Pause when Zoomed",
+  "@comicAutoplayPauseOnZoom": { "description": "Switch label to pause autoplay while zooming in" },
+  "comicAutoplayEndReached": "Reached the end of the comic.",
+  "@comicAutoplayEndReached": { "description": "Snackbar message when reaching end of comic in autoplay" },
+  "comicAutoplayPausedForZoom": "Paused (Zoomed)",
+  "@comicAutoplayPausedForZoom": { "description": "Badge text when autoplay is paused due to zoom" },
 
   "unsupportedFileFormat": "Unsupported file format: {name}",
   "@unsupportedFileFormat": {
@@ -594,5 +632,29 @@
   "allFilesHiddenWarning": "All files are hidden from the presentation. Please include at least one file.",
   "@allFilesHiddenWarning": { "description": "Warning when trying to start presentation with all files hidden" },
   "fileSkippedInPresentation": "Skipped in presentation",
-  "@fileSkippedInPresentation": { "description": "Subtitle tag shown in presentation bar when current file is hidden" }
+  "@fileSkippedInPresentation": { "description": "Subtitle tag shown in presentation bar when current file is hidden" },
+  "checkForUpdates": "Check for Updates",
+  "@checkForUpdates": { "description": "Button or menu item to check for application updates" },
+  "checkingForUpdates": "Checking for updates...",
+  "@checkingForUpdates": { "description": "Status message while checking for updates" },
+  "updateAvailableTitle": "Update Available",
+  "@updateAvailableTitle": { "description": "Dialog or snackbar title when a new version is found" },
+  "updateAvailableMessage": "A new version of KoToViewer is available on Google Play.",
+  "@updateAvailableMessage": { "description": "Message informing user that an update is available" },
+  "updateNow": "Update Now",
+  "@updateNow": { "description": "Button to start update process" },
+  "updateDownloadedSnackbar": "A new version has been downloaded. Restart the app to apply it.",
+  "@updateDownloadedSnackbar": { "description": "Snackbar notifying user that flexible update is ready to install" },
+  "restartToUpdate": "Restart",
+  "@restartToUpdate": { "description": "Button label to restart and apply the downloaded update" },
+  "appUpToDate": "You are using the latest version of KoToViewer.",
+  "@appUpToDate": { "description": "Notification that no updates are available" },
+  "updateCheckFailed": "Could not check for updates via Google Play.",
+  "@updateCheckFailed": { "description": "Notification when update check fails" },
+  "openPlayStore": "Open Google Play",
+  "@openPlayStore": { "description": "Button to open application page in Google Play Store" },
+  "debugTestingNote": "In debug / local build, Google Play In-App Updates require installation via Play Store (Internal Testing track or Internal App Sharing).",
+  "@debugTestingNote": { "description": "Developer informational note in debug mode" },
+  "simulateUpdate": "Simulate Update (Debug)",
+  "@simulateUpdate": { "description": "Debug button to test update UI and restart flow" }
 }
