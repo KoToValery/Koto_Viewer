@@ -78,7 +78,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
 
   @override
   void dispose() {
-    _stopAutoplay();
+    _stopAutoplay(updateState: false);
     _autoplayProgressNotifier.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _saveReadingProgress();
@@ -429,7 +429,16 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
       }
     } else {
       if (_pageController.hasClients) {
-        _pageController.jumpToPage(index);
+        final current = _pageController.page?.round() ?? _currentPageIndex;
+        if ((index - current).abs() == 1) {
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeInOutCubic,
+          );
+        } else {
+          _pageController.jumpToPage(index);
+        }
       }
     }
     _scrollThumbnailToView(index);
@@ -519,7 +528,35 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   }
 
   void _startAutoplay() {
-    if (_comic == null || _comic!.pageCount <= 1) return;
+    if (_comic == null) return;
+    if (_comic!.pageCount <= 1) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            content: Text(context.l10n.comicAutoplayEndReached),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Rewind to start if already at the end
+    if (_readingMode != ComicReadingMode.verticalContinuous &&
+        _currentPageIndex >= _comic!.pageCount - 1) {
+      _goToPage(0);
+    }
+    if (_readingMode == ComicReadingMode.verticalContinuous &&
+        _webtoonScrollController.hasClients &&
+        _webtoonScrollController.position.maxScrollExtent > 0 &&
+        _webtoonScrollController.offset >= _webtoonScrollController.position.maxScrollExtent - 10) {
+      _webtoonScrollController.jumpTo(0.0);
+    }
+
+    // Reset zoom so autoplay is not blocked by pauseOnZoom
+    _resetZoom();
+
     setState(() {
       _isAutoplayActive = true;
       _isAutoplayPaused = false;
@@ -544,15 +581,18 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     }
   }
 
-  void _stopAutoplay() {
+  void _stopAutoplay({bool updateState = true}) {
     _autoplayTimer?.cancel();
     _autoplayTimer = null;
-    if (mounted) {
+    if (updateState && mounted) {
       setState(() {
         _isAutoplayActive = false;
         _isAutoplayPaused = false;
         _autoplayProgressNotifier.value = 0.0;
       });
+    } else {
+      _isAutoplayActive = false;
+      _isAutoplayPaused = false;
     }
   }
 
@@ -565,8 +605,15 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   }
 
   void _toggleAutoplayPause() {
+    if (!_isAutoplayActive) {
+      _startAutoplay();
+      return;
+    }
     setState(() {
       _isAutoplayPaused = !_isAutoplayPaused;
+      if (!_isAutoplayPaused && (_isCurrentPageZoomed || _currentZoomScale > 1.05)) {
+        _resetZoom();
+      }
     });
   }
 
@@ -580,8 +627,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     if (!mounted || !_isAutoplayActive || _isAutoplayPaused) return;
 
     final isZoomed = (_readingMode == ComicReadingMode.verticalContinuous)
-        ? _currentZoomScale > 1.05
-        : (_isCurrentPageZoomed || _currentZoomScale > 1.05);
+        ? _currentZoomScale > 1.15
+        : (_isCurrentPageZoomed || _currentZoomScale > 1.15);
 
     if (_autoplayConfig.pauseOnZoom && isZoomed) {
       return;
@@ -594,7 +641,11 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
         final delta = _autoplayConfig.webtoonScrollSpeed * 0.05;
         final nextOffset = currentOffset + delta;
 
-        if (nextOffset >= maxScroll) {
+        final isAtTrueEnd = maxScroll > 0 &&
+            nextOffset >= maxScroll &&
+            (_comic == null || _currentPageIndex >= _comic!.pageCount - 1);
+
+        if (isAtTrueEnd) {
           if (_autoplayConfig.loop) {
             _webtoonScrollController.jumpTo(0.0);
             _autoplayProgressNotifier.value = 0.0;
@@ -611,19 +662,20 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
             }
           }
         } else {
-          _webtoonScrollController.jumpTo(nextOffset);
           if (maxScroll > 0) {
-            _autoplayProgressNotifier.value = (nextOffset / maxScroll).clamp(0.0, 1.0);
-          }
-          if (_comic != null && _comic!.pageCount > 0 && maxScroll > 0) {
-            final pageFraction = nextOffset / maxScroll;
-            final estimatedPage =
-                (pageFraction * (_comic!.pageCount - 1)).round().clamp(0, _comic!.pageCount - 1);
-            if (estimatedPage != _currentPageIndex) {
-              setState(() {
-                _currentPageIndex = estimatedPage;
-              });
-              _scrollThumbnailToView(estimatedPage);
+            final targetOffset = nextOffset.clamp(0.0, maxScroll);
+            _webtoonScrollController.jumpTo(targetOffset);
+            _autoplayProgressNotifier.value = (targetOffset / maxScroll).clamp(0.0, 1.0);
+            if (_comic != null && _comic!.pageCount > 0) {
+              final pageFraction = targetOffset / maxScroll;
+              final estimatedPage =
+                  (pageFraction * (_comic!.pageCount - 1)).round().clamp(0, _comic!.pageCount - 1);
+              if (estimatedPage != _currentPageIndex) {
+                setState(() {
+                  _currentPageIndex = estimatedPage;
+                });
+                _scrollThumbnailToView(estimatedPage);
+              }
             }
           }
         }
@@ -683,33 +735,6 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
         );
       },
     );
-  }
-
-  void _zoomIn() {
-    if (_readingMode == ComicReadingMode.verticalContinuous) {
-      final cur = _webtoonTransformController.value.getMaxScaleOnAxis();
-      final target = (cur + 0.5).clamp(1.0, 4.0);
-      _webtoonTransformController.value = Matrix4.diagonal3Values(target, target, 1.0);
-      setState(() => _currentZoomScale = target);
-    } else {
-      _pageItemControllers[_currentPageIndex]?.zoomIn();
-    }
-  }
-
-  void _zoomOut() {
-    if (_readingMode == ComicReadingMode.verticalContinuous) {
-      final cur = _webtoonTransformController.value.getMaxScaleOnAxis();
-      final target = (cur - 0.5).clamp(1.0, 4.0);
-      if (target <= 1.05) {
-        _webtoonTransformController.value = Matrix4.identity();
-        setState(() => _currentZoomScale = 1.0);
-      } else {
-        _webtoonTransformController.value = Matrix4.diagonal3Values(target, target, 1.0);
-        setState(() => _currentZoomScale = target);
-      }
-    } else {
-      _pageItemControllers[_currentPageIndex]?.zoomOut();
-    }
   }
 
   void _resetZoom() {
@@ -1002,7 +1027,46 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                       ),
                   ],
                 ),
-                actions: const [],
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: TextButton.icon(
+                      onPressed: _toggleAutoplay,
+                      icon: Icon(
+                        _isAutoplayActive
+                            ? (_isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_rounded)
+                            : Icons.play_circle_fill,
+                        color: _isAutoplayActive ? const Color(0xFFE11D48) : theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                      label: Text(
+                        _isAutoplayActive
+                            ? (_isAutoplayPaused ? context.l10n.comicAutoplayResume : context.l10n.comicAutoplayPause)
+                            : context.l10n.comicAutoplay,
+                        style: TextStyle(
+                          color: _isAutoplayActive ? const Color(0xFFE11D48) : Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        backgroundColor: _isAutoplayActive
+                            ? const Color(0xFFE11D48).withValues(alpha: 0.15)
+                            : Colors.white.withValues(alpha: 0.12),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: _isAutoplayActive
+                                ? const Color(0xFFE11D48).withValues(alpha: 0.4)
+                                : Colors.white24,
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 // Row 2: Command Actions Bar (horizontally scrollable, no overflow)
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(44),
@@ -1043,9 +1107,14 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                                       color: _readingMode == mode ? theme.colorScheme.primary : null,
                                     ),
                                     const SizedBox(width: 10),
-                                    Text(mode.label),
+                                    Expanded(
+                                      child: Text(
+                                        mode.label,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                     if (_readingMode == mode) ...[
-                                      const Spacer(),
+                                      const SizedBox(width: 8),
                                       Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
                                     ],
                                   ],
@@ -1157,8 +1226,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                           ? _buildWebtoonView()
                           : _buildPagedView(),
 
-                      // Autoplay Minimal Progress Indicator when controls are hidden
-                      if (!_showControls && _isAutoplayActive)
+                      // Autoplay Minimal Indicator when controls are hidden
+                      if (!_showControls && _isAutoplayActive) ...[
                         Positioned(
                           bottom: 0,
                           left: 0,
@@ -1175,6 +1244,54 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                             },
                           ),
                         ),
+                        // Sleek minimal floating pill during full-screen autoplay
+                        Positioned(
+                          bottom: 16,
+                          right: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.80),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white24, width: 1),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 2)),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    _isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                                    size: 20,
+                                    color: const Color(0xFFE11D48),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: _toggleAutoplayPause,
+                                  tooltip: _isAutoplayPaused ? context.l10n.comicAutoplayResume : context.l10n.comicAutoplayPause,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _readingMode == ComicReadingMode.verticalContinuous
+                                      ? '${_autoplayConfig.webtoonScrollSpeed.round()} px/s'
+                                      : '${_autoplayConfig.intervalSeconds.round()}s',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: _stopAutoplay,
+                                  tooltip: context.l10n.comicAutoplayStop,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
 
                       // Floating Autoplay Controls Bar
                       if (_showControls && _isAutoplayActive)
@@ -1188,8 +1305,8 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                               isPaused: _isAutoplayPaused,
                               isPausedForZoom: _autoplayConfig.pauseOnZoom &&
                                   ((_readingMode == ComicReadingMode.verticalContinuous)
-                                      ? _currentZoomScale > 1.05
-                                      : (_isCurrentPageZoomed || _currentZoomScale > 1.05)),
+                                      ? _currentZoomScale > 1.15
+                                      : (_isCurrentPageZoomed || _currentZoomScale > 1.15)),
                               isWebtoon: _readingMode == ComicReadingMode.verticalContinuous,
                               config: _autoplayConfig,
                               progressNotifier: _autoplayProgressNotifier,
@@ -1219,12 +1336,11 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                               },
                               onOpenSettings: _showAutoplaySettingsSheet,
                               onClose: _stopAutoplay,
+                              onResetZoom: _resetZoom,
                             ),
                           ),
                         ),
 
-                      // Floating Zoom & Fit Bar
-                      if (_showControls) _buildFloatingZoomBar(theme),
 
                       // Bottom Controls Overlay
                       if (_showControls) _buildBottomControlsOverlay(theme),
@@ -1467,9 +1583,11 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
         transformationController: _webtoonTransformController,
         minScale: 1.0,
         maxScale: 4.0,
-        panEnabled: true,
+        panEnabled: _currentZoomScale > 1.05,
         scaleEnabled: true,
-        boundaryMargin: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
+        boundaryMargin: _currentZoomScale > 1.05
+            ? const EdgeInsets.symmetric(horizontal: 40, vertical: 40)
+            : EdgeInsets.zero,
         child: ListView.builder(
           controller: _webtoonScrollController,
           itemCount: _comic!.pageCount,
@@ -1492,88 +1610,6 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     );
   }
 
-  Widget _buildFloatingZoomBar(ThemeData theme) {
-    return Positioned(
-      bottom: _isAutoplayActive ? 220 : 148,
-      right: 16,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.85),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white24, width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.remove, size: 18, color: Colors.white),
-              tooltip: 'Zoom Out',
-              padding: const EdgeInsets.all(6),
-              constraints: const BoxConstraints(),
-              onPressed: _currentZoomScale > 1.05 ? _zoomOut : null,
-            ),
-            const SizedBox(width: 4),
-            InkWell(
-              onTap: _resetZoom,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white12,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${(_currentZoomScale * 100).round()}%',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.add, size: 18, color: Colors.white),
-              tooltip: 'Zoom In',
-              padding: const EdgeInsets.all(6),
-              constraints: const BoxConstraints(),
-              onPressed: _currentZoomScale < 3.95 ? _zoomIn : null,
-            ),
-            Container(
-              height: 18,
-              width: 1,
-              margin: const EdgeInsets.symmetric(horizontal: 6),
-              color: Colors.white24,
-            ),
-            IconButton(
-              icon: Icon(
-                _fitMode == ComicFitMode.fitWidth
-                    ? Icons.fit_screen
-                    : _fitMode == ComicFitMode.fitPage
-                        ? Icons.fullscreen
-                        : Icons.swap_vert,
-                size: 18,
-                color: Colors.white,
-              ),
-              tooltip: '${_fitMode.label} (Tap to change)',
-              padding: const EdgeInsets.all(6),
-              constraints: const BoxConstraints(),
-              onPressed: _cycleFitMode,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildBottomControlsOverlay(ThemeData theme) {
     return Positioned(

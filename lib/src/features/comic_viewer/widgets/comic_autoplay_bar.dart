@@ -21,6 +21,7 @@ class ComicAutoplayBar extends StatelessWidget {
   final ValueChanged<double> onScrollSpeedChanged;
   final VoidCallback onOpenSettings;
   final VoidCallback onClose;
+  final VoidCallback? onResetZoom;
 
   const ComicAutoplayBar({
     super.key,
@@ -38,6 +39,7 @@ class ComicAutoplayBar extends StatelessWidget {
     required this.onScrollSpeedChanged,
     required this.onOpenSettings,
     required this.onClose,
+    this.onResetZoom,
   });
 
   void _stepInterval(int deltaSeconds) {
@@ -79,26 +81,40 @@ class ComicAutoplayBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Zoom Pause Status Banner
+              // Zoom Pause Status Banner (Tap to reset zoom and resume)
               if (isPausedForZoom)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  color: Colors.amber.withValues(alpha: 0.2),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.zoom_in, size: 14, color: Colors.amberAccent),
-                      const SizedBox(width: 6),
-                      Text(
-                        l10n.comicAutoplayPausedForZoom,
-                        style: const TextStyle(
-                          color: Colors.amberAccent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                InkWell(
+                  onTap: onResetZoom,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    color: Colors.amber.withValues(alpha: 0.2),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.zoom_in, size: 14, color: Colors.amberAccent),
+                        const SizedBox(width: 6),
+                        Text(
+                          l10n.comicAutoplayPausedForZoom,
+                          style: const TextStyle(
+                            color: Colors.amberAccent,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
+                        if (onResetZoom != null) ...[
+                          const SizedBox(width: 6),
+                          const Text(
+                            '(100%)',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
 
