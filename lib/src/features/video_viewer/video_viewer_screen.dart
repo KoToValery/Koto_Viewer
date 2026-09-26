@@ -65,8 +65,12 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
-    // Enable immersive fullscreen
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Schedule immersive sticky after the first frame to avoid window layout collisions
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      }
+    });
     _initPlayer();
   }
 
@@ -80,7 +84,19 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
       final controller = VideoPlayerController.file(file);
       _controller = controller;
 
+      // Yield frame so the route transition animation completes cleanly without dropping frames
+      await Future.delayed(const Duration(milliseconds: 50));
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
       await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
       controller.addListener(_onControllerUpdate);
 
       // Auto-adapt orientation if the video is wide (16:9 / horizontal)
@@ -109,13 +125,21 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
   }
 
   void _onControllerUpdate() {
-    if (!mounted) return;
-    if (_controller != null && _controller!.value.hasError) {
-      setState(() {
-        _hasError = true;
-        _errorMessage = _controller!.value.errorDescription;
-      });
-    } else {
+    if (!mounted || _controller == null) return;
+    if (_controller!.value.hasError) {
+      if (!_hasError) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = _controller!.value.errorDescription;
+        });
+      }
+      return;
+    }
+
+    // Only rebuild the widget tree when controls are actually visible!
+    // When controls are hidden, the native VideoPlayer texture renders on the GPU
+    // without burdening the Flutter UI thread on every frame.
+    if (_showControls) {
       setState(() {});
     }
   }
@@ -127,14 +151,17 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> with SingleTicker
     _controller?.removeListener(_onControllerUpdate);
     _controller?.dispose();
 
-    // Restore system UI and device orientations
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    // Only restore system UI if exiting standalone viewer
+    // (Presentation mode maintains immersive mode across slides and restores on exit)
+    if (widget.projectBundle == null) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
 
     super.dispose();
   }

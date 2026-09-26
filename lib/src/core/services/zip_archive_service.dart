@@ -230,17 +230,35 @@ class ZipArchiveService {
     required File targetFile,
   }) async {
     final entries = await readCentralDirectory(zipPath);
-    final normalizedSearch = internalName.replaceAll('\\', '/');
+    final normalizedSearch = internalName
+        .replaceAll('\\', '/')
+        .replaceAll(RegExp(r'^\.?/'), '');
 
     ZipEntryInfo? match;
     for (final e in entries) {
       if (e.isDirectory) continue;
-      final entryNorm = e.name.replaceAll('\\', '/');
+      final entryNorm = e.name
+          .replaceAll('\\', '/')
+          .replaceAll(RegExp(r'^\.?/'), '');
       if (entryNorm == normalizedSearch ||
           entryNorm.endsWith('/$normalizedSearch') ||
+          normalizedSearch.endsWith('/$entryNorm') ||
           e.name == internalName) {
         match = e;
         break;
+      }
+    }
+
+    // Fallback: match by filename if directory prefix differs in archive
+    if (match == null) {
+      final baseSearch = normalizedSearch.split('/').last.toLowerCase();
+      for (final e in entries) {
+        if (e.isDirectory) continue;
+        final entryBase = e.name.replaceAll('\\', '/').split('/').last.toLowerCase();
+        if (entryBase == baseSearch) {
+          match = e;
+          break;
+        }
       }
     }
 

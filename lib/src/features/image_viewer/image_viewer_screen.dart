@@ -116,7 +116,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
   void dispose() {
     _hideControlsTimer?.cancel();
     _focusNode.dispose();
-    if (widget.projectBundle != null) {
+    if (widget.projectBundle != null && widget.onSwitchProjectItem == null) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
     _transformationController.dispose();

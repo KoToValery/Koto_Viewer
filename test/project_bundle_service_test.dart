@@ -163,6 +163,39 @@ void main() {
       expect(info3.files.first.fileName, '02_Flythrough.mp4');
     });
 
+    test('reordering files preserves paths and enables opening every item in any order', () async {
+      // Create a zip with subfolders having same-named files
+      final subZipPath = '${tempDir.path}${Platform.pathSeparator}Nested_Project.zip';
+      final archive = Archive();
+      archive.addFile(ArchiveFile('part1/render.jpg', 3, Uint8List.fromList([1, 2, 3])));
+      archive.addFile(ArchiveFile('part2/render.jpg', 4, Uint8List.fromList([4, 5, 6, 7])));
+      archive.addFile(ArchiveFile('videos/intro.mp4', 3, Uint8List.fromList([8, 9, 10])));
+      await File(subZipPath).writeAsBytes(ZipEncoder().encode(archive)!);
+
+      final bundle = await ProjectBundleService.inspectBundle(subZipPath);
+      expect(bundle.files.length, 3);
+
+      // Reorder items in reverse order
+      final reorderedPaths = bundle.files.reversed.map((f) => f.internalPath).toList();
+      await ProjectBundleService.savePresentationOrder(subZipPath, reorderedPaths);
+
+      final reloadedBundle = await ProjectBundleService.inspectBundle(subZipPath);
+      expect(reloadedBundle.files.map((f) => f.internalPath).toList(), reorderedPaths);
+
+      // Verify that every reordered file can be extracted to distinct paths without collision or loss
+      final extractedPaths = <String>{};
+      for (final fileEntry in reloadedBundle.files) {
+        final path = await ProjectBundleService.extractFile(subZipPath, fileEntry.internalPath);
+        final file = File(path);
+        expect(await file.exists(), isTrue);
+        expect(await file.length(), fileEntry.uncompressedSize);
+        extractedPaths.add(path);
+      }
+
+      // All extracted paths must be distinct (part1/render.jpg and part2/render.jpg never collide)
+      expect(extractedPaths.length, 3);
+    });
+
     test('isProjectBundle returns false for PCB ZIP archives containing mixed 3D/BOM/image media', () async {
       final pcbZipPath = '${tempDir.path}${Platform.pathSeparator}PCB_Board_Production.zip';
       final pcbArchive = Archive();

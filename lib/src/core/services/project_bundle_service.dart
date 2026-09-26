@@ -246,8 +246,14 @@ class ProjectBundleService {
   static const String _orderPrefsPrefix = 'koto_proj_bundle_order_';
 
   static String _getOrderKey(String archivePath) {
-    final normalized = archivePath.replaceAll('\\', '/');
-    return '$_orderPrefsPrefix${normalized.hashCode}';
+    final normalized = archivePath.replaceAll('\\', '/').toLowerCase();
+    // Deterministic FNV-1a 64-bit hash to guarantee stability across platforms and app restarts
+    var hash = BigInt.parse('cbf29ce484222325', radix: 16);
+    final prime = BigInt.parse('100000001b3', radix: 16);
+    for (final unit in utf8.encode(normalized)) {
+      hash = ((hash ^ BigInt.from(unit)) * prime) & BigInt.parse('ffffffffffffffff', radix: 16);
+    }
+    return '$_orderPrefsPrefix${hash.toRadixString(16)}';
   }
 
   /// Saves the custom presentation order for an archive bundle using internal file paths.
@@ -288,10 +294,15 @@ class ProjectBundleService {
   /// Any file paths in [savedOrder] that exist in [files] are placed first in that exact sequence.
   /// Any remaining/new files not found in [savedOrder] are appended at the end.
   static void applyPresentationOrder(List<ProjectFileEntry> files, List<String> savedOrder) {
-    final fileMap = {for (final f in files) f.internalPath: f};
+    final fileMap = <String, ProjectFileEntry>{};
+    for (final f in files) {
+      final clean = f.internalPath.replaceAll('\\', '/').replaceAll(RegExp(r'^\.?/'), '');
+      fileMap[clean] = f;
+    }
     final reordered = <ProjectFileEntry>[];
-    for (final path in savedOrder) {
-      final entry = fileMap.remove(path);
+    for (final rawPath in savedOrder) {
+      final clean = rawPath.replaceAll('\\', '/').replaceAll(RegExp(r'^\.?/'), '');
+      final entry = fileMap.remove(clean);
       if (entry != null) {
         reordered.add(entry);
       }
@@ -426,6 +437,23 @@ class ProjectBundleService {
     return dir;
   }
 
+  /// Returns the target cached file path for an archive entry.
+  static Future<File> getCachedFile(String archivePath, String internalPath) async {
+    final cacheDir = await _getBundleCacheDir(archivePath);
+    final safeSubPath = internalPath
+        .replaceAll('..', '')
+        .replaceAll('\\', '/')
+        .replaceAll(RegExp(r'^\.?/'), '');
+    final safeFileName = safeSubPath.replaceAll('/', '_');
+    return File('${cacheDir.path}${Platform.pathSeparator}$safeFileName');
+  }
+
+  /// Checks if a file is already extracted in cache and has valid size.
+  static Future<bool> isFileExtracted(String archivePath, String internalPath) async {
+    final file = await getCachedFile(archivePath, internalPath);
+    return await file.exists() && await file.length() > 0;
+  }
+
   /// Extracts a single file on-demand from the archive into the temporary cache.
   /// Uses random-access seeking and background Isolate decompression without reading the entire archive.
   /// Returns the absolute local file path of the extracted file.
@@ -434,10 +462,7 @@ class ProjectBundleService {
     String internalPath, {
     void Function(double progress)? onProgress,
   }) async {
-    final cacheDir = await _getBundleCacheDir(archivePath);
-    // Sanitize internal filename to prevent path traversal
-    final safeSubPath = internalPath.replaceAll('..', '').replaceAll('\\', '/');
-    final targetFile = File('${cacheDir.path}${Platform.pathSeparator}${safeSubPath.split('/').last}');
+    final targetFile = await getCachedFile(archivePath, internalPath);
 
     // If already extracted and has valid size, return cached file
     if (await targetFile.exists() && await targetFile.length() > 0) {

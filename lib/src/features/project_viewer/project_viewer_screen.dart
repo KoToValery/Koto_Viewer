@@ -74,52 +74,64 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     }
   }
 
-  Future<void> _openProjectItem(ProjectFileEntry item, int index) async {
+  Future<void> _openProjectItem(ProjectFileEntry item, int index, {bool replace = false}) async {
     if (_bundle == null) return;
 
-    // Show extraction progress dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: CircularProgressIndicator(strokeWidth: 3, color: Colors.amber),
-                ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        context.l10n.extractingFile(item.fileName),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.formattedSize,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    // Check if file is already extracted in cache
+    final isCached = await ProjectBundleService.isFileExtracted(
+      _bundle!.archivePath,
+      item.internalPath,
     );
+
+    BuildContext? dialogContext;
+    if (!isCached && mounted) {
+      // Show extraction progress dialog ONLY when extraction is genuinely needed
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          dialogContext = ctx;
+          return PopScope(
+            canPop: false,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              content: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(strokeWidth: 3, color: Colors.amber),
+                    ),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.l10n.extractingFile(item.fileName),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.formattedSize,
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
 
     final String extractedPath;
     String? readyDwgPath;
@@ -136,8 +148,10 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
       }
     } catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'ProjectViewerScreen.extractFile');
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!).pop();
+      }
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // Close dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not open file: $e'), backgroundColor: Colors.red),
         );
@@ -145,93 +159,76 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
       return;
     }
 
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pop(); // Close progress dialog
+    if (dialogContext != null && dialogContext!.mounted) {
+      Navigator.of(dialogContext!).pop(); // Close progress dialog specifically
+    }
 
-    if (!File(extractedPath).existsSync()) return;
+    if (!mounted || !File(extractedPath).existsSync()) return;
 
-    // Helper to switch project items from child viewers
+    // Helper to switch project items from child viewers smoothly without losing path or presentation state
     void switchItem(int newIndex) {
-      Navigator.of(context).pop();
+      if (!mounted || _bundle == null) return;
       if (newIndex >= 0 && newIndex < _bundle!.files.length) {
-        _openProjectItem(_bundle!.files[newIndex], newIndex);
+        _openProjectItem(_bundle!.files[newIndex], newIndex, replace: true);
       }
     }
 
     // Route to appropriate viewer with full presentation context
+    final Widget viewerWidget;
     if (item.category == ProjectItemCategory.video || item.fileType == KotoFileType.video) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => VideoViewerScreen(
-            filePath: extractedPath,
-            title: item.fileName,
-            addToRecent: false,
-            projectBundle: _bundle,
-            currentProjectIndex: index,
-            onSwitchProjectItem: switchItem,
-          ),
-        ),
+      viewerWidget = VideoViewerScreen(
+        filePath: extractedPath,
+        title: item.fileName,
+        addToRecent: false,
+        projectBundle: _bundle,
+        currentProjectIndex: index,
+        onSwitchProjectItem: switchItem,
       );
-    } else if (item.category == ProjectItemCategory.image || item.fileType == KotoFileType.image ||
-               item.fileType == KotoFileType.ico || item.fileType == KotoFileType.psd) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ImageViewerScreen(
-            filePath: extractedPath,
-            projectBundle: _bundle,
-            currentProjectIndex: index,
-            onSwitchProjectItem: switchItem,
-          ),
-        ),
+    } else if (item.category == ProjectItemCategory.image ||
+        item.fileType == KotoFileType.image ||
+        item.fileType == KotoFileType.ico ||
+        item.fileType == KotoFileType.psd) {
+      viewerWidget = ImageViewerScreen(
+        filePath: extractedPath,
+        projectBundle: _bundle,
+        currentProjectIndex: index,
+        onSwitchProjectItem: switchItem,
       );
     } else if (item.category == ProjectItemCategory.drawing &&
-               (item.fileType == KotoFileType.dxf || item.fileType == KotoFileType.dwg)) {
+        (item.fileType == KotoFileType.dxf || item.fileType == KotoFileType.dwg)) {
       String dxfPath = extractedPath;
       String? origPath;
       if (item.fileType == KotoFileType.dwg) {
         origPath = extractedPath;
         dxfPath = readyDwgPath ?? extractedPath;
       }
-      if (!mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => DxfViewerScreen(
-            filePath: dxfPath,
-            title: item.fileName,
-            originalFilePath: origPath,
-            addToRecent: false,
-            projectBundle: _bundle,
-            currentProjectIndex: index,
-            onSwitchProjectItem: switchItem,
-          ),
-        ),
+      viewerWidget = DxfViewerScreen(
+        filePath: dxfPath,
+        title: item.fileName,
+        originalFilePath: origPath,
+        addToRecent: false,
+        projectBundle: _bundle,
+        currentProjectIndex: index,
+        onSwitchProjectItem: switchItem,
       );
     } else if (item.fileType == KotoFileType.pdf ||
-               (item.category == ProjectItemCategory.drawing && item.fileType == KotoFileType.pdf)) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => PdfViewerScreen(
-            filePath: extractedPath,
-            title: item.fileName,
-            addToRecent: false,
-            projectBundle: _bundle,
-            currentProjectIndex: index,
-            onSwitchProjectItem: switchItem,
-          ),
-        ),
+        (item.category == ProjectItemCategory.drawing && item.fileType == KotoFileType.pdf)) {
+      viewerWidget = PdfViewerScreen(
+        filePath: extractedPath,
+        title: item.fileName,
+        addToRecent: false,
+        projectBundle: _bundle,
+        currentProjectIndex: index,
+        onSwitchProjectItem: switchItem,
       );
     } else if (item.category == ProjectItemCategory.model3d) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => Dxf3DViewerScreen(
-            filePath: extractedPath,
-            title: item.fileName,
-            addToRecent: false,
-            projectBundle: _bundle,
-            currentProjectIndex: index,
-            onSwitchProjectItem: switchItem,
-          ),
-        ),
+      viewerWidget = Dxf3DViewerScreen(
+        filePath: extractedPath,
+        title: item.fileName,
+        addToRecent: false,
+        projectBundle: _bundle,
+        currentProjectIndex: index,
+        onSwitchProjectItem: switchItem,
       );
     } else {
       await FileOpenerService.openFile(
@@ -239,6 +236,27 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         filePath: extractedPath,
         addToRecent: false,
       );
+      return;
+    }
+
+    if (!mounted) return;
+    if (replace) {
+      // Lightweight 180ms fade transition for slide replacement avoids heavy 3D route transitions
+      await Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, animation, __) => viewerWidget,
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
+          transitionDuration: const Duration(milliseconds: 180),
+        ),
+      );
+    } else {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => viewerWidget),
+      );
+      if (mounted) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      }
     }
   }
 
@@ -277,19 +295,18 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
 
     if (moveUp && filteredIndex > 0) {
       final prevItem = currentFiltered[filteredIndex - 1];
-      final targetIndex = files.indexOf(prevItem);
       setState(() {
-        files.removeAt(currentIndex);
-        files.insert(targetIndex, item);
+        files.remove(item);
+        final newPrevIndex = files.indexOf(prevItem);
+        files.insert(newPrevIndex, item);
       });
       _saveCurrentOrder();
     } else if (!moveUp && filteredIndex < currentFiltered.length - 1) {
       final nextItem = currentFiltered[filteredIndex + 1];
-      final targetIndex = files.indexOf(nextItem);
       setState(() {
-        files.removeAt(currentIndex);
-        final adjustedTarget = targetIndex > currentIndex ? targetIndex : targetIndex + 1;
-        files.insert(adjustedTarget, item);
+        files.remove(item);
+        final newNextIndex = files.indexOf(nextItem);
+        files.insert(newNextIndex + 1, item);
       });
       _saveCurrentOrder();
     }
