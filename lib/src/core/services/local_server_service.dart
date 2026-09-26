@@ -156,63 +156,16 @@ class LocalServerService {
     }
   }
 
-  /// Determines the safe directory to store uploaded files.
+  /// Determines the dedicated directory in local app storage to store uploaded files.
   static Future<Directory> getUploadDirectory() async {
-    if (Platform.isAndroid) {
-      try {
-        final publicDownload = Directory('/storage/emulated/0/Download');
-        if (publicDownload.existsSync()) {
-          final testFile = File('${publicDownload.path}/.koto_write_test_${DateTime.now().millisecondsSinceEpoch}');
-          testFile.writeAsStringSync('ok');
-          testFile.deleteSync();
-          return publicDownload;
-        }
-      } catch (_) {
-        // Scoped storage on Android 11+ might restrict direct writes to /Download
-      }
-
-      try {
-        final extDir = await getExternalStorageDirectory();
-        if (extDir != null) {
-          final uploads = Directory('${extDir.path}/Uploads');
-          if (!uploads.existsSync()) {
-            uploads.createSync(recursive: true);
-          }
-          return uploads;
-        }
-      } catch (_) {}
-
-      final docs = await getApplicationDocumentsDirectory();
-      final uploads = Directory('${docs.path}/Uploads');
-      if (!uploads.existsSync()) {
-        uploads.createSync(recursive: true);
-      }
-      return uploads;
-    } else if (Platform.isWindows) {
-      try {
-        final userProfile = Platform.environment['USERPROFILE'];
-        if (userProfile != null) {
-          final downloadDir = Directory('$userProfile\\Downloads');
-          if (downloadDir.existsSync()) return downloadDir;
-        }
-        final downloads = await getDownloadsDirectory();
-        if (downloads != null && downloads.existsSync()) return downloads;
-      } catch (_) {}
-
-      final docs = await getApplicationDocumentsDirectory();
-      final uploads = Directory('${docs.path}\\KoToViewer\\Uploads');
-      if (!uploads.existsSync()) {
-        uploads.createSync(recursive: true);
-      }
-      return uploads;
-    } else {
-      final docs = await getApplicationDocumentsDirectory();
-      final uploads = Directory('${docs.path}/Uploads');
-      if (!uploads.existsSync()) {
-        uploads.createSync(recursive: true);
-      }
-      return uploads;
+    final docs = await getApplicationDocumentsDirectory();
+    final uploads = Directory(
+      '${docs.path}${Platform.pathSeparator}KoToViewer${Platform.pathSeparator}Uploads',
+    );
+    if (!uploads.existsSync()) {
+      uploads.createSync(recursive: true);
     }
+    return uploads;
   }
 
   static shelf.Handler _buildHandler({

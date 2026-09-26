@@ -745,4 +745,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get simulateUpdate => 'Simulate Update (Debug)';
+
+  @override
+  String get localAppFolder => 'Uploaded Files';
+
+  @override
+  String get localAppFolderSubtitle => 'App local storage';
+
+  @override
+  String get deleteFileTitle => 'Delete File';
+
+  @override
+  String deleteFileConfirm(String name) {
+    return 'Are you sure you want to permanently delete \"$name\" from app storage?';
+  }
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get fileDeleted => 'File deleted';
+
+  @override
+  String get removeFromRecent => 'Remove from recent';
 }

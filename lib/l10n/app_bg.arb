@@ -219,5 +219,12 @@
   "updateCheckFailed": "Неуспешна проверка за нова версия през Google Play.",
   "openPlayStore": "Отвори Google Play",
   "debugTestingNote": "При дебъг / локален билд, Google Play обновяването изисква инсталация през Play Store (Вътрешен тестов канал или Internal App Sharing).",
-  "simulateUpdate": "Симулирай обновяване (Дебъг)"
+  "simulateUpdate": "Симулирай обновяване (Дебъг)",
+  "localAppFolder": "Качени файлове",
+  "localAppFolderSubtitle": "Папка в паметта на приложението",
+  "deleteFileTitle": "Изтриване на файл",
+  "deleteFileConfirm": "Сигурни ли сте, че искате да изтриете \"{name}\" от паметта на приложението?",
+  "delete": "Изтрий",
+  "fileDeleted": "Файлът беше изтрит",
+  "removeFromRecent": "Премахни от скорошни"
 }

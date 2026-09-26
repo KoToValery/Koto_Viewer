@@ -8,8 +8,9 @@ import '../models/pdf_item.dart';
 import '../l10n/l10n_extensions.dart';
 import 'recent_files_service.dart';
 import 'android_saf_service.dart';
+import 'local_server_service.dart';
 
-enum FileSourceMode { recent, custom }
+enum FileSourceMode { recent, localFolder, custom }
 
 extension FileSourceModeExtension on FileSourceMode {
   String localizedLabel(BuildContext context) {
@@ -17,6 +18,8 @@ extension FileSourceModeExtension on FileSourceMode {
     switch (this) {
       case FileSourceMode.recent:
         return l10n.recentFiles;
+      case FileSourceMode.localFolder:
+        return l10n.localAppFolder;
       case FileSourceMode.custom:
         return l10n.customFolder;
     }
@@ -26,6 +29,8 @@ extension FileSourceModeExtension on FileSourceMode {
     switch (this) {
       case FileSourceMode.recent:
         return 'recent';
+      case FileSourceMode.localFolder:
+        return 'localFolder';
       case FileSourceMode.custom:
         return 'custom';
     }
@@ -35,6 +40,8 @@ extension FileSourceModeExtension on FileSourceMode {
     switch (this) {
       case FileSourceMode.recent:
         return 'Recent Files';
+      case FileSourceMode.localFolder:
+        return 'Uploaded Files';
       case FileSourceMode.custom:
         return 'Custom Folder';
     }
@@ -42,6 +49,8 @@ extension FileSourceModeExtension on FileSourceMode {
 
   static FileSourceMode fromKey(String? key) {
     switch (key) {
+      case 'localFolder':
+        return FileSourceMode.localFolder;
       case 'custom':
         return FileSourceMode.custom;
       case 'recent':
@@ -303,6 +312,10 @@ class FileSourceService {
     return paths;
   }
 
+  static Future<Directory> getLocalAppDirectory() async {
+    return await LocalServerService.getUploadDirectory();
+  }
+
   static Future<List<PdfItem>> getPdfFilesForCurrentSource() async {
     final mode = await getSourceMode();
     List<PdfItem> files = [];
@@ -311,6 +324,11 @@ class FileSourceService {
       case FileSourceMode.recent:
         final rawFiles = await RecentFilesService.getRecentFiles();
         files = rawFiles.where((item) => File(item.path).existsSync()).toList();
+        break;
+
+      case FileSourceMode.localFolder:
+        final dir = await getLocalAppDirectory();
+        files = await _scanDirectoryForFiles(dir, recursive: false);
         break;
 
       case FileSourceMode.custom:

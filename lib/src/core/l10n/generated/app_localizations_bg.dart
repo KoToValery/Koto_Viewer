@@ -750,4 +750,27 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get simulateUpdate => 'Симулирай обновяване (Дебъг)';
+
+  @override
+  String get localAppFolder => 'Качени файлове';
+
+  @override
+  String get localAppFolderSubtitle => 'Папка в паметта на приложението';
+
+  @override
+  String get deleteFileTitle => 'Изтриване на файл';
+
+  @override
+  String deleteFileConfirm(String name) {
+    return 'Сигурни ли сте, че искате да изтриете \"$name\" от паметта на приложението?';
+  }
+
+  @override
+  String get delete => 'Изтрий';
+
+  @override
+  String get fileDeleted => 'Файлът беше изтрит';
+
+  @override
+  String get removeFromRecent => 'Премахни от скорошни';
 }

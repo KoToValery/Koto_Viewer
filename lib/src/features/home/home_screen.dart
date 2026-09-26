@@ -2090,6 +2090,68 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadFiles();
   }
 
+  Future<void> _deleteLocalFile(PdfItem item) async {
+    final l10n = context.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.deleteFileTitle),
+        content: Text(
+          l10n.deleteFileConfirm(item.name),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final file = File(item.path);
+        if (await file.exists()) {
+          await file.delete();
+        }
+        await RecentFilesService.removeRecentFile(item.path);
+
+        final ext = item.path.contains('.') ? item.path.split('.').last.toLowerCase() : '';
+        if (ext == 'dwg' || ext == 'dxf') {
+          await DwgConverterService.clearCacheForFile(item.path);
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.fileDeleted),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e, stack) {
+        AppErrorHandler.recordError(e, stack, context: 'HomeScreen._deleteLocalFile');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting file: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+      await _loadFiles();
+    }
+  }
+
   Future<void> _clearAllRecent() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2597,6 +2659,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_currentMode == FileSourceMode.recent) {
       titleText = l10n.recentFiles;
       subtitleText = l10n.recentlyOpenedSubtitle;
+    } else if (_currentMode == FileSourceMode.localFolder) {
+      titleText = l10n.localAppFolder;
+      subtitleText = l10n.localAppFolderSubtitle;
     } else if (_currentMode == FileSourceMode.custom) {
       if (_customFolderPath != null && _customFolderPath!.isNotEmpty) {
         titleText = _getFolderName(_customFolderPath!);
@@ -2617,6 +2682,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSelected: (value) async {
                   if (value == '__recent__') {
                     await _switchMode(FileSourceMode.recent);
+                  } else if (value == '__local_folder__') {
+                    await _switchMode(FileSourceMode.localFolder);
                   } else if (value == '__add_new__') {
                     await _pickCustomFolder();
                   } else {
@@ -2632,8 +2699,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(
                       _currentMode == FileSourceMode.recent
                           ? Icons.history_rounded
-                          : Icons.folder_special_rounded,
-                      color: theme.colorScheme.primary,
+                          : (_currentMode == FileSourceMode.localFolder
+                              ? Icons.download_for_offline_rounded
+                              : Icons.folder_special_rounded),
+                      color: _currentMode == FileSourceMode.localFolder
+                          ? const Color(0xFF10B981)
+                          : theme.colorScheme.primary,
                       size: 24,
                     ),
                     const SizedBox(width: 8),
@@ -2688,6 +2759,50 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           if (_currentMode == FileSourceMode.recent)
+                            Icon(
+                              Icons.check,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+
+                  // 2. Default Local App Folder (Uploaded / Wi-Fi files)
+                  items.add(
+                    PopupMenuItem<String>(
+                      value: '__local_folder__',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.download_for_offline_rounded, color: Color(0xFF10B981)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  l10n.localAppFolder,
+                                  style: TextStyle(
+                                    fontWeight: _currentMode == FileSourceMode.localFolder
+                                        ? FontWeight.bold
+                                        : FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  l10n.localAppFolderSubtitle,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_currentMode == FileSourceMode.localFolder)
                             Icon(
                               Icons.check,
                               size: 18,
@@ -3216,6 +3331,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: const Icon(Icons.folder_open),
                             label: const Text('Select Folder'),
                           ),
+                        ] else if (_currentMode == FileSourceMode.localFolder && _searchQuery.isEmpty) ...[
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _showReceiveFilesDialog,
+                            icon: const Icon(Icons.cloud_upload_rounded),
+                            label: Text(l10n.uploadViaWifi),
+                          ),
                         ],
                       ],
                     ),
@@ -3327,9 +3449,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                   if (_currentMode == FileSourceMode.recent)
                                     IconButton(
                                       icon: const Icon(Icons.close, size: 20),
-                                      tooltip: 'Remove from recent',
+                                      tooltip: l10n.removeFromRecent,
                                       onPressed: () =>
                                           _removeRecentFile(item.path),
+                                    )
+                                  else if (_currentMode == FileSourceMode.localFolder)
+                                    IconButton(
+                                      icon: Icon(Icons.close, size: 20, color: Colors.red.shade400),
+                                      tooltip: l10n.deleteFileTitle,
+                                      onPressed: () =>
+                                          _deleteLocalFile(item),
                                     )
                                   else
                                     const Icon(Icons.chevron_right, size: 20),

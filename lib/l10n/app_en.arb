@@ -656,5 +656,24 @@
   "debugTestingNote": "In debug / local build, Google Play In-App Updates require installation via Play Store (Internal Testing track or Internal App Sharing).",
   "@debugTestingNote": { "description": "Developer informational note in debug mode" },
   "simulateUpdate": "Simulate Update (Debug)",
-  "@simulateUpdate": { "description": "Debug button to test update UI and restart flow" }
+  "@simulateUpdate": { "description": "Debug button to test update UI and restart flow" },
+  "localAppFolder": "Uploaded Files",
+  "@localAppFolder": { "description": "Label for the local app storage folder where files received via Wi-Fi are stored" },
+  "localAppFolderSubtitle": "App local storage",
+  "@localAppFolderSubtitle": { "description": "Subtitle for local app storage folder" },
+  "deleteFileTitle": "Delete File",
+  "@deleteFileTitle": { "description": "Title of delete file dialog" },
+  "deleteFileConfirm": "Are you sure you want to permanently delete \"{name}\" from app storage?",
+  "@deleteFileConfirm": {
+    "description": "Confirmation message when deleting a file from app storage",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "delete": "Delete",
+  "@delete": { "description": "Delete button label" },
+  "fileDeleted": "File deleted",
+  "@fileDeleted": { "description": "Notification that file was deleted" },
+  "removeFromRecent": "Remove from recent",
+  "@removeFromRecent": { "description": "Tooltip for removing file from recent list" }
 }

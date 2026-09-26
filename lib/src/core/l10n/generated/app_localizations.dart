@@ -1381,6 +1381,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Simulate Update (Debug)'**
   String get simulateUpdate;
+
+  /// Label for the local app storage folder where files received via Wi-Fi are stored
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded Files'**
+  String get localAppFolder;
+
+  /// Subtitle for local app storage folder
+  ///
+  /// In en, this message translates to:
+  /// **'App local storage'**
+  String get localAppFolderSubtitle;
+
+  /// Title of delete file dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Delete File'**
+  String get deleteFileTitle;
+
+  /// Confirmation message when deleting a file from app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to permanently delete \"{name}\" from app storage?'**
+  String deleteFileConfirm(String name);
+
+  /// Delete button label
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// Notification that file was deleted
+  ///
+  /// In en, this message translates to:
+  /// **'File deleted'**
+  String get fileDeleted;
+
+  /// Tooltip for removing file from recent list
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from recent'**
+  String get removeFromRecent;
 }
 
 class _AppLocalizationsDelegate

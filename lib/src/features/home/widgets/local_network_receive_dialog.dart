@@ -27,6 +27,8 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
 
   StreamSubscription<File>? _fileSub;
   final List<File> _receivedFiles = [];
+  String? _latestReceivedFileName;
+  Timer? _notificationDismissTimer;
 
   @override
   void initState() {
@@ -37,30 +39,29 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
 
   @override
   void dispose() {
+    _notificationDismissTimer?.cancel();
     _fileSub?.cancel();
     LocalServerService.stopServer();
+    ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
     super.dispose();
   }
 
   void _handleFileReceived(File file) {
     if (mounted) {
+      final fileName = file.path.split(Platform.pathSeparator).last;
+      _notificationDismissTimer?.cancel();
+      _notificationDismissTimer = Timer(const Duration(milliseconds: 2800), () {
+        if (mounted) {
+          setState(() {
+            _latestReceivedFileName = null;
+          });
+        }
+      });
+
       setState(() {
         _receivedFiles.insert(0, file);
+        _latestReceivedFileName = fileName;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Received: ${file.path.split(Platform.pathSeparator).last}',
-          ),
-          backgroundColor: const Color(0xFF10B981),
-          duration: const Duration(seconds: 3),
-          action: SnackBarAction(
-            label: 'Open',
-            textColor: Colors.white,
-            onPressed: () => _openFile(file),
-          ),
-        ),
-      );
     }
   }
 
@@ -253,6 +254,48 @@ class _LocalNetworkReceiveDialogState extends State<LocalNetworkReceiveDialog> {
               ),
 
               const SizedBox(height: 18),
+
+              if (_latestReceivedFileName != null) ...[
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    border: Border.all(color: const Color(0xFF10B981), width: 1.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${context.l10n.receivedFiles}: $_latestReceivedFileName',
+                          style: const TextStyle(
+                            color: Color(0xFF047857),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          _notificationDismissTimer?.cancel();
+                          setState(() => _latestReceivedFileName = null);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.close, size: 16, color: Color(0xFF047857)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               if (_isStarting)
                 _buildLoading()
