@@ -773,45 +773,47 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         ),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.only(left: 10, right: 4, top: 2, bottom: 2),
+        contentPadding: const EdgeInsets.only(left: 8, right: 4, top: 2, bottom: 2),
+        horizontalTitleGap: 8,
+        minLeadingWidth: 0,
         leading: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Order number badge showing presentation sequence or skipped indicator
             Container(
-              width: 26,
-              height: 26,
+              width: 24,
+              height: 24,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: isHidden
                     ? Colors.grey.withValues(alpha: 0.2)
                     : Colors.amber.shade700.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
               ),
               child: isHidden
-                  ? Icon(Icons.visibility_off_rounded, size: 14, color: Colors.grey.shade600)
+                  ? Icon(Icons.visibility_off_rounded, size: 13, color: Colors.grey.shade600)
                   : Text(
                       '${visiblePos ?? (presentationIndex + 1)}',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        fontSize: 11.5,
                         color: Colors.amber.shade800,
                       ),
                     ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             // Category icon
             Container(
-              width: 38,
-              height: 38,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: (isHidden ? Colors.grey : iconColor).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 iconData,
                 color: isHidden ? Colors.grey.shade500 : iconColor,
-                size: 22,
+                size: 20,
               ),
             ),
           ],
@@ -826,39 +828,43 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Row(
-          children: [
-            Text(item.formattedSize, style: const TextStyle(fontSize: 11.5, color: Colors.grey)),
-            const SizedBox(width: 6),
-            Text('•', style: const TextStyle(fontSize: 11.5, color: Colors.grey)),
-            const SizedBox(width: 6),
-            Text(
-              item.category.shortLabel,
-              style: TextStyle(
-                fontSize: 11.5,
-                color: isHidden ? Colors.grey : iconColor,
-                fontWeight: FontWeight.w600,
+        subtitle: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: item.formattedSize,
+                style: const TextStyle(fontSize: 11.5, color: Colors.grey),
               ),
-            ),
-            if (isHidden) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
+              const TextSpan(
+                text: ' • ',
+                style: TextStyle(fontSize: 11.5, color: Colors.grey),
+              ),
+              TextSpan(
+                text: item.category.shortLabel,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: isHidden ? Colors.grey : iconColor,
+                  fontWeight: FontWeight.w600,
                 ),
-                child: Text(
-                  context.l10n.hiddenInPresentation,
+              ),
+              if (isHidden) ...[
+                const TextSpan(
+                  text: ' • ',
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                ),
+                TextSpan(
+                  text: context.l10n.hiddenInPresentation,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     color: Colors.orange.shade800,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -866,7 +872,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
             IconButton(
               icon: Icon(
                 isHidden ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                size: 19,
+                size: 18,
                 color: isHidden
                     ? Colors.orange.shade800
                     : (isDark ? Colors.white60 : Colors.grey.shade600),
@@ -876,34 +882,34 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                   : context.l10n.hideFromPresentation,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               onPressed: () => _toggleHideItem(item),
             ),
             IconButton(
-              icon: const Icon(Icons.arrow_upward_rounded, size: 19),
+              icon: const Icon(Icons.arrow_upward_rounded, size: 18),
               tooltip: 'Премести нагоре',
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+              constraints: const BoxConstraints(minWidth: 26, minHeight: 28),
               onPressed: onMoveUp,
             ),
             IconButton(
-              icon: const Icon(Icons.arrow_downward_rounded, size: 19),
+              icon: const Icon(Icons.arrow_downward_rounded, size: 18),
               tooltip: 'Премести надолу',
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+              constraints: const BoxConstraints(minWidth: 26, minHeight: 28),
               onPressed: onMoveDown,
             ),
             if (isReorderable)
               ReorderableDragStartListener(
                 index: listIndex,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                   child: Icon(
                     Icons.drag_indicator_rounded,
                     color: isDark ? Colors.white38 : Colors.grey.shade400,
-                    size: 22,
+                    size: 20,
                   ),
                 ),
               ),
