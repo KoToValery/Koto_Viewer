@@ -605,4 +605,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get projectOverview => 'Project Assets';
+
+  @override
+  String get uploadViaWifi => 'Upload via Wi-Fi';
+
+  @override
+  String get receiveFiles => 'Receive Files';
+
+  @override
+  String get receiveFilesSubtitle =>
+      'Upload files from browser over local network';
+
+  @override
+  String get receivedFiles => 'Received Files';
+
+  @override
+  String get openFile => 'Open';
 }

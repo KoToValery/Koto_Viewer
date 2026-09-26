@@ -549,5 +549,15 @@
   "prevProjectItem": "Previous File",
   "@prevProjectItem": { "description": "Button to go to previous item in project" },
   "projectOverview": "Project Assets",
-  "@projectOverview": { "description": "Overview label for project assets" }
+  "@projectOverview": { "description": "Overview label for project assets" },
+  "uploadViaWifi": "Upload via Wi-Fi",
+  "@uploadViaWifi": { "description": "Button to upload files via Wi-Fi" },
+  "receiveFiles": "Receive Files",
+  "@receiveFiles": { "description": "Title for receive files via Wi-Fi dialog" },
+  "receiveFilesSubtitle": "Upload files from browser over local network",
+  "@receiveFilesSubtitle": { "description": "Subtitle explaining how to upload files from browser" },
+  "receivedFiles": "Received Files",
+  "@receivedFiles": { "description": "Header for list of received files" },
+  "openFile": "Open",
+  "@openFile": { "description": "Button label to open a received file" }
 }

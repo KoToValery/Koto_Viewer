@@ -1135,6 +1135,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Project Assets'**
   String get projectOverview;
+
+  /// Button to upload files via Wi-Fi
+  ///
+  /// In en, this message translates to:
+  /// **'Upload via Wi-Fi'**
+  String get uploadViaWifi;
+
+  /// Title for receive files via Wi-Fi dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Receive Files'**
+  String get receiveFiles;
+
+  /// Subtitle explaining how to upload files from browser
+  ///
+  /// In en, this message translates to:
+  /// **'Upload files from browser over local network'**
+  String get receiveFilesSubtitle;
+
+  /// Header for list of received files
+  ///
+  /// In en, this message translates to:
+  /// **'Received Files'**
+  String get receivedFiles;
+
+  /// Button label to open a received file
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get openFile;
 }
 
 class _AppLocalizationsDelegate

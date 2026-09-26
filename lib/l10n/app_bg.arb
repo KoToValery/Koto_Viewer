@@ -178,5 +178,10 @@
   "presentationMode": "Старт на презентацията",
   "nextProjectItem": "Следващ файл",
   "prevProjectItem": "Предишен файл",
-  "projectOverview": "Файлове в проекта"
+  "projectOverview": "Файлове в проекта",
+  "uploadViaWifi": "Качване през Wi-Fi",
+  "receiveFiles": "Получаване на файлове",
+  "receiveFilesSubtitle": "Качване от браузър през локалната мрежа",
+  "receivedFiles": "Получени файлове",
+  "openFile": "Отвори"
 }

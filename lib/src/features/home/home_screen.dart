@@ -17,6 +17,7 @@ import '../../core/widgets/language_selection_dialog.dart';
 import '../../core/l10n/l10n_extensions.dart';
 import 'widgets/share_options_sheet.dart';
 import 'widgets/app_info_dialog.dart';
+import 'widgets/local_network_receive_dialog.dart';
 
 class FileTypeIcon extends StatelessWidget {
   final KotoFileType type;
@@ -2048,6 +2049,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _showReceiveFilesDialog() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const LocalNetworkReceiveDialog(),
+    );
+  }
+
   Future<void> _openFileScreen(String filePath) async {
     await FileOpenerService.openFile(
       context: context,
@@ -2900,6 +2909,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.wifi_tethering_rounded, color: Color(0xFF6366F1)),
+            tooltip: l10n.receiveFiles,
+            visualDensity: VisualDensity.compact,
+            onPressed: _showReceiveFilesDialog,
+          ),
+          IconButton(
             icon: const Icon(Icons.favorite, color: Color(0xFF7C3AED)),
             tooltip: l10n.supportDeveloper,
             visualDensity: VisualDensity.compact,
@@ -3040,6 +3055,32 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 0,
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: _showReceiveFilesDialog,
+                              icon: const Icon(Icons.cloud_upload_rounded),
+                              label: Text(
+                                l10n.uploadViaWifi,
+                                style: const TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withValues(alpha: 0.18),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.35),
+                                  ),
                                 ),
                                 elevation: 0,
                               ),

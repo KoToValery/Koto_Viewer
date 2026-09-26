@@ -611,4 +611,19 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get projectOverview => 'Файлове в проекта';
+
+  @override
+  String get uploadViaWifi => 'Качване през Wi-Fi';
+
+  @override
+  String get receiveFiles => 'Получаване на файлове';
+
+  @override
+  String get receiveFilesSubtitle => 'Качване от браузър през локалната мрежа';
+
+  @override
+  String get receivedFiles => 'Получени файлове';
+
+  @override
+  String get openFile => 'Отвори';
 }
