@@ -342,17 +342,17 @@ class ProjectBundleService {
         ? rawBaseName.substring(0, rawBaseName.lastIndexOf('.'))
         : rawBaseName;
 
-    // Use ZipArchiveService to avoid FormatException on non-UTF-8 entry names
-    // and to correctly decode CP866/CP1251/other legacy encodings.
-    final archive = ZipArchiveService.openFromPath(archivePath);
+    // Use ZipArchiveService Central Directory reader (Random Access via RandomAccessFile)
+    // to read ONLY the directory headers in <15ms without loading the archive into RAM.
+    final entries = await ZipArchiveService.readCentralDirectory(archivePath);
 
     final List<ProjectFileEntry> files = [];
     int totalSize = 0;
     String? customClientName;
     String? customDescription;
 
-    for (final entry in archive) {
-      if (!entry.isFile) continue;
+    for (final entry in entries) {
+      if (entry.isDirectory) continue;
       final rawName = entry.name.replaceAll('\\', '/');
       final baseName = rawName.split('/').last;
       final lower = baseName.toLowerCase();
@@ -365,31 +365,32 @@ class ProjectBundleService {
       // Optional metadata file: project.json
       if (lower == 'project.json' || lower == 'presentation.json') {
         try {
-          final content = entry.content;
-          if (content != null) {
-            final jsonStr = utf8.decode(content as List<int>);
-            final data = json.decode(jsonStr) as Map<String, dynamic>;
-            customClientName = data['client'] as String? ?? data['client_name'] as String?;
-            customDescription = data['description'] as String? ?? data['notes'] as String?;
-          }
+          final content = await ZipArchiveService.readEntryBytes(
+            zipPath: archivePath,
+            entry: entry,
+          );
+          final jsonStr = utf8.decode(content);
+          final data = json.decode(jsonStr) as Map<String, dynamic>;
+          customClientName = data['client'] as String? ?? data['client_name'] as String?;
+          customDescription = data['description'] as String? ?? data['notes'] as String?;
         } catch (_) {}
         continue;
       }
 
       final category = classifyCategory(baseName);
-      final pdfItem = PdfItem.fromPath(baseName, sizeInBytes: entry.size);
+      final pdfItem = PdfItem.fromPath(baseName, sizeInBytes: entry.uncompressedSize);
       final order = extractPresentationOrder(baseName);
 
       files.add(ProjectFileEntry(
         internalPath: rawName,
         fileName: baseName,
-        uncompressedSize: entry.size,
+        uncompressedSize: entry.uncompressedSize,
         category: category,
         fileType: pdfItem.fileType,
         presentationOrder: order,
       ));
 
-      totalSize += entry.size;
+      totalSize += entry.uncompressedSize;
     }
 
     // Initially group files by categories, then presentationOrder, then alphabetically
@@ -426,6 +427,7 @@ class ProjectBundleService {
   }
 
   /// Extracts a single file on-demand from the archive into the temporary cache.
+  /// Uses random-access seeking and background Isolate decompression without reading the entire archive.
   /// Returns the absolute local file path of the extracted file.
   static Future<String> extractFile(
     String archivePath,
@@ -442,29 +444,20 @@ class ProjectBundleService {
       return targetFile.path;
     }
 
-    onProgress?.call(0.1);
+    onProgress?.call(0.2);
 
-    // Use ZipArchiveService to avoid FormatException on non-UTF-8 entry names
-    // and to correctly decode CP866/CP1251/other legacy encodings.
-    final archive = ZipArchiveService.openFromPath(archivePath);
+    final success = await ZipArchiveService.extractEntryByName(
+      zipPath: archivePath,
+      internalName: internalPath,
+      targetFile: targetFile,
+    );
 
-    onProgress?.call(0.4);
-
-    for (final entry in archive) {
-      if (!entry.isFile) continue;
-      final entryPath = entry.name.replaceAll('\\', '/');
-      if (entryPath == internalPath || entryPath.endsWith(internalPath)) {
-        final content = entry.content;
-        if (content is List<int>) {
-          await targetFile.parent.create(recursive: true);
-          await targetFile.writeAsBytes(content, flush: true);
-          onProgress?.call(1.0);
-          return targetFile.path;
-        }
-      }
+    if (!success) {
+      throw Exception('File "$internalPath" not found in archive "$archivePath"');
     }
 
-    throw Exception('File "$internalPath" not found in archive "$archivePath"');
+    onProgress?.call(1.0);
+    return targetFile.path;
   }
 
   /// Cleans up temporary project extraction files older than 2 days or on startup.

@@ -27,12 +27,11 @@ class PcbArchiveParser {
         return isPcbFileName(lower);
       }
 
-      // Use ZipArchiveService to avoid FormatException on non-UTF-8 entry names
-      // (e.g. CP866 DOS Cyrillic). It also fixes mojibake in the entry names.
-      final archive = ZipArchiveService.openFromPath(filePath);
+      // Use ZipArchiveService Central Directory reader to avoid loading multi-gigabyte files into RAM
+      final entries = ZipArchiveService.readCentralDirectorySync(filePath);
 
-      for (final entry in archive) {
-        if (!entry.isFile) continue;
+      for (final entry in entries) {
+        if (entry.isDirectory) continue;
         final rawName = entry.name.replaceAll('\\', '/');
         final baseName = rawName.split('/').last;
         final entryLower = baseName.toLowerCase();
@@ -51,17 +50,6 @@ class PcbArchiveParser {
         if (_is3DModelFileName(entryLower) &&
             (entryLower.contains('pcb') || entryLower.contains('board') || entryLower.contains('assy') || entryLower.contains('assembly'))) {
           return true;
-        }
-
-        // 3. Check content heuristics for ambiguous text files
-        if (entryLower.endsWith('.txt') || entryLower.endsWith('.out') || !entryLower.contains('.')) {
-          final content = entry.content;
-          if (content is List<int> && content.isNotEmpty) {
-            final sampleBytes = Uint8List.fromList(content.take(math.min(content.length, 500)).toList());
-            if (_isGerberContent(sampleBytes) || _isDrillContent(sampleBytes)) {
-              return true;
-            }
-          }
         }
       }
 
