@@ -626,4 +626,42 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get openFile => 'Отвори';
+
+  @override
+  String get hideFromPresentation => 'Скрий от презентацията';
+
+  @override
+  String get includeInPresentation => 'Включи в презентацията';
+
+  @override
+  String get hiddenInPresentation => 'Скрит';
+
+  @override
+  String fileHiddenNotification(String name) {
+    return '\"$name\" е скрит от презентацията';
+  }
+
+  @override
+  String fileIncludedNotification(String name) {
+    return '\"$name\" е включен в презентацията';
+  }
+
+  @override
+  String get unhideAllFiles => 'Включи всички файлове';
+
+  @override
+  String get allFilesIncludedNotification =>
+      'Всички файлове са включени в презентацията';
+
+  @override
+  String hiddenFilesFilter(int count) {
+    return 'Скрити ($count)';
+  }
+
+  @override
+  String get allFilesHiddenWarning =>
+      'Всички файлове са скрити от презентацията. Моля, включете поне един файл.';
+
+  @override
+  String get fileSkippedInPresentation => 'Пропуснат от презентацията';
 }

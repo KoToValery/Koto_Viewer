@@ -559,5 +559,40 @@
   "receivedFiles": "Received Files",
   "@receivedFiles": { "description": "Header for list of received files" },
   "openFile": "Open",
-  "@openFile": { "description": "Button label to open a received file" }
+  "@openFile": { "description": "Button label to open a received file" },
+  "hideFromPresentation": "Hide from presentation",
+  "@hideFromPresentation": { "description": "Tooltip/button to hide or skip a file from the presentation" },
+  "includeInPresentation": "Include in presentation",
+  "@includeInPresentation": { "description": "Tooltip/button to include a previously hidden file in the presentation" },
+  "hiddenInPresentation": "Hidden",
+  "@hiddenInPresentation": { "description": "Badge/label indicating a file is skipped from presentation" },
+  "fileHiddenNotification": "\"{name}\" hidden from presentation",
+  "@fileHiddenNotification": {
+    "description": "Snackbar notification when a file is hidden",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "fileIncludedNotification": "\"{name}\" included in presentation",
+  "@fileIncludedNotification": {
+    "description": "Snackbar notification when a file is included",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "unhideAllFiles": "Include all files",
+  "@unhideAllFiles": { "description": "Action to include all hidden files in the presentation" },
+  "allFilesIncludedNotification": "All files are now included in the presentation",
+  "@allFilesIncludedNotification": { "description": "Notification when all files are included" },
+  "hiddenFilesFilter": "Hidden ({count})",
+  "@hiddenFilesFilter": {
+    "description": "Filter tab/chip label showing number of hidden files",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "allFilesHiddenWarning": "All files are hidden from the presentation. Please include at least one file.",
+  "@allFilesHiddenWarning": { "description": "Warning when trying to start presentation with all files hidden" },
+  "fileSkippedInPresentation": "Skipped in presentation",
+  "@fileSkippedInPresentation": { "description": "Subtitle tag shown in presentation bar when current file is hidden" }
 }

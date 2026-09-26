@@ -1165,6 +1165,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open'**
   String get openFile;
+
+  /// Tooltip/button to hide or skip a file from the presentation
+  ///
+  /// In en, this message translates to:
+  /// **'Hide from presentation'**
+  String get hideFromPresentation;
+
+  /// Tooltip/button to include a previously hidden file in the presentation
+  ///
+  /// In en, this message translates to:
+  /// **'Include in presentation'**
+  String get includeInPresentation;
+
+  /// Badge/label indicating a file is skipped from presentation
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get hiddenInPresentation;
+
+  /// Snackbar notification when a file is hidden
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" hidden from presentation'**
+  String fileHiddenNotification(String name);
+
+  /// Snackbar notification when a file is included
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" included in presentation'**
+  String fileIncludedNotification(String name);
+
+  /// Action to include all hidden files in the presentation
+  ///
+  /// In en, this message translates to:
+  /// **'Include all files'**
+  String get unhideAllFiles;
+
+  /// Notification when all files are included
+  ///
+  /// In en, this message translates to:
+  /// **'All files are now included in the presentation'**
+  String get allFilesIncludedNotification;
+
+  /// Filter tab/chip label showing number of hidden files
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden ({count})'**
+  String hiddenFilesFilter(int count);
+
+  /// Warning when trying to start presentation with all files hidden
+  ///
+  /// In en, this message translates to:
+  /// **'All files are hidden from the presentation. Please include at least one file.'**
+  String get allFilesHiddenWarning;
+
+  /// Subtitle tag shown in presentation bar when current file is hidden
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped in presentation'**
+  String get fileSkippedInPresentation;
 }
 
 class _AppLocalizationsDelegate

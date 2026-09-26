@@ -65,14 +65,16 @@ class ProjectFileEntry {
   final ProjectItemCategory category;
   final KotoFileType fileType;
   final int presentationOrder; // Derived from leading numbers e.g. "01_render.jpg" -> 1
+  bool isHidden;
 
-  const ProjectFileEntry({
+  ProjectFileEntry({
     required this.internalPath,
     required this.fileName,
     required this.uncompressedSize,
     required this.category,
     required this.fileType,
     required this.presentationOrder,
+    this.isHidden = false,
   });
 
   String get formattedSize {
@@ -108,6 +110,26 @@ class ProjectBundleInfo {
     required this.totalSizeBytes,
     required this.files,
   });
+
+  List<ProjectFileEntry> get visibleFiles => files.where((f) => !f.isHidden).toList();
+  int get visibleFilesCount => files.where((f) => !f.isHidden).length;
+  int get hiddenFilesCount => files.where((f) => f.isHidden).length;
+
+  /// Returns the index of the next visible file after [currentIndex], or null if none.
+  int? getNextVisibleIndex(int currentIndex) {
+    for (int i = currentIndex + 1; i < files.length; i++) {
+      if (!files[i].isHidden) return i;
+    }
+    return null;
+  }
+
+  /// Returns the index of the previous visible file before [currentIndex], or null if none.
+  int? getPreviousVisibleIndex(int currentIndex) {
+    for (int i = currentIndex - 1; i >= 0; i--) {
+      if (!files[i].isHidden) return i;
+    }
+    return null;
+  }
 
   List<ProjectFileEntry> getFilesByCategory(ProjectItemCategory cat) {
     if (cat == ProjectItemCategory.all) return files;
@@ -244,8 +266,12 @@ class ProjectBundleService {
   }
 
   static const String _orderPrefsPrefix = 'koto_proj_bundle_order_';
+  static const String _hiddenPrefsPrefix = 'koto_proj_bundle_hidden_';
 
-  static String _getOrderKey(String archivePath) {
+  static String _cleanInternalPath(String rawPath) =>
+      rawPath.replaceAll('\\', '/').replaceAll(RegExp(r'^\.?/'), '');
+
+  static String _computeArchiveHash(String archivePath) {
     final normalized = archivePath.replaceAll('\\', '/').toLowerCase();
     // Deterministic FNV-1a 64-bit hash to guarantee stability across platforms and app restarts
     var hash = BigInt.parse('cbf29ce484222325', radix: 16);
@@ -253,8 +279,14 @@ class ProjectBundleService {
     for (final unit in utf8.encode(normalized)) {
       hash = ((hash ^ BigInt.from(unit)) * prime) & BigInt.parse('ffffffffffffffff', radix: 16);
     }
-    return '$_orderPrefsPrefix${hash.toRadixString(16)}';
+    return hash.toRadixString(16);
   }
+
+  static String _getOrderKey(String archivePath) =>
+      '$_orderPrefsPrefix${_computeArchiveHash(archivePath)}';
+
+  static String _getHiddenKey(String archivePath) =>
+      '$_hiddenPrefsPrefix${_computeArchiveHash(archivePath)}';
 
   /// Saves the custom presentation order for an archive bundle using internal file paths.
   static Future<void> savePresentationOrder(String archivePath, List<String> orderedInternalPaths) async {
@@ -288,6 +320,63 @@ class ProjectBundleService {
     } catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'ProjectBundleService.clearPresentationOrder');
     }
+  }
+
+  /// Saves the set of hidden/skipped file internal paths for an archive bundle.
+  static Future<void> saveHiddenFiles(String archivePath, Set<String> hiddenPaths) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _getHiddenKey(archivePath);
+      await prefs.setStringList(key, hiddenPaths.toList());
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ProjectBundleService.saveHiddenFiles');
+    }
+  }
+
+  /// Loads the saved set of hidden/skipped file internal paths for an archive bundle.
+  static Future<Set<String>> loadHiddenFiles(String archivePath) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _getHiddenKey(archivePath);
+      final list = prefs.getStringList(key);
+      return list?.toSet() ?? <String>{};
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ProjectBundleService.loadHiddenFiles');
+      return <String>{};
+    }
+  }
+
+  /// Clears hidden files for an archive bundle, making all files visible in presentation.
+  static Future<void> clearHiddenFiles(String archivePath) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _getHiddenKey(archivePath);
+      await prefs.remove(key);
+    } catch (e, stack) {
+      AppErrorHandler.recordError(e, stack, context: 'ProjectBundleService.clearHiddenFiles');
+    }
+  }
+
+  /// Toggles the hidden state of a specific file entry and persists the change to preferences.
+  static Future<void> toggleFileHidden(String archivePath, ProjectFileEntry entry, bool isHidden) async {
+    entry.isHidden = isHidden;
+    final hiddenPaths = await loadHiddenFiles(archivePath);
+    final clean = _cleanInternalPath(entry.internalPath);
+    if (isHidden) {
+      hiddenPaths.add(clean);
+    } else {
+      hiddenPaths.remove(clean);
+      hiddenPaths.remove(entry.internalPath);
+    }
+    await saveHiddenFiles(archivePath, hiddenPaths);
+  }
+
+  /// Unhides all files in a bundle and clears saved hidden state.
+  static Future<void> unhideAllFiles(String archivePath, List<ProjectFileEntry> files) async {
+    for (final f in files) {
+      f.isHidden = false;
+    }
+    await clearHiddenFiles(archivePath);
   }
 
   /// Re-orders [files] in-place according to [savedOrder].
@@ -411,6 +500,17 @@ class ProjectBundleService {
     final savedOrder = await loadPresentationOrder(archivePath);
     if (savedOrder != null && savedOrder.isNotEmpty) {
       applyPresentationOrder(files, savedOrder);
+    }
+
+    // Apply saved hidden files
+    final hiddenPaths = await loadHiddenFiles(archivePath);
+    if (hiddenPaths.isNotEmpty) {
+      for (final f in files) {
+        final clean = _cleanInternalPath(f.internalPath);
+        if (hiddenPaths.contains(clean) || hiddenPaths.contains(f.internalPath)) {
+          f.isHidden = true;
+        }
+      }
     }
 
     return ProjectBundleInfo(

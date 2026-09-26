@@ -28,8 +28,9 @@ class ProjectBundlePreloadService {
   static void startPreloading(ProjectBundleInfo bundle) {
     _isCancelled = false;
 
-    // Collect all DWG files from the bundle
+    // Collect visible DWG files from the bundle for preloading
     final dwgFiles = bundle.files.where((f) =>
+      !f.isHidden &&
       f.category == ProjectItemCategory.drawing &&
       (f.fileType == KotoFileType.dwg || f.fileName.toLowerCase().endsWith('.dwg'))
     ).toList();

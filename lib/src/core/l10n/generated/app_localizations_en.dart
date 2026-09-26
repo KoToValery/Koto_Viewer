@@ -621,4 +621,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openFile => 'Open';
+
+  @override
+  String get hideFromPresentation => 'Hide from presentation';
+
+  @override
+  String get includeInPresentation => 'Include in presentation';
+
+  @override
+  String get hiddenInPresentation => 'Hidden';
+
+  @override
+  String fileHiddenNotification(String name) {
+    return '\"$name\" hidden from presentation';
+  }
+
+  @override
+  String fileIncludedNotification(String name) {
+    return '\"$name\" included in presentation';
+  }
+
+  @override
+  String get unhideAllFiles => 'Include all files';
+
+  @override
+  String get allFilesIncludedNotification =>
+      'All files are now included in the presentation';
+
+  @override
+  String hiddenFilesFilter(int count) {
+    return 'Hidden ($count)';
+  }
+
+  @override
+  String get allFilesHiddenWarning =>
+      'All files are hidden from the presentation. Please include at least one file.';
+
+  @override
+  String get fileSkippedInPresentation => 'Skipped in presentation';
 }

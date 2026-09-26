@@ -183,5 +183,15 @@
   "receiveFiles": "Получаване на файлове",
   "receiveFilesSubtitle": "Качване от браузър през локалната мрежа",
   "receivedFiles": "Получени файлове",
-  "openFile": "Отвори"
+  "openFile": "Отвори",
+  "hideFromPresentation": "Скрий от презентацията",
+  "includeInPresentation": "Включи в презентацията",
+  "hiddenInPresentation": "Скрит",
+  "fileHiddenNotification": "\"{name}\" е скрит от презентацията",
+  "fileIncludedNotification": "\"{name}\" е включен в презентацията",
+  "unhideAllFiles": "Включи всички файлове",
+  "allFilesIncludedNotification": "Всички файлове са включени в презентацията",
+  "hiddenFilesFilter": "Скрити ({count})",
+  "allFilesHiddenWarning": "Всички файлове са скрити от презентацията. Моля, включете поне един файл.",
+  "fileSkippedInPresentation": "Пропуснат от презентацията"
 }

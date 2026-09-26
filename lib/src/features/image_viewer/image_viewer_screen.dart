@@ -146,17 +146,18 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
   void _handleKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent && widget.projectBundle != null) {
       final currentIndex = widget.currentProjectIndex ?? 0;
-      final total = widget.projectBundle!.files.length;
       if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
           event.logicalKey == LogicalKeyboardKey.pageDown ||
           event.logicalKey == LogicalKeyboardKey.space) {
-        if (currentIndex < total - 1 && widget.onSwitchProjectItem != null) {
-          widget.onSwitchProjectItem!(currentIndex + 1);
+        final nextIdx = widget.projectBundle!.getNextVisibleIndex(currentIndex);
+        if (nextIdx != null && widget.onSwitchProjectItem != null) {
+          widget.onSwitchProjectItem!(nextIdx);
         }
       } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
           event.logicalKey == LogicalKeyboardKey.pageUp) {
-        if (currentIndex > 0 && widget.onSwitchProjectItem != null) {
-          widget.onSwitchProjectItem!(currentIndex - 1);
+        final prevIdx = widget.projectBundle!.getPreviousVisibleIndex(currentIndex);
+        if (prevIdx != null && widget.onSwitchProjectItem != null) {
+          widget.onSwitchProjectItem!(prevIdx);
         }
       } else if (event.logicalKey == LogicalKeyboardKey.escape) {
         Navigator.of(context).pop();

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/l10n/l10n_extensions.dart';
 import '../../core/models/pdf_item.dart';
@@ -35,6 +36,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
   ProjectBundleInfo? _bundle;
   ProjectItemCategory _selectedCategory = ProjectItemCategory.all;
   String _searchQuery = '';
+  bool _showHiddenOnly = false;
 
   @override
   void initState() {
@@ -244,8 +246,8 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
       // Lightweight 180ms fade transition for slide replacement avoids heavy 3D route transitions
       await Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, animation, __) => viewerWidget,
-          transitionsBuilder: (_, animation, __, child) =>
+          pageBuilder: (_, animation, _) => viewerWidget,
+          transitionsBuilder: (_, animation, _, child) =>
               FadeTransition(opacity: animation, child: child),
           transitionDuration: const Duration(milliseconds: 180),
         ),
@@ -255,14 +257,71 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         MaterialPageRoute(builder: (_) => viewerWidget),
       );
       if (mounted) {
+        setState(() {});
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       }
     }
   }
 
   void _startPresentation() {
-    if (_bundle != null && _bundle!.files.isNotEmpty) {
-      _openProjectItem(_bundle!.files.first, 0);
+    if (_bundle == null || _bundle!.files.isEmpty) return;
+    final firstVisibleIndex = _bundle!.files.indexWhere((f) => !f.isHidden);
+    if (firstVisibleIndex == -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.allFilesHiddenWarning),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    _openProjectItem(_bundle!.files[firstVisibleIndex], firstVisibleIndex);
+  }
+
+  Future<void> _toggleHideItem(ProjectFileEntry item) async {
+    if (_bundle == null) return;
+    final newHidden = !item.isHidden;
+    setState(() {
+      item.isHidden = newHidden;
+    });
+    await ProjectBundleService.toggleFileHidden(_bundle!.archivePath, item, newHidden);
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            newHidden
+                ? context.l10n.fileHiddenNotification(item.fileName)
+                : context.l10n.fileIncludedNotification(item.fileName),
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => _toggleHideItem(item),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _unhideAll() async {
+    if (_bundle == null) return;
+    setState(() {
+      for (final f in _bundle!.files) {
+        f.isHidden = false;
+      }
+      _showHiddenOnly = false;
+    });
+    await ProjectBundleService.unhideAllFiles(_bundle!.archivePath, _bundle!.files);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.allFilesIncludedNotification),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -337,6 +396,12 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
         title: Text(_bundle?.projectName ?? 'Project Presentation'),
         actions: [
           if (_bundle != null && _bundle!.files.isNotEmpty) ...[
+            if (_bundle!.hiddenFilesCount > 0)
+              IconButton(
+                icon: const Icon(Icons.visibility_rounded),
+                tooltip: context.l10n.unhideAllFiles,
+                onPressed: _unhideAll,
+              ),
             IconButton(
               icon: const Icon(Icons.sort_rounded),
               tooltip: 'Групирай по категории',
@@ -395,11 +460,12 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
   Widget _buildContentView(ThemeData theme, bool isDark) {
     final bundle = _bundle!;
     final filtered = bundle.files.where((f) {
-      final matchesCategory = _selectedCategory == ProjectItemCategory.all || f.category == _selectedCategory;
+      if (_showHiddenOnly && !f.isHidden) return false;
+      final matchesCategory = _showHiddenOnly || _selectedCategory == ProjectItemCategory.all || f.category == _selectedCategory;
       final matchesSearch = _searchQuery.isEmpty || f.fileName.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     }).toList();
-    final isAllTab = _selectedCategory == ProjectItemCategory.all && _searchQuery.isEmpty;
+    final isAllTab = !_showHiddenOnly && _selectedCategory == ProjectItemCategory.all && _searchQuery.isEmpty;
 
     return Column(
       children: [
@@ -464,7 +530,7 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
           child: filtered.isEmpty
               ? Center(
                   child: Text(
-                    'No items in this category',
+                    _showHiddenOnly ? 'Няма скрити файлове' : 'No items in this category',
                     style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
                   ),
                 )
@@ -565,7 +631,9 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${bundle.totalFiles} assets • $totalMb MB total',
+                      bundle.hiddenFilesCount > 0
+                          ? '${bundle.visibleFilesCount} в презентацията • ${bundle.hiddenFilesCount} скрити • $totalMb MB total'
+                          : '${bundle.totalFiles} assets • $totalMb MB total',
                       style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
                     ),
                   ],
@@ -597,25 +665,54 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        children: ProjectItemCategory.values.map((cat) {
-          final count = bundle.getCountByCategory(cat);
-          if (cat != ProjectItemCategory.all && count == 0) return const SizedBox.shrink();
+        children: [
+          ...ProjectItemCategory.values.map((cat) {
+            final count = bundle.getCountByCategory(cat);
+            if (cat != ProjectItemCategory.all && count == 0) return const SizedBox.shrink();
 
-          final isSelected = _selectedCategory == cat;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              selected: isSelected,
-              label: Text('${cat.shortLabel} ($count)'),
-              avatar: Icon(_getCategoryIcon(cat), size: 16),
-              onSelected: (_) {
-                setState(() {
-                  _selectedCategory = cat;
-                });
-              },
+            final isSelected = !_showHiddenOnly && _selectedCategory == cat;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                selected: isSelected,
+                label: Text('${cat.shortLabel} ($count)'),
+                avatar: Icon(_getCategoryIcon(cat), size: 16),
+                onSelected: (_) {
+                  setState(() {
+                    _showHiddenOnly = false;
+                    _selectedCategory = cat;
+                  });
+                },
+              ),
+            );
+          }),
+          if (bundle.hiddenFilesCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                selected: _showHiddenOnly,
+                selectedColor: Colors.orange.withValues(alpha: 0.22),
+                checkmarkColor: Colors.orange.shade800,
+                label: Text(
+                  context.l10n.hiddenFilesFilter(bundle.hiddenFilesCount),
+                  style: TextStyle(
+                    color: _showHiddenOnly ? Colors.orange.shade900 : null,
+                    fontWeight: _showHiddenOnly ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                avatar: Icon(
+                  Icons.visibility_off_rounded,
+                  size: 16,
+                  color: _showHiddenOnly ? Colors.orange.shade800 : Colors.grey,
+                ),
+                onSelected: (val) {
+                  setState(() {
+                    _showHiddenOnly = val;
+                  });
+                },
+              ),
             ),
-          );
-        }).toList(),
+        ],
       ),
     );
   }
@@ -651,37 +748,56 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
     required VoidCallback? onMoveDown,
   }) {
     final (iconData, iconColor) = _getFileVisuals(item);
+    final isHidden = item.isHidden;
+
+    // Calculate position among visible presentation slides
+    int? visiblePos;
+    if (!isHidden && _bundle != null) {
+      final pos = _bundle!.visibleFiles.indexOf(item);
+      if (pos != -1) visiblePos = pos + 1;
+    }
 
     return Card(
       key: ValueKey(item.internalPath),
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
+      color: isHidden
+          ? (isDark ? Colors.grey.shade900.withValues(alpha: 0.4) : Colors.grey.shade100)
+          : null,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade200),
+        side: BorderSide(
+          color: isHidden
+              ? (isDark ? Colors.white10 : Colors.grey.shade300)
+              : (isDark ? Colors.white12 : Colors.grey.shade200),
+        ),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.only(left: 10, right: 6, top: 2, bottom: 2),
+        contentPadding: const EdgeInsets.only(left: 10, right: 4, top: 2, bottom: 2),
         leading: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Order number badge showing presentation sequence
+            // Order number badge showing presentation sequence or skipped indicator
             Container(
               width: 26,
               height: 26,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Colors.amber.shade700.withValues(alpha: 0.15),
+                color: isHidden
+                    ? Colors.grey.withValues(alpha: 0.2)
+                    : Colors.amber.shade700.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                '${presentationIndex + 1}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: Colors.amber.shade800,
-                ),
-              ),
+              child: isHidden
+                  ? Icon(Icons.visibility_off_rounded, size: 14, color: Colors.grey.shade600)
+                  : Text(
+                      '${visiblePos ?? (presentationIndex + 1)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: Colors.amber.shade800,
+                      ),
+                    ),
             ),
             const SizedBox(width: 8),
             // Category icon
@@ -689,16 +805,24 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
+                color: (isHidden ? Colors.grey : iconColor).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(iconData, color: iconColor, size: 22),
+              child: Icon(
+                iconData,
+                color: isHidden ? Colors.grey.shade500 : iconColor,
+                size: 22,
+              ),
             ),
           ],
         ),
         title: Text(
           item.fileName,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+          style: TextStyle(
+            fontWeight: isHidden ? FontWeight.w500 : FontWeight.w600,
+            fontSize: 13.5,
+            color: isHidden ? (isDark ? Colors.white60 : Colors.grey.shade700) : null,
+          ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -710,19 +834,57 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
             const SizedBox(width: 6),
             Text(
               item.category.shortLabel,
-              style: TextStyle(fontSize: 11.5, color: iconColor, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 11.5,
+                color: isHidden ? Colors.grey : iconColor,
+                fontWeight: FontWeight.w600,
+              ),
             ),
+            if (isHidden) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  context.l10n.hiddenInPresentation,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.orange.shade800,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
+              icon: Icon(
+                isHidden ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                size: 19,
+                color: isHidden
+                    ? Colors.orange.shade800
+                    : (isDark ? Colors.white60 : Colors.grey.shade600),
+              ),
+              tooltip: isHidden
+                  ? context.l10n.includeInPresentation
+                  : context.l10n.hideFromPresentation,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+              onPressed: () => _toggleHideItem(item),
+            ),
+            IconButton(
               icon: const Icon(Icons.arrow_upward_rounded, size: 19),
               tooltip: 'Премести нагоре',
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
               onPressed: onMoveUp,
             ),
             IconButton(
@@ -730,14 +892,14 @@ class _ProjectViewerScreenState extends State<ProjectViewerScreen> {
               tooltip: 'Премести надолу',
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
               onPressed: onMoveDown,
             ),
             if (isReorderable)
               ReorderableDragStartListener(
                 index: listIndex,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
                   child: Icon(
                     Icons.drag_indicator_rounded,
                     color: isDark ? Colors.white38 : Colors.grey.shade400,

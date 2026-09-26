@@ -210,6 +210,135 @@ void main() {
     });
   });
 
+  group('Presentation File Hiding & Skipping Tests', () {
+    test('ProjectBundleInfo calculates visible and hidden files accurately', () {
+      final f1 = ProjectFileEntry(
+        internalPath: '01.mp4',
+        fileName: '01.mp4',
+        uncompressedSize: 100,
+        category: ProjectItemCategory.video,
+        fileType: KotoFileType.video,
+        presentationOrder: 1,
+      );
+      final f2 = ProjectFileEntry(
+        internalPath: '02.dwg',
+        fileName: '02.dwg',
+        uncompressedSize: 200,
+        category: ProjectItemCategory.drawing,
+        fileType: KotoFileType.dwg,
+        presentationOrder: 2,
+        isHidden: true,
+      );
+      final f3 = ProjectFileEntry(
+        internalPath: '03.glb',
+        fileName: '03.glb',
+        uncompressedSize: 300,
+        category: ProjectItemCategory.model3d,
+        fileType: KotoFileType.glb,
+        presentationOrder: 3,
+      );
+      final f4 = ProjectFileEntry(
+        internalPath: '04.jpg',
+        fileName: '04.jpg',
+        uncompressedSize: 400,
+        category: ProjectItemCategory.image,
+        fileType: KotoFileType.image,
+        presentationOrder: 4,
+        isHidden: true,
+      );
+
+      final bundle = ProjectBundleInfo(
+        archivePath: '/test/proj.zip',
+        projectName: 'Test Project',
+        totalFiles: 4,
+        totalSizeBytes: 1000,
+        files: [f1, f2, f3, f4],
+      );
+
+      expect(bundle.totalFiles, 4);
+      expect(bundle.visibleFilesCount, 2);
+      expect(bundle.hiddenFilesCount, 2);
+      expect(bundle.visibleFiles.map((f) => f.fileName).toList(), ['01.mp4', '03.glb']);
+
+      // getNextVisibleIndex skips hidden files
+      expect(bundle.getNextVisibleIndex(0), 2); // skips f2 (index 1), returns f3 (index 2)
+      expect(bundle.getNextVisibleIndex(1), 2); // from hidden f2, next visible is f3 (index 2)
+      expect(bundle.getNextVisibleIndex(2), isNull); // after f3, f4 is hidden, so null
+      expect(bundle.getNextVisibleIndex(3), isNull);
+
+      // getPreviousVisibleIndex skips hidden files
+      expect(bundle.getPreviousVisibleIndex(3), 2); // skips f4, returns f3 (index 2)
+      expect(bundle.getPreviousVisibleIndex(2), 0); // skips f2 (index 1), returns f1 (index 0)
+      expect(bundle.getPreviousVisibleIndex(1), 0);
+      expect(bundle.getPreviousVisibleIndex(0), isNull);
+    });
+
+    test('persists and restores hidden files in ProjectBundleService', () async {
+      SharedPreferences.setMockInitialValues({});
+      const archivePath = 'C:/test/archive.zip';
+
+      await ProjectBundleService.saveHiddenFiles(archivePath, {'file1.pdf', 'file2.jpg'});
+      final loaded = await ProjectBundleService.loadHiddenFiles(archivePath);
+
+      expect(loaded.contains('file1.pdf'), isTrue);
+      expect(loaded.contains('file2.jpg'), isTrue);
+      expect(loaded.contains('file3.png'), isFalse);
+
+      await ProjectBundleService.clearHiddenFiles(archivePath);
+      final emptyLoaded = await ProjectBundleService.loadHiddenFiles(archivePath);
+      expect(emptyLoaded.isEmpty, isTrue);
+    });
+
+    test('toggleFileHidden and unhideAllFiles update model and preferences', () async {
+      SharedPreferences.setMockInitialValues({});
+      const archivePath = 'C:/test/my_bundle.zip';
+
+      final entry1 = ProjectFileEntry(
+        internalPath: 'sub/01.pdf',
+        fileName: '01.pdf',
+        uncompressedSize: 50,
+        category: ProjectItemCategory.drawing,
+        fileType: KotoFileType.pdf,
+        presentationOrder: 1,
+      );
+      final entry2 = ProjectFileEntry(
+        internalPath: '02.jpg',
+        fileName: '02.jpg',
+        uncompressedSize: 80,
+        category: ProjectItemCategory.image,
+        fileType: KotoFileType.image,
+        presentationOrder: 2,
+      );
+
+      // Toggle entry1 to hidden
+      await ProjectBundleService.toggleFileHidden(archivePath, entry1, true);
+      expect(entry1.isHidden, isTrue);
+
+      var hiddenSet = await ProjectBundleService.loadHiddenFiles(archivePath);
+      expect(hiddenSet.contains('sub/01.pdf'), isTrue);
+
+      // Toggle entry1 back to visible
+      await ProjectBundleService.toggleFileHidden(archivePath, entry1, false);
+      expect(entry1.isHidden, isFalse);
+
+      hiddenSet = await ProjectBundleService.loadHiddenFiles(archivePath);
+      expect(hiddenSet.contains('sub/01.pdf'), isFalse);
+
+      // Hide both, then unhide all
+      await ProjectBundleService.toggleFileHidden(archivePath, entry1, true);
+      await ProjectBundleService.toggleFileHidden(archivePath, entry2, true);
+      expect(entry1.isHidden, isTrue);
+      expect(entry2.isHidden, isTrue);
+
+      await ProjectBundleService.unhideAllFiles(archivePath, [entry1, entry2]);
+      expect(entry1.isHidden, isFalse);
+      expect(entry2.isHidden, isFalse);
+
+      hiddenSet = await ProjectBundleService.loadHiddenFiles(archivePath);
+      expect(hiddenSet.isEmpty, isTrue);
+    });
+  });
+
   group('KotoFileType and Category Extensions', () {
     test('PdfItem detects video and project files', () {
       final videoItem = PdfItem.fromPath('C:/projects/render.mp4');
@@ -223,3 +352,4 @@ void main() {
     });
   });
 }
+
