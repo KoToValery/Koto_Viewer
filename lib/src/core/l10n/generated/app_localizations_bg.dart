@@ -773,4 +773,81 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get removeFromRecent => 'Премахни от скорошни';
+
+  @override
+  String get pdfFormFilling => 'Попълване на формуляр';
+
+  @override
+  String pdfFormFieldsCount(int count) {
+    return '$count полета';
+  }
+
+  @override
+  String get pdfNoFormFields =>
+      'Този документ не съдържа интерактивни формулярни полета.';
+
+  @override
+  String get pdfFormSaved => 'Формулярът беше успешно запазен!';
+
+  @override
+  String get pdfFormFlatten => 'Заключи формуляра след запис (Flatten)';
+
+  @override
+  String get pdfFormFlattenTooltip =>
+      'Стойностите ще станат статичен текст и формулярът няма да може да се редактира.';
+
+  @override
+  String get pdfFormSaveAsCopy => 'Запази като нов файл...';
+
+  @override
+  String get pdfFormSaveOverwrite => 'Запази';
+
+  @override
+  String get pdfDigitalCertificates => 'Цифрови сертификати и подписи';
+
+  @override
+  String get pdfNoDigitalCertificates =>
+      'Този документ не съдържа цифров сертификат или вграден електронен подпис.';
+
+  @override
+  String get pdfSignedBy => 'Подписано от:';
+
+  @override
+  String get pdfIssuer => 'Издател (CA):';
+
+  @override
+  String get pdfSignDate => 'Дата на подписване:';
+
+  @override
+  String get pdfValidFrom => 'Валиден от:';
+
+  @override
+  String get pdfValidTo => 'Валиден до:';
+
+  @override
+  String get pdfSignatureValid => 'Валиден сертификат';
+
+  @override
+  String get pdfSignatureExpired => 'Изтекъл сертификат';
+
+  @override
+  String get pdfCheckExternalCert => 'Провери външен сертификатен файл';
+
+  @override
+  String get fullscreen => 'Цял екран';
+
+  @override
+  String get exitFullscreen => 'Изход от цял екран';
+
+  @override
+  String get lockRotation => 'Заключване на завъртането';
+
+  @override
+  String get unlockRotation => 'Отключване на завъртането';
+
+  @override
+  String get rotationLocked => 'Завъртането на екрана е заключено';
+
+  @override
+  String get rotationUnlocked => 'Автоматичното завъртане е възстановено';
 }

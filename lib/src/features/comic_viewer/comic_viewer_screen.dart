@@ -41,6 +41,7 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
   int _currentPageIndex = 0;
   ComicReadingMode _readingMode = ComicReadingMode.leftToRight;
   bool _showControls = true;
+  bool _isOrientationLocked = false;
   ComicFitMode _fitMode = ComicFitMode.fitWidth;
   double _currentZoomScale = 1.0;
   bool _isCurrentPageZoomed = false;
@@ -81,6 +82,9 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     _stopAutoplay(updateState: false);
     _autoplayProgressNotifier.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (_isOrientationLocked) {
+      SystemChrome.setPreferredOrientations([]);
+    }
     _saveReadingProgress();
     _pageController.dispose();
     _webtoonScrollController.dispose();
@@ -788,6 +792,50 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     });
   }
 
+  void _toggleOrientationLock() {
+    final next = !_isOrientationLocked;
+    setState(() {
+      _isOrientationLocked = next;
+    });
+
+    if (next) {
+      final orientation = MediaQuery.orientationOf(context);
+      if (orientation == Orientation.landscape) {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      } else {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.rotationLocked),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } else {
+      SystemChrome.setPreferredOrientations([]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.rotationUnlocked),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   void _showJumpToPageDialog() {
     if (_comic == null || _comic!.pageCount <= 1) return;
     final controller = TextEditingController(text: '${_currentPageIndex + 1}');
@@ -1177,6 +1225,13 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                             onPressed: _showBookmarksSheet,
                           ),
 
+                          // Fullscreen
+                          IconButton(
+                            icon: const Icon(Icons.fullscreen, size: 20),
+                            tooltip: context.l10n.fullscreen,
+                            onPressed: _toggleControls,
+                          ),
+
                           // Info
                           IconButton(
                             icon: const Icon(Icons.info_outline, size: 20),
@@ -1292,6 +1347,50 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                           ),
                         ),
                       ],
+
+                      // Floating Fullscreen & Orientation Lock buttons when controls are hidden
+                      if (!_showControls)
+                        Positioned(
+                          top: 20,
+                          right: 20,
+                          child: SafeArea(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Material(
+                                  color: _isOrientationLocked
+                                      ? theme.colorScheme.primary
+                                      : Colors.black54,
+                                  shape: const CircleBorder(),
+                                  child: IconButton(
+                                    icon: Icon(
+                                      _isOrientationLocked
+                                          ? Icons.screen_lock_rotation
+                                          : Icons.screen_rotation,
+                                      color: _isOrientationLocked
+                                          ? theme.colorScheme.onPrimary
+                                          : Colors.white,
+                                    ),
+                                    tooltip: _isOrientationLocked
+                                        ? context.l10n.unlockRotation
+                                        : context.l10n.lockRotation,
+                                    onPressed: _toggleOrientationLock,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Material(
+                                  color: Colors.black54,
+                                  shape: const CircleBorder(),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
+                                    tooltip: context.l10n.exitFullscreen,
+                                    onPressed: _toggleControls,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
 
                       // Floating Autoplay Controls Bar
                       if (_showControls && _isAutoplayActive)

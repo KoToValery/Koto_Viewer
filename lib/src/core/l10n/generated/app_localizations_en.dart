@@ -768,4 +768,81 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeFromRecent => 'Remove from recent';
+
+  @override
+  String get pdfFormFilling => 'Fill PDF Form';
+
+  @override
+  String pdfFormFieldsCount(int count) {
+    return '$count fields';
+  }
+
+  @override
+  String get pdfNoFormFields =>
+      'This document contains no interactive form fields.';
+
+  @override
+  String get pdfFormSaved => 'Form saved successfully!';
+
+  @override
+  String get pdfFormFlatten => 'Flatten form after saving (Lock fields)';
+
+  @override
+  String get pdfFormFlattenTooltip =>
+      'Values will become static text and fields cannot be edited further.';
+
+  @override
+  String get pdfFormSaveAsCopy => 'Save as new file...';
+
+  @override
+  String get pdfFormSaveOverwrite => 'Save';
+
+  @override
+  String get pdfDigitalCertificates => 'Digital Certificates & Signatures';
+
+  @override
+  String get pdfNoDigitalCertificates =>
+      'This document does not contain a digital certificate or embedded electronic signature.';
+
+  @override
+  String get pdfSignedBy => 'Signed by:';
+
+  @override
+  String get pdfIssuer => 'Issuer (CA):';
+
+  @override
+  String get pdfSignDate => 'Signing Date:';
+
+  @override
+  String get pdfValidFrom => 'Valid from:';
+
+  @override
+  String get pdfValidTo => 'Valid to:';
+
+  @override
+  String get pdfSignatureValid => 'Valid Certificate';
+
+  @override
+  String get pdfSignatureExpired => 'Expired Certificate';
+
+  @override
+  String get pdfCheckExternalCert => 'Check external certificate file';
+
+  @override
+  String get fullscreen => 'Fullscreen';
+
+  @override
+  String get exitFullscreen => 'Exit Fullscreen';
+
+  @override
+  String get lockRotation => 'Lock Rotation';
+
+  @override
+  String get unlockRotation => 'Unlock Rotation';
+
+  @override
+  String get rotationLocked => 'Screen rotation locked';
+
+  @override
+  String get rotationUnlocked => 'Auto-rotation restored';
 }

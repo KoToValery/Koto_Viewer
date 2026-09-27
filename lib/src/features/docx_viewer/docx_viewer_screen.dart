@@ -36,6 +36,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   bool _isSinglePageZoomed = false;
   TapDownDetails? _continuousDoubleTapDetails;
   bool _isFullscreen = false;
+  bool _isOrientationLocked = false;
   int _currentPageIndex = 0;
   late PageController _docxPageController;
 
@@ -65,6 +66,9 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (_isOrientationLocked) {
+      SystemChrome.setPreferredOrientations([]);
+    }
     _saveReadingProgress();
     _docxPageController.dispose();
     _verticalScrollController.dispose();
@@ -83,6 +87,50 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       }
     });
+  }
+
+  void _toggleOrientationLock() {
+    final next = !_isOrientationLocked;
+    setState(() {
+      _isOrientationLocked = next;
+    });
+
+    if (next) {
+      final orientation = MediaQuery.orientationOf(context);
+      if (orientation == Orientation.landscape) {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      } else {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.rotationLocked),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } else {
+      SystemChrome.setPreferredOrientations([]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.rotationUnlocked),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadDocxFile() async {
@@ -723,7 +771,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                           icon: const Icon(Icons.fullscreen, size: 20),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                          tooltip: 'Fullscreen',
+                          tooltip: context.l10n.fullscreen,
                           onPressed: _toggleFullscreen,
                         ),
 
@@ -914,36 +962,80 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                             ),
                           ),
 
-                        // Floating Exit Fullscreen Button
+                        // Floating Exit Fullscreen and Rotation Lock Buttons
                         if (_isFullscreen)
                           Positioned(
                             top: MediaQuery.paddingOf(context).top + 12,
                             right: 16,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: _toggleFullscreen,
-                                borderRadius: BorderRadius.circular(24),
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: (isDark ? Colors.black87 : Colors.white.withValues(alpha: 0.9)),
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.25),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Material(
+                                  color: Colors.transparent,
+                                  child: Tooltip(
+                                    message: _isOrientationLocked
+                                        ? context.l10n.unlockRotation
+                                        : context.l10n.lockRotation,
+                                    child: InkWell(
+                                      onTap: _toggleOrientationLock,
+                                      borderRadius: BorderRadius.circular(24),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: _isOrientationLocked
+                                              ? theme.colorScheme.primary
+                                              : (isDark ? Colors.black87 : Colors.white.withValues(alpha: 0.9)),
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.25),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          _isOrientationLocked ? Icons.screen_lock_rotation : Icons.screen_rotation,
+                                          size: 22,
+                                          color: _isOrientationLocked
+                                              ? theme.colorScheme.onPrimary
+                                              : theme.colorScheme.onSurface,
+                                        ),
                                       ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    Icons.fullscreen_exit,
-                                    size: 22,
-                                    color: theme.colorScheme.onSurface,
+                                    ),
                                   ),
                                 ),
-                              ),
+                                const SizedBox(width: 8),
+                                Material(
+                                  color: Colors.transparent,
+                                  child: Tooltip(
+                                    message: context.l10n.exitFullscreen,
+                                    child: InkWell(
+                                      onTap: _toggleFullscreen,
+                                      borderRadius: BorderRadius.circular(24),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: (isDark ? Colors.black87 : Colors.white.withValues(alpha: 0.9)),
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.25),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          Icons.fullscreen_exit,
+                                          size: 22,
+                                          color: theme.colorScheme.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
 

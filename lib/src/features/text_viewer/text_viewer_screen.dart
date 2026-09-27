@@ -51,6 +51,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   bool _isWordWrap = true;
   double _fontSize = 13.5;
   bool _isFullscreen = false;
+  bool _isOrientationLocked = false;
 
   // Pinch-to-zoom & Gesture scaling
   final Map<int, Offset> _activePointers = {};
@@ -117,6 +118,9 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
   void dispose() {
     _zoomIndicatorTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (_isOrientationLocked) {
+      SystemChrome.setPreferredOrientations([]);
+    }
     _saveReadingProgress();
     _verticalScrollController.dispose();
     _horizontalScrollController.dispose();
@@ -606,6 +610,50 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     });
   }
 
+  void _toggleOrientationLock() {
+    final next = !_isOrientationLocked;
+    setState(() {
+      _isOrientationLocked = next;
+    });
+
+    if (next) {
+      final orientation = MediaQuery.orientationOf(context);
+      if (orientation == Orientation.landscape) {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      } else {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.rotationLocked),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } else {
+      SystemChrome.setPreferredOrientations([]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.rotationUnlocked),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildLogFilterBar() {
     return Container(
       height: 48,
@@ -915,7 +963,7 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                     icon: const Icon(Icons.fullscreen, size: 20),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Fullscreen',
+                    tooltip: context.l10n.fullscreen,
                     onPressed: _toggleFullscreen,
                   ),
 
@@ -1105,11 +1153,34 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                   Positioned(
                     top: 20,
                     right: 20,
-                    child: FloatingActionButton.small(
-                      heroTag: 'exit_fullscreen',
-                      onPressed: _toggleFullscreen,
-                      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
-                      child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FloatingActionButton.small(
+                          heroTag: 'orientation_lock_text',
+                          onPressed: _toggleOrientationLock,
+                          backgroundColor: _isOrientationLocked
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.surface.withValues(alpha: 0.8),
+                          tooltip: _isOrientationLocked
+                              ? context.l10n.unlockRotation
+                              : context.l10n.lockRotation,
+                          child: Icon(
+                            _isOrientationLocked ? Icons.screen_lock_rotation : Icons.screen_rotation,
+                            color: _isOrientationLocked
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FloatingActionButton.small(
+                          heroTag: 'exit_fullscreen',
+                          onPressed: _toggleFullscreen,
+                          backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+                          tooltip: context.l10n.exitFullscreen,
+                          child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+                        ),
+                      ],
                     ),
                   ),
               ],

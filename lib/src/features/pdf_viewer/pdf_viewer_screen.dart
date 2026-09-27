@@ -16,8 +16,14 @@ import '../home/widgets/share_options_sheet.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
 import '../../core/l10n/l10n_extensions.dart';
 import 'models/pdf_reflow_models.dart';
+import 'models/pdf_form_models.dart';
+import 'models/pdf_certificate_models.dart';
 import 'services/pdf_text_extractor_service.dart';
+import 'services/pdf_form_service.dart';
+import 'services/pdf_certificate_service.dart';
 import 'widgets/pdf_reflow_view.dart';
+import 'widgets/pdf_form_fill_sheet.dart';
+import 'widgets/pdf_certificate_info_dialog.dart';
 
 /// PDF Document Viewer Screen with Single Page Mode (Swipe) and Continuous Scroll,
 /// 2-row header navigation, reading progress auto-save & resume, bookmarks,
@@ -61,7 +67,7 @@ class SinglePageSwipeScrollPhysics extends PageScrollPhysics {
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfController = PdfViewerController();
-  late final PdfDocumentRef _documentRef;
+  late PdfDocumentRef _documentRef;
   late PageController _singlePageController;
 
   int _activePointers = 0;
@@ -76,6 +82,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   double _currentZoom = 1.0;
   bool _isZoomBarExpanded = false;
   bool _isFullscreen = false;
+  bool _isOrientationLocked = false;
 
   // Bookmarks & Reading Progress
   bool _isCurrentBookmarked = false;
@@ -87,6 +94,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _isReflowMode = false;
   PdfReflowSettings _reflowSettings = const PdfReflowSettings();
   late final PdfTextExtractorService _textExtractorService;
+
+  // Forms & Digital Signatures
+  List<PdfFormFieldModel> _formFields = [];
+  List<PdfCertificateInfo> _certificates = [];
 
   // Page zoom controllers for Single Page Mode
   final Map<int, TransformationController> _pageTransformControllers = {};
@@ -101,11 +112,62 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     _pdfController.addListener(_onControllerChanged);
     _loadProgressAndSaveRecent();
     _loadReflowSettings();
+    _detectFormAndCertificates();
+  }
+
+  Future<void> _detectFormAndCertificates() async {
+    try {
+      final formFields = await PdfFormService.extractFormFields(widget.filePath);
+      final certs = await PdfCertificateService.extractCertificates(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _formFields = formFields;
+          _certificates = certs;
+        });
+      }
+    } catch (e) {
+      debugPrint('PdfViewer._detectFormAndCertificates error: $e');
+    }
+  }
+
+  void _openFormFilling() async {
+    if (_formFields.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.pdfNoFormFields),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    await PdfFormFillSheet.show(
+      context: context,
+      filePath: widget.filePath,
+      initialFields: _formFields,
+      onSaved: () {
+        setState(() {
+          _documentRef = PdfDocumentRefFile(widget.filePath);
+        });
+        _detectFormAndCertificates();
+      },
+    );
+  }
+
+  void _showCertificateInfo() {
+    PdfCertificateInfoDialog.show(
+      context: context,
+      filePath: widget.filePath,
+      certificates: _certificates,
+    );
   }
 
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (_isOrientationLocked) {
+      SystemChrome.setPreferredOrientations([]);
+    }
     _pageTransformControllers.clear();
     _textExtractorService.clearMemoryCache();
     _saveReadingProgress();
@@ -447,6 +509,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   _buildInfoRow('Current Page:', 'Page $_currentPage of $_pageCount'),
                   _buildInfoRow('File Size:', formattedSize),
                   _buildInfoRow(context.l10n.viewMode, _isSinglePageMode ? context.l10n.singlePageSwipe : context.l10n.continuousScroll),
+                  _buildInfoRow('Form Fields:', _formFields.isEmpty ? 'None' : '${_formFields.length} AcroForm fields'),
+                  _buildInfoRow('Signatures:', _certificates.isEmpty ? 'None' : '${_certificates.length} digital signature(s)'),
                   _buildInfoRow('File Path:', widget.filePath),
                 ],
               ),
@@ -691,6 +755,50 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     });
   }
 
+  void _toggleOrientationLock() {
+    final next = !_isOrientationLocked;
+    setState(() {
+      _isOrientationLocked = next;
+    });
+
+    if (next) {
+      final orientation = MediaQuery.orientationOf(context);
+      if (orientation == Orientation.landscape) {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      } else {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.rotationLocked),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } else {
+      SystemChrome.setPreferredOrientations([]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.rotationUnlocked),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   void _toggleViewMode() {
     setState(() {
       _isSinglePageMode = !_isSinglePageMode;
@@ -847,7 +955,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         // Fullscreen
                         IconButton(
                           icon: const Icon(Icons.fullscreen, size: 20),
-                          tooltip: 'Fullscreen',
+                          tooltip: context.l10n.fullscreen,
                           onPressed: _toggleFullscreen,
                         ),
 
@@ -856,6 +964,33 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                           icon: const Icon(Icons.info_outline, size: 20),
                           tooltip: 'PDF Properties',
                           onPressed: _showInfoSheet,
+                        ),
+
+                        // Form Filling (AcroForms)
+                        IconButton(
+                          icon: Badge(
+                            isLabelVisible: _formFields.isNotEmpty,
+                            label: Text('${_formFields.length}'),
+                            backgroundColor: theme.colorScheme.primary,
+                            child: Icon(
+                              _formFields.isNotEmpty ? Icons.edit_note : Icons.edit_note_outlined,
+                              size: 20,
+                              color: _formFields.isNotEmpty ? theme.colorScheme.primary : null,
+                            ),
+                          ),
+                          tooltip: context.l10n.pdfFormFilling,
+                          onPressed: _openFormFilling,
+                        ),
+
+                        // Digital Certificates & Signatures
+                        IconButton(
+                          icon: Icon(
+                            _certificates.isNotEmpty ? Icons.verified_user : Icons.security_outlined,
+                            size: 20,
+                            color: _certificates.isNotEmpty ? Colors.green.shade600 : null,
+                          ),
+                          tooltip: context.l10n.pdfDigitalCertificates,
+                          onPressed: _showCertificateInfo,
                         ),
 
                         // Share
@@ -907,11 +1042,34 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             Positioned(
               top: 20,
               right: 20,
-              child: FloatingActionButton.small(
-                heroTag: 'exit_fullscreen_pdf',
-                onPressed: _toggleFullscreen,
-                backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
-                child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FloatingActionButton.small(
+                    heroTag: 'orientation_lock_pdf',
+                    onPressed: _toggleOrientationLock,
+                    backgroundColor: _isOrientationLocked
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.surface.withValues(alpha: 0.8),
+                    tooltip: _isOrientationLocked
+                        ? context.l10n.unlockRotation
+                        : context.l10n.lockRotation,
+                    child: Icon(
+                      _isOrientationLocked ? Icons.screen_lock_rotation : Icons.screen_rotation,
+                      color: _isOrientationLocked
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FloatingActionButton.small(
+                    heroTag: 'exit_fullscreen_pdf',
+                    onPressed: _toggleFullscreen,
+                    backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+                    tooltip: context.l10n.exitFullscreen,
+                    child: Icon(Icons.fullscreen_exit, color: theme.colorScheme.onSurface),
+                  ),
+                ],
               ),
             ),
 

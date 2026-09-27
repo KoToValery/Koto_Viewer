@@ -1423,6 +1423,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove from recent'**
   String get removeFromRecent;
+
+  /// Title/action for filling PDF AcroForms
+  ///
+  /// In en, this message translates to:
+  /// **'Fill PDF Form'**
+  String get pdfFormFilling;
+
+  /// Number of form fields in the document
+  ///
+  /// In en, this message translates to:
+  /// **'{count} fields'**
+  String pdfFormFieldsCount(int count);
+
+  /// Notice when PDF has no AcroForm fields
+  ///
+  /// In en, this message translates to:
+  /// **'This document contains no interactive form fields.'**
+  String get pdfNoFormFields;
+
+  /// Success message when form is saved
+  ///
+  /// In en, this message translates to:
+  /// **'Form saved successfully!'**
+  String get pdfFormSaved;
+
+  /// Option to convert form fields to static text
+  ///
+  /// In en, this message translates to:
+  /// **'Flatten form after saving (Lock fields)'**
+  String get pdfFormFlatten;
+
+  /// Tooltip explaining flattening
+  ///
+  /// In en, this message translates to:
+  /// **'Values will become static text and fields cannot be edited further.'**
+  String get pdfFormFlattenTooltip;
+
+  /// Save copy of filled form
+  ///
+  /// In en, this message translates to:
+  /// **'Save as new file...'**
+  String get pdfFormSaveAsCopy;
+
+  /// Overwrite existing file with filled form
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get pdfFormSaveOverwrite;
+
+  /// Title for certificate and digital signature viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Digital Certificates & Signatures'**
+  String get pdfDigitalCertificates;
+
+  /// Notice when no certificates/signatures found
+  ///
+  /// In en, this message translates to:
+  /// **'This document does not contain a digital certificate or embedded electronic signature.'**
+  String get pdfNoDigitalCertificates;
+
+  /// Label for certificate signer
+  ///
+  /// In en, this message translates to:
+  /// **'Signed by:'**
+  String get pdfSignedBy;
+
+  /// Label for certificate authority
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer (CA):'**
+  String get pdfIssuer;
+
+  /// Label for signature timestamp
+  ///
+  /// In en, this message translates to:
+  /// **'Signing Date:'**
+  String get pdfSignDate;
+
+  /// Label for certificate start date
+  ///
+  /// In en, this message translates to:
+  /// **'Valid from:'**
+  String get pdfValidFrom;
+
+  /// Label for certificate expiration date
+  ///
+  /// In en, this message translates to:
+  /// **'Valid to:'**
+  String get pdfValidTo;
+
+  /// Status badge for valid certificate
+  ///
+  /// In en, this message translates to:
+  /// **'Valid Certificate'**
+  String get pdfSignatureValid;
+
+  /// Status badge for expired certificate
+  ///
+  /// In en, this message translates to:
+  /// **'Expired Certificate'**
+  String get pdfSignatureExpired;
+
+  /// Button to inspect external .cer or .pfx certificate
+  ///
+  /// In en, this message translates to:
+  /// **'Check external certificate file'**
+  String get pdfCheckExternalCert;
+
+  /// Tooltip for entering fullscreen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen'**
+  String get fullscreen;
+
+  /// Tooltip for exiting fullscreen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Fullscreen'**
+  String get exitFullscreen;
+
+  /// Tooltip to lock screen rotation
+  ///
+  /// In en, this message translates to:
+  /// **'Lock Rotation'**
+  String get lockRotation;
+
+  /// Tooltip to unlock screen rotation
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Rotation'**
+  String get unlockRotation;
+
+  /// Snackbar message when rotation is locked
+  ///
+  /// In en, this message translates to:
+  /// **'Screen rotation locked'**
+  String get rotationLocked;
+
+  /// Snackbar message when rotation is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-rotation restored'**
+  String get rotationUnlocked;
 }
 
 class _AppLocalizationsDelegate
