@@ -79,23 +79,12 @@ class Cad3DCamera {
     return Vector3(sinY * sinP, cosY * sinP, cosP);
   }
 
-  /// Switches to Walkthrough / Fly Mode, initializing eye position seamlessly from current view.
-  void switchToFlyMode(double modelScale) {
+  /// Switches to Walkthrough / Fly Mode.
+  /// Starts 100% seamlessly from the exact current view without moving or jumping.
+  void switchToFlyMode([double? modelScale]) {
     if (mode == Cad3DInteractionMode.fly) return;
     mode = Cad3DInteractionMode.fly;
-
-    const cameraDist = 1200.0;
-    final effectiveDist = cameraDist / (math.max(modelScale * zoom, 1e-6));
-    final fwd = forwardVector;
-    final rgt = rightVector;
-    final up = upVector;
-
-    final panX = panOffset.dx / (math.max(modelScale * zoom, 1e-6));
-    final panY = panOffset.dy / (math.max(modelScale * zoom, 1e-6));
-
-    eyePosition = (fwd * -effectiveDist) - (rgt * panX) + (up * panY);
-    panOffset = Offset.zero;
-    zoom = 1.0;
+    eyePosition = Vector3.zero;
   }
 
   /// Switches back to Orbit mode.
@@ -121,11 +110,19 @@ class Cad3DCamera {
   }
 
   /// First-person look rotation for right thumb drag.
-  void look(double deltaX, double deltaY) {
+  /// Rotates around the observer's eye in place without shifting vantage point.
+  void look(double deltaX, double deltaY, [double? modelScale]) {
+    final scale = modelScale ?? 1.0;
+    final oldFwd = forwardVector;
     yaw += deltaX * 0.005;
     pitch += (invertY ? 1 : -1) * deltaY * 0.005;
     const limit = math.pi * 0.48; // ~86.4 degrees
     pitch = pitch.clamp(-limit, limit);
+
+    final newFwd = forwardVector;
+    const cameraDist = 1200.0;
+    final D = cameraDist / math.max(scale * zoom, 1e-4);
+    eyePosition += (newFwd - oldFwd) * D;
   }
 
   void orbit(double deltaX, double deltaY) {
@@ -144,10 +141,13 @@ class Cad3DCamera {
     zoom = (zoom * factor).clamp(0.05, 100.0);
   }
 
-  void reset() {
-    mode = Cad3DInteractionMode.orbit;
-    eyePosition = Vector3.zero;
+  void reset({bool keepMode = false}) {
+    final previousMode = mode;
     setPreset(Cad3DViewPreset.isometric);
+    if (keepMode) {
+      mode = previousMode;
+    }
+    eyePosition = Vector3.zero;
     zoom = 1.0;
     panOffset = Offset.zero;
   }
@@ -222,17 +222,9 @@ class Cad3DCamera {
     final sz = p.z * modelScale;
 
     const cameraDist = 1200.0;
-    final double depth;
-    if (isFlyMode) {
-      // In fly mode, p is relative to camera eye, so sy is the distance along forward line of sight.
-      // Near plane distance minimum in screen units prevents division by zero or negative flip.
-      depth = math.max(sy, 10.0);
-    } else {
-      depth = math.max(cameraDist + sy, 40.0);
-    }
-
+    final depth = math.max(cameraDist + sy, 40.0);
     final perspective = cameraDist / depth;
-    final scaleFactor = isFlyMode ? perspective : (zoom * perspective);
+    final scaleFactor = zoom * perspective;
 
     final screenX = centerX + sx * scaleFactor;
     final screenY = centerY - sz * scaleFactor;

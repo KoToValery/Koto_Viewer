@@ -131,9 +131,9 @@ class Cad3DMeshPainter extends CustomPainter {
       final tv1 = camera.transformVertex(v1Local);
       final tv2 = camera.transformVertex(v2Local);
 
-      // Fly Mode Near-Plane Clipping: discard triangles that are behind or too close to the eye
+      // Fly Mode Near-Plane Clipping: discard triangles behind or clipping into the eye plane
       if (camera.isFlyMode) {
-        const double nearPlane = 0.001;
+        final double nearPlane = -1150.0 / modelScale;
         if (tv0.y <= nearPlane || tv1.y <= nearPlane || tv2.y <= nearPlane) {
           continue;
         }
@@ -341,10 +341,11 @@ class Cad3DMeshPainter extends CustomPainter {
     const int lines = 10;
     final double step = gridSize / lines;
 
+    final double nearPlane = -1150.0 / modelScale;
     for (int i = -lines; i <= lines; i++) {
       final tv1 = camera.transformVertex(Vector3(i * step, -gridSize, zBottom));
       final tv2 = camera.transformVertex(Vector3(i * step, gridSize, zBottom));
-      if (!camera.isFlyMode || (tv1.y > 0.001 && tv2.y > 0.001)) {
+      if (!camera.isFlyMode || (tv1.y > nearPlane && tv2.y > nearPlane)) {
         final p1 = camera.projectToScreen(tv1, size, modelScale);
         final p2 = camera.projectToScreen(tv2, size, modelScale);
         canvas.drawLine(p1, p2, gridPaint);
@@ -352,7 +353,7 @@ class Cad3DMeshPainter extends CustomPainter {
 
       final tv3 = camera.transformVertex(Vector3(-gridSize, i * step, zBottom));
       final tv4 = camera.transformVertex(Vector3(gridSize, i * step, zBottom));
-      if (!camera.isFlyMode || (tv3.y > 0.001 && tv4.y > 0.001)) {
+      if (!camera.isFlyMode || (tv3.y > nearPlane && tv4.y > nearPlane)) {
         final p3 = camera.projectToScreen(tv3, size, modelScale);
         final p4 = camera.projectToScreen(tv4, size, modelScale);
         canvas.drawLine(p3, p4, gridPaint);
@@ -544,10 +545,11 @@ class Cad3DMeshPainter extends CustomPainter {
     double minScreenX = double.infinity, maxScreenX = -double.infinity;
     double minScreenY = double.infinity, maxScreenY = -double.infinity;
     int inFrontCount = 0;
+    final double nearPlane = -1150.0 / modelScale;
     for (final c in corners) {
       final tv = camera.transformVertex(c - center);
       if (camera.isFlyMode) {
-        if (tv.y > 0.001) inFrontCount++;
+        if (tv.y > nearPlane) inFrontCount++;
       }
       final p = camera.projectToScreen(tv, size, modelScale);
       if (p.dx < minScreenX) minScreenX = p.dx;

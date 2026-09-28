@@ -64,7 +64,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
   late String _fileName;
   int _fileSizeBytes = 0;
 
-  Cad3DShadingMode _shadingMode = Cad3DShadingMode.smoothShaded;
+  final Cad3DShadingMode _shadingMode = Cad3DShadingMode.smoothShaded;
   Cad3DTheme _theme = Cad3DTheme.darkCad;
   final bool _showGrid = true;
   Color? _customModelColor;
@@ -79,6 +79,20 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
   bool _isGpuRendering = false;
   bool _pendingGpuRender = false;
   Size _lastViewportSize = Size.zero;
+  bool _isFullscreen = false;
+
+  double get _modelScale {
+    if (_mesh == null || _lastViewportSize.isEmpty) return 1.0;
+    final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
+    return (math.min(_lastViewportSize.width, _lastViewportSize.height) * 0.55) / maxDim;
+  }
+
+  void _toggleFullscreen() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _isFullscreen = !_isFullscreen;
+    });
+  }
 
   Ticker? _flyTicker;
   Duration? _lastTickTime;
@@ -380,13 +394,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
     setState(() {
       _interactionMode = mode;
       if (mode == Cad3DInteractionMode.fly) {
-        if (_mesh != null) {
-          final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
-          final modelScale = _lastViewportSize.isEmpty
-              ? 1.0
-              : (math.min(_lastViewportSize.width, _lastViewportSize.height) * 0.55) / maxDim;
-          _camera.switchToFlyMode(modelScale);
-        }
+        _camera.switchToFlyMode(_modelScale);
       } else {
         _joystickDeflection = Offset.zero;
         _flyTicker?.stop();
@@ -412,7 +420,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
       _isInteracting = true;
       if (_interactionMode == Cad3DInteractionMode.fly) {
         // Fly / Walkthrough Mode: Drag rotates first-person look (yaw & pitch)
-        _camera.look(delta.dx, delta.dy);
+        _camera.look(delta.dx, delta.dy, _modelScale);
       } else {
         if (details.pointerCount == 1) {
           if (_isPanActive) {
@@ -493,7 +501,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
       _mousePanStart = event.position;
       setState(() {
         if (_interactionMode == Cad3DInteractionMode.fly) {
-          _camera.look(delta.dx, delta.dy);
+          _camera.look(delta.dx, delta.dy, _modelScale);
         } else {
           _camera.pan(delta);
         }
@@ -509,10 +517,13 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
   void _resetView() {
     HapticFeedback.selectionClick();
     setState(() {
-      _interactionMode = Cad3DInteractionMode.orbit;
+      final wasFly = _interactionMode == Cad3DInteractionMode.fly;
       _joystickDeflection = Offset.zero;
       _flyTicker?.stop();
-      _camera.reset();
+      _camera.reset(keepMode: wasFly);
+      if (!wasFly) {
+        _interactionMode = Cad3DInteractionMode.orbit;
+      }
     });
     _requestGpuRender(_lastViewportSize);
   }
@@ -746,15 +757,38 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
 
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: _theme.background,
-      appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(true),
-        ),
+    return PopScope(
+      canPop: !_isFullscreen,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_isFullscreen) {
+          _toggleFullscreen();
+        }
+      },
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            if (_isFullscreen) {
+              _toggleFullscreen();
+            }
+          },
+          const SingleActivator(LogicalKeyboardKey.keyF): () {
+            _toggleFullscreen();
+          },
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            backgroundColor: _theme.background,
+            appBar: _isFullscreen
+                ? null
+                : AppBar(
+                    backgroundColor: theme.colorScheme.surface,
+                    elevation: 0,
+                    leading: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.of(context).pop(true),
+                    ),
         title: Text(
           _fileName,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -914,140 +948,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                               ],
                             ),
 
-                            // Model Color / Material Menu
-                            PopupMenuButton<Color?>(
-                              icon: const Icon(
-                                Icons.format_paint_outlined,
-                                size: 20,
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 38,
-                                minHeight: 38,
-                              ),
-                              tooltip: 'Model Color',
-                              onSelected: (c) {
-                                setState(() => _customModelColor = c);
-                                if (_useGpuAcceleration &&
-                                    _lastViewportSize != Size.zero) {
-                                  _requestGpuRender(_lastViewportSize);
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem<Color?>(
-                                  value: null,
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 16,
-                                        height: 16,
-                                        decoration: BoxDecoration(
-                                          color: _theme.defaultMeshColor,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.grey,
-                                            width: 1,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      const Text('Theme Default'),
-                                      if (_customModelColor == null) ...[
-                                        const Spacer(),
-                                        Icon(
-                                          Icons.check,
-                                          size: 18,
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                ...[
-                                  ('CAD Blue', const Color(0xFF3B82F6)),
-                                  ('Titanium Silver', const Color(0xFFCBD5E1)),
-                                  ('Steel Slate', const Color(0xFF94A3B8)),
-                                  ('Studio White', const Color(0xFFF8FAFC)),
-                                  ('Amber Gold', const Color(0xFFF59E0B)),
-                                  ('Cyber Cyan', const Color(0xFF06B6D4)),
-                                  ('Emerald Green', const Color(0xFF10B981)),
-                                  ('Crimson Red', const Color(0xFFEF4444)),
-                                  (
-                                    'Graphite Charcoal',
-                                    const Color(0xFF475569),
-                                  ),
-                                ].map((entry) {
-                                  final (name, col) = entry;
-                                  return PopupMenuItem<Color?>(
-                                    value: col,
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 16,
-                                          height: 16,
-                                          decoration: BoxDecoration(
-                                            color: col,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.grey,
-                                              width: 1,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Text(name),
-                                        if (_customModelColor == col) ...[
-                                          const Spacer(),
-                                          Icon(
-                                            Icons.check,
-                                            size: 18,
-                                            color: theme.colorScheme.primary,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
 
-                            // Shading Mode Menu
-                            PopupMenuButton<Cad3DShadingMode>(
-                              icon: Icon(_shadingMode.icon, size: 20),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 38,
-                                minHeight: 38,
-                              ),
-                              tooltip: 'Rendering Mode',
-                              onSelected: (m) =>
-                                  setState(() => _shadingMode = m),
-                              itemBuilder: (context) =>
-                                  Cad3DShadingMode.values.map((m) {
-                                    return PopupMenuItem<Cad3DShadingMode>(
-                                      value: m,
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            m.icon,
-                                            size: 18,
-                                            color: theme.colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Text(m.label),
-                                          if (_shadingMode == m) ...[
-                                            const Spacer(),
-                                            Icon(
-                                              Icons.check,
-                                              size: 18,
-                                              color: theme.colorScheme.primary,
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                            ),
 
                             // Canvas Theme Menu
                             PopupMenuButton<Cad3DTheme>(
@@ -1170,6 +1071,24 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                               ),
                               tooltip: l10n.share,
                               onPressed: _shareFile,
+                            ),
+
+                            // Fullscreen Toggle
+                            IconButton(
+                              icon: Icon(
+                                _isFullscreen
+                                    ? Icons.fullscreen_exit_rounded
+                                    : Icons.fullscreen_rounded,
+                                size: 20,
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 38,
+                                minHeight: 38,
+                              ),
+                              tooltip:
+                                  _isFullscreen ? 'Exit Fullscreen' : 'Fullscreen',
+                              onPressed: _toggleFullscreen,
                             ),
                           ],
                         ),
@@ -1466,11 +1385,38 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                     ),
                   ),
                 ),
+
+              // Floating Exit Fullscreen Button
+              if (_isFullscreen)
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: SafeArea(
+                    child: Material(
+                      color: Colors.black54,
+                      shape: const CircleBorder(),
+                      elevation: 4,
+                      clipBehavior: Clip.antiAlias,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.fullscreen_exit_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        tooltip: 'Exit Fullscreen (ESC)',
+                        onPressed: _toggleFullscreen,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           );
         },
       ),
-    );
+    ),
+  ),
+),
+);
   }
 
   Widget _buildModeButton({

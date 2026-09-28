@@ -16,19 +16,48 @@ void main() {
       expect(camera.eyePosition.z, equals(0.0));
     });
 
-    test('switchToFlyMode sets fly mode and computes initial eyePosition', () {
-      final camera = Cad3DCamera(yaw: 0.0, pitch: 0.0);
-      const modelScale = 1.0;
+    test('switchToFlyMode starts seamlessly from exact current view with zero jump', () {
+      final camera = Cad3DCamera(yaw: 0.5, pitch: 0.3, zoom: 2.5, panOffset: const Offset(40, -30));
+      const modelScale = 0.05;
+      const viewport = Size(1000, 800);
+      final testVertex = const Vector3(120.0, -85.0, 45.0);
 
+      // Pre-switch Orbit projection
+      final tvOrbit = camera.transformVertex(testVertex);
+      final screenOrbit = camera.projectToScreen(tvOrbit, viewport, modelScale);
+
+      // Switch to Fly mode
       camera.switchToFlyMode(modelScale);
       expect(camera.mode, equals(Cad3DInteractionMode.fly));
       expect(camera.isFlyMode, isTrue);
 
-      // With yaw=0, pitch=0, forward vector is (0, 1, 0)
-      // Camera eye should be placed at -1200 along forward vector: (0, -1200, 0)
+      // Seamless: eyePosition begins at origin, zoom and pan are preserved
       expect(camera.eyePosition.x, closeTo(0.0, 1e-4));
-      expect(camera.eyePosition.y, closeTo(-1200.0, 1e-4));
+      expect(camera.eyePosition.y, closeTo(0.0, 1e-4));
       expect(camera.eyePosition.z, closeTo(0.0, 1e-4));
+      expect(camera.zoom, equals(2.5));
+      expect(camera.panOffset, equals(const Offset(40, -30)));
+
+      // Post-switch Fly projection MUST be 100% mathematically identical to Orbit projection
+      final tvFly = camera.transformVertex(testVertex);
+      final screenFly = camera.projectToScreen(tvFly, viewport, modelScale);
+
+      expect(tvFly.x, closeTo(tvOrbit.x, 1e-4));
+      expect(tvFly.y, closeTo(tvOrbit.y, 1e-4));
+      expect(tvFly.z, closeTo(tvOrbit.z, 1e-4));
+      expect(screenFly.dx, closeTo(screenOrbit.dx, 1e-4));
+      expect(screenFly.dy, closeTo(screenOrbit.dy, 1e-4));
+    });
+
+    test('reset(keepMode: true) preserves Fly mode and resets view to center', () {
+      final camera = Cad3DCamera(yaw: 1.0, pitch: 0.5, zoom: 3.0, panOffset: const Offset(50, 50));
+      camera.switchToFlyMode(1.0);
+      camera.eyePosition = const Vector3(100, 200, 300);
+
+      camera.reset(keepMode: true);
+      expect(camera.mode, equals(Cad3DInteractionMode.fly));
+      expect(camera.isFlyMode, isTrue);
+      expect(camera.eyePosition, equals(Vector3.zero));
       expect(camera.zoom, equals(1.0));
       expect(camera.panOffset, equals(Offset.zero));
     });

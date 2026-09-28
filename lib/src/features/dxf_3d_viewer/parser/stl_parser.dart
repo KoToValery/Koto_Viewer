@@ -41,7 +41,7 @@ class StlParser {
     }
 
     // Double check if file contains non-ASCII binary bytes
-    for (int i = 0; i < math_min(bytes.length, 512); i++) {
+    for (int i = 0; i < mathMin(bytes.length, 512); i++) {
       final b = bytes[i];
       if (b == 0 || (b < 32 && b != 9 && b != 10 && b != 13)) {
         return true;
@@ -51,7 +51,7 @@ class StlParser {
     return false;
   }
 
-  static int math_min(int a, int b) => a < b ? a : b;
+  static int mathMin(int a, int b) => a < b ? a : b;
 
   static Mesh3D _parseBinaryStl(Uint8List bytes, {required String name}) {
     final byteData = ByteData.sublistView(bytes);
