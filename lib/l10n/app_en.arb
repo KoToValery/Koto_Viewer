@@ -366,6 +366,12 @@
   "@rotateModelTooltip": { "description": "Tooltip indicating dragging will rotate the 3D model" },
   "dragModeActive": "Drag Mode Active",
   "@dragModeActive": { "description": "Badge indicator when drag/pan mode is active" },
+  "flyMode": "Walk / Fly",
+  "@flyMode": { "description": "Walkthrough and fly interaction mode for 3D viewer" },
+  "flyModeTooltip": "Free fly & walkthrough mode (ArchiCAD / BIMx)",
+  "@flyModeTooltip": { "description": "Tooltip indicating walkthrough / fly mode" },
+  "flyModeActive": "Walk / Fly Mode (BIMx)",
+  "@flyModeActive": { "description": "Badge indicator when walkthrough fly mode is active" },
   "errorLoadingDxf": "Error opening DXF file: {error}",
   "@errorLoadingDxf": {
     "description": "Error message when opening DXF file fails",

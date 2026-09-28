@@ -127,9 +127,17 @@ class Cad3DMeshPainter extends CustomPainter {
       final v2Local = tri.v2 - center;
 
       // Transform to view coordinates
-      final tv0 = camera.transformPoint(v0Local);
-      final tv1 = camera.transformPoint(v1Local);
-      final tv2 = camera.transformPoint(v2Local);
+      final tv0 = camera.transformVertex(v0Local);
+      final tv1 = camera.transformVertex(v1Local);
+      final tv2 = camera.transformVertex(v2Local);
+
+      // Fly Mode Near-Plane Clipping: discard triangles that are behind or too close to the eye
+      if (camera.isFlyMode) {
+        const double nearPlane = 0.001;
+        if (tv0.y <= nearPlane || tv1.y <= nearPlane || tv2.y <= nearPlane) {
+          continue;
+        }
+      }
 
       // Project vertices to 2D screen coordinates
       final p0 = camera.projectToScreen(tv0, size, modelScale);
@@ -334,29 +342,21 @@ class Cad3DMeshPainter extends CustomPainter {
     final double step = gridSize / lines;
 
     for (int i = -lines; i <= lines; i++) {
-      final p1 = camera.projectToScreen(
-        camera.transformPoint(Vector3(i * step, -gridSize, zBottom)),
-        size,
-        modelScale,
-      );
-      final p2 = camera.projectToScreen(
-        camera.transformPoint(Vector3(i * step, gridSize, zBottom)),
-        size,
-        modelScale,
-      );
-      canvas.drawLine(p1, p2, gridPaint);
+      final tv1 = camera.transformVertex(Vector3(i * step, -gridSize, zBottom));
+      final tv2 = camera.transformVertex(Vector3(i * step, gridSize, zBottom));
+      if (!camera.isFlyMode || (tv1.y > 0.001 && tv2.y > 0.001)) {
+        final p1 = camera.projectToScreen(tv1, size, modelScale);
+        final p2 = camera.projectToScreen(tv2, size, modelScale);
+        canvas.drawLine(p1, p2, gridPaint);
+      }
 
-      final p3 = camera.projectToScreen(
-        camera.transformPoint(Vector3(-gridSize, i * step, zBottom)),
-        size,
-        modelScale,
-      );
-      final p4 = camera.projectToScreen(
-        camera.transformPoint(Vector3(gridSize, i * step, zBottom)),
-        size,
-        modelScale,
-      );
-      canvas.drawLine(p3, p4, gridPaint);
+      final tv3 = camera.transformVertex(Vector3(-gridSize, i * step, zBottom));
+      final tv4 = camera.transformVertex(Vector3(gridSize, i * step, zBottom));
+      if (!camera.isFlyMode || (tv3.y > 0.001 && tv4.y > 0.001)) {
+        final p3 = camera.projectToScreen(tv3, size, modelScale);
+        final p4 = camera.projectToScreen(tv4, size, modelScale);
+        canvas.drawLine(p3, p4, gridPaint);
+      }
     }
   }
 
@@ -543,15 +543,20 @@ class Cad3DMeshPainter extends CustomPainter {
 
     double minScreenX = double.infinity, maxScreenX = -double.infinity;
     double minScreenY = double.infinity, maxScreenY = -double.infinity;
-
+    int inFrontCount = 0;
     for (final c in corners) {
-      final tv = camera.transformPoint(c - center);
+      final tv = camera.transformVertex(c - center);
+      if (camera.isFlyMode) {
+        if (tv.y > 0.001) inFrontCount++;
+      }
       final p = camera.projectToScreen(tv, size, modelScale);
       if (p.dx < minScreenX) minScreenX = p.dx;
       if (p.dx > maxScreenX) maxScreenX = p.dx;
       if (p.dy < minScreenY) minScreenY = p.dy;
       if (p.dy > maxScreenY) maxScreenY = p.dy;
     }
+
+    if (camera.isFlyMode && inFrontCount == 0) return false;
 
     if (maxScreenX < -margin || minScreenX > size.width + margin) return false;
     if (maxScreenY < -margin || minScreenY > size.height + margin) return false;

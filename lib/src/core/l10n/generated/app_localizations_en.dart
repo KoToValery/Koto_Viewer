@@ -479,6 +479,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dragModeActive => 'Drag Mode Active';
 
   @override
+  String get flyMode => 'Walk / Fly';
+
+  @override
+  String get flyModeTooltip => 'Free fly & walkthrough mode (ArchiCAD / BIMx)';
+
+  @override
+  String get flyModeActive => 'Walk / Fly Mode (BIMx)';
+
+  @override
   String errorLoadingDxf(String error) {
     return 'Error opening DXF file: $error';
   }

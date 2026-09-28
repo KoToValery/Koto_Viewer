@@ -968,6 +968,24 @@ abstract class AppLocalizations {
   /// **'Drag Mode Active'**
   String get dragModeActive;
 
+  /// Walkthrough and fly interaction mode for 3D viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Walk / Fly'**
+  String get flyMode;
+
+  /// Tooltip indicating walkthrough / fly mode
+  ///
+  /// In en, this message translates to:
+  /// **'Free fly & walkthrough mode (ArchiCAD / BIMx)'**
+  String get flyModeTooltip;
+
+  /// Badge indicator when walkthrough fly mode is active
+  ///
+  /// In en, this message translates to:
+  /// **'Walk / Fly Mode (BIMx)'**
+  String get flyModeActive;
+
   /// Error message when opening DXF file fails
   ///
   /// In en, this message translates to:

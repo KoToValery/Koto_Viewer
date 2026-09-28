@@ -432,11 +432,23 @@ class Cad3DGpuRenderer {
     m[10] = p21 * modelScale * ryz;
     m[11] = p31 * ryz;
 
-    // Column 3
-    m[12] = p03;
-    m[13] = p13;
-    m[14] = p23;
-    m[15] = p33;
+    // Column 3 (Translation & Depth)
+    if (camera.isFlyMode) {
+      final eye = camera.eyePosition;
+      final tx = rxx * eye.x + rxy * eye.y + rxz * eye.z;
+      final ty = ryx * eye.x + ryy * eye.y + ryz * eye.z;
+      final tz = rzx * eye.x + rzy * eye.y + rzz * eye.z;
+
+      m[12] = p03 - (p00 * tx + p01 * ty);
+      m[13] = p13 - (p11 * ty + p12 * tz);
+      m[14] = p23 - (p21 * modelScale * ty);
+      m[15] = -modelScale * ty;
+    } else {
+      m[12] = p03;
+      m[13] = p13;
+      m[14] = p23;
+      m[15] = p33;
+    }
 
     return m;
   }

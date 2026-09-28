@@ -482,6 +482,15 @@ class AppLocalizationsBg extends AppLocalizations {
   String get dragModeActive => 'Режим преместване (активен)';
 
   @override
+  String get flyMode => 'Летене (Walk / Fly)';
+
+  @override
+  String get flyModeTooltip => 'Свободно летене и оглед (BIMx / ArchiCAD)';
+
+  @override
+  String get flyModeActive => 'Режим летене (BIMx Walk / Fly)';
+
+  @override
   String errorLoadingDxf(String error) {
     return 'Грешка при отваряне на DXF файл: $error';
   }

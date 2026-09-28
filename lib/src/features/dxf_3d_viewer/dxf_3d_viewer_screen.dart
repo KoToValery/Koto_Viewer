@@ -20,10 +20,12 @@ import 'parser/ifc_parser.dart';
 import 'parser/fbx_parser.dart';
 import 'parser/three_mf_parser.dart';
 import 'widgets/ifc_bim_sheet.dart';
+import 'widgets/cad_3d_virtual_joystick.dart';
 import 'rendering/cad_3d_camera.dart';
 import 'rendering/cad_3d_mesh_painter.dart';
 import 'rendering/cad_3d_gpu_bindings.dart';
 import 'package:archive/archive.dart';
+import 'package:flutter/scheduler.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/widgets/viewer_loading_screen.dart';
 import '../../core/l10n/l10n_extensions.dart';
@@ -51,7 +53,8 @@ class Dxf3DViewerScreen extends StatefulWidget {
   State<Dxf3DViewerScreen> createState() => _Dxf3DViewerScreenState();
 }
 
-class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
+class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
+    with SingleTickerProviderStateMixin {
   final Cad3DCamera _camera = Cad3DCamera();
 
   Mesh3D? _mesh;
@@ -77,19 +80,79 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   bool _pendingGpuRender = false;
   Size _lastViewportSize = Size.zero;
 
+  Ticker? _flyTicker;
+  Duration? _lastTickTime;
+  Offset _joystickDeflection = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _fileName =
+        widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
+    _flyTicker = createTicker(_onFlyTick);
+    _load3DModel();
+  }
+
   @override
   void dispose() {
+    _flyTicker?.dispose();
     _gpuRenderer.dispose();
     _gpuImage?.dispose();
     super.dispose();
+  }
+
+  void _onJoystickDirectionChanged(Offset deflection) {
+    _joystickDeflection = deflection;
+    if (deflection != Offset.zero) {
+      if (_flyTicker != null && !_flyTicker!.isActive) {
+        _lastTickTime = null;
+        _flyTicker!.start();
+      }
+    } else {
+      _flyTicker?.stop();
+      _lastTickTime = null;
+      _requestGpuRender(_lastViewportSize);
+    }
+  }
+
+  void _onFlyTick(Duration elapsed) {
+    if (_mesh == null || !_camera.isFlyMode || _joystickDeflection == Offset.zero) {
+      _flyTicker?.stop();
+      return;
+    }
+
+    final dt = _lastTickTime == null
+        ? 0.016
+        : (elapsed - _lastTickTime!).inMicroseconds / 1000000.0;
+    _lastTickTime = elapsed;
+
+    final clampedDt = dt.clamp(0.001, 0.05);
+
+    // Standard controlled speed: traverses model in ~25 seconds at full deflection
+    final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
+    final speed = maxDim / 25.0;
+
+    final forward = -_joystickDeflection.dy; // Up is forward
+    final strafe = _joystickDeflection.dx;   // Right is strafe right
+
+    _camera.fly(
+      forward: forward,
+      strafe: strafe,
+      speed: speed,
+      dt: clampedDt,
+    );
+
+    setState(() {});
+    _requestGpuRender(_lastViewportSize);
   }
 
   void _requestGpuRender(Size size) {
     if (!_useGpuAcceleration ||
         !_gpuRenderer.isReady ||
         _mesh == null ||
-        size.isEmpty)
+        size.isEmpty) {
       return;
+    }
     if (_isGpuRendering) {
       _pendingGpuRender = true;
       return;
@@ -129,13 +192,6 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
         });
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _fileName =
-        widget.title ?? widget.filePath.split(Platform.pathSeparator).last;
-    _load3DModel();
-  }
 
   Future<void> _load3DModel() async {
     setState(() {
@@ -310,11 +366,12 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
   void _toggleInteractionMode() {
     HapticFeedback.selectionClick();
-    setState(() {
-      _interactionMode = _interactionMode == Cad3DInteractionMode.orbit
-          ? Cad3DInteractionMode.pan
-          : Cad3DInteractionMode.orbit;
-    });
+    final next = switch (_interactionMode) {
+      Cad3DInteractionMode.orbit => Cad3DInteractionMode.pan,
+      Cad3DInteractionMode.pan => Cad3DInteractionMode.fly,
+      Cad3DInteractionMode.fly => Cad3DInteractionMode.orbit,
+    };
+    _setInteractionMode(next);
   }
 
   void _setInteractionMode(Cad3DInteractionMode mode) {
@@ -322,7 +379,21 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
     HapticFeedback.selectionClick();
     setState(() {
       _interactionMode = mode;
+      if (mode == Cad3DInteractionMode.fly) {
+        if (_mesh != null) {
+          final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
+          final modelScale = _lastViewportSize.isEmpty
+              ? 1.0
+              : (math.min(_lastViewportSize.width, _lastViewportSize.height) * 0.55) / maxDim;
+          _camera.switchToFlyMode(modelScale);
+        }
+      } else {
+        _joystickDeflection = Offset.zero;
+        _flyTicker?.stop();
+        _camera.switchToOrbitMode();
+      }
     });
+    _requestGpuRender(_lastViewportSize);
   }
 
   void _onScaleStart(ScaleStartDetails details) {
@@ -339,18 +410,23 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
 
     setState(() {
       _isInteracting = true;
-      if (details.pointerCount == 1) {
-        if (_isPanActive) {
-          // 1 pointer in Pan / Drag Mode (or Shift/Space/Ctrl held): Drag model across screen
+      if (_interactionMode == Cad3DInteractionMode.fly) {
+        // Fly / Walkthrough Mode: Drag rotates first-person look (yaw & pitch)
+        _camera.look(delta.dx, delta.dy);
+      } else {
+        if (details.pointerCount == 1) {
+          if (_isPanActive) {
+            // 1 pointer in Pan / Drag Mode (or Shift/Space/Ctrl held): Drag model across screen
+            _camera.pan(delta);
+          } else {
+            // 1 pointer in Orbit Mode: Rotate model
+            _camera.orbit(delta.dx, delta.dy);
+          }
+        } else if (details.pointerCount >= 2) {
+          // 2 fingers: Pan and Zoom
           _camera.pan(delta);
-        } else {
-          // 1 pointer in Orbit Mode: Rotate model
-          _camera.orbit(delta.dx, delta.dy);
+          _camera.zoom = (_baseScale * details.scale).clamp(0.05, 100.0);
         }
-      } else if (details.pointerCount >= 2) {
-        // 2 fingers: Pan and Zoom
-        _camera.pan(delta);
-        _camera.zoom = (_baseScale * details.scale).clamp(0.05, 100.0);
       }
     });
     _requestGpuRender(_lastViewportSize);
@@ -369,18 +445,35 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
       final delta = event.scrollDelta.dy;
-      if (delta < 0) {
-        // Scrolled up -> Zoom In
-        setState(() {
-          _camera.zoomBy(1.15);
-        });
-        _requestGpuRender(_lastViewportSize);
-      } else if (delta > 0) {
-        // Scrolled down -> Zoom Out
-        setState(() {
-          _camera.zoomBy(1.0 / 1.15);
-        });
-        _requestGpuRender(_lastViewportSize);
+      if (_interactionMode == Cad3DInteractionMode.fly) {
+        if (_mesh != null) {
+          final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
+          final step = (maxDim / 25.0) * 0.35;
+          final forwardDelta = delta < 0 ? 1.0 : -1.0;
+          setState(() {
+            _camera.fly(
+              forward: forwardDelta,
+              strafe: 0.0,
+              speed: step,
+              dt: 1.0,
+            );
+          });
+          _requestGpuRender(_lastViewportSize);
+        }
+      } else {
+        if (delta < 0) {
+          // Scrolled up -> Zoom In
+          setState(() {
+            _camera.zoomBy(1.15);
+          });
+          _requestGpuRender(_lastViewportSize);
+        } else if (delta > 0) {
+          // Scrolled down -> Zoom Out
+          setState(() {
+            _camera.zoomBy(1.0 / 1.15);
+          });
+          _requestGpuRender(_lastViewportSize);
+        }
       }
     }
   }
@@ -399,7 +492,11 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
       final delta = event.position - _mousePanStart!;
       _mousePanStart = event.position;
       setState(() {
-        _camera.pan(delta);
+        if (_interactionMode == Cad3DInteractionMode.fly) {
+          _camera.look(delta.dx, delta.dy);
+        } else {
+          _camera.pan(delta);
+        }
       });
       _requestGpuRender(_lastViewportSize);
     }
@@ -412,6 +509,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   void _resetView() {
     HapticFeedback.selectionClick();
     setState(() {
+      _interactionMode = Cad3DInteractionMode.orbit;
+      _joystickDeflection = Offset.zero;
+      _flyTicker?.stop();
       _camera.reset();
     });
     _requestGpuRender(_lastViewportSize);
@@ -420,6 +520,9 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
   void _setViewPreset(Cad3DViewPreset preset) {
     HapticFeedback.selectionClick();
     setState(() {
+      _interactionMode = Cad3DInteractionMode.orbit;
+      _joystickDeflection = Offset.zero;
+      _flyTicker?.stop();
       _camera.setPreset(preset);
     });
     _requestGpuRender(_lastViewportSize);
@@ -720,6 +823,18 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                                     Cad3DInteractionMode.pan,
                                 onTap: () => _setInteractionMode(
                                   Cad3DInteractionMode.pan,
+                                ),
+                                theme: theme,
+                              ),
+                              _buildModeButton(
+                                icon: Icons.flight_takeoff_rounded,
+                                tooltip:
+                                    '${l10n.flyMode} (${l10n.flyModeTooltip})',
+                                isSelected:
+                                    _interactionMode ==
+                                    Cad3DInteractionMode.fly,
+                                onTap: () => _setInteractionMode(
+                                  Cad3DInteractionMode.fly,
                                 ),
                                 theme: theme,
                               ),
@@ -1220,6 +1335,74 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   ),
                 ),
 
+              // Fly Mode Active Indicator Pill
+              if (_interactionMode == Cad3DInteractionMode.fly)
+                Positioned(
+                  top: 16,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: InkWell(
+                      onTap: _toggleInteractionMode,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(
+                              0xFF00E5FF,
+                            ).withValues(alpha: 0.8),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.flight_takeoff_rounded,
+                              size: 15,
+                              color: Color(0xFF00E5FF),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              l10n.flyModeActive,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF00E5FF),
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Left Virtual Joystick (in Walk / Fly Mode)
+              if (_interactionMode == Cad3DInteractionMode.fly)
+                Positioned(
+                  bottom: 28,
+                  left: 24,
+                  child: Cad3DVirtualJoystick(
+                    isDark: _theme.isDark,
+                    onDirectionChanged: _onJoystickDirectionChanged,
+                  ),
+                ),
+
               // Floating Controls (Mode Toggle, Zoom +, Zoom -, Fit)
               Positioned(
                 bottom: 24,
@@ -1228,11 +1411,18 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildFloatingButton(
-                      icon: Icons.pan_tool_rounded,
-                      tooltip: _interactionMode == Cad3DInteractionMode.pan
-                          ? '${l10n.dragModeActive} (${l10n.rotateModelTooltip})'
-                          : '${l10n.dragMode} (${l10n.dragModelTooltip})',
-                      isActive: _interactionMode == Cad3DInteractionMode.pan,
+                      icon: _interactionMode == Cad3DInteractionMode.fly
+                          ? Icons.flight_takeoff_rounded
+                          : (_interactionMode == Cad3DInteractionMode.pan
+                              ? Icons.pan_tool_rounded
+                              : Icons.threed_rotation_rounded),
+                      tooltip: _interactionMode == Cad3DInteractionMode.fly
+                          ? '${l10n.flyModeActive} (${l10n.orbitMode})'
+                          : (_interactionMode == Cad3DInteractionMode.pan
+                              ? '${l10n.dragModeActive} (${l10n.flyMode})'
+                              : '${l10n.orbitMode} (${l10n.dragMode})'),
+                      isActive: _interactionMode == Cad3DInteractionMode.fly ||
+                          _interactionMode == Cad3DInteractionMode.pan,
                       onTap: _toggleInteractionMode,
                       theme: theme,
                     ),
