@@ -79,7 +79,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
   bool _isGpuRendering = false;
   bool _pendingGpuRender = false;
   Size _lastViewportSize = Size.zero;
-  bool _isFullscreen = false;
+  bool _isFullscreen = true;
 
   double get _modelScale {
     if (_mesh == null || _lastViewportSize.isEmpty) return 1.0;
@@ -140,19 +140,24 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
         : (elapsed - _lastTickTime!).inMicroseconds / 1000000.0;
     _lastTickTime = elapsed;
 
-    final clampedDt = dt.clamp(0.001, 0.05);
+    final clampedDt = dt.clamp(0.001, 0.2);
 
-    // Standard controlled speed: traverses model in ~25 seconds at full deflection
     final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
-    final speed = maxDim / 25.0;
+    final deflectionMag = _joystickDeflection.distance.clamp(0.0, 1.0);
+    if (deflectionMag < 1e-4) return;
 
-    final forward = -_joystickDeflection.dy; // Up is forward
-    final strafe = _joystickDeflection.dx;   // Right is strafe right
+    // Dual-range analog response: gentle walking speed on slight tilt, fast flight on full tilt
+    final speedCurve = deflectionMag * deflectionMag * 0.75 + deflectionMag * 0.25;
+    final baseSpeed = (maxDim * 2.2) / math.max(_camera.zoom, 0.4);
+
+    final normDir = _joystickDeflection / deflectionMag;
+    final forward = -normDir.dy * speedCurve; // Up is forward
+    final strafe = normDir.dx * speedCurve;   // Right is strafe right
 
     _camera.fly(
       forward: forward,
       strafe: strafe,
-      speed: speed,
+      speed: baseSpeed,
       dt: clampedDt,
     );
 
@@ -456,7 +461,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
       if (_interactionMode == Cad3DInteractionMode.fly) {
         if (_mesh != null) {
           final maxDim = math.max(_mesh!.bounds.maxDimension, 1e-4);
-          final step = (maxDim / 25.0) * 0.35;
+          final step = (maxDim * 0.25) / math.max(_camera.zoom, 0.4);
           final forwardDelta = delta < 0 ? 1.0 : -1.0;
           setState(() {
             _camera.fly(
@@ -1322,7 +1327,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                   ),
                 ),
 
-              // Floating Controls (Mode Toggle, Zoom +, Zoom -, Fit)
+              // Floating Controls (Flight Mode, 3D Orbit, Drag, Fit to Screen)
               Positioned(
                 bottom: 24,
                 right: 20,
@@ -1330,33 +1335,30 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildFloatingButton(
-                      icon: _interactionMode == Cad3DInteractionMode.fly
-                          ? Icons.flight_takeoff_rounded
-                          : (_interactionMode == Cad3DInteractionMode.pan
-                              ? Icons.pan_tool_rounded
-                              : Icons.threed_rotation_rounded),
-                      tooltip: _interactionMode == Cad3DInteractionMode.fly
-                          ? '${l10n.flyModeActive} (${l10n.orbitMode})'
-                          : (_interactionMode == Cad3DInteractionMode.pan
-                              ? '${l10n.dragModeActive} (${l10n.flyMode})'
-                              : '${l10n.orbitMode} (${l10n.dragMode})'),
-                      isActive: _interactionMode == Cad3DInteractionMode.fly ||
-                          _interactionMode == Cad3DInteractionMode.pan,
-                      onTap: _toggleInteractionMode,
+                      icon: Icons.flight_takeoff_rounded,
+                      tooltip: '${l10n.flyMode} (${l10n.flyModeTooltip})',
+                      isActive: _interactionMode == Cad3DInteractionMode.fly,
+                      onTap: () => _setInteractionMode(
+                        _interactionMode == Cad3DInteractionMode.fly
+                            ? Cad3DInteractionMode.orbit
+                            : Cad3DInteractionMode.fly,
+                      ),
                       theme: theme,
                     ),
                     const SizedBox(height: 8),
                     _buildFloatingButton(
-                      icon: Icons.add,
-                      tooltip: 'Zoom In (+)',
-                      onTap: () => setState(() => _camera.zoomBy(1.2)),
+                      icon: Icons.threed_rotation_rounded,
+                      tooltip: '${l10n.orbitMode} (${l10n.rotateModelTooltip})',
+                      isActive: _interactionMode == Cad3DInteractionMode.orbit,
+                      onTap: () => _setInteractionMode(Cad3DInteractionMode.orbit),
                       theme: theme,
                     ),
                     const SizedBox(height: 8),
                     _buildFloatingButton(
-                      icon: Icons.remove,
-                      tooltip: 'Zoom Out (-)',
-                      onTap: () => setState(() => _camera.zoomBy(0.8)),
+                      icon: Icons.pan_tool_rounded,
+                      tooltip: '${l10n.dragMode} (${l10n.dragModelTooltip})',
+                      isActive: _interactionMode == Cad3DInteractionMode.pan,
+                      onTap: () => _setInteractionMode(Cad3DInteractionMode.pan),
                       theme: theme,
                     ),
                     const SizedBox(height: 8),
@@ -1382,6 +1384,30 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                       currentIndex: widget.currentProjectIndex ?? 0,
                       onSwitchProjectItem: widget.onSwitchProjectItem,
                       onExit: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ),
+
+              // Floating Back Button in Fullscreen
+              if (_isFullscreen)
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: SafeArea(
+                    child: Material(
+                      color: Colors.black54,
+                      shape: const CircleBorder(),
+                      elevation: 4,
+                      clipBehavior: Clip.antiAlias,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        tooltip: 'Back',
+                        onPressed: () => Navigator.of(context).pop(true),
+                      ),
                     ),
                   ),
                 ),
