@@ -399,9 +399,10 @@ class Cad3DGpuRenderer {
     final p12 = (2400.0 * z * modelScale) / h;
     final p13 = (-2400.0 * panY) / h;
 
-    // Optimized near/far bounds for maximum hardware depth buffer resolution
-    const nearZ = 400.0;
-    const farZ = 2400.0;
+    // Human-scale near clip buffer (~15-20cm, 12 screen units) enables seamless walking
+    // through doors and exploring interiors without premature wall/roof slicing
+    const nearZ = 12.0;
+    const farZ = 12000.0;
     const a = (farZ + nearZ) / (farZ - nearZ);
     const b = (-2.0 * farZ * nearZ) / (farZ - nearZ);
 

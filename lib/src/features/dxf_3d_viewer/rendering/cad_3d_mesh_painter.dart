@@ -131,10 +131,11 @@ class Cad3DMeshPainter extends CustomPainter {
       final tv1 = camera.transformVertex(v1Local);
       final tv2 = camera.transformVertex(v2Local);
 
-      // Fly Mode Near-Plane Clipping: discard triangles behind or clipping into the eye plane
+      // Human-scale near plane (~15-20cm, 12.0 screen units ahead of eye):
+      // Only discard triangle if ALL three vertices are completely behind the human eye
       if (camera.isFlyMode) {
-        final double nearPlane = -1150.0 / modelScale;
-        if (tv0.y <= nearPlane || tv1.y <= nearPlane || tv2.y <= nearPlane) {
+        final double nearPlane = -1188.0 / modelScale;
+        if (tv0.y <= nearPlane && tv1.y <= nearPlane && tv2.y <= nearPlane) {
           continue;
         }
       }
@@ -341,7 +342,7 @@ class Cad3DMeshPainter extends CustomPainter {
     const int lines = 10;
     final double step = gridSize / lines;
 
-    final double nearPlane = -1150.0 / modelScale;
+    final double nearPlane = -1188.0 / modelScale;
     for (int i = -lines; i <= lines; i++) {
       final tv1 = camera.transformVertex(Vector3(i * step, -gridSize, zBottom));
       final tv2 = camera.transformVertex(Vector3(i * step, gridSize, zBottom));
@@ -545,7 +546,7 @@ class Cad3DMeshPainter extends CustomPainter {
     double minScreenX = double.infinity, maxScreenX = -double.infinity;
     double minScreenY = double.infinity, maxScreenY = -double.infinity;
     int inFrontCount = 0;
-    final double nearPlane = -1150.0 / modelScale;
+    final double nearPlane = -1188.0 / modelScale;
     for (final c in corners) {
       final tv = camera.transformVertex(c - center);
       if (camera.isFlyMode) {
