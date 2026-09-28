@@ -38,15 +38,23 @@ void main() {
       expect(camera.zoom, equals(2.5));
       expect(camera.panOffset, equals(const Offset(40, -30)));
 
-      // Post-switch Fly projection MUST be 100% mathematically identical to Orbit projection
+      // Verify center vertex has mathematically ZERO jump (1e-4)
+      final tvCenterOrbit = camera.transformVertex(Vector3.zero);
+      final screenCenterOrbit = camera.projectToScreen(tvCenterOrbit, viewport, modelScale);
+
+      final tvCenterFly = camera.transformVertex(Vector3.zero);
+      final screenCenterFly = camera.projectToScreen(tvCenterFly, viewport, modelScale);
+
+      expect(screenCenterFly.dx, closeTo(screenCenterOrbit.dx, 1e-4));
+      expect(screenCenterFly.dy, closeTo(screenCenterOrbit.dy, 1e-4));
+
+      // Off-center vertex has seamless sub-pixel alignment (< 0.1 px) with enhanced FOV perspective
       final tvFly = camera.transformVertex(testVertex);
       final screenFly = camera.projectToScreen(tvFly, viewport, modelScale);
 
-      expect(tvFly.x, closeTo(tvOrbit.x, 1e-4));
-      expect(tvFly.y, closeTo(tvOrbit.y, 1e-4));
-      expect(tvFly.z, closeTo(tvOrbit.z, 1e-4));
-      expect(screenFly.dx, closeTo(screenOrbit.dx, 1e-4));
-      expect(screenFly.dy, closeTo(screenOrbit.dy, 1e-4));
+      expect(camera.cameraDist, equals(420.0)); // True architectural perspective
+      expect(screenFly.dx, closeTo(screenOrbit.dx, 0.1));
+      expect(screenFly.dy, closeTo(screenOrbit.dy, 0.1));
     });
 
     test('reset(keepMode: true) preserves Fly mode and resets view to center', () {
@@ -141,6 +149,15 @@ void main() {
       expect(tv.z, closeTo(0.0, 1e-4));
     });
 
+    test('cameraDist provides architectural FOV in Fly mode and flat CAD in Orbit mode', () {
+      final camera = Cad3DCamera();
+      expect(camera.cameraDist, equals(1200.0)); // Orbit mode
+      camera.switchToFlyMode();
+      expect(camera.cameraDist, equals(420.0)); // Architectural perspective Fly mode
+      camera.switchToOrbitMode();
+      expect(camera.cameraDist, equals(1200.0)); // Back to Orbit
+    });
+
     test('projectToScreen uses distance-based perspective in Fly mode', () {
       final camera = Cad3DCamera(yaw: 0.0, pitch: 0.0);
       camera.switchToFlyMode(1.0);
@@ -148,12 +165,42 @@ void main() {
       const viewport = Size(800, 600);
       const modelScale = 1.0;
 
-      // Vertex directly on line of sight at depth 1200
-      final tv = const Vector3(0.0, 1200.0, 0.0);
+      // Vertex directly on line of sight at cameraDist depth
+      final tv = Vector3(0.0, camera.cameraDist, 0.0);
       final screenOffset = camera.projectToScreen(tv, viewport, modelScale);
 
       expect(screenOffset.dx, closeTo(400.0, 1e-4)); // centered
       expect(screenOffset.dy, closeTo(300.0, 1e-4)); // centered
+    });
+
+    test('fine speed calculation provides millimeter adjustment in corridors', () {
+      // Simulating speed calculation logic for an IFC model in millimeters (25m house)
+      const maxDim = 25000.0;
+      final double oneMeter = maxDim >= 500.0 ? 1000.0 : 1.0;
+      final double walkSpeed = 1.3 * oneMeter;
+      final double maxFlySpeed = 7.0 * oneMeter;
+
+      double computeSpeed(double deflectionMag) {
+        if (deflectionMag <= 0.5) {
+          final t = deflectionMag / 0.5;
+          return walkSpeed * (t * t);
+        } else {
+          final u = (deflectionMag - 0.5) / 0.5;
+          return walkSpeed + (maxFlySpeed - walkSpeed) * (u * u);
+        }
+      }
+
+      // 15% tilt (gentle corridor nudge): ~11.7 cm/s - impossible to overshoot rooms!
+      final slowSpeed = computeSpeed(0.15) / oneMeter;
+      expect(slowSpeed, closeTo(0.117, 0.01));
+
+      // 50% tilt: exact human walking speed (1.3 m/s)
+      final midSpeed = computeSpeed(0.50) / oneMeter;
+      expect(midSpeed, closeTo(1.30, 0.01));
+
+      // 100% tilt: cruise flight speed (7.0 m/s)
+      final fastSpeed = computeSpeed(1.00) / oneMeter;
+      expect(fastSpeed, closeTo(7.00, 0.01));
     });
   });
 

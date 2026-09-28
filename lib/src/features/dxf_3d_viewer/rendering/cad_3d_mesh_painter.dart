@@ -134,7 +134,7 @@ class Cad3DMeshPainter extends CustomPainter {
       // Human-scale near plane (~15-20cm, 12.0 screen units ahead of eye):
       // Only discard triangle if ALL three vertices are completely behind the human eye
       if (camera.isFlyMode) {
-        final double nearPlane = -1188.0 / modelScale;
+        final double nearPlane = (-camera.cameraDist + 12.0) / modelScale;
         if (tv0.y <= nearPlane && tv1.y <= nearPlane && tv2.y <= nearPlane) {
           continue;
         }

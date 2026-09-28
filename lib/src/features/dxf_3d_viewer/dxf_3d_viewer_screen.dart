@@ -146,18 +146,52 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
     final deflectionMag = _joystickDeflection.distance.clamp(0.0, 1.0);
     if (deflectionMag < 1e-4) return;
 
-    // Dual-range analog response: gentle walking speed on slight tilt, fast flight on full tilt
-    final speedCurve = deflectionMag * deflectionMag * 0.75 + deflectionMag * 0.25;
-    final baseSpeed = (maxDim * 2.2) / math.max(_camera.zoom, 0.4);
+    // 1. Detect real-world 1-meter unit scale from model bounds:
+    // Millimeter models (IFC/CAD buildings in mm): maxDim >= 500.0 -> 1 meter = 1000 units.
+    // Meter models (IFC/OBJ buildings in m): maxDim in [3.0, 500.0) -> 1 meter = 1.0 unit.
+    // Small parts/components: maxDim < 3.0 -> 1 meter-equivalent = maxDim / 10.0.
+    final double oneMeter;
+    if (maxDim >= 500.0) {
+      oneMeter = 1000.0;
+    } else if (maxDim >= 3.0) {
+      oneMeter = 1.0;
+    } else {
+      oneMeter = maxDim / 10.0;
+    }
+
+    // 2. Realistic human walking and flight speeds:
+    // Normal human walking speed: ~1.3 m/s.
+    final double walkSpeed = 1.3 * oneMeter;
+    // Outdoor cruise flight speed: scales smoothly for massive campuses while remaining grounded for houses.
+    final double modelMeters = maxDim / oneMeter;
+    final double maxFlySpeed = (modelMeters <= 30.0)
+        ? 7.0 * oneMeter
+        : (7.0 + (modelMeters - 30.0) * 0.1).clamp(7.0, 30.0) * oneMeter;
+
+    // 3. Piecewise analog response curve for ultra-fine adjustment in tight corridors:
+    // - For small tilts (d <= 0.5): quadratic curve up to walkSpeed (e.g. 5 cm/s at 10% tilt, 20 cm/s at 20% tilt).
+    //   Allows millimeter-fine positioning in narrow corridors, doorways, and rooms.
+    // - For large tilts (d > 0.5): smooth ramp from walkSpeed up to maxFlySpeed for fast cruising.
+    final double speed;
+    if (deflectionMag <= 0.5) {
+      final t = deflectionMag / 0.5; // [0.0, 1.0]
+      speed = walkSpeed * (t * t);
+    } else {
+      final u = (deflectionMag - 0.5) / 0.5; // [0.0, 1.0]
+      speed = walkSpeed + (maxFlySpeed - walkSpeed) * (u * u);
+    }
+
+    // Normalize speed if camera zoom was adjusted so apparent screen motion remains natural
+    final effectiveSpeed = speed / math.max(_camera.zoom, 0.5);
 
     final normDir = _joystickDeflection / deflectionMag;
-    final forward = -normDir.dy * speedCurve; // Up is forward
-    final strafe = normDir.dx * speedCurve;   // Right is strafe right
+    final forward = -normDir.dy; // Up is forward
+    final strafe = normDir.dx;   // Right is strafe right
 
     _camera.fly(
       forward: forward,
       strafe: strafe,
-      speed: baseSpeed,
+      speed: effectiveSpeed,
       dt: clampedDt,
     );
 

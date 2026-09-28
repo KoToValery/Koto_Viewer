@@ -52,6 +52,11 @@ class Cad3DCamera {
 
   bool get isFlyMode => mode == Cad3DInteractionMode.fly;
 
+  /// Effective camera distance for perspective projection.
+  /// Fly mode uses a realistic architectural perspective (FOV ~60°, cameraDist 420.0),
+  /// while Orbit mode uses a flatter CAD axonometric perspective (cameraDist 1200.0).
+  double get cameraDist => isFlyMode ? 420.0 : 1200.0;
+
   /// 3D Forward gaze vector in model coordinates (Z is up, pitch tilts up/down).
   /// When pitch < 0 (looking up), -sin(pitch) > 0, so forward points up in Z.
   /// When pitch > 0 (looking down), -sin(pitch) < 0, so forward points down in Z.
@@ -120,8 +125,8 @@ class Cad3DCamera {
     pitch = pitch.clamp(-limit, limit);
 
     final newFwd = forwardVector;
-    const cameraDist = 1200.0;
-    final D = cameraDist / math.max(scale * zoom, 1e-4);
+    final dist = cameraDist;
+    final D = dist / math.max(scale * zoom, 1e-4);
     eyePosition += (newFwd - oldFwd) * D;
   }
 
@@ -221,9 +226,9 @@ class Cad3DCamera {
     final sy = p.y * modelScale;
     final sz = p.z * modelScale;
 
-    const cameraDist = 1200.0;
-    final depth = math.max(cameraDist + sy, 40.0);
-    final perspective = cameraDist / depth;
+    final dist = cameraDist;
+    final depth = math.max(dist + sy, 12.0);
+    final perspective = dist / depth;
     final scaleFactor = zoom * perspective;
 
     final screenX = centerX + sx * scaleFactor;

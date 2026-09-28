@@ -390,27 +390,28 @@ class Cad3DGpuRenderer {
     final panX = camera.panOffset.dx;
     final panY = camera.panOffset.dy;
 
-    // Viewport and perspective projection parameters
-    final p00 = (2400.0 * z * modelScale) / w;
+    // Viewport and perspective projection parameters matching camera mode
+    final dist = camera.cameraDist;
+    final p00 = (2.0 * dist * z * modelScale) / w;
     final p01 = (2.0 * panX * modelScale) / w;
-    final p03 = (2400.0 * panX) / w;
+    final p03 = (2.0 * dist * panX) / w;
 
     final p11 = (-2.0 * panY * modelScale) / h;
-    final p12 = (2400.0 * z * modelScale) / h;
-    final p13 = (-2400.0 * panY) / h;
+    final p12 = (2.0 * dist * z * modelScale) / h;
+    final p13 = (-2.0 * dist * panY) / h;
 
     // Human-scale near clip buffer (~15-20cm, 12 screen units) enables seamless walking
     // through doors and exploring interiors without premature wall/roof slicing
     const nearZ = 12.0;
-    const farZ = 12000.0;
-    const a = (farZ + nearZ) / (farZ - nearZ);
-    const b = (-2.0 * farZ * nearZ) / (farZ - nearZ);
+    final farZ = dist * 10.0;
+    final a = (farZ + nearZ) / (farZ - nearZ);
+    final b = (-2.0 * farZ * nearZ) / (farZ - nearZ);
 
-    const p21 = a * 1.0; // scale factor applied per element
-    final p23 = 1200.0 * a + b;
+    final p21 = a * 1.0; // scale factor applied per element
+    final p23 = dist * a + b;
 
     final p31 = modelScale;
-    const p33 = 1200.0;
+    final p33 = dist;
 
     // Combine M_proj * M_rot into column-major 4x4 matrix
     final m = Float32List(16);
