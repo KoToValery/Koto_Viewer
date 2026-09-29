@@ -779,6 +779,253 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
     );
   }
 
+  Widget _buildInteractionModeSwitch(ThemeData theme, AppLocalizations l10n) {
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.brightness == Brightness.dark ? Colors.white12 : Colors.black12,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildModeButton(
+            icon: Icons.threed_rotation_rounded,
+            tooltip: '${l10n.orbitMode} (${l10n.rotateModelTooltip})',
+            isSelected: _interactionMode == Cad3DInteractionMode.orbit,
+            onTap: () => _setInteractionMode(Cad3DInteractionMode.orbit),
+            theme: theme,
+          ),
+          _buildModeButton(
+            icon: Icons.pan_tool_rounded,
+            tooltip: '${l10n.dragMode} (${l10n.dragModelTooltip})',
+            isSelected: _interactionMode == Cad3DInteractionMode.pan,
+            onTap: () => _setInteractionMode(Cad3DInteractionMode.pan),
+            theme: theme,
+          ),
+          _buildModeButton(
+            icon: Icons.flight_takeoff_rounded,
+            tooltip: '${l10n.flyMode} (${l10n.flyModeTooltip})',
+            isSelected: _interactionMode == Cad3DInteractionMode.fly,
+            onTap: () => _setInteractionMode(Cad3DInteractionMode.fly),
+            theme: theme,
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildDxf3dActionButtons(ThemeData theme, AppLocalizations l10n) {
+    return [
+      // Quick Views Menu & Controls
+      PopupMenuButton<dynamic>(
+        icon: const Icon(
+          Icons.videocam_outlined,
+          size: 20,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(
+          minWidth: 38,
+          minHeight: 38,
+        ),
+        tooltip: 'Camera View',
+        onSelected: (val) {
+          if (val is Cad3DViewPreset) {
+            _setViewPreset(val);
+          } else if (val == 'toggle_invert_y') {
+            HapticFeedback.selectionClick();
+            setState(() {
+              _camera.invertY = !_camera.invertY;
+            });
+          }
+        },
+        itemBuilder: (context) => [
+          ...Cad3DViewPreset.values.map((v) {
+            return PopupMenuItem<dynamic>(
+              value: v,
+              child: Row(
+                children: [
+                  Icon(
+                    v.icon,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(v.label),
+                ],
+              ),
+            );
+          }),
+          const PopupMenuDivider(),
+          PopupMenuItem<dynamic>(
+            value: 'toggle_invert_y',
+            child: Row(
+              children: [
+                Icon(
+                  _camera.invertY
+                      ? Icons.swap_vert_rounded
+                      : Icons.swap_vert_outlined,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                const Text('Invert Up/Down (Y)'),
+                const Spacer(),
+                if (_camera.invertY)
+                  Icon(
+                    Icons.check,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+
+      // Canvas Theme Menu
+      PopupMenuButton<Cad3DTheme>(
+        icon: const Icon(
+          Icons.palette_outlined,
+          size: 20,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(
+          minWidth: 38,
+          minHeight: 38,
+        ),
+        tooltip: 'Theme',
+        onSelected: (t) => setState(() => _theme = t),
+        itemBuilder: (context) => Cad3DTheme.values.map((t) {
+          return PopupMenuItem<Cad3DTheme>(
+            value: t,
+            child: Row(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: t.background,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.grey,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(t.label),
+                if (_theme == t) ...[
+                  const Spacer(),
+                  Icon(
+                    Icons.check,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+
+      // Hardware GPU Depth-Buffer Acceleration Toggle
+      if (_gpuRenderer.bindings.isAvailable)
+        IconButton(
+          icon: Icon(
+            _useGpuAcceleration
+                ? Icons.speed_rounded
+                : Icons.speed_outlined,
+            size: 20,
+            color: _useGpuAcceleration
+                ? const Color(0xFF00E5FF)
+                : Colors.grey,
+          ),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(
+            minWidth: 38,
+            minHeight: 38,
+          ),
+          tooltip: _useGpuAcceleration
+              ? 'Hardware GPU Depth Buffer (Active)'
+              : 'Hardware GPU Depth Buffer (Off - Canvas Fallback)',
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            setState(() {
+              _useGpuAcceleration = !_useGpuAcceleration;
+              if (!_useGpuAcceleration) {
+                _gpuImage = null;
+              }
+            });
+            if (_useGpuAcceleration && _lastViewportSize != Size.zero) {
+              _requestGpuRender(_lastViewportSize);
+            }
+          },
+        ),
+
+      // BIM Storeys & Categories (when IFC model is loaded)
+      if (_ifcModel != null)
+        IconButton(
+          icon: const Icon(
+            Icons.apartment_rounded,
+            size: 20,
+          ),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(
+            minWidth: 38,
+            minHeight: 38,
+          ),
+          color: const Color(0xFF00E5FF),
+          tooltip: l10n.bimStoreysAndCategories,
+          onPressed: _openBimSheet,
+        ),
+
+      // 3D Model Info & Metrics
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(
+          minWidth: 38,
+          minHeight: 38,
+        ),
+        tooltip: l10n.properties3d,
+        onPressed: _showMetricsSheet,
+      ),
+
+      // Share
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(
+          minWidth: 38,
+          minHeight: 38,
+        ),
+        tooltip: l10n.share,
+        onPressed: _shareFile,
+      ),
+
+      // Fullscreen Toggle
+      IconButton(
+        icon: Icon(
+          _isFullscreen
+              ? Icons.fullscreen_exit_rounded
+              : Icons.fullscreen_rounded,
+          size: 20,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(
+          minWidth: 38,
+          minHeight: 38,
+        ),
+        tooltip: _isFullscreen ? 'Exit Fullscreen' : 'Fullscreen',
+        onPressed: _toggleFullscreen,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -795,6 +1042,7 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
     }
 
     final theme = Theme.of(context);
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return PopScope(
       canPop: !_isFullscreen,
@@ -828,318 +1076,61 @@ class _Dxf3DViewerScreenState extends State<Dxf3DViewerScreen>
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => Navigator.of(context).pop(true),
                     ),
-        title: Text(
-          _fileName,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.white10
-                      : Colors.black12,
-                ),
-              ),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minWidth: math.max(0.0, constraints.maxWidth - 24.0),
+                    title: Text(
+                      _fileName,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Interaction Mode Segmented Switch: Orbit (Rotate) vs Pan (Drag)
-                        Container(
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: theme.brightness == Brightness.dark
-                                  ? Colors.white12
-                                  : Colors.black12,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _buildModeButton(
-                                icon: Icons.threed_rotation_rounded,
-                                tooltip:
-                                    '${l10n.orbitMode} (${l10n.rotateModelTooltip})',
-                                isSelected:
-                                    _interactionMode ==
-                                    Cad3DInteractionMode.orbit,
-                                onTap: () => _setInteractionMode(
-                                  Cad3DInteractionMode.orbit,
-                                ),
-                                theme: theme,
-                              ),
-                              _buildModeButton(
-                                icon: Icons.pan_tool_rounded,
-                                tooltip:
-                                    '${l10n.dragMode} (${l10n.dragModelTooltip})',
-                                isSelected:
-                                    _interactionMode ==
-                                    Cad3DInteractionMode.pan,
-                                onTap: () => _setInteractionMode(
-                                  Cad3DInteractionMode.pan,
-                                ),
-                                theme: theme,
-                              ),
-                              _buildModeButton(
-                                icon: Icons.flight_takeoff_rounded,
-                                tooltip:
-                                    '${l10n.flyMode} (${l10n.flyModeTooltip})',
-                                isSelected:
-                                    _interactionMode ==
-                                    Cad3DInteractionMode.fly,
-                                onTap: () => _setInteractionMode(
-                                  Cad3DInteractionMode.fly,
-                                ),
-                                theme: theme,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        // Action Controls Row
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Quick Views Menu & Controls
-                            PopupMenuButton<dynamic>(
-                              icon: const Icon(
-                                Icons.videocam_outlined,
-                                size: 20,
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 38,
-                                minHeight: 38,
-                              ),
-                              tooltip: 'Camera View',
-                              onSelected: (val) {
-                                if (val is Cad3DViewPreset) {
-                                  _setViewPreset(val);
-                                } else if (val == 'toggle_invert_y') {
-                                  HapticFeedback.selectionClick();
-                                  setState(() {
-                                    _camera.invertY = !_camera.invertY;
-                                  });
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                ...Cad3DViewPreset.values.map((v) {
-                                  return PopupMenuItem<dynamic>(
-                                    value: v,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          v.icon,
-                                          size: 18,
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Text(v.label),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                                const PopupMenuDivider(),
-                                PopupMenuItem<dynamic>(
-                                  value: 'toggle_invert_y',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        _camera.invertY
-                                            ? Icons.swap_vert_rounded
-                                            : Icons.swap_vert_outlined,
-                                        size: 18,
-                                        color: theme.colorScheme.primary,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      const Text('Invert Up/Down (Y)'),
-                                      const Spacer(),
-                                      if (_camera.invertY)
-                                        Icon(
-                                          Icons.check,
-                                          size: 18,
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                    ],
+                    actions: isLandscape
+                        ? [
+                            _buildInteractionModeSwitch(theme, l10n),
+                            const SizedBox(width: 8),
+                            ..._buildDxf3dActionButtons(theme, l10n),
+                          ]
+                        : const [],
+                    bottom: isLandscape
+                        ? null
+                        : PreferredSize(
+                            preferredSize: const Size.fromHeight(44),
+                            child: Container(
+                              height: 44,
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: theme.brightness == Brightness.dark
+                                        ? Colors.white10
+                                        : Colors.black12,
                                   ),
                                 ),
-                              ],
-                            ),
-
-
-
-                            // Canvas Theme Menu
-                            PopupMenuButton<Cad3DTheme>(
-                              icon: const Icon(
-                                Icons.palette_outlined,
-                                size: 20,
                               ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 38,
-                                minHeight: 38,
-                              ),
-                              tooltip: 'Theme',
-                              onSelected: (t) => setState(() => _theme = t),
-                              itemBuilder: (context) =>
-                                  Cad3DTheme.values.map((t) {
-                                    return PopupMenuItem<Cad3DTheme>(
-                                      value: t,
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        minWidth: math.max(0.0, constraints.maxWidth - 24.0),
+                                      ),
                                       child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Container(
-                                            width: 16,
-                                            height: 16,
-                                            decoration: BoxDecoration(
-                                              color: t.background,
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: Colors.grey,
-                                                width: 1,
-                                              ),
-                                            ),
+                                          _buildInteractionModeSwitch(theme, l10n),
+                                          const SizedBox(width: 8),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: _buildDxf3dActionButtons(theme, l10n),
                                           ),
-                                          const SizedBox(width: 10),
-                                          Text(t.label),
-                                          if (_theme == t) ...[
-                                            const Spacer(),
-                                            Icon(
-                                              Icons.check,
-                                              size: 18,
-                                              color: theme.colorScheme.primary,
-                                            ),
-                                          ],
                                         ],
                                       ),
-                                    );
-                                  }).toList(),
-                            ),
-
-                            // Hardware GPU Depth-Buffer Acceleration Toggle
-                            if (_gpuRenderer.bindings.isAvailable)
-                              IconButton(
-                                icon: Icon(
-                                  _useGpuAcceleration
-                                      ? Icons.speed_rounded
-                                      : Icons.speed_outlined,
-                                  size: 20,
-                                  color: _useGpuAcceleration
-                                      ? const Color(0xFF00E5FF)
-                                      : Colors.grey,
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 38,
-                                  minHeight: 38,
-                                ),
-                                tooltip: _useGpuAcceleration
-                                    ? 'Hardware GPU Depth Buffer (Active)'
-                                    : 'Hardware GPU Depth Buffer (Off - Canvas Fallback)',
-                                onPressed: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() {
-                                    _useGpuAcceleration = !_useGpuAcceleration;
-                                    if (!_useGpuAcceleration) {
-                                      _gpuImage = null;
-                                    }
-                                  });
-                                  if (_useGpuAcceleration &&
-                                      _lastViewportSize != Size.zero) {
-                                    _requestGpuRender(_lastViewportSize);
-                                  }
+                                    ),
+                                  );
                                 },
                               ),
-
-                            // BIM Storeys & Categories (when IFC model is loaded)
-                            if (_ifcModel != null)
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.apartment_rounded,
-                                  size: 20,
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 38,
-                                  minHeight: 38,
-                                ),
-                                color: const Color(0xFF00E5FF),
-                                tooltip: l10n.bimStoreysAndCategories,
-                                onPressed: _openBimSheet,
-                              ),
-
-                            // 3D Model Info & Metrics
-                            IconButton(
-                              icon: const Icon(Icons.info_outline, size: 20),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 38,
-                                minHeight: 38,
-                              ),
-                              tooltip: l10n.properties3d,
-                              onPressed: _showMetricsSheet,
                             ),
-
-                            // Share
-                            IconButton(
-                              icon: const Icon(Icons.share_outlined, size: 20),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 38,
-                                minHeight: 38,
-                              ),
-                              tooltip: l10n.share,
-                              onPressed: _shareFile,
-                            ),
-
-                            // Fullscreen Toggle
-                            IconButton(
-                              icon: Icon(
-                                _isFullscreen
-                                    ? Icons.fullscreen_exit_rounded
-                                    : Icons.fullscreen_rounded,
-                                size: 20,
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 38,
-                                minHeight: 38,
-                              ),
-                              tooltip:
-                                  _isFullscreen ? 'Exit Fullscreen' : 'Fullscreen',
-                              onPressed: _toggleFullscreen,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          ),
                   ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           if (_isLoading) {

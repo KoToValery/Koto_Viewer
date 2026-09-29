@@ -205,10 +205,51 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
     Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
+  List<Widget> _buildMarkdownActions() {
+    return [
+      // Raw Source Toggle
+      IconButton(
+        icon: Icon(_showRawSource ? Icons.visibility : Icons.code, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: _showRawSource ? 'Formatted View' : 'Raw Markdown Source',
+        onPressed: () => setState(() => _showRawSource = !_showRawSource),
+      ),
+
+      // Copy Content
+      IconButton(
+        icon: const Icon(Icons.copy_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Copy Markdown',
+        onPressed: _copyContent,
+      ),
+
+      // Info / Properties
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Markdown Properties',
+        onPressed: _showInfoSheet,
+      ),
+
+      // Share
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Share',
+        onPressed: _shareFile,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -225,61 +266,29 @@ class _MarkdownViewerScreenState extends State<MarkdownViewerScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? Colors.white10 : Colors.black12,
+        actions: isLandscape ? _buildMarkdownActions() : const [],
+        bottom: isLandscape
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(44),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Spacer(),
+                      ..._buildMarkdownActions(),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            child: Row(
-              children: [
-                const Spacer(),
-
-                // Raw Source Toggle
-                IconButton(
-                  icon: Icon(_showRawSource ? Icons.visibility : Icons.code, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: _showRawSource ? 'Formatted View' : 'Raw Markdown Source',
-                  onPressed: () => setState(() => _showRawSource = !_showRawSource),
-                ),
-
-                // Copy Content
-                IconButton(
-                  icon: const Icon(Icons.copy_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Copy Markdown',
-                  onPressed: _copyContent,
-                ),
-
-                // Info / Properties
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Markdown Properties',
-                  onPressed: _showInfoSheet,
-                ),
-
-                // Share
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Share',
-                  onPressed: _shareFile,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
       body: _isLoading
           ? const Center(

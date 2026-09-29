@@ -616,6 +616,105 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
     Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
+  List<Widget> _buildDocxActions(BuildContext context, ThemeData theme) {
+    return [
+      // View Mode Toggle (Single Page vs Continuous Scroll)
+      IconButton(
+        icon: Icon(
+          _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
+          size: 20,
+        ),
+        tooltip: _isSinglePageMode
+            ? context.l10n.singlePageModeTooltip
+            : context.l10n.continuousModeTooltip,
+        onPressed: () {
+          setState(() {
+            _isSinglePageMode = !_isSinglePageMode;
+          });
+          if (_isSinglePageMode) {
+            _docxPageController.dispose();
+            _docxPageController = PageController(initialPage: _currentPageIndex);
+          }
+        },
+      ),
+
+      // Search Action
+      IconButton(
+        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: _isSearchOpen ? 'Close Search' : 'Search in Document',
+        onPressed: () {
+          setState(() {
+            _isSearchOpen = !_isSearchOpen;
+            if (!_isSearchOpen) {
+              _searchController.clear();
+              _onSearchChanged('');
+            }
+          });
+        },
+      ),
+
+      // Bookmark Toggle
+      IconButton(
+        icon: Icon(
+          _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
+          size: 20,
+          color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+        onPressed: _toggleBookmark,
+      ),
+
+      // Bookmarks List
+      IconButton(
+        icon: const Icon(Icons.bookmarks_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Saved Bookmarks',
+        onPressed: _showBookmarksSheet,
+      ),
+
+      // Fullscreen Toggle
+      IconButton(
+        icon: const Icon(Icons.fullscreen, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: context.l10n.fullscreen,
+        onPressed: _toggleFullscreen,
+      ),
+
+      // Copy All
+      IconButton(
+        icon: const Icon(Icons.copy_all_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Copy Document Text',
+        onPressed: _copyAllText,
+      ),
+
+      // Info / Properties
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Document Properties',
+        onPressed: _showInfoSheet,
+      ),
+
+      // Share
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Share',
+        onPressed: _shareFile,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -633,6 +732,7 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     final viewerBg = isDark ? const Color(0xFF141414) : const Color(0xFFE2E8F0);
 
@@ -688,124 +788,31 @@ class _DocxViewerScreenState extends State<DocxViewerScreen> {
                           ),
                       ],
                     ),
-              actions: const [],
+              actions: isLandscape ? _buildDocxActions(context, theme) : const [],
               // Row 2: Action commands (horizontally scrollable, no overflow)
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(44),
-                child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    border: Border(
-                      bottom: BorderSide(
-                        color: isDark ? Colors.white10 : Colors.black12,
+              bottom: isLandscape
+                  ? null
+                  : PreferredSize(
+                      preferredSize: const Size.fromHeight(44),
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: isDark ? Colors.white10 : Colors.black12,
+                            ),
+                          ),
+                        ),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: _buildDocxActions(context, theme),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        // View Mode Toggle (Single Page vs Continuous Scroll)
-                        IconButton(
-                          icon: Icon(
-                            _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
-                            size: 20,
-                          ),
-                          tooltip: _isSinglePageMode
-                              ? context.l10n.singlePageModeTooltip
-                              : context.l10n.continuousModeTooltip,
-                          onPressed: () {
-                            setState(() {
-                              _isSinglePageMode = !_isSinglePageMode;
-                            });
-                            if (_isSinglePageMode) {
-                              _docxPageController.dispose();
-                              _docxPageController = PageController(initialPage: _currentPageIndex);
-                            }
-                          },
-                        ),
-
-                        // Search Action
-                        IconButton(
-                          icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                          tooltip: _isSearchOpen ? 'Close Search' : 'Search in Document',
-                          onPressed: () {
-                            setState(() {
-                              _isSearchOpen = !_isSearchOpen;
-                              if (!_isSearchOpen) {
-                                _searchController.clear();
-                                _onSearchChanged('');
-                              }
-                            });
-                          },
-                        ),
-
-                        // Bookmark Toggle
-                        IconButton(
-                          icon: Icon(
-                            _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                            size: 20,
-                            color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
-                          ),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                          tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
-                          onPressed: _toggleBookmark,
-                        ),
-
-                        // Bookmarks List
-                        IconButton(
-                          icon: const Icon(Icons.bookmarks_outlined, size: 20),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                          tooltip: 'Saved Bookmarks',
-                          onPressed: _showBookmarksSheet,
-                        ),
-
-                        // Fullscreen Toggle
-                        IconButton(
-                          icon: const Icon(Icons.fullscreen, size: 20),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                          tooltip: context.l10n.fullscreen,
-                          onPressed: _toggleFullscreen,
-                        ),
-
-                        // Copy All
-                        IconButton(
-                          icon: const Icon(Icons.copy_all_outlined, size: 20),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                          tooltip: 'Copy Document Text',
-                          onPressed: _copyAllText,
-                        ),
-
-                        // Info / Properties
-                        IconButton(
-                          icon: const Icon(Icons.info_outline, size: 20),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                          tooltip: 'Document Properties',
-                          onPressed: _showInfoSheet,
-                        ),
-
-                        // Share
-                        IconButton(
-                          icon: const Icon(Icons.share_outlined, size: 20),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                          tooltip: 'Share',
-                          onPressed: _shareFile,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
             ),
       body: _isLoading
           ? const Center(

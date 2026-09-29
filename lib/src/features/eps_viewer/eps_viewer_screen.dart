@@ -160,13 +160,6 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
     _transformController.value = matrix;
   }
 
-  void _zoomIn() {
-    _zoomBy(1.3);
-  }
-
-  void _zoomOut() {
-    _zoomBy(1 / 1.3);
-  }
 
   void _zoomBy(double factor, {Offset? focalPoint}) {
     if (_viewportSize.isEmpty) return;
@@ -312,9 +305,125 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
     Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
+  List<Widget> _buildEpsActions(ThemeData theme) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.fit_screen_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Fit to Screen',
+        onPressed: _document != null ? _fitToScreen : null,
+      ),
+      IconButton(
+        icon: const Icon(Icons.rotate_right_rounded, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Rotate 90° Clockwise',
+        onPressed: _document != null ? _rotateClockwise : null,
+      ),
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.flip_rounded, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Flip',
+        onSelected: (val) {
+          if (val == 'h') _toggleFlipHorizontal();
+          if (val == 'v') _toggleFlipVertical();
+        },
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: 'h',
+            child: Row(
+              children: [
+                const Icon(Icons.swap_horiz, size: 18),
+                const SizedBox(width: 8),
+                const Text('Flip Horizontal'),
+                if (_flipHorizontal) ...[
+                  const Spacer(),
+                  Icon(Icons.check, size: 16, color: theme.colorScheme.primary),
+                ],
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'v',
+            child: Row(
+              children: [
+                const Icon(Icons.swap_vert, size: 18),
+                const SizedBox(width: 8),
+                const Text('Flip Vertical'),
+                if (_flipVertical) ...[
+                  const Spacer(),
+                  Icon(Icons.check, size: 16, color: theme.colorScheme.primary),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+      PopupMenuButton<EpsCanvasTheme>(
+        icon: const Icon(Icons.palette_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Canvas Theme',
+        onSelected: (t) => setState(() => _canvasTheme = t),
+        itemBuilder: (context) => EpsCanvasTheme.values.map((t) {
+          return PopupMenuItem<EpsCanvasTheme>(
+            value: t,
+            child: Row(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: t.background,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey, width: 1),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(t.label),
+                if (_canvasTheme == t) ...[
+                  const Spacer(),
+                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+      IconButton(
+        icon: Icon(
+          _showGrid ? Icons.grid_on : Icons.grid_off,
+          size: 20,
+          color: _showGrid ? theme.colorScheme.primary : null,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Grid',
+        onPressed: () => setState(() => _showGrid = !_showGrid),
+      ),
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Information',
+        onPressed: _showInfoSheet,
+      ),
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Share',
+        onPressed: _shareFile,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: _canvasTheme.background,
@@ -331,107 +440,29 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+        actions: isLandscape ? _buildEpsActions(theme) : const [],
+        bottom: isLandscape
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(44),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Spacer(),
+                      ..._buildEpsActions(theme),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            child: Row(
-              children: [
-                const Spacer(),
-
-                // Fit to Screen Button in Top Bar
-                IconButton(
-                  icon: const Icon(Icons.fit_screen_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Fit to Screen',
-                  onPressed: _document != null ? _fitToScreen : null,
-                ),
-
-                // Rotate 90°
-                IconButton(
-                  icon: const Icon(Icons.rotate_right_rounded, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Rotate 90° Clockwise',
-                  onPressed: _document != null ? _rotateClockwise : null,
-                ),
-
-                // Canvas Theme Menu
-                PopupMenuButton<EpsCanvasTheme>(
-                  icon: const Icon(Icons.palette_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Canvas Theme',
-                  onSelected: (t) => setState(() => _canvasTheme = t),
-                  itemBuilder: (context) => EpsCanvasTheme.values.map((t) {
-                    return PopupMenuItem<EpsCanvasTheme>(
-                      value: t,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: t.background,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey, width: 1),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(t.label),
-                          if (_canvasTheme == t) ...[
-                            const Spacer(),
-                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                          ],
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-                // Grid Toggle Button
-                IconButton(
-                  icon: Icon(
-                    _showGrid ? Icons.grid_on : Icons.grid_off,
-                    size: 20,
-                    color: _showGrid ? theme.colorScheme.primary : null,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Grid',
-                  onPressed: () => setState(() => _showGrid = !_showGrid),
-                ),
-
-                // Info Dialog
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Information',
-                  onPressed: _showInfoSheet,
-                ),
-
-                // Share Button
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Share',
-                  onPressed: _shareFile,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -511,47 +542,15 @@ class _EpsViewerScreenState extends State<EpsViewerScreen> {
               ),
 
               // Floating Controls (Zoom, Fit, Rotate, Flip)
+              // Floating Controls (Fit)
               Positioned(
                 bottom: 24,
                 right: 20,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildFloatingButton(
-                      icon: Icons.add,
-                      tooltip: 'Zoom In (+)',
-                      onTap: _zoomIn,
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingButton(
-                      icon: Icons.remove,
-                      tooltip: 'Zoom Out (-)',
-                      onTap: _zoomOut,
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingButton(
-                      icon: Icons.rotate_right_rounded,
-                      tooltip: 'Rotate 90°',
-                      onTap: _rotateClockwise,
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingButton(
-                      icon: Icons.flip_rounded,
-                      tooltip: 'Flip Vertical',
-                      onTap: _toggleFlipVertical,
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingButton(
-                      icon: Icons.fit_screen_outlined,
-                      tooltip: 'Fit to View (Center)',
-                      onTap: _fitToScreen,
-                      theme: theme,
-                    ),
-                  ],
+                child: _buildFloatingButton(
+                  icon: Icons.fit_screen_outlined,
+                  tooltip: 'Fit to View (Center)',
+                  onTap: _fitToScreen,
+                  theme: theme,
                 ),
               ),
             ],

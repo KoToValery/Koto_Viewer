@@ -790,10 +790,146 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
     });
   }
 
+  List<Widget> _buildTextActions(BuildContext context) {
+    return [
+      // Search Action
+      IconButton(
+        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: _isSearchOpen ? 'Close Search' : 'Find in Text',
+        onPressed: () {
+          setState(() {
+            _isSearchOpen = !_isSearchOpen;
+            if (!_isSearchOpen) {
+              _searchController.clear();
+              _onSearchChanged('');
+            }
+          });
+        },
+      ),
+
+      // If in Reflow Mode, show Table of Contents
+      if (_isReflowMode)
+        IconButton(
+          icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+          tooltip: 'Table of Contents',
+          onPressed: () => _reflowKey.currentState?.showTocSheet(),
+        ),
+
+      // Bookmark button
+      IconButton(
+        icon: const Icon(Icons.bookmark_add_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Add Bookmark',
+        onPressed: _toggleBookmark,
+      ),
+
+      // Bookmarks list
+      IconButton(
+        icon: Badge(
+          isLabelVisible: _bookmarks.isNotEmpty,
+          label: Text('${_bookmarks.length}'),
+          child: const Icon(Icons.bookmarks_outlined, size: 20),
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Bookmarks',
+        onPressed: _showBookmarksSheet,
+      ),
+
+      // Reading Mode (Reflow / Overflow / E-Book)
+      IconButton(
+        icon: Icon(
+          _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
+          size: 20,
+          color: _isReflowMode ? _reflowSettings.theme.accentColor : null,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: _isReflowMode
+            ? 'Exit Reading Mode (Code/Log View)'
+            : 'Reading Mode (Reflow / Overflow / E-Book)',
+        onPressed: _toggleReflowMode,
+      ),
+
+      // If in Reflow Mode, show Reading Settings
+      if (_isReflowMode)
+        IconButton(
+          icon: const Icon(Icons.tune, size: 20),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+          tooltip: 'Reading Settings',
+          onPressed: () => _reflowKey.currentState?.showSettingsSheet(),
+        ),
+
+      // Raw text controls (only when NOT in Reflow Mode)
+      if (!_isReflowMode) ...[
+        // Monospace Toggle
+        IconButton(
+          icon: Icon(_isMonospace ? Icons.font_download : Icons.font_download_outlined, size: 20),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+          tooltip: _isMonospace ? 'Switch to Proportional Font' : 'Switch to Monospace Font',
+          onPressed: () => setState(() => _isMonospace = !_isMonospace),
+        ),
+
+        // Word Wrap Toggle (Fit to Screen)
+        IconButton(
+          icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+          tooltip: _isWordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
+          onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
+        ),
+
+        // Copy All
+        IconButton(
+          icon: const Icon(Icons.copy_all_outlined, size: 20),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+          tooltip: 'Copy All',
+          onPressed: _copyAllText,
+        ),
+      ],
+
+      // Fullscreen
+      IconButton(
+        icon: const Icon(Icons.fullscreen, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: context.l10n.fullscreen,
+        onPressed: _toggleFullscreen,
+      ),
+
+      // Info / Properties
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Text Properties',
+        onPressed: _showInfoSheet,
+      ),
+
+      // Share
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Share',
+        onPressed: _shareFile,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     final fontStyle = _isMonospace
         ? GoogleFonts.firaCode(fontSize: _fontSize, height: 1.45)
@@ -835,160 +971,32 @@ class _TextViewerScreenState extends State<TextViewerScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: _isReflowMode ? _reflowSettings.theme.surfaceColor : null,
-              border: Border(
-                bottom: BorderSide(
-                  color: _isReflowMode
-                      ? _reflowSettings.theme.textColor.withValues(alpha: 0.1)
-                      : (isDark ? Colors.white10 : Colors.black12),
+        actions: isLandscape ? _buildTextActions(context) : const [],
+        bottom: isLandscape
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(44),
+                child: Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _isReflowMode ? _reflowSettings.theme.surfaceColor : null,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: _isReflowMode
+                            ? _reflowSettings.theme.textColor.withValues(alpha: 0.1)
+                            : (isDark ? Colors.white10 : Colors.black12),
+                      ),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: _buildTextActions(context),
+                    ),
+                  ),
                 ),
               ),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                children: [
-                  // Search Action
-                  IconButton(
-                    icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _isSearchOpen ? 'Close Search' : 'Find in Text',
-                    onPressed: () {
-                      setState(() {
-                        _isSearchOpen = !_isSearchOpen;
-                        if (!_isSearchOpen) {
-                          _searchController.clear();
-                          _onSearchChanged('');
-                        }
-                      });
-                    },
-                  ),
-
-                  // If in Reflow Mode, show Table of Contents
-                  if (_isReflowMode)
-                    IconButton(
-                      icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'Table of Contents',
-                      onPressed: () => _reflowKey.currentState?.showTocSheet(),
-                    ),
-
-                  // Bookmark button
-                  IconButton(
-                    icon: const Icon(Icons.bookmark_add_outlined, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Add Bookmark',
-                    onPressed: _toggleBookmark,
-                  ),
-
-                  // Bookmarks list
-                  IconButton(
-                    icon: Badge(
-                      isLabelVisible: _bookmarks.isNotEmpty,
-                      label: Text('${_bookmarks.length}'),
-                      child: const Icon(Icons.bookmarks_outlined, size: 20),
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Bookmarks',
-                    onPressed: _showBookmarksSheet,
-                  ),
-
-                  // Reading Mode (Reflow / Overflow / E-Book)
-                  IconButton(
-                    icon: Icon(
-                      _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
-                      size: 20,
-                      color: _isReflowMode ? _reflowSettings.theme.accentColor : null,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _isReflowMode
-                        ? 'Exit Reading Mode (Code/Log View)'
-                        : 'Reading Mode (Reflow / Overflow / E-Book)',
-                    onPressed: _toggleReflowMode,
-                  ),
-
-                  // If in Reflow Mode, show Reading Settings
-                  if (_isReflowMode)
-                    IconButton(
-                      icon: const Icon(Icons.tune, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'Reading Settings',
-                      onPressed: () => _reflowKey.currentState?.showSettingsSheet(),
-                    ),
-
-                  // Raw text controls (only when NOT in Reflow Mode)
-                  if (!_isReflowMode) ...[
-                    // Monospace Toggle
-                    IconButton(
-                      icon: Icon(_isMonospace ? Icons.font_download : Icons.font_download_outlined, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: _isMonospace ? 'Switch to Proportional Font' : 'Switch to Monospace Font',
-                      onPressed: () => setState(() => _isMonospace = !_isMonospace),
-                    ),
-
-                    // Word Wrap Toggle (Fit to Screen)
-                    IconButton(
-                      icon: Icon(_isWordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: _isWordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
-                      onPressed: () => setState(() => _isWordWrap = !_isWordWrap),
-                    ),
-
-                    // Copy All
-                    IconButton(
-                      icon: const Icon(Icons.copy_all_outlined, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      tooltip: 'Copy All',
-                      onPressed: _copyAllText,
-                    ),
-                  ],
-
-                  // Fullscreen
-                  IconButton(
-                    icon: const Icon(Icons.fullscreen, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: context.l10n.fullscreen,
-                    onPressed: _toggleFullscreen,
-                  ),
-
-                  // Info / Properties
-                  IconButton(
-                    icon: const Icon(Icons.info_outline, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Text Properties',
-                    onPressed: _showInfoSheet,
-                  ),
-
-                  // Share
-                  IconButton(
-                    icon: const Icon(Icons.share_outlined, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: 'Share',
-                    onPressed: _shareFile,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
       body: _isLoading
           ? const Center(

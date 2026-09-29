@@ -153,13 +153,6 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
     _transformController.value = matrix;
   }
 
-  void _zoomIn() {
-    _zoomBy(1.3);
-  }
-
-  void _zoomOut() {
-    _zoomBy(1 / 1.3);
-  }
 
   void _zoomBy(double factor, {Offset? focalPoint}) {
     if (_viewportSize.isEmpty) return;
@@ -287,9 +280,78 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
     Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
+  List<Widget> _buildHpglActions(ThemeData theme) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.fit_screen_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Fit to Screen',
+        onPressed: _document != null ? _fitToScreen : null,
+      ),
+      PopupMenuButton<EpsCanvasTheme>(
+        icon: const Icon(Icons.palette_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Canvas Theme',
+        onSelected: (t) => setState(() => _canvasTheme = t),
+        itemBuilder: (context) => EpsCanvasTheme.values.map((t) {
+          return PopupMenuItem<EpsCanvasTheme>(
+            value: t,
+            child: Row(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: t.background,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey, width: 1),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(t.label),
+                if (_canvasTheme == t) ...[
+                  const Spacer(),
+                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+      IconButton(
+        icon: Icon(
+          _showGrid ? Icons.grid_on : Icons.grid_off,
+          size: 20,
+          color: _showGrid ? theme.colorScheme.primary : null,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Grid',
+        onPressed: () => setState(() => _showGrid = !_showGrid),
+      ),
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Plotter Properties',
+        onPressed: _showInfoSheet,
+      ),
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Share',
+        onPressed: _shareFile,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: _canvasTheme.background,
@@ -306,98 +368,29 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+        actions: isLandscape ? _buildHpglActions(theme) : const [],
+        bottom: isLandscape
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(44),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Spacer(),
+                      ..._buildHpglActions(theme),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            child: Row(
-              children: [
-                const Spacer(),
-
-                // Fit to Screen Button in Top Bar
-                IconButton(
-                  icon: const Icon(Icons.fit_screen_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Fit to Screen',
-                  onPressed: _document != null ? _fitToScreen : null,
-                ),
-
-                // Theme Menu
-                PopupMenuButton<EpsCanvasTheme>(
-                  icon: const Icon(Icons.palette_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Canvas Theme',
-                  onSelected: (t) => setState(() => _canvasTheme = t),
-                  itemBuilder: (context) => EpsCanvasTheme.values.map((t) {
-                    return PopupMenuItem<EpsCanvasTheme>(
-                      value: t,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: t.background,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey, width: 1),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(t.label),
-                          if (_canvasTheme == t) ...[
-                            const Spacer(),
-                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                          ],
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-                // Grid Toggle Button
-                IconButton(
-                  icon: Icon(
-                    _showGrid ? Icons.grid_on : Icons.grid_off,
-                    size: 20,
-                    color: _showGrid ? theme.colorScheme.primary : null,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Grid',
-                  onPressed: () => setState(() => _showGrid = !_showGrid),
-                ),
-
-                // Info Dialog
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Plotter Properties',
-                  onPressed: _showInfoSheet,
-                ),
-
-                // Share Button
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Share',
-                  onPressed: _shareFile,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -473,30 +466,11 @@ class _HpglViewerScreenState extends State<HpglViewerScreen> {
               Positioned(
                 bottom: 24,
                 right: 20,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildFloatingButton(
-                      icon: Icons.add,
-                      tooltip: 'Zoom In (+)',
-                      onTap: _zoomIn,
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingButton(
-                      icon: Icons.remove,
-                      tooltip: 'Zoom Out (-)',
-                      onTap: _zoomOut,
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingButton(
-                      icon: Icons.fit_screen_outlined,
-                      tooltip: 'Fit to View (Center)',
-                      onTap: _fitToScreen,
-                      theme: theme,
-                    ),
-                  ],
+                child: _buildFloatingButton(
+                  icon: Icons.fit_screen_outlined,
+                  tooltip: 'Fit to View (Center)',
+                  onTap: _fitToScreen,
+                  theme: theme,
                 ),
               ),
             ],

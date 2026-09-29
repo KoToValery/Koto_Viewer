@@ -371,18 +371,6 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
     }
   }
 
-  void _zoomIn() {
-    final m = _transformationController.value.clone();
-    m.scaleByDouble(1.25, 1.25, 1.0, 1.0);
-    _transformationController.value = m;
-  }
-
-  void _zoomOut() {
-    final m = _transformationController.value.clone();
-    m.scaleByDouble(0.8, 0.8, 1.0, 1.0);
-    _transformationController.value = m;
-  }
-
   Future<void> _shareCurrentFile() async {
     if (_isIco && _icoFrames != null && _icoFrames!.isNotEmpty) {
       await _shareCurrentFrame();
@@ -1100,27 +1088,10 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
               Positioned(
                 bottom: 24,
                 right: 20,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildFloatingBtn(
-                      icon: Icons.add,
-                      tooltip: 'Zoom In (+)',
-                      onTap: _zoomIn,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingBtn(
-                      icon: Icons.remove,
-                      tooltip: 'Zoom Out (-)',
-                      onTap: _zoomOut,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildFloatingBtn(
-                      icon: Icons.fit_screen_outlined,
-                      tooltip: 'Reset View',
-                      onTap: _resetTransform,
-                    ),
-                  ],
+                child: _buildFloatingBtn(
+                  icon: Icons.fit_screen_outlined,
+                  tooltip: 'Reset View',
+                  onTap: _resetTransform,
                 ),
               ),
             ],

@@ -288,13 +288,6 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     _hasInitialFitted = true;
   }
 
-  void _zoomIn() {
-    _zoomBy(1.3);
-  }
-
-  void _zoomOut() {
-    _zoomBy(1 / 1.3);
-  }
 
   void _zoomBy(double factor, {Offset? focalPoint}) {
     if (_viewportSize.isEmpty) return;
@@ -450,315 +443,6 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
                                 '${(doc.trackCount == 0 && doc.padCount == 0 && doc.holeCount == 0) ? "Empty layer" : ""}',
                                 style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
                               ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showImagesSheet() {
-    if (_project == null) return;
-    final theme = Theme.of(context);
-    final images = _project!.images;
-
-    if (images.isEmpty) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: theme.colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          expand: false,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                const SizedBox(height: 12),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Archive Images (${images.length})',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      FilledButton.tonalIcon(
-                        icon: const Icon(Icons.zoom_in, size: 18),
-                        label: const Text('Interactive Zoom'),
-                        style: FilledButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          PcbImageZoomDialog.show(context, images: images, initialIndex: 0);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: images.length,
-                    itemBuilder: (context, index) {
-                      final img = images[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        clipBehavior: Clip.antiAlias,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      img.fileName,
-                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.zoom_in, size: 20),
-                                    tooltip: 'Zoom in (Приближаване)',
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      PcbImageZoomDialog.show(context, images: images, initialIndex: index);
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                            InkWell(
-                              onTap: () {
-                                Navigator.pop(context);
-                                PcbImageZoomDialog.show(context, images: images, initialIndex: index);
-                              },
-                              child: Stack(
-                                alignment: Alignment.bottomRight,
-                                children: [
-                                  Image.memory(
-                                    img.bytes,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (ctx, err, stack) => const Padding(
-                                      padding: EdgeInsets.all(32),
-                                      child: Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
-                                    ),
-                                  ),
-                                  Container(
-                                    margin: const EdgeInsets.all(8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.zoom_in, size: 14, color: Colors.white),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'Tap to zoom',
-                                          style: TextStyle(color: Colors.white, fontSize: 11),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showBomSheet() {
-    if (_project == null) return;
-    final theme = Theme.of(context);
-    final bom = _project!.bomEntries;
-
-    if (bom.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No Bill of Materials (BOM) file found in this archive.')),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: theme.colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        String searchQuery = '';
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final filteredBom = bom.where((e) {
-              final q = searchQuery.toLowerCase();
-              return e.designator.toLowerCase().contains(q) ||
-                  e.value.toLowerCase().contains(q) ||
-                  e.footprint.toLowerCase().contains(q) ||
-                  e.description.toLowerCase().contains(q);
-            }).toList();
-
-            return DraggableScrollableSheet(
-              initialChildSize: 0.65,
-              minChildSize: 0.40,
-              maxChildSize: 0.90,
-              expand: false,
-              builder: (context, scrollController) {
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 36,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.list_alt_rounded, color: Color(0xFF2563EB)),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Bill of Materials (BOM)',
-                                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  '${_project!.totalComponents} total parts • ${bom.length} items',
-                                  style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Search designator, value, package (e.g. R1, 10k)...',
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          isDense: true,
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        onChanged: (val) {
-                          setSheetState(() => searchQuery = val);
-                        },
-                      ),
-                      const Divider(height: 20),
-                      Expanded(
-                        child: ListView.separated(
-                          controller: scrollController,
-                          itemCount: filteredBom.length,
-                          separatorBuilder: (context, index) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final item = filteredBom[index];
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.primaryContainer,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      item.designator,
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.colorScheme.onPrimaryContainer,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      item.value.isNotEmpty ? item.value : item.description,
-                                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Text(
-                                    '×${item.quantity}',
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                              subtitle: item.footprint.isNotEmpty
-                                  ? Text(
-                                      'Package: ${item.footprint}${item.description.isNotEmpty ? " • ${item.description}" : ""}',
-                                      style: TextStyle(fontSize: 11.5, color: theme.textTheme.bodySmall?.color),
-                                    )
-                                  : null,
                             );
                           },
                         ),
@@ -1133,6 +817,8 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final modes = _availableModes;
 
     return PopScope(
       canPop: true,
@@ -1163,38 +849,17 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          actions: [
-            if (_activeMode == PcbViewerMode.board2D && _project != null && _project!.layers.isNotEmpty) ...[
-              IconButton(
-                icon: const Icon(Icons.layers_outlined, size: 20),
-                tooltip: 'PCB Layers (${_project?.visibleLayers ?? 0}/${_project?.totalLayers ?? 0})',
-                onPressed: _showLayersSheet,
-              ),
-              _buildThemeMenu(theme),
-              IconButton(
-                icon: Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
-                tooltip: '1mm Measurement Grid',
-                onPressed: () => setState(() => _showGrid = !_showGrid),
-              ),
-              if (_project!.hasPadNumbers)
-                IconButton(
-                  icon: Icon(_showPadNumbers ? Icons.tag : Icons.tag_outlined, size: 20),
-                  tooltip: 'Toggle Pad Numbers',
-                  onPressed: () => setState(() => _showPadNumbers = !_showPadNumbers),
-                ),
-            ],
-            IconButton(
-              icon: const Icon(Icons.info_outline, size: 20),
-              tooltip: 'Board / Archive Properties',
-              onPressed: _showInfoSheet,
-            ),
-            IconButton(
-              icon: const Icon(Icons.share_outlined, size: 20),
-              tooltip: 'Share',
-              onPressed: _shareFile,
-            ),
-          ],
-          bottom: _buildAppBarBottom(theme, isDark),
+          actions: isLandscape
+              ? [
+                  if (modes.length > 1)
+                    SizedBox(
+                      height: 36,
+                      child: _buildModesSelector(theme, isDark, isLandscape: true),
+                    ),
+                  ..._buildPcbActions(theme),
+                ]
+              : (modes.length > 1 ? _buildPcbActions(theme) : const []),
+          bottom: isLandscape ? null : _buildAppBarBottom(theme, isDark),
         ),
         body: LayoutBuilder(
           builder: (context, constraints) {
@@ -1286,6 +951,40 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
     return modes;
   }
 
+  List<Widget> _buildPcbActions(ThemeData theme) {
+    return [
+      if (_activeMode == PcbViewerMode.board2D && _project != null && _project!.layers.isNotEmpty) ...[
+        IconButton(
+          icon: const Icon(Icons.layers_outlined, size: 20),
+          tooltip: 'PCB Layers (${_project?.visibleLayers ?? 0}/${_project?.totalLayers ?? 0})',
+          onPressed: _showLayersSheet,
+        ),
+        _buildThemeMenu(theme),
+        IconButton(
+          icon: Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
+          tooltip: '1mm Measurement Grid',
+          onPressed: () => setState(() => _showGrid = !_showGrid),
+        ),
+        if (_project!.hasPadNumbers)
+          IconButton(
+            icon: Icon(_showPadNumbers ? Icons.tag : Icons.tag_outlined, size: 20),
+            tooltip: 'Toggle Pad Numbers',
+            onPressed: () => setState(() => _showPadNumbers = !_showPadNumbers),
+          ),
+      ],
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        tooltip: 'Board / Archive Properties',
+        onPressed: _showInfoSheet,
+      ),
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        tooltip: 'Share',
+        onPressed: _shareFile,
+      ),
+    ];
+  }
+
   PreferredSizeWidget? _buildAppBarBottom(ThemeData theme, bool isDark) {
     final modes = _availableModes;
     if (modes.length <= 1) {
@@ -1305,33 +1004,7 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
             child: Row(
               children: [
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.layers_outlined, size: 20),
-                  tooltip: 'PCB Layers (${_project?.visibleLayers ?? 0}/${_project?.totalLayers ?? 0})',
-                  onPressed: _showLayersSheet,
-                ),
-                _buildThemeMenu(theme),
-                IconButton(
-                  icon: Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
-                  tooltip: '1mm Measurement Grid',
-                  onPressed: () => setState(() => _showGrid = !_showGrid),
-                ),
-                if (_project!.hasPadNumbers)
-                  IconButton(
-                    icon: Icon(_showPadNumbers ? Icons.tag : Icons.tag_outlined, size: 20),
-                    tooltip: 'Toggle Pad Numbers',
-                    onPressed: () => setState(() => _showPadNumbers = !_showPadNumbers),
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  tooltip: 'Board Properties',
-                  onPressed: _showInfoSheet,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  tooltip: 'Share',
-                  onPressed: _shareFile,
-                ),
+                ..._buildPcbActions(theme),
               ],
             ),
           ),
@@ -1352,76 +1025,82 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
             ),
           ),
         ),
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          itemCount: modes.length,
-          separatorBuilder: (context, index) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            final mode = modes[index];
-            final isSelected = mode == _activeMode;
-            final count = _getModeCount(mode);
+        child: _buildModesSelector(theme, isDark),
+      ),
+    );
+  }
 
-            return InkWell(
+  Widget _buildModesSelector(ThemeData theme, bool isDark, {bool isLandscape = false}) {
+    final modes = _availableModes;
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      shrinkWrap: isLandscape,
+      padding: EdgeInsets.symmetric(horizontal: isLandscape ? 4 : 12, vertical: isLandscape ? 4 : 6),
+      itemCount: modes.length,
+      separatorBuilder: (context, index) => const SizedBox(width: 8),
+      itemBuilder: (context, index) {
+        final mode = modes[index];
+        final isSelected = mode == _activeMode;
+        final count = _getModeCount(mode);
+
+        return InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => setState(() => _activeMode = mode),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                  : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03)),
               borderRadius: BorderRadius.circular(10),
-              onTap: () => setState(() => _activeMode = mode),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? theme.colorScheme.primary.withValues(alpha: 0.15)
-                      : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03)),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isSelected ? theme.colorScheme.primary : Colors.transparent,
-                    width: 1.5,
+              border: Border.all(
+                color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  mode.icon,
+                  size: 17,
+                  color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  mode.label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      mode.icon,
-                      size: 17,
-                      color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                if (count > 0) ...[
+                  const SizedBox(width: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : (isDark ? Colors.white12 : Colors.black12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      mode.label,
+                    child: Text(
+                      '$count',
                       style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    if (count > 0) ...[
-                      const SizedBox(width: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? theme.colorScheme.primary
-                              : (isDark ? Colors.white12 : Colors.black12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '$count',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1579,30 +1258,11 @@ class _PcbViewerScreenState extends State<PcbViewerScreen> {
         Positioned(
           bottom: 24 + MediaQuery.paddingOf(context).bottom,
           right: 20,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildFloatingButton(
-                icon: Icons.add,
-                tooltip: 'Zoom In (+)',
-                onTap: _zoomIn,
-                theme: theme,
-              ),
-              const SizedBox(height: 8),
-              _buildFloatingButton(
-                icon: Icons.remove,
-                tooltip: 'Zoom Out (-)',
-                onTap: _zoomOut,
-                theme: theme,
-              ),
-              const SizedBox(height: 8),
-              _buildFloatingButton(
-                icon: Icons.fit_screen_outlined,
-                tooltip: 'Fit Board to View (Center)',
-                onTap: _fitToScreen,
-                theme: theme,
-              ),
-            ],
+          child: _buildFloatingButton(
+            icon: Icons.fit_screen_outlined,
+            tooltip: 'Fit Board to View (Center)',
+            onTap: _fitToScreen,
+            theme: theme,
           ),
         ),
       ],

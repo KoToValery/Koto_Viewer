@@ -301,9 +301,179 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
     }
   }
 
+  Widget _buildPreviewBadge(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: isDark ? 0.16 : 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: Colors.amber.withValues(alpha: isDark ? 0.35 : 0.45),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.visibility_outlined,
+            size: 13,
+            color: isDark ? Colors.amber[300] : Colors.amber[900],
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '${context.l10n.previewOnly} (Raster)',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.amber[200] : Colors.amber[900],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildCdrActions() {
+    return [
+      PopupMenuButton<CdrCanvasTheme>(
+        icon: const Icon(Icons.palette_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Canvas Background',
+        onSelected: (t) => setState(() => _canvasTheme = t),
+        itemBuilder: (_) => CdrCanvasTheme.values.map((t) {
+          final isSelected = _canvasTheme == t;
+          return PopupMenuItem(
+            value: t,
+            child: Row(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: t.background,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.grey),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(t.label),
+                if (isSelected) ...[
+                  const Spacer(),
+                  const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+      IconButton(
+        icon: const Icon(Icons.rotate_right_rounded, size: 22),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Rotate 90°',
+        onPressed: _rotateClockwise,
+      ),
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.flip_rounded, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Flip Orientation',
+        onSelected: (v) {
+          setState(() {
+            if (v == 'horizontal') _flipHorizontal = !_flipHorizontal;
+            if (v == 'vertical') _flipVertical = !_flipVertical;
+          });
+        },
+        itemBuilder: (_) => [
+          PopupMenuItem(
+            value: 'horizontal',
+            child: Row(
+              children: [
+                const Icon(Icons.swap_horiz_rounded, size: 18),
+                const SizedBox(width: 10),
+                const Text('Flip Horizontal'),
+                if (_flipHorizontal) ...[
+                  const Spacer(),
+                  const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
+                ],
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'vertical',
+            child: Row(
+              children: [
+                const Icon(Icons.swap_vert_rounded, size: 18),
+                const SizedBox(width: 10),
+                const Text('Flip Vertical'),
+                if (_flipVertical) ...[
+                  const Spacer(),
+                  const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+      IconButton(
+        icon: const Icon(Icons.info_outline_rounded, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Properties',
+        onPressed: _showPropertiesSheet,
+      ),
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Share & Export',
+        onSelected: (v) {
+          if (v == 'share_cdr') _shareOriginalCdr();
+          if (v == 'export_png') _exportAndSharePng();
+          if (v == 'print') _printDocument();
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem(
+            value: 'share_cdr',
+            child: Row(
+              children: [
+                Icon(Icons.file_upload_outlined, size: 18),
+                SizedBox(width: 10),
+                Text('Share Original .CDR'),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'export_png',
+            child: Row(
+              children: [
+                Icon(Icons.image_outlined, size: 18),
+                SizedBox(width: 10),
+                Text('Export as PNG Image'),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'print',
+            child: Row(
+              children: [
+                Icon(Icons.print_outlined, size: 18),
+                SizedBox(width: 10),
+                Text('Print / Export PDF'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: _canvasTheme.background,
@@ -317,204 +487,42 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        actions: const [],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(46),
-          child: Container(
-            height: 46,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0B132B) : const Color(0xFFF1F5F9),
-              border: Border(
-                top: BorderSide(
-                  color: isDark ? Colors.white12 : Colors.black12,
-                  width: 0.5,
-                ),
-                bottom: BorderSide(
-                  color: isDark ? Colors.white12 : Colors.black12,
-                  width: 0.5,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                // Preview Mode Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        actions: isLandscape
+            ? [
+                _buildPreviewBadge(isDark),
+                const SizedBox(width: 6),
+                ..._buildCdrActions(),
+              ]
+            : const [],
+        bottom: isLandscape
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(46),
+                child: Container(
+                  height: 46,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: isDark ? 0.16 : 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: Colors.amber.withValues(alpha: isDark ? 0.35 : 0.45),
-                      width: 0.8,
+                    color: isDark ? const Color(0xFF0B132B) : const Color(0xFFF1F5F9),
+                    border: Border(
+                      top: BorderSide(
+                        color: isDark ? Colors.white12 : Colors.black12,
+                        width: 0.5,
+                      ),
+                      bottom: BorderSide(
+                        color: isDark ? Colors.white12 : Colors.black12,
+                        width: 0.5,
+                      ),
                     ),
                   ),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.visibility_outlined,
-                        size: 13,
-                        color: isDark ? Colors.amber[300] : Colors.amber[900],
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        '${context.l10n.previewOnly} (Raster)',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.amber[200] : Colors.amber[900],
-                        ),
-                      ),
+                      _buildPreviewBadge(isDark),
+                      const Spacer(),
+                      ..._buildCdrActions(),
                     ],
                   ),
                 ),
-                const Spacer(),
-
-                // Theme Switcher
-                PopupMenuButton<CdrCanvasTheme>(
-                  icon: const Icon(Icons.palette_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Canvas Background',
-                  onSelected: (t) => setState(() => _canvasTheme = t),
-                  itemBuilder: (_) => CdrCanvasTheme.values.map((t) {
-                    final isSelected = _canvasTheme == t;
-                    return PopupMenuItem(
-                      value: t,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: t.background,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.grey),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(t.label),
-                          if (isSelected) ...[
-                            const Spacer(),
-                            const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
-                          ],
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-                // Rotate 90° Clockwise
-                IconButton(
-                  icon: const Icon(Icons.rotate_right_rounded, size: 22),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Rotate 90°',
-                  onPressed: _rotateClockwise,
-                ),
-
-                // Flip Options
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.flip_rounded, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Flip Orientation',
-                  onSelected: (v) {
-                    setState(() {
-                      if (v == 'horizontal') _flipHorizontal = !_flipHorizontal;
-                      if (v == 'vertical') _flipVertical = !_flipVertical;
-                    });
-                  },
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'horizontal',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.swap_horiz_rounded, size: 18),
-                          const SizedBox(width: 10),
-                          const Text('Flip Horizontal'),
-                          if (_flipHorizontal) ...[
-                            const Spacer(),
-                            const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
-                          ],
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'vertical',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.swap_vert_rounded, size: 18),
-                          const SizedBox(width: 10),
-                          const Text('Flip Vertical'),
-                          if (_flipVertical) ...[
-                            const Spacer(),
-                            const Icon(Icons.check, size: 16, color: Color(0xFF16A34A)),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Document Properties
-                IconButton(
-                  icon: const Icon(Icons.info_outline_rounded, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Properties',
-                  onPressed: _showPropertiesSheet,
-                ),
-
-                // Share / Export Menu
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Share & Export',
-                  onSelected: (v) {
-                    if (v == 'share_cdr') _shareOriginalCdr();
-                    if (v == 'export_png') _exportAndSharePng();
-                    if (v == 'print') _printDocument();
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                      value: 'share_cdr',
-                      child: Row(
-                        children: [
-                          Icon(Icons.file_upload_outlined, size: 18),
-                          SizedBox(width: 10),
-                          Text('Share Original .CDR'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'export_png',
-                      child: Row(
-                        children: [
-                          Icon(Icons.image_outlined, size: 18),
-                          SizedBox(width: 10),
-                          Text('Export as PNG Image'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'print',
-                      child: Row(
-                        children: [
-                          Icon(Icons.print_outlined, size: 18),
-                          SizedBox(width: 10),
-                          Text('Print / Export PDF'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
+              ),
       ),
       body: _buildBody(),
     );
@@ -630,35 +638,10 @@ class _CdrViewerScreenState extends State<CdrViewerScreen> {
             Positioned(
               bottom: 24,
               right: 20,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildFloatingBtn(
-                    icon: Icons.add,
-                    tooltip: 'Zoom In (+)',
-                    onTap: () {
-                      final m = _transformController.value.clone();
-                      m.scaleByDouble(1.25, 1.25, 1.0, 1.0);
-                      _transformController.value = m;
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _buildFloatingBtn(
-                    icon: Icons.remove,
-                    tooltip: 'Zoom Out (-)',
-                    onTap: () {
-                      final m = _transformController.value.clone();
-                      m.scaleByDouble(0.8, 0.8, 1.0, 1.0);
-                      _transformController.value = m;
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _buildFloatingBtn(
-                    icon: Icons.fit_screen_outlined,
-                    tooltip: 'Reset View',
-                    onTap: _resetTransform,
-                  ),
-                ],
+              child: _buildFloatingBtn(
+                icon: Icons.fit_screen_outlined,
+                tooltip: 'Reset View',
+                onTap: _resetTransform,
               ),
             ),
           ],

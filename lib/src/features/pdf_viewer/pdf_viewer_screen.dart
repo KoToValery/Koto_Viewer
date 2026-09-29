@@ -836,10 +836,128 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
+  List<Widget> _buildPdfActions(BuildContext context, ThemeData theme) {
+    return [
+      // Reading Mode / Reflow Toggle (E-Book Experience)
+      IconButton(
+        icon: Icon(
+          _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
+          size: 20,
+          color: _isReflowMode ? theme.colorScheme.primary : null,
+        ),
+        tooltip: _isReflowMode
+            ? 'Exit Reading Mode (Back to Original PDF)'
+            : 'Reading Mode (Reflow / E-Book)',
+        onPressed: _toggleReflowMode,
+      ),
+
+      // View Mode Toggle (Single Page vs Continuous Scroll)
+      IconButton(
+        icon: Icon(
+          _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
+          size: 20,
+        ),
+        tooltip: _isSinglePageMode
+            ? context.l10n.singlePageModeTooltip
+            : context.l10n.continuousModeTooltip,
+        onPressed: _toggleViewMode,
+      ),
+
+      // Bookmark Toggle
+      IconButton(
+        icon: Icon(
+          _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
+          size: 20,
+          color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
+        ),
+        tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+        onPressed: _toggleBookmark,
+      ),
+
+      // Bookmarks List
+      IconButton(
+        icon: Badge(
+          isLabelVisible: _bookmarks.isNotEmpty,
+          label: Text('${_bookmarks.length}'),
+          child: const Icon(Icons.bookmarks_outlined, size: 20),
+        ),
+        tooltip: 'Saved Bookmarks',
+        onPressed: _showBookmarksSheet,
+      ),
+
+      // Invert Mode (Dark/Light)
+      IconButton(
+        icon: Icon(_isDarkModeView ? Icons.light_mode : Icons.dark_mode, size: 20),
+        tooltip: 'Toggle Invert Colors',
+        onPressed: () {
+          setState(() {
+            _isDarkModeView = !_isDarkModeView;
+          });
+        },
+      ),
+
+      // Fullscreen
+      IconButton(
+        icon: const Icon(Icons.fullscreen, size: 20),
+        tooltip: context.l10n.fullscreen,
+        onPressed: _toggleFullscreen,
+      ),
+
+      // Info Sheet
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        tooltip: 'PDF Properties',
+        onPressed: _showInfoSheet,
+      ),
+
+      // Form Filling (AcroForms)
+      IconButton(
+        icon: Badge(
+          isLabelVisible: _formFields.isNotEmpty,
+          label: Text('${_formFields.length}'),
+          backgroundColor: theme.colorScheme.primary,
+          child: Icon(
+            _formFields.isNotEmpty ? Icons.edit_note : Icons.edit_note_outlined,
+            size: 20,
+            color: _formFields.isNotEmpty ? theme.colorScheme.primary : null,
+          ),
+        ),
+        tooltip: context.l10n.pdfFormFilling,
+        onPressed: _openFormFilling,
+      ),
+
+      // Digital Certificates & Signatures
+      IconButton(
+        icon: Icon(
+          _certificates.isNotEmpty ? Icons.verified_user : Icons.security_outlined,
+          size: 20,
+          color: _certificates.isNotEmpty ? Colors.green.shade600 : null,
+        ),
+        tooltip: context.l10n.pdfDigitalCertificates,
+        onPressed: _showCertificateInfo,
+      ),
+
+      // Share
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        tooltip: 'Share PDF',
+        onPressed: _sharePdf,
+      ),
+
+      // Print
+      IconButton(
+        icon: const Icon(Icons.print_outlined, size: 20),
+        tooltip: 'Print PDF',
+        onPressed: _printPdf,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       appBar: (_isFullscreen || _pageCount == 0)
@@ -874,143 +992,31 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     ),
                 ],
               ),
-              actions: const [],
+              actions: isLandscape ? _buildPdfActions(context, theme) : const [],
               // Row 2: Actions Bar (horizontally scrollable, no overflow)
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(44),
-                child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    border: Border(
-                      bottom: BorderSide(
-                        color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
-                      ),
-                    ),
-                  ),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        // Reading Mode / Reflow Toggle (E-Book Experience)
-                        IconButton(
-                          icon: Icon(
-                            _isReflowMode ? Icons.auto_stories : Icons.auto_stories_outlined,
-                            size: 20,
-                            color: _isReflowMode ? theme.colorScheme.primary : null,
-                          ),
-                          tooltip: _isReflowMode
-                              ? 'Exit Reading Mode (Back to Original PDF)'
-                              : 'Reading Mode (Reflow / E-Book)',
-                          onPressed: _toggleReflowMode,
-                        ),
-
-                        // View Mode Toggle (Single Page vs Continuous Scroll)
-                        IconButton(
-                          icon: Icon(
-                            _isSinglePageMode ? Icons.view_carousel_outlined : Icons.view_stream_outlined,
-                            size: 20,
-                          ),
-                          tooltip: _isSinglePageMode
-                              ? context.l10n.singlePageModeTooltip
-                              : context.l10n.continuousModeTooltip,
-                          onPressed: _toggleViewMode,
-                        ),
-
-
-                        // Bookmark Toggle
-                        IconButton(
-                          icon: Icon(
-                            _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                            size: 20,
-                            color: _isCurrentBookmarked ? theme.colorScheme.primary : null,
-                          ),
-                          tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
-                          onPressed: _toggleBookmark,
-                        ),
-
-                        // Bookmarks List
-                        IconButton(
-                          icon: Badge(
-                            isLabelVisible: _bookmarks.isNotEmpty,
-                            label: Text('${_bookmarks.length}'),
-                            child: const Icon(Icons.bookmarks_outlined, size: 20),
-                          ),
-                          tooltip: 'Saved Bookmarks',
-                          onPressed: _showBookmarksSheet,
-                        ),
-
-                        // Invert Mode (Dark/Light)
-                        IconButton(
-                          icon: Icon(_isDarkModeView ? Icons.light_mode : Icons.dark_mode, size: 20),
-                          tooltip: 'Toggle Invert Colors',
-                          onPressed: () {
-                            setState(() {
-                              _isDarkModeView = !_isDarkModeView;
-                            });
-                          },
-                        ),
-
-                        // Fullscreen
-                        IconButton(
-                          icon: const Icon(Icons.fullscreen, size: 20),
-                          tooltip: context.l10n.fullscreen,
-                          onPressed: _toggleFullscreen,
-                        ),
-
-                        // Info Sheet
-                        IconButton(
-                          icon: const Icon(Icons.info_outline, size: 20),
-                          tooltip: 'PDF Properties',
-                          onPressed: _showInfoSheet,
-                        ),
-
-                        // Form Filling (AcroForms)
-                        IconButton(
-                          icon: Badge(
-                            isLabelVisible: _formFields.isNotEmpty,
-                            label: Text('${_formFields.length}'),
-                            backgroundColor: theme.colorScheme.primary,
-                            child: Icon(
-                              _formFields.isNotEmpty ? Icons.edit_note : Icons.edit_note_outlined,
-                              size: 20,
-                              color: _formFields.isNotEmpty ? theme.colorScheme.primary : null,
+              bottom: isLandscape
+                  ? null
+                  : PreferredSize(
+                      preferredSize: const Size.fromHeight(44),
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: theme.brightness == Brightness.dark ? Colors.white10 : Colors.black12,
                             ),
                           ),
-                          tooltip: context.l10n.pdfFormFilling,
-                          onPressed: _openFormFilling,
                         ),
-
-                        // Digital Certificates & Signatures
-                        IconButton(
-                          icon: Icon(
-                            _certificates.isNotEmpty ? Icons.verified_user : Icons.security_outlined,
-                            size: 20,
-                            color: _certificates.isNotEmpty ? Colors.green.shade600 : null,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: _buildPdfActions(context, theme),
                           ),
-                          tooltip: context.l10n.pdfDigitalCertificates,
-                          onPressed: _showCertificateInfo,
                         ),
-
-                        // Share
-                        IconButton(
-                          icon: const Icon(Icons.share_outlined, size: 20),
-                          tooltip: 'Share PDF',
-                          onPressed: _sharePdf,
-                        ),
-
-                        // Print
-                        IconButton(
-                          icon: const Icon(Icons.print_outlined, size: 20),
-                          tooltip: 'Print PDF',
-                          onPressed: _printPdf,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
             ),
       body: Stack(
         children: [

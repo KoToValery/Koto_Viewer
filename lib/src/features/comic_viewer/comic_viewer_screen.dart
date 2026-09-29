@@ -1001,9 +1001,170 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
     Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
+  Widget _buildAutoplayBadge(BuildContext context, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: TextButton.icon(
+        onPressed: _toggleAutoplay,
+        icon: Icon(
+          _isAutoplayActive
+              ? (_isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_rounded)
+              : Icons.play_circle_fill,
+          color: _isAutoplayActive ? const Color(0xFFE11D48) : theme.colorScheme.primary,
+          size: 20,
+        ),
+        label: Text(
+          _isAutoplayActive
+              ? (_isAutoplayPaused ? context.l10n.comicAutoplayResume : context.l10n.comicAutoplayPause)
+              : context.l10n.comicAutoplay,
+          style: TextStyle(
+            color: _isAutoplayActive ? const Color(0xFFE11D48) : Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12.5,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          backgroundColor: _isAutoplayActive
+              ? const Color(0xFFE11D48).withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.12),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: _isAutoplayActive
+                  ? const Color(0xFFE11D48).withValues(alpha: 0.4)
+                  : Colors.white24,
+              width: 1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildComicActions(BuildContext context, ThemeData theme) {
+    return [
+      // Reading Mode Menu
+      PopupMenuButton<ComicReadingMode>(
+        icon: const Icon(Icons.menu_book_rounded, size: 20),
+        tooltip: 'Reading Mode',
+        onSelected: (mode) {
+          setState(() {
+            _readingMode = mode;
+          });
+        },
+        itemBuilder: (context) => ComicReadingMode.values.map((mode) {
+          return PopupMenuItem<ComicReadingMode>(
+            value: mode,
+            child: Row(
+              children: [
+                Icon(
+                  mode == ComicReadingMode.verticalContinuous
+                      ? Icons.view_headline_rounded
+                      : mode == ComicReadingMode.rightToLeft
+                          ? Icons.keyboard_double_arrow_left_rounded
+                          : Icons.keyboard_double_arrow_right_rounded,
+                  size: 18,
+                  color: _readingMode == mode ? theme.colorScheme.primary : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    mode.label,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (_readingMode == mode) ...[
+                  const SizedBox(width: 8),
+                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+
+      // Fit Mode toggle
+      IconButton(
+        icon: Icon(
+          _fitMode == ComicFitMode.fitWidth
+              ? Icons.fit_screen
+              : _fitMode == ComicFitMode.fitPage
+                  ? Icons.fullscreen
+                  : Icons.swap_vert,
+          size: 20,
+        ),
+        tooltip: '${_fitMode.label} (Tap to change)',
+        onPressed: _cycleFitMode,
+      ),
+
+      // Autoplay Toggle
+      IconButton(
+        icon: Icon(
+          _isAutoplayActive
+              ? (_isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_circle_filled)
+              : Icons.play_circle_outline,
+          size: 20,
+          color: _isAutoplayActive ? const Color(0xFFE11D48) : null,
+        ),
+        tooltip: _isAutoplayActive
+            ? (_isAutoplayPaused ? context.l10n.comicAutoplayResume : context.l10n.comicAutoplayPause)
+            : context.l10n.comicAutoplayStart,
+        onPressed: _toggleAutoplay,
+      ),
+
+      // Jump to Page
+      IconButton(
+        icon: const Icon(Icons.pin_outlined, size: 20),
+        tooltip: 'Jump to Page',
+        onPressed: _showJumpToPageDialog,
+      ),
+
+      // Bookmark Toggle
+      IconButton(
+        icon: Icon(
+          _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
+          size: 20,
+          color: _isCurrentBookmarked ? const Color(0xFFE11D48) : null,
+        ),
+        tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+        onPressed: _toggleBookmark,
+      ),
+
+      // View Bookmarks
+      IconButton(
+        icon: const Icon(Icons.bookmarks_outlined, size: 20),
+        tooltip: 'Saved Bookmarks',
+        onPressed: _showBookmarksSheet,
+      ),
+
+      // Fullscreen
+      IconButton(
+        icon: const Icon(Icons.fullscreen, size: 20),
+        tooltip: context.l10n.fullscreen,
+        onPressed: _toggleControls,
+      ),
+
+      // Info
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        tooltip: 'Comic Info',
+        onPressed: _showInfoSheet,
+      ),
+
+      // Share
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        tooltip: 'Share',
+        onPressed: _shareFile,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     if (_isLoading) {
       return _buildLoadingScreen(theme);
@@ -1075,181 +1236,31 @@ class _ComicViewerScreenState extends State<ComicViewerScreen> {
                       ),
                   ],
                 ),
-                actions: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: TextButton.icon(
-                      onPressed: _toggleAutoplay,
-                      icon: Icon(
-                        _isAutoplayActive
-                            ? (_isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_rounded)
-                            : Icons.play_circle_fill,
-                        color: _isAutoplayActive ? const Color(0xFFE11D48) : theme.colorScheme.primary,
-                        size: 20,
-                      ),
-                      label: Text(
-                        _isAutoplayActive
-                            ? (_isAutoplayPaused ? context.l10n.comicAutoplayResume : context.l10n.comicAutoplayPause)
-                            : context.l10n.comicAutoplay,
-                        style: TextStyle(
-                          color: _isAutoplayActive ? const Color(0xFFE11D48) : Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        backgroundColor: _isAutoplayActive
-                            ? const Color(0xFFE11D48).withValues(alpha: 0.15)
-                            : Colors.white.withValues(alpha: 0.12),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(
-                            color: _isAutoplayActive
-                                ? const Color(0xFFE11D48).withValues(alpha: 0.4)
-                                : Colors.white24,
-                            width: 1,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                actions: isLandscape
+                    ? _buildComicActions(context, theme)
+                    : [_buildAutoplayBadge(context, theme)],
                 // Row 2: Command Actions Bar (horizontally scrollable, no overflow)
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(44),
-                  child: Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.88),
-                      border: const Border(
-                        bottom: BorderSide(color: Colors.white12),
+                bottom: isLandscape
+                    ? null
+                    : PreferredSize(
+                        preferredSize: const Size.fromHeight(44),
+                        child: Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.88),
+                            border: const Border(
+                              bottom: BorderSide(color: Colors.white12),
+                            ),
+                          ),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: _buildComicActions(context, theme),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          // Reading Mode Menu
-                          PopupMenuButton<ComicReadingMode>(
-                            icon: const Icon(Icons.menu_book_rounded, size: 20),
-                            tooltip: 'Reading Mode',
-                            onSelected: (mode) {
-                              setState(() {
-                                _readingMode = mode;
-                              });
-                            },
-                            itemBuilder: (context) => ComicReadingMode.values.map((mode) {
-                              return PopupMenuItem<ComicReadingMode>(
-                                value: mode,
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      mode == ComicReadingMode.verticalContinuous
-                                          ? Icons.view_headline_rounded
-                                          : mode == ComicReadingMode.rightToLeft
-                                              ? Icons.keyboard_double_arrow_left_rounded
-                                              : Icons.keyboard_double_arrow_right_rounded,
-                                      size: 18,
-                                      color: _readingMode == mode ? theme.colorScheme.primary : null,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        mode.label,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (_readingMode == mode) ...[
-                                      const SizedBox(width: 8),
-                                      Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                                    ],
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ),
-
-                          // Fit Mode toggle
-                          IconButton(
-                            icon: Icon(
-                              _fitMode == ComicFitMode.fitWidth
-                                  ? Icons.fit_screen
-                                  : _fitMode == ComicFitMode.fitPage
-                                      ? Icons.fullscreen
-                                      : Icons.swap_vert,
-                              size: 20,
-                            ),
-                            tooltip: '${_fitMode.label} (Tap to change)',
-                            onPressed: _cycleFitMode,
-                          ),
-
-                          // Autoplay Toggle
-                          IconButton(
-                            icon: Icon(
-                              _isAutoplayActive
-                                  ? (_isAutoplayPaused ? Icons.play_arrow_rounded : Icons.pause_circle_filled)
-                                  : Icons.play_circle_outline,
-                              size: 20,
-                              color: _isAutoplayActive ? const Color(0xFFE11D48) : null,
-                            ),
-                            tooltip: _isAutoplayActive
-                                ? (_isAutoplayPaused ? context.l10n.comicAutoplayResume : context.l10n.comicAutoplayPause)
-                                : context.l10n.comicAutoplayStart,
-                            onPressed: _toggleAutoplay,
-                          ),
-
-                          // Jump to Page
-                          IconButton(
-                            icon: const Icon(Icons.pin_outlined, size: 20),
-                            tooltip: 'Jump to Page',
-                            onPressed: _showJumpToPageDialog,
-                          ),
-
-                          // Bookmark Toggle
-                          IconButton(
-                            icon: Icon(
-                              _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                              size: 20,
-                              color: _isCurrentBookmarked ? const Color(0xFFE11D48) : null,
-                            ),
-                            tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
-                            onPressed: _toggleBookmark,
-                          ),
-
-                          // View Bookmarks
-                          IconButton(
-                            icon: const Icon(Icons.bookmarks_outlined, size: 20),
-                            tooltip: 'Saved Bookmarks',
-                            onPressed: _showBookmarksSheet,
-                          ),
-
-                          // Fullscreen
-                          IconButton(
-                            icon: const Icon(Icons.fullscreen, size: 20),
-                            tooltip: context.l10n.fullscreen,
-                            onPressed: _toggleControls,
-                          ),
-
-                          // Info
-                          IconButton(
-                            icon: const Icon(Icons.info_outline, size: 20),
-                            tooltip: 'Comic Info',
-                            onPressed: _showInfoSheet,
-                          ),
-
-                          // Share
-                          IconButton(
-                            icon: const Icon(Icons.share_outlined, size: 20),
-                            tooltip: 'Share',
-                            onPressed: _shareFile,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
               )
             : null,
         body: _errorMessage != null

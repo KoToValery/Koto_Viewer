@@ -641,6 +641,55 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
     Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
+  List<Widget> _buildXlsxActions() {
+    return [
+      // Search Toggle
+      IconButton(
+        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: _isSearchOpen ? 'Close Search' : 'Search in Sheet',
+        onPressed: () {
+          setState(() {
+            _isSearchOpen = !_isSearchOpen;
+            if (!_isSearchOpen) {
+              _searchQuery = '';
+              _searchController.clear();
+              _searchMatchCount = 0;
+            }
+          });
+        },
+      ),
+
+      // Sheets List Quick Button
+      IconButton(
+        icon: const Icon(Icons.table_chart_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'All Sheets',
+        onPressed: _showSheetsMenu,
+      ),
+
+      // Info / Properties
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Spreadsheet Properties',
+        onPressed: _showInfoSheet,
+      ),
+
+      // Share
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Share',
+        onPressed: _shareFile,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -658,6 +707,7 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     final cellBgOdd = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final cellBgEven = isDark ? const Color(0xFF242424) : const Color(0xFFF9FAFB);
@@ -720,70 +770,29 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? Colors.white10 : Colors.black12,
+        actions: isLandscape ? _buildXlsxActions() : const [],
+        bottom: isLandscape
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(44),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Spacer(),
+                      ..._buildXlsxActions(),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            child: Row(
-              children: [
-                const Spacer(),
-
-                // Search Toggle
-                IconButton(
-                  icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: _isSearchOpen ? 'Close Search' : 'Search in Sheet',
-                  onPressed: () {
-                    setState(() {
-                      _isSearchOpen = !_isSearchOpen;
-                      if (!_isSearchOpen) {
-                        _searchQuery = '';
-                        _searchController.clear();
-                        _searchMatchCount = 0;
-                      }
-                    });
-                  },
-                ),
-
-                // Sheets List Quick Button
-                IconButton(
-                  icon: const Icon(Icons.table_chart_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'All Sheets',
-                  onPressed: _showSheetsMenu,
-                ),
-
-                // Info / Properties
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Spreadsheet Properties',
-                  onPressed: _showInfoSheet,
-                ),
-
-                // Share
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Share',
-                  onPressed: _shareFile,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
       body: _isLoading
           ? const Center(
@@ -1140,50 +1149,18 @@ class _XlsxViewerScreenState extends State<XlsxViewerScreen> {
                                   ],
                                 ),
 
-                                // Floating Zoom Controls (+ / - / 100%)
+                                // Floating Zoom / Reset View Control
                                 Positioned(
                                   bottom: 16,
                                   right: 16,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.surface.withValues(alpha: 0.92),
-                                      borderRadius: BorderRadius.circular(24),
-                                      boxShadow: const [
-                                        BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.remove, size: 18),
-                                          tooltip: 'Zoom Out',
-                                          onPressed: () {
-                                            setState(() {
-                                              _zoomScale = (_zoomScale - 0.2).clamp(0.5, 2.5);
-                                            });
-                                          },
-                                        ),
-                                        InkWell(
-                                          onTap: () => setState(() => _zoomScale = 1.0),
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                            child: Text(
-                                              '${(_zoomScale * 100).toStringAsFixed(0)}%',
-                                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.add, size: 18),
-                                          tooltip: 'Zoom In',
-                                          onPressed: () {
-                                            setState(() {
-                                              _zoomScale = (_zoomScale + 0.2).clamp(0.5, 2.5);
-                                            });
-                                          },
-                                        ),
-                                      ],
+                                  child: Material(
+                                    color: theme.colorScheme.surface.withValues(alpha: 0.92),
+                                    shape: const CircleBorder(),
+                                    elevation: 4,
+                                    child: IconButton(
+                                      icon: const Icon(Icons.fit_screen_outlined, size: 20),
+                                      tooltip: 'Reset Zoom (100%)',
+                                      onPressed: () => setState(() => _zoomScale = 1.0),
                                     ),
                                   ),
                                 ),

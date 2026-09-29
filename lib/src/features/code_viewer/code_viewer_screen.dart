@@ -677,9 +677,132 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
     }
   }
 
+  List<Widget> _buildCodeActions(BuildContext context) {
+    return [
+      // Search Toggle
+      IconButton(
+        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+        tooltip: _isSearchOpen ? 'Close Search' : 'Search',
+        onPressed: () {
+          setState(() {
+            _isSearchOpen = !_isSearchOpen;
+            if (!_isSearchOpen) {
+              _searchController.clear();
+              _searchMatches.clear();
+              _currentMatchIndex = -1;
+            }
+          });
+        },
+      ),
+
+      // Word Wrap Toggle (Fit to Screen)
+      IconButton(
+        icon: Icon(_wordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
+        color: _wordWrap ? Theme.of(context).colorScheme.primary : null,
+        tooltip: _wordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
+        onPressed: () => setState(() => _wordWrap = !_wordWrap),
+      ),
+
+      // Copy All
+      IconButton(
+        icon: const Icon(Icons.copy_all_outlined, size: 20),
+        tooltip: 'Copy All',
+        onPressed: _copyContent,
+      ),
+
+      // Share
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        tooltip: 'Share',
+        onPressed: _shareContent,
+      ),
+
+      // If JSON / XML: Pretty Print / Format Toggle
+      if (_isJsonOrXml)
+        IconButton(
+          icon: Icon(_isFormatted ? Icons.code_off : Icons.code, size: 20),
+          color: _isFormatted ? Theme.of(context).colorScheme.primary : null,
+          tooltip: _isFormatted ? 'Show Raw' : 'Pretty Print',
+          onPressed: () {
+            setState(() {
+              _isFormatted = !_isFormatted;
+              _updateDisplayContent();
+            });
+          },
+        ),
+
+      // If .env: Hide/Show Secrets Toggle
+      if (_isEnv)
+        IconButton(
+          icon: Icon(_hideSecrets ? Icons.visibility_off : Icons.visibility, size: 20),
+          color: _hideSecrets ? Theme.of(context).colorScheme.primary : null,
+          tooltip: _hideSecrets ? 'Show Secrets' : 'Hide Secrets',
+          onPressed: () {
+            setState(() {
+              _hideSecrets = !_hideSecrets;
+              _updateDisplayContent();
+            });
+          },
+        ),
+
+      // Plain Text vs Syntax Highlighting (for large files)
+      if (_isLargeFile)
+        IconButton(
+          icon: Icon(_showAsPlainText ? Icons.text_fields : Icons.code, size: 20),
+          tooltip: _showAsPlainText ? 'Enable Syntax Highlighting' : 'View as Plain Text',
+          onPressed: () {
+            setState(() {
+              _showAsPlainText = !_showAsPlainText;
+              _updateLineSpans();
+            });
+          },
+        ),
+
+      // Font Size Slider Menu
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.format_size, size: 20),
+        tooltip: 'Font Size (${_fontSize.toStringAsFixed(1)})',
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            enabled: false,
+            child: StatefulBuilder(
+              builder: (context, setPopupState) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Font Size: ${_fontSize.toStringAsFixed(1)}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Slider(
+                    value: _fontSize,
+                    min: 10.0,
+                    max: 22.0,
+                    divisions: 12,
+                    onChanged: (v) {
+                      setPopupState(() => _fontSize = v);
+                      setState(() {
+                        _fontSize = v;
+                        _updateLineSpans();
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       appBar: AppBar(
@@ -694,147 +817,31 @@ class _CodeViewerScreenState extends State<CodeViewerScreen> {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        actions: const [],
+        actions: isLandscape ? _buildCodeActions(context) : const [],
         // Row 2: Universal Controls Bar (horizontally scrollable, no overflow)
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF21252B) : Theme.of(context).colorScheme.surface,
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? Colors.white10 : Colors.black12,
+        bottom: isLandscape
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(44),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF21252B) : Theme.of(context).colorScheme.surface,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _buildCodeActions(context),
+                    ),
+                  ),
                 ),
               ),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  // Search Toggle
-                  IconButton(
-                    icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-                    tooltip: _isSearchOpen ? 'Close Search' : 'Search',
-                    onPressed: () {
-                      setState(() {
-                        _isSearchOpen = !_isSearchOpen;
-                        if (!_isSearchOpen) {
-                          _searchController.clear();
-                          _searchMatches.clear();
-                          _currentMatchIndex = -1;
-                        }
-                      });
-                    },
-                  ),
-
-                  // Word Wrap Toggle (Fit to Screen)
-                  IconButton(
-                    icon: Icon(_wordWrap ? Icons.wrap_text : Icons.format_align_left, size: 20),
-                    color: _wordWrap ? Theme.of(context).colorScheme.primary : null,
-                    tooltip: _wordWrap ? 'Disable Word Wrap' : 'Enable Word Wrap',
-                    onPressed: () => setState(() => _wordWrap = !_wordWrap),
-                  ),
-
-                  // Copy All
-                  IconButton(
-                    icon: const Icon(Icons.copy_all_outlined, size: 20),
-                    tooltip: 'Copy All',
-                    onPressed: _copyContent,
-                  ),
-
-                  // Share
-                  IconButton(
-                    icon: const Icon(Icons.share_outlined, size: 20),
-                    tooltip: 'Share',
-                    onPressed: _shareContent,
-                  ),
-
-                  // If JSON / XML: Pretty Print / Format Toggle
-                  if (_isJsonOrXml)
-                    IconButton(
-                      icon: Icon(_isFormatted ? Icons.code_off : Icons.code, size: 20),
-                      color: _isFormatted ? Theme.of(context).colorScheme.primary : null,
-                      tooltip: _isFormatted ? 'Show Raw' : 'Pretty Print',
-                      onPressed: () {
-                        setState(() {
-                          _isFormatted = !_isFormatted;
-                          _updateDisplayContent();
-                        });
-                      },
-                    ),
-
-                  // If .env: Hide/Show Secrets Toggle
-                  if (_isEnv)
-                    IconButton(
-                      icon: Icon(_hideSecrets ? Icons.visibility_off : Icons.visibility, size: 20),
-                      color: _hideSecrets ? Theme.of(context).colorScheme.primary : null,
-                      tooltip: _hideSecrets ? 'Show Secrets' : 'Hide Secrets',
-                      onPressed: () {
-                        setState(() {
-                          _hideSecrets = !_hideSecrets;
-                          _updateDisplayContent();
-                        });
-                      },
-                    ),
-
-                  // Plain Text vs Syntax Highlighting (for large files)
-                  if (_isLargeFile)
-                    IconButton(
-                      icon: Icon(_showAsPlainText ? Icons.text_fields : Icons.code, size: 20),
-                      tooltip: _showAsPlainText ? 'Enable Syntax Highlighting' : 'View as Plain Text',
-                      onPressed: () {
-                        setState(() {
-                          _showAsPlainText = !_showAsPlainText;
-                          _updateLineSpans();
-                        });
-                      },
-                    ),
-
-                  // Font Size Slider Menu
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.format_size, size: 20),
-                    tooltip: 'Font Size (${_fontSize.toStringAsFixed(1)})',
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        enabled: false,
-                        child: StatefulBuilder(
-                          builder: (context, setPopupState) => Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Font Size: ${_fontSize.toStringAsFixed(1)}',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Slider(
-                                value: _fontSize,
-                                min: 10.0,
-                                max: 22.0,
-                                divisions: 12,
-                                onChanged: (v) {
-                                  setPopupState(() => _fontSize = v);
-                                  setState(() {
-                                    _fontSize = v;
-                                    _updateLineSpans();
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

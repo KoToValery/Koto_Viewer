@@ -343,34 +343,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     _transformController.value = Matrix4.identity();
   }
 
-  void _zoomIn() {
-    _zoomBy(1.35);
-  }
 
-  void _zoomOut() {
-    _zoomBy(1 / 1.35);
-  }
-
-  void _zoomBy(double factor, {Offset? focalPoint}) {
-    if (_viewportSize.isEmpty) return;
-
-    final targetPoint = focalPoint ?? Offset(_viewportSize.width / 2, _viewportSize.height / 2);
-    final currentMatrix = _transformController.value;
-
-    final translation = currentMatrix.getTranslation();
-    final scale = currentMatrix.getMaxScaleOnAxis();
-
-    final newScale = (scale * factor).clamp(0.001, 1000.0);
-
-    final dx = targetPoint.dx - (targetPoint.dx - translation.x) * (newScale / scale);
-    final dy = targetPoint.dy - (targetPoint.dy - translation.y) * (newScale / scale);
-
-    final newMatrix = Matrix4.identity()
-      ..translate(dx, dy)
-      ..scale(newScale);
-
-    _transformController.value = newMatrix;
-  }
 
   Rect get _currentBounds {
     if (_document == null) return const Rect.fromLTWH(0, 0, 100, 100);
@@ -1687,6 +1660,280 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
     }
   }
 
+  Widget _buildLayoutTabsWidget(ThemeData theme) {
+    if (_document == null || _document!.layouts.length <= 1) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      height: 30,
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white10
+            : Colors.black.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: _document!.layouts.map((layout) {
+            final isSelected = layout == _activeLayout;
+            return InkWell(
+              onTap: () => _switchLayout(layout),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFFFF9800)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      layout == 'Model' ? Icons.grid_4x4 : Icons.article_outlined,
+                      size: 13,
+                      color: isSelected
+                          ? Colors.white
+                          : (Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white70
+                              : Colors.black87),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      layout,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? Colors.white
+                            : (Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white70
+                                : Colors.black87),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildDxfActionButtons(ThemeData theme) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.fit_screen_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Fit to Screen',
+        onPressed: _document != null ? _fitToScreen : null,
+      ),
+      IconButton(
+        icon: const Icon(Icons.add_to_photos_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Import',
+        onPressed: _document != null ? _importDxfFile : null,
+      ),
+      IconButton(
+        icon: const Icon(Icons.layers_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'CAD Layers',
+        onPressed: _document != null ? _showLayersSheet : null,
+      ),
+      IconButton(
+        icon: Icon(
+          Icons.straighten,
+          size: 20,
+          color: _isMeasureMode ? const Color(0xFFFF5252) : null,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: _isMeasureMode
+            ? 'Exit Measure & Markup'
+            : 'Measure Tools',
+        onPressed: _document != null
+            ? () {
+                setState(() {
+                  _isMeasureMode = !_isMeasureMode;
+                  if (!_isMeasureMode) {
+                    _measurement = null;
+                    _hoveredSnap = null;
+                    _touchScreenPos = null;
+                    _targetScreenPos = null;
+                    _snappedScreenPos = null;
+                    _activeMeasureSnap = null;
+                    _pointerCustomTitle = null;
+                    _pointerCustomSubText = null;
+                  } else {
+                    _measurement = DxfMeasurement(tool: _currentMeasureTool);
+                  }
+                });
+              }
+            : null,
+      ),
+      if (_annotations.isNotEmpty || _importedDxfFiles.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.save_as_outlined, size: 20, color: Color(0xFF00E5FF)),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+          tooltip: _importedDxfFiles.isNotEmpty ? 'Save Merged DXF' : 'Save Annotated DXF',
+          onPressed: _saveAsAnnotatedDxf,
+        ),
+      PopupMenuButton<DxfCanvasTheme>(
+        icon: const Icon(Icons.palette_outlined, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Canvas Theme',
+        initialValue: _canvasTheme,
+        onSelected: (t) {
+          setState(() {
+            _canvasTheme = t;
+          });
+        },
+        itemBuilder: (context) => DxfCanvasTheme.values.map((t) {
+          return PopupMenuItem(
+            value: t,
+            child: Row(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: t.bgColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(t.name),
+                if (t == _canvasTheme) ...[
+                  const Spacer(),
+                  Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        onSelected: (value) {
+          switch (value) {
+            case 'save_merged':
+              _saveAsAnnotatedDxf();
+              break;
+            case 'import':
+              _importDxfFile();
+              break;
+            case 'crs':
+              _showCoordinateSettings();
+              break;
+            case 'info':
+              _showInfoSheet();
+              break;
+            case 'grid':
+              setState(() {
+                _showGrid = !_showGrid;
+              });
+              break;
+            case 'share':
+              _shareDxf();
+              break;
+            case 'export_kcad':
+              _exportKcad();
+              break;
+            case 'print':
+              _printDxf();
+              break;
+          }
+        },
+        itemBuilder: (context) => [
+          const PopupMenuItem(
+            value: 'export_kcad',
+            child: Row(
+              children: [
+                Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 20),
+                SizedBox(width: 12),
+                Text('Export as Fast KCAD'),
+              ],
+            ),
+          ),
+          if (_annotations.isNotEmpty || _importedDxfFiles.isNotEmpty)
+            PopupMenuItem(
+              value: 'save_merged',
+              child: Row(
+                children: [
+                  const Icon(Icons.save_as_outlined, size: 20),
+                  const SizedBox(width: 12),
+                  Text(_importedDxfFiles.isNotEmpty ? 'Save Merged DXF' : 'Save Annotated DXF'),
+                ],
+              ),
+            ),
+          const PopupMenuItem(
+            value: 'crs',
+            child: Row(
+              children: [
+                Icon(Icons.public_rounded, size: 20),
+                SizedBox(width: 12),
+                Text('Coordinate System'),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'grid',
+            child: Row(
+              children: [
+                Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
+                SizedBox(width: 12),
+                Text(_showGrid ? 'Hide CAD Grid' : 'Show CAD Grid'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'info',
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 20),
+                SizedBox(width: 12),
+                Text('Drawing Properties'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'share',
+            child: Row(
+              children: [
+                Icon(Icons.share_outlined, size: 20),
+                SizedBox(width: 12),
+                Text('Share File'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'print',
+            child: Row(
+              children: [
+                Icon(Icons.print_outlined, size: 20),
+                SizedBox(width: 12),
+                Text('Print / Export'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -1707,6 +1954,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
     final theme = Theme.of(context);
     final activeCrs = CoordinateSystemService.activeSystemNotifier.value;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: _canvasTheme.bgColor,
@@ -1723,307 +1971,37 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+        actions: isLandscape
+            ? [
+                if (_document != null && _document!.layouts.length > 1)
+                  _buildLayoutTabsWidget(theme),
+                ..._buildDxfActionButtons(theme),
+              ]
+            : const [],
+        bottom: isLandscape
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(44),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      if (_document != null && _document!.layouts.length > 1)
+                        Flexible(child: _buildLayoutTabsWidget(theme)),
+                      const Spacer(),
+                      ..._buildDxfActionButtons(theme),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            child: Row(
-              children: [
-                // Layout Switcher Tabs (Model | Layout1 | Sheet1 ...)
-                if (_document != null && _document!.layouts.length > 1)
-                  Flexible(
-                    child: Container(
-                      height: 30,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white10
-                            : Colors.black.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: _document!.layouts.map((layout) {
-                            final isSelected = layout == _activeLayout;
-                            return InkWell(
-                              onTap: () => _switchLayout(layout),
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? const Color(0xFFFF9800)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      layout == 'Model' ? Icons.grid_4x4 : Icons.article_outlined,
-                                      size: 13,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : (Theme.of(context).brightness == Brightness.dark
-                                              ? Colors.white70
-                                              : Colors.black87),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      layout,
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : (Theme.of(context).brightness == Brightness.dark
-                                                ? Colors.white70
-                                                : Colors.black87),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                const Spacer(),
-
-                // Fit to screen (Zoom Extents)
-                IconButton(
-                  icon: const Icon(Icons.fit_screen_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Fit to Screen',
-                  onPressed: _document != null ? _fitToScreen : null,
-                ),
-
-                // Import DXF
-                IconButton(
-                  icon: const Icon(Icons.add_to_photos_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Import',
-                  onPressed: _document != null ? _importDxfFile : null,
-                ),
-
-                // Layer Manager
-                IconButton(
-                  icon: const Icon(Icons.layers_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'CAD Layers',
-                  onPressed: _document != null ? _showLayersSheet : null,
-                ),
-
-                // Measurement & Markup Tool
-                IconButton(
-                  icon: Icon(
-                    Icons.straighten,
-                    size: 20,
-                    color: _isMeasureMode ? const Color(0xFFFF5252) : null,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: _isMeasureMode
-                      ? 'Exit Measure & Markup'
-                      : 'Measure Tools',
-                  onPressed: _document != null
-                      ? () {
-                          setState(() {
-                            _isMeasureMode = !_isMeasureMode;
-                            if (!_isMeasureMode) {
-                              _measurement = null;
-                              _hoveredSnap = null;
-                              _touchScreenPos = null;
-                              _targetScreenPos = null;
-                              _snappedScreenPos = null;
-                              _activeMeasureSnap = null;
-                              _pointerCustomTitle = null;
-                              _pointerCustomSubText = null;
-                            } else {
-                              _measurement = DxfMeasurement(tool: _currentMeasureTool);
-                            }
-                          });
-                        }
-                      : null,
-                ),
-
-                // Save Annotated DXF
-                if (_annotations.isNotEmpty || _importedDxfFiles.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.save_as_outlined, size: 20, color: Color(0xFF00E5FF)),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                    tooltip: _importedDxfFiles.isNotEmpty ? 'Save Merged DXF' : 'Save Annotated DXF',
-                    onPressed: _saveAsAnnotatedDxf,
-                  ),
-
-                // Theme / Background Popup
-                PopupMenuButton<DxfCanvasTheme>(
-                  icon: const Icon(Icons.palette_outlined, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  tooltip: 'Canvas Theme',
-                  initialValue: _canvasTheme,
-                  onSelected: (t) {
-                    setState(() {
-                      _canvasTheme = t;
-                    });
-                  },
-                  itemBuilder: (context) => DxfCanvasTheme.values.map((t) {
-                    return PopupMenuItem(
-                      value: t,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: t.bgColor,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(t.name),
-                          if (t == _canvasTheme) ...[
-                            const Spacer(),
-                            Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
-                          ],
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-                // More Options
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'save_merged':
-                        _saveAsAnnotatedDxf();
-                        break;
-                      case 'import':
-                        _importDxfFile();
-                        break;
-                      case 'crs':
-                        _showCoordinateSettings();
-                        break;
-                      case 'info':
-                        _showInfoSheet();
-                        break;
-                      case 'grid':
-                        setState(() {
-                          _showGrid = !_showGrid;
-                        });
-                        break;
-                      case 'share':
-                        _shareDxf();
-                        break;
-                      case 'export_kcad':
-                        _exportKcad();
-                        break;
-                      case 'print':
-                        _printDxf();
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'export_kcad',
-                      child: Row(
-                        children: [
-                          Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 20),
-                          SizedBox(width: 12),
-                          Text('Export as Fast KCAD'),
-                        ],
-                      ),
-                    ),
-                    if (_annotations.isNotEmpty || _importedDxfFiles.isNotEmpty)
-                      PopupMenuItem(
-                        value: 'save_merged',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.save_as_outlined, size: 20),
-                            const SizedBox(width: 12),
-                            Text(_importedDxfFiles.isNotEmpty ? 'Save Merged DXF' : 'Save Annotated DXF'),
-                          ],
-                        ),
-                      ),
-                    const PopupMenuItem(
-                      value: 'crs',
-                      child: Row(
-                        children: [
-                          Icon(Icons.public_rounded, size: 20),
-                          SizedBox(width: 12),
-                          Text('Coordinate System'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'grid',
-                      child: Row(
-                        children: [
-                          Icon(_showGrid ? Icons.grid_on : Icons.grid_off, size: 20),
-                          const SizedBox(width: 12),
-                          Text(_showGrid ? 'Hide CAD Grid' : 'Show CAD Grid'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'info',
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline, size: 20),
-                          SizedBox(width: 12),
-                          Text('Drawing Properties'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'share',
-                      child: Row(
-                        children: [
-                          Icon(Icons.share_outlined, size: 20),
-                          SizedBox(width: 12),
-                          Text('Share File'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'print',
-                      child: Row(
-                        children: [
-                          Icon(Icons.print_outlined, size: 20),
-                          SizedBox(width: 12),
-                          Text('Print / Export'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
       body: KeyboardListener(
         focusNode: _focusNode,
@@ -2355,31 +2333,14 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                     ),
                   ),
 
-                  // Bottom Right Floating Navigation Controls
+                  // Bottom Right Floating Navigation Control
                   Positioned(
                     bottom: 16,
                     right: 16,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildFloatingButton(
-                          icon: Icons.add,
-                          tooltip: 'Zoom In',
-                          onPressed: _zoomIn,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildFloatingButton(
-                          icon: Icons.remove,
-                          tooltip: 'Zoom Out',
-                          onPressed: _zoomOut,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildFloatingButton(
-                          icon: Icons.center_focus_strong,
-                          tooltip: 'Fit to Screen',
-                          onPressed: _fitToScreen,
-                        ),
-                      ],
+                    child: _buildFloatingButton(
+                      icon: Icons.center_focus_strong,
+                      tooltip: 'Fit to Screen',
+                      onPressed: _fitToScreen,
                     ),
                   ),
 

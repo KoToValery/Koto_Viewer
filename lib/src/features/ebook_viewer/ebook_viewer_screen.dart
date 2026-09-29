@@ -1134,6 +1134,106 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
     Share.shareXFiles([XFile(widget.filePath)], subject: _fileName);
   }
 
+  List<Widget> _buildEbookActions(BuildContext context, EbookThemeMode currentTheme, bool isPaginated) {
+    return [
+      // Search Toggle
+      IconButton(
+        icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
+        tooltip: 'Search Book',
+        onPressed: () {
+          setState(() {
+            _isSearchOpen = !_isSearchOpen;
+            if (!_isSearchOpen) {
+              _searchController.clear();
+              _searchQuery = '';
+              _matchedChapterIndices.clear();
+            }
+          });
+        },
+      ),
+
+      // Table of Contents
+      IconButton(
+        icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
+        tooltip: 'Table of Contents',
+        onPressed: _showTocSheet,
+      ),
+
+      // Bookmark Toggle
+      IconButton(
+        icon: Icon(
+          _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
+          size: 20,
+          color: _isCurrentBookmarked ? currentTheme.accentColor : null,
+        ),
+        tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
+        onPressed: _toggleBookmark,
+      ),
+
+      // View Bookmarks List
+      IconButton(
+        icon: Badge(
+          isLabelVisible: _bookmarks.isNotEmpty,
+          label: Text('${_bookmarks.length}'),
+          child: const Icon(Icons.bookmarks_outlined, size: 20),
+        ),
+        tooltip: 'Saved Bookmarks',
+        onPressed: _showBookmarksSheet,
+      ),
+
+      // Reading Flow Mode Toggle (Pages vs Scroll)
+      IconButton(
+        icon: Icon(
+          isPaginated ? Icons.auto_stories : Icons.view_day_outlined,
+          size: 20,
+        ),
+        tooltip: isPaginated
+            ? 'Page Flip Mode (Tap for Continuous)'
+            : 'Continuous Scroll (Tap for Pages)',
+        onPressed: () {
+          setState(() {
+            _settings = _settings.copyWith(
+              readingMode: isPaginated
+                  ? EbookReadingMode.continuous
+                  : EbookReadingMode.paginated,
+            );
+          });
+          if (_settings.readingMode == EbookReadingMode.paginated && _lastViewportSize != null) {
+            _paginateChapter(_lastViewportSize!);
+          }
+        },
+      ),
+
+      // Reading Settings
+      IconButton(
+        icon: const Icon(Icons.tune, size: 20),
+        tooltip: 'Reading Settings',
+        onPressed: _showTypographySheet,
+      ),
+
+      // Fullscreen
+      IconButton(
+        icon: const Icon(Icons.fullscreen, size: 20),
+        tooltip: context.l10n.fullscreen,
+        onPressed: _toggleControls,
+      ),
+
+      // Book Info
+      IconButton(
+        icon: const Icon(Icons.info_outline, size: 20),
+        tooltip: 'Book Info',
+        onPressed: _showInfoSheet,
+      ),
+
+      // Share
+      IconButton(
+        icon: const Icon(Icons.share_outlined, size: 20),
+        tooltip: 'Share',
+        onPressed: _shareFile,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -1152,6 +1252,7 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
 
     final currentTheme = _settings.themeMode;
     final isPaginated = _settings.readingMode == EbookReadingMode.paginated;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return PopScope(
       canPop: true,
@@ -1208,138 +1309,46 @@ class _EbookViewerScreenState extends State<EbookViewerScreen> {
                             ),
                         ],
                       ),
-                actions: [
-                  if (_isSearchOpen)
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () {
-                        setState(() {
-                          _isSearchOpen = false;
-                          _searchController.clear();
-                          _searchQuery = '';
-                          _matchedChapterIndices.clear();
-                        });
-                      },
-                    ),
-                ],
+                actions: isLandscape
+                    ? _buildEbookActions(context, currentTheme, isPaginated)
+                    : [
+                        if (_isSearchOpen)
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () {
+                              setState(() {
+                                _isSearchOpen = false;
+                                _searchController.clear();
+                                _searchQuery = '';
+                                _matchedChapterIndices.clear();
+                              });
+                            },
+                          ),
+                      ],
                 // Row 2: Universal Action Commands Bar (horizontally scrollable, no overflow)
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(44),
-                  child: Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: currentTheme.surfaceColor,
-                      border: Border(
-                        bottom: BorderSide(
-                          color: currentTheme.textColor.withValues(alpha: 0.1),
+                bottom: isLandscape
+                    ? null
+                    : PreferredSize(
+                        preferredSize: const Size.fromHeight(44),
+                        child: Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: currentTheme.surfaceColor,
+                            border: Border(
+                              bottom: BorderSide(
+                                color: currentTheme.textColor.withValues(alpha: 0.1),
+                              ),
+                            ),
+                          ),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: _buildEbookActions(context, currentTheme, isPaginated),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          // Search Toggle
-                          IconButton(
-                            icon: Icon(_isSearchOpen ? Icons.close : Icons.search, size: 20),
-                            tooltip: 'Search Book',
-                            onPressed: () {
-                              setState(() {
-                                _isSearchOpen = !_isSearchOpen;
-                                if (!_isSearchOpen) {
-                                  _searchController.clear();
-                                  _searchQuery = '';
-                                  _matchedChapterIndices.clear();
-                                }
-                              });
-                            },
-                          ),
-
-                          // Table of Contents
-                          IconButton(
-                            icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
-                            tooltip: 'Table of Contents',
-                            onPressed: _showTocSheet,
-                          ),
-
-                          // Bookmark Toggle
-                          IconButton(
-                            icon: Icon(
-                              _isCurrentBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                              size: 20,
-                              color: _isCurrentBookmarked ? currentTheme.accentColor : null,
-                            ),
-                            tooltip: _isCurrentBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
-                            onPressed: _toggleBookmark,
-                          ),
-
-                          // View Bookmarks List
-                          IconButton(
-                            icon: Badge(
-                              isLabelVisible: _bookmarks.isNotEmpty,
-                              label: Text('${_bookmarks.length}'),
-                              child: const Icon(Icons.bookmarks_outlined, size: 20),
-                            ),
-                            tooltip: 'Saved Bookmarks',
-                            onPressed: _showBookmarksSheet,
-                          ),
-
-                          // Reading Flow Mode Toggle (Pages vs Scroll)
-                          IconButton(
-                            icon: Icon(
-                              isPaginated ? Icons.auto_stories : Icons.view_day_outlined,
-                              size: 20,
-                            ),
-                            tooltip: isPaginated
-                                ? 'Page Flip Mode (Tap for Continuous)'
-                                : 'Continuous Scroll (Tap for Pages)',
-                            onPressed: () {
-                              setState(() {
-                                _settings = _settings.copyWith(
-                                  readingMode: isPaginated
-                                      ? EbookReadingMode.continuous
-                                      : EbookReadingMode.paginated,
-                                );
-                              });
-                              if (_settings.readingMode == EbookReadingMode.paginated && _lastViewportSize != null) {
-                                _paginateChapter(_lastViewportSize!);
-                              }
-                            },
-                          ),
-
-                          // Reading Settings
-                          IconButton(
-                            icon: const Icon(Icons.tune, size: 20),
-                            tooltip: 'Reading Settings',
-                            onPressed: _showTypographySheet,
-                          ),
-
-                          // Fullscreen
-                          IconButton(
-                            icon: const Icon(Icons.fullscreen, size: 20),
-                            tooltip: context.l10n.fullscreen,
-                            onPressed: _toggleControls,
-                          ),
-
-                          // Book Info
-                          IconButton(
-                            icon: const Icon(Icons.info_outline, size: 20),
-                            tooltip: 'Book Info',
-                            onPressed: _showInfoSheet,
-                          ),
-
-                          // Share
-                          IconButton(
-                            icon: const Icon(Icons.share_outlined, size: 20),
-                            tooltip: 'Share',
-                            onPressed: _shareFile,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
               )
             : null,
         body: GestureDetector(
