@@ -7,8 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/errors/app_error_handler.dart';
-import '../../core/widgets/viewer_loading_screen.dart';
 import '../../core/l10n/l10n_extensions.dart';
+import '../../core/widgets/viewer_loading_screen.dart';
+import 'dicom_geometry.dart';
 import 'dicom_models.dart';
 import 'dicom_parser.dart';
 import 'dicom_renderer.dart';
@@ -31,44 +32,48 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
   bool _isLoading = true;
   String? _error;
 
-  // Study & Series state
+  // Study & Multi-Viewport State
   DicomStudyItem? _study;
-  int _activeSeriesIndex = 0;
-  int _currentSliceIndex = 0;
-
-  // Rendering state
-  ui.Image? _currentImage;
-  bool _isRendering = false;
-
-  // Windowing
-  double _windowCenter = 127;
-  double _windowWidth = 256;
-  bool _showWindowing = true;
+  DicomViewportLayout _layout = DicomViewportLayout.single;
+  int _activeViewportIndex = 0;
+  final List<DicomViewportState> _viewports = [];
 
   // Interaction modes: Pan/Zoom, Window/Level, Ruler
   DicomInteractionMode _interactionMode = DicomInteractionMode.panZoom;
 
-  // Measurement states
-  final List<DicomMeasurement> _measurements = [];
-  DicomMeasurement? _draftMeasurement;
+  // Feature Toggles
+  bool _showReferenceLines = true;
+  bool _showOverlays = true;
+  bool _showMetadata = false;
 
-  // Cine loop playback
+  // Series thumbnail image cache
+  final Map<String, ui.Image?> _seriesThumbnails = {};
+
+  // Cine loop playback for active viewport
   Timer? _cineTimer;
   bool _isPlayingCine = false;
 
-  // UI state
-  bool _showMetadata = false;
-  bool _showOverlays = true;
-
   static const Color _accent = Color(0xFF0EA5E9); // cyan-blue medical accent
 
-  DicomSeriesItem get _activeSeries =>
-      _study!.series[_activeSeriesIndex.clamp(0, _study!.series.length - 1)];
+  DicomViewportState? get _activeViewport {
+    if (_viewports.isEmpty) return null;
+    return _viewports[_activeViewportIndex.clamp(0, _viewports.length - 1)];
+  }
 
-  DicomSliceItem get _currentSlice =>
-      _activeSeries.slices[_currentSliceIndex.clamp(0, _activeSeries.sliceCount - 1)];
+  DicomSeriesItem? get _activeSeries {
+    final vp = _activeViewport;
+    if (_study == null || vp == null || _study!.series.isEmpty) return null;
+    return _study!.series[vp.seriesIndex.clamp(0, _study!.series.length - 1)];
+  }
 
-  DicomHeader get _currentHeader => _currentSlice.header;
+  DicomSliceItem? get _currentSlice {
+    final s = _activeSeries;
+    final vp = _activeViewport;
+    if (s == null || vp == null || s.slices.isEmpty) return null;
+    return s.slices[vp.sliceIndex.clamp(0, s.sliceCount - 1)];
+  }
+
+  DicomHeader? get _currentHeader => _currentSlice?.header;
 
   @override
   void initState() {
@@ -79,13 +84,18 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
   @override
   void dispose() {
     _stopCine();
-    _currentImage?.dispose();
+    for (final vp in _viewports) {
+      vp.dispose();
+    }
+    for (final img in _seriesThumbnails.values) {
+      img?.dispose();
+    }
     _study?.dispose();
     super.dispose();
   }
 
   // --------------------------------------------------------------------------
-  // Loading
+  // Loading & Initialization
   // --------------------------------------------------------------------------
 
   Future<void> _loadDicomStudy() async {
@@ -99,29 +109,64 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
 
       if (!mounted) return;
 
-      final firstHeader = study.series.first.firstSlice.header;
-      double? wc = firstHeader.windowCenter;
-      double? ww = firstHeader.windowWidth;
+      final seriesCount = study.series.length;
+      final newViewports = <DicomViewportState>[];
 
-      if (wc == null) {
-        final preset = DicomRenderer.suggestPresetForModality(firstHeader.modality);
-        if (preset != null) {
-          wc = preset.center;
-          ww = preset.width;
+      // If study has >= 2 series, default to splitVertical (1x2) as seen in user reference
+      DicomViewportLayout initialLayout;
+      int initialViewportCount;
+
+      if (seriesCount >= 4) {
+        initialLayout = DicomViewportLayout.grid2x2;
+        initialViewportCount = 4;
+      } else if (seriesCount >= 2) {
+        initialLayout = DicomViewportLayout.splitVertical;
+        initialViewportCount = 2;
+      } else {
+        initialLayout = DicomViewportLayout.single;
+        initialViewportCount = 1;
+      }
+
+      for (int i = 0; i < 4; i++) {
+        final sIdx = i % seriesCount;
+        final firstHeader = study.series[sIdx].firstSlice.header;
+        double? wc = firstHeader.windowCenter;
+        double? ww = firstHeader.windowWidth;
+
+        if (wc == null) {
+          final preset = DicomRenderer.suggestPresetForModality(firstHeader.modality);
+          if (preset != null) {
+            wc = preset.center;
+            ww = preset.width;
+          }
         }
+
+        newViewports.add(DicomViewportState(
+          viewportIndex: i,
+          seriesIndex: sIdx,
+          sliceIndex: 0,
+          windowCenter: wc ?? 127.0,
+          windowWidth: (ww ?? 256.0).clamp(1.0, 65535.0),
+          accentColor: DicomViewportColors.getColor(i),
+        ));
       }
 
       setState(() {
         _study = study;
-        _activeSeriesIndex = 0;
-        _currentSliceIndex = 0;
-        _windowCenter = wc ?? 127;
-        _windowWidth = (ww ?? 256).clamp(1, 65535);
-        _showWindowing = firstHeader.isMonochrome && firstHeader.bitsAllocated >= 16;
+        _layout = initialLayout;
+        _activeViewportIndex = 0;
+        _viewports.clear();
+        _viewports.addAll(newViewports);
         _isLoading = false;
       });
 
-      await _renderCurrentSlice(initialWc: wc, initialWw: ww);
+      // Render initial slices for the visible viewports
+      for (int i = 0; i < initialViewportCount && i < _viewports.length; i++) {
+        _renderViewportSlice(_viewports[i]);
+      }
+
+      // Generate series thumbnails in the background
+      _generateThumbnails();
     } on DicomParseException catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'DicomViewer._loadDicomStudy.parse');
       if (!mounted) return;
@@ -157,23 +202,47 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
     }
   }
 
+  Future<void> _generateThumbnails() async {
+    if (_study == null) return;
+    for (final series in _study!.series) {
+      if (series.slices.isEmpty) continue;
+      final slice = series.firstSlice;
+      try {
+        final bytes = await slice.getBytes();
+        final res = await DicomRenderer.renderFrame(
+          fileBytes: bytes,
+          header: slice.header,
+          frameIndex: slice.frameIndex,
+        );
+        if (mounted) {
+          setState(() {
+            _seriesThumbnails[series.seriesInstanceUID] = res.image;
+          });
+        }
+      } catch (_) {
+        // Thumbnail generation is best-effort
+      }
+    }
+  }
+
   // --------------------------------------------------------------------------
   // Rendering
   // --------------------------------------------------------------------------
 
-  Future<void> _renderCurrentSlice({double? initialWc, double? initialWw}) async {
-    if (_study == null || _activeSeries.slices.isEmpty) return;
-    if (_isRendering) return;
+  Future<void> _renderViewportSlice(DicomViewportState vp, {double? initialWc, double? initialWw}) async {
+    if (_study == null || _study!.series.isEmpty) return;
+    final series = _study!.series[vp.seriesIndex.clamp(0, _study!.series.length - 1)];
+    if (series.slices.isEmpty || vp.isRendering) return;
 
-    setState(() => _isRendering = true);
+    setState(() => vp.isRendering = true);
 
     try {
-      final slice = _currentSlice;
+      final slice = series.slices[vp.sliceIndex.clamp(0, series.sliceCount - 1)];
       final bytes = await slice.getBytes();
       final header = slice.header;
 
-      final overrideWc = initialWc ?? (header.isMonochrome ? _windowCenter : null);
-      final overrideWw = initialWw ?? (header.isMonochrome ? _windowWidth : null);
+      final overrideWc = initialWc ?? (header.isMonochrome ? vp.windowCenter : null);
+      final overrideWw = initialWw ?? (header.isMonochrome ? vp.windowWidth : null);
 
       final result = await DicomRenderer.renderFrame(
         fileBytes: bytes,
@@ -185,65 +254,66 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
 
       if (!mounted) return;
 
-      final old = _currentImage;
+      final oldImage = vp.renderedImage;
       setState(() {
-        _currentImage = result.image;
+        vp.renderedImage = result.image;
         if (initialWc == null || initialWw == null) {
-          _windowCenter = result.windowCenter.clamp(-2048.0, 4096.0);
-          _windowWidth = result.windowWidth.clamp(1.0, 8192.0);
+          vp.windowCenter = result.windowCenter.clamp(-2048.0, 4096.0);
+          vp.windowWidth = result.windowWidth.clamp(1.0, 8192.0);
         }
-        _isRendering = false;
+        vp.isRendering = false;
       });
-      old?.dispose();
+      oldImage?.dispose();
     } on Exception catch (e, stack) {
-      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._renderCurrentSlice');
+      AppErrorHandler.recordError(e, stack, context: 'DicomViewer._renderViewportSlice');
       if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _isRendering = false;
-      });
+      setState(() => vp.isRendering = false);
     }
   }
 
-  void _onWindowingChanged() {
-    _renderCurrentSlice();
+  void _onWindowingChanged(DicomViewportState vp) {
+    _renderViewportSlice(vp);
   }
 
-  void _applyPreset(WindowPreset preset) {
+  void _applyPreset(DicomViewportState vp, WindowPreset preset) {
     setState(() {
-      _windowCenter = preset.center;
-      _windowWidth = preset.width;
+      vp.windowCenter = preset.center;
+      vp.windowWidth = preset.width;
     });
-    _renderCurrentSlice();
+    _renderViewportSlice(vp);
   }
 
   // --------------------------------------------------------------------------
-  // Navigation
+  // Navigation & Slicing
   // --------------------------------------------------------------------------
 
-  void _goToSlice(int index) {
-    if (_study == null) return;
-    final maxSlice = _activeSeries.sliceCount - 1;
-    final target = index.clamp(0, maxSlice);
-    if (target != _currentSliceIndex) {
+  void _goToSlice(int targetSlice, [int? viewportIdx]) {
+    if (_study == null || _viewports.isEmpty) return;
+    final idx = viewportIdx ?? _activeViewportIndex;
+    final vp = _viewports[idx.clamp(0, _viewports.length - 1)];
+    final series = _study!.series[vp.seriesIndex.clamp(0, _study!.series.length - 1)];
+    final clamped = targetSlice.clamp(0, series.sliceCount - 1);
+
+    if (clamped != vp.sliceIndex) {
       setState(() {
-        _currentSliceIndex = target;
-        _measurements.clear();
+        vp.sliceIndex = clamped;
+        vp.measurements.clear();
       });
-      _renderCurrentSlice();
+      _renderViewportSlice(vp);
     }
   }
 
-  void _switchSeries(int seriesIndex) {
-    if (_study == null || seriesIndex == _activeSeriesIndex) return;
+  void _switchViewportSeries(DicomViewportState vp, int newSeriesIndex) {
+    if (_study == null || newSeriesIndex == vp.seriesIndex) return;
     _stopCine();
     setState(() {
-      _activeSeriesIndex = seriesIndex;
-      _currentSliceIndex = 0;
-      _measurements.clear();
+      vp.seriesIndex = newSeriesIndex;
+      vp.sliceIndex = 0;
+      vp.measurements.clear();
     });
 
-    final header = _activeSeries.firstSlice.header;
+    final series = _study!.series[newSeriesIndex.clamp(0, _study!.series.length - 1)];
+    final header = series.firstSlice.header;
     double? wc = header.windowCenter;
     double? ww = header.windowWidth;
     if (wc == null) {
@@ -254,12 +324,29 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       }
     }
     setState(() {
-      _windowCenter = wc ?? 127;
-      _windowWidth = (ww ?? 256).clamp(1, 65535);
-      _showWindowing = header.isMonochrome && header.bitsAllocated >= 16;
+      vp.windowCenter = wc ?? 127.0;
+      vp.windowWidth = (ww ?? 256.0).clamp(1.0, 65535.0);
     });
 
-    _renderCurrentSlice(initialWc: wc, initialWw: ww);
+    _renderViewportSlice(vp, initialWc: wc, initialWw: ww);
+  }
+
+  void _changeLayout(DicomViewportLayout newLayout) {
+    if (newLayout == _layout) return;
+    setState(() {
+      _layout = newLayout;
+      if (_activeViewportIndex >= newLayout.totalViewports) {
+        _activeViewportIndex = 0;
+      }
+    });
+
+    // Ensure all visible viewports have rendered slices
+    final count = newLayout.totalViewports;
+    for (int i = 0; i < count && i < _viewports.length; i++) {
+      if (_viewports[i].renderedImage == null) {
+        _renderViewportSlice(_viewports[i]);
+      }
+    }
   }
 
   void _toggleCine() {
@@ -271,13 +358,18 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
   }
 
   void _startCine() {
-    if (_activeSeries.sliceCount <= 1) return;
+    final s = _activeSeries;
+    final vp = _activeViewport;
+    if (s == null || vp == null || s.sliceCount <= 1) return;
     setState(() => _isPlayingCine = true);
     _cineTimer?.cancel();
     _cineTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (!mounted) return;
-      final next = (_currentSliceIndex + 1) % _activeSeries.sliceCount;
-      _goToSlice(next);
+      final currentVp = _activeViewport;
+      if (currentVp == null) return;
+      final currentSeries = _study!.series[currentVp.seriesIndex];
+      final next = (currentVp.sliceIndex + 1) % currentSeries.sliceCount;
+      _goToSlice(next, currentVp.viewportIndex);
     });
   }
 
@@ -285,6 +377,46 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
     _cineTimer?.cancel();
     _cineTimer = null;
     if (mounted) setState(() => _isPlayingCine = false);
+  }
+
+  // --------------------------------------------------------------------------
+  // Reference Lines Calculation (Localizer / Scout Lines)
+  // --------------------------------------------------------------------------
+
+  List<DicomReferenceLineEntry> _calculateReferenceLinesFor(DicomViewportState targetVp) {
+    if (!_showReferenceLines || _study == null) return const [];
+
+    final results = <DicomReferenceLineEntry>[];
+    final targetSeries = _study!.series[targetVp.seriesIndex.clamp(0, _study!.series.length - 1)];
+    final targetSlice = targetSeries.slices[targetVp.sliceIndex.clamp(0, targetSeries.sliceCount - 1)];
+    final targetHeader = targetSlice.header;
+
+    final visibleCount = _layout.totalViewports;
+    for (int i = 0; i < visibleCount && i < _viewports.length; i++) {
+      final otherVp = _viewports[i];
+      if (otherVp.viewportIndex == targetVp.viewportIndex) continue;
+
+      final otherSeries = _study!.series[otherVp.seriesIndex.clamp(0, _study!.series.length - 1)];
+      final otherSlice = otherSeries.slices[otherVp.sliceIndex.clamp(0, otherSeries.sliceCount - 1)];
+      final otherHeader = otherSlice.header;
+
+      final refLine = DicomGeometry.calculateIntersection(
+        targetHeader: targetHeader,
+        sourceHeader: otherHeader,
+        sourceSliceIndex: otherVp.sliceIndex,
+        sourceTotalSlices: otherSeries.sliceCount,
+        sourceSeriesDescription: otherSeries.seriesDescription,
+      );
+
+      if (refLine != null) {
+        results.add(DicomReferenceLineEntry(
+          line: refLine,
+          color: otherVp.accentColor,
+        ));
+      }
+    }
+
+    return results;
   }
 
   // --------------------------------------------------------------------------
@@ -319,28 +451,31 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       appBar: _buildAppBar(fileName),
       body: Column(
         children: [
-          // Multi-series tab selector if multiple series exist
-          if (_study != null && _study!.series.length > 1)
-            _buildSeriesSelector(),
-
-          // Metadata panel (collapsible)
+          // Collapsible Metadata Panel
           if (_study != null) _buildMetadataPanel(),
 
           // Interaction mode toolbar
           _buildToolbar(),
 
-          // Image canvas with overlays & gesture support
-          Expanded(child: _buildImageCanvas()),
+          // Multi-Viewport Canvas Grid
+          Expanded(child: _buildMultiViewportGrid()),
 
-          // Bottom navigation & Windowing controls
-          if (_study != null) _buildBottomControls(),
+          // Series Thumbnail Filmstrip (bottom row matching reference pictures)
+          if (_study != null && _study!.series.isNotEmpty)
+            _buildSeriesFilmstrip(),
+
+          // Bottom navigation & Windowing controls for active viewport
+          if (_study != null && _activeViewport != null)
+            _buildBottomControls(_activeViewport!),
         ],
       ),
     );
   }
 
   PreferredSizeWidget _buildAppBar(String fileName) {
+    final s = _activeSeries;
     final h = _currentHeader;
+
     return AppBar(
       backgroundColor: const Color(0xFF12121A),
       foregroundColor: Colors.white,
@@ -354,27 +489,53 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             overflow: TextOverflow.ellipsis,
           ),
-          Text(
-            '${_activeSeries.modality} · ${h.columns}×${h.rows}'
-            '${_activeSeries.sliceCount > 1 ? " · ${_activeSeries.sliceCount} slices" : ""}',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.6),
+          if (s != null && h != null)
+            Text(
+              '${s.modality} · ${h.columns}×${h.rows}'
+              '${s.sliceCount > 1 ? " · ${s.sliceCount} slices" : ""}',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.6),
+              ),
             ),
-          ),
         ],
       ),
       actions: [
-        // Overlay toggle
+        // Layout selector popup
+        PopupMenuButton<DicomViewportLayout>(
+          tooltip: context.l10n.dicomLayout,
+          icon: const Icon(Icons.grid_view_outlined, color: Colors.white70),
+          color: const Color(0xFF1E1E2E),
+          onSelected: _changeLayout,
+          itemBuilder: (context) => [
+            _layoutMenuItem(DicomViewportLayout.single, '1×1 Single', Icons.crop_square),
+            _layoutMenuItem(DicomViewportLayout.splitVertical, '1×2 Vertical', Icons.view_agenda_outlined),
+            _layoutMenuItem(DicomViewportLayout.splitHorizontal, '2×1 Horizontal', Icons.view_column_outlined),
+            _layoutMenuItem(DicomViewportLayout.grid2x2, '2×2 Grid', Icons.grid_view),
+          ],
+        ),
+
+        // Cross-Reference / Localizer Lines Toggle
         IconButton(
           icon: Icon(
-            _showOverlays ? Icons.grid_view : Icons.grid_off_outlined,
+            _showReferenceLines ? Icons.center_focus_strong : Icons.center_focus_weak,
+            color: _showReferenceLines ? _accent : Colors.white60,
+          ),
+          tooltip: context.l10n.dicomReferenceLines,
+          onPressed: () => setState(() => _showReferenceLines = !_showReferenceLines),
+        ),
+
+        // Overlay text toggle
+        IconButton(
+          icon: Icon(
+            _showOverlays ? Icons.branding_watermark : Icons.branding_watermark_outlined,
             color: _showOverlays ? _accent : Colors.white60,
           ),
           tooltip: 'Toggle HUD text',
           onPressed: () => setState(() => _showOverlays = !_showOverlays),
         ),
-        // Metadata toggle
+
+        // Metadata sheet toggle
         IconButton(
           icon: Icon(
             Icons.info_outline,
@@ -383,6 +544,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
           tooltip: 'Show metadata',
           onPressed: () => setState(() => _showMetadata = !_showMetadata),
         ),
+
         // Share
         IconButton(
           icon: const Icon(Icons.share, color: Colors.white70),
@@ -392,47 +554,37 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
     );
   }
 
-  Widget _buildSeriesSelector() {
-    return Container(
-      height: 42,
-      color: const Color(0xFF161622),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        itemCount: _study!.series.length,
-        itemBuilder: (context, index) {
-          final s = _study!.series[index];
-          final isSelected = index == _activeSeriesIndex;
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: ChoiceChip(
-              selected: isSelected,
-              label: Text(
-                '${s.seriesDescription} (${s.sliceCount})',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? Colors.white : Colors.white60,
-                ),
-              ),
-              selectedColor: _accent.withValues(alpha: 0.35),
-              backgroundColor: const Color(0xFF1E1E2E),
-              side: BorderSide(
-                color: isSelected ? _accent : Colors.white12,
-              ),
-              onSelected: (selected) {
-                if (selected && index != _activeSeriesIndex) {
-                  _switchSeries(index);
-                }
-              },
+  PopupMenuItem<DicomViewportLayout> _layoutMenuItem(
+    DicomViewportLayout layout,
+    String label,
+    IconData icon,
+  ) {
+    final isSelected = _layout == layout;
+    return PopupMenuItem<DicomViewportLayout>(
+      value: layout,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: isSelected ? _accent : Colors.white70),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? _accent : Colors.white,
             ),
-          );
-        },
+          ),
+          if (isSelected) ...[
+            const Spacer(),
+            const Icon(Icons.check, size: 16, color: _accent),
+          ],
+        ],
       ),
     );
   }
 
   Widget _buildToolbar() {
+    final vp = _activeViewport;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       color: const Color(0xFF13131D),
@@ -463,16 +615,16 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                 setState(() => _interactionMode = DicomInteractionMode.ruler),
           ),
           const Spacer(),
-          if (_measurements.isNotEmpty)
+          if (vp != null && vp.measurements.isNotEmpty)
             TextButton.icon(
               style: TextButton.styleFrom(
                 foregroundColor: Colors.amberAccent,
                 visualDensity: VisualDensity.compact,
               ),
               icon: const Icon(Icons.clear, size: 14),
-              label: Text('Clear (${_measurements.length})',
+              label: Text('Clear (${vp.measurements.length})',
                   style: const TextStyle(fontSize: 11)),
-              onPressed: () => setState(() => _measurements.clear()),
+              onPressed: () => setState(() => vp.measurements.clear()),
             ),
         ],
       ),
@@ -501,18 +653,201 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
   }
 
   // --------------------------------------------------------------------------
-  // Image Canvas with Gesture support & HUD Overlays
+  // Multi-Viewport Grid Layout
   // --------------------------------------------------------------------------
 
-  Widget _buildImageCanvas() {
-    if (_currentImage == null) {
+  Widget _buildMultiViewportGrid() {
+    if (_viewports.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: _accent));
+    }
+
+    switch (_layout) {
+      case DicomViewportLayout.single:
+        return _buildViewportCard(_viewports[_activeViewportIndex.clamp(0, _viewports.length - 1)]);
+
+      case DicomViewportLayout.splitVertical:
+        return Column(
+          children: [
+            Expanded(child: _buildViewportCard(_viewports[0])),
+            Expanded(child: _buildViewportCard(_viewports[1])),
+          ],
+        );
+
+      case DicomViewportLayout.splitHorizontal:
+        return Row(
+          children: [
+            Expanded(child: _buildViewportCard(_viewports[0])),
+            Expanded(child: _buildViewportCard(_viewports[1])),
+          ],
+        );
+
+      case DicomViewportLayout.grid2x2:
+        return Column(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(child: _buildViewportCard(_viewports[0])),
+                  Expanded(child: _buildViewportCard(_viewports[1])),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(child: _buildViewportCard(_viewports[2])),
+                  Expanded(child: _buildViewportCard(_viewports[3])),
+                ],
+              ),
+            ),
+          ],
+        );
+    }
+  }
+
+  Widget _buildViewportCard(DicomViewportState vp) {
+    final isSelected = vp.viewportIndex == _activeViewportIndex;
+    final series = _study!.series[vp.seriesIndex.clamp(0, _study!.series.length - 1)];
+    final slice = series.slices[vp.sliceIndex.clamp(0, series.sliceCount - 1)];
+    final header = slice.header;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (_activeViewportIndex != vp.viewportIndex) {
+          setState(() => _activeViewportIndex = vp.viewportIndex);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D0D11),
+          border: Border.all(
+            color: isSelected ? vp.accentColor : vp.accentColor.withValues(alpha: 0.45),
+            width: isSelected ? 2.0 : 1.0,
+          ),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: Column(
+            children: [
+              // Top Bar in each Viewport: Series dropdown and Caliper button
+              _buildViewportHeader(vp, series),
+              // Viewport Canvas with interactive gestures & reference lines
+              Expanded(
+                child: _buildViewportCanvas(vp, series, slice, header),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewportHeader(DicomViewportState vp, DicomSeriesItem series) {
+    return Container(
+      height: 32,
+      color: const Color(0xFF14141E),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        children: [
+          // Dropdown menu button to change series directly in this viewport
+          PopupMenuButton<int>(
+            tooltip: 'Select Series',
+            color: const Color(0xFF1E1E2E),
+            padding: EdgeInsets.zero,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  series.seriesDescription,
+                  style: TextStyle(
+                    color: vp.accentColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.keyboard_arrow_down, size: 16, color: vp.accentColor),
+              ],
+            ),
+            onSelected: (newSeriesIndex) {
+              _switchViewportSeries(vp, newSeriesIndex);
+            },
+            itemBuilder: (context) {
+              return List.generate(_study!.series.length, (idx) {
+                final s = _study!.series[idx];
+                final isCurrent = idx == vp.seriesIndex;
+                return PopupMenuItem<int>(
+                  value: idx,
+                  child: Row(
+                    children: [
+                      if (isCurrent)
+                        Icon(Icons.check, size: 14, color: vp.accentColor)
+                      else
+                        const SizedBox(width: 14),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${s.seriesDescription} (${s.sliceCount})',
+                          style: TextStyle(
+                            color: isCurrent ? vp.accentColor : Colors.white,
+                            fontSize: 12,
+                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              });
+            },
+          ),
+          const Spacer(),
+          // Caliper / Ruler button for this viewport
+          IconButton(
+            icon: Icon(
+              Icons.edit_outlined,
+              size: 16,
+              color: _interactionMode == DicomInteractionMode.ruler && _activeViewportIndex == vp.viewportIndex
+                  ? vp.accentColor
+                  : Colors.white54,
+            ),
+            tooltip: 'Ruler Measurement',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            onPressed: () {
+              setState(() {
+                _activeViewportIndex = vp.viewportIndex;
+                _interactionMode = _interactionMode == DicomInteractionMode.ruler
+                    ? DicomInteractionMode.panZoom
+                    : DicomInteractionMode.ruler;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewportCanvas(
+    DicomViewportState vp,
+    DicomSeriesItem series,
+    DicomSliceItem slice,
+    DicomHeader header,
+  ) {
+    if (vp.renderedImage == null) {
       return const Center(child: CircularProgressIndicator(color: _accent));
     }
 
     final imageSize = Size(
-      _currentImage!.width.toDouble(),
-      _currentImage!.height.toDouble(),
+      vp.renderedImage!.width.toDouble(),
+      vp.renderedImage!.height.toDouble(),
     );
+
+    final refLines = _calculateReferenceLinesFor(vp);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -520,9 +855,9 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
           onPointerSignal: (event) {
             if (event is PointerScrollEvent) {
               if (event.scrollDelta.dy > 0) {
-                _goToSlice(_currentSliceIndex + 1);
+                _goToSlice(vp.sliceIndex + 1, vp.viewportIndex);
               } else if (event.scrollDelta.dy < 0) {
-                _goToSlice(_currentSliceIndex - 1);
+                _goToSlice(vp.sliceIndex - 1, vp.viewportIndex);
               }
             }
           },
@@ -537,7 +872,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                   maxScale: 25,
                   child: Center(
                     child: RawImage(
-                      image: _currentImage,
+                      image: vp.renderedImage,
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.medium,
                     ),
@@ -546,7 +881,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
               ),
 
               // 2. Gesture Detector for Window/Level and Ruler modes
-              if (_interactionMode != DicomInteractionMode.panZoom)
+              if (_interactionMode != DicomInteractionMode.panZoom &&
+                  vp.viewportIndex == _activeViewportIndex)
                 Positioned.fill(
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
@@ -556,11 +892,11 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                             details.localPosition, constraints.biggest, imageSize);
                         if (imgCoords != null) {
                           setState(() {
-                            _draftMeasurement = DicomMeasurement(
+                            vp.draftMeasurement = DicomMeasurement(
                               start: imgCoords,
                               end: imgCoords,
-                              pixelSpacingRow: _currentHeader.pixelSpacingRow,
-                              pixelSpacingCol: _currentHeader.pixelSpacingCol,
+                              pixelSpacingRow: header.pixelSpacingRow,
+                              pixelSpacingCol: header.pixelSpacingCol,
                             );
                           });
                         }
@@ -569,23 +905,23 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                     onPanUpdate: (details) {
                       if (_interactionMode == DicomInteractionMode.windowLevel) {
                         setState(() {
-                          _windowWidth = (_windowWidth + details.delta.dx * 3.0)
+                          vp.windowWidth = (vp.windowWidth + details.delta.dx * 3.0)
                               .clamp(1.0, 8192.0);
-                          _windowCenter = (_windowCenter - details.delta.dy * 3.0)
+                          vp.windowCenter = (vp.windowCenter - details.delta.dy * 3.0)
                               .clamp(-2048.0, 4096.0);
                         });
-                        _onWindowingChanged();
+                        _onWindowingChanged(vp);
                       } else if (_interactionMode == DicomInteractionMode.ruler &&
-                          _draftMeasurement != null) {
+                          vp.draftMeasurement != null) {
                         final imgCoords = _screenToImageCoords(
                             details.localPosition, constraints.biggest, imageSize);
                         if (imgCoords != null) {
                           setState(() {
-                            _draftMeasurement = DicomMeasurement(
-                              start: _draftMeasurement!.start,
+                            vp.draftMeasurement = DicomMeasurement(
+                              start: vp.draftMeasurement!.start,
                               end: imgCoords,
-                              pixelSpacingRow: _currentHeader.pixelSpacingRow,
-                              pixelSpacingCol: _currentHeader.pixelSpacingCol,
+                              pixelSpacingRow: header.pixelSpacingRow,
+                              pixelSpacingCol: header.pixelSpacingCol,
                             );
                           });
                         }
@@ -593,10 +929,10 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                     },
                     onPanEnd: (_) {
                       if (_interactionMode == DicomInteractionMode.ruler &&
-                          _draftMeasurement != null) {
+                          vp.draftMeasurement != null) {
                         setState(() {
-                          _measurements.add(_draftMeasurement!);
-                          _draftMeasurement = null;
+                          vp.measurements.add(vp.draftMeasurement!);
+                          vp.draftMeasurement = null;
                         });
                       }
                     },
@@ -608,25 +944,39 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                 child: IgnorePointer(
                   child: CustomPaint(
                     painter: _RulerPainter(
-                      measurements: _measurements,
-                      currentDraft: _draftMeasurement,
+                      measurements: vp.measurements,
+                      currentDraft: vp.draftMeasurement,
                       imageSize: imageSize,
                     ),
                   ),
                 ),
               ),
 
-              // 4. Medical HUD Corner Overlays
-              if (_showOverlays) _buildHudOverlays(),
+              // 4. Cross-Reference (Localizer / Scout) Lines Overlay
+              if (_showReferenceLines && refLines.isNotEmpty)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _LocalizerLinesPainter(
+                        lines: refLines,
+                        imageSize: imageSize,
+                      ),
+                    ),
+                  ),
+                ),
 
-              // 5. Rendering indicator
-              if (_isRendering)
+              // 5. Medical HUD Corner Overlays
+              if (_showOverlays)
+                _buildViewportHud(vp, series, slice, header),
+
+              // 6. Rendering indicator
+              if (vp.isRendering)
                 const Positioned(
                   bottom: 8,
                   right: 8,
                   child: SizedBox(
-                    width: 18,
-                    height: 18,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: _accent,
@@ -658,54 +1008,34 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
     );
   }
 
-  Widget _buildHudOverlays() {
-    final h = _currentHeader;
-    final series = _activeSeries;
-
+  Widget _buildViewportHud(
+    DicomViewportState vp,
+    DicomSeriesItem series,
+    DicomSliceItem slice,
+    DicomHeader h,
+  ) {
     return Positioned.fill(
       child: IgnorePointer(
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
           child: Stack(
             children: [
-              // Top-Left: Patient Name, ID, Age/Sex
-              Align(
-                alignment: Alignment.topLeft,
-                child: _hudText(
-                  '${_study?.patientName ?? h.formattedPatientName}\n'
-                  'ID: ${_study?.patientId ?? h.patientId ?? "—"}'
-                  '${_study?.patientAge != null ? "\nAge: ${_study!.patientAge}" : ""}'
-                  '${_study?.patientSex != null ? " (${_study!.patientSex})" : ""}',
-                ),
-              ),
-              // Top-Right: Modality, Study Date, Series Description
-              Align(
-                alignment: Alignment.topRight,
-                child: _hudText(
-                  '${series.modality} · ${_study?.studyDate ?? h.formattedStudyDate}\n'
-                  '${series.seriesDescription}\n'
-                  '${h.institutionName ?? ""}',
-                  textAlign: TextAlign.right,
-                ),
-              ),
-              // Bottom-Left: Slice info, thickness, Windowing
+              // Bottom-Left: Window Level and Window Width (WL / WW)
               Align(
                 alignment: Alignment.bottomLeft,
                 child: _hudText(
-                  'Slice: ${_currentSliceIndex + 1} / ${series.sliceCount}'
-                  '${h.formattedSliceLocation != null ? "\nLoc: ${h.formattedSliceLocation}" : ""}'
-                  '${h.formattedSliceThickness != null ? "\nThick: ${h.formattedSliceThickness}" : ""}\n'
-                  'W: ${_windowWidth.toInt()}  L: ${_windowCenter.toInt()}',
+                  'WL: ${vp.windowCenter.toInt()}\nWW: ${vp.windowWidth.toInt()}',
+                  color: const Color(0xFF60A5FA),
                 ),
               ),
-              // Bottom-Right: Matrix & Spacing
+              // Bottom-Right: Series number & Instance / Slice number (SE / IM)
               Align(
                 alignment: Alignment.bottomRight,
                 child: _hudText(
-                  '${h.columns}×${h.rows} px\n'
-                  '${h.pixelSpacingRow != null ? "Pixel: ${h.pixelSpacingRow!.toStringAsFixed(2)} mm" : ""}\n'
-                  '${_study != null && _study!.series.length > 1 ? "Series ${_activeSeriesIndex + 1}/${_study!.series.length}" : ""}',
+                  'SE: ${vp.seriesIndex + 1}\nIM: ${vp.sliceIndex + 1}/${series.sliceCount}',
                   textAlign: TextAlign.right,
+                  color: Colors.white,
+                  highlightSecondLineColor: const Color(0xFF60A5FA),
                 ),
               ),
             ],
@@ -715,16 +1045,42 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
     );
   }
 
-  Widget _hudText(String text, {TextAlign textAlign = TextAlign.left}) {
+  Widget _hudText(
+    String text, {
+    TextAlign textAlign = TextAlign.left,
+    Color color = Colors.white,
+    Color? highlightSecondLineColor,
+  }) {
+    final lines = text.split('\n');
+    if (lines.length == 2 && highlightSecondLineColor != null) {
+      return RichText(
+        textAlign: textAlign,
+        text: TextSpan(
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            shadows: [
+              Shadow(color: Colors.black, blurRadius: 4),
+              Shadow(color: Colors.black, blurRadius: 8),
+            ],
+          ),
+          children: [
+            TextSpan(text: '${lines[0]}\n', style: TextStyle(color: color)),
+            TextSpan(text: lines[1], style: TextStyle(color: highlightSecondLineColor)),
+          ],
+        ),
+      );
+    }
+
     return Text(
       text,
       textAlign: textAlign,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 11.5,
+      style: TextStyle(
+        color: color,
+        fontSize: 11,
         fontWeight: FontWeight.w600,
         height: 1.35,
-        shadows: [
+        shadows: const [
           Shadow(color: Colors.black, blurRadius: 4),
           Shadow(color: Colors.black, blurRadius: 8),
         ],
@@ -733,28 +1089,138 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
   }
 
   // --------------------------------------------------------------------------
+  // Series Thumbnail Filmstrip (matching reference images)
+  // --------------------------------------------------------------------------
+
+  Widget _buildSeriesFilmstrip() {
+    if (_study == null || _study!.series.isEmpty) return const SizedBox.shrink();
+
+    final activeVp = _activeViewport;
+
+    return Container(
+      height: 72,
+      color: const Color(0xFF101018),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _study!.series.length,
+        itemBuilder: (context, index) {
+          final s = _study!.series[index];
+
+          // Check if any visible viewport is currently displaying this series
+          DicomViewportState? assignedVp;
+          final visibleCount = _layout.totalViewports;
+          for (int v = 0; v < visibleCount && v < _viewports.length; v++) {
+            if (_viewports[v].seriesIndex == index) {
+              assignedVp = _viewports[v];
+              break;
+            }
+          }
+
+          final isCurrentActive = activeVp?.seriesIndex == index;
+          final borderColor = assignedVp != null
+              ? assignedVp.accentColor
+              : (isCurrentActive ? _accent : Colors.white12);
+
+          final thumbImage = _seriesThumbnails[s.seriesInstanceUID];
+
+          return GestureDetector(
+            onTap: () {
+              if (activeVp != null && activeVp.seriesIndex != index) {
+                _switchViewportSeries(activeVp, index);
+              }
+            },
+            child: Container(
+              width: 60,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF181824),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: borderColor,
+                  width: assignedVp != null ? 2.0 : 1.0,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  // Thumbnail image or placeholder
+                  Positioned.fill(
+                    child: thumbImage != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: RawImage(
+                              image: thumbImage,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Center(
+                            child: Icon(
+                              Icons.view_in_ar,
+                              size: 24,
+                              color: assignedVp != null
+                                  ? assignedVp.accentColor.withValues(alpha: 0.6)
+                                  : Colors.white24,
+                            ),
+                          ),
+                  ),
+                  // Slice count badge at bottom right (e.g. "25", "48")
+                  Positioned(
+                    bottom: 2,
+                    right: 2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: Text(
+                        '${s.sliceCount}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
   // Bottom Controls
   // --------------------------------------------------------------------------
 
-  Widget _buildBottomControls() {
-    final h = _currentHeader;
+  Widget _buildBottomControls(DicomViewportState vp) {
+    final series = _study!.series[vp.seriesIndex.clamp(0, _study!.series.length - 1)];
+    final slice = series.slices[vp.sliceIndex.clamp(0, series.sliceCount - 1)];
+    final header = slice.header;
+    final showWindowing = header.isMonochrome && header.bitsAllocated >= 16;
+
     return Container(
       color: const Color(0xFF12121A),
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Slice navigation (if series has multiple slices)
-          if (_activeSeries.sliceCount > 1) _buildSliceNavigation(),
+          // Slice navigation (if active series has multiple slices)
+          if (series.sliceCount > 1)
+            _buildSliceNavigation(vp, series),
           // Windowing controls
-          if (_showWindowing) _buildWindowingControls(h),
+          if (showWindowing)
+            _buildWindowingControls(vp, header),
         ],
       ),
     );
   }
 
-  Widget _buildSliceNavigation() {
-    final count = _activeSeries.sliceCount;
+  Widget _buildSliceNavigation(DicomViewportState vp, DicomSeriesItem series) {
+    final count = series.sliceCount;
     return Column(
       children: [
         Row(
@@ -762,7 +1228,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
             const Icon(Icons.layers_outlined, color: Colors.white38, size: 14),
             const SizedBox(width: 6),
             Text(
-              'Slice ${_currentSliceIndex + 1} / $count',
+              'Slice ${vp.sliceIndex + 1} / $count (${series.seriesDescription})',
               style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
             const Spacer(),
@@ -772,7 +1238,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               icon: Icon(
                 _isPlayingCine ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                color: _isPlayingCine ? _accent : Colors.white70,
+                color: _isPlayingCine ? vp.accentColor : Colors.white70,
                 size: 22,
               ),
               tooltip: _isPlayingCine ? 'Pause Cine' : 'Play Cine',
@@ -782,35 +1248,35 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               icon: const Icon(Icons.skip_previous, color: Colors.white70, size: 20),
-              onPressed: _currentSliceIndex > 0
-                  ? () => _goToSlice(_currentSliceIndex - 1)
+              onPressed: vp.sliceIndex > 0
+                  ? () => _goToSlice(vp.sliceIndex - 1, vp.viewportIndex)
                   : null,
             ),
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               icon: const Icon(Icons.skip_next, color: Colors.white70, size: 20),
-              onPressed: _currentSliceIndex < count - 1
-                  ? () => _goToSlice(_currentSliceIndex + 1)
+              onPressed: vp.sliceIndex < count - 1
+                  ? () => _goToSlice(vp.sliceIndex + 1, vp.viewportIndex)
                   : null,
             ),
           ],
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: _accent,
-            thumbColor: _accent,
+            activeTrackColor: vp.accentColor,
+            thumbColor: vp.accentColor,
             inactiveTrackColor: Colors.white12,
-            overlayColor: _accent.withValues(alpha: 0.2),
+            overlayColor: vp.accentColor.withValues(alpha: 0.2),
             trackHeight: 2,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
           ),
           child: Slider(
-            value: _currentSliceIndex.toDouble(),
+            value: vp.sliceIndex.toDouble(),
             min: 0,
             max: (count - 1).toDouble(),
             divisions: count > 1 ? count - 1 : null,
-            onChanged: (v) => _goToSlice(v.round()),
+            onChanged: (v) => _goToSlice(v.round(), vp.viewportIndex),
           ),
         ),
         const SizedBox(height: 2),
@@ -818,7 +1284,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
     );
   }
 
-  Widget _buildWindowingControls(DicomHeader h) {
+  Widget _buildWindowingControls(DicomViewportState vp, DicomHeader h) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -838,9 +1304,9 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                       visualDensity: VisualDensity.compact,
                       label: Text(p.name, style: const TextStyle(fontSize: 11)),
                       backgroundColor: const Color(0xFF1E1E30),
-                      side: BorderSide(color: _accent.withValues(alpha: 0.3)),
+                      side: BorderSide(color: vp.accentColor.withValues(alpha: 0.3)),
                       labelStyle: const TextStyle(color: Colors.white70),
-                      onPressed: () => _applyPreset(p),
+                      onPressed: () => _applyPreset(vp, p),
                     ),
                   )),
               if (h.windowCenter != null)
@@ -853,10 +1319,10 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
                   labelStyle: const TextStyle(color: Colors.white38),
                   onPressed: () {
                     setState(() {
-                      _windowCenter = h.windowCenter!;
-                      _windowWidth = h.windowWidth ?? 256;
+                      vp.windowCenter = h.windowCenter!;
+                      vp.windowWidth = h.windowWidth ?? 256;
                     });
-                    _onWindowingChanged();
+                    _onWindowingChanged(vp);
                   },
                 ),
             ],
@@ -865,29 +1331,32 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
         const SizedBox(height: 4),
         // Window Center (Level)
         _windowSlider(
+          accentColor: vp.accentColor,
           label: 'WC',
-          value: _windowCenter,
+          value: vp.windowCenter,
           min: -2048.0,
           max: 4096.0,
-          display: _windowCenter.toStringAsFixed(0),
-          onChanged: (v) => setState(() => _windowCenter = v),
-          onChangeEnd: (_) => _onWindowingChanged(),
+          display: vp.windowCenter.toStringAsFixed(0),
+          onChanged: (v) => setState(() => vp.windowCenter = v),
+          onChangeEnd: (_) => _onWindowingChanged(vp),
         ),
         // Window Width
         _windowSlider(
+          accentColor: vp.accentColor,
           label: 'WW',
-          value: _windowWidth,
+          value: vp.windowWidth,
           min: 1.0,
           max: 8192.0,
-          display: _windowWidth.toStringAsFixed(0),
-          onChanged: (v) => setState(() => _windowWidth = v.clamp(1, 8192.0)),
-          onChangeEnd: (_) => _onWindowingChanged(),
+          display: vp.windowWidth.toStringAsFixed(0),
+          onChanged: (v) => setState(() => vp.windowWidth = v.clamp(1, 8192.0)),
+          onChangeEnd: (_) => _onWindowingChanged(vp),
         ),
       ],
     );
   }
 
   Widget _windowSlider({
+    required Color accentColor,
     required String label,
     required double value,
     required double min,
@@ -903,7 +1372,7 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
           child: Text(
             label,
             style: TextStyle(
-              color: _accent.withValues(alpha: 0.9),
+              color: accentColor.withValues(alpha: 0.9),
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
@@ -912,10 +1381,10 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
         Expanded(
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              activeTrackColor: _accent,
-              thumbColor: _accent,
+              activeTrackColor: accentColor,
+              thumbColor: accentColor,
               inactiveTrackColor: Colors.white12,
-              overlayColor: _accent.withValues(alpha: 0.15),
+              overlayColor: accentColor.withValues(alpha: 0.15),
               trackHeight: 2,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
             ),
@@ -947,6 +1416,8 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
   Widget _buildMetadataPanel() {
     if (!_showMetadata) return const SizedBox.shrink();
     final h = _currentHeader;
+    final s = _activeSeries;
+    if (h == null || s == null) return const SizedBox.shrink();
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -971,11 +1442,11 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
             if (h.patientBirthDate != null)
               _metaRow('DOB', h.patientBirthDate!),
             const Divider(color: Colors.white12, height: 14),
-            _metaRow('Modality', _activeSeries.modality),
+            _metaRow('Modality', s.modality),
             _metaRow('Study Date', _study?.studyDate ?? h.formattedStudyDate),
             if (h.studyDescription != null)
               _metaRow('Study', h.studyDescription!),
-            _metaRow('Series', _activeSeries.seriesDescription),
+            _metaRow('Series', s.seriesDescription),
             if (h.institutionName != null)
               _metaRow('Institution', h.institutionName!),
             const Divider(color: Colors.white12, height: 14),
@@ -1081,6 +1552,75 @@ class _DicomViewerScreenState extends State<DicomViewerScreen> {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Cross-Reference (Localizer / Scout) Lines Custom Painter
+// ---------------------------------------------------------------------------
+class DicomReferenceLineEntry {
+  final DicomReferenceLine line;
+  final Color color;
+
+  const DicomReferenceLineEntry({required this.line, required this.color});
+}
+
+class _LocalizerLinesPainter extends CustomPainter {
+  final List<DicomReferenceLineEntry> lines;
+  final Size imageSize;
+
+  _LocalizerLinesPainter({
+    required this.lines,
+    required this.imageSize,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (imageSize.width == 0 || imageSize.height == 0) return;
+
+    final fitted = applyBoxFit(BoxFit.contain, imageSize, size);
+    final dst = Alignment.center.inscribe(fitted.destination, Offset.zero & size);
+
+    Offset toCanvas(Offset p) {
+      final normX = p.dx / imageSize.width;
+      final normY = p.dy / imageSize.height;
+      return Offset(
+        dst.left + normX * dst.width,
+        dst.top + normY * dst.height,
+      );
+    }
+
+    for (final entry in lines) {
+      final refLine = entry.line;
+      final p1 = toCanvas(refLine.start);
+      final p2 = toCanvas(refLine.end);
+
+      // 1. Dark halo shadow so line is distinct on bright bone areas
+      final shadowPaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.7)
+        ..strokeWidth = 3.5
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(p1, p2, shadowPaint);
+
+      // 2. Main vivid reference line in the source viewport's accent color
+      final linePaint = Paint()
+        ..color = entry.color
+        ..strokeWidth = 1.8
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(p1, p2, linePaint);
+
+      // 3. Small end dots for clarity
+      final dotPaint = Paint()
+        ..color = entry.color
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(p1, 2.5, dotPaint);
+      canvas.drawCircle(p2, 2.5, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LocalizerLinesPainter oldDelegate) => true;
 }
 
 // ---------------------------------------------------------------------------

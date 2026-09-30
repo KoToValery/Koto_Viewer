@@ -579,6 +579,12 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get dicomReferenceLines => 'Референтни линии';
+
+  @override
+  String get dicomLayout => 'Разпределение';
+
+  @override
   String errorLoadingEbook(String error) {
     return 'Грешка при зареждане на електронна книга: $error';
   }

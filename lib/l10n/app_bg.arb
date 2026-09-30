@@ -158,6 +158,8 @@
   "centeredOnWaypoint": "Центрирано върху: {name}",
   "dicomParseError": "Грешка при анализ на DICOM: {error}",
   "errorLoadingDicom": "Грешка при зареждане на DICOM изследване: {error}",
+  "dicomReferenceLines": "Референтни линии",
+  "dicomLayout": "Разпределение",
   "errorLoadingEbook": "Грешка при зареждане на електронна книга: {error}",
   "couldNotDecodePsd": "Неуспешно декодиране на PSD композитно изображение.",
   "errorPickingFolder": "Грешка при избор на папка: {error}",

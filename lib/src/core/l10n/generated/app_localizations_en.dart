@@ -576,6 +576,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get dicomReferenceLines => 'Cross-Reference Lines';
+
+  @override
+  String get dicomLayout => 'Layout';
+
+  @override
   String errorLoadingEbook(String error) {
     return 'Error loading e-book: $error';
   }

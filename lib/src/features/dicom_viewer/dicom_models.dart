@@ -152,3 +152,66 @@ class DicomStudyItem {
     }
   }
 }
+
+/// Layout mode for the DICOM multi-viewport grid
+enum DicomViewportLayout {
+  single('1×1', 1, 1),
+  splitVertical('1×2', 1, 2),
+  splitHorizontal('2×1', 2, 1),
+  grid2x2('2×2', 2, 2);
+
+  final String label;
+  final int columns;
+  final int rows;
+
+  const DicomViewportLayout(this.label, this.columns, this.rows);
+
+  int get totalViewports => columns * rows;
+}
+
+/// Standard high-visibility viewport accent colors for cross-referencing
+class DicomViewportColors {
+  const DicomViewportColors._();
+
+  static const List<Color> palette = [
+    Color(0xFF3B82F6), // 0: Vivid Blue
+    Color(0xFFFACC15), // 1: Radiant Yellow / Gold
+    Color(0xFF22C55E), // 2: Emerald Green
+    Color(0xFFEF4444), // 3: Coral / Red
+  ];
+
+  static Color getColor(int index) => palette[index % palette.length];
+}
+
+/// State representation for an individual viewport in a multi-viewport layout.
+class DicomViewportState {
+  final int viewportIndex;
+  int seriesIndex;
+  int sliceIndex;
+  double windowCenter;
+  double windowWidth;
+  Color accentColor;
+  Image? renderedImage;
+  bool isRendering;
+  final List<DicomMeasurement> measurements;
+  DicomMeasurement? draftMeasurement;
+
+  DicomViewportState({
+    required this.viewportIndex,
+    required this.seriesIndex,
+    this.sliceIndex = 0,
+    this.windowCenter = 127.0,
+    this.windowWidth = 256.0,
+    Color? accentColor,
+    this.renderedImage,
+    this.isRendering = false,
+    List<DicomMeasurement>? measurements,
+    this.draftMeasurement,
+  })  : accentColor = accentColor ?? DicomViewportColors.getColor(viewportIndex),
+        measurements = measurements ?? [];
+
+  void dispose() {
+    renderedImage?.dispose();
+    renderedImage = null;
+  }
+}

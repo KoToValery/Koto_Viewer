@@ -494,6 +494,14 @@
       "error": { "type": "String" }
     }
   },
+  "dicomReferenceLines": "Cross-Reference Lines",
+  "@dicomReferenceLines": {
+    "description": "Tooltip/label for toggling DICOM scout / localizer cross-reference lines"
+  },
+  "dicomLayout": "Layout",
+  "@dicomLayout": {
+    "description": "Label for selecting multi-viewport grid layout in DICOM viewer"
+  },
   "errorLoadingEbook": "Error loading e-book: {error}",
   "@errorLoadingEbook": {
     "description": "Error message when loading e-book fails",

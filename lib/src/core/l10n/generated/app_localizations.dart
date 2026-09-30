@@ -1094,6 +1094,18 @@ abstract class AppLocalizations {
   /// **'Error loading DICOM study: {error}'**
   String errorLoadingDicom(String error);
 
+  /// Tooltip/label for toggling DICOM scout / localizer cross-reference lines
+  ///
+  /// In en, this message translates to:
+  /// **'Cross-Reference Lines'**
+  String get dicomReferenceLines;
+
+  /// Label for selecting multi-viewport grid layout in DICOM viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Layout'**
+  String get dicomLayout;
+
   /// Error message when loading e-book fails
   ///
   /// In en, this message translates to:
