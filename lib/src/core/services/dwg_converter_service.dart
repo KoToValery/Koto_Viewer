@@ -369,6 +369,13 @@ class DwgConverterService {
           errorCode: result,
         );
       }
+      if (result < -100) {
+        final sig = -(result + 100);
+        throw DwgConversionException(
+          'DWG parser encountered a native fault (signal $sig) and safely recovered. The file may contain corrupted or unsupported entities.',
+          errorCode: result,
+        );
+      }
       throw DwgConversionException(
         'Failed to convert DWG file to DXF format.',
         errorCode: result,
