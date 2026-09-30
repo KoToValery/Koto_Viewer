@@ -1406,9 +1406,18 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         type: FileType.any,
       );
 
-      if (result == null || result.files.single.path == null) return;
+      if (result == null || result.files.isEmpty) return;
 
-      final filePath = result.files.single.path!;
+      String? filePath = result.files.single.path;
+      if (filePath == null && result.files.single.bytes != null) {
+        final tempDir = await getTemporaryDirectory();
+        final name = result.files.single.name;
+        final tempFile = File('${tempDir.path}${Platform.pathSeparator}$name');
+        await tempFile.writeAsBytes(result.files.single.bytes!);
+        filePath = tempFile.path;
+      }
+      if (filePath == null) return;
+
       final lower = filePath.toLowerCase();
 
       if (!lower.endsWith('.dxf') && !lower.endsWith('.dwg')) {

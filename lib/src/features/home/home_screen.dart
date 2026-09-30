@@ -2026,22 +2026,32 @@ class _HomeScreenState extends State<HomeScreen> {
         initialDirectory: initialDir,
       );
 
-      if (result != null && result.files.single.path != null) {
-        final filePath = result.files.single.path!;
-        if (!FileSourceService.isSupportedFile(filePath)) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  context.l10n.pleaseSelectSupportedFile,
-                ),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-          return;
+      if (result != null && result.files.isNotEmpty) {
+        String? filePath = result.files.single.path;
+        if (filePath == null && result.files.single.bytes != null) {
+          final tempDir = await getTemporaryDirectory();
+          final name = result.files.single.name;
+          final tempFile = File('${tempDir.path}${Platform.pathSeparator}$name');
+          await tempFile.writeAsBytes(result.files.single.bytes!);
+          filePath = tempFile.path;
         }
-        await _openFileScreen(filePath);
+
+        if (filePath != null) {
+          if (!FileSourceService.isSupportedFile(filePath)) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    context.l10n.pleaseSelectSupportedFile,
+                  ),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+            return;
+          }
+          await _openFileScreen(filePath);
+        }
       }
     } on PlatformException catch (e, stack) {
       AppErrorHandler.recordError(e, stack, context: 'HomeScreen._pickAndOpenFile.platform');

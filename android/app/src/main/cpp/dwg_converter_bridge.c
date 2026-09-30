@@ -11,6 +11,18 @@
 #include <dwg.h>
 #include <dwg_api.h>
 
+#ifdef __ANDROID__
+  #include <android/log.h>
+  #define LOG_TAG "KotoDwg"
+  #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+  #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+  #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#else
+  #define LOGI(...) printf(__VA_ARGS__)
+  #define LOGW(...) printf(__VA_ARGS__)
+  #define LOGE(...) fprintf(stderr, __VA_ARGS__)
+#endif
+
 typedef struct _bit_chain
 {
   unsigned char *chain;
@@ -42,18 +54,24 @@ KOTO_EXPORT int koto_convert_dwg_to_dxf(const char* in_dwg_path, const char* out
     }
 
 #ifdef HAVE_LIBREDWG
+    LOGI("koto_convert_dwg_to_dxf starting: %s -> %s", in_dwg_path, out_dxf_path);
+
     Dwg_Data dwg;
     memset(&dwg, 0, sizeof(Dwg_Data));
     dwg.opts = 0; // Standard read options
 
     int error = dwg_read_file(in_dwg_path, &dwg);
+    LOGI("dwg_read_file finished with code %d (critical threshold is %d)", error, DWG_ERR_CRITICAL);
+
     if (error >= DWG_ERR_CRITICAL) {
-        dwg_free(&dwg);
+        LOGE("dwg_read_file encountered critical error %d; skipping conversion and dwg_free to avoid crash", error);
+        // Do not call dwg_free on corrupted / half-initialized data as it can cause SIGSEGV
         return error;
     }
 
     FILE *fout = fopen(out_dxf_path, "wb");
     if (!fout) {
+        LOGE("Failed to open output DXF for writing: %s", out_dxf_path);
         dwg_free(&dwg);
         return -3; // Output file cannot be created
     }
@@ -61,20 +79,34 @@ KOTO_EXPORT int koto_convert_dwg_to_dxf(const char* in_dwg_path, const char* out
     Bit_Chain dat;
     memset(&dat, 0, sizeof(Bit_Chain));
     dat.fh = fout;
-    dat.version = dwg.header.version;
-    dat.from_version = dwg.header.from_version;
+    dat.version = dwg.header.version ? dwg.header.version : R_2000;
+    dat.from_version = dwg.header.from_version ? dwg.header.from_version : dat.version;
+    dat.opts = (unsigned char)(dwg.opts & 0xFF);
     // Pass DWG codepage (e.g. CP_ANSI_1251 for Cyrillic) so dwg_write_dxf can decode strings properly
     dat.codepage = dwg.header.codepage ? dwg.header.codepage : 29; // 29 is CP_ANSI_1251
 
-    error = dwg_write_dxf(&dat, &dwg);
+    LOGI("Writing DXF (dwg version: %d, from: %d, codepage: %d)...",
+         (int)dat.version, (int)dat.from_version, (int)dat.codepage);
 
+    error = dwg_write_dxf(&dat, &dwg);
     fclose(fout);
-    dwg_free(&dwg);
+
+    LOGI("dwg_write_dxf finished with code %d", error);
+
+    // Free memory only if error was non-critical and drawing was properly decoded
+    if (error < DWG_ERR_CRITICAL) {
+        LOGI("Cleaning up LibreDWG memory...");
+        dwg_free(&dwg);
+        LOGI("dwg_free finished successfully");
+    } else {
+        LOGW("dwg_write_dxf had error %d; skipping dwg_free", error);
+    }
 
     if (error >= DWG_ERR_CRITICAL) {
         return error;
     }
 
+    LOGI("koto_convert_dwg_to_dxf completed successfully for %s", out_dxf_path);
     return 0;
 #else
     // Fallback stub if compiled without direct LibreDWG link
