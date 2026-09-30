@@ -38,6 +38,7 @@ import 'widgets/dxf_measurement_canvas_painter.dart';
 import 'widgets/dxf_measurement_overlay.dart';
 import '../../core/services/project_bundle_service.dart';
 import '../project_viewer/widgets/project_presentation_bar.dart';
+import '../structural_designer/structural_designer_screen.dart';
 
 class DxfViewerScreen extends StatefulWidget {
   final String filePath;
@@ -1747,6 +1748,25 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
         tooltip: 'CAD Layers',
         onPressed: _document != null ? _showLayersSheet : null,
+      ),
+      IconButton(
+        icon: const Icon(Icons.apartment_rounded, size: 20, color: Color(0xFF00E5FF)),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        tooltip: 'Конструктивен Модул (BIM)',
+        onPressed: _document != null
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => StructuralDesignerScreen(
+                      document: _document!,
+                      initialCadBounds: _currentBounds,
+                      title: _fileName,
+                    ),
+                  ),
+                );
+              }
+            : null,
       ),
       IconButton(
         icon: Icon(
