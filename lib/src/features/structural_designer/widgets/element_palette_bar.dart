@@ -79,8 +79,8 @@ class ElementPaletteBar extends StatelessWidget {
               children: [
                 _buildToolButton(
                   tool: StructuralDrawTool.select,
-                  icon: Icons.pan_tool_alt_rounded,
-                  label: 'Преглед',
+                  icon: Icons.pan_tool_rounded,
+                  label: 'Навигация',
                 ),
                 _buildToolButton(
                   tool: StructuralDrawTool.column,

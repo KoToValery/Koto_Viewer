@@ -1277,21 +1277,6 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             setState(() {
               layer.isVisible = false;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Layer "$layerName" hidden'),
-                behavior: SnackBarBehavior.floating,
-                action: SnackBarAction(
-                  label: 'Undo',
-                  textColor: const Color(0xFF00E5FF),
-                  onPressed: () {
-                    setState(() {
-                      layer.isVisible = true;
-                    });
-                  },
-                ),
-              ),
-            );
           }
         },
         onIsolateLayer: () {
@@ -1300,23 +1285,6 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
               l.isVisible = (l.name == layerName);
             }
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Isolated layer "$layerName"'),
-              behavior: SnackBarBehavior.floating,
-              action: SnackBarAction(
-                label: 'Show All',
-                textColor: const Color(0xFF00E5FF),
-                onPressed: () {
-                  setState(() {
-                    for (final l in _document!.layers.values) {
-                      l.isVisible = true;
-                    }
-                  });
-                },
-              ),
-            ),
-          );
         },
         onShowAllLayers: () {
           setState(() {
@@ -1770,6 +1738,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                     builder: (_) => StructuralDesignerScreen(
                       document: _document!,
                       initialCadBounds: _currentBounds,
+                      initialTransform: _transformController.value,
                       title: _fileName,
                     ),
                   ),

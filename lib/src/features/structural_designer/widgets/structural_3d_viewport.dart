@@ -1,9 +1,11 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../../dxf_3d_viewer/rendering/cad_3d_camera.dart';
 import '../../dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
+import '../../dxf_3d_viewer/rendering/cad_3d_gpu_bindings.dart';
 import '../models/cantilever_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../rendering/structural_3d_mesh_builder.dart';
@@ -32,6 +34,14 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
   late Mesh3D _mesh;
   bool _isInteracting = false;
 
+  // Hardware acceleration (native SIMD depth buffer GPU renderer)
+  final Cad3DGpuRenderer _gpuRenderer = Cad3DGpuRenderer();
+  bool _useGpuAcceleration = true;
+  ui.Image? _gpuImage;
+  bool _isGpuRendering = false;
+  bool _pendingGpuRender = false;
+  Size _lastViewportSize = Size.zero;
+
   Offset? _lastPanPos;
   double _baseZoom = 1.0;
 
@@ -47,12 +57,69 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
     _rebuildMesh();
   }
 
+  @override
+  void dispose() {
+    _gpuRenderer.dispose();
+    _gpuImage?.dispose();
+    super.dispose();
+  }
+
   void _rebuildMesh() {
     _mesh = Structural3dMeshBuilder.buildProjectMesh(
       widget.project,
       cantileverZones: widget.cantileverZones,
       highlightStoreyIndex: _highlightStoreyIndex,
     );
+    if (_useGpuAcceleration) {
+      _gpuRenderer.setMesh(_mesh);
+      if (_lastViewportSize != Size.zero) {
+        _requestGpuRender(_lastViewportSize);
+      }
+    }
+  }
+
+  void _requestGpuRender(Size size) {
+    if (!_useGpuAcceleration ||
+        !_gpuRenderer.isReady ||
+        size.isEmpty) {
+      return;
+    }
+    if (_isGpuRendering) {
+      _pendingGpuRender = true;
+      return;
+    }
+    _isGpuRendering = true;
+    _pendingGpuRender = false;
+
+    final maxDim = math.max(_mesh.bounds.maxDimension, 1e-4);
+    final modelScale = (math.min(size.width, size.height) * 0.55) / maxDim;
+
+    _gpuRenderer
+        .renderFrame(
+          camera: _camera,
+          viewport: size,
+          modelScale: modelScale,
+        )
+        .then((img) {
+          if (!mounted) {
+            img?.dispose();
+            return;
+          }
+          if (img != null) {
+            final old = _gpuImage;
+            setState(() {
+              _gpuImage = img;
+            });
+            old?.dispose();
+          }
+          _isGpuRendering = false;
+          if (_pendingGpuRender && _lastViewportSize != Size.zero) {
+            _requestGpuRender(_lastViewportSize);
+          }
+        })
+        .catchError((_) {
+          _isGpuRendering = false;
+        });
   }
 
   @override
@@ -61,6 +128,21 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
     if (oldWidget.project != widget.project ||
         oldWidget.cantileverZones != widget.cantileverZones) {
       _rebuildMesh();
+    }
+  }
+
+  String _getShadingModeBg(Cad3DShadingMode mode) {
+    switch (mode) {
+      case Cad3DShadingMode.cadShadedEdges:
+        return 'CAD Засенчен + Ръбове';
+      case Cad3DShadingMode.smoothShaded:
+        return 'Плавен (Smooth)';
+      case Cad3DShadingMode.flatShaded:
+        return 'Плосък (Flat)';
+      case Cad3DShadingMode.wireframe:
+        return 'Мрежов (Wireframe)';
+      case Cad3DShadingMode.xray:
+        return 'Рентген (X-Ray)';
     }
   }
 
@@ -81,11 +163,40 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
           style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
         actions: [
+          // GPU Hardware Acceleration Toggle
+          IconButton(
+            icon: Icon(
+              _useGpuAcceleration ? Icons.speed_rounded : Icons.speed_outlined,
+              color: _useGpuAcceleration ? const Color(0xFF00E5FF) : Colors.white38,
+            ),
+            tooltip: _useGpuAcceleration
+                ? 'Хардуерно 3D ускорение: Включено'
+                : 'Хардуерно 3D ускорение: Изключено',
+            onPressed: () {
+              setState(() {
+                _useGpuAcceleration = !_useGpuAcceleration;
+                if (!_useGpuAcceleration) {
+                  _gpuImage?.dispose();
+                  _gpuImage = null;
+                } else {
+                  _gpuRenderer.setMesh(_mesh);
+                  if (_lastViewportSize != Size.zero) {
+                    _requestGpuRender(_lastViewportSize);
+                  }
+                }
+              });
+            },
+          ),
           // Shading mode menu
           PopupMenuButton<Cad3DShadingMode>(
             icon: Icon(_shadingMode.icon, color: Colors.white70),
             tooltip: 'Режим на осветяване',
-            onSelected: (mode) => setState(() => _shadingMode = mode),
+            onSelected: (mode) => setState(() {
+              _shadingMode = mode;
+              if (_useGpuAcceleration && _lastViewportSize != Size.zero) {
+                _requestGpuRender(_lastViewportSize);
+              }
+            }),
             itemBuilder: (ctx) => [
               for (final m in Cad3DShadingMode.values)
                 PopupMenuItem(
@@ -94,7 +205,7 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
                     children: [
                       Icon(m.icon, size: 18, color: Colors.white70),
                       const SizedBox(width: 8),
-                      Text(m.label),
+                      Text(_getShadingModeBg(m)),
                     ],
                   ),
                 ),
@@ -115,63 +226,82 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          // 3D Canvas with Gestures
-          GestureDetector(
-            onScaleStart: (details) {
-              _isInteracting = true;
-              _lastPanPos = details.localFocalPoint;
-              _baseZoom = _camera.zoom;
-            },
-            onScaleUpdate: (details) {
-              setState(() {
-                if (details.pointerCount == 1 && _lastPanPos != null) {
-                  // Single finger: orbit rotation
-                  final delta = details.localFocalPoint - _lastPanPos!;
-                  _camera.yaw += delta.dx * 0.01;
-                  _camera.pitch = (_camera.pitch - delta.dy * 0.01)
-                      .clamp(-math.pi / 2.1, math.pi / 2.1);
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          _lastViewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+          if (_useGpuAcceleration && _gpuImage == null && !_isGpuRendering) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _requestGpuRender(_lastViewportSize);
+            });
+          }
+
+          return Stack(
+            children: [
+              // 3D Canvas with Gestures
+              GestureDetector(
+                onScaleStart: (details) {
+                  _isInteracting = true;
                   _lastPanPos = details.localFocalPoint;
-                } else if (details.pointerCount > 1) {
-                  // Multi-touch: zoom & pan
-                  _camera.zoom = (_baseZoom * details.scale).clamp(0.2, 10.0);
-                  if (_lastPanPos != null) {
-                    final delta = details.localFocalPoint - _lastPanPos!;
-                    _camera.panOffset += delta;
-                    _lastPanPos = details.localFocalPoint;
-                  }
-                }
-              });
-            },
-            onScaleEnd: (_) {
-              setState(() {
-                _isInteracting = false;
-                _lastPanPos = null;
-              });
-            },
-            child: Listener(
-              onPointerSignal: (signal) {
-                if (signal is PointerScrollEvent) {
+                  _baseZoom = _camera.zoom;
+                },
+                onScaleUpdate: (details) {
                   setState(() {
-                    final factor = signal.scrollDelta.dy > 0 ? 0.9 : 1.1;
-                    _camera.zoom = (_camera.zoom * factor).clamp(0.2, 10.0);
+                    if (details.pointerCount == 1 && _lastPanPos != null) {
+                      // Single finger: orbit rotation
+                      final delta = details.localFocalPoint - _lastPanPos!;
+                      _camera.yaw += delta.dx * 0.01;
+                      _camera.pitch = (_camera.pitch - delta.dy * 0.01)
+                          .clamp(-math.pi / 2.1, math.pi / 2.1);
+                      _lastPanPos = details.localFocalPoint;
+                    } else if (details.pointerCount > 1) {
+                      // Multi-touch: zoom & pan
+                      _camera.zoom = (_baseZoom * details.scale).clamp(0.2, 10.0);
+                      if (_lastPanPos != null) {
+                        final delta = details.localFocalPoint - _lastPanPos!;
+                        _camera.panOffset += delta;
+                        _lastPanPos = details.localFocalPoint;
+                      }
+                    }
                   });
-                }
-              },
-              child: CustomPaint(
-                size: Size.infinite,
-                painter: Cad3DMeshPainter(
-                  mesh: _mesh,
-                  camera: _camera,
-                  shadingMode: _shadingMode,
-                  theme: Cad3DTheme.darkCad,
-                  showGrid: true,
-                  isInteracting: _isInteracting,
+                  if (_useGpuAcceleration) {
+                    _requestGpuRender(_lastViewportSize);
+                  }
+                },
+                onScaleEnd: (_) {
+                  setState(() {
+                    _isInteracting = false;
+                    _lastPanPos = null;
+                  });
+                  if (_useGpuAcceleration) {
+                    _requestGpuRender(_lastViewportSize);
+                  }
+                },
+                child: Listener(
+                  onPointerSignal: (signal) {
+                    if (signal is PointerScrollEvent) {
+                      setState(() {
+                        final factor = signal.scrollDelta.dy > 0 ? 0.9 : 1.1;
+                        _camera.zoom = (_camera.zoom * factor).clamp(0.2, 10.0);
+                      });
+                      if (_useGpuAcceleration) {
+                        _requestGpuRender(_lastViewportSize);
+                      }
+                    }
+                  },
+                  child: CustomPaint(
+                    size: Size.infinite,
+                    painter: Cad3DMeshPainter(
+                      mesh: _mesh,
+                      camera: _camera,
+                      shadingMode: _shadingMode,
+                      theme: Cad3DTheme.darkCad,
+                      showGrid: true,
+                      isInteracting: _isInteracting,
+                      gpuImage: _useGpuAcceleration ? _gpuImage : null,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
 
           // Storey Filter Chips (Top Overlay)
           Positioned(
@@ -216,7 +346,9 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
             ),
           ),
         ],
-      ),
-    );
-  }
+      );
+    },
+  ),
+);
+}
 }

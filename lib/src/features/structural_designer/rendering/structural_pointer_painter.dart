@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../models/structural_element.dart';
@@ -106,8 +107,59 @@ class StructuralPointerPainter extends CustomPainter {
       _drawSnapIndicator(canvas, effectiveTip, snapType!, themeColor);
     }
 
-    // 5. Element Dimensions & Tool Preview Tag
+    // 5. Draw Element Footprint Silhouette at the Pointer Apex
+    if (activeTool == StructuralDrawTool.column && previewColumn != null) {
+      _drawColumnFootprint(canvas, effectiveTip, themeColor);
+    }
+
+    // 6. Element Dimensions & Tool Preview Tag
     _drawPreviewTag(canvas, effectiveTip, isSnapped, themeColor);
+  }
+
+  void _drawColumnFootprint(Canvas canvas, Offset tip, Color color) {
+    final double wScreen = math.max(previewColumn!.width * 45.0, 16.0);
+    final double hScreen = math.max(previewColumn!.height * 45.0, 16.0);
+
+    final footFill = Paint()
+      ..color = color.withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
+    final footBorder = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+
+    if (previewColumn!.shape == ColumnShape.circular) {
+      final double r = wScreen / 2.0;
+      canvas.drawCircle(tip, r, footFill);
+      canvas.drawCircle(tip, r, footBorder);
+      // Small center cross
+      canvas.drawLine(Offset(tip.dx - 4, tip.dy), Offset(tip.dx + 4, tip.dy), footBorder);
+      canvas.drawLine(Offset(tip.dx, tip.dy - 4), Offset(tip.dx, tip.dy + 4), footBorder);
+    } else {
+      final rect = Rect.fromCenter(center: tip, width: wScreen, height: hScreen);
+      canvas.drawRect(rect, footFill);
+      canvas.drawRect(rect, footBorder);
+      // Small center cross
+      canvas.drawLine(Offset(tip.dx - 4, tip.dy), Offset(tip.dx + 4, tip.dy), footBorder);
+      canvas.drawLine(Offset(tip.dx, tip.dy - 4), Offset(tip.dx, tip.dy + 4), footBorder);
+    }
+  }
+
+  String _getSnapTypeBg(DxfSnapType type) {
+    switch (type) {
+      case DxfSnapType.endpoint:
+        return 'Край';
+      case DxfSnapType.midpoint:
+        return 'Среда';
+      case DxfSnapType.center:
+        return 'Център';
+      case DxfSnapType.nearest:
+        return 'Най-близка';
+      case DxfSnapType.perpendicular:
+        return 'Перпендикуляр';
+      case DxfSnapType.point:
+        return 'Точка';
+    }
   }
 
   void _drawSnapIndicator(
@@ -173,7 +225,7 @@ class StructuralPointerPainter extends CustomPainter {
     if (text.isEmpty) return;
 
     if (isSnapped && snapType != null) {
-      text = '$text (${snapType!.label})';
+      text = '$text (${_getSnapTypeBg(snapType!)})';
     }
 
     final tp = TextPainter(

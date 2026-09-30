@@ -23,12 +23,14 @@ import 'widgets/structural_3d_viewport.dart';
 class StructuralDesignerScreen extends StatefulWidget {
   final DxfDocument document;
   final Rect? initialCadBounds;
+  final Matrix4? initialTransform;
   final String title;
 
   const StructuralDesignerScreen({
     super.key,
     required this.document,
     this.initialCadBounds,
+    this.initialTransform,
     this.title = 'Конструктивен Модел',
   });
 
@@ -38,8 +40,7 @@ class StructuralDesignerScreen extends StatefulWidget {
 }
 
 class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
-  final TransformationController _transformController =
-      TransformationController();
+  late final TransformationController _transformController;
 
   late StructuralProject _project;
   StructuralDrawTool _activeTool = StructuralDrawTool.column;
@@ -81,6 +82,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   @override
   void initState() {
     super.initState();
+    _transformController = TransformationController(
+      widget.initialTransform != null
+          ? Matrix4.copy(widget.initialTransform!)
+          : Matrix4.identity(),
+    );
     _project = const StructuralProject();
     _runAnalysis();
   }
@@ -194,8 +200,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
     _isMultiTouchGesture = false;
-    _updatePointer(event.localPosition,
-        isMouse: event.kind == PointerDeviceKind.mouse);
+    if (_activeTool != StructuralDrawTool.select) {
+      _updatePointer(event.localPosition,
+          isMouse: event.kind == PointerDeviceKind.mouse);
+    }
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
@@ -204,8 +212,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
-    _updatePointer(event.localPosition,
-        isMouse: event.kind == PointerDeviceKind.mouse);
+    if (_activeTool != StructuralDrawTool.select) {
+      _updatePointer(event.localPosition,
+          isMouse: event.kind == PointerDeviceKind.mouse);
+    }
   }
 
   void _updatePointer(Offset screenPos, {bool isMouse = false}) {
@@ -335,7 +345,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    if (_currentCadCoord != null) {
+    if (_activeTool != StructuralDrawTool.select && _currentCadCoord != null) {
       _commitPlacement(_currentCadCoord!);
     }
 
@@ -585,7 +595,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               _snapEnabled ? Icons.grain_rounded : Icons.lens_blur_rounded,
               color: _snapEnabled ? const Color(0xFF00E5FF) : Colors.white38,
             ),
-            tooltip: _snapEnabled ? 'Snap включен' : 'Snap изключен',
+            tooltip: _snapEnabled
+                ? 'Прилепване (Snap): Включено'
+                : 'Прилепване (Snap): Изключено',
             onPressed: () {
               setState(() => _snapEnabled = !_snapEnabled);
               HapticFeedback.selectionClick();
@@ -595,7 +607,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           IconButton(
             icon: Icon(Icons.undo_rounded,
                 color: _undoStack.isNotEmpty ? Colors.white : Colors.white24),
-            tooltip: 'Отмени действие',
+            tooltip: 'Отмени последно действие',
             onPressed: _undoStack.isNotEmpty ? _undo : null,
           ),
           // 3D Viewport Launcher
@@ -612,70 +624,83 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
           return Stack(
             children: [
-              // 1. Interactive 2D Canvas with CAD DWG/DXF Underlay + Structural Layers
+              // 1. Gesture Listener wrapping InteractiveViewer:
+              // Allows single-finger placement with 56px offset ruler,
+              // while simultaneously enabling free 2-finger pinch-to-zoom and pan anytime!
               Positioned.fill(
-                child: InteractiveViewer(
-                  transformationController: _transformController,
-                  minScale: 0.05,
-                  maxScale: 100.0,
-                  boundaryMargin: const EdgeInsets.all(double.infinity),
-                  panEnabled: _activeTool == StructuralDrawTool.select,
-                  scaleEnabled: true,
-                  child: SizedBox(
-                    width: _viewportSize.width,
-                    height: _viewportSize.height,
-                    child: Stack(
-                      children: [
-                        // CAD DWG/DXF Architecture Underlay (dimmed)
-                        Positioned.fill(
-                          child: RepaintBoundary(
-                            child: CustomPaint(
-                              painter: DxfPainter(
-                                document: widget.document,
-                                theme: DxfCanvasTheme.darkCad,
-                                activeLayout: 'Model',
-                                currentScale: 1.0,
+                child: Listener(
+                  onPointerDown: _handlePointerDown,
+                  onPointerMove: _handlePointerMove,
+                  onPointerUp: _handlePointerUp,
+                  onPointerCancel: _handlePointerCancel,
+                  child: InteractiveViewer(
+                    transformationController: _transformController,
+                    panEnabled: _activeTool == StructuralDrawTool.select || _isMultiTouchGesture,
+                    scaleEnabled: true,
+                    scaleFactor: 350.0,
+                    trackpadScrollCausesScale: true,
+                    minScale: 0.001,
+                    maxScale: 1000.0,
+                    boundaryMargin: const EdgeInsets.all(double.infinity),
+                    onInteractionStart: (details) {
+                      if (details.pointerCount > 1) {
+                        setState(() {
+                          _isMultiTouchGesture = true;
+                          _touchScreenPos = null;
+                          _targetScreenPos = null;
+                          _snappedScreenPos = null;
+                          _activeSnap = null;
+                        });
+                      }
+                    },
+                    onInteractionEnd: (details) {
+                      _activePointersCount = 0;
+                      _isMultiTouchGesture = false;
+                    },
+                    child: SizedBox(
+                      width: _viewportSize.width,
+                      height: _viewportSize.height,
+                      child: Stack(
+                        children: [
+                          // CAD DWG/DXF Architecture Underlay (dimmed)
+                          Positioned.fill(
+                            child: RepaintBoundary(
+                              child: CustomPaint(
+                                painter: DxfPainter(
+                                  document: widget.document,
+                                  theme: DxfCanvasTheme.darkCad,
+                                  activeLayout: 'Model',
+                                  currentScale: 1.0,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        // Structural Elements Layer (Columns, Walls, Slabs, Ghost Story, Cantilever badges)
-                        Positioned.fill(
-                          child: CustomPaint(
-                            painter: Structural2dPainter(
-                              currentStorey: _project.activeStorey,
-                              ghostStorey: _project.ghostStorey,
-                              cantileverZones: _analysisSummary.zones,
-                              showCantileverHeatmap: true,
-                              activeTool: _activeTool,
-                              previewColumn: _currentColumnPreset,
-                              previewColumnPos: _currentCadCoord,
-                              wallStartPos: _wallStartCad,
-                              currentCursorCad: _currentCadCoord,
-                              slabPointsInProgress: _slabPointsCad,
-                              zoomScale: _transformController.value.getMaxScaleOnAxis(),
+                          // Structural Elements Layer (Columns, Walls, Slabs, Ghost Story, Cantilever badges)
+                          Positioned.fill(
+                            child: CustomPaint(
+                              painter: Structural2dPainter(
+                                currentStorey: _project.activeStorey,
+                                ghostStorey: _project.ghostStorey,
+                                cantileverZones: _analysisSummary.zones,
+                                showCantileverHeatmap: true,
+                                activeTool: _activeTool,
+                                previewColumn: _currentColumnPreset,
+                                previewColumnPos: _currentCadCoord,
+                                wallStartPos: _wallStartCad,
+                                currentCursorCad: _currentCadCoord,
+                                slabPointsInProgress: _slabPointsCad,
+                                zoomScale: _transformController.value.getMaxScaleOnAxis(),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
 
-              // 2. Gesture Listener for Offset Touch Pointer (56px)
-              if (_activeTool != StructuralDrawTool.select)
-                Positioned.fill(
-                  child: Listener(
-                    behavior: HitTestBehavior.opaque,
-                    onPointerDown: _handlePointerDown,
-                    onPointerMove: _handlePointerMove,
-                    onPointerUp: _handlePointerUp,
-                    onPointerCancel: _handlePointerCancel,
-                  ),
-                ),
-
-              // 3. Screen-Space Offset Target Pointer with Stem Guideline & Live Dimensioning
+              // 2. Screen-Space Offset Target Pointer with Stem Guideline & Live Dimensioning
               if (_touchScreenPos != null && _targetScreenPos != null)
                 Positioned.fill(
                   child: IgnorePointer(
@@ -687,8 +712,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         snapType: _activeSnap?.type,
                         activeTool: _activeTool,
                         previewColumn: _currentColumnPreset,
-                        wallStartPos: _wallStartCad,
-                        slabPoints: _slabPointsCad,
+                        wallStartPos: _wallStartCad != null ? _cadToScreen(_wallStartCad!) : null,
+                        slabPoints: _slabPointsCad.map(_cadToScreen).toList(),
                       ),
                     ),
                   ),
@@ -716,7 +741,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               size: 14, color: Color(0xFF00E5FF)),
                           const SizedBox(width: 6),
                           Text(
-                            'Trace: ${_project.ghostStorey!.name}',
+                            'Референтен слой (Trace): ${_project.ghostStorey!.name}',
                             style: const TextStyle(
                                 color: Color(0xFF00E5FF), fontSize: 11),
                           ),
