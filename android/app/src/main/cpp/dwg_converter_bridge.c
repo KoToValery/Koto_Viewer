@@ -86,15 +86,16 @@ static int do_convert_dwg_to_dxf(const char* in_dwg_path, const char* out_dxf_pa
     LOGI("Input DWG file verified, size: %ld bytes (%.2f MB)", fsize, (double)fsize / (1024.0 * 1024.0));
 
     // 2. Allocate Dwg_Data on the HEAP (avoid stack pressure)
-    Dwg_Data *dwg = (Dwg_Data*)calloc(1, sizeof(Dwg_Data));
+    // Over-allocate by 64KB to avoid ABI size mismatch buffer overflow
+    Dwg_Data *dwg = (Dwg_Data*)calloc(1, sizeof(Dwg_Data) + 65536);
     if (!dwg) {
-        LOGE("Failed to allocate Dwg_Data on heap (%zu bytes)", sizeof(Dwg_Data));
+        LOGE("Failed to allocate Dwg_Data on heap (%zu bytes)", sizeof(Dwg_Data) + 65536);
         return -4;
     }
 
 #if !defined(_WIN32) && !defined(__CYGWIN__)
-    // 3. Install signal handlers to intercept SIGSEGV/SIGBUS/SIGABRT/SIGFPE
-    struct sigaction sa, old_segv, old_bus, old_abrt, old_fpe;
+    // 3. Install signal handlers to intercept SIGSEGV/SIGBUS/SIGABRT/SIGFPE/SIGTRAP/SIGILL
+    struct sigaction sa, old_segv, old_bus, old_abrt, old_fpe, old_trap, old_ill;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = crash_signal_handler;
     sa.sa_flags = SA_SIGINFO | SA_NODEFER;
@@ -104,6 +105,8 @@ static int do_convert_dwg_to_dxf(const char* in_dwg_path, const char* out_dxf_pa
     sigaction(SIGBUS, &sa, &old_bus);
     sigaction(SIGABRT, &sa, &old_abrt);
     sigaction(SIGFPE, &sa, &old_fpe);
+    sigaction(SIGTRAP, &sa, &old_trap);
+    sigaction(SIGILL, &sa, &old_ill);
 
     g_crash_guard_active = 1;
     int sig = sigsetjmp(g_crash_jmp_buf, 1);
@@ -114,6 +117,8 @@ static int do_convert_dwg_to_dxf(const char* in_dwg_path, const char* out_dxf_pa
         sigaction(SIGBUS, &old_bus, NULL);
         sigaction(SIGABRT, &old_abrt, NULL);
         sigaction(SIGFPE, &old_fpe, NULL);
+        sigaction(SIGTRAP, &old_trap, NULL);
+        sigaction(SIGILL, &old_ill, NULL);
         free(dwg);
         return -100 - sig;
     }
@@ -134,6 +139,8 @@ static int do_convert_dwg_to_dxf(const char* in_dwg_path, const char* out_dxf_pa
         sigaction(SIGBUS, &old_bus, NULL);
         sigaction(SIGABRT, &old_abrt, NULL);
         sigaction(SIGFPE, &old_fpe, NULL);
+        sigaction(SIGTRAP, &old_trap, NULL);
+        sigaction(SIGILL, &old_ill, NULL);
 #endif
         free(dwg);
         return error;
@@ -149,6 +156,8 @@ static int do_convert_dwg_to_dxf(const char* in_dwg_path, const char* out_dxf_pa
         sigaction(SIGBUS, &old_bus, NULL);
         sigaction(SIGABRT, &old_abrt, NULL);
         sigaction(SIGFPE, &old_fpe, NULL);
+        sigaction(SIGTRAP, &old_trap, NULL);
+        sigaction(SIGILL, &old_ill, NULL);
 #endif
         free(dwg);
         return -3;
@@ -188,6 +197,8 @@ static int do_convert_dwg_to_dxf(const char* in_dwg_path, const char* out_dxf_pa
     sigaction(SIGBUS, &old_bus, NULL);
     sigaction(SIGABRT, &old_abrt, NULL);
     sigaction(SIGFPE, &old_fpe, NULL);
+    sigaction(SIGTRAP, &old_trap, NULL);
+    sigaction(SIGILL, &old_ill, NULL);
 #endif
 
     free(dwg);
