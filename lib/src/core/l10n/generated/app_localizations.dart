@@ -2101,6 +2101,12 @@ abstract class AppLocalizations {
   /// **'Rotate 90°'**
   String get rotateElement;
 
+  /// Mirror structural element button
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror'**
+  String get mirrorElement;
+
   /// Snackbar message when a column is deleted
   ///
   /// In en, this message translates to:
@@ -2184,6 +2190,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Selected Slab'**
   String get selectedSlabTitle;
+
+  /// Duplicate selected structural element
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get duplicateElement;
+
+  /// Flip side of shear wall leading line
+  ///
+  /// In en, this message translates to:
+  /// **'Flip Side'**
+  String get flipSide;
+
+  /// Title badge for selected shear wall
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Shear Wall {dimensions}'**
+  String selectedWallTitle(String dimensions);
+
+  /// L-shaped column preset label
+  ///
+  /// In en, this message translates to:
+  /// **'L-Shape 50x50/25'**
+  String get columnShapeLShape;
 }
 
 class _AppLocalizationsDelegate

@@ -988,6 +988,8 @@
   "@moveElement": { "description": "Move structural element button" },
   "rotateElement": "Rotate 90°",
   "@rotateElement": { "description": "Rotate structural element 90 degrees button" },
+  "mirrorElement": "Mirror",
+  "@mirrorElement": { "description": "Mirror structural element button" },
   "columnDeleted": "Column deleted",
   "@columnDeleted": { "description": "Snackbar message when a column is deleted" },
   "selectedColumnTitle": "Selected Column {dimensions}",
@@ -1025,5 +1027,18 @@
   "editSlabAction": "Edit Slab",
   "@editSlabAction": { "description": "Action button to edit slab" },
   "selectedSlabTitle": "Selected Slab",
-  "@selectedSlabTitle": { "description": "Title badge for selected slab" }
+  "@selectedSlabTitle": { "description": "Title badge for selected slab" },
+  "duplicateElement": "Duplicate",
+  "@duplicateElement": { "description": "Duplicate selected structural element" },
+  "flipSide": "Flip Side",
+  "@flipSide": { "description": "Flip side of shear wall leading line" },
+  "selectedWallTitle": "Selected Shear Wall {dimensions}",
+  "@selectedWallTitle": {
+    "description": "Title badge for selected shear wall",
+    "placeholders": {
+      "dimensions": { "type": "String" }
+    }
+  },
+  "columnShapeLShape": "L-Shape 50x50/25",
+  "@columnShapeLShape": { "description": "L-shaped column preset label" }
 }

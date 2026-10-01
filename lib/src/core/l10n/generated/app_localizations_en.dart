@@ -1150,6 +1150,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rotateElement => 'Rotate 90°';
 
   @override
+  String get mirrorElement => 'Mirror';
+
+  @override
   String get columnDeleted => 'Column deleted';
 
   @override
@@ -1194,4 +1197,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get selectedSlabTitle => 'Selected Slab';
+
+  @override
+  String get duplicateElement => 'Duplicate';
+
+  @override
+  String get flipSide => 'Flip Side';
+
+  @override
+  String selectedWallTitle(String dimensions) {
+    return 'Selected Shear Wall $dimensions';
+  }
+
+  @override
+  String get columnShapeLShape => 'L-Shape 50x50/25';
 }

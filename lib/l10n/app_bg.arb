@@ -339,6 +339,7 @@
   "slabRectDimensions": "Плоча: {width} x {height} m",
   "moveElement": "Премести",
   "rotateElement": "Завърти 90°",
+  "mirrorElement": "Огледало",
   "columnDeleted": "Колоната е изтрита",
   "selectedColumnTitle": "Избрана колона {dimensions}",
   "dragToMoveTooltip": "Задръжте и плъзнете за преместване",
@@ -352,5 +353,9 @@
   "deleteSlab": "Изтрий плоча",
   "slabDeleted": "Плочата е изтрита",
   "editSlabAction": "Корекция на плоча",
-  "selectedSlabTitle": "Избрана плоча"
+  "selectedSlabTitle": "Избрана плоча",
+  "duplicateElement": "Дублирай",
+  "flipSide": "Обърни страна",
+  "selectedWallTitle": "Избрана шайба {dimensions}",
+  "columnShapeLShape": "Г-образна 50x50/25"
 }

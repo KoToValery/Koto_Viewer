@@ -132,6 +132,9 @@ class DxfSnapHelper {
 
     final double maxDistSq = toleranceCad * toleranceCad;
 
+    DxfSnapResult? bestEndpointSnap;
+    double minEndpointDistSq = maxDistSq;
+
     DxfSnapResult? bestLandmarkSnap;
     double minLandmarkDistSq = maxDistSq;
 
@@ -145,6 +148,17 @@ class DxfSnapHelper {
       final dx = p.dx - cadPoint.dx;
       final dy = p.dy - cadPoint.dy;
       final distSq = dx * dx + dy * dy;
+
+      if (type == DxfSnapType.endpoint) {
+        if (distSq <= minEndpointDistSq) {
+          minEndpointDistSq = distSq;
+          bestEndpointSnap = DxfSnapResult(
+            point: p,
+            type: type,
+            distance: math.sqrt(distSq),
+          );
+        }
+      }
 
       if (distSq <= minLandmarkDistSq) {
         minLandmarkDistSq = distSq;
@@ -488,8 +502,12 @@ class DxfSnapHelper {
       }
     }
 
-    // If both landmark and nearest point coincide (e.g. at the segment endpoint),
-    // always return the landmark snap.
+    // 1. Endpoint has HIGHEST priority (corners of walls, opening boundaries)
+    if (bestEndpointSnap != null) {
+      return bestEndpointSnap;
+    }
+
+    // 2. If both landmark and nearest point coincide, always return landmark snap.
     if (bestLandmarkSnap != null && bestNearestSnap != null) {
       final double diffSq = (bestNearestSnap!.point.dx - bestLandmarkSnap!.point.dx) *
               (bestNearestSnap!.point.dx - bestLandmarkSnap!.point.dx) +
@@ -500,7 +518,14 @@ class DxfSnapHelper {
       }
     }
 
-    // Prioritize perpendicular right-angle snap when cursor is close to the perpendicular point (within 70% of tolerance)
+    // 3. Prioritize landmark (midpoint/center)
+    if (bestLandmarkSnap != null) {
+      if (bestNearestSnap == null || bestLandmarkSnap!.distance <= toleranceCad * 0.75) {
+        return bestLandmarkSnap;
+      }
+    }
+
+    // 4. Perpendicular right-angle snap
     if (bestPerpendicularSnap != null) {
       if (bestPerpendicularSnap!.distance <= toleranceCad * 0.70 ||
           (bestNearestSnap != null && (bestPerpendicularSnap!.point - bestNearestSnap!.point).distanceSquared < 1e-4)) {
@@ -508,20 +533,7 @@ class DxfSnapHelper {
       }
     }
 
-    // Prioritize landmark (endpoint/midpoint/center) when cursor is within 65% of snap tolerance,
-    // or when no nearest segment was found.
-    if (bestLandmarkSnap != null) {
-      if (bestNearestSnap == null || bestLandmarkSnap!.distance <= toleranceCad * 0.65) {
-        return bestLandmarkSnap;
-      }
-    }
-
-    // If perpendicular snap was found and is closer than nearest
-    if (bestPerpendicularSnap != null &&
-        (bestNearestSnap == null || bestPerpendicularSnap!.distance < bestNearestSnap!.distance)) {
-      return bestPerpendicularSnap;
-    }
-
+    // 5. Nearest line segment
     if (bestNearestSnap != null) {
       return bestNearestSnap;
     }

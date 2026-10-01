@@ -255,7 +255,7 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
                       // Single finger: orbit rotation
                       final delta = details.localFocalPoint - _lastPanPos!;
                       _camera.yaw += delta.dx * 0.01;
-                      _camera.pitch = (_camera.pitch - delta.dy * 0.01)
+                      _camera.pitch = (_camera.pitch + delta.dy * 0.01)
                           .clamp(-math.pi / 2.1, math.pi / 2.1);
                       _lastPanPos = details.localFocalPoint;
                     } else if (details.pointerCount > 1) {

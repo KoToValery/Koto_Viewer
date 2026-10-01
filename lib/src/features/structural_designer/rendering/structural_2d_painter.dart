@@ -21,6 +21,7 @@ class Structural2dPainter extends CustomPainter {
   final SlabEdgeGripInfo? extrudingGrip;
   final double? extrusionDistance;
   final String? selectedColumnId;
+  final String? selectedShearWallId;
   final StructuralColumn? movingColumn;
   final Offset? movingColumnPos;
   final String? selectedSlabId;
@@ -47,6 +48,7 @@ class Structural2dPainter extends CustomPainter {
     this.extrudingGrip,
     this.extrusionDistance,
     this.selectedColumnId,
+    this.selectedShearWallId,
     this.movingColumn,
     this.movingColumnPos,
     this.selectedSlabId,
@@ -373,12 +375,32 @@ class Structural2dPainter extends CustomPainter {
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
 
-    // Centerline
-    final centerLinePaint = Paint()
-      ..color = isGhost ? const Color(0x40FFFFFF) : const Color(0x99FFC107)
+    // Leading reference line on the left edge of the wall
+    final leadingLinePaint = Paint()
+      ..color = isGhost ? const Color(0x40FFFFFF) : const Color(0xFF00E5FF)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 / zoomScale;
-    canvas.drawLine(cadToScene(wall.start), cadToScene(wall.end), centerLinePaint);
+      ..strokeWidth = 2.0 / zoomScale;
+    canvas.drawLine(cadToScene(wall.start), cadToScene(wall.end), leadingLinePaint);
+
+    final isSelected = !isGhost && (wall.id == selectedShearWallId);
+    if (isSelected) {
+      final selectHalo = Paint()
+        ..color = const Color(0xFFFFB300)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5 / zoomScale;
+      canvas.drawPath(path, selectHalo);
+
+      final handlePaint = Paint()
+        ..color = const Color(0xFFFFB300)
+        ..style = PaintingStyle.fill;
+      final handleSize = 3.5 / zoomScale;
+      for (final pt in pts) {
+        canvas.drawRect(
+          Rect.fromCenter(center: pt, width: handleSize * 2, height: handleSize * 2),
+          handlePaint,
+        );
+      }
+    }
   }
 
   void _drawColumn(Canvas canvas, StructuralColumn col,

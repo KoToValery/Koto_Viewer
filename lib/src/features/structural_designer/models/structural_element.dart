@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 enum ColumnShape {
   rectangular,
   circular,
+  lShape,
 }
 
 /// Mode for ArchiCAD-like ghost story / trace reference underlay.
@@ -19,20 +20,24 @@ class StructuralColumn {
   final String id;
   final Offset center;
   final ColumnShape shape;
-  final double width; // in meters (or diameter if circular)
-  final double height; // in meters
+  final double width; // in meters (or diameter if circular, or Leg 1 for L-shape)
+  final double height; // in meters (or Leg 2 for L-shape)
   final double rotationRad;
+  final double thickness; // in meters (flange/web thickness for L-shape, default 0.25)
+  final bool isMirrored; // whether shape is mirrored horizontally
 
   const StructuralColumn({
     required this.id,
     required this.center,
     this.shape = ColumnShape.rectangular,
     this.width = 0.25,
-    this.height = 0.50,
+    this.height = 0.25,
     this.rotationRad = 0.0,
+    this.thickness = 0.25,
+    this.isMirrored = false,
   });
 
-  /// Top-left corner of the column in CAD coordinates.
+  /// Top-left corner of the column bounding box in CAD coordinates.
   Offset get topLeft => Offset(center.dx - width / 2.0, center.dy + height / 2.0);
 
   /// Creates a column with its top-left corner positioned at [topLeft] in CAD coordinates.
@@ -41,8 +46,10 @@ class StructuralColumn {
     required Offset topLeft,
     ColumnShape shape = ColumnShape.rectangular,
     double width = 0.25,
-    double height = 0.50,
+    double height = 0.25,
     double rotationRad = 0.0,
+    double thickness = 0.25,
+    bool isMirrored = false,
   }) {
     final center = Offset(topLeft.dx + width / 2.0, topLeft.dy - height / 2.0);
     return StructuralColumn(
@@ -52,11 +59,13 @@ class StructuralColumn {
       width: width,
       height: height,
       rotationRad: rotationRad,
+      thickness: thickness,
+      isMirrored: isMirrored,
     );
   }
 
-  /// Calculates the 4 corner vertices of the column in CAD world coordinates,
-  /// starting from Top-Left in clockwise/counter-clockwise order.
+  /// Calculates the corner vertices of the column in CAD world coordinates,
+  /// starting from outer corner in clockwise/counter-clockwise order.
   List<Offset> get polygonVertices {
     if (shape == ColumnShape.circular) {
       // 12-sided polygon approximation for circular column
@@ -83,6 +92,30 @@ class StructuralColumn {
         center.dx + (lx * cosA - ly * sinA),
         center.dy + (lx * sinA + ly * cosA),
       );
+    }
+
+    if (shape == ColumnShape.lShape) {
+      // 6-vertex L-shaped corner column: legs width x height, flange thickness
+      final double t = math.min(thickness, math.min(width, height) * 0.9);
+      if (!isMirrored) {
+        return [
+          rotate(-halfW, -halfH), // Outer corner
+          rotate(halfW, -halfH), // Tip of horizontal leg
+          rotate(halfW, -halfH + t),
+          rotate(-halfW + t, -halfH + t), // Inner corner
+          rotate(-halfW + t, halfH),
+          rotate(-halfW, halfH), // Tip of vertical leg
+        ];
+      } else {
+        return [
+          rotate(halfW, -halfH), // Outer corner (mirrored)
+          rotate(-halfW, -halfH), // Tip of horizontal leg
+          rotate(-halfW, -halfH + t),
+          rotate(halfW - t, -halfH + t), // Inner corner
+          rotate(halfW - t, halfH),
+          rotate(halfW, halfH), // Tip of vertical leg
+        ];
+      }
     }
 
     // Top-Left, Top-Right, Bottom-Right, Bottom-Left in CAD coordinates (Y up)
@@ -114,6 +147,8 @@ class StructuralColumn {
     double? width,
     double? height,
     double? rotationRad,
+    double? thickness,
+    bool? isMirrored,
   }) {
     return StructuralColumn(
       id: id ?? this.id,
@@ -122,22 +157,27 @@ class StructuralColumn {
       width: width ?? this.width,
       height: height ?? this.height,
       rotationRad: rotationRad ?? this.rotationRad,
+      thickness: thickness ?? this.thickness,
+      isMirrored: isMirrored ?? this.isMirrored,
     );
   }
 }
 
 /// Represents a structural reinforced concrete shear wall (шайба).
+/// The line from [start] to [end] is the LEADING REFERENCE LINE (default on the LEFT of the wall).
 class StructuralShearWall {
   final String id;
   final Offset start;
   final Offset end;
   final double thickness; // in meters (default 0.25)
+  final bool isFlipped; // whether the wall body is flipped to the left side of the line
 
   const StructuralShearWall({
     required this.id,
     required this.start,
     required this.end,
     this.thickness = 0.25,
+    this.isFlipped = false,
   });
 
   double get length {
@@ -149,20 +189,27 @@ class StructuralShearWall {
   double get angleRad => math.atan2(end.dy - start.dy, end.dx - start.dx);
 
   /// 4 corner vertices forming the thick wall box in CAD coordinates.
+  /// The line from [start] to [end] is the leading line on the LEFT (or right if flipped).
   List<Offset> get polygonVertices {
     final double l = length;
     if (l < 1e-6) {
       return [start, start, start, start];
     }
-    final double halfT = thickness / 2.0;
-    final double nx = -(end.dy - start.dy) / l * halfT;
-    final double ny = (end.dx - start.dx) / l * halfT;
+    // In CAD coordinates (Y up):
+    // Direction vector is (dx/l, dy/l)
+    // Left normal is (-dy/l, dx/l)
+    // Right normal is (dy/l, -dx/l)
+    final double dx = end.dx - start.dx;
+    final double dy = end.dy - start.dy;
+    final normal = isFlipped ? Offset(-dy / l, dx / l) : Offset(dy / l, -dx / l);
+    final ox = normal.dx * thickness;
+    final oy = normal.dy * thickness;
 
     return [
-      Offset(start.dx + nx, start.dy + ny),
-      Offset(end.dx + nx, end.dy + ny),
-      Offset(end.dx - nx, end.dy - ny),
-      Offset(start.dx - nx, start.dy - ny),
+      start,
+      end,
+      Offset(end.dx + ox, end.dy + oy),
+      Offset(start.dx + ox, start.dy + oy),
     ];
   }
 
@@ -171,12 +218,14 @@ class StructuralShearWall {
     Offset? start,
     Offset? end,
     double? thickness,
+    bool? isFlipped,
   }) {
     return StructuralShearWall(
       id: id ?? this.id,
       start: start ?? this.start,
       end: end ?? this.end,
       thickness: thickness ?? this.thickness,
+      isFlipped: isFlipped ?? this.isFlipped,
     );
   }
 }

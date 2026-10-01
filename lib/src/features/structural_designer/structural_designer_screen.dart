@@ -54,7 +54,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     center: Offset.zero,
     shape: ColumnShape.rectangular,
     width: 0.25,
-    height: 0.50,
+    height: 0.25,
+    thickness: 0.25,
   );
   double _currentWallThickness = 0.25;
   double _currentSlabThickness = 0.20;
@@ -71,17 +72,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   bool _isExtrudingEdge = false;
   double _extrusionDistanceCad = 0.0;
 
-  // Pointer & Touch states (Offset pointer: 56px above finger)
+  // Pointer & Touch states (Offset pointer: dynamic height above finger)
   Offset? _touchScreenPos;
   Offset? _targetScreenPos;
   Offset? _snappedScreenPos;
+  List<Offset> _snappedScreenPositions = [];
   DxfSnapResult? _activeSnap;
+  String? _liveDimensionText;
   Offset? _currentCadCoord;
   bool _isPlacingWithHold = false;
   bool _initializedStoreyName = false;
 
-  // Selection and move states (Column edit/drag)
+  // Selection and move states (Column & Shear Wall edit/drag)
   StructuralColumn? _selectedColumn;
+  StructuralShearWall? _selectedShearWall;
   bool _isMovingColumn = false;
   bool _hasMovedSelectedColumn = false;
 
@@ -94,9 +98,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Offset? _draggingSlabVertexCad;
   int? _mergeCandidateSlabVertexIndex;
   Offset? _midpointTouchDownPos;
-  double _slabOffsetSlider = 0.0;
-  double _slabRotateSlider = 0.0;
-  StructuralSlab? _sliderBaseSlab;
 
   // History for Undo
   final List<StructuralProject> _undoStack = [];
@@ -132,8 +133,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _originalLayerVisibility[entry.key] = entry.value.isVisible;
     }
 
-    // Automatically hide thin lines and isolate thickest structural lines by default
-    _applyUnderlayFilter(true);
+    // Underlay filter starts off (all layers visible as in commit e781d51).
+    // The user can manually toggle structural underlay filtering via the AppBar funnel icon.
 
     _project = const StructuralProject();
     _runAnalysis();
@@ -327,6 +328,27 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return null;
   }
 
+  StructuralShearWall? _hitTestShearWall(Offset screenPos) {
+    const double hitMarginScreen = 24.0;
+    for (final wall in _project.activeStorey.shearWalls.reversed) {
+      final pts = wall.polygonVertices.map(_cadToScreen).toList();
+      if (pts.isEmpty) continue;
+      double minX = pts.first.dx, maxX = pts.first.dx;
+      double minY = pts.first.dy, maxY = pts.first.dy;
+      for (final p in pts) {
+        minX = math.min(minX, p.dx);
+        maxX = math.max(maxX, p.dx);
+        minY = math.min(minY, p.dy);
+        maxY = math.max(maxY, p.dy);
+      }
+      final rect = Rect.fromLTRB(minX, minY, maxX, maxY).inflate(hitMarginScreen);
+      if (rect.contains(screenPos)) {
+        return wall;
+      }
+    }
+    return null;
+  }
+
   StructuralSlab? _hitTestSlab(Offset screenPos) {
     final active = _project.activeStorey;
     final cadPt = _screenToCad(screenPos);
@@ -385,25 +407,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _isMovingColumn = false;
     });
     HapticFeedback.heavyImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.columnDeleted),
-        duration: const Duration(seconds: 3),
-        action: SnackBarAction(
-          label: context.l10n.undoAction,
-          onPressed: _undo,
-        ),
-      ),
-    );
   }
 
   void _rotateSelectedColumn() {
     if (_selectedColumn == null) return;
     _pushUndo();
     final active = _project.activeStorey;
-    final updatedCol = _selectedColumn!.copyWith(
-      width: _selectedColumn!.height,
-      height: _selectedColumn!.width,
+    final col = _selectedColumn!;
+    final updatedCol = col.copyWith(
+      rotationRad: (col.rotationRad + math.pi / 2.0) % (2 * math.pi),
     );
     final updatedCols = active.columns
         .map((c) => c.id == updatedCol.id ? updatedCol : c)
@@ -411,6 +423,182 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _updateActiveStorey(active.copyWith(columns: updatedCols));
     setState(() {
       _selectedColumn = updatedCol;
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _mirrorSelectedColumn() {
+    if (_selectedColumn == null) return;
+    _pushUndo();
+    final active = _project.activeStorey;
+    final col = _selectedColumn!;
+
+    final StructuralColumn updatedCol;
+    if (col.shape == ColumnShape.lShape) {
+      // Mirroring L-shaped column flips the orientation of the L
+      updatedCol = col.copyWith(
+        isMirrored: !col.isMirrored,
+      );
+    } else {
+      // True geometric reflection across vertical axis: theta -> (pi - theta)
+      final double newRot = (math.pi - col.rotationRad) % (2 * math.pi);
+      updatedCol = col.copyWith(
+        rotationRad: newRot,
+      );
+    }
+
+    final updatedCols = active.columns
+        .map((c) => c.id == updatedCol.id ? updatedCol : c)
+        .toList();
+    _updateActiveStorey(active.copyWith(columns: updatedCols));
+    setState(() {
+      _selectedColumn = updatedCol;
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _updateSelectedColumnDimensions(double deltaWMeters, double deltaHMeters) {
+    if (_selectedColumn == null) return;
+    _pushUndo();
+    final col = _selectedColumn!;
+    final active = _project.activeStorey;
+    final scale = _cadUnitsPerMeter;
+    final currentWM = col.width / scale;
+    final currentHM = col.height / scale;
+    final newWM = (currentWM + deltaWMeters).clamp(0.15, 3.0);
+    final newHM = (currentHM + deltaHMeters).clamp(0.15, 3.0);
+    final updatedCol = col.copyWith(
+      width: double.parse(newWM.toStringAsFixed(2)) * scale,
+      height: double.parse(newHM.toStringAsFixed(2)) * scale,
+    );
+    final updatedCols = active.columns
+        .map((c) => c.id == updatedCol.id ? updatedCol : c)
+        .toList();
+    _updateActiveStorey(active.copyWith(columns: updatedCols));
+    setState(() {
+      _selectedColumn = updatedCol;
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _duplicateSelectedColumn() {
+    if (_selectedColumn == null) return;
+    _pushUndo();
+    final col = _selectedColumn!;
+    final active = _project.activeStorey;
+    final offset = Offset(0.20 * _cadUnitsPerMeter, -0.20 * _cadUnitsPerMeter);
+    final dup = StructuralColumn(
+      id: 'col_${DateTime.now().millisecondsSinceEpoch}',
+      center: col.center + offset,
+      shape: col.shape,
+      width: col.width,
+      height: col.height,
+      rotationRad: col.rotationRad,
+      thickness: col.thickness,
+      isMirrored: col.isMirrored,
+    );
+    final updatedCols = List<StructuralColumn>.from(active.columns)..add(dup);
+    _updateActiveStorey(active.copyWith(columns: updatedCols));
+    setState(() {
+      _selectedColumn = dup;
+      _isMovingColumn = false;
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  void _deleteSelectedWall() {
+    if (_selectedShearWall == null) return;
+    _pushUndo();
+    final active = _project.activeStorey;
+    final updatedWalls =
+        active.shearWalls.where((w) => w.id != _selectedShearWall!.id).toList();
+    _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
+    setState(() {
+      _selectedShearWall = null;
+    });
+    HapticFeedback.heavyImpact();
+  }
+
+  void _flipSelectedWall() {
+    if (_selectedShearWall == null) return;
+    _pushUndo();
+    final active = _project.activeStorey;
+    final wall = _selectedShearWall!;
+    final updatedWall = wall.copyWith(isFlipped: !wall.isFlipped);
+    final updatedWalls = active.shearWalls
+        .map((w) => w.id == updatedWall.id ? updatedWall : w)
+        .toList();
+    _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
+    setState(() {
+      _selectedShearWall = updatedWall;
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _duplicateSelectedWall() {
+    if (_selectedShearWall == null) return;
+    _pushUndo();
+    final wall = _selectedShearWall!;
+    final active = _project.activeStorey;
+    final offset = Offset(0.25 * _cadUnitsPerMeter, -0.25 * _cadUnitsPerMeter);
+    final dup = StructuralShearWall(
+      id: 'wall_${DateTime.now().millisecondsSinceEpoch}',
+      start: wall.start + offset,
+      end: wall.end + offset,
+      thickness: wall.thickness,
+      isFlipped: wall.isFlipped,
+    );
+    final updatedWalls = List<StructuralShearWall>.from(active.shearWalls)..add(dup);
+    _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
+    setState(() {
+      _selectedShearWall = dup;
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  void _updateSelectedWallLength(double deltaMeters) {
+    if (_selectedShearWall == null) return;
+    _pushUndo();
+    final wall = _selectedShearWall!;
+    final active = _project.activeStorey;
+    final l = wall.length;
+    final newL = math.max(0.30 * _cadUnitsPerMeter, l + deltaMeters * _cadUnitsPerMeter);
+    final dir = (wall.end - wall.start) / (l > 1e-6 ? l : 1.0);
+    final newEnd = wall.start + dir * newL;
+    final updatedWall = wall.copyWith(end: newEnd);
+    final updatedWalls = active.shearWalls
+        .map((w) => w.id == updatedWall.id ? updatedWall : w)
+        .toList();
+    _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
+    setState(() {
+      _selectedShearWall = updatedWall;
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _mirrorEditingSlab() {
+    if (_editingSlab == null) return;
+    _pushSlabCorrectionUndo();
+    final poly = _editingSlab!.polygon;
+    if (poly.isEmpty) return;
+    double minX = poly.first.dx, maxX = poly.first.dx;
+    for (final p in poly) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dx > maxX) maxX = p.dx;
+    }
+    final double midX = (minX + maxX) / 2.0;
+
+    final mirroredPoly = poly.map((p) => Offset(2 * midX - p.dx, p.dy)).toList();
+    final mirroredOpenings = _editingSlab!.openings.map((op) {
+      return op.map((p) => Offset(2 * midX - p.dx, p.dy)).toList();
+    }).toList();
+
+    setState(() {
+      _editingSlab = _editingSlab!.copyWith(
+        polygon: mirroredPoly,
+        openings: mirroredOpenings,
+      );
+      _updateActiveStoreySlab(_editingSlab!);
     });
     HapticFeedback.selectionClick();
   }
@@ -432,9 +620,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _draggingSlabVertexCad = null;
       _mergeCandidateSlabVertexIndex = null;
       _midpointTouchDownPos = null;
-      _slabOffsetSlider = 0.0;
-      _slabRotateSlider = 0.0;
-      _sliderBaseSlab = null;
     });
     HapticFeedback.selectionClick();
   }
@@ -476,7 +661,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _draggingSlabVertexCad = null;
       _mergeCandidateSlabVertexIndex = null;
       _midpointTouchDownPos = null;
-      _sliderBaseSlab = null;
     });
     HapticFeedback.selectionClick();
   }
@@ -494,7 +678,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _draggingSlabVertexCad = null;
       _mergeCandidateSlabVertexIndex = null;
       _midpointTouchDownPos = null;
-      _sliderBaseSlab = null;
       _runAnalysis();
     });
     HapticFeedback.mediumImpact();
@@ -515,19 +698,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _draggingSlabVertexCad = null;
       _mergeCandidateSlabVertexIndex = null;
       _midpointTouchDownPos = null;
-      _sliderBaseSlab = null;
     });
     HapticFeedback.heavyImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.slabDeleted),
-        duration: const Duration(seconds: 3),
-        action: SnackBarAction(
-          label: context.l10n.undoAction,
-          onPressed: _undo,
-        ),
-      ),
-    );
   }
 
   StructuralSlab _cleanSlabPolygon(StructuralSlab slab) {
@@ -573,53 +745,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     return slab.copyWith(polygon: pts);
-  }
-
-  void _applySlabOffset(double deltaMeters) {
-    if (_editingSlab == null) return;
-    _pushSlabCorrectionUndo();
-    final updated =
-        _editingSlab!.offsetContour(deltaMeters * _cadUnitsPerMeter);
-    _editingSlab = updated;
-    _updateActiveStoreySlab(updated);
-    HapticFeedback.selectionClick();
-  }
-
-  void _applySlabRotation(double deltaDegrees) {
-    if (_editingSlab == null) return;
-    _pushSlabCorrectionUndo();
-    final updated = _editingSlab!.rotate(deltaDegrees);
-    _editingSlab = updated;
-    _updateActiveStoreySlab(updated);
-    HapticFeedback.selectionClick();
-  }
-
-  void _startSliderTransform() {
-    _pushSlabCorrectionUndo();
-    _sliderBaseSlab = _editingSlab;
-  }
-
-  void _updateSliderOffset(double valMeters) {
-    if (_sliderBaseSlab == null) return;
-    final updated =
-        _sliderBaseSlab!.offsetContour(valMeters * _cadUnitsPerMeter);
-    _editingSlab = updated;
-    _updateActiveStoreySlab(updated);
-  }
-
-  void _updateSliderRotation(double degrees) {
-    if (_sliderBaseSlab == null) return;
-    final updated = _sliderBaseSlab!.rotate(degrees);
-    _editingSlab = updated;
-    _updateActiveStoreySlab(updated);
-  }
-
-  void _endSliderTransform() {
-    setState(() {
-      _slabOffsetSlider = 0.0;
-      _slabRotateSlider = 0.0;
-      _sliderBaseSlab = null;
-    });
   }
 
   void _updateSlabVertexDrag(Offset screenPos) {
@@ -809,7 +934,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         HapticFeedback.selectionClick();
         return;
       }
-      if (_activeTool != StructuralDrawTool.select && !_isEditingSlab) {
+      final hitSlab = _hitTestSlab(event.localPosition);
+      if (hitSlab != null) {
+        _startSlabCorrection(hitSlab);
+        return;
+      }
+      if (!_isEditingSlab) {
         _isPlacingWithHold = true;
         _updatePointer(event.localPosition, isMouse: true);
       }
@@ -888,39 +1018,280 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _updatePointer(Offset screenPos, {bool isMouse = false}) {
     final touchPos = screenPos;
-    // On touch mobile: target apex is positioned 56 pixels directly above finger
-    // so finger does not obscure the crosshair or CAD vertices!
+
+    // 1. Position target so the ENTIRE element is shifted above the finger and 100% visible
+    double offsetAboveFinger = 72.0;
+    if (!isMouse && (_activeTool == StructuralDrawTool.column || _isMovingColumn)) {
+      final double fitScale = _getCadFitScale();
+      final double currentScale = _transformController.value.getMaxScaleOnAxis();
+      final double cadScale = fitScale * currentScale.clamp(0.001, 10000.0);
+      final double colH = (_isMovingColumn && _selectedColumn != null)
+          ? _selectedColumn!.height
+          : _currentColumnPreset.height * _cadUnitsPerMeter;
+      final double colW = (_isMovingColumn && _selectedColumn != null)
+          ? _selectedColumn!.width
+          : _currentColumnPreset.width * _cadUnitsPerMeter;
+      final double maxDimScreen = math.max(colW, colH) * cadScale;
+      // Entire column (including bottom edge) is clearly above the finger touch area
+      offsetAboveFinger = math.max(80.0, maxDimScreen + 36.0);
+    } else if (!isMouse) {
+      offsetAboveFinger = 72.0;
+    } else {
+      offsetAboveFinger = 0.0;
+    }
+
     final targetPos =
-        isMouse ? screenPos : (screenPos - const Offset(0, 56.0));
+        isMouse ? screenPos : (screenPos - Offset(0, offsetAboveFinger));
 
     final rawCad = _screenToCad(targetPos);
     DxfSnapResult? snap;
     Offset? snappedScreen;
+    Offset effectiveCad = rawCad;
 
     if (_snapEnabled) {
       final double fitScale = _getCadFitScale();
       final double currentScale = _transformController.value.getMaxScaleOnAxis();
       final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
 
-      // 1. First search in CAD DXF geometry
-      snap = DxfSnapHelper.findSnapPoint(
-        document: widget.document,
-        cadPoint: rawCad,
-        toleranceCad: toleranceCad,
-      );
+      if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
+        // Multi-corner weighted snapping for columns:
+        // Key points: all polygon vertices/corners, edge midpoints, and center
+        final ColumnShape colShape = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.shape
+            : _currentColumnPreset.shape;
+        final double colW = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.width
+            : _currentColumnPreset.width * _cadUnitsPerMeter;
+        final double colH = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.height
+            : _currentColumnPreset.height * _cadUnitsPerMeter;
+        final double colThick = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.thickness
+            : _currentColumnPreset.thickness * _cadUnitsPerMeter;
+        final double rot = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.rotationRad
+            : _currentColumnPreset.rotationRad;
+        final bool colMirrored = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.isMirrored
+            : _currentColumnPreset.isMirrored;
 
-      // 2. Also search in existing structural elements (columns, walls, slabs, ghost story)
-      snap ??= _findStructuralSnap(rawCad, toleranceCad);
+        final tempCol = StructuralColumn(
+          id: 'temp_calc',
+          center: Offset.zero,
+          shape: colShape,
+          width: colW,
+          height: colH,
+          thickness: colThick,
+          rotationRad: rot,
+          isMirrored: colMirrored,
+        );
+
+        final cornerOffsets = tempCol.polygonVertices;
+        final midOffsets = <Offset>[];
+        for (int i = 0; i < cornerOffsets.length; i++) {
+          final next = cornerOffsets[(i + 1) % cornerOffsets.length];
+          midOffsets.add((cornerOffsets[i] + next) / 2.0);
+        }
+
+        // 1. Gather candidate column centers:
+        final candidateCenters = <Offset>{rawCad};
+        for (final cornerOffset in cornerOffsets) {
+          final p = rawCad + cornerOffset;
+          final s = DxfSnapHelper.findSnapPoint(
+            document: widget.document,
+            cadPoint: p,
+            toleranceCad: toleranceCad,
+          ) ?? _findStructuralSnap(p, toleranceCad);
+          if (s != null) {
+            candidateCenters.add(s.point - cornerOffset);
+          }
+        }
+        for (final midOffset in midOffsets) {
+          final p = rawCad + midOffset;
+          final s = DxfSnapHelper.findSnapPoint(
+            document: widget.document,
+            cadPoint: p,
+            toleranceCad: toleranceCad * 0.7,
+          ) ?? _findStructuralSnap(p, toleranceCad * 0.7);
+          if (s != null) {
+            candidateCenters.add(s.point - midOffset);
+          }
+        }
+
+        // 2. Score candidate centers with weighted snap priorities:
+        // Endpoints have highest weight (+120), multi-endpoint corner locks (+1000 per endpoint)
+        double bestScore = -1.0;
+        Offset bestCenter = rawCad;
+        List<Offset> bestSnappedScreenPts = [];
+        List<DxfSnapResult> bestActiveSnaps = [];
+
+        for (final candCenter in candidateCenters) {
+          double candScore = 0.0;
+          int endpointMatches = 0;
+          final List<Offset> candScreens = [];
+          final List<DxfSnapResult> candSnaps = [];
+
+          for (final cornerOffset in cornerOffsets) {
+            final pt = candCenter + cornerOffset;
+            final match = DxfSnapHelper.findSnapPoint(
+              document: widget.document,
+              cadPoint: pt,
+              toleranceCad: toleranceCad * 0.8,
+            ) ?? _findStructuralSnap(pt, toleranceCad * 0.8);
+
+            if (match != null) {
+              if (match.type == DxfSnapType.endpoint) {
+                candScore += 120.0;
+                endpointMatches++;
+              } else {
+                candScore += 40.0;
+              }
+              candScreens.add(_cadToScreen(match.point));
+              candSnaps.add(match);
+            }
+          }
+
+          // Bonus for locking into corner (multiple endpoints simultaneously):
+          if (endpointMatches >= 2) {
+            candScore += 1000.0 * endpointMatches;
+          }
+
+          for (final midOffset in midOffsets) {
+            final pt = candCenter + midOffset;
+            final match = DxfSnapHelper.findSnapPoint(
+              document: widget.document,
+              cadPoint: pt,
+              toleranceCad: toleranceCad * 0.5,
+            ) ?? _findStructuralSnap(pt, toleranceCad * 0.5);
+
+            if (match != null) {
+              candScore += 25.0;
+              candScreens.add(_cadToScreen(match.point));
+              candSnaps.add(match);
+            }
+          }
+
+          // Distance penalty from target position:
+          final dist = (candCenter - rawCad).distance;
+          candScore -= (dist / toleranceCad) * 8.0;
+
+          if (candScore > bestScore && candScore > 0.0) {
+            bestScore = candScore;
+            bestCenter = candCenter;
+            bestSnappedScreenPts = candScreens;
+            bestActiveSnaps = candSnaps;
+          }
+        }
+
+        if (bestScore > 0.0) {
+          snap = bestActiveSnaps.isNotEmpty ? bestActiveSnaps.first : null;
+          snappedScreen = bestSnappedScreenPts.isNotEmpty ? bestSnappedScreenPts.first : null;
+          _snappedScreenPositions = bestSnappedScreenPts;
+          effectiveCad = Offset(bestCenter.dx - colW / 2.0, bestCenter.dy + colH / 2.0);
+        } else {
+          _snappedScreenPositions = [];
+          effectiveCad = Offset(rawCad.dx - colW / 2.0, rawCad.dy + colH / 2.0);
+        }
+        _liveDimensionText = null;
+      } else if (_activeTool == StructuralDrawTool.shearWall) {
+        // Shear wall drawing with 10 cm snapping and live dimensioning
+        if (_wallStartCad == null) {
+          snap = DxfSnapHelper.findSnapPoint(
+            document: widget.document,
+            cadPoint: rawCad,
+            toleranceCad: toleranceCad,
+          ) ?? _findStructuralSnap(rawCad, toleranceCad);
+
+          if (snap != null) {
+            effectiveCad = snap.point;
+            snappedScreen = _cadToScreen(snap.point);
+            _snappedScreenPositions = [snappedScreen];
+          } else {
+            _snappedScreenPositions = [];
+          }
+          _liveDimensionText = null;
+        } else {
+          snap = DxfSnapHelper.findSnapPoint(
+            document: widget.document,
+            cadPoint: rawCad,
+            toleranceCad: toleranceCad,
+          ) ?? _findStructuralSnap(rawCad, toleranceCad);
+
+          if (snap != null) {
+            effectiveCad = snap.point;
+            snappedScreen = _cadToScreen(snap.point);
+            _snappedScreenPositions = [snappedScreen];
+          } else {
+            // Free length snapped to 10 cm increments (0.10 m)
+            final v = rawCad - _wallStartCad!;
+            final distCad = v.distance;
+            final distM = distCad / _cadUnitsPerMeter;
+            final snappedM = math.max(0.10, (distM / 0.10).round() * 0.10);
+            final snappedDistCad = snappedM * _cadUnitsPerMeter;
+            if (distCad > 1e-6) {
+              final unitDir = v / distCad;
+              effectiveCad = _wallStartCad! + unitDir * snappedDistCad;
+            } else {
+              effectiveCad = rawCad;
+            }
+            snappedScreen = _cadToScreen(effectiveCad);
+            _snappedScreenPositions = [];
+          }
+          final wallLenM = (effectiveCad - _wallStartCad!).distance / _cadUnitsPerMeter;
+          _liveDimensionText = '${wallLenM.toStringAsFixed(2)} m';
+        }
+      } else {
+        // Single point snap for slabs
+        snap = DxfSnapHelper.findSnapPoint(
+          document: widget.document,
+          cadPoint: rawCad,
+          toleranceCad: toleranceCad,
+        ) ?? _findStructuralSnap(rawCad, toleranceCad);
+
+        if (snap != null) {
+          effectiveCad = snap.point;
+          snappedScreen = _cadToScreen(snap.point);
+          _snappedScreenPositions = [snappedScreen];
+        } else {
+          _snappedScreenPositions = [];
+        }
+        _liveDimensionText = null;
+      }
 
       if (snap != null) {
         if (_activeSnap == null || _activeSnap!.point != snap.point) {
           HapticFeedback.selectionClick();
         }
-        snappedScreen = _cadToScreen(snap.point);
+      }
+    } else {
+      _snappedScreenPositions = [];
+      if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
+        final double colW = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.width
+            : _currentColumnPreset.width * _cadUnitsPerMeter;
+        final double colH = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.height
+            : _currentColumnPreset.height * _cadUnitsPerMeter;
+        effectiveCad = Offset(rawCad.dx - colW / 2.0, rawCad.dy + colH / 2.0);
+        _liveDimensionText = null;
+      } else if (_activeTool == StructuralDrawTool.shearWall && _wallStartCad != null) {
+        final v = rawCad - _wallStartCad!;
+        final distCad = v.distance;
+        final distM = distCad / _cadUnitsPerMeter;
+        final snappedM = math.max(0.10, (distM / 0.10).round() * 0.10);
+        final snappedDistCad = snappedM * _cadUnitsPerMeter;
+        if (distCad > 1e-6) {
+          final unitDir = v / distCad;
+          effectiveCad = _wallStartCad! + unitDir * snappedDistCad;
+        } else {
+          effectiveCad = rawCad;
+        }
+        final wallLenM = (effectiveCad - _wallStartCad!).distance / _cadUnitsPerMeter;
+        _liveDimensionText = '${wallLenM.toStringAsFixed(2)} m';
+      } else {
+        _liveDimensionText = null;
       }
     }
-
-    final effectiveCad = snap != null ? snap.point : rawCad;
 
     setState(() {
       _touchScreenPos = touchPos;
@@ -1037,12 +1408,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _editingSlab = updated;
           _updateActiveStoreySlab(updated);
           HapticFeedback.heavyImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.slabPointsMerged),
-              duration: const Duration(seconds: 2),
-            ),
-          );
         }
       } else if (_draggingSlabVertexCad != null) {
         _pushSlabCorrectionUndo();
@@ -1093,12 +1458,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _editingSlab = updated;
           _updateActiveStoreySlab(updated);
           HapticFeedback.lightImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.slabVertexInserted),
-              duration: const Duration(seconds: 2),
-            ),
-          );
         } else {
           // If not currently in editing mode, start editing this slab!
           final active = _project.activeStorey;
@@ -1122,7 +1481,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // 3. Moving column with mouse or touch release
     if (_isMovingColumn && _selectedColumn != null) {
       if (_hasMovedSelectedColumn) {
-        final newTopLeft = _activeSnap?.point ?? _currentCadCoord;
+        final newTopLeft = _currentCadCoord;
         if (newTopLeft != null) {
           _pushUndo();
           final updatedCol = StructuralColumn.fromTopLeft(
@@ -1132,6 +1491,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             width: _selectedColumn!.width,
             height: _selectedColumn!.height,
             rotationRad: _selectedColumn!.rotationRad,
+            thickness: _selectedColumn!.thickness,
+            isMirrored: _selectedColumn!.isMirrored,
           );
           final active = _project.activeStorey;
           final updatedCols = active.columns
@@ -1147,14 +1508,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
+        _snappedScreenPositions = [];
         _activeSnap = null;
+        _liveDimensionText = null;
       });
       return;
     }
 
     // 4. Placing element with mouse hold release
     if (event.kind == PointerDeviceKind.mouse && _isPlacingWithHold) {
-      final cadToPlace = _activeSnap?.point ?? _currentCadCoord;
+      final cadToPlace = _currentCadCoord;
       if (cadToPlace != null) {
         _commitPlacement(cadToPlace);
       }
@@ -1163,7 +1526,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
+        _snappedScreenPositions = [];
         _activeSnap = null;
+        _liveDimensionText = null;
       });
     }
   }
@@ -1186,7 +1551,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _touchScreenPos = null;
       _targetScreenPos = null;
       _snappedScreenPos = null;
+      _snappedScreenPositions = [];
       _activeSnap = null;
+      _liveDimensionText = null;
     });
   }
 
@@ -1200,12 +1567,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final hitVIdx = _hitTestSlabVertex(details.localPosition, _editingSlab!);
       if (hitVIdx != null) {
         if (_editingSlab!.polygon.length <= 3) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.slabMinPointsWarning),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          HapticFeedback.vibrate();
         } else {
           _pushSlabCorrectionUndo();
           final updated = _editingSlab!.removeVertex(hitVIdx);
@@ -1213,12 +1575,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             _editingSlab = updated;
             _updateActiveStoreySlab(updated);
             HapticFeedback.heavyImpact();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(context.l10n.slabPointDeleted(hitVIdx + 1)),
-                duration: const Duration(seconds: 2),
-              ),
-            );
           }
         }
         return;
@@ -1267,7 +1623,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isMovingColumn && _selectedColumn != null) {
       _updatePointer(details.localPosition, isMouse: false);
-      final effectiveCad = _activeSnap?.point ?? _currentCadCoord;
+      final effectiveCad = _currentCadCoord;
       if (effectiveCad != null) {
         final dist = (effectiveCad - _selectedColumn!.topLeft).distance;
         if (dist > 0.05 * _cadUnitsPerMeter) {
@@ -1285,7 +1641,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isMovingColumn && _selectedColumn != null) {
       if (_hasMovedSelectedColumn) {
-        final newTopLeft = _activeSnap?.point ?? _currentCadCoord;
+        final newTopLeft = _currentCadCoord;
         if (newTopLeft != null) {
           _pushUndo();
           final updatedCol = StructuralColumn.fromTopLeft(
@@ -1316,7 +1672,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     if (_isPlacingWithHold) {
-      final cadToPlace = _activeSnap?.point ?? _currentCadCoord;
+      final cadToPlace = _currentCadCoord;
       if (cadToPlace != null) {
         _commitPlacement(cadToPlace);
       }
@@ -1351,6 +1707,46 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
+  void _handleTapUp(TapUpDetails details) {
+    if (_activePointerKind == PointerDeviceKind.mouse) return;
+    if (_isEditingSlab) return;
+
+    final hitCol = _hitTestColumn(details.localPosition);
+    if (hitCol != null) {
+      setState(() {
+        _selectedColumn = hitCol;
+        _selectedShearWall = null;
+        _isMovingColumn = false;
+      });
+      HapticFeedback.selectionClick();
+      return;
+    }
+
+    final hitWall = _hitTestShearWall(details.localPosition);
+    if (hitWall != null) {
+      setState(() {
+        _selectedShearWall = hitWall;
+        _selectedColumn = null;
+        _isMovingColumn = false;
+      });
+      HapticFeedback.selectionClick();
+      return;
+    }
+
+    final hitSlab = _hitTestSlab(details.localPosition);
+    if (hitSlab != null) {
+      _startSlabCorrection(hitSlab);
+      return;
+    }
+
+    if (_selectedColumn != null || _selectedShearWall != null) {
+      setState(() {
+        _selectedColumn = null;
+        _selectedShearWall = null;
+      });
+    }
+  }
+
   // --- Element Placement Logic ---
 
   void _commitPlacement(Offset cadCoord) {
@@ -1367,6 +1763,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         width: _currentColumnPreset.width * scale,
         height: _currentColumnPreset.height * scale,
         rotationRad: _currentColumnPreset.rotationRad,
+        thickness: _currentColumnPreset.thickness * scale,
+        isMirrored: _currentColumnPreset.isMirrored,
       );
       final updatedColumns = List<StructuralColumn>.from(active.columns)
         ..add(newCol);
@@ -1387,6 +1785,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             start: _wallStartCad!,
             end: cadCoord,
             thickness: _currentWallThickness * scale,
+            isFlipped: false,
           );
           final updatedWalls = List<StructuralShearWall>.from(active.shearWalls)
             ..add(newWall);
@@ -1394,7 +1793,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _updateActiveStorey(updatedStorey);
           HapticFeedback.mediumImpact();
         }
-        setState(() => _wallStartCad = null);
+        setState(() {
+          _wallStartCad = null;
+          _liveDimensionText = null;
+        });
       }
     } else if (_activeTool == StructuralDrawTool.slab) {
       if (_slabStartCornerCad == null) {
@@ -1517,15 +1919,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _toggleUnderlayFilter() {
     setState(() {
       _applyUnderlayFilter(!_underlayFilterActive);
-      if (!_underlayFilterActive && widget.document.layers.values.every((l) => l.isVisible)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.structuralFilterNoWallsFound),
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
     });
     HapticFeedback.selectionClick();
   }
@@ -1728,6 +2121,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
 
           return Stack(
+            fit: StackFit.expand,
             children: [
               // 1. Gesture Recognizer wrapping InteractiveViewer:
               // Allows free 1-finger pan and 2-finger zoom to navigate freely,
@@ -1747,6 +2141,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           ..onLongPressMoveUpdate = _handleLongPressMoveUpdate
                           ..onLongPressEnd = _handleLongPressEnd
                           ..onLongPressCancel = _handleLongPressCancel;
+                      },
+                    ),
+                    TapGestureRecognizer:
+                        GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+                      () => TapGestureRecognizer(debugOwner: this),
+                      (TapGestureRecognizer instance) {
+                        instance.onTapUp = _handleTapUp;
                       },
                     ),
                   },
@@ -1834,6 +2235,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   extrudingGrip: _activeGrip,
                                   extrusionDistance: _isExtrudingEdge ? _extrusionDistanceCad : null,
                                   selectedColumnId: _selectedColumn?.id,
+                                  selectedShearWallId: _selectedShearWall?.id,
                                   movingColumn: _isMovingColumn ? _selectedColumn : null,
                                   movingColumnPos: _isMovingColumn ? (_activeSnap?.point ?? _currentCadCoord) : null,
                                   selectedSlabId: _editingSlab?.id,
@@ -1866,6 +2268,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         touchPos: _touchScreenPos!,
                         targetPos: _targetScreenPos!,
                         snappedPos: _snappedScreenPos,
+                        snappedPositions: _snappedScreenPositions,
                         snapType: _activeSnap?.type,
                         activeTool: _isMovingColumn
                             ? StructuralDrawTool.column
@@ -1879,6 +2282,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         wallStartPos: _wallStartCad != null ? _cadToScreen(_wallStartCad!) : null,
                         slabStartCornerPos: _slabStartCornerCad != null ? _cadToScreen(_slabStartCornerCad!) : null,
                         slabPoints: _slabPointsCad.map(_cadToScreen).toList(),
+                        liveDimensionText: _liveDimensionText,
                         l10n: context.l10n,
                       ),
                     ),
@@ -1917,8 +2321,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                 ),
 
-              // 4. Floating Contextual Action Card for Selected Column
-              _buildSelectedColumnActionCard(context),
+              // 4. Floating Contextual Action Card for Selected Column or Shear Wall
+              if (_selectedColumn != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
+                _buildSelectedColumnActionCard(context),
+              if (_selectedShearWall != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
+                _buildSelectedWallActionCard(context),
 
               // 5. Bottom Dock Bar (Switches to Slab Correction Bar when editing slab)
               Positioned(
@@ -1993,8 +2400,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     final colScreen = _cadToScreen(_selectedColumn!.center);
-    const double cardWidth = 270.0;
-    const double cardHeight = 84.0;
+    const double cardWidth = 350.0;
+    const double cardHeight = 88.0;
 
     // Horizontal centering over column, clamped to viewport margins
     final double left = (colScreen.dx - cardWidth / 2.0).clamp(
@@ -2015,9 +2422,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         (_selectedColumn!.width / _cadUnitsPerMeter * 100).round();
     final int hCm =
         (_selectedColumn!.height / _cadUnitsPerMeter * 100).round();
-    final String dimStr = _selectedColumn!.shape == ColumnShape.circular
-        ? 'Ø$wCm cm'
-        : '$wCm x $hCm cm';
+    final String dimStr = _selectedColumn!.shape == ColumnShape.lShape
+        ? 'Г $wCm x $hCm / 25 cm'
+        : _selectedColumn!.shape == ColumnShape.circular
+            ? 'Ø$wCm cm'
+            : '$wCm x $hCm cm';
 
     return Positioned(
       left: left,
@@ -2044,7 +2453,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header Row: Type & Dimensions badge + Close button
+              // Header Row: Type & Dimensions badge + Modeling +/- 5cm buttons + Close
               Row(
                 children: [
                   Container(
@@ -2067,6 +2476,40 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  // In-place modeling 5 cm buttons
+                  InkWell(
+                    onTap: () => _updateSelectedColumnDimensions(-0.05, -0.05),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '-5 cm',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _updateSelectedColumnDimensions(0.05, 0.05),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '+5 cm',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   InkWell(
                     onTap: () => setState(() => _selectedColumn = null),
                     borderRadius: BorderRadius.circular(12),
@@ -2079,7 +2522,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              // Action Buttons Row: Delete, Rotate 90°, Move hint
+              // Action Buttons Row: Delete, Rotate 90°, Mirror, Duplicate
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -2114,7 +2557,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       ),
                     ),
                   ),
-                  // 2. Rotate 90° Button
+                  // 2. Rotate 90° Button (Amber)
                   InkWell(
                     onTap: _rotateSelectedColumn,
                     borderRadius: BorderRadius.circular(8),
@@ -2145,16 +2588,40 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       ),
                     ),
                   ),
-                  // 3. Move Hint Button
+                  // 3. Mirror Button (Purple)
                   InkWell(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(context.l10n.dragToMoveTooltip),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    },
+                    onTap: _mirrorSelectedColumn,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0x29B388FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: const Color(0xFFB388FF), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.flip_rounded,
+                              size: 15, color: Color(0xFFB388FF)),
+                          const SizedBox(width: 4),
+                          Text(
+                            context.l10n.mirrorElement,
+                            style: const TextStyle(
+                              color: Color(0xFFB388FF),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // 4. Duplicate Button (Teal / Cyan)
+                  InkWell(
+                    onTap: _duplicateSelectedColumn,
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -2168,13 +2635,230 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.open_with_rounded,
+                          const Icon(Icons.copy_rounded,
                               size: 14, color: Color(0xFF00E5FF)),
                           const SizedBox(width: 4),
                           Text(
-                            context.l10n.moveElement,
+                            context.l10n.duplicateElement,
                             style: const TextStyle(
                               color: Color(0xFF00E5FF),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedWallActionCard(BuildContext context) {
+    if (_selectedShearWall == null || _isMovingColumn || _isPlacingWithHold || _isEditingSlab) {
+      return const SizedBox.shrink();
+    }
+
+    final wall = _selectedShearWall!;
+    final wallMidCad = (wall.start + wall.end) / 2.0;
+    final wallScreen = _cadToScreen(wallMidCad);
+    const double cardWidth = 350.0;
+    const double cardHeight = 88.0;
+
+    final double left = (wallScreen.dx - cardWidth / 2.0).clamp(
+      16.0,
+      math.max(16.0, _viewportSize.width - cardWidth - 16.0),
+    );
+
+    double top = wallScreen.dy - cardHeight - 28.0;
+    if (top < 12.0) {
+      top = wallScreen.dy + 32.0;
+    }
+    top = top.clamp(
+        12.0, math.max(12.0, _viewportSize.height - cardHeight - 160.0));
+
+    final double lengthM = wall.length / _cadUnitsPerMeter;
+    final int thickCm = (wall.thickness / _cadUnitsPerMeter * 100).round();
+    final String dimStr = '${lengthM.toStringAsFixed(2)} m (d=$thickCm cm)';
+
+    return Positioned(
+      left: left,
+      top: top,
+      child: Material(
+        color: Colors.transparent,
+        elevation: 8,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: cardWidth,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xF01E1E24),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header Row: Title & Close + [-10 cm] [+10 cm]
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00E5FF),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      context.l10n.selectedWallTitle(dimStr),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Length step buttons [-10 cm] [+10 cm]
+                  InkWell(
+                    onTap: () => _updateSelectedWallLength(-0.10),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '-10 cm',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _updateSelectedWallLength(0.10),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '+10 cm',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () => setState(() => _selectedShearWall = null),
+                    borderRadius: BorderRadius.circular(12),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2.0),
+                      child: Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Action Buttons Row: Delete, Flip Side, Duplicate
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // 1. Delete Button (Red)
+                  InkWell(
+                    onTap: _deleteSelectedWall,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0x29FF5252),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFF5252), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFFF5252)),
+                          const SizedBox(width: 4),
+                          Text(
+                            context.l10n.delete,
+                            style: const TextStyle(
+                              color: Color(0xFFFF5252),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // 2. Flip Side Button (Teal / Cyan)
+                  InkWell(
+                    onTap: _flipSelectedWall,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0x2900E5FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF00E5FF), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.swap_horiz_rounded, size: 15, color: Color(0xFF00E5FF)),
+                          const SizedBox(width: 4),
+                          Text(
+                            context.l10n.flipSide,
+                            style: const TextStyle(
+                              color: Color(0xFF00E5FF),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // 3. Duplicate Button (Purple)
+                  InkWell(
+                    onTap: _duplicateSelectedWall,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0x29B388FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFB388FF), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.copy_rounded, size: 14, color: Color(0xFFB388FF)),
+                          const SizedBox(width: 4),
+                          Text(
+                            context.l10n.duplicateElement,
+                            style: const TextStyle(
+                              color: Color(0xFFB388FF),
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
@@ -2217,273 +2901,143 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            // Row 1: Отместване (Offset) with quick step buttons
-            Row(
-              children: [
-                _buildStepButton(
-                  label: '-0.5м',
-                  onTap: () => _applySlabOffset(-0.5),
-                ),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${context.l10n.slabOffsetLabel}: ${_slabOffsetSlider >= 0 ? '+' : ''}${_slabOffsetSlider.toStringAsFixed(2)} м',
-                        style: const TextStyle(
-                          color: Color(0xFF00E5FF),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(
-                        height: 30,
-                        child: SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 3,
-                            thumbShape:
-                                const RoundSliderThumbShape(enabledThumbRadius: 6),
-                            overlayShape:
-                                const RoundSliderOverlayShape(overlayRadius: 14),
-                            activeTrackColor: const Color(0xFF00E5FF),
-                            inactiveTrackColor: Colors.white24,
-                            thumbColor: const Color(0xFF00E5FF),
-                          ),
-                          child: Slider(
-                            value: _slabOffsetSlider,
-                            min: -5.0,
-                            max: 5.0,
-                            onChangeStart: (_) => _startSliderTransform(),
-                            onChanged: (val) {
-                              setState(() => _slabOffsetSlider = val);
-                              _updateSliderOffset(val);
-                            },
-                            onChangeEnd: (_) => _endSliderTransform(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _buildStepButton(
-                  label: '+0.5м',
-                  onTap: () => _applySlabOffset(0.5),
-                ),
-              ],
+            // Cancel Button (Red outline)
+            OutlinedButton.icon(
+              onPressed: _cancelSlabCorrection,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFFF5252),
+                side: const BorderSide(color: Color(0xFFFF5252), width: 1.2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: Text(
+                context.l10n.cancel,
+                style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.bold),
+              ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(width: 8),
 
-            // Row 2: Ротация (Rotation) with quick step buttons
-            Row(
-              children: [
-                _buildStepButton(
-                  label: '-15°',
-                  onTap: () => _applySlabRotation(-15.0),
+            // Center Stats Pill
+            Expanded(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0x337C4DFF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0x667C4DFF)),
                 ),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${context.l10n.slabRotateLabel}: ${_slabRotateSlider >= 0 ? '+' : ''}${_slabRotateSlider.toStringAsFixed(0)}°',
-                        style: const TextStyle(
-                          color: Color(0xFFFFB300),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(
-                        height: 30,
-                        child: SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 3,
-                            thumbShape:
-                                const RoundSliderThumbShape(enabledThumbRadius: 6),
-                            overlayShape:
-                                const RoundSliderOverlayShape(overlayRadius: 14),
-                            activeTrackColor: const Color(0xFFFFB300),
-                            inactiveTrackColor: Colors.white24,
-                            thumbColor: const Color(0xFFFFB300),
-                          ),
-                          child: Slider(
-                            value: _slabRotateSlider,
-                            min: -180.0,
-                            max: 180.0,
-                            onChangeStart: (_) => _startSliderTransform(),
-                            onChanged: (val) {
-                              setState(() => _slabRotateSlider = val);
-                              _updateSliderRotation(val);
-                            },
-                            onChangeEnd: (_) => _endSliderTransform(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _buildStepButton(
-                  label: '+15°',
-                  onTap: () => _applySlabRotation(15.0),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Row 3: Action Buttons (Откажи, Stats, Undo, Изтрий, Запази)
-            Row(
-              children: [
-                // Cancel Button (Red outline)
-                OutlinedButton.icon(
-                  onPressed: _cancelSlabCorrection,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFF5252),
-                    side: const BorderSide(color: Color(0xFFFF5252), width: 1.2),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: const Icon(Icons.close_rounded, size: 16),
-                  label: Text(
-                    context.l10n.cancel,
-                    style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // Center Stats Pill
-                Expanded(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0x337C4DFF),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0x667C4DFF)),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFB388FF),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              context.l10n.slabCorrectionTitle,
-                              style: const TextStyle(
-                                color: Color(0xFFB388FF),
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFB388FF),
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(width: 4),
                         Text(
-                          'S: ${areaM2.toStringAsFixed(1)} m²  P: ${perimM.toStringAsFixed(1)} m  ($numPts т.)',
+                          context.l10n.slabCorrectionTitle,
                           style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
+                            color: Color(0xFFB388FF),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'S: ${areaM2.toStringAsFixed(1)} m²  P: ${perimM.toStringAsFixed(1)} m  ($numPts т.)',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
+              ),
+            ),
+            const SizedBox(width: 8),
 
-                // Undo Button
-                IconButton(
-                  onPressed: _slabCorrectionUndoStack.isNotEmpty
-                      ? _undoSlabCorrection
-                      : null,
-                  icon: const Icon(Icons.undo_rounded),
-                  iconSize: 20,
-                  color: const Color(0xFF00E5FF),
-                  disabledColor: Colors.white24,
-                  padding: const EdgeInsets.all(6),
-                  constraints: const BoxConstraints(),
-                  tooltip: context.l10n.undoAction,
-                ),
-                const SizedBox(width: 4),
+            // Undo Button
+            IconButton(
+              onPressed: _slabCorrectionUndoStack.isNotEmpty
+                  ? _undoSlabCorrection
+                  : null,
+              icon: const Icon(Icons.undo_rounded),
+              iconSize: 20,
+              color: const Color(0xFF00E5FF),
+              disabledColor: Colors.white24,
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+              tooltip: context.l10n.undoAction,
+            ),
+            const SizedBox(width: 4),
 
-                // Delete Slab Button
-                IconButton(
-                  onPressed: _deleteEditingSlab,
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  iconSize: 20,
-                  color: const Color(0xFFFF5252),
-                  padding: const EdgeInsets.all(6),
-                  constraints: const BoxConstraints(),
-                  tooltip: context.l10n.deleteSlab,
-                ),
-                const SizedBox(width: 6),
+            // Mirror Slab Button
+            IconButton(
+              onPressed: _mirrorEditingSlab,
+              icon: const Icon(Icons.flip_rounded),
+              iconSize: 20,
+              color: const Color(0xFFB388FF),
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+              tooltip: context.l10n.mirrorElement,
+            ),
+            const SizedBox(width: 4),
 
-                // Save Button (Green elevated)
-                ElevatedButton.icon(
-                  onPressed: _saveSlabCorrection,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00C853),
-                    foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    elevation: 2,
-                  ),
-                  icon: const Icon(Icons.check_rounded, size: 16),
-                  label: Text(
-                    context.l10n.save,
-                    style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+            // Delete Slab Button
+            IconButton(
+              onPressed: _deleteEditingSlab,
+              icon: const Icon(Icons.delete_outline_rounded),
+              iconSize: 20,
+              color: const Color(0xFFFF5252),
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+              tooltip: context.l10n.deleteSlab,
+            ),
+            const SizedBox(width: 6),
+
+            // Save Button (Green elevated)
+            ElevatedButton.icon(
+              onPressed: _saveSlabCorrection,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00C853),
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                elevation: 2,
+              ),
+              icon: const Icon(Icons.check_rounded, size: 16),
+              label: Text(
+                context.l10n.save,
+                style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.bold),
+              ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStepButton(
-      {required String label, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0x33FFFFFF),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.white24),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-          ),
         ),
       ),
     );

@@ -83,11 +83,6 @@ class ElementPaletteBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildToolButton(
-                  tool: StructuralDrawTool.select,
-                  icon: Icons.pan_tool_rounded,
-                  label: l10n.toolNavigation,
-                ),
-                _buildToolButton(
                   tool: StructuralDrawTool.column,
                   icon: Icons.view_column_rounded,
                   label: l10n.toolColumn,
@@ -120,32 +115,37 @@ class ElementPaletteBar extends StatelessWidget {
     final bool isSelected = activeTool == tool;
     final color = isSelected ? const Color(0xFF00E5FF) : Colors.white70;
 
-    return InkWell(
-      onTap: () => onSelectTool(tool),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0x3300E5FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF00E5FF) : Colors.transparent,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
+    return Expanded(
+      child: InkWell(
+        onTap: () => onSelectTool(tool),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0x3300E5FF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF00E5FF) : Colors.transparent,
             ),
-          ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -157,96 +157,93 @@ class ElementPaletteBar extends StatelessWidget {
         ? const Color(0xFFFF1744)
         : const Color(0xFFFFB300);
 
-    return InkWell(
-      onTap: onOpenCantileverReport,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: warningCount > 0 ? badgeColor.withValues(alpha: 0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: warningCount > 0 ? badgeColor : Colors.white24,
+    return Expanded(
+      child: InkWell(
+        onTap: onOpenCantileverReport,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          decoration: BoxDecoration(
+            color: warningCount > 0 ? badgeColor.withValues(alpha: 0.2) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: warningCount > 0 ? badgeColor : Colors.white24,
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Badge(
-              isLabelVisible: warningCount > 0,
-              backgroundColor: badgeColor,
-              label: Text(
-                '$warningCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Badge(
+                isLabelVisible: warningCount > 0,
+                backgroundColor: badgeColor,
+                label: Text(
+                  '$warningCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
+                ),
+                child: Icon(
+                  Icons.analytics_rounded,
+                  color: warningCount > 0 ? badgeColor : Colors.white70,
+                  size: 22,
                 ),
               ),
-              child: Icon(
-                Icons.analytics_rounded,
-                color: warningCount > 0 ? badgeColor : Colors.white70,
-                size: 22,
+              const SizedBox(height: 2),
+              Text(
+                context.l10n.toolCantilevers,
+                style: TextStyle(
+                  color: warningCount > 0 ? badgeColor : Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              context.l10n.toolCantilevers,
-              style: TextStyle(
-                color: warningCount > 0 ? badgeColor : Colors.white70,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildColumnOptionsBar(BuildContext context) {
-    final presets = [
-      (0.25, 0.25, '25x25'),
-      (0.25, 0.50, '25x50'),
-      (0.30, 0.60, '30x60'),
-      (0.40, 0.40, '40x40'),
-    ];
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          for (final p in presets)
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: ChoiceChip(
-                label: Text(p.$3),
-                selected: currentColumnPreset.shape == ColumnShape.rectangular &&
-                    currentColumnPreset.width == p.$1 &&
-                    currentColumnPreset.height == p.$2,
-                onSelected: (selected) {
-                  if (selected) {
-                    onUpdateColumnPreset(currentColumnPreset.copyWith(
-                       shape: ColumnShape.rectangular,
-                      width: p.$1,
-                      height: p.$2,
-                    ));
-                  }
-                },
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: ChoiceChip(
-              label: Text(context.l10n.circularColumnPreset(40)),
-              selected: currentColumnPreset.shape == ColumnShape.circular,
+              label: const Text('25x25'),
+              selected: currentColumnPreset.shape == ColumnShape.rectangular,
               onSelected: (selected) {
                 if (selected) {
                   onUpdateColumnPreset(currentColumnPreset.copyWith(
-                    shape: ColumnShape.circular,
-                    width: 0.40,
-                    height: 0.40,
+                    shape: ColumnShape.rectangular,
+                    width: 0.25,
+                    height: 0.25,
+                    thickness: 0.25,
+                  ));
+                }
+              },
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: ChoiceChip(
+              label: Text(context.l10n.columnShapeLShape),
+              selected: currentColumnPreset.shape == ColumnShape.lShape,
+              onSelected: (selected) {
+                if (selected) {
+                  onUpdateColumnPreset(currentColumnPreset.copyWith(
+                    shape: ColumnShape.lShape,
+                    width: 0.50,
+                    height: 0.50,
+                    thickness: 0.25,
                   ));
                 }
               },

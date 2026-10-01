@@ -37,12 +37,14 @@ class StructuralPointerPainter extends CustomPainter {
   final Offset touchPos;
   final Offset targetPos;
   final Offset? snappedPos;
+  final List<Offset>? snappedPositions;
   final DxfSnapType? snapType;
   final StructuralDrawTool activeTool;
   final StructuralColumn? previewColumn;
   final Offset? wallStartPos;
   final Offset? slabStartCornerPos;
   final List<Offset>? slabPoints;
+  final String? liveDimensionText;
   final double scale;
   final AppLocalizations? l10n;
 
@@ -50,12 +52,14 @@ class StructuralPointerPainter extends CustomPainter {
     required this.touchPos,
     required this.targetPos,
     this.snappedPos,
+    this.snappedPositions,
     this.snapType,
     required this.activeTool,
     this.previewColumn,
     this.wallStartPos,
     this.slabStartCornerPos,
     this.slabPoints,
+    this.liveDimensionText,
     this.scale = 1.0,
     this.l10n,
   });
@@ -63,7 +67,7 @@ class StructuralPointerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final effectiveTip = snappedPos ?? targetPos;
-    final bool isSnapped = snappedPos != null;
+    final bool isSnapped = (snappedPositions != null && snappedPositions!.isNotEmpty) || snappedPos != null;
 
     final Color themeColor = isSnapped
         ? const Color(0xFF00E5FF)
@@ -85,52 +89,30 @@ class StructuralPointerPainter extends CustomPainter {
     canvas.drawCircle(touchPos, 18, touchBorder);
     canvas.drawCircle(touchPos, 3.5, touchDot);
 
-    // 2. Guideline Stem connecting finger to the offset target apex
-    final double stemTopY = effectiveTip.dy + 12.0;
+    // 2. Guideline Stem connecting finger to the offset target
     final stemPaint = Paint()
-      ..color = themeColor.withValues(alpha: 0.85)
+      ..color = themeColor.withValues(alpha: 0.5)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8
-      ..isAntiAlias = true;
-
-    final glowPaint = Paint()
-      ..color = themeColor.withValues(alpha: 0.3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5.0
+      ..strokeWidth = 1.2
       ..isAntiAlias = true;
 
     final stemPath = Path()
       ..moveTo(touchPos.dx, touchPos.dy - 18)
-      ..lineTo(effectiveTip.dx, stemTopY);
+      ..lineTo(effectiveTip.dx, effectiveTip.dy);
 
-    canvas.drawPath(stemPath, glowPaint);
     canvas.drawPath(stemPath, stemPaint);
 
-    // 3. Pointer Apex (Target Arrow)
-    final arrowPaint = Paint()
-      ..color = themeColor
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
-
-    final arrowPath = Path()
-      ..moveTo(effectiveTip.dx, effectiveTip.dy)
-      ..lineTo(effectiveTip.dx + 8, effectiveTip.dy + 12)
-      ..lineTo(effectiveTip.dx, effectiveTip.dy + 9)
-      ..lineTo(effectiveTip.dx - 8, effectiveTip.dy + 12)
-      ..close();
-
-    canvas.drawPath(arrowPath, arrowPaint);
-
-    // 4. Snap Marker & Text Badge
-    if (isSnapped && snapType != null) {
+    // 3. Snap Markers at all snapped positions (supports simultaneous multi-point snap)
+    if (snappedPositions != null && snappedPositions!.isNotEmpty) {
+      for (final sPos in snappedPositions!) {
+        _drawSnapIndicator(canvas, sPos, snapType ?? DxfSnapType.endpoint, themeColor);
+      }
+    } else if (isSnapped && snapType != null) {
       _drawSnapIndicator(canvas, effectiveTip, snapType!, themeColor);
     }
 
-    // 5. Draw Element Footprint Silhouette at the Pointer Apex
-    if (activeTool == StructuralDrawTool.column && previewColumn != null) {
-      _drawColumnFootprint(canvas, effectiveTip, themeColor);
-    } else if (activeTool == StructuralDrawTool.slab && slabStartCornerPos != null) {
-      // Live rectangular slab preview on pointer overlay
+    // 4. Live rectangular slab preview on pointer overlay (if drawing slab)
+    if (activeTool == StructuralDrawTool.slab && slabStartCornerPos != null) {
       final rect = Rect.fromPoints(slabStartCornerPos!, effectiveTip);
       final slabFill = Paint()
         ..color = themeColor.withValues(alpha: 0.22)
@@ -143,81 +125,15 @@ class StructuralPointerPainter extends CustomPainter {
       canvas.drawRect(rect, slabBorder);
     }
 
-    // 6. Element Dimensions & Tool Preview Tag
-    _drawPreviewTag(canvas, effectiveTip, isSnapped, themeColor);
-  }
-
-  void _drawColumnFootprint(Canvas canvas, Offset tip, Color color) {
-    final double wScreen = math.max(previewColumn!.width * 45.0, 16.0);
-    final double hScreen = math.max(previewColumn!.height * 45.0, 16.0);
-
-    final footFill = Paint()
-      ..color = color.withValues(alpha: 0.25)
-      ..style = PaintingStyle.fill;
-    final footBorder = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
-    final anchorDot = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    if (previewColumn!.shape == ColumnShape.circular) {
-      final double r = wScreen / 2.0;
-      final center = Offset(tip.dx + r, tip.dy + r);
-      canvas.drawCircle(center, r, footFill);
-      canvas.drawCircle(center, r, footBorder);
-      // Small center cross
-      canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), footBorder);
-      canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), footBorder);
-      // Top-Left anchor marker dot
-      canvas.drawCircle(tip, 3.5, anchorDot);
-    } else {
-      // Top-Left anchor: Rect starts from tip (top-left)
-      final rect = Rect.fromLTWH(tip.dx, tip.dy, wScreen, hScreen);
-      canvas.drawRect(rect, footFill);
-      canvas.drawRect(rect, footBorder);
-      // Small center cross
-      final center = rect.center;
-      canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), footBorder);
-      canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), footBorder);
-      // Top-Left anchor marker dot
-      canvas.drawCircle(tip, 3.5, anchorDot);
+    // 5. Dimension badge snapped to 10 cm (only when drawing wall)
+    if (liveDimensionText != null && wallStartPos != null) {
+      _drawDimensionBadge(canvas, wallStartPos!, effectiveTip, liveDimensionText!);
     }
   }
 
-  String _getSnapTypeLabel(DxfSnapType type) {
-    if (l10n != null) {
-      switch (type) {
-        case DxfSnapType.endpoint:
-          return l10n!.snapEndpoint;
-        case DxfSnapType.midpoint:
-          return l10n!.snapMidpoint;
-        case DxfSnapType.center:
-          return l10n!.snapCenter;
-        case DxfSnapType.nearest:
-          return l10n!.snapNearest;
-        case DxfSnapType.perpendicular:
-          return l10n!.snapPerpendicular;
-        case DxfSnapType.point:
-          return l10n!.snapPoint;
-      }
-    }
-    switch (type) {
-      case DxfSnapType.endpoint:
-        return 'Endpoint';
-      case DxfSnapType.midpoint:
-        return 'Midpoint';
-      case DxfSnapType.center:
-        return 'Center';
-      case DxfSnapType.nearest:
-        return 'Nearest';
-      case DxfSnapType.perpendicular:
-        return 'Perpendicular';
-      case DxfSnapType.point:
-        return 'Point';
-    }
-  }
+
+
+
 
   void _drawSnapIndicator(
       Canvas canvas, Offset pos, DxfSnapType type, Color color) {
@@ -259,57 +175,34 @@ class StructuralPointerPainter extends CustomPainter {
     }
   }
 
-  void _drawPreviewTag(
-      Canvas canvas, Offset pos, bool isSnapped, Color color) {
-    String text = '';
-    if (activeTool == StructuralDrawTool.column && previewColumn != null) {
-      final wCm = (previewColumn!.width * 100).round();
-      final hCm = (previewColumn!.height * 100).round();
-      if (l10n != null) {
-        text = previewColumn!.shape == ColumnShape.circular
-            ? l10n!.previewCircularColumnTag(wCm)
-            : l10n!.previewColumnTag(wCm, hCm);
-      } else {
-        text = previewColumn!.shape == ColumnShape.circular
-            ? 'Column Ø$wCm cm'
-            : 'Column $wCm x $hCm cm';
-      }
-    } else if (activeTool == StructuralDrawTool.shearWall) {
-      if (wallStartPos != null) {
-        text = l10n?.previewWallEndTag ?? 'Shear Wall: end point';
-      } else {
-        text = l10n?.previewWallStartTag ?? 'Shear Wall: start point';
-      }
-    } else if (activeTool == StructuralDrawTool.slab) {
-      if (slabStartCornerPos != null) {
-        text = l10n?.previewSlabCorner2Tag ?? 'Slab: pick opposite corner';
-      } else {
-        text = l10n?.previewSlabCorner1Tag ?? 'Slab: pick 1st corner';
-      }
-    }
-
-    if (text.isEmpty) return;
-
-    if (isSnapped && snapType != null) {
-      text = '$text (${_getSnapTypeLabel(snapType!)})';
+  void _drawDimensionBadge(
+      Canvas canvas, Offset p1, Offset p2, String text) {
+    final mid = Offset((p1.dx + p2.dx) / 2.0, (p1.dy + p2.dy) / 2.0);
+    final dx = p2.dx - p1.dx;
+    final dy = p2.dy - p1.dy;
+    final len = math.sqrt(dx * dx + dy * dy);
+    Offset offsetMid = mid;
+    if (len > 1e-4) {
+      final nx = -dy / len * 22.0;
+      final ny = dx / len * 22.0;
+      offsetMid = Offset(mid.dx + nx, mid.dy + ny);
     }
 
     final tp = TextPainter(
       text: TextSpan(
         text: text,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF00E5FF),
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          backgroundColor: Color(0xCC000000),
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
 
     final badgeOffset = Offset(
-      pos.dx - tp.width / 2.0,
-      pos.dy - 26.0,
+      offsetMid.dx - tp.width / 2.0,
+      offsetMid.dy - tp.height / 2.0,
     );
 
     final bgRect = RRect.fromRectAndRadius(
@@ -317,9 +210,9 @@ class StructuralPointerPainter extends CustomPainter {
       const Radius.circular(6),
     );
 
-    final bgPaint = Paint()..color = const Color(0xE61E1E1E);
+    final bgPaint = Paint()..color = const Color(0xE61A1C23);
     final borderPaint = Paint()
-      ..color = color
+      ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
@@ -333,11 +226,13 @@ class StructuralPointerPainter extends CustomPainter {
     return oldDelegate.touchPos != touchPos ||
         oldDelegate.targetPos != targetPos ||
         oldDelegate.snappedPos != snappedPos ||
+        oldDelegate.snappedPositions != snappedPositions ||
         oldDelegate.snapType != snapType ||
         oldDelegate.activeTool != activeTool ||
         oldDelegate.previewColumn != previewColumn ||
         oldDelegate.wallStartPos != wallStartPos ||
         oldDelegate.slabStartCornerPos != slabStartCornerPos ||
-        oldDelegate.slabPoints != slabPoints;
+        oldDelegate.slabPoints != slabPoints ||
+        oldDelegate.liveDimensionText != liveDimensionText;
   }
 }

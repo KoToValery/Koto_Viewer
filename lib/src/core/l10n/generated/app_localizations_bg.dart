@@ -1158,6 +1158,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get rotateElement => 'Завърти 90°';
 
   @override
+  String get mirrorElement => 'Огледало';
+
+  @override
   String get columnDeleted => 'Колоната е изтрита';
 
   @override
@@ -1202,4 +1205,18 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get selectedSlabTitle => 'Избрана плоча';
+
+  @override
+  String get duplicateElement => 'Дублирай';
+
+  @override
+  String get flipSide => 'Обърни страна';
+
+  @override
+  String selectedWallTitle(String dimensions) {
+    return 'Избрана шайба $dimensions';
+  }
+
+  @override
+  String get columnShapeLShape => 'Г-образна 50x50/25';
 }
