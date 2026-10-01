@@ -9,6 +9,7 @@ import '../dxf_viewer/models/dxf_models.dart';
 import '../dxf_viewer/rendering/dxf_painter.dart';
 import '../dxf_viewer/rendering/dxf_snap_helper.dart';
 import 'analysis/cantilever_detector.dart';
+import 'analysis/structural_underlay_filter.dart';
 import 'models/cantilever_analysis_models.dart';
 import 'models/structural_element.dart';
 import 'rendering/structural_2d_painter.dart';
@@ -1466,63 +1467,47 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     });
   }
 
-  // --- Structural Underlay Layer Filtering (Walls & Grid Axes) ---
-
-  bool _isStructuralOrThickLayer(DxfLayer layer, double maxLw) {
-    final lw = layer.customLineweight ?? layer.lineweight ?? 0.0;
-    // 1. Explicitly thick layers or at least 70% of max lineweight (if max >= 0.25mm)
-    if (layer.isThick) return true;
-    if (maxLw >= 0.25 && lw >= maxLw * 0.70) return true;
-    if (lw >= 0.30) return true;
-
-    // 2. Structural & grid keywords
-    final name = layer.name.toLowerCase();
-
-    // Check negative keywords first: hatching, furniture, dimensions, text are NEVER walls
-    final thinKeywords = [
-      'hatch', 'штрих', 'furn', 'мебел', 'dim', 'размер', 'text', 'текст',
-      'annot', 'door', 'врати', 'win', 'прозор', 'glass', 'сан', 'plumb', 'elec'
-    ];
-    for (final kw in thinKeywords) {
-      if (name.contains(kw)) return false;
-    }
-
-    final structuralKeywords = [
-      'wall', 'zid', 'beton', 'col', 'ste', 'stb', 'носещ', 'структура',
-      'колони', 'стб', 'фундамент', 'греди', 'beam', 'pillar', 'slab', 'плоч'
-    ];
-    for (final kw in structuralKeywords) {
-      if (name.contains(kw)) return true;
-    }
-
-    final axisKeywords = ['grid', 'axis', 'osi', 'оси', 'ос', 'raster'];
-    for (final kw in axisKeywords) {
-      if (name.contains(kw)) return true;
-    }
-
-    return false;
-  }
+  // --- Structural Underlay Layer Filtering (White Thick Walls & Slabs focus) ---
 
   void _applyUnderlayFilter(bool activate) {
     _underlayFilterActive = activate;
     if (activate) {
-      double maxLw = 0.0;
-      for (final l in widget.document.layers.values) {
-        final lw = l.customLineweight ?? l.lineweight ?? 0.0;
-        if (lw > maxLw) maxLw = lw;
+      final visibleLayerNames = StructuralUnderlayFilter.filterLayers(
+        layers: widget.document.layers.values,
+        entities: widget.document.entities,
+        blocks: widget.document.blocks,
+      );
+
+      // Verify how many entities in Model space will actually be visible
+      final modelEntities = widget.document.layoutEntities['Model'] ?? widget.document.entities;
+      int visibleCount = 0;
+      for (final e in modelEntities) {
+        if (e is DxfInsert) {
+          final block = widget.document.blocks[e.blockName];
+          if (block != null) {
+            final hasChild = block.compiled.subpaths.any((s) => visibleLayerNames.contains(s.layer)) ||
+                block.compiled.otherEntities.any((o) => visibleLayerNames.contains(o.layer)) ||
+                block.entities.any((child) => visibleLayerNames.contains(child.layer));
+            if (hasChild || visibleLayerNames.contains(e.layer)) visibleCount++;
+          } else if (visibleLayerNames.contains(e.layer)) {
+            visibleCount++;
+          }
+        } else if (visibleLayerNames.contains(e.layer)) {
+          visibleCount++;
+        }
       }
 
-      final structuralLayers = widget.document.layers.values
-          .where((l) => _isStructuralOrThickLayer(l, maxLw))
-          .toList();
-
-      if (structuralLayers.isEmpty) {
+      // If the filter resulted in ZERO visible entities, abort filter so screen is NEVER blank!
+      if (visibleLayerNames.isEmpty || visibleCount == 0) {
         _underlayFilterActive = false;
+        for (final entry in _originalLayerVisibility.entries) {
+          widget.document.layers[entry.key]?.isVisible = entry.value;
+        }
         return;
       }
 
       for (final layer in widget.document.layers.values) {
-        layer.isVisible = _isStructuralOrThickLayer(layer, maxLw);
+        layer.isVisible = visibleLayerNames.contains(layer.name);
       }
     } else {
       for (final entry in _originalLayerVisibility.entries) {

@@ -365,7 +365,21 @@ class DxfPainter extends CustomPainter {
       try {
         final layer = document.layers[entity.layer];
         if (layer != null && (!layer.isVisible || layer.isFrozen)) {
-          continue;
+          // If entity is an Insert on a hidden layer (e.g. layer 0),
+          // don't drop the entire block if it contains child entities on layers that ARE visible!
+          if (entity is DxfInsert) {
+            final block = document.blocks[entity.blockName];
+            if (block != null) {
+              final hasVisibleChild = block.compiled.subpaths.any((s) => document.layers[s.layer]?.isVisible != false) ||
+                  block.compiled.otherEntities.any((e) => document.layers[e.layer]?.isVisible != false) ||
+                  block.entities.any((e) => document.layers[e.layer]?.isVisible != false);
+              if (!hasVisibleChild) continue;
+            } else {
+              continue;
+            }
+          } else {
+            continue;
+          }
         }
 
         final bool isDarkForEntity = isPaperSpaceMode ? false : theme.isDark;
@@ -388,7 +402,7 @@ class DxfPainter extends CustomPainter {
         if (entity is DxfLine && _isContinuousLineType(entity.lineType, layer?.lineType)) {
           final p1 = toCanvas(entity.p1);
           final p2 = toCanvas(entity.p2);
-          final int styleKey = (color.value & 0xFFFFFFFF) | (((strokeWidth * 100).round() & 0x7FFFFFFF) << 32);
+          final int styleKey = (color.toARGB32() & 0xFFFFFFFF) | (((strokeWidth * 100).round() & 0x7FFFFFFF) << 32);
           var batchPath = continuousLineBatches[styleKey];
           if (batchPath == null) {
             batchPath = Path();
@@ -411,7 +425,7 @@ class DxfPainter extends CustomPainter {
         if (entity is DxfLwPolyline && _isContinuousLineType(entity.lineType, layer?.lineType)) {
           final vertices = entity.vertices;
           if (vertices.isNotEmpty) {
-            final int styleKey = (color.value & 0xFFFFFFFF) | (((strokeWidth * 100).round() & 0x7FFFFFFF) << 32);
+            final int styleKey = (color.toARGB32() & 0xFFFFFFFF) | (((strokeWidth * 100).round() & 0x7FFFFFFF) << 32);
             var batchPath = continuousLineBatches[styleKey];
             if (batchPath == null) {
               batchPath = Path();
