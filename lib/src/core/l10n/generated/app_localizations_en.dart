@@ -860,4 +860,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rotationUnlocked => 'Auto-rotation restored';
+
+  @override
+  String get dwgMemoryLimitError =>
+      'This DWG drawing requires more memory than available on this device. Please convert it to DXF on a PC or clean it with the PURGE command in CAD software.';
+
+  @override
+  String dwgConversionFailed(String error) {
+    return 'Could not convert DWG file: $error';
+  }
 }

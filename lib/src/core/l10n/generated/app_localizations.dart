@@ -1597,6 +1597,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto-rotation restored'**
   String get rotationUnlocked;
+
+  /// Error message when DWG conversion exceeds device memory limits
+  ///
+  /// In en, this message translates to:
+  /// **'This DWG drawing requires more memory than available on this device. Please convert it to DXF on a PC or clean it with the PURGE command in CAD software.'**
+  String get dwgMemoryLimitError;
+
+  /// Error message when DWG file conversion fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not convert DWG file: {error}'**
+  String dwgConversionFailed(String error);
 }
 
 class _AppLocalizationsDelegate

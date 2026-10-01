@@ -156,7 +156,7 @@ class FileOpenerService {
         }
 
         String? convertedDxfPath;
-        String? conversionError;
+        dynamic conversionException;
         try {
           convertedDxfPath = await _showConversionProgressDialog(
             context: context,
@@ -164,9 +164,9 @@ class FileOpenerService {
             message: l10n?.convertingDwgMessage ?? 'Converting DWG to DXF for viewing',
             action: () => DwgConverterService.convertDwgToDxf(resolvedPath),
           );
-        } on Exception catch (e, stack) {
+        } catch (e, stack) {
           AppErrorHandler.recordError(e, stack, context: 'FileOpenerService.convertDwg');
-          conversionError = e.toString();
+          conversionException = e;
         }
 
         if (convertedDxfPath != null &&
@@ -188,12 +188,23 @@ class FileOpenerService {
           await RecentFilesService.removeRecentFile(filePath);
           await DwgConverterService.clearCacheForFile(filePath);
           if (context.mounted && scaffoldMessenger != null) {
+            final String errorMessage;
+            if (conversionException is DwgMemoryLimitException) {
+              errorMessage = l10n?.dwgMemoryLimitError ?? conversionException.toString();
+            } else if (conversionException != null) {
+              final errStr = conversionException is DwgConversionException
+                  ? conversionException.message
+                  : conversionException.toString();
+              errorMessage = l10n?.dwgConversionFailed(errStr) ?? errStr;
+            } else {
+              errorMessage = l10n?.dwgConversionFailed('') ?? '';
+            }
+
             scaffoldMessenger.showSnackBar(
               SnackBar(
-                content: Text(
-                  'Could not convert DWG file: ${conversionError ?? "Unknown error"}',
-                ),
+                content: Text(errorMessage),
                 backgroundColor: Colors.red.shade700,
+                duration: const Duration(seconds: 6),
               ),
             );
           }

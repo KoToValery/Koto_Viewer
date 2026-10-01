@@ -742,5 +742,16 @@
   "rotationLocked": "Screen rotation locked",
   "@rotationLocked": { "description": "Snackbar message when rotation is locked" },
   "rotationUnlocked": "Auto-rotation restored",
-  "@rotationUnlocked": { "description": "Snackbar message when rotation is unlocked" }
+  "@rotationUnlocked": { "description": "Snackbar message when rotation is unlocked" },
+  "dwgMemoryLimitError": "This DWG drawing requires more memory than available on this device. Please convert it to DXF on a PC or clean it with the PURGE command in CAD software.",
+  "@dwgMemoryLimitError": {
+    "description": "Error message when DWG conversion exceeds device memory limits"
+  },
+  "dwgConversionFailed": "Could not convert DWG file: {error}",
+  "@dwgConversionFailed": {
+    "description": "Error message when DWG file conversion fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  }
 }

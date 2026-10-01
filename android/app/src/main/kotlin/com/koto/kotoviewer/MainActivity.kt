@@ -1,9 +1,17 @@
 package com.koto.kotoviewer
 
 import android.app.Activity
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import android.provider.DocumentsContract
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
@@ -19,11 +27,13 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.koto.kotoviewer/intent"
     private val SHARE_CHANNEL = "com.koto.kotoviewer/share"
     private val SAF_CHANNEL = "koto/saf"
+    private val DWG_CONVERTER_CHANNEL = "com.koto.kotoviewer/dwg_converter"
     private val DIRECTORY_PICKER_REQUEST = 2001
     private var initialFilePath: String? = null
     private var methodChannel: MethodChannel? = null
     private var shareMethodChannel: MethodChannel? = null
     private var safMethodChannel: MethodChannel? = null
+    private var dwgConverterChannel: MethodChannel? = null
     /** Holds the pending Dart result for a native directory-picker request. */
     private var directoryPickerResult: MethodChannel.Result? = null
     /** Background thread pool for SAF operations to prevent blocking the UI thread. */
@@ -51,6 +61,23 @@ class MainActivity : FlutterActivity() {
                 initialFilePath = null
             } else {
                 result.notImplemented()
+            }
+        }
+
+        // Isolated DWG converter channel
+        dwgConverterChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DWG_CONVERTER_CHANNEL)
+        dwgConverterChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "convertDwg" -> {
+                    val inputPath = call.argument<String>("inputPath")
+                    val outputPath = call.argument<String>("outputPath")
+                    if (inputPath != null && outputPath != null) {
+                        convertDwgInIsolatedService(inputPath, outputPath, result)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "inputPath and outputPath required", null)
+                    }
+                }
+                else -> result.notImplemented()
             }
         }
         
@@ -219,6 +246,96 @@ class MainActivity : FlutterActivity() {
                 // User cancelled or no data
                 pending?.success(null)
             }
+        }
+    }
+
+    private fun convertDwgInIsolatedService(
+        inputPath: String,
+        outputPath: String,
+        result: MethodChannel.Result
+    ) {
+        val intent = Intent(this, DwgConverterService::class.java)
+        var isUnbound = false
+        var hasResponded = false
+
+        lateinit var serviceConnection: ServiceConnection
+
+        val responseHandler = object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                if (msg.what == DwgConverterService.MSG_RESULT) {
+                    val resultCode = msg.data.getInt(DwgConverterService.KEY_RESULT_CODE, -1)
+                    if (!hasResponded) {
+                        hasResponded = true
+                        result.success(resultCode)
+                    }
+                    if (!isUnbound) {
+                        try {
+                            unbindService(serviceConnection)
+                            isUnbound = true
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
+        val clientMessenger = Messenger(responseHandler)
+
+        serviceConnection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                try {
+                    val serviceMessenger = Messenger(service)
+                    val msg = Message.obtain(null, DwgConverterService.MSG_CONVERT)
+                    val data = Bundle().apply {
+                        putString(DwgConverterService.KEY_INPUT_PATH, inputPath)
+                        putString(DwgConverterService.KEY_OUTPUT_PATH, outputPath)
+                    }
+                    msg.data = data
+                    msg.replyTo = clientMessenger
+                    serviceMessenger.send(msg)
+                } catch (e: Exception) {
+                    if (!hasResponded) {
+                        hasResponded = true
+                        result.error("CONVERT_SEND_FAILED", e.message, null)
+                    }
+                    if (!isUnbound) {
+                        try {
+                            unbindService(this)
+                            isUnbound = true
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                android.util.Log.e("MainActivity", "DwgConverterService process was killed unexpectedly by OS (OOM / SIGKILL)")
+                if (!hasResponded) {
+                    hasResponded = true
+                    result.error("OOM_KILLED", "Process was killed by Android due to memory limits", null)
+                }
+                isUnbound = true
+            }
+
+            override fun onBindingDied(name: ComponentName?) {
+                android.util.Log.e("MainActivity", "DwgConverterService binding died")
+                if (!hasResponded) {
+                    hasResponded = true
+                    result.error("OOM_KILLED", "Binding died: Process was killed by Android", null)
+                }
+                if (!isUnbound) {
+                    try {
+                        unbindService(this)
+                        isUnbound = true
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+
+        try {
+            val bound = bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            if (!bound) {
+                result.error("BIND_FAILED", "Failed to bind to DwgConverterService", null)
+            }
+        } catch (e: Exception) {
+            result.error("BIND_EXCEPTION", e.message, null)
         }
     }
 

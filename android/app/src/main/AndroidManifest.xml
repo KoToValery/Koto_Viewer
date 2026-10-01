@@ -139,6 +139,12 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Dedicated isolated process for DWG conversions to protect the main app from OOM kills -->
+        <service
+            android:name=".DwgConverterService"
+            android:process=":dwg_converter"
+            android:exported="false" />
         
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

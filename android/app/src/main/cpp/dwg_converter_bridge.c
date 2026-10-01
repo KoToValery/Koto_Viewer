@@ -290,3 +290,26 @@ KOTO_EXPORT int koto_convert_dwg_to_dxf(const char* in_dwg_path, const char* out
     return 0;
 #endif
 }
+
+#ifdef __ANDROID__
+#include <jni.h>
+
+JNIEXPORT jint JNICALL
+Java_com_koto_kotoviewer_DwgConverterService_convertDwgToDxf(
+    JNIEnv *env,
+    jclass clazz,
+    jstring j_in_path,
+    jstring j_out_path
+) {
+    (void)clazz;
+    if (!j_in_path || !j_out_path) {
+        return -1;
+    }
+    const char *in_path = (*env)->GetStringUTFChars(env, j_in_path, NULL);
+    const char *out_path = (*env)->GetStringUTFChars(env, j_out_path, NULL);
+    int result = koto_convert_dwg_to_dxf(in_path, out_path);
+    (*env)->ReleaseStringUTFChars(env, j_in_path, in_path);
+    (*env)->ReleaseStringUTFChars(env, j_out_path, out_path);
+    return (jint)result;
+}
+#endif

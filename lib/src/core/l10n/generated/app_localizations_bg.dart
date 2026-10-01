@@ -865,4 +865,13 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get rotationUnlocked => 'Автоматичното завъртане е възстановено';
+
+  @override
+  String get dwgMemoryLimitError =>
+      'Чертежът съдържа твърде много вътрешни обекти и изисква повече оперативна памет от наличната на това устройство. Препоръчваме да го конвертирате в DXF на компютър или да го изчистите с командата PURGE в CAD софтуер.';
+
+  @override
+  String dwgConversionFailed(String error) {
+    return 'Грешка при конвертиране на DWG файл: $error';
+  }
 }

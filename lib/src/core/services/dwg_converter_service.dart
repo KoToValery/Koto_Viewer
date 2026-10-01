@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../errors/app_error_handler.dart';
 import 'libredwg_ffi.dart';
@@ -17,6 +18,12 @@ class DwgConversionException implements Exception {
   @override
   String toString() =>
       errorCode != null ? '$message (code: $errorCode)' : message;
+}
+
+/// Specialized exception thrown when conversion is killed by the OS due to excessive memory usage.
+class DwgMemoryLimitException extends DwgConversionException {
+  const DwgMemoryLimitException([String message = 'DWG requires excessive memory'])
+      : super(message, errorCode: -999);
 }
 
 /// Service to handle DWG -> DXF conversion and cache management.
@@ -153,10 +160,16 @@ class DwgConverterService {
     return Directory.systemTemp;
   }
 
+  static const MethodChannel _androidChannel =
+      MethodChannel('com.koto.kotoviewer/dwg_converter');
+
   /// Returns true if native LibreDWG converter library or CLI tool is loaded and ready.
   static bool get isNativeSupported {
     if (Platform.isWindows) {
       return _findWindowsDwg2DxfExe() != null || LibreDwgFfi.isAvailable;
+    }
+    if (Platform.isAndroid) {
+      return true;
     }
     return LibreDwgFfi.isAvailable;
   }
@@ -343,7 +356,28 @@ class DwgConverterService {
       }
     }
 
-    // 2. Fallback to Isolate FFI conversion (Android, Linux, or if FFI DLL is loaded)
+    // 2. On Android: Use isolated background service (:dwg_converter)
+    // to shield the main Flutter app from OOM kills on massive/complex drawings.
+    if (result != 0 && Platform.isAndroid) {
+      try {
+        final res = await _androidChannel.invokeMethod<int>('convertDwg', {
+          'inputPath': dwgPath,
+          'outputPath': targetDxfPath,
+        });
+        result = res ?? -1;
+      } on PlatformException catch (e) {
+        debugPrint('DwgConverterService: Android isolated service error: ${e.code} ${e.message}');
+        if (e.code == 'OOM_KILLED') {
+          throw const DwgMemoryLimitException();
+        }
+        result = -1;
+      } catch (e) {
+        debugPrint('DwgConverterService: Android service exception: $e');
+        result = -1;
+      }
+    }
+
+    // 3. Fallback to Isolate FFI conversion (Linux, or if service not available)
     if (result != 0 && LibreDwgFfi.isAvailable) {
       final params = _ConversionParams(
         inputDwgPath: dwgPath,
@@ -362,6 +396,9 @@ class DwgConverterService {
         } on Exception catch (_) {
           // Best effort target cleanup
         }
+      }
+      if (result == -999) {
+        throw const DwgMemoryLimitException();
       }
       if (result == -1073741515 || result == 3221225781) {
         throw DwgConversionException(
