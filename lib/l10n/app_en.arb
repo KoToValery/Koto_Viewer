@@ -983,5 +983,47 @@
       "width": { "type": "String" },
       "height": { "type": "String" }
     }
-  }
+  },
+  "moveElement": "Move",
+  "@moveElement": { "description": "Move structural element button" },
+  "rotateElement": "Rotate 90°",
+  "@rotateElement": { "description": "Rotate structural element 90 degrees button" },
+  "columnDeleted": "Column deleted",
+  "@columnDeleted": { "description": "Snackbar message when a column is deleted" },
+  "selectedColumnTitle": "Selected Column {dimensions}",
+  "@selectedColumnTitle": {
+    "description": "Title badge on selected column action card",
+    "placeholders": {
+      "dimensions": { "type": "String" }
+    }
+  },
+  "dragToMoveTooltip": "Hold and drag to move",
+  "@dragToMoveTooltip": { "description": "Tooltip hint to drag element to relocate" },
+  "slabCorrectionTitle": "Slab Correction",
+  "@slabCorrectionTitle": { "description": "Title for slab correction mode bottom bar" },
+  "slabOffsetLabel": "Offset",
+  "@slabOffsetLabel": { "description": "Offset label in slab correction bar" },
+  "slabRotateLabel": "Rotation",
+  "@slabRotateLabel": { "description": "Rotation label in slab correction bar" },
+  "slabPointsMerged": "Points merged",
+  "@slabPointsMerged": { "description": "Snackbar message when two vertices are merged" },
+  "slabPointDeleted": "Point {number} deleted",
+  "@slabPointDeleted": {
+    "description": "Snackbar message when a vertex is deleted",
+    "placeholders": {
+      "number": { "type": "int" }
+    }
+  },
+  "slabVertexInserted": "New vertex inserted at midpoint",
+  "@slabVertexInserted": { "description": "Snackbar message when a new vertex is inserted at midpoint" },
+  "slabMinPointsWarning": "Slab must have at least 3 points",
+  "@slabMinPointsWarning": { "description": "Warning when trying to delete vertex with fewer than 4 points" },
+  "deleteSlab": "Delete slab",
+  "@deleteSlab": { "description": "Button to delete the slab" },
+  "slabDeleted": "Slab deleted",
+  "@slabDeleted": { "description": "Snackbar message when slab is deleted" },
+  "editSlabAction": "Edit Slab",
+  "@editSlabAction": { "description": "Action button to edit slab" },
+  "selectedSlabTitle": "Selected Slab",
+  "@selectedSlabTitle": { "description": "Title badge for selected slab" }
 }

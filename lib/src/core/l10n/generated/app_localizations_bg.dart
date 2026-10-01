@@ -1150,4 +1150,56 @@ class AppLocalizationsBg extends AppLocalizations {
   String slabRectDimensions(String width, String height) {
     return 'Плоча: $width x $height m';
   }
+
+  @override
+  String get moveElement => 'Премести';
+
+  @override
+  String get rotateElement => 'Завърти 90°';
+
+  @override
+  String get columnDeleted => 'Колоната е изтрита';
+
+  @override
+  String selectedColumnTitle(String dimensions) {
+    return 'Избрана колона $dimensions';
+  }
+
+  @override
+  String get dragToMoveTooltip => 'Задръжте и плъзнете за преместване';
+
+  @override
+  String get slabCorrectionTitle => 'Корекция на плоча';
+
+  @override
+  String get slabOffsetLabel => 'Отместване';
+
+  @override
+  String get slabRotateLabel => 'Ротация';
+
+  @override
+  String get slabPointsMerged => 'Точките са обединени';
+
+  @override
+  String slabPointDeleted(int number) {
+    return 'Точка $number е изтрита';
+  }
+
+  @override
+  String get slabVertexInserted => 'Добавена е нова точка в средата';
+
+  @override
+  String get slabMinPointsWarning => 'Плочата трябва да има поне 3 точки';
+
+  @override
+  String get deleteSlab => 'Изтрий плоча';
+
+  @override
+  String get slabDeleted => 'Плочата е изтрита';
+
+  @override
+  String get editSlabAction => 'Корекция на плоча';
+
+  @override
+  String get selectedSlabTitle => 'Избрана плоча';
 }

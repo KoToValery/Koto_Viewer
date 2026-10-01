@@ -1142,4 +1142,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String slabRectDimensions(String width, String height) {
     return 'Slab: $width x $height m';
   }
+
+  @override
+  String get moveElement => 'Move';
+
+  @override
+  String get rotateElement => 'Rotate 90°';
+
+  @override
+  String get columnDeleted => 'Column deleted';
+
+  @override
+  String selectedColumnTitle(String dimensions) {
+    return 'Selected Column $dimensions';
+  }
+
+  @override
+  String get dragToMoveTooltip => 'Hold and drag to move';
+
+  @override
+  String get slabCorrectionTitle => 'Slab Correction';
+
+  @override
+  String get slabOffsetLabel => 'Offset';
+
+  @override
+  String get slabRotateLabel => 'Rotation';
+
+  @override
+  String get slabPointsMerged => 'Points merged';
+
+  @override
+  String slabPointDeleted(int number) {
+    return 'Point $number deleted';
+  }
+
+  @override
+  String get slabVertexInserted => 'New vertex inserted at midpoint';
+
+  @override
+  String get slabMinPointsWarning => 'Slab must have at least 3 points';
+
+  @override
+  String get deleteSlab => 'Delete slab';
+
+  @override
+  String get slabDeleted => 'Slab deleted';
+
+  @override
+  String get editSlabAction => 'Edit Slab';
+
+  @override
+  String get selectedSlabTitle => 'Selected Slab';
 }

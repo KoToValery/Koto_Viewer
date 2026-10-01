@@ -336,5 +336,21 @@
   "cantileverExtrudeDepth": "Еркер: {depth} m",
   "slabEdgeExtrudeTooltip": "Изтеглете средата на отсечката за еркер",
   "cancelSlab": "Откажи плоча",
-  "slabRectDimensions": "Плоча: {width} x {height} m"
+  "slabRectDimensions": "Плоча: {width} x {height} m",
+  "moveElement": "Премести",
+  "rotateElement": "Завърти 90°",
+  "columnDeleted": "Колоната е изтрита",
+  "selectedColumnTitle": "Избрана колона {dimensions}",
+  "dragToMoveTooltip": "Задръжте и плъзнете за преместване",
+  "slabCorrectionTitle": "Корекция на плоча",
+  "slabOffsetLabel": "Отместване",
+  "slabRotateLabel": "Ротация",
+  "slabPointsMerged": "Точките са обединени",
+  "slabPointDeleted": "Точка {number} е изтрита",
+  "slabVertexInserted": "Добавена е нова точка в средата",
+  "slabMinPointsWarning": "Плочата трябва да има поне 3 точки",
+  "deleteSlab": "Изтрий плоча",
+  "slabDeleted": "Плочата е изтрита",
+  "editSlabAction": "Корекция на плоча",
+  "selectedSlabTitle": "Избрана плоча"
 }

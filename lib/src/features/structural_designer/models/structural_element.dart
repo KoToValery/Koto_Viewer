@@ -228,6 +228,115 @@ class StructuralSlab {
     return Rect.fromLTRB(minX, minY, maxX, maxY);
   }
 
+  /// Centroid of the polygon vertices.
+  Offset get centroid {
+    if (polygon.isEmpty) return Offset.zero;
+    double cx = 0.0, cy = 0.0;
+    for (final p in polygon) {
+      cx += p.dx;
+      cy += p.dy;
+    }
+    return Offset(cx / polygon.length, cy / polygon.length);
+  }
+
+  /// Total perimeter of the slab in CAD units.
+  double get perimeter {
+    if (polygon.length < 2) return 0.0;
+    double p = 0.0;
+    for (int i = 0; i < polygon.length; i++) {
+      p += (polygon[(i + 1) % polygon.length] - polygon[i]).distance;
+    }
+    return p;
+  }
+
+  /// Inserts a new vertex at the midpoint of edge [edgeIndex].
+  StructuralSlab insertMidpointVertex(int edgeIndex) {
+    if (edgeIndex < 0 || edgeIndex >= polygon.length) return this;
+    final p1 = polygon[edgeIndex];
+    final p2 = polygon[(edgeIndex + 1) % polygon.length];
+    final mid = Offset((p1.dx + p2.dx) / 2.0, (p1.dy + p2.dy) / 2.0);
+    final updated = List<Offset>.from(polygon);
+    updated.insert(edgeIndex + 1, mid);
+    return copyWith(polygon: updated);
+  }
+
+  /// Moves vertex at [index] to [newPos].
+  StructuralSlab moveVertex(int index, Offset newPos) {
+    if (index < 0 || index >= polygon.length) return this;
+    final updated = List<Offset>.from(polygon);
+    updated[index] = newPos;
+    return copyWith(polygon: updated);
+  }
+
+  /// Removes vertex at [index] if at least 4 vertices remain.
+  StructuralSlab? removeVertex(int index) {
+    if (polygon.length <= 3 || index < 0 || index >= polygon.length) return null;
+    final updated = List<Offset>.from(polygon)..removeAt(index);
+    return copyWith(polygon: updated);
+  }
+
+  /// Uniform parallel offset of all edges by [distance] in CAD units.
+  /// Positive distance expands outward, negative distance shrinks inward.
+  StructuralSlab offsetContour(double distance) {
+    if (polygon.length < 3 || distance.abs() < 1e-6) return this;
+    final count = polygon.length;
+    double sum = 0.0;
+    for (int i = 0; i < count; i++) {
+      final pA = polygon[i];
+      final pB = polygon[(i + 1) % count];
+      sum += (pA.dx * pB.dy - pB.dx * pA.dy);
+    }
+    final isCCW = sum > 0;
+    final List<Offset> normals = [];
+    for (int i = 0; i < count; i++) {
+      final p1 = polygon[i];
+      final p2 = polygon[(i + 1) % count];
+      final edge = p2 - p1;
+      final len = edge.distance;
+      if (len < 1e-6) {
+        normals.add(Offset.zero);
+      } else {
+        final u = edge / len;
+        normals.add(isCCW ? Offset(u.dy, -u.dx) : Offset(-u.dy, u.dx));
+      }
+    }
+    final List<Offset> newPts = [];
+    for (int i = 0; i < count; i++) {
+      final prevIdx = (i - 1 + count) % count;
+      final n1 = normals[prevIdx];
+      final n2 = normals[i];
+      final bisector = n1 + n2;
+      final bisLen = bisector.distance;
+      if (bisLen < 1e-4) {
+        newPts.add(polygon[i] + n2 * distance);
+      } else {
+        final uBis = bisector / bisLen;
+        final cosHalf = (n1.dx * uBis.dx + n1.dy * uBis.dy).clamp(0.25, 1.0);
+        final d = (distance / cosHalf).clamp(-distance.abs() * 2.5, distance.abs() * 2.5);
+        newPts.add(polygon[i] + uBis * d);
+      }
+    }
+    return copyWith(polygon: newPts);
+  }
+
+  /// Rotates the slab polygon by [angleDegrees] around its centroid.
+  StructuralSlab rotate(double angleDegrees) {
+    if (polygon.isEmpty || angleDegrees == 0.0) return this;
+    final center = centroid;
+    final rad = angleDegrees * math.pi / 180.0;
+    final cosA = math.cos(rad);
+    final sinA = math.sin(rad);
+    final newPts = polygon.map((p) {
+      final dx = p.dx - center.dx;
+      final dy = p.dy - center.dy;
+      return Offset(
+        center.dx + (dx * cosA - dy * sinA),
+        center.dy + (dx * sinA + dy * cosA),
+      );
+    }).toList();
+    return copyWith(polygon: newPts);
+  }
+
   /// Ray-casting point-in-polygon check.
   bool containsPoint(Offset pt) {
     if (!bounds.contains(pt)) return false;

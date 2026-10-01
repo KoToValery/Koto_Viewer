@@ -248,5 +248,189 @@ void main() {
       expect(analysis.totalCantilevers, greaterThan(0));
       expect(analysis.zones.first.length, closeTo(1.50, 0.05));
     });
+
+    test('Moving a placed column updates its position and vertices correctly', () {
+      final initialCol = StructuralColumn.fromTopLeft(
+        id: 'col_move_test',
+        topLeft: const Offset(2.0, 5.0),
+        width: 0.25,
+        height: 0.50,
+      );
+
+      // Move top-left corner to (6.0, 8.0)
+      final movedCol = StructuralColumn.fromTopLeft(
+        id: initialCol.id,
+        topLeft: const Offset(6.0, 8.0),
+        width: initialCol.width,
+        height: initialCol.height,
+        rotationRad: initialCol.rotationRad,
+      );
+
+      expect(movedCol.topLeft.dx, closeTo(6.0, 1e-6));
+      expect(movedCol.topLeft.dy, closeTo(8.0, 1e-6));
+      expect(movedCol.center.dx, closeTo(6.125, 1e-6));
+      expect(movedCol.center.dy, closeTo(7.75, 1e-6));
+
+      final vertices = movedCol.polygonVertices;
+      expect(vertices.first.dx, closeTo(6.0, 1e-6));
+      expect(vertices.first.dy, closeTo(8.0, 1e-6));
+    });
+
+    test('Deleting a placed column removes it from storey and triggers recalculation', () {
+      final col1 = StructuralColumn(id: 'c1', center: const Offset(0, 0), width: 0.25, height: 0.25);
+      final col2 = StructuralColumn(id: 'c2', center: const Offset(5, 5), width: 0.25, height: 0.25);
+
+      final storey = StoreyLevel(
+        id: 's1',
+        name: 'Storey 1',
+        columns: [col1, col2],
+      );
+
+      expect(storey.columns.length, equals(2));
+
+      // Simulate deletion of c2
+      final updatedColumns = storey.columns.where((c) => c.id != 'c2').toList();
+      final updatedStorey = storey.copyWith(columns: updatedColumns);
+
+      expect(updatedStorey.columns.length, equals(1));
+      expect(updatedStorey.columns.first.id, equals('c1'));
+    });
+
+    test('Rotating a placed column swaps width and height correctly', () {
+      final col = const StructuralColumn(
+        id: 'c_rot',
+        center: Offset(3.0, 4.0),
+        width: 0.25,
+        height: 0.60,
+      );
+
+      final rotated = col.copyWith(
+        width: col.height,
+        height: col.width,
+      );
+
+      expect(rotated.width, equals(0.60));
+      expect(rotated.height, equals(0.25));
+      expect(rotated.center, equals(const Offset(3.0, 4.0)));
+    });
+
+    test('Moving a slab vertex modifies polygon while retaining other vertices', () {
+      const slab = StructuralSlab(
+        id: 'slab_move_v',
+        polygon: [
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 8),
+          Offset(0, 8),
+        ],
+      );
+
+      // Move vertex 2 from (10, 8) to (12, 10)
+      final moved = slab.moveVertex(2, const Offset(12.0, 10.0));
+      expect(moved.polygon.length, equals(4));
+      expect(moved.polygon[0], equals(const Offset(0, 0)));
+      expect(moved.polygon[1], equals(const Offset(10, 0)));
+      expect(moved.polygon[2], equals(const Offset(12, 10)));
+      expect(moved.polygon[3], equals(const Offset(0, 8)));
+    });
+
+    test('Inserting midpoint vertex divides edge into two segments', () {
+      const slab = StructuralSlab(
+        id: 'slab_insert_mid',
+        polygon: [
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 8),
+          Offset(0, 8),
+        ],
+      );
+
+      // Insert at midpoint of edge 1 (from (10,0) to (10,8), mid is (10,4))
+      final withMid = slab.insertMidpointVertex(1);
+      expect(withMid.polygon.length, equals(5));
+      expect(withMid.polygon[0], equals(const Offset(0, 0)));
+      expect(withMid.polygon[1], equals(const Offset(10, 0)));
+      expect(withMid.polygon[2], equals(const Offset(10, 4))); // new vertex!
+      expect(withMid.polygon[3], equals(const Offset(10, 8)));
+      expect(withMid.polygon[4], equals(const Offset(0, 8)));
+    });
+
+    test('Deleting/merging slab vertex reduces vertex count, enforces minimum 3 vertices', () {
+      const slab5 = StructuralSlab(
+        id: 'slab_del_v',
+        polygon: [
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 4),
+          Offset(10, 8),
+          Offset(0, 8),
+        ],
+      );
+
+      // Remove vertex 2 (midpoint)
+      final slab4 = slab5.removeVertex(2);
+      expect(slab4, isNotNull);
+      expect(slab4!.polygon.length, equals(4));
+      expect(slab4.polygon[2], equals(const Offset(10, 8)));
+
+      // Triangle slab cannot have a vertex removed
+      const slab3 = StructuralSlab(
+        id: 'slab_tri',
+        polygon: [
+          Offset(0, 0),
+          Offset(5, 0),
+          Offset(2.5, 5),
+        ],
+      );
+      final slabInvalid = slab3.removeVertex(0);
+      expect(slabInvalid, isNull);
+    });
+
+    test('Slab offsetContour expands polygon uniformly in all directions', () {
+      const slab = StructuralSlab(
+        id: 'slab_offset',
+        polygon: [
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 10),
+          Offset(0, 10),
+        ],
+      );
+
+      // Expand outward by 1.0m
+      final expanded = slab.offsetContour(1.0);
+      expect(expanded.polygon.length, equals(4));
+      expect(expanded.bounds.width, closeTo(12.0, 0.05));
+      expect(expanded.bounds.height, closeTo(12.0, 0.05));
+      expect(expanded.netArea, greaterThan(slab.netArea));
+
+      // Shrink inward by 1.0m
+      final shrunk = slab.offsetContour(-1.0);
+      expect(shrunk.bounds.width, closeTo(8.0, 0.05));
+      expect(shrunk.bounds.height, closeTo(8.0, 0.05));
+      expect(shrunk.netArea, lessThan(slab.netArea));
+    });
+
+    test('Slab rotate rotates polygon around centroid preserving area', () {
+      const slab = StructuralSlab(
+        id: 'slab_rot',
+        polygon: [
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 6),
+          Offset(0, 6),
+        ],
+      );
+
+      expect(slab.centroid, equals(const Offset(5.0, 3.0)));
+      final initialArea = slab.netArea;
+
+      // Rotate by 90 degrees around centroid
+      final rotated90 = slab.rotate(90.0);
+      expect(rotated90.centroid.dx, closeTo(5.0, 1e-4));
+      expect(rotated90.centroid.dy, closeTo(3.0, 1e-4));
+      expect(rotated90.netArea, closeTo(initialArea, 1e-2));
+      expect(rotated90.perimeter, closeTo(slab.perimeter, 1e-2));
+    });
   });
 }

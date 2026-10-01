@@ -20,6 +20,13 @@ class Structural2dPainter extends CustomPainter {
   final List<Offset> slabPointsInProgress;
   final SlabEdgeGripInfo? extrudingGrip;
   final double? extrusionDistance;
+  final String? selectedColumnId;
+  final StructuralColumn? movingColumn;
+  final Offset? movingColumnPos;
+  final String? selectedSlabId;
+  final int? draggingSlabVertexIndex;
+  final Offset? draggingSlabVertexPos;
+  final int? mergeCandidateVertexIndex;
   final double cadUnitsPerMeter;
   final double zoomScale;
   final Offset Function(Offset) cadToScene;
@@ -39,6 +46,13 @@ class Structural2dPainter extends CustomPainter {
     this.slabPointsInProgress = const [],
     this.extrudingGrip,
     this.extrusionDistance,
+    this.selectedColumnId,
+    this.movingColumn,
+    this.movingColumnPos,
+    this.selectedSlabId,
+    this.draggingSlabVertexIndex,
+    this.draggingSlabVertexPos,
+    this.mergeCandidateVertexIndex,
     this.cadUnitsPerMeter = 1.0,
     this.zoomScale = 1.0,
     required this.cadToScene,
@@ -96,7 +110,17 @@ class Structural2dPainter extends CustomPainter {
   void _drawSlab(Canvas canvas, StructuralSlab slab, {required bool isGhost}) {
     if (slab.polygon.length < 3) return;
 
-    final pts = slab.polygon.map(cadToScene).toList();
+    final isSelected = !isGhost && (slab.id == selectedSlabId);
+    List<Offset> polygon = slab.polygon;
+    if (isSelected &&
+        draggingSlabVertexIndex != null &&
+        draggingSlabVertexPos != null &&
+        draggingSlabVertexIndex! < polygon.length) {
+      polygon = List<Offset>.from(polygon);
+      polygon[draggingSlabVertexIndex!] = draggingSlabVertexPos!;
+    }
+
+    final pts = polygon.map(cadToScene).toList();
     final path = Path();
     path.moveTo(pts.first.dx, pts.first.dy);
     for (int i = 1; i < pts.length; i++) {
@@ -121,18 +145,25 @@ class Structural2dPainter extends CustomPainter {
     final fillPaint = Paint()
       ..color = isGhost
           ? const Color(0x1A90CAF9)
-          : const Color(0x2803A9F4)
+          : (isSelected ? const Color(0x3D7C4DFF) : const Color(0x2803A9F4))
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
       ..color = isGhost
           ? const Color(0x6664B5F6)
-          : const Color(0xFF0288D1)
+          : (isSelected ? const Color(0xFFB388FF) : const Color(0xFF0288D1))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isGhost ? (1.0 / zoomScale) : (2.0 / zoomScale);
+      ..strokeWidth = isGhost
+          ? (1.0 / zoomScale)
+          : (isSelected ? (2.5 / zoomScale) : (2.0 / zoomScale));
 
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
+
+    // If selected, draw corner vertex handles
+    if (isSelected) {
+      _drawSlabVertexHandles(canvas, polygon);
+    }
 
     // Draw midpoint edge grips for slabs on active storey
     if (!isGhost) {
@@ -140,11 +171,51 @@ class Structural2dPainter extends CustomPainter {
     }
   }
 
+  void _drawSlabVertexHandles(Canvas canvas, List<Offset> polygon) {
+    final double radius = 6.0 / zoomScale;
+    final handleFill = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final handleStroke = Paint()
+      ..color = const Color(0xFF7C4DFF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 / zoomScale;
+
+    final candidateFill = Paint()
+      ..color = const Color(0x55F44336)
+      ..style = PaintingStyle.fill;
+    final candidateStroke = Paint()
+      ..color = const Color(0xFFE53935)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5 / zoomScale;
+
+    for (int i = 0; i < polygon.length; i++) {
+      final scenePt = cadToScene(polygon[i]);
+      if (mergeCandidateVertexIndex == i) {
+        // Highlight merge candidate with glowing red target
+        canvas.drawCircle(scenePt, radius * 1.8, candidateFill);
+        canvas.drawCircle(scenePt, radius * 1.8, candidateStroke);
+      }
+
+      if (draggingSlabVertexIndex == i) {
+        // Active dragging vertex
+        final activeFill = Paint()
+          ..color = const Color(0xFFFFD600)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(scenePt, radius * 1.3, activeFill);
+        canvas.drawCircle(scenePt, radius * 1.3, handleStroke);
+      } else {
+        canvas.drawCircle(scenePt, radius, handleFill);
+        canvas.drawCircle(scenePt, radius, handleStroke);
+      }
+    }
+  }
+
   void _drawSlabEdgeGrips(Canvas canvas, StructuralSlab slab) {
     final grips = slab.edgeGrips;
     if (grips.isEmpty) return;
 
-    final double radius = (4.5 / zoomScale).clamp(3.5, 7.5);
+    final double radius = 4.5 / zoomScale;
     final gripFill = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.fill;
@@ -219,7 +290,7 @@ class Structural2dPainter extends CustomPainter {
     final vDotPaint = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.fill;
-    final dotRadius = (4.0 / zoomScale).clamp(3.0, 6.0);
+    final dotRadius = 4.0 / zoomScale;
     canvas.drawCircle(sNew1, dotRadius, vDotPaint);
     canvas.drawCircle(sNew2, dotRadius, vDotPaint);
 
@@ -232,7 +303,7 @@ class Structural2dPainter extends CustomPainter {
     canvas.drawCircle(sV2, dotRadius, anchorPaint);
 
     // Midpoint active grip handle with glowing ring
-    final gripRadius = (5.5 / zoomScale).clamp(4.5, 9.0);
+    final gripRadius = 5.5 / zoomScale;
     final gripPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
@@ -242,6 +313,37 @@ class Structural2dPainter extends CustomPainter {
       ..strokeWidth = 2.0 / zoomScale;
     canvas.drawCircle(sMidNew, gripRadius, gripPaint);
     canvas.drawCircle(sMidNew, gripRadius + 3.0 / zoomScale, ringPaint);
+
+    // Distance badge text
+    final distText = '${d.abs().toStringAsFixed(2)} m';
+    final textSpan = TextSpan(
+      text: distText,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: (11.0 / zoomScale).clamp(8.0, 16.0),
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final badgeOffset = sMidNew + Offset(12.0 / zoomScale, -12.0 / zoomScale);
+    final bgRect = Rect.fromLTWH(
+      badgeOffset.dx - 4.0 / zoomScale,
+      badgeOffset.dy - 2.0 / zoomScale,
+      textPainter.width + 8.0 / zoomScale,
+      textPainter.height + 4.0 / zoomScale,
+    );
+    final badgeBgPaint = Paint()
+      ..color = const Color(0xCC000000)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(bgRect, Radius.circular(4.0 / zoomScale)),
+      badgeBgPaint,
+    );
+    textPainter.paint(canvas, badgeOffset);
   }
 
   void _drawShearWall(Canvas canvas, StructuralShearWall wall,
@@ -289,25 +391,56 @@ class Structural2dPainter extends CustomPainter {
     }
     path.close();
 
+    final bool isMovingThis = movingColumn != null && movingColumn!.id == col.id;
+    final bool isSelected = !isGhost && (col.id == selectedColumnId);
+
     final fillPaint = Paint()
       ..color = isGhost
           ? const Color(0x4D64B5F6)
-          : const Color(0xF01565C0)
+          : isMovingThis
+              ? const Color(0x331565C0)
+              : const Color(0xF01565C0)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
       ..color = isGhost
           ? const Color(0x8090CAF9)
-          : Colors.white
+          : isMovingThis
+              ? const Color(0x66FFFFFF)
+              : Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5 / zoomScale;
 
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
 
+    // Selected highlight halo & corner grip handles
+    if (isSelected && !isMovingThis) {
+      final selectHalo = Paint()
+        ..color = const Color(0xFFFFB300)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5 / zoomScale;
+      canvas.drawPath(path, selectHalo);
+
+      final handlePaint = Paint()
+        ..color = const Color(0xFFFFB300)
+        ..style = PaintingStyle.fill;
+      final handleSize = 3.5 / zoomScale;
+      for (final pt in pts) {
+        canvas.drawRect(
+          Rect.fromCenter(center: pt, width: handleSize * 2, height: handleSize * 2),
+          handlePaint,
+        );
+      }
+    }
+
     // Centroid crossmark
     final crossPaint = Paint()
-      ..color = isGhost ? const Color(0x40FFFFFF) : const Color(0xCCFFFFFF)
+      ..color = isGhost
+          ? const Color(0x40FFFFFF)
+          : isMovingThis
+              ? const Color(0x40FFFFFF)
+              : const Color(0xCCFFFFFF)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0 / zoomScale;
 
@@ -327,9 +460,39 @@ class Structural2dPainter extends CustomPainter {
   }
 
   void _drawInteractivePreview(Canvas canvas) {
+    // 1. Moving column live preview (anchored at Top-Left)
+    if (movingColumn != null && movingColumnPos != null) {
+      final center = Offset(
+        movingColumnPos!.dx + movingColumn!.width / 2.0,
+        movingColumnPos!.dy - movingColumn!.height / 2.0,
+      );
+      final col = movingColumn!.copyWith(center: center);
+      final pts = col.polygonVertices.map(cadToScene).toList();
+      if (pts.isNotEmpty) {
+        final path = Path()..moveTo(pts[0].dx, pts[0].dy);
+        for (int i = 1; i < pts.length; i++) {
+          path.lineTo(pts[i].dx, pts[i].dy);
+        }
+        path.close();
+
+        final movingFill = Paint()
+          ..color = const Color(0x99FFB300)
+          ..style = PaintingStyle.fill;
+        final movingBorder = Paint()
+          ..color = const Color(0xFFFFD54F)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5 / zoomScale;
+
+        canvas.drawPath(path, movingFill);
+        canvas.drawPath(path, movingBorder);
+      }
+    }
+
+    // 2. New column placement live preview (anchored at Top-Left)
     if (activeTool == StructuralDrawTool.column &&
         previewColumn != null &&
-        previewColumnPos != null) {
+        previewColumnPos != null &&
+        movingColumn == null) {
       // Top-Left anchor:
       // In CAD (Y up), top-left is (previewColumnPos.dx, previewColumnPos.dy),
       // so center is (previewColumnPos.dx + previewColumn.width / 2.0, previewColumnPos.dy - previewColumn.height / 2.0).
@@ -356,13 +519,6 @@ class Structural2dPainter extends CustomPainter {
 
         canvas.drawPath(path, previewFill);
         canvas.drawPath(path, previewBorder);
-
-        // Top-Left anchor indicator dot
-        final anchorScene = cadToScene(previewColumnPos!);
-        final anchorDot = Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(anchorScene, (4.0 / zoomScale).clamp(3.0, 6.0), anchorDot);
       }
     } else if (activeTool == StructuralDrawTool.shearWall &&
         wallStartPos != null &&
@@ -431,7 +587,7 @@ class Structural2dPainter extends CustomPainter {
         final cornerDot = Paint()
           ..color = const Color(0xFFFF5252)
           ..style = PaintingStyle.fill;
-        final rDot = (4.0 / zoomScale).clamp(3.0, 6.0);
+        final rDot = 4.0 / zoomScale;
         canvas.drawCircle(p1, rDot, cornerDot);
         canvas.drawCircle(p2, rDot, cornerDot);
         canvas.drawCircle(p3, rDot, cornerDot);

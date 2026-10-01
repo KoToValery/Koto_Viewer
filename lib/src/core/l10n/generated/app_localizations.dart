@@ -2088,6 +2088,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Slab: {width} x {height} m'**
   String slabRectDimensions(String width, String height);
+
+  /// Move structural element button
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get moveElement;
+
+  /// Rotate structural element 90 degrees button
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate 90°'**
+  String get rotateElement;
+
+  /// Snackbar message when a column is deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Column deleted'**
+  String get columnDeleted;
+
+  /// Title badge on selected column action card
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Column {dimensions}'**
+  String selectedColumnTitle(String dimensions);
+
+  /// Tooltip hint to drag element to relocate
+  ///
+  /// In en, this message translates to:
+  /// **'Hold and drag to move'**
+  String get dragToMoveTooltip;
+
+  /// Title for slab correction mode bottom bar
+  ///
+  /// In en, this message translates to:
+  /// **'Slab Correction'**
+  String get slabCorrectionTitle;
+
+  /// Offset label in slab correction bar
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get slabOffsetLabel;
+
+  /// Rotation label in slab correction bar
+  ///
+  /// In en, this message translates to:
+  /// **'Rotation'**
+  String get slabRotateLabel;
+
+  /// Snackbar message when two vertices are merged
+  ///
+  /// In en, this message translates to:
+  /// **'Points merged'**
+  String get slabPointsMerged;
+
+  /// Snackbar message when a vertex is deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Point {number} deleted'**
+  String slabPointDeleted(int number);
+
+  /// Snackbar message when a new vertex is inserted at midpoint
+  ///
+  /// In en, this message translates to:
+  /// **'New vertex inserted at midpoint'**
+  String get slabVertexInserted;
+
+  /// Warning when trying to delete vertex with fewer than 4 points
+  ///
+  /// In en, this message translates to:
+  /// **'Slab must have at least 3 points'**
+  String get slabMinPointsWarning;
+
+  /// Button to delete the slab
+  ///
+  /// In en, this message translates to:
+  /// **'Delete slab'**
+  String get deleteSlab;
+
+  /// Snackbar message when slab is deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Slab deleted'**
+  String get slabDeleted;
+
+  /// Action button to edit slab
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Slab'**
+  String get editSlabAction;
+
+  /// Title badge for selected slab
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Slab'**
+  String get selectedSlabTitle;
 }
 
 class _AppLocalizationsDelegate
