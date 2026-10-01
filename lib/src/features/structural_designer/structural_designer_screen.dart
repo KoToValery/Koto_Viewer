@@ -61,7 +61,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   // In-progress drawing states
   Offset? _wallStartCad;
+  Offset? _slabStartCornerCad;
   final List<Offset> _slabPointsCad = [];
+
+  // Midpoint edge extrusion states (Cantilever / еркер drag)
+  SlabEdgeGripInfo? _activeGrip;
+  String? _activeExtrudingSlabId;
+  bool _isExtrudingEdge = false;
+  double _extrusionDistanceCad = 0.0;
 
   // Pointer & Touch states (Offset pointer: 56px above finger)
   Offset? _touchScreenPos;
@@ -105,6 +112,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     for (final entry in widget.document.layers.entries) {
       _originalLayerVisibility[entry.key] = entry.value.isVisible;
     }
+
+    // Automatically hide thin lines and isolate thickest structural lines by default
+    _applyUnderlayFilter(true);
 
     _project = const StructuralProject();
     _runAnalysis();
@@ -258,6 +268,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   // --- Pointer & Touch Handling with Offset Ruler (56px) & Magnetic Snap ---
 
+  SlabEdgeGripInfo? _hitTestSlabMidpoint(Offset screenPos) {
+    const double hitRadiusScreen = 28.0;
+    for (final slab in _project.activeStorey.slabs) {
+      for (final grip in slab.edgeGrips) {
+        final screenGrip = _cadToScreen(grip.midpoint);
+        if ((screenPos - screenGrip).distance <= hitRadiusScreen) {
+          _activeExtrudingSlabId = slab.id;
+          return grip;
+        }
+      }
+    }
+    return null;
+  }
+
   void _handlePointerDown(PointerDownEvent event) {
     _activePointersCount++;
     _activePointerKind = event.kind;
@@ -272,9 +296,30 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _activeSnap = null;
         });
       }
+      if (_isExtrudingEdge) {
+        setState(() {
+          _isExtrudingEdge = false;
+          _activeGrip = null;
+          _activeExtrudingSlabId = null;
+          _extrusionDistanceCad = 0.0;
+        });
+      }
       return;
     }
     _isMultiTouchGesture = false;
+
+    // Check hit test on slab midpoint grips for edge extrusion
+    final grip = _hitTestSlabMidpoint(event.localPosition);
+    if (grip != null) {
+      setState(() {
+        _activeGrip = grip;
+        _isExtrudingEdge = true;
+        _extrusionDistanceCad = 0.0;
+      });
+      HapticFeedback.selectionClick();
+      return;
+    }
+
     if (event.kind == PointerDeviceKind.mouse &&
         _activeTool != StructuralDrawTool.select) {
       _isPlacingWithHold = true;
@@ -288,9 +333,38 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
+
+    if (_isExtrudingEdge && _activeGrip != null) {
+      _updateEdgeExtrusion(event.localPosition);
+      return;
+    }
+
     if (event.kind == PointerDeviceKind.mouse && _isPlacingWithHold) {
       _updatePointer(event.localPosition, isMouse: true);
     }
+  }
+
+  void _updateEdgeExtrusion(Offset screenPos) {
+    final rawCad = _screenToCad(screenPos);
+    DxfSnapResult? snap;
+    if (_snapEnabled) {
+      final double fitScale = _getCadFitScale();
+      final double currentScale = _transformController.value.getMaxScaleOnAxis();
+      final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+      snap = DxfSnapHelper.findSnapPoint(
+        document: widget.document,
+        cadPoint: rawCad,
+        toleranceCad: toleranceCad,
+      );
+      snap ??= _findStructuralSnap(rawCad, toleranceCad);
+    }
+    final effectiveCad = snap?.point ?? rawCad;
+    final disp = effectiveCad - _activeGrip!.midpoint;
+    final d = disp.dx * _activeGrip!.normal.dx + disp.dy * _activeGrip!.normal.dy;
+
+    setState(() {
+      _extrusionDistanceCad = d;
+    });
   }
 
   void _updatePointer(Offset screenPos, {bool isMouse = false}) {
@@ -394,7 +468,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
       }
 
-      // Slab polygon vertices
+      // Slab polygon vertices and edge midpoints
       for (final slab in s.slabs) {
         for (final v in slab.polygon) {
           final d = (cadPt - v).distance;
@@ -403,6 +477,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             bestSnap = DxfSnapResult(
               point: v,
               type: DxfSnapType.endpoint,
+              distance: d,
+            );
+          }
+        }
+        for (final g in slab.edgeGrips) {
+          final d = (cadPt - g.midpoint).distance;
+          if (d < minDist) {
+            minDist = d;
+            bestSnap = DxfSnapResult(
+              point: g.midpoint,
+              type: DxfSnapType.midpoint,
               distance: d,
             );
           }
@@ -418,6 +503,34 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_activePointersCount == 0) _activePointerKind = null;
     if (_isMultiTouchGesture) {
       if (_activePointersCount == 0) _isMultiTouchGesture = false;
+      return;
+    }
+
+    // Edge extrusion commit on release
+    if (_isExtrudingEdge && _activeGrip != null) {
+      final d = _extrusionDistanceCad;
+      final scale = _cadUnitsPerMeter;
+      if (d.abs() >= 0.05 * scale) {
+        final active = _project.activeStorey;
+        final slabIdx = active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId);
+        if (slabIdx != -1) {
+          _pushUndo();
+          final updatedSlab = active.slabs[slabIdx].extrudeEdgeParallel(
+            edgeIndex: _activeGrip!.edgeIndex,
+            distance: d,
+          );
+          final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+          updatedSlabs[slabIdx] = updatedSlab;
+          _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+          HapticFeedback.heavyImpact();
+        }
+      }
+      setState(() {
+        _isExtrudingEdge = false;
+        _activeGrip = null;
+        _activeExtrudingSlabId = null;
+        _extrusionDistanceCad = 0.0;
+      });
       return;
     }
 
@@ -442,6 +555,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _isMultiTouchGesture = false;
     setState(() {
       _isPlacingWithHold = false;
+      _isExtrudingEdge = false;
+      _activeGrip = null;
+      _activeExtrudingSlabId = null;
+      _extrusionDistanceCad = 0.0;
       _touchScreenPos = null;
       _targetScreenPos = null;
       _snappedScreenPos = null;
@@ -451,6 +568,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handleLongPressStart(LongPressStartDetails details) {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
+    if (_isExtrudingEdge || _activeGrip != null) return;
     if (_activeTool == StructuralDrawTool.select) return;
     if (_isMultiTouchGesture || _activePointersCount > 1) return;
 
@@ -505,11 +623,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     if (_activeTool == StructuralDrawTool.column) {
       _pushUndo();
-      final newCol = _currentColumnPreset.copyWith(
+      // Anchor column at Top-Left corner in CAD coordinates
+      final newCol = StructuralColumn.fromTopLeft(
         id: 'col_${DateTime.now().millisecondsSinceEpoch}',
-        center: cadCoord,
+        topLeft: cadCoord,
+        shape: _currentColumnPreset.shape,
         width: _currentColumnPreset.width * scale,
         height: _currentColumnPreset.height * scale,
+        rotationRad: _currentColumnPreset.rotationRad,
       );
       final updatedColumns = List<StructuralColumn>.from(active.columns)
         ..add(newCol);
@@ -540,9 +661,46 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         setState(() => _wallStartCad = null);
       }
     } else if (_activeTool == StructuralDrawTool.slab) {
-      // Add vertex to polygon
-      setState(() => _slabPointsCad.add(cadCoord));
-      HapticFeedback.lightImpact();
+      if (_slabStartCornerCad == null) {
+        // Step 1: Set 1st corner of rectangular slab
+        setState(() => _slabStartCornerCad = cadCoord);
+        HapticFeedback.lightImpact();
+      } else {
+        // Step 2: Set opposite corner and commit closed rectangular slab
+        final c1 = _slabStartCornerCad!;
+        final c2 = cadCoord;
+        final minX = math.min(c1.dx, c2.dx);
+        final maxX = math.max(c1.dx, c2.dx);
+        final minY = math.min(c1.dy, c2.dy);
+        final maxY = math.max(c1.dy, c2.dy);
+
+        final w = maxX - minX;
+        final h = maxY - minY;
+
+        if (w >= 0.3 * scale && h >= 0.3 * scale) {
+          _pushUndo();
+          // Closed counter-clockwise rectangle in CAD coordinates (Y up)
+          final rectPolygon = [
+            Offset(minX, minY),
+            Offset(maxX, minY),
+            Offset(maxX, maxY),
+            Offset(minX, maxY),
+          ];
+          final newSlab = StructuralSlab(
+            id: 'slab_${DateTime.now().millisecondsSinceEpoch}',
+            polygon: rectPolygon,
+            thickness: _currentSlabThickness,
+          );
+          final updatedSlabs = List<StructuralSlab>.from(active.slabs)..add(newSlab);
+          final updatedStorey = active.copyWith(slabs: updatedSlabs);
+          _updateActiveStorey(updatedStorey);
+          HapticFeedback.heavyImpact();
+        }
+        setState(() {
+          _slabStartCornerCad = null;
+          _slabPointsCad.clear();
+        });
+      }
     }
   }
 
@@ -575,14 +733,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   // --- Structural Underlay Layer Filtering (Walls & Grid Axes) ---
 
-  bool _isStructuralOrAxisLayer(DxfLayer layer) {
+  bool _isStructuralOrThickLayer(DxfLayer layer, double maxLw) {
+    final lw = layer.customLineweight ?? layer.lineweight ?? 0.0;
+    // 1. Explicitly thick layers or at least 70% of max lineweight (if max >= 0.25mm)
     if (layer.isThick) return true;
-    if ((layer.lineweight != null && layer.lineweight! >= 0.30) ||
-        (layer.customLineweight != null && layer.customLineweight! >= 0.30)) {
-      return true;
-    }
+    if (maxLw >= 0.25 && lw >= maxLw * 0.70) return true;
+    if (lw >= 0.30) return true;
 
+    // 2. Structural & grid keywords
     final name = layer.name.toLowerCase();
+
+    // Check negative keywords first: hatching, furniture, dimensions, text are NEVER walls
+    final thinKeywords = [
+      'hatch', 'штрих', 'furn', 'мебел', 'dim', 'размер', 'text', 'текст',
+      'annot', 'door', 'врати', 'win', 'прозор', 'glass', 'сан', 'plumb', 'elec'
+    ];
+    for (final kw in thinKeywords) {
+      if (name.contains(kw)) return false;
+    }
 
     final structuralKeywords = [
       'wall', 'zid', 'beton', 'col', 'ste', 'stb', 'носещ', 'структура',
@@ -600,33 +768,45 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return false;
   }
 
+  void _applyUnderlayFilter(bool activate) {
+    _underlayFilterActive = activate;
+    if (activate) {
+      double maxLw = 0.0;
+      for (final l in widget.document.layers.values) {
+        final lw = l.customLineweight ?? l.lineweight ?? 0.0;
+        if (lw > maxLw) maxLw = lw;
+      }
+
+      final structuralLayers = widget.document.layers.values
+          .where((l) => _isStructuralOrThickLayer(l, maxLw))
+          .toList();
+
+      if (structuralLayers.isEmpty) {
+        _underlayFilterActive = false;
+        return;
+      }
+
+      for (final layer in widget.document.layers.values) {
+        layer.isVisible = _isStructuralOrThickLayer(layer, maxLw);
+      }
+    } else {
+      for (final entry in _originalLayerVisibility.entries) {
+        widget.document.layers[entry.key]?.isVisible = entry.value;
+      }
+    }
+  }
+
   void _toggleUnderlayFilter() {
     setState(() {
-      _underlayFilterActive = !_underlayFilterActive;
-      if (_underlayFilterActive) {
-        final structuralLayers = widget.document.layers.values
-            .where((l) => _isStructuralOrAxisLayer(l))
-            .toList();
-
-        if (structuralLayers.isEmpty) {
-          _underlayFilterActive = false;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.structuralFilterNoWallsFound),
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-          return;
-        }
-
-        for (final layer in widget.document.layers.values) {
-          layer.isVisible = _isStructuralOrAxisLayer(layer);
-        }
-      } else {
-        for (final entry in _originalLayerVisibility.entries) {
-          widget.document.layers[entry.key]?.isVisible = entry.value;
-        }
+      _applyUnderlayFilter(!_underlayFilterActive);
+      if (!_underlayFilterActive && widget.document.layers.values.every((l) => l.isVisible)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.structuralFilterNoWallsFound),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     });
     HapticFeedback.selectionClick();
@@ -859,8 +1039,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     onPointerCancel: _handlePointerCancel,
                     child: InteractiveViewer(
                       transformationController: _transformController,
-                      panEnabled: !_isPlacingWithHold,
-                      scaleEnabled: !_isPlacingWithHold,
+                      panEnabled: !_isPlacingWithHold && !_isExtrudingEdge,
+                      scaleEnabled: !_isPlacingWithHold && !_isExtrudingEdge,
                       scaleFactor: 350.0,
                       trackpadScrollCausesScale: true,
                       minScale: 0.001,
@@ -871,6 +1051,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           setState(() {
                             _isMultiTouchGesture = true;
                             _isPlacingWithHold = false;
+                            _isExtrudingEdge = false;
+                            _activeGrip = null;
+                            _activeExtrudingSlabId = null;
+                            _extrusionDistanceCad = 0.0;
                             _touchScreenPos = null;
                             _targetScreenPos = null;
                             _snappedScreenPos = null;
@@ -916,7 +1100,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   previewColumnPos: _isPlacingWithHold ? _currentCadCoord : null,
                                   wallStartPos: _wallStartCad,
                                   currentCursorCad: _currentCadCoord,
+                                  slabStartCornerCad: _slabStartCornerCad,
                                   slabPointsInProgress: _slabPointsCad,
+                                  extrudingGrip: _activeGrip,
+                                  extrusionDistance: _isExtrudingEdge ? _extrusionDistanceCad : null,
+                                  cadUnitsPerMeter: _cadUnitsPerMeter,
                                   zoomScale: _transformController.value.getMaxScaleOnAxis(),
                                   cadToScene: _cadToScene,
                                   cadScale: _getCadFitScale(),
@@ -944,6 +1132,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         activeTool: _activeTool,
                         previewColumn: _currentColumnPreset,
                         wallStartPos: _wallStartCad != null ? _cadToScreen(_wallStartCad!) : null,
+                        slabStartCornerPos: _slabStartCornerCad != null ? _cadToScreen(_slabStartCornerCad!) : null,
                         slabPoints: _slabPointsCad.map(_cadToScreen).toList(),
                         l10n: context.l10n,
                       ),
@@ -994,6 +1183,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     setState(() {
                       _activeTool = tool;
                       _wallStartCad = null;
+                      _slabStartCornerCad = null;
+                      _slabPointsCad.clear();
                     });
                   },
                   currentColumnPreset: _currentColumnPreset,
@@ -1009,15 +1200,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     setState(() => _currentSlabThickness = t);
                   },
                   isDrawingSlab: _activeTool == StructuralDrawTool.slab,
-                  slabPointCount: _slabPointsCad.length,
+                  hasSlabStartCorner: _slabStartCornerCad != null,
+                  slabPointCount: _slabStartCornerCad != null ? 1 : _slabPointsCad.length,
                   onCloseSlab: _closeSlabPolygon,
                   onUndoPoint: () {
-                    if (_slabPointsCad.isNotEmpty) {
-                      setState(() => _slabPointsCad.removeLast());
-                    }
+                    setState(() {
+                      _slabStartCornerCad = null;
+                      if (_slabPointsCad.isNotEmpty) _slabPointsCad.removeLast();
+                    });
                   },
                   onClearSlab: () {
-                    setState(() => _slabPointsCad.clear());
+                    setState(() {
+                      _slabStartCornerCad = null;
+                      _slabPointsCad.clear();
+                    });
                   },
                   onRotateColumn: () {
                     setState(() {

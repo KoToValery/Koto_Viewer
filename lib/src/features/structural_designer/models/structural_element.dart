@@ -32,7 +32,31 @@ class StructuralColumn {
     this.rotationRad = 0.0,
   });
 
-  /// Calculates the 4 corner vertices of the column in CAD world coordinates.
+  /// Top-left corner of the column in CAD coordinates.
+  Offset get topLeft => Offset(center.dx - width / 2.0, center.dy + height / 2.0);
+
+  /// Creates a column with its top-left corner positioned at [topLeft] in CAD coordinates.
+  factory StructuralColumn.fromTopLeft({
+    required String id,
+    required Offset topLeft,
+    ColumnShape shape = ColumnShape.rectangular,
+    double width = 0.25,
+    double height = 0.50,
+    double rotationRad = 0.0,
+  }) {
+    final center = Offset(topLeft.dx + width / 2.0, topLeft.dy - height / 2.0);
+    return StructuralColumn(
+      id: id,
+      center: center,
+      shape: shape,
+      width: width,
+      height: height,
+      rotationRad: rotationRad,
+    );
+  }
+
+  /// Calculates the 4 corner vertices of the column in CAD world coordinates,
+  /// starting from Top-Left in clockwise/counter-clockwise order.
   List<Offset> get polygonVertices {
     if (shape == ColumnShape.circular) {
       // 12-sided polygon approximation for circular column
@@ -61,11 +85,12 @@ class StructuralColumn {
       );
     }
 
+    // Top-Left, Top-Right, Bottom-Right, Bottom-Left in CAD coordinates (Y up)
     return [
-      rotate(-halfW, -halfH),
-      rotate(halfW, -halfH),
-      rotate(halfW, halfH),
       rotate(-halfW, halfH),
+      rotate(halfW, halfH),
+      rotate(halfW, -halfH),
+      rotate(-halfW, -halfH),
     ];
   }
 
@@ -232,6 +257,82 @@ class StructuralSlab {
     return true;
   }
 
+  /// Calculates the midpoints and outward normal vectors for all edges of the slab perimeter.
+  List<SlabEdgeGripInfo> get edgeGrips {
+    if (polygon.length < 3) return const [];
+
+    double sum = 0.0;
+    for (int i = 0; i < polygon.length; i++) {
+      final pA = polygon[i];
+      final pB = polygon[(i + 1) % polygon.length];
+      sum += (pA.dx * pB.dy - pB.dx * pA.dy);
+    }
+    final isCCW = sum > 0;
+
+    final List<SlabEdgeGripInfo> grips = [];
+    for (int i = 0; i < polygon.length; i++) {
+      final v1 = polygon[i];
+      final v2 = polygon[(i + 1) % polygon.length];
+      final edge = v2 - v1;
+      final len = edge.distance;
+      if (len < 1e-6) continue;
+      final u = edge / len;
+      final normal = isCCW ? Offset(u.dy, -u.dx) : Offset(-u.dy, u.dx);
+      final mid = Offset((v1.dx + v2.dx) / 2.0, (v1.dy + v2.dy) / 2.0);
+
+      grips.add(SlabEdgeGripInfo(
+        edgeIndex: i,
+        midpoint: mid,
+        normal: normal,
+        v1: v1,
+        v2: v2,
+        length: len,
+      ));
+    }
+    return grips;
+  }
+
+  /// Extrudes the polygon edge from vertex [edgeIndex] to [(edgeIndex + 1) % len]
+  /// parallel to itself by [distance] in the outward normal direction,
+  /// while keeping all existing vertices strictly in place.
+  StructuralSlab extrudeEdgeParallel({
+    required int edgeIndex,
+    required double distance,
+  }) {
+    if (polygon.length < 3 || edgeIndex < 0 || edgeIndex >= polygon.length) {
+      return this;
+    }
+    if (distance.abs() < 1e-4) {
+      return this;
+    }
+
+    final v1 = polygon[edgeIndex];
+    final v2 = polygon[(edgeIndex + 1) % polygon.length];
+    final edge = v2 - v1;
+    final len = edge.distance;
+    if (len < 1e-6) return this;
+
+    final u = edge / len;
+
+    // Determine outward normal using signed Shoelace formula
+    double sum = 0.0;
+    for (int i = 0; i < polygon.length; i++) {
+      final pA = polygon[i];
+      final pB = polygon[(i + 1) % polygon.length];
+      sum += (pA.dx * pB.dy - pB.dx * pA.dy);
+    }
+    final isCCW = sum > 0;
+    final normal = isCCW ? Offset(u.dy, -u.dx) : Offset(-u.dy, u.dx);
+
+    final vNew1 = v1 + normal * distance;
+    final vNew2 = v2 + normal * distance;
+
+    final newPolygon = List<Offset>.from(polygon);
+    newPolygon.insertAll(edgeIndex + 1, [vNew1, vNew2]);
+
+    return copyWith(polygon: newPolygon);
+  }
+
   StructuralSlab copyWith({
     String? id,
     List<Offset>? polygon,
@@ -245,6 +346,25 @@ class StructuralSlab {
       thickness: thickness ?? this.thickness,
     );
   }
+}
+
+/// Represents a midpoint grip along an edge of a slab polygon.
+class SlabEdgeGripInfo {
+  final int edgeIndex;
+  final Offset midpoint;
+  final Offset normal; // Outward unit normal
+  final Offset v1;
+  final Offset v2;
+  final double length;
+
+  const SlabEdgeGripInfo({
+    required this.edgeIndex,
+    required this.midpoint,
+    required this.normal,
+    required this.v1,
+    required this.v2,
+    required this.length,
+  });
 }
 
 /// Represents a building storey / level (Етаж).

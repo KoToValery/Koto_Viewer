@@ -1120,4 +1120,26 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get structuralFilterNoWallsFound =>
       'No specific wall or axis layers identified; showing full drawing';
+
+  @override
+  String get previewSlabCorner1Tag => 'Slab: pick 1st corner';
+
+  @override
+  String get previewSlabCorner2Tag => 'Slab: pick opposite corner';
+
+  @override
+  String cantileverExtrudeDepth(String depth) {
+    return 'Cantilever: $depth m';
+  }
+
+  @override
+  String get slabEdgeExtrudeTooltip => 'Drag midpoint to extrude cantilever';
+
+  @override
+  String get cancelSlab => 'Cancel slab';
+
+  @override
+  String slabRectDimensions(String width, String height) {
+    return 'Slab: $width x $height m';
+  }
 }

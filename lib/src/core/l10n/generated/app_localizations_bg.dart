@@ -1127,4 +1127,27 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get structuralFilterNoWallsFound =>
       'Няма разпознати специфични слоеве за стени; показани са всички слоеве';
+
+  @override
+  String get previewSlabCorner1Tag => 'Плоча: посочете 1-ви ъгъл';
+
+  @override
+  String get previewSlabCorner2Tag => 'Плоча: посочете срещуположен ъгъл';
+
+  @override
+  String cantileverExtrudeDepth(String depth) {
+    return 'Еркер: $depth m';
+  }
+
+  @override
+  String get slabEdgeExtrudeTooltip =>
+      'Изтеглете средата на отсечката за еркер';
+
+  @override
+  String get cancelSlab => 'Откажи плоча';
+
+  @override
+  String slabRectDimensions(String width, String height) {
+    return 'Плоча: $width x $height m';
+  }
 }

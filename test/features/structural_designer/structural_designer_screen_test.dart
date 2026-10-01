@@ -131,5 +131,122 @@ void main() {
       expect(cantilever.length, closeTo(2.0, 0.05));
       expect(cantilever.longTermDeflectionMm, greaterThan(0.0));
     });
+
+    test('StructuralColumn.fromTopLeft positions anchor precisely at top-left corner', () {
+      // Column width = 0.25m, height = 0.50m placed at top-left corner (10.0, 20.0)
+      final col = StructuralColumn.fromTopLeft(
+        id: 'col_tl',
+        topLeft: const Offset(10.0, 20.0),
+        width: 0.25,
+        height: 0.50,
+      );
+
+      // In CAD (Y up): top-left is (10.0, 20.0), center is (10.125, 19.75)
+      expect(col.topLeft.dx, closeTo(10.0, 1e-6));
+      expect(col.topLeft.dy, closeTo(20.0, 1e-6));
+      expect(col.center.dx, closeTo(10.125, 1e-6));
+      expect(col.center.dy, closeTo(19.75, 1e-6));
+
+      // Polygon vertices begin with top-left corner
+      final vertices = col.polygonVertices;
+      expect(vertices.length, equals(4));
+      expect(vertices[0].dx, closeTo(10.0, 1e-6)); // Top-Left
+      expect(vertices[0].dy, closeTo(20.0, 1e-6));
+      expect(vertices[1].dx, closeTo(10.25, 1e-6)); // Top-Right
+      expect(vertices[1].dy, closeTo(20.0, 1e-6));
+      expect(vertices[2].dx, closeTo(10.25, 1e-6)); // Bottom-Right
+      expect(vertices[2].dy, closeTo(19.50, 1e-6));
+      expect(vertices[3].dx, closeTo(10.0, 1e-6)); // Bottom-Left
+      expect(vertices[3].dy, closeTo(19.50, 1e-6));
+    });
+
+    test('StructuralSlab edgeGrips computes midpoints and orthogonal outward normals', () {
+      // 10m x 10m rectangular slab: (0,0) -> (10,0) -> (10,10) -> (0,10)
+      const slab = StructuralSlab(
+        id: 'slab_rect',
+        polygon: [
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 10),
+          Offset(0, 10),
+        ],
+      );
+
+      final grips = slab.edgeGrips;
+      expect(grips.length, equals(4));
+
+      // Edge 0: Bottom edge (0,0) -> (10,0), midpoint (5,0), normal downwards (0, -1)
+      expect(grips[0].midpoint, equals(const Offset(5, 0)));
+      expect(grips[0].normal.dx, closeTo(0.0, 1e-6));
+      expect(grips[0].normal.dy, closeTo(-1.0, 1e-6));
+
+      // Edge 1: Right edge (10,0) -> (10,10), midpoint (10,5), normal rightwards (1, 0)
+      expect(grips[1].midpoint, equals(const Offset(10, 5)));
+      expect(grips[1].normal.dx, closeTo(1.0, 1e-6));
+      expect(grips[1].normal.dy, closeTo(0.0, 1e-6));
+
+      // Edge 2: Top edge (10,10) -> (0,10), midpoint (5,10), normal upwards (0, 1)
+      expect(grips[2].midpoint, equals(const Offset(5, 10)));
+      expect(grips[2].normal.dx, closeTo(0.0, 1e-6));
+      expect(grips[2].normal.dy, closeTo(1.0, 1e-6));
+
+      // Edge 3: Left edge (0,10) -> (0,0), midpoint (0,5), normal leftwards (-1, 0)
+      expect(grips[3].midpoint, equals(const Offset(0, 5)));
+      expect(grips[3].normal.dx, closeTo(-1.0, 1e-6));
+      expect(grips[3].normal.dy, closeTo(0.0, 1e-6));
+    });
+
+    test('StructuralSlab extrudeEdgeParallel extrudes segment parallel keeping existing corners in place', () {
+      // 10m x 10m slab supported by columns at the four corners
+      const slab = StructuralSlab(
+        id: 'slab_extrude',
+        polygon: [
+          Offset(0, 0),
+          Offset(10, 0),
+          Offset(10, 10),
+          Offset(0, 10),
+        ],
+      );
+
+      // Extrude Edge 2 (Top edge: from (10,10) to (0,10)) outward parallel by 1.50 meters
+      final extrudedSlab = slab.extrudeEdgeParallel(edgeIndex: 2, distance: 1.50);
+
+      // Polygon expands from 4 to 6 vertices
+      expect(extrudedSlab.polygon.length, equals(6));
+
+      // Existing corners (10,10) and (0,10) remain strictly in place!
+      expect(extrudedSlab.polygon[2], equals(const Offset(10, 10)));
+      expect(extrudedSlab.polygon[5], equals(const Offset(0, 10)));
+
+      // Two new corner vertices are inserted forming parallel overhang
+      expect(extrudedSlab.polygon[3].dx, closeTo(10.0, 1e-6));
+      expect(extrudedSlab.polygon[3].dy, closeTo(11.5, 1e-6));
+      expect(extrudedSlab.polygon[4].dx, closeTo(0.0, 1e-6));
+      expect(extrudedSlab.polygon[4].dy, closeTo(11.5, 1e-6));
+
+      // Parallel extruded edge has identical length and is strictly parallel
+      final parallelEdge = extrudedSlab.polygon[4] - extrudedSlab.polygon[3];
+      expect(parallelEdge.dx, closeTo(-10.0, 1e-6));
+      expect(parallelEdge.dy, closeTo(0.0, 1e-6));
+
+      // Cantilever detection detects the newly created 1.5m balcony overhang
+      final project = StructuralProject(storeys: [
+        StoreyLevel(
+          id: 's1',
+          name: 'Storey 1',
+          columns: const [
+            StructuralColumn(id: 'c1', center: Offset(0, 0), width: 0.25, height: 0.25),
+            StructuralColumn(id: 'c2', center: Offset(10, 0), width: 0.25, height: 0.25),
+            StructuralColumn(id: 'c3', center: Offset(10, 10), width: 0.25, height: 0.25),
+            StructuralColumn(id: 'c4', center: Offset(0, 10), width: 0.25, height: 0.25),
+          ],
+          slabs: [extrudedSlab],
+        ),
+      ]);
+
+      final analysis = CantileverDetector.analyzeProject(project);
+      expect(analysis.totalCantilevers, greaterThan(0));
+      expect(analysis.zones.first.length, closeTo(1.50, 0.05));
+    });
   });
 }

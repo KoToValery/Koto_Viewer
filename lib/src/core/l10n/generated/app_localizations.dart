@@ -2052,6 +2052,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No specific wall or axis layers identified; showing full drawing'**
   String get structuralFilterNoWallsFound;
+
+  /// Pointer badge for rectangular slab 1st corner
+  ///
+  /// In en, this message translates to:
+  /// **'Slab: pick 1st corner'**
+  String get previewSlabCorner1Tag;
+
+  /// Pointer badge for rectangular slab opposite corner
+  ///
+  /// In en, this message translates to:
+  /// **'Slab: pick opposite corner'**
+  String get previewSlabCorner2Tag;
+
+  /// Live dimension badge for parallel cantilever extrusion
+  ///
+  /// In en, this message translates to:
+  /// **'Cantilever: {depth} m'**
+  String cantileverExtrudeDepth(String depth);
+
+  /// Tooltip for edge midpoint grip
+  ///
+  /// In en, this message translates to:
+  /// **'Drag midpoint to extrude cantilever'**
+  String get slabEdgeExtrudeTooltip;
+
+  /// Cancel rectangular slab drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel slab'**
+  String get cancelSlab;
+
+  /// Dimensions badge for rectangular slab
+  ///
+  /// In en, this message translates to:
+  /// **'Slab: {width} x {height} m'**
+  String slabRectDimensions(String width, String height);
 }
 
 class _AppLocalizationsDelegate

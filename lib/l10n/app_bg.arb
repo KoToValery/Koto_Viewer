@@ -330,5 +330,11 @@
   "gpuAccelerationInactive": "Хардуерно GPU ускорение (Изключено)",
   "structuralFilterActive": "Филтър подложка: Само стени и оси (Вкл.)",
   "structuralFilterInactive": "Филтър подложка: Всички слоеве (Изкл.)",
-  "structuralFilterNoWallsFound": "Няма разпознати специфични слоеве за стени; показани са всички слоеве"
+  "structuralFilterNoWallsFound": "Няма разпознати специфични слоеве за стени; показани са всички слоеве",
+  "previewSlabCorner1Tag": "Плоча: посочете 1-ви ъгъл",
+  "previewSlabCorner2Tag": "Плоча: посочете срещуположен ъгъл",
+  "cantileverExtrudeDepth": "Еркер: {depth} m",
+  "slabEdgeExtrudeTooltip": "Изтеглете средата на отсечката за еркер",
+  "cancelSlab": "Откажи плоча",
+  "slabRectDimensions": "Плоча: {width} x {height} m"
 }

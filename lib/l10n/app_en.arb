@@ -960,5 +960,28 @@
   "structuralFilterInactive": "Underlay Filter: All Layers (Off)",
   "@structuralFilterInactive": { "description": "Tooltip when structural underlay filter is off" },
   "structuralFilterNoWallsFound": "No specific wall or axis layers identified; showing full drawing",
-  "@structuralFilterNoWallsFound": { "description": "Snackbar notice when drawing has no isolated wall layers" }
+  "@structuralFilterNoWallsFound": { "description": "Snackbar notice when drawing has no isolated wall layers" },
+  "previewSlabCorner1Tag": "Slab: pick 1st corner",
+  "@previewSlabCorner1Tag": { "description": "Pointer badge for rectangular slab 1st corner" },
+  "previewSlabCorner2Tag": "Slab: pick opposite corner",
+  "@previewSlabCorner2Tag": { "description": "Pointer badge for rectangular slab opposite corner" },
+  "cantileverExtrudeDepth": "Cantilever: {depth} m",
+  "@cantileverExtrudeDepth": {
+    "description": "Live dimension badge for parallel cantilever extrusion",
+    "placeholders": {
+      "depth": { "type": "String" }
+    }
+  },
+  "slabEdgeExtrudeTooltip": "Drag midpoint to extrude cantilever",
+  "@slabEdgeExtrudeTooltip": { "description": "Tooltip for edge midpoint grip" },
+  "cancelSlab": "Cancel slab",
+  "@cancelSlab": { "description": "Cancel rectangular slab drawing" },
+  "slabRectDimensions": "Slab: {width} x {height} m",
+  "@slabRectDimensions": {
+    "description": "Dimensions badge for rectangular slab",
+    "placeholders": {
+      "width": { "type": "String" },
+      "height": { "type": "String" }
+    }
+  }
 }

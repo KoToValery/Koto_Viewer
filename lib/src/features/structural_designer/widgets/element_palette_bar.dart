@@ -16,6 +16,7 @@ class ElementPaletteBar extends StatelessWidget {
   final double currentSlabThickness;
   final ValueChanged<double> onUpdateSlabThickness;
   final bool isDrawingSlab;
+  final bool hasSlabStartCorner;
   final int slabPointCount;
   final VoidCallback onCloseSlab;
   final VoidCallback onUndoPoint;
@@ -35,6 +36,7 @@ class ElementPaletteBar extends StatelessWidget {
     required this.currentSlabThickness,
     required this.onUpdateSlabThickness,
     required this.isDrawingSlab,
+    this.hasSlabStartCorner = false,
     required this.slabPointCount,
     required this.onCloseSlab,
     required this.onUndoPoint,
@@ -303,23 +305,25 @@ class ElementPaletteBar extends StatelessWidget {
             ),
           ),
         const Spacer(),
-        if (isDrawingSlab) ...[
-          IconButton.filledTonal(
-            icon: const Icon(Icons.undo, size: 16),
-            tooltip: context.l10n.undoPoint,
-            onPressed: onUndoPoint,
-            visualDensity: VisualDensity.compact,
+        if (isDrawingSlab && (hasSlabStartCorner || slabPointCount > 0)) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0x3300E5FF),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF00E5FF)),
+            ),
+            child: Text(
+              context.l10n.previewSlabCorner2Tag,
+              style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 11),
+            ),
           ),
           const SizedBox(width: 4),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.check, size: 16),
-            label: Text(context.l10n.closeSlab(slabPointCount)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00E5FF),
-              foregroundColor: Colors.black,
-              visualDensity: VisualDensity.compact,
-            ),
-            onPressed: slabPointCount >= 3 ? onCloseSlab : null,
+          IconButton.filledTonal(
+            icon: const Icon(Icons.close, size: 16),
+            tooltip: context.l10n.cancelSlab,
+            onPressed: onClearSlab,
+            visualDensity: VisualDensity.compact,
           ),
         ],
       ],

@@ -41,6 +41,7 @@ class StructuralPointerPainter extends CustomPainter {
   final StructuralDrawTool activeTool;
   final StructuralColumn? previewColumn;
   final Offset? wallStartPos;
+  final Offset? slabStartCornerPos;
   final List<Offset>? slabPoints;
   final double scale;
   final AppLocalizations? l10n;
@@ -53,6 +54,7 @@ class StructuralPointerPainter extends CustomPainter {
     required this.activeTool,
     this.previewColumn,
     this.wallStartPos,
+    this.slabStartCornerPos,
     this.slabPoints,
     this.scale = 1.0,
     this.l10n,
@@ -127,6 +129,18 @@ class StructuralPointerPainter extends CustomPainter {
     // 5. Draw Element Footprint Silhouette at the Pointer Apex
     if (activeTool == StructuralDrawTool.column && previewColumn != null) {
       _drawColumnFootprint(canvas, effectiveTip, themeColor);
+    } else if (activeTool == StructuralDrawTool.slab && slabStartCornerPos != null) {
+      // Live rectangular slab preview on pointer overlay
+      final rect = Rect.fromPoints(slabStartCornerPos!, effectiveTip);
+      final slabFill = Paint()
+        ..color = themeColor.withValues(alpha: 0.22)
+        ..style = PaintingStyle.fill;
+      final slabBorder = Paint()
+        ..color = themeColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8;
+      canvas.drawRect(rect, slabFill);
+      canvas.drawRect(rect, slabBorder);
     }
 
     // 6. Element Dimensions & Tool Preview Tag
@@ -144,21 +158,31 @@ class StructuralPointerPainter extends CustomPainter {
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.8;
+    final anchorDot = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
 
     if (previewColumn!.shape == ColumnShape.circular) {
       final double r = wScreen / 2.0;
-      canvas.drawCircle(tip, r, footFill);
-      canvas.drawCircle(tip, r, footBorder);
+      final center = Offset(tip.dx + r, tip.dy + r);
+      canvas.drawCircle(center, r, footFill);
+      canvas.drawCircle(center, r, footBorder);
       // Small center cross
-      canvas.drawLine(Offset(tip.dx - 4, tip.dy), Offset(tip.dx + 4, tip.dy), footBorder);
-      canvas.drawLine(Offset(tip.dx, tip.dy - 4), Offset(tip.dx, tip.dy + 4), footBorder);
+      canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), footBorder);
+      canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), footBorder);
+      // Top-Left anchor marker dot
+      canvas.drawCircle(tip, 3.5, anchorDot);
     } else {
-      final rect = Rect.fromCenter(center: tip, width: wScreen, height: hScreen);
+      // Top-Left anchor: Rect starts from tip (top-left)
+      final rect = Rect.fromLTWH(tip.dx, tip.dy, wScreen, hScreen);
       canvas.drawRect(rect, footFill);
       canvas.drawRect(rect, footBorder);
       // Small center cross
-      canvas.drawLine(Offset(tip.dx - 4, tip.dy), Offset(tip.dx + 4, tip.dy), footBorder);
-      canvas.drawLine(Offset(tip.dx, tip.dy - 4), Offset(tip.dx, tip.dy + 4), footBorder);
+      final center = rect.center;
+      canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), footBorder);
+      canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), footBorder);
+      // Top-Left anchor marker dot
+      canvas.drawCircle(tip, 3.5, anchorDot);
     }
   }
 
@@ -257,8 +281,11 @@ class StructuralPointerPainter extends CustomPainter {
         text = l10n?.previewWallStartTag ?? 'Shear Wall: start point';
       }
     } else if (activeTool == StructuralDrawTool.slab) {
-      final count = (slabPoints?.length ?? 0) + 1;
-      text = l10n?.previewSlabVertexTag(count) ?? 'Slab: vertex $count';
+      if (slabStartCornerPos != null) {
+        text = l10n?.previewSlabCorner2Tag ?? 'Slab: pick opposite corner';
+      } else {
+        text = l10n?.previewSlabCorner1Tag ?? 'Slab: pick 1st corner';
+      }
     }
 
     if (text.isEmpty) return;
@@ -310,6 +337,7 @@ class StructuralPointerPainter extends CustomPainter {
         oldDelegate.activeTool != activeTool ||
         oldDelegate.previewColumn != previewColumn ||
         oldDelegate.wallStartPos != wallStartPos ||
+        oldDelegate.slabStartCornerPos != slabStartCornerPos ||
         oldDelegate.slabPoints != slabPoints;
   }
 }
