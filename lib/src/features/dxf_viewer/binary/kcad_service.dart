@@ -122,7 +122,8 @@ class KcadService {
       final tmpPath = '$cachePath.tmp_${DateTime.now().microsecondsSinceEpoch}';
       tmpFile = File(tmpPath);
 
-      final bytes = await compute(_kcadWriteIsolate, document);
+      final safeDoc = document.toIsolateSafe();
+      final bytes = await compute(_kcadWriteIsolate, safeDoc);
       await tmpFile.writeAsBytes(bytes, flush: true);
 
       // Atomic rename on the same filesystem
@@ -178,7 +179,8 @@ class KcadService {
 
   /// Exports [document] directly to a standalone `.kcad` file at [outputPath].
   static Future<void> exportKcadFile(DxfDocument document, String outputPath) async {
-    final bytes = await compute(_kcadWriteIsolate, document);
+    final safeDoc = document.toIsolateSafe();
+    final bytes = await compute(_kcadWriteIsolate, safeDoc);
     final file = File(outputPath);
     await file.writeAsBytes(bytes, flush: true);
   }

@@ -387,7 +387,8 @@ class DxfBlock {
   final String name;
   final Offset basePoint;
   final List<DxfEntity> entities;
-  late final DxfCompiledBlock compiled = DxfCompiledBlock.fromBlock(this);
+  DxfCompiledBlock? _compiled;
+  DxfCompiledBlock get compiled => _compiled ??= DxfCompiledBlock.fromBlock(this);
   Rect? _cachedBounds;
   bool _boundsComputed = false;
 
@@ -396,6 +397,12 @@ class DxfBlock {
     this.basePoint = Offset.zero,
     this.entities = const [],
   });
+
+  /// Clears any cached ui.Path or compiled representations so this block
+  /// can safely be sent across Dart Isolates via SendPort.
+  void clearCompiled() {
+    _compiled = null;
+  }
 
   /// Lazily computes and caches CAD bounding box of all block entities.
   Rect? getBounds(Map<String, DxfBlock> blocks) {
@@ -1611,6 +1618,35 @@ class DxfDocument {
         blocks,
         bounds,
       );
+
+  /// Returns a clean copy of this document with any isolate-unsendable native objects
+  /// (such as ui.Path inside compiled blocks) stripped, making it 100% safe to pass to
+  /// background compute() / Isolate.run().
+  DxfDocument toIsolateSafe() {
+    final cleanBlocks = <String, DxfBlock>{};
+    for (final entry in blocks.entries) {
+      final b = entry.value;
+      cleanBlocks[entry.key] = DxfBlock(
+        name: b.name,
+        basePoint: b.basePoint,
+        entities: b.entities,
+      );
+    }
+    return DxfDocument(
+      layers: layers,
+      blocks: cleanBlocks,
+      entities: entities,
+      headerVars: headerVars,
+      textStyles: textStyles,
+      bounds: bounds,
+      entityStats: entityStats,
+      lineTypes: lineTypes,
+      dimStyles: dimStyles,
+      layouts: layouts,
+      layoutEntities: layoutEntities,
+      layoutBounds: layoutBounds,
+    );
+  }
 
   int get totalEntities => entities.length;
   int get totalLayers => layers.length;

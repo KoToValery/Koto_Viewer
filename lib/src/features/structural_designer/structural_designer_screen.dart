@@ -1485,9 +1485,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         if (e is DxfInsert) {
           final block = widget.document.blocks[e.blockName];
           if (block != null) {
-            final hasChild = block.compiled.subpaths.any((s) => visibleLayerNames.contains(s.layer)) ||
-                block.compiled.otherEntities.any((o) => visibleLayerNames.contains(o.layer)) ||
-                block.entities.any((child) => visibleLayerNames.contains(child.layer));
+            final hasChild = block.entities.any((child) => visibleLayerNames.contains(child.layer));
             if (hasChild || visibleLayerNames.contains(e.layer)) visibleCount++;
           } else if (visibleLayerNames.contains(e.layer)) {
             visibleCount++;

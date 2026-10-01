@@ -208,15 +208,6 @@ class StructuralUnderlayFilter {
           entitiesByLayer.putIfAbsent(name, () => []).add(e);
           entityCounts[name] = (entityCounts[name] ?? 0) + 1;
         }
-        for (final s in b.compiled.subpaths) {
-          final name = s.layer.trim();
-          entityCounts[name] = (entityCounts[name] ?? 0) + 1;
-        }
-        for (final o in b.compiled.otherEntities) {
-          final name = o.layer.trim();
-          entitiesByLayer.putIfAbsent(name, () => []).add(o);
-          entityCounts[name] = (entityCounts[name] ?? 0) + 1;
-        }
       }
     }
 
@@ -230,7 +221,7 @@ class StructuralUnderlayFilter {
         .where((l) => !isNegativeKeyword(l.name) && isWhiteLayer(l, entitiesByLayer[l.name]))
         .toList();
 
-    // Check if any non-white layers explicitly match structural keywords
+    // Check if any layers explicitly match structural keywords
     final keywordLayers = candidateList
         .where((l) => matchesStructuralKeyword(l.name))
         .toList();
@@ -245,35 +236,21 @@ class StructuralUnderlayFilter {
 
       if (maxWhiteLw > 0.0) {
         // "Най-дебелия Бял цвят да остава, всички други се скриват."
+        final hasWhiteKeywords = whiteLayers.any((l) => matchesStructuralKeyword(l.name));
         final thickestWhite = whiteLayers.where((l) {
           final lw = getLayerThickness(l, entitiesByLayer[l.name]);
-          if (lw >= maxWhiteLw - 0.005) return true;
-          if (lw >= 0.30 && matchesStructuralKeyword(l.name)) return true;
-          return false;
+          if (hasWhiteKeywords) {
+            // When structural keyword layers are present, keep all white structural layers
+            if (matchesStructuralKeyword(l.name)) return true;
+            return false;
+          }
+          return lw >= maxWhiteLw - 0.005;
         }).toList();
 
         return thickestWhite.map((l) => l.name).toSet();
       } else {
         // "Ако нямат линиите дебелина- остават всички бели"
-        final result = whiteLayers.map((l) => l.name).toSet();
-
-        // If the only white layer has very few entities (e.g. <= 10 lines of title frame),
-        // while keyword layers have substantial geometry, include keyword layers too!
-        final totalWhiteEntities = whiteLayers.fold<int>(
-          0,
-          (sum, l) => sum + (entityCounts[l.name] ?? 0),
-        );
-        final totalKeywordEntities = keywordLayers.fold<int>(
-          0,
-          (sum, l) => sum + (entityCounts[l.name] ?? 0),
-        );
-
-        if (totalKeywordEntities > totalWhiteEntities * 2 &&
-            whiteLayers.every((l) => !matchesStructuralKeyword(l.name))) {
-          result.addAll(keywordLayers.map((l) => l.name));
-        }
-
-        return result;
+        return whiteLayers.map((l) => l.name).toSet();
       }
     }
 
