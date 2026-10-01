@@ -1730,7 +1730,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         icon: const Icon(Icons.apartment_rounded, size: 20, color: Color(0xFF00E5FF)),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        tooltip: 'Конструктивен Модул (BIM)',
+        tooltip: context.l10n.structuralDesignerBim,
         onPressed: _document != null
             ? () {
                 Navigator.of(context).push(

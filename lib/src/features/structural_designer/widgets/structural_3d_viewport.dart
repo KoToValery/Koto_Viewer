@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../../dxf_3d_viewer/rendering/cad_3d_camera.dart';
 import '../../dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
@@ -15,12 +16,14 @@ class Structural3dViewport extends StatefulWidget {
   final StructuralProject project;
   final List<CantileverZone> cantileverZones;
   final VoidCallback onExit;
+  final double cadUnitsPerMeter;
 
   const Structural3dViewport({
     super.key,
     required this.project,
     this.cantileverZones = const [],
     required this.onExit,
+    this.cadUnitsPerMeter = 1.0,
   });
 
   @override
@@ -69,6 +72,7 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
       widget.project,
       cantileverZones: widget.cantileverZones,
       highlightStoreyIndex: _highlightStoreyIndex,
+      cadUnitsPerMeter: widget.cadUnitsPerMeter,
     );
     if (_useGpuAcceleration) {
       _gpuRenderer.setMesh(_mesh);
@@ -131,23 +135,25 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
     }
   }
 
-  String _getShadingModeBg(Cad3DShadingMode mode) {
+  String _getShadingModeLabel(Cad3DShadingMode mode, AppLocalizations l10n) {
     switch (mode) {
       case Cad3DShadingMode.cadShadedEdges:
-        return 'CAD Засенчен + Ръбове';
+        return l10n.shadingShadedEdges;
       case Cad3DShadingMode.smoothShaded:
-        return 'Плавен (Smooth)';
+        return 'Smooth';
       case Cad3DShadingMode.flatShaded:
-        return 'Плосък (Flat)';
+        return l10n.shadingSolid;
       case Cad3DShadingMode.wireframe:
-        return 'Мрежов (Wireframe)';
+        return l10n.shadingWireframe;
       case Cad3DShadingMode.xray:
-        return 'Рентген (X-Ray)';
+        return 'X-Ray';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E1E),
       appBar: AppBar(
@@ -156,10 +162,9 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: widget.onExit,
-          tooltip: 'Назад към 2D план',
         ),
         title: Text(
-          '3D Конструктивен Модел (${_mesh.triangleCount} полигона)',
+          '${l10n.structural3dTitle} (${_mesh.triangleCount})',
           style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
         actions: [
@@ -170,8 +175,8 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
               color: _useGpuAcceleration ? const Color(0xFF00E5FF) : Colors.white38,
             ),
             tooltip: _useGpuAcceleration
-                ? 'Хардуерно 3D ускорение: Включено'
-                : 'Хардуерно 3D ускорение: Изключено',
+                ? l10n.gpuAccelerationActive
+                : l10n.gpuAccelerationInactive,
             onPressed: () {
               setState(() {
                 _useGpuAcceleration = !_useGpuAcceleration;
@@ -190,7 +195,7 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
           // Shading mode menu
           PopupMenuButton<Cad3DShadingMode>(
             icon: Icon(_shadingMode.icon, color: Colors.white70),
-            tooltip: 'Режим на осветяване',
+            tooltip: l10n.shadingModeTitle,
             onSelected: (mode) => setState(() {
               _shadingMode = mode;
               if (_useGpuAcceleration && _lastViewportSize != Size.zero) {
@@ -205,7 +210,7 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
                     children: [
                       Icon(m.icon, size: 18, color: Colors.white70),
                       const SizedBox(width: 8),
-                      Text(_getShadingModeBg(m)),
+                      Text(_getShadingModeLabel(m, l10n)),
                     ],
                   ),
                 ),
@@ -214,7 +219,7 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
           // Reset Camera
           IconButton(
             icon: const Icon(Icons.center_focus_strong, color: Colors.white70),
-            tooltip: 'Центрирай изглед',
+            tooltip: l10n.centerView,
             onPressed: () {
               setState(() {
                 _camera.yaw = math.pi / 4;
@@ -313,7 +318,7 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
               child: Row(
                 children: [
                   ChoiceChip(
-                    label: const Text('Всички етажи'),
+                    label: Text(l10n.allStoreys),
                     selected: _highlightStoreyIndex == null,
                     onSelected: (sel) {
                       if (sel) {

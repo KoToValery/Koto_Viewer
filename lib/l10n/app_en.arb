@@ -753,5 +753,212 @@
     "placeholders": {
       "error": { "type": "String" }
     }
-  }
+  },
+  "structuralDesignerBim": "Structural Model (BIM)",
+  "@structuralDesignerBim": { "description": "Tooltip / button for opening Structural Designer (BIM) module" },
+  "structuralDesigner": "Structural Model",
+  "@structuralDesigner": { "description": "Title of Structural Designer screen" },
+  "structural3dView": "3D Structure",
+  "@structural3dView": { "description": "Tooltip for opening 3D structural model view" },
+  "snapEnabledTooltip": "Snap: Enabled",
+  "@snapEnabledTooltip": { "description": "Tooltip when snap is active" },
+  "snapDisabledTooltip": "Snap: Disabled",
+  "@snapDisabledTooltip": { "description": "Tooltip when snap is inactive" },
+  "undoAction": "Undo last action",
+  "@undoAction": { "description": "Tooltip for undo button" },
+  "traceReferenceLayer": "Trace Reference: {storey}",
+  "@traceReferenceLayer": {
+    "description": "Trace reference storey indicator pill",
+    "placeholders": {
+      "storey": { "type": "String" }
+    }
+  },
+  "toolNavigation": "Navigation",
+  "@toolNavigation": { "description": "Navigation tool mode label" },
+  "toolColumn": "Column",
+  "@toolColumn": { "description": "Column tool mode label" },
+  "toolShearWall": "Shear Wall",
+  "@toolShearWall": { "description": "Shear Wall tool mode label" },
+  "toolSlab": "Slab",
+  "@toolSlab": { "description": "Slab tool mode label" },
+  "toolOpening": "Opening",
+  "@toolOpening": { "description": "Opening tool mode label" },
+  "toolCantilevers": "Cantilevers",
+  "@toolCantilevers": { "description": "Cantilever analysis button label" },
+  "circularColumnPreset": "Ø{diameter} circular",
+  "@circularColumnPreset": {
+    "description": "Preset circular column label",
+    "placeholders": {
+      "diameter": { "type": "int" }
+    }
+  },
+  "rotate90": "Rotate 90°",
+  "@rotate90": { "description": "Tooltip to rotate column 90 degrees" },
+  "wallThicknessLabel": "Wall thickness: ",
+  "@wallThicknessLabel": { "description": "Label for wall thickness selector" },
+  "undoPoint": "Undo point",
+  "@undoPoint": { "description": "Tooltip to undo last drawn point" },
+  "closeSlab": "Close ({count})",
+  "@closeSlab": {
+    "description": "Button to close slab polygon with vertex count",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "storeyManagerTitle": "Storey Manager (Levels & Layers)",
+  "@storeyManagerTitle": { "description": "Title of storey manager sheet" },
+  "traceReferenceTitle": "Trace Reference (Ghost Underlay)",
+  "@traceReferenceTitle": { "description": "Header for Trace Reference settings" },
+  "traceRefNone": "Off",
+  "@traceRefNone": { "description": "Option to disable Trace Reference" },
+  "traceRefBelow": "Storey Below",
+  "@traceRefBelow": { "description": "Trace reference from floor below" },
+  "traceRefAbove": "Storey Above",
+  "@traceRefAbove": { "description": "Trace reference from floor above" },
+  "storeyElevationSub": "Z: +{elevation} m • H: {height} m • {columns} cols, {walls} walls",
+  "@storeyElevationSub": {
+    "description": "Storey subtitle showing elevation and element counts",
+    "placeholders": {
+      "elevation": { "type": "String" },
+      "height": { "type": "String" },
+      "columns": { "type": "int" },
+      "walls": { "type": "int" }
+    }
+  },
+  "changeHeightH": "Change height H",
+  "@changeHeightH": { "description": "Tooltip to edit storey clear height" },
+  "deleteStorey": "Delete storey",
+  "@deleteStorey": { "description": "Tooltip to delete storey" },
+  "newStorey": "New Storey",
+  "@newStorey": { "description": "Button to add a new storey level" },
+  "duplicateTypical": "Duplicate Typical",
+  "@duplicateTypical": { "description": "Button to duplicate storey elements to new level" },
+  "storeyClearHeight": "Storey clear height (m)",
+  "@storeyClearHeight": { "description": "Dialog title for changing storey height" },
+  "cantileverAnalysisTitle": "Cantilever Analysis (Overhangs & Deflection)",
+  "@cantileverAnalysisTitle": { "description": "Title of cantilever analysis sheet" },
+  "totalCantilevers": "Total cantilevers",
+  "@totalCantilevers": { "description": "Stat card title for total cantilevers" },
+  "cornerCantilevers": "Corner 2-way",
+  "@cornerCantilevers": { "description": "Stat card title for corner cantilevers" },
+  "criticalZones": "Critical zones",
+  "@criticalZones": { "description": "Stat card title for critical risk zones" },
+  "maxDeflection": "Max. deflection",
+  "@maxDeflection": { "description": "Stat card title for max deflection" },
+  "eurocodeStandardInfo": "EN 1992-1-1 (EC2): Deflection limit flim = Lcant / 250. Concrete creep φ = 2.5 and facade load included.",
+  "@eurocodeStandardInfo": { "description": "Eurocode SLS info banner" },
+  "noCantileversFound": "No cantilever overhangs detected.\nAll slabs are fully supported by columns/walls.",
+  "@noCantileversFound": { "description": "Empty state when building has no cantilevers" },
+  "propLengthL": "Length L",
+  "@propLengthL": { "description": "Length label for linear cantilever" },
+  "propSlabH": "Slab h",
+  "@propSlabH": { "description": "Slab thickness label" },
+  "deflectionFtot": "Deflection ftot: {value} mm",
+  "@deflectionFtot": {
+    "description": "Calculated long term deflection label",
+    "placeholders": {
+      "value": { "type": "String" }
+    }
+  },
+  "deflectionLimitFlim": "Limit flim: {value} mm",
+  "@deflectionLimitFlim": {
+    "description": "Code limit deflection label",
+    "placeholders": {
+      "value": { "type": "String" }
+    }
+  },
+  "structural3dTitle": "3D Structural Model",
+  "@structural3dTitle": { "description": "AppBar title for 3D structural model viewport" },
+  "shadingModeTitle": "Shading Mode",
+  "@shadingModeTitle": { "description": "Tooltip for shading mode popup" },
+  "centerView": "Center View",
+  "@centerView": { "description": "Tooltip to reset 3D camera" },
+  "allStoreys": "All Storeys",
+  "@allStoreys": { "description": "Chip to show all building storeys in 3D" },
+  "shadingWireframe": "Wireframe",
+  "@shadingWireframe": { "description": "Wireframe shading mode" },
+  "shadingSolid": "Solid White",
+  "@shadingSolid": { "description": "Solid white shading mode" },
+  "shadingShadedEdges": "Shaded with Edges",
+  "@shadingShadedEdges": { "description": "CAD shaded edges mode" },
+  "shadingNormals": "Surface Normals",
+  "@shadingNormals": { "description": "Surface normals shading mode" },
+  "snapEndpoint": "Endpoint",
+  "@snapEndpoint": { "description": "Snap type endpoint" },
+  "snapMidpoint": "Midpoint",
+  "@snapMidpoint": { "description": "Snap type midpoint" },
+  "snapCenter": "Center",
+  "@snapCenter": { "description": "Snap type center" },
+  "snapNearest": "Nearest",
+  "@snapNearest": { "description": "Snap type nearest" },
+  "snapPerpendicular": "Perpendicular",
+  "@snapPerpendicular": { "description": "Snap type perpendicular" },
+  "snapPoint": "Point",
+  "@snapPoint": { "description": "Snap type point" },
+  "previewColumnTag": "Column {width} x {height} cm",
+  "@previewColumnTag": {
+    "description": "Pointer badge for rectangular column",
+    "placeholders": {
+      "width": { "type": "int" },
+      "height": { "type": "int" }
+    }
+  },
+  "previewCircularColumnTag": "Column Ø{diameter} cm",
+  "@previewCircularColumnTag": {
+    "description": "Pointer badge for circular column",
+    "placeholders": {
+      "diameter": { "type": "int" }
+    }
+  },
+  "previewWallStartTag": "Shear Wall: start point",
+  "@previewWallStartTag": { "description": "Pointer badge for wall start" },
+  "previewWallEndTag": "Shear Wall: end point",
+  "@previewWallEndTag": { "description": "Pointer badge for wall end" },
+  "previewSlabVertexTag": "Slab: vertex {index}",
+  "@previewSlabVertexTag": {
+    "description": "Pointer badge for slab vertex",
+    "placeholders": {
+      "index": { "type": "int" }
+    }
+  },
+  "cantileverTypeLinear": "Linear cantilever (1-way)",
+  "@cantileverTypeLinear": { "description": "Cantilever type linear" },
+  "cantileverTypeCorner": "Double corner cantilever (2-way)",
+  "@cantileverTypeCorner": { "description": "Cantilever type corner" },
+  "cantileverTypeTransfer": "Transfer cantilever (column on overhang)",
+  "@cantileverTypeTransfer": { "description": "Cantilever type transfer" },
+  "riskLevelSafe": "Safe (Compliant)",
+  "@riskLevelSafe": { "description": "Cantilever risk level safe" },
+  "riskLevelWarning": "Warning (High deflection)",
+  "@riskLevelWarning": { "description": "Cantilever risk level warning" },
+  "riskLevelCritical": "Critical (Excessive deflection)",
+  "@riskLevelCritical": { "description": "Cantilever risk level critical" },
+  "storeyLevelName": "Storey {number} (Elev. +{elevation})",
+  "@storeyLevelName": {
+    "description": "Default storey name pattern",
+    "placeholders": {
+      "number": { "type": "int" },
+      "elevation": { "type": "String" }
+    }
+  },
+  "storeyTypicalName": "Storey {number} (Typical from {source})",
+  "@storeyTypicalName": {
+    "description": "Duplicated typical storey name pattern",
+    "placeholders": {
+      "number": { "type": "int" },
+      "source": { "type": "String" }
+    }
+  },
+  "hardwareAcceleration": "Hardware GPU Acceleration",
+  "@hardwareAcceleration": { "description": "Hardware GPU Acceleration label" },
+  "gpuAccelerationActive": "Hardware GPU Acceleration (Active)",
+  "@gpuAccelerationActive": { "description": "Hardware GPU Acceleration active state" },
+  "gpuAccelerationInactive": "Hardware GPU Acceleration (Off)",
+  "@gpuAccelerationInactive": { "description": "Hardware GPU Acceleration inactive state" },
+  "structuralFilterActive": "Underlay Filter: Walls & Axes only",
+  "@structuralFilterActive": { "description": "Tooltip when structural underlay filter is active" },
+  "structuralFilterInactive": "Underlay Filter: All Layers (Off)",
+  "@structuralFilterInactive": { "description": "Tooltip when structural underlay filter is off" },
+  "structuralFilterNoWallsFound": "No specific wall or axis layers identified; showing full drawing",
+  "@structuralFilterNoWallsFound": { "description": "Snackbar notice when drawing has no isolated wall layers" }
 }

@@ -874,4 +874,257 @@ class AppLocalizationsBg extends AppLocalizations {
   String dwgConversionFailed(String error) {
     return 'Грешка при конвертиране на DWG файл: $error';
   }
+
+  @override
+  String get structuralDesignerBim => 'Конструктивен Модел (BIM)';
+
+  @override
+  String get structuralDesigner => 'Конструктивен Модел';
+
+  @override
+  String get structural3dView => '3D Конструкция';
+
+  @override
+  String get snapEnabledTooltip => 'Прилепване (Snap): Включено';
+
+  @override
+  String get snapDisabledTooltip => 'Прилепване (Snap): Изключено';
+
+  @override
+  String get undoAction => 'Отмени последно действие';
+
+  @override
+  String traceReferenceLayer(String storey) {
+    return 'Референтен слой (Trace): $storey';
+  }
+
+  @override
+  String get toolNavigation => 'Навигация';
+
+  @override
+  String get toolColumn => 'Колона';
+
+  @override
+  String get toolShearWall => 'Шайба';
+
+  @override
+  String get toolSlab => 'Плоча';
+
+  @override
+  String get toolOpening => 'Отвор';
+
+  @override
+  String get toolCantilevers => 'Еркери';
+
+  @override
+  String circularColumnPreset(int diameter) {
+    return 'Ø$diameter кръгла';
+  }
+
+  @override
+  String get rotate90 => 'Завърти на 90°';
+
+  @override
+  String get wallThicknessLabel => 'Дебелина на шайба: ';
+
+  @override
+  String get undoPoint => 'Отмени точка';
+
+  @override
+  String closeSlab(int count) {
+    return 'Затвори ($count)';
+  }
+
+  @override
+  String get storeyManagerTitle => 'Етажен Мениджър (Нива & Слоеве)';
+
+  @override
+  String get traceReferenceTitle => 'Trace Reference (Блед референтен слой)';
+
+  @override
+  String get traceRefNone => 'Изключен';
+
+  @override
+  String get traceRefBelow => 'Долен етаж';
+
+  @override
+  String get traceRefAbove => 'Горен етаж';
+
+  @override
+  String storeyElevationSub(
+    String elevation,
+    String height,
+    int columns,
+    int walls,
+  ) {
+    return 'Кота Z: +$elevation m • H: $height m • $columns кол, $walls шайби';
+  }
+
+  @override
+  String get changeHeightH => 'Промени височина H';
+
+  @override
+  String get deleteStorey => 'Изтрий етаж';
+
+  @override
+  String get newStorey => 'Нов етаж';
+
+  @override
+  String get duplicateTypical => 'Дублирай типови';
+
+  @override
+  String get storeyClearHeight => 'Светла височина на етажа (m)';
+
+  @override
+  String get cantileverAnalysisTitle =>
+      'Анализ на Еркери (Конзоли & Провисване)';
+
+  @override
+  String get totalCantilevers => 'Общо еркери';
+
+  @override
+  String get cornerCantilevers => 'Ъглови двойни';
+
+  @override
+  String get criticalZones => 'Критични зони';
+
+  @override
+  String get maxDeflection => 'Макс. провисване';
+
+  @override
+  String get eurocodeStandardInfo =>
+      'БДС EN 1992-1-1 (EC2): Гранично провисване flim = Lcant / 250. Включено пълзене на бетона φ = 2.5 и фасаден товар.';
+
+  @override
+  String get noCantileversFound =>
+      'Няма засечени конзолни зони или еркери.\nВсички плочи стъпват изцяло върху колони/шайби.';
+
+  @override
+  String get propLengthL => 'Дължина L';
+
+  @override
+  String get propSlabH => 'Плоча h';
+
+  @override
+  String deflectionFtot(String value) {
+    return 'Провисване ftot: $value mm';
+  }
+
+  @override
+  String deflectionLimitFlim(String value) {
+    return 'Лимит flim: $value mm';
+  }
+
+  @override
+  String get structural3dTitle => '3D Конструктивен Модел';
+
+  @override
+  String get shadingModeTitle => 'Режим на осветяване';
+
+  @override
+  String get centerView => 'Центрирай изглед';
+
+  @override
+  String get allStoreys => 'Всички етажи';
+
+  @override
+  String get shadingWireframe => 'Прозрачен (Телена мрежа)';
+
+  @override
+  String get shadingSolid => 'Бял солид';
+
+  @override
+  String get shadingShadedEdges => 'Осветен с ръбове';
+
+  @override
+  String get shadingNormals => 'Нормали на повърхнините';
+
+  @override
+  String get snapEndpoint => 'Край';
+
+  @override
+  String get snapMidpoint => 'Среда';
+
+  @override
+  String get snapCenter => 'Център';
+
+  @override
+  String get snapNearest => 'Най-близка';
+
+  @override
+  String get snapPerpendicular => 'Перпендикуляр';
+
+  @override
+  String get snapPoint => 'Точка';
+
+  @override
+  String previewColumnTag(int width, int height) {
+    return 'Колона $width x $height cm';
+  }
+
+  @override
+  String previewCircularColumnTag(int diameter) {
+    return 'Колона Ø$diameter cm';
+  }
+
+  @override
+  String get previewWallStartTag => 'Шайба: начало на стена';
+
+  @override
+  String get previewWallEndTag => 'Шайба: край на стена';
+
+  @override
+  String previewSlabVertexTag(int index) {
+    return 'Плоча: точка $index';
+  }
+
+  @override
+  String get cantileverTypeLinear => 'Линеен еркер (еднопосочна конзола)';
+
+  @override
+  String get cantileverTypeCorner => 'Двоен ъглов еркер (двупосочна конзола)';
+
+  @override
+  String get cantileverTypeTransfer =>
+      'Трансферен еркер (колона върху конзола)';
+
+  @override
+  String get riskLevelSafe => 'В норма (Безопасно)';
+
+  @override
+  String get riskLevelWarning => 'Внимание (Повишено провисване)';
+
+  @override
+  String get riskLevelCritical => 'Критично (Риск от недопустими деформации)';
+
+  @override
+  String storeyLevelName(int number, String elevation) {
+    return 'Етаж $number (Кота +$elevation)';
+  }
+
+  @override
+  String storeyTypicalName(int number, String source) {
+    return 'Етаж $number (Типов от $source)';
+  }
+
+  @override
+  String get hardwareAcceleration => 'Хардуерно GPU ускорение';
+
+  @override
+  String get gpuAccelerationActive => 'Хардуерно GPU ускорение (Активно)';
+
+  @override
+  String get gpuAccelerationInactive => 'Хардуерно GPU ускорение (Изключено)';
+
+  @override
+  String get structuralFilterActive =>
+      'Филтър подложка: Само стени и оси (Вкл.)';
+
+  @override
+  String get structuralFilterInactive =>
+      'Филтър подложка: Всички слоеве (Изкл.)';
+
+  @override
+  String get structuralFilterNoWallsFound =>
+      'Няма разпознати специфични слоеве за стени; показани са всички слоеве';
 }

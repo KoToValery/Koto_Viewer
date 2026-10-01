@@ -1609,6 +1609,449 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not convert DWG file: {error}'**
   String dwgConversionFailed(String error);
+
+  /// Tooltip / button for opening Structural Designer (BIM) module
+  ///
+  /// In en, this message translates to:
+  /// **'Structural Model (BIM)'**
+  String get structuralDesignerBim;
+
+  /// Title of Structural Designer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Structural Model'**
+  String get structuralDesigner;
+
+  /// Tooltip for opening 3D structural model view
+  ///
+  /// In en, this message translates to:
+  /// **'3D Structure'**
+  String get structural3dView;
+
+  /// Tooltip when snap is active
+  ///
+  /// In en, this message translates to:
+  /// **'Snap: Enabled'**
+  String get snapEnabledTooltip;
+
+  /// Tooltip when snap is inactive
+  ///
+  /// In en, this message translates to:
+  /// **'Snap: Disabled'**
+  String get snapDisabledTooltip;
+
+  /// Tooltip for undo button
+  ///
+  /// In en, this message translates to:
+  /// **'Undo last action'**
+  String get undoAction;
+
+  /// Trace reference storey indicator pill
+  ///
+  /// In en, this message translates to:
+  /// **'Trace Reference: {storey}'**
+  String traceReferenceLayer(String storey);
+
+  /// Navigation tool mode label
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation'**
+  String get toolNavigation;
+
+  /// Column tool mode label
+  ///
+  /// In en, this message translates to:
+  /// **'Column'**
+  String get toolColumn;
+
+  /// Shear Wall tool mode label
+  ///
+  /// In en, this message translates to:
+  /// **'Shear Wall'**
+  String get toolShearWall;
+
+  /// Slab tool mode label
+  ///
+  /// In en, this message translates to:
+  /// **'Slab'**
+  String get toolSlab;
+
+  /// Opening tool mode label
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get toolOpening;
+
+  /// Cantilever analysis button label
+  ///
+  /// In en, this message translates to:
+  /// **'Cantilevers'**
+  String get toolCantilevers;
+
+  /// Preset circular column label
+  ///
+  /// In en, this message translates to:
+  /// **'Ø{diameter} circular'**
+  String circularColumnPreset(int diameter);
+
+  /// Tooltip to rotate column 90 degrees
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate 90°'**
+  String get rotate90;
+
+  /// Label for wall thickness selector
+  ///
+  /// In en, this message translates to:
+  /// **'Wall thickness: '**
+  String get wallThicknessLabel;
+
+  /// Tooltip to undo last drawn point
+  ///
+  /// In en, this message translates to:
+  /// **'Undo point'**
+  String get undoPoint;
+
+  /// Button to close slab polygon with vertex count
+  ///
+  /// In en, this message translates to:
+  /// **'Close ({count})'**
+  String closeSlab(int count);
+
+  /// Title of storey manager sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Storey Manager (Levels & Layers)'**
+  String get storeyManagerTitle;
+
+  /// Header for Trace Reference settings
+  ///
+  /// In en, this message translates to:
+  /// **'Trace Reference (Ghost Underlay)'**
+  String get traceReferenceTitle;
+
+  /// Option to disable Trace Reference
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get traceRefNone;
+
+  /// Trace reference from floor below
+  ///
+  /// In en, this message translates to:
+  /// **'Storey Below'**
+  String get traceRefBelow;
+
+  /// Trace reference from floor above
+  ///
+  /// In en, this message translates to:
+  /// **'Storey Above'**
+  String get traceRefAbove;
+
+  /// Storey subtitle showing elevation and element counts
+  ///
+  /// In en, this message translates to:
+  /// **'Z: +{elevation} m • H: {height} m • {columns} cols, {walls} walls'**
+  String storeyElevationSub(
+    String elevation,
+    String height,
+    int columns,
+    int walls,
+  );
+
+  /// Tooltip to edit storey clear height
+  ///
+  /// In en, this message translates to:
+  /// **'Change height H'**
+  String get changeHeightH;
+
+  /// Tooltip to delete storey
+  ///
+  /// In en, this message translates to:
+  /// **'Delete storey'**
+  String get deleteStorey;
+
+  /// Button to add a new storey level
+  ///
+  /// In en, this message translates to:
+  /// **'New Storey'**
+  String get newStorey;
+
+  /// Button to duplicate storey elements to new level
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate Typical'**
+  String get duplicateTypical;
+
+  /// Dialog title for changing storey height
+  ///
+  /// In en, this message translates to:
+  /// **'Storey clear height (m)'**
+  String get storeyClearHeight;
+
+  /// Title of cantilever analysis sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Cantilever Analysis (Overhangs & Deflection)'**
+  String get cantileverAnalysisTitle;
+
+  /// Stat card title for total cantilevers
+  ///
+  /// In en, this message translates to:
+  /// **'Total cantilevers'**
+  String get totalCantilevers;
+
+  /// Stat card title for corner cantilevers
+  ///
+  /// In en, this message translates to:
+  /// **'Corner 2-way'**
+  String get cornerCantilevers;
+
+  /// Stat card title for critical risk zones
+  ///
+  /// In en, this message translates to:
+  /// **'Critical zones'**
+  String get criticalZones;
+
+  /// Stat card title for max deflection
+  ///
+  /// In en, this message translates to:
+  /// **'Max. deflection'**
+  String get maxDeflection;
+
+  /// Eurocode SLS info banner
+  ///
+  /// In en, this message translates to:
+  /// **'EN 1992-1-1 (EC2): Deflection limit flim = Lcant / 250. Concrete creep φ = 2.5 and facade load included.'**
+  String get eurocodeStandardInfo;
+
+  /// Empty state when building has no cantilevers
+  ///
+  /// In en, this message translates to:
+  /// **'No cantilever overhangs detected.\nAll slabs are fully supported by columns/walls.'**
+  String get noCantileversFound;
+
+  /// Length label for linear cantilever
+  ///
+  /// In en, this message translates to:
+  /// **'Length L'**
+  String get propLengthL;
+
+  /// Slab thickness label
+  ///
+  /// In en, this message translates to:
+  /// **'Slab h'**
+  String get propSlabH;
+
+  /// Calculated long term deflection label
+  ///
+  /// In en, this message translates to:
+  /// **'Deflection ftot: {value} mm'**
+  String deflectionFtot(String value);
+
+  /// Code limit deflection label
+  ///
+  /// In en, this message translates to:
+  /// **'Limit flim: {value} mm'**
+  String deflectionLimitFlim(String value);
+
+  /// AppBar title for 3D structural model viewport
+  ///
+  /// In en, this message translates to:
+  /// **'3D Structural Model'**
+  String get structural3dTitle;
+
+  /// Tooltip for shading mode popup
+  ///
+  /// In en, this message translates to:
+  /// **'Shading Mode'**
+  String get shadingModeTitle;
+
+  /// Tooltip to reset 3D camera
+  ///
+  /// In en, this message translates to:
+  /// **'Center View'**
+  String get centerView;
+
+  /// Chip to show all building storeys in 3D
+  ///
+  /// In en, this message translates to:
+  /// **'All Storeys'**
+  String get allStoreys;
+
+  /// Wireframe shading mode
+  ///
+  /// In en, this message translates to:
+  /// **'Wireframe'**
+  String get shadingWireframe;
+
+  /// Solid white shading mode
+  ///
+  /// In en, this message translates to:
+  /// **'Solid White'**
+  String get shadingSolid;
+
+  /// CAD shaded edges mode
+  ///
+  /// In en, this message translates to:
+  /// **'Shaded with Edges'**
+  String get shadingShadedEdges;
+
+  /// Surface normals shading mode
+  ///
+  /// In en, this message translates to:
+  /// **'Surface Normals'**
+  String get shadingNormals;
+
+  /// Snap type endpoint
+  ///
+  /// In en, this message translates to:
+  /// **'Endpoint'**
+  String get snapEndpoint;
+
+  /// Snap type midpoint
+  ///
+  /// In en, this message translates to:
+  /// **'Midpoint'**
+  String get snapMidpoint;
+
+  /// Snap type center
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get snapCenter;
+
+  /// Snap type nearest
+  ///
+  /// In en, this message translates to:
+  /// **'Nearest'**
+  String get snapNearest;
+
+  /// Snap type perpendicular
+  ///
+  /// In en, this message translates to:
+  /// **'Perpendicular'**
+  String get snapPerpendicular;
+
+  /// Snap type point
+  ///
+  /// In en, this message translates to:
+  /// **'Point'**
+  String get snapPoint;
+
+  /// Pointer badge for rectangular column
+  ///
+  /// In en, this message translates to:
+  /// **'Column {width} x {height} cm'**
+  String previewColumnTag(int width, int height);
+
+  /// Pointer badge for circular column
+  ///
+  /// In en, this message translates to:
+  /// **'Column Ø{diameter} cm'**
+  String previewCircularColumnTag(int diameter);
+
+  /// Pointer badge for wall start
+  ///
+  /// In en, this message translates to:
+  /// **'Shear Wall: start point'**
+  String get previewWallStartTag;
+
+  /// Pointer badge for wall end
+  ///
+  /// In en, this message translates to:
+  /// **'Shear Wall: end point'**
+  String get previewWallEndTag;
+
+  /// Pointer badge for slab vertex
+  ///
+  /// In en, this message translates to:
+  /// **'Slab: vertex {index}'**
+  String previewSlabVertexTag(int index);
+
+  /// Cantilever type linear
+  ///
+  /// In en, this message translates to:
+  /// **'Linear cantilever (1-way)'**
+  String get cantileverTypeLinear;
+
+  /// Cantilever type corner
+  ///
+  /// In en, this message translates to:
+  /// **'Double corner cantilever (2-way)'**
+  String get cantileverTypeCorner;
+
+  /// Cantilever type transfer
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer cantilever (column on overhang)'**
+  String get cantileverTypeTransfer;
+
+  /// Cantilever risk level safe
+  ///
+  /// In en, this message translates to:
+  /// **'Safe (Compliant)'**
+  String get riskLevelSafe;
+
+  /// Cantilever risk level warning
+  ///
+  /// In en, this message translates to:
+  /// **'Warning (High deflection)'**
+  String get riskLevelWarning;
+
+  /// Cantilever risk level critical
+  ///
+  /// In en, this message translates to:
+  /// **'Critical (Excessive deflection)'**
+  String get riskLevelCritical;
+
+  /// Default storey name pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Storey {number} (Elev. +{elevation})'**
+  String storeyLevelName(int number, String elevation);
+
+  /// Duplicated typical storey name pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Storey {number} (Typical from {source})'**
+  String storeyTypicalName(int number, String source);
+
+  /// Hardware GPU Acceleration label
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware GPU Acceleration'**
+  String get hardwareAcceleration;
+
+  /// Hardware GPU Acceleration active state
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware GPU Acceleration (Active)'**
+  String get gpuAccelerationActive;
+
+  /// Hardware GPU Acceleration inactive state
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware GPU Acceleration (Off)'**
+  String get gpuAccelerationInactive;
+
+  /// Tooltip when structural underlay filter is active
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay Filter: Walls & Axes only'**
+  String get structuralFilterActive;
+
+  /// Tooltip when structural underlay filter is off
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay Filter: All Layers (Off)'**
+  String get structuralFilterInactive;
+
+  /// Snackbar notice when drawing has no isolated wall layers
+  ///
+  /// In en, this message translates to:
+  /// **'No specific wall or axis layers identified; showing full drawing'**
+  String get structuralFilterNoWallsFound;
 }
 
 class _AppLocalizationsDelegate

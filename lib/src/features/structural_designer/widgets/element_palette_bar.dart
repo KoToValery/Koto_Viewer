@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 import '../models/cantilever_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../rendering/structural_pointer_painter.dart';
@@ -45,6 +46,8 @@ class ElementPaletteBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xF21C1C1E),
@@ -80,25 +83,25 @@ class ElementPaletteBar extends StatelessWidget {
                 _buildToolButton(
                   tool: StructuralDrawTool.select,
                   icon: Icons.pan_tool_rounded,
-                  label: 'Навигация',
+                  label: l10n.toolNavigation,
                 ),
                 _buildToolButton(
                   tool: StructuralDrawTool.column,
                   icon: Icons.view_column_rounded,
-                  label: 'Колона',
+                  label: l10n.toolColumn,
                 ),
                 _buildToolButton(
                   tool: StructuralDrawTool.shearWall,
                   icon: Icons.line_weight_rounded,
-                  label: 'Шайба',
+                  label: l10n.toolShearWall,
                 ),
                 _buildToolButton(
                   tool: StructuralDrawTool.slab,
                   icon: Icons.crop_square_rounded,
-                  label: 'Плоча',
+                  label: l10n.toolSlab,
                 ),
                 // Cantilever Analysis report launcher with badge
-                _buildCantileverAnalysisButton(),
+                _buildCantileverAnalysisButton(context),
               ],
             ),
           ],
@@ -146,7 +149,7 @@ class ElementPaletteBar extends StatelessWidget {
     );
   }
 
-  Widget _buildCantileverAnalysisButton() {
+  Widget _buildCantileverAnalysisButton(BuildContext context) {
     final int warningCount = analysisSummary.criticalCount + analysisSummary.warningCount;
     final Color badgeColor = analysisSummary.criticalCount > 0
         ? const Color(0xFFFF1744)
@@ -186,7 +189,7 @@ class ElementPaletteBar extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'Еркери',
+              context.l10n.toolCantilevers,
               style: TextStyle(
                 color: warningCount > 0 ? badgeColor : Colors.white70,
                 fontSize: 11,
@@ -222,7 +225,7 @@ class ElementPaletteBar extends StatelessWidget {
                 onSelected: (selected) {
                   if (selected) {
                     onUpdateColumnPreset(currentColumnPreset.copyWith(
-                      shape: ColumnShape.rectangular,
+                       shape: ColumnShape.rectangular,
                       width: p.$1,
                       height: p.$2,
                     ));
@@ -234,7 +237,7 @@ class ElementPaletteBar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: ChoiceChip(
-              label: const Text('Ø40 кръгла'),
+              label: Text(context.l10n.circularColumnPreset(40)),
               selected: currentColumnPreset.shape == ColumnShape.circular,
               onSelected: (selected) {
                 if (selected) {
@@ -250,7 +253,7 @@ class ElementPaletteBar extends StatelessWidget {
           ),
           IconButton.filledTonal(
             icon: const Icon(Icons.rotate_90_degrees_ccw, size: 18),
-            tooltip: 'Завърти на 90°',
+            tooltip: context.l10n.rotate90,
             onPressed: onRotateColumn,
             visualDensity: VisualDensity.compact,
           ),
@@ -263,9 +266,9 @@ class ElementPaletteBar extends StatelessWidget {
     final thicknesses = [0.20, 0.25, 0.30];
     return Row(
       children: [
-        const Text(
-          'Дебелина на шайба: ',
-          style: TextStyle(color: Colors.white70, fontSize: 12),
+        Text(
+          context.l10n.wallThicknessLabel,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
         ),
         for (final t in thicknesses)
           Padding(
@@ -303,14 +306,14 @@ class ElementPaletteBar extends StatelessWidget {
         if (isDrawingSlab) ...[
           IconButton.filledTonal(
             icon: const Icon(Icons.undo, size: 16),
-            tooltip: 'Отмени точка',
+            tooltip: context.l10n.undoPoint,
             onPressed: onUndoPoint,
             visualDensity: VisualDensity.compact,
           ),
           const SizedBox(width: 4),
           ElevatedButton.icon(
             icon: const Icon(Icons.check, size: 16),
-            label: Text('Затвори ($slabPointCount)'),
+            label: Text(context.l10n.closeSlab(slabPointCount)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00E5FF),
               foregroundColor: Colors.black,

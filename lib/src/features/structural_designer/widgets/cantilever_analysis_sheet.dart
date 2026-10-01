@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 import '../models/cantilever_analysis_models.dart';
 
 /// Modal bottom sheet presenting a comprehensive Eurocode 2 structural check report
@@ -40,10 +41,10 @@ class CantileverAnalysisSheet extends StatelessWidget {
               children: [
                 const Icon(Icons.analytics_rounded, color: Color(0xFF00E5FF)),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Анализ на Еркери (Конзоли & Провисване)',
-                    style: TextStyle(
+                    context.l10n.cantileverAnalysisTitle,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
@@ -62,13 +63,13 @@ class CantileverAnalysisSheet extends StatelessWidget {
             Row(
               children: [
                 _buildStatCard(
-                  title: 'Общо еркери',
+                  title: context.l10n.totalCantilevers,
                   value: '${summary.totalCantilevers}',
                   color: Colors.white70,
                 ),
                 const SizedBox(width: 8),
                 _buildStatCard(
-                  title: 'Ъглови двойни',
+                  title: context.l10n.cornerCantilevers,
                   value: '${summary.cornerCantilevers}',
                   color: summary.cornerCantilevers > 0
                       ? const Color(0xFFFFB300)
@@ -76,7 +77,7 @@ class CantileverAnalysisSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 _buildStatCard(
-                  title: 'Критични зони',
+                  title: context.l10n.criticalZones,
                   value: '${summary.criticalCount}',
                   color: summary.criticalCount > 0
                       ? const Color(0xFFFF1744)
@@ -84,7 +85,7 @@ class CantileverAnalysisSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 _buildStatCard(
-                  title: 'Макс. провисване',
+                  title: context.l10n.maxDeflection,
                   value: '${summary.maxDeflectionMm.toStringAsFixed(1)} mm',
                   color: summary.maxDeflectionRatio > 1.0
                       ? const Color(0xFFFF1744)
@@ -102,15 +103,14 @@ class CantileverAnalysisSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.white10),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 16, color: Color(0xFF00E5FF)),
-                  SizedBox(width: 8),
+                  const Icon(Icons.info_outline, size: 16, color: Color(0xFF00E5FF)),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'БДС EN 1992-1-1 (EC2): Гранично провисване flim = Lcant / 250. '
-                      'Включено пълзене на бетона φ = 2.5 и фасаден товар.',
-                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                      context.l10n.eurocodeStandardInfo,
+                      style: const TextStyle(color: Colors.white70, fontSize: 11),
                     ),
                   ),
                 ],
@@ -120,18 +120,18 @@ class CantileverAnalysisSheet extends StatelessWidget {
 
             // Zones List
             if (summary.zones.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 36),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 36),
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.check_circle_outline,
+                      const Icon(Icons.check_circle_outline,
                           color: Color(0xFF00E676), size: 48),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       Text(
-                        'Няма засечени конзолни зони или еркери.\nВсички плочи стъпват изцяло върху колони/шайби.',
+                        context.l10n.noCantileversFound,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
                       ),
                     ],
                   ),
@@ -146,7 +146,7 @@ class CantileverAnalysisSheet extends StatelessWidget {
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, idx) {
                     final zone = summary.zones[idx];
-                    return _buildZoneCard(zone);
+                    return _buildZoneCard(context, zone);
                   },
                 ),
               ),
@@ -191,7 +191,7 @@ class CantileverAnalysisSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildZoneCard(CantileverZone zone) {
+  Widget _buildZoneCard(BuildContext context, CantileverZone zone) {
     final statusColor = zone.riskLevel.color;
     final bool isOverLimit = zone.longTermDeflectionMm > zone.limitDeflectionMm;
 
@@ -218,7 +218,7 @@ class CantileverAnalysisSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      zone.type.label,
+                      zone.type.localizedLabel(context.l10n),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -240,7 +240,7 @@ class CantileverAnalysisSheet extends StatelessWidget {
                   border: Border.all(color: statusColor),
                 ),
                 child: Text(
-                  zone.riskLevel.label,
+                  zone.riskLevel.localizedLabel(context.l10n),
                   style: TextStyle(
                     color: statusColor,
                     fontSize: 10,
@@ -261,9 +261,9 @@ class CantileverAnalysisSheet extends StatelessWidget {
                 _buildProp('Ly', '${zone.lengthY?.toStringAsFixed(2) ?? '-'} m'),
                 _buildProp('Ldiag', '${zone.effectiveDiagonal?.toStringAsFixed(2)} m'),
               ] else ...[
-                _buildProp('Дължина L', '${zone.length.toStringAsFixed(2)} m'),
+                _buildProp(context.l10n.propLengthL, '${zone.length.toStringAsFixed(2)} m'),
               ],
-              _buildProp('Плоча h', '${(zone.slabThickness * 100).toInt()} cm'),
+              _buildProp(context.l10n.propSlabH, '${(zone.slabThickness * 100).toInt()} cm'),
               _buildProp(
                 'L/h',
                 zone.slendernessRatio.toStringAsFixed(1),
@@ -288,7 +288,7 @@ class CantileverAnalysisSheet extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Провисване ftot: ${zone.longTermDeflectionMm.toStringAsFixed(1)} mm',
+                          context.l10n.deflectionFtot(zone.longTermDeflectionMm.toStringAsFixed(1)),
                           style: TextStyle(
                             color: isOverLimit
                                 ? const Color(0xFFFF1744)
@@ -298,7 +298,7 @@ class CantileverAnalysisSheet extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Лимит flim: ${zone.limitDeflectionMm.toStringAsFixed(1)} mm',
+                          context.l10n.deflectionLimitFlim(zone.limitDeflectionMm.toStringAsFixed(1)),
                           style: const TextStyle(
                               color: Colors.white60, fontSize: 11),
                         ),

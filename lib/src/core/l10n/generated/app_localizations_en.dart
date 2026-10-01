@@ -869,4 +869,255 @@ class AppLocalizationsEn extends AppLocalizations {
   String dwgConversionFailed(String error) {
     return 'Could not convert DWG file: $error';
   }
+
+  @override
+  String get structuralDesignerBim => 'Structural Model (BIM)';
+
+  @override
+  String get structuralDesigner => 'Structural Model';
+
+  @override
+  String get structural3dView => '3D Structure';
+
+  @override
+  String get snapEnabledTooltip => 'Snap: Enabled';
+
+  @override
+  String get snapDisabledTooltip => 'Snap: Disabled';
+
+  @override
+  String get undoAction => 'Undo last action';
+
+  @override
+  String traceReferenceLayer(String storey) {
+    return 'Trace Reference: $storey';
+  }
+
+  @override
+  String get toolNavigation => 'Navigation';
+
+  @override
+  String get toolColumn => 'Column';
+
+  @override
+  String get toolShearWall => 'Shear Wall';
+
+  @override
+  String get toolSlab => 'Slab';
+
+  @override
+  String get toolOpening => 'Opening';
+
+  @override
+  String get toolCantilevers => 'Cantilevers';
+
+  @override
+  String circularColumnPreset(int diameter) {
+    return 'Ø$diameter circular';
+  }
+
+  @override
+  String get rotate90 => 'Rotate 90°';
+
+  @override
+  String get wallThicknessLabel => 'Wall thickness: ';
+
+  @override
+  String get undoPoint => 'Undo point';
+
+  @override
+  String closeSlab(int count) {
+    return 'Close ($count)';
+  }
+
+  @override
+  String get storeyManagerTitle => 'Storey Manager (Levels & Layers)';
+
+  @override
+  String get traceReferenceTitle => 'Trace Reference (Ghost Underlay)';
+
+  @override
+  String get traceRefNone => 'Off';
+
+  @override
+  String get traceRefBelow => 'Storey Below';
+
+  @override
+  String get traceRefAbove => 'Storey Above';
+
+  @override
+  String storeyElevationSub(
+    String elevation,
+    String height,
+    int columns,
+    int walls,
+  ) {
+    return 'Z: +$elevation m • H: $height m • $columns cols, $walls walls';
+  }
+
+  @override
+  String get changeHeightH => 'Change height H';
+
+  @override
+  String get deleteStorey => 'Delete storey';
+
+  @override
+  String get newStorey => 'New Storey';
+
+  @override
+  String get duplicateTypical => 'Duplicate Typical';
+
+  @override
+  String get storeyClearHeight => 'Storey clear height (m)';
+
+  @override
+  String get cantileverAnalysisTitle =>
+      'Cantilever Analysis (Overhangs & Deflection)';
+
+  @override
+  String get totalCantilevers => 'Total cantilevers';
+
+  @override
+  String get cornerCantilevers => 'Corner 2-way';
+
+  @override
+  String get criticalZones => 'Critical zones';
+
+  @override
+  String get maxDeflection => 'Max. deflection';
+
+  @override
+  String get eurocodeStandardInfo =>
+      'EN 1992-1-1 (EC2): Deflection limit flim = Lcant / 250. Concrete creep φ = 2.5 and facade load included.';
+
+  @override
+  String get noCantileversFound =>
+      'No cantilever overhangs detected.\nAll slabs are fully supported by columns/walls.';
+
+  @override
+  String get propLengthL => 'Length L';
+
+  @override
+  String get propSlabH => 'Slab h';
+
+  @override
+  String deflectionFtot(String value) {
+    return 'Deflection ftot: $value mm';
+  }
+
+  @override
+  String deflectionLimitFlim(String value) {
+    return 'Limit flim: $value mm';
+  }
+
+  @override
+  String get structural3dTitle => '3D Structural Model';
+
+  @override
+  String get shadingModeTitle => 'Shading Mode';
+
+  @override
+  String get centerView => 'Center View';
+
+  @override
+  String get allStoreys => 'All Storeys';
+
+  @override
+  String get shadingWireframe => 'Wireframe';
+
+  @override
+  String get shadingSolid => 'Solid White';
+
+  @override
+  String get shadingShadedEdges => 'Shaded with Edges';
+
+  @override
+  String get shadingNormals => 'Surface Normals';
+
+  @override
+  String get snapEndpoint => 'Endpoint';
+
+  @override
+  String get snapMidpoint => 'Midpoint';
+
+  @override
+  String get snapCenter => 'Center';
+
+  @override
+  String get snapNearest => 'Nearest';
+
+  @override
+  String get snapPerpendicular => 'Perpendicular';
+
+  @override
+  String get snapPoint => 'Point';
+
+  @override
+  String previewColumnTag(int width, int height) {
+    return 'Column $width x $height cm';
+  }
+
+  @override
+  String previewCircularColumnTag(int diameter) {
+    return 'Column Ø$diameter cm';
+  }
+
+  @override
+  String get previewWallStartTag => 'Shear Wall: start point';
+
+  @override
+  String get previewWallEndTag => 'Shear Wall: end point';
+
+  @override
+  String previewSlabVertexTag(int index) {
+    return 'Slab: vertex $index';
+  }
+
+  @override
+  String get cantileverTypeLinear => 'Linear cantilever (1-way)';
+
+  @override
+  String get cantileverTypeCorner => 'Double corner cantilever (2-way)';
+
+  @override
+  String get cantileverTypeTransfer =>
+      'Transfer cantilever (column on overhang)';
+
+  @override
+  String get riskLevelSafe => 'Safe (Compliant)';
+
+  @override
+  String get riskLevelWarning => 'Warning (High deflection)';
+
+  @override
+  String get riskLevelCritical => 'Critical (Excessive deflection)';
+
+  @override
+  String storeyLevelName(int number, String elevation) {
+    return 'Storey $number (Elev. +$elevation)';
+  }
+
+  @override
+  String storeyTypicalName(int number, String source) {
+    return 'Storey $number (Typical from $source)';
+  }
+
+  @override
+  String get hardwareAcceleration => 'Hardware GPU Acceleration';
+
+  @override
+  String get gpuAccelerationActive => 'Hardware GPU Acceleration (Active)';
+
+  @override
+  String get gpuAccelerationInactive => 'Hardware GPU Acceleration (Off)';
+
+  @override
+  String get structuralFilterActive => 'Underlay Filter: Walls & Axes only';
+
+  @override
+  String get structuralFilterInactive => 'Underlay Filter: All Layers (Off)';
+
+  @override
+  String get structuralFilterNoWallsFound =>
+      'No specific wall or axis layers identified; showing full drawing';
 }

@@ -1,19 +1,34 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../models/structural_element.dart';
 
 /// Interactive tool modes for structural drawing.
 enum StructuralDrawTool {
-  select('Избор', Icons.near_me_rounded),
-  column('Колона', Icons.view_column_rounded),
-  shearWall('Шайба', Icons.line_weight_rounded),
-  slab('Плоча', Icons.crop_square_rounded),
-  slabOpening('Отвор', Icons.tab_unselected_rounded);
+  select(Icons.pan_tool_rounded),
+  column(Icons.view_column_rounded),
+  shearWall(Icons.line_weight_rounded),
+  slab(Icons.crop_square_rounded),
+  slabOpening(Icons.tab_unselected_rounded);
 
-  final String label;
   final IconData icon;
-  const StructuralDrawTool(this.label, this.icon);
+  const StructuralDrawTool(this.icon);
+
+  String label(AppLocalizations l10n) {
+    switch (this) {
+      case StructuralDrawTool.select:
+        return l10n.toolNavigation;
+      case StructuralDrawTool.column:
+        return l10n.toolColumn;
+      case StructuralDrawTool.shearWall:
+        return l10n.toolShearWall;
+      case StructuralDrawTool.slab:
+        return l10n.toolSlab;
+      case StructuralDrawTool.slabOpening:
+        return l10n.toolOpening;
+    }
+  }
 }
 
 /// Custom screen-space painter for the offset pointer, stem guideline,
@@ -28,6 +43,7 @@ class StructuralPointerPainter extends CustomPainter {
   final Offset? wallStartPos;
   final List<Offset>? slabPoints;
   final double scale;
+  final AppLocalizations? l10n;
 
   const StructuralPointerPainter({
     required this.touchPos,
@@ -39,6 +55,7 @@ class StructuralPointerPainter extends CustomPainter {
     this.wallStartPos,
     this.slabPoints,
     this.scale = 1.0,
+    this.l10n,
   });
 
   @override
@@ -145,20 +162,36 @@ class StructuralPointerPainter extends CustomPainter {
     }
   }
 
-  String _getSnapTypeBg(DxfSnapType type) {
+  String _getSnapTypeLabel(DxfSnapType type) {
+    if (l10n != null) {
+      switch (type) {
+        case DxfSnapType.endpoint:
+          return l10n!.snapEndpoint;
+        case DxfSnapType.midpoint:
+          return l10n!.snapMidpoint;
+        case DxfSnapType.center:
+          return l10n!.snapCenter;
+        case DxfSnapType.nearest:
+          return l10n!.snapNearest;
+        case DxfSnapType.perpendicular:
+          return l10n!.snapPerpendicular;
+        case DxfSnapType.point:
+          return l10n!.snapPoint;
+      }
+    }
     switch (type) {
       case DxfSnapType.endpoint:
-        return 'Край';
+        return 'Endpoint';
       case DxfSnapType.midpoint:
-        return 'Среда';
+        return 'Midpoint';
       case DxfSnapType.center:
-        return 'Център';
+        return 'Center';
       case DxfSnapType.nearest:
-        return 'Най-близка';
+        return 'Nearest';
       case DxfSnapType.perpendicular:
-        return 'Перпендикуляр';
+        return 'Perpendicular';
       case DxfSnapType.point:
-        return 'Точка';
+        return 'Point';
     }
   }
 
@@ -208,24 +241,30 @@ class StructuralPointerPainter extends CustomPainter {
     if (activeTool == StructuralDrawTool.column && previewColumn != null) {
       final wCm = (previewColumn!.width * 100).round();
       final hCm = (previewColumn!.height * 100).round();
-      text = previewColumn!.shape == ColumnShape.circular
-          ? 'Колона Ø$wCm cm'
-          : 'Колона $wCm x $hCm cm';
+      if (l10n != null) {
+        text = previewColumn!.shape == ColumnShape.circular
+            ? l10n!.previewCircularColumnTag(wCm)
+            : l10n!.previewColumnTag(wCm, hCm);
+      } else {
+        text = previewColumn!.shape == ColumnShape.circular
+            ? 'Column Ø$wCm cm'
+            : 'Column $wCm x $hCm cm';
+      }
     } else if (activeTool == StructuralDrawTool.shearWall) {
       if (wallStartPos != null) {
-        text = 'Шайба: край на стена';
+        text = l10n?.previewWallEndTag ?? 'Shear Wall: end point';
       } else {
-        text = 'Шайба: начало на стена';
+        text = l10n?.previewWallStartTag ?? 'Shear Wall: start point';
       }
     } else if (activeTool == StructuralDrawTool.slab) {
-      final count = slabPoints?.length ?? 0;
-      text = 'Плоча: точка ${count + 1}';
+      final count = (slabPoints?.length ?? 0) + 1;
+      text = l10n?.previewSlabVertexTag(count) ?? 'Slab: vertex $count';
     }
 
     if (text.isEmpty) return;
 
     if (isSnapped && snapType != null) {
-      text = '$text (${_getSnapTypeBg(snapType!)})';
+      text = '$text (${_getSnapTypeLabel(snapType!)})';
     }
 
     final tp = TextPainter(

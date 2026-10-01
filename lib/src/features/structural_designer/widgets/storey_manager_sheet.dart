@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 import '../models/structural_element.dart';
 
 /// Bottom sheet dialog for managing building storeys, floor heights,
@@ -55,10 +56,10 @@ class StoreyManagerSheet extends StatelessWidget {
               children: [
                 const Icon(Icons.layers_rounded, color: Color(0xFF00E5FF)),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Етажен Мениджър (Нива & Слоеве)',
-                    style: TextStyle(
+                    context.l10n.storeyManagerTitle,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -84,14 +85,14 @@ class StoreyManagerSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.visibility_rounded,
+                      const Icon(Icons.visibility_rounded,
                           size: 16, color: Color(0xFFFFB300)),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
-                        'Trace Reference (Блед референтен слой)',
-                        style: TextStyle(
+                        context.l10n.traceReferenceTitle,
+                        style: const TextStyle(
                           color: Color(0xFFFFB300),
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -101,20 +102,20 @@ class StoreyManagerSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   SegmentedButton<GhostStoreyMode>(
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                         value: GhostStoreyMode.none,
-                        label: Text('Изключен'),
+                        label: Text(context.l10n.traceRefNone),
                       ),
                       ButtonSegment(
                         value: GhostStoreyMode.below,
-                        label: Text('Долен етаж'),
-                        icon: Icon(Icons.arrow_downward, size: 16),
+                        label: Text(context.l10n.traceRefBelow),
+                        icon: const Icon(Icons.arrow_downward, size: 16),
                       ),
                       ButtonSegment(
                         value: GhostStoreyMode.above,
-                        label: Text('Горен етаж'),
-                        icon: Icon(Icons.arrow_upward, size: 16),
+                        label: Text(context.l10n.traceRefAbove),
+                        icon: const Icon(Icons.arrow_upward, size: 16),
                       ),
                     ],
                     selected: {project.ghostMode},
@@ -182,8 +183,12 @@ class StoreyManagerSheet extends StatelessWidget {
                         ),
                       ),
                       subtitle: Text(
-                        'Кота Z: +${storey.elevation.toStringAsFixed(2)} m • H: ${storey.height.toStringAsFixed(2)} m • '
-                        '${storey.columns.length} кол, ${storey.shearWalls.length} шайби',
+                        context.l10n.storeyElevationSub(
+                          storey.elevation.toStringAsFixed(2),
+                          storey.height.toStringAsFixed(2),
+                          storey.columns.length,
+                          storey.shearWalls.length,
+                        ),
                         style: const TextStyle(
                             color: Colors.white60, fontSize: 11),
                       ),
@@ -193,7 +198,7 @@ class StoreyManagerSheet extends StatelessWidget {
                           IconButton(
                             icon: const Icon(Icons.edit_road_rounded,
                                 size: 18, color: Colors.white70),
-                            tooltip: 'Промени височина H',
+                            tooltip: context.l10n.changeHeightH,
                             onPressed: () => _showEditHeightDialog(
                               context,
                               storey.height,
@@ -204,7 +209,7 @@ class StoreyManagerSheet extends StatelessWidget {
                             IconButton(
                               icon: const Icon(Icons.delete_outline,
                                   size: 18, color: Colors.redAccent),
-                              tooltip: 'Изтрий етаж',
+                              tooltip: context.l10n.deleteStorey,
                               onPressed: () => onDeleteStorey(storeyIdx),
                             ),
                         ],
@@ -230,7 +235,7 @@ class StoreyManagerSheet extends StatelessWidget {
                       Navigator.of(context).pop();
                     },
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Нов етаж'),
+                    label: Text(context.l10n.newStorey),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF333333),
                       foregroundColor: Colors.white,
@@ -245,7 +250,7 @@ class StoreyManagerSheet extends StatelessWidget {
                       Navigator.of(context).pop();
                     },
                     icon: const Icon(Icons.copy_all_rounded, size: 18),
-                    label: const Text('Дублирай типови'),
+                    label: Text(context.l10n.duplicateTypical),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00E5FF),
                       foregroundColor: Colors.black,
@@ -268,8 +273,8 @@ class StoreyManagerSheet extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF222222),
-        title: const Text('Светла височина на етажа (m)',
-            style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(context.l10n.storeyClearHeight,
+            style: const TextStyle(color: Colors.white, fontSize: 16)),
         content: TextField(
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -283,7 +288,7 @@ class StoreyManagerSheet extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отказ'),
+            child: Text(context.l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -293,7 +298,7 @@ class StoreyManagerSheet extends StatelessWidget {
               }
               Navigator.of(ctx).pop();
             },
-            child: const Text('Запази'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),

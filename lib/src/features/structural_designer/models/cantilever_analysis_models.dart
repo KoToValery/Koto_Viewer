@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 
 /// Type of detected cantilever zone.
 enum CantileverType {
@@ -14,6 +15,17 @@ enum CantileverType {
   final String label;
   final IconData icon;
   const CantileverType(this.label, this.icon);
+
+  String localizedLabel(AppLocalizations l10n) {
+    switch (this) {
+      case CantileverType.linear:
+        return l10n.cantileverTypeLinear;
+      case CantileverType.cornerBiaxial:
+        return l10n.cantileverTypeCorner;
+      case CantileverType.transferStacked:
+        return l10n.cantileverTypeTransfer;
+    }
+  }
 }
 
 /// Structural safety & deflection assessment status.
@@ -26,6 +38,17 @@ enum CantileverRiskLevel {
   final Color color;
   final Color fillColor;
   const CantileverRiskLevel(this.label, this.color, this.fillColor);
+
+  String localizedLabel(AppLocalizations l10n) {
+    switch (this) {
+      case CantileverRiskLevel.safe:
+        return l10n.riskLevelSafe;
+      case CantileverRiskLevel.warning:
+        return l10n.riskLevelWarning;
+      case CantileverRiskLevel.critical:
+        return l10n.riskLevelCritical;
+    }
+  }
 }
 
 /// Detailed calculation result for a detected cantilever region.

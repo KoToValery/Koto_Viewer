@@ -13,6 +13,7 @@ class Structural3dMeshBuilder {
     StructuralProject project, {
     List<CantileverZone> cantileverZones = const [],
     int? highlightStoreyIndex,
+    double cadUnitsPerMeter = 1.0,
   }) {
     final List<Triangle3D> triangles = [];
     final List<ElementMeshGroup> groups = [];
@@ -22,8 +23,8 @@ class Structural3dMeshBuilder {
       final bool isCurrentStorey =
           highlightStoreyIndex == null || highlightStoreyIndex == sIdx;
 
-      final double zBase = storey.elevation;
-      final double zTop = storey.elevation + storey.height;
+      final double zBase = storey.elevation * cadUnitsPerMeter;
+      final double zTop = (storey.elevation + storey.height) * cadUnitsPerMeter;
       final List<Triangle3D> storeyTriangles = [];
 
       // 1. Extrude Columns
@@ -61,7 +62,7 @@ class Structural3dMeshBuilder {
       // 3. Extrude Slabs (plate with slab thickness)
       for (final slab in storey.slabs) {
         final double slabZTop = zBase;
-        final double slabZBottom = zBase - slab.thickness;
+        final double slabZBottom = zBase - slab.thickness * cadUnitsPerMeter;
 
         final slabTris = _extrudePolygon(
           slab.polygon,
