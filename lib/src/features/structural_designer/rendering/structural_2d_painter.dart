@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/cantilever_analysis_models.dart';
 import '../models/structural_element.dart';
+import '../models/vertical_capacity_models.dart';
 import 'structural_pointer_painter.dart';
 
 /// 2D CustomPainter that renders structural elements, ghost storeys (ArchiCAD Trace Reference),
@@ -10,6 +11,7 @@ class Structural2dPainter extends CustomPainter {
   final StoreyLevel currentStorey;
   final StoreyLevel? ghostStorey;
   final List<CantileverZone> cantileverZones;
+  final VerticalCapacityReport? verticalReport;
   final bool showCantileverHeatmap;
   final StructuralDrawTool activeTool;
   final StructuralColumn? previewColumn;
@@ -22,6 +24,16 @@ class Structural2dPainter extends CustomPainter {
   final double? extrusionDistance;
   final String? selectedColumnId;
   final String? selectedShearWallId;
+  final String? selectedBeamId;
+  final String? selectedGridAxisId;
+  final Offset? firstWallEdgeStartCad;
+  final Offset? firstWallEdgeEndCad;
+  final Offset? gridAxisPreviewStartCad;
+  final Offset? gridAxisPreviewEndCad;
+  final Offset? beamStartPos;
+  final double beamPreviewWidth;
+  final Offset? openingStartCornerCad;
+  final (String, int)? selectedOpening;
   final StructuralColumn? movingColumn;
   final Offset? movingColumnPos;
   final String? selectedSlabId;
@@ -37,11 +49,21 @@ class Structural2dPainter extends CustomPainter {
     required this.currentStorey,
     this.ghostStorey,
     this.cantileverZones = const [],
+    this.verticalReport,
     this.showCantileverHeatmap = true,
     this.activeTool = StructuralDrawTool.select,
     this.previewColumn,
     this.previewColumnPos,
     this.wallStartPos,
+    this.beamStartPos,
+    this.beamPreviewWidth = 0.25,
+    this.openingStartCornerCad,
+    this.selectedOpening,
+    this.selectedGridAxisId,
+    this.firstWallEdgeStartCad,
+    this.firstWallEdgeEndCad,
+    this.gridAxisPreviewStartCad,
+    this.gridAxisPreviewEndCad,
     this.currentCursorCad,
     this.slabStartCornerCad,
     this.slabPointsInProgress = const [],
@@ -49,6 +71,7 @@ class Structural2dPainter extends CustomPainter {
     this.extrusionDistance,
     this.selectedColumnId,
     this.selectedShearWallId,
+    this.selectedBeamId,
     this.movingColumn,
     this.movingColumnPos,
     this.selectedSlabId,
@@ -71,6 +94,16 @@ class Structural2dPainter extends CustomPainter {
     // 2. Draw Active Storey Slabs
     for (final slab in currentStorey.slabs) {
       _drawSlab(canvas, slab, isGhost: false);
+    }
+
+    // 2b. Draw Active Storey Beams
+    for (final beam in currentStorey.beams) {
+      _drawBeam(canvas, beam, isGhost: false);
+    }
+
+    // 2c. Draw Active Storey Grid Axes
+    for (final axis in currentStorey.gridAxes) {
+      _drawGridAxis(canvas, axis, isGhost: false);
     }
 
     // 3. Draw Active Storey Shear Walls
@@ -101,6 +134,12 @@ class Structural2dPainter extends CustomPainter {
     for (final slab in ghost.slabs) {
       _drawSlab(canvas, slab, isGhost: true);
     }
+    for (final beam in ghost.beams) {
+      _drawBeam(canvas, beam, isGhost: true);
+    }
+    for (final axis in ghost.gridAxes) {
+      _drawGridAxis(canvas, axis, isGhost: true);
+    }
     for (final wall in ghost.shearWalls) {
       _drawShearWall(canvas, wall, isGhost: true);
     }
@@ -123,7 +162,7 @@ class Structural2dPainter extends CustomPainter {
     }
 
     final pts = polygon.map(cadToScene).toList();
-    final path = Path();
+    final path = Path()..fillType = PathFillType.evenOdd;
     path.moveTo(pts.first.dx, pts.first.dy);
     for (int i = 1; i < pts.length; i++) {
       path.lineTo(pts[i].dx, pts[i].dy);
@@ -161,6 +200,39 @@ class Structural2dPainter extends CustomPainter {
 
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
+
+    // Draw openings outline & architectural X cross
+    for (int oIdx = 0; oIdx < slab.openings.length; oIdx++) {
+      final op = slab.openings[oIdx];
+      if (op.length >= 3) {
+        final opPts = op.map(cadToScene).toList();
+        final opPath = Path()..moveTo(opPts.first.dx, opPts.first.dy);
+        for (int i = 1; i < opPts.length; i++) {
+          opPath.lineTo(opPts[i].dx, opPts[i].dy);
+        }
+        opPath.close();
+
+        final isOpSelected = !isGhost &&
+            selectedOpening != null &&
+            selectedOpening!.$1 == slab.id &&
+            selectedOpening!.$2 == oIdx;
+
+        final opBorderPaint = Paint()
+          ..color = isGhost
+              ? const Color(0x66FFB74D)
+              : (isOpSelected ? const Color(0xFFFF5252) : const Color(0xFFFF9800))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = isOpSelected ? (2.5 / zoomScale) : (1.5 / zoomScale);
+
+        canvas.drawPath(opPath, opBorderPaint);
+
+        // Draw architectural X cross
+        if (opPts.length >= 4) {
+          canvas.drawLine(opPts[0], opPts[2], opBorderPaint);
+          canvas.drawLine(opPts[1], opPts[3], opBorderPaint);
+        }
+      }
+    }
 
     // If selected, draw corner vertex handles
     if (isSelected) {
@@ -348,6 +420,166 @@ class Structural2dPainter extends CustomPainter {
     textPainter.paint(canvas, badgeOffset);
   }
 
+  void _drawBeam(Canvas canvas, StructuralBeam beam, {required bool isGhost}) {
+    final pts = beam.polygonVertices.map(cadToScene).toList();
+    if (pts.length < 4) return;
+    final path = Path()
+      ..moveTo(pts[0].dx, pts[0].dy)
+      ..lineTo(pts[1].dx, pts[1].dy)
+      ..lineTo(pts[2].dx, pts[2].dy)
+      ..lineTo(pts[3].dx, pts[3].dy)
+      ..close();
+
+    final isSelected = !isGhost && (beam.id == selectedBeamId);
+
+    final fillPaint = Paint()
+      ..color = isGhost
+          ? const Color(0x33FFA726)
+          : (isSelected ? const Color(0x66FFB300) : const Color(0x44FFA726))
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = isGhost
+          ? const Color(0x66FFB300)
+          : (isSelected ? const Color(0xFFFFD54F) : const Color(0xFFFB8C00))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = isSelected ? (2.5 / zoomScale) : (1.6 / zoomScale);
+
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, borderPaint);
+
+    // Centerline
+    final centerPaint = Paint()
+      ..color = isGhost ? const Color(0x40FFFFFF) : const Color(0xCCFFFFFF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0 / zoomScale;
+    canvas.drawLine(cadToScene(beam.start), cadToScene(beam.end), centerPaint);
+
+    if (isSelected) {
+      final selectHalo = Paint()
+        ..color = const Color(0xFFFFB300)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5 / zoomScale;
+      canvas.drawPath(path, selectHalo);
+
+      final handlePaint = Paint()
+        ..color = const Color(0xFFFFB300)
+        ..style = PaintingStyle.fill;
+      final handleSize = 3.5 / zoomScale;
+      for (final pt in pts) {
+        canvas.drawRect(
+          Rect.fromCenter(center: pt, width: handleSize * 2, height: handleSize * 2),
+          handlePaint,
+        );
+      }
+    }
+  }
+
+  void _drawGridAxis(Canvas canvas, StructuralGridAxis axis, {required bool isGhost}) {
+    final p1 = cadToScene(axis.start);
+    final p2 = cadToScene(axis.end);
+    final isSelected = !isGhost && (axis.id == selectedGridAxisId);
+
+    final axisPaint = Paint()
+      ..color = isGhost
+          ? const Color(0x66FF453A)
+          : (isSelected ? const Color(0xFFFF9F0A) : const Color(0xFFFF453A))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (isSelected ? 2.5 : 1.5) / zoomScale;
+
+    _drawDashDotLine(canvas, p1, p2, axisPaint);
+
+    if (axis.bubbleAtEnd) {
+      _drawAxisBubble(canvas, p2, axis.direction, axis.name, isSelected: isSelected, isGhost: isGhost);
+    }
+    if (axis.bubbleAtStart) {
+      _drawAxisBubble(canvas, p1, -axis.direction, axis.name, isSelected: isSelected, isGhost: isGhost);
+    }
+
+    if (isSelected) {
+      final handlePaint = Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..style = PaintingStyle.fill;
+      final handleBorder = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5 / zoomScale;
+      final handleRadius = 6.0 / zoomScale;
+
+      canvas.drawCircle(p1, handleRadius, handlePaint);
+      canvas.drawCircle(p1, handleRadius, handleBorder);
+
+      canvas.drawCircle(p2, handleRadius, handlePaint);
+      canvas.drawCircle(p2, handleRadius, handleBorder);
+    }
+  }
+
+  void _drawAxisBubble(
+    Canvas canvas,
+    Offset center,
+    Offset dir,
+    String label, {
+    required bool isSelected,
+    required bool isGhost,
+  }) {
+    final radius = 13.0 / zoomScale;
+    final bgPaint = Paint()
+      ..color = isGhost ? const Color(0xCC2C2C2E) : const Color(0xFF1C1C1E)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = isGhost
+          ? const Color(0x66FF453A)
+          : (isSelected ? const Color(0xFFFF9F0A) : const Color(0xFFFF453A))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (isSelected ? 2.5 : 1.8) / zoomScale;
+
+    canvas.drawCircle(center, radius, bgPaint);
+    canvas.drawCircle(center, radius, borderPaint);
+
+    final fontSize = (11.0 / zoomScale).clamp(8.0, 16.0);
+    final textSpan = TextSpan(
+      text: label,
+      style: TextStyle(
+        color: isGhost ? const Color(0xAAFFFFFF) : Colors.white,
+        fontSize: fontSize,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final textOffset = Offset(
+      center.dx - textPainter.width / 2.0,
+      center.dy - textPainter.height / 2.0,
+    );
+    textPainter.paint(canvas, textOffset);
+  }
+
+  void _drawDashDotLine(Canvas canvas, Offset p1, Offset p2, Paint paint) {
+    final v = p2 - p1;
+    final dist = v.distance;
+    if (dist < 1e-4) return;
+    final u = v / dist;
+
+    final dashLen = 14.0 / zoomScale;
+    final gapLen = 4.0 / zoomScale;
+    final dotLen = 2.0 / zoomScale;
+
+    double d = 0.0;
+    while (d < dist) {
+      final dEnd = math.min(d + dashLen, dist);
+      canvas.drawLine(p1 + u * d, p1 + u * dEnd, paint);
+      d += dashLen + gapLen;
+      if (d >= dist) break;
+
+      final dotEnd = math.min(d + dotLen, dist);
+      canvas.drawLine(p1 + u * d, p1 + u * dotEnd, paint);
+      d += dotLen + gapLen;
+    }
+  }
+
   void _drawShearWall(Canvas canvas, StructuralShearWall wall,
       {required bool isGhost}) {
     final pts = wall.polygonVertices.map(cadToScene).toList();
@@ -415,26 +647,65 @@ class Structural2dPainter extends CustomPainter {
 
     final bool isMovingThis = movingColumn != null && movingColumn!.id == col.id;
     final bool isSelected = !isGhost && (col.id == selectedColumnId);
+    final vCheck = (!isGhost && !isMovingThis)
+        ? verticalReport?.getCheckForColumn(col.id)
+        : null;
+
+    final Color fillColor;
+    final Color borderColor;
+    if (isGhost) {
+      fillColor = const Color(0x4D64B5F6);
+      borderColor = const Color(0x8090CAF9);
+    } else if (isMovingThis) {
+      fillColor = const Color(0x331565C0);
+      borderColor = const Color(0x66FFFFFF);
+    } else if (vCheck != null && vCheck.status == VerticalCapacityStatus.critical) {
+      // Glows RED for critical crushing or punching failure
+      fillColor = const Color(0xEEB71C1C);
+      borderColor = const Color(0xFFFF1744);
+    } else if (vCheck != null && vCheck.status == VerticalCapacityStatus.warning) {
+      // Glows ORANGE/AMBER for near-capacity columns
+      fillColor = const Color(0xEEF57F17);
+      borderColor = const Color(0xFFFFB300);
+    } else {
+      fillColor = const Color(0xF01565C0);
+      borderColor = Colors.white;
+    }
+
+    // Glowing aura behind critical/warning columns
+    if (vCheck != null && vCheck.status != VerticalCapacityStatus.safe && !isGhost && !isMovingThis) {
+      final glowPaint = Paint()
+        ..color = (vCheck.status == VerticalCapacityStatus.critical
+                ? const Color(0xFFFF1744)
+                : const Color(0xFFFFB300))
+            .withValues(alpha: 0.45)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5.0 / zoomScale;
+      canvas.drawPath(path, glowPaint);
+    }
 
     final fillPaint = Paint()
-      ..color = isGhost
-          ? const Color(0x4D64B5F6)
-          : isMovingThis
-              ? const Color(0x331565C0)
-              : const Color(0xF01565C0)
+      ..color = fillColor
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = isGhost
-          ? const Color(0x8090CAF9)
-          : isMovingThis
-              ? const Color(0x66FFFFFF)
-              : Colors.white
+      ..color = borderColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5 / zoomScale;
+      ..strokeWidth = (vCheck != null && vCheck.status == VerticalCapacityStatus.critical ? 2.2 : 1.5) / zoomScale;
 
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
+
+    // Punching shear risk indicator (EC2 §6.4 control perimeter alert)
+    if (vCheck != null && vCheck.isPunchingCritical && !isGhost && !isMovingThis) {
+      final centerScene = cadToScene(col.center);
+      final double rPunching = (math.max(col.width, col.height) / 2.0 + 0.35) * cadScale;
+      final punchPaint = Paint()
+        ..color = const Color(0xFFFF1744)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4 / zoomScale;
+      canvas.drawCircle(centerScene, rPunching, punchPaint);
+    }
 
     // Selected highlight halo & corner grip handles
     if (isSelected && !isMovingThis) {
@@ -482,13 +753,9 @@ class Structural2dPainter extends CustomPainter {
   }
 
   void _drawInteractivePreview(Canvas canvas) {
-    // 1. Moving column live preview (anchored at Top-Left)
+    // 1. Moving column live preview
     if (movingColumn != null && movingColumnPos != null) {
-      final center = Offset(
-        movingColumnPos!.dx + movingColumn!.width / 2.0,
-        movingColumnPos!.dy - movingColumn!.height / 2.0,
-      );
-      final col = movingColumn!.copyWith(center: center);
+      final col = movingColumn!.copyWith(center: movingColumnPos!);
       final pts = col.polygonVertices.map(cadToScene).toList();
       if (pts.isNotEmpty) {
         final path = Path()..moveTo(pts[0].dx, pts[0].dy);
@@ -510,19 +777,12 @@ class Structural2dPainter extends CustomPainter {
       }
     }
 
-    // 2. New column placement live preview (anchored at Top-Left)
+    // 2. New column placement live preview
     if (activeTool == StructuralDrawTool.column &&
         previewColumn != null &&
         previewColumnPos != null &&
         movingColumn == null) {
-      // Top-Left anchor:
-      // In CAD (Y up), top-left is (previewColumnPos.dx, previewColumnPos.dy),
-      // so center is (previewColumnPos.dx + previewColumn.width / 2.0, previewColumnPos.dy - previewColumn.height / 2.0).
-      final center = Offset(
-        previewColumnPos!.dx + previewColumn!.width / 2.0,
-        previewColumnPos!.dy - previewColumn!.height / 2.0,
-      );
-      final col = previewColumn!.copyWith(center: center);
+      final col = previewColumn!.copyWith(center: previewColumnPos!);
       final pts = col.polygonVertices.map(cadToScene).toList();
       if (pts.isNotEmpty) {
         final path = Path()..moveTo(pts[0].dx, pts[0].dy);
@@ -571,6 +831,36 @@ class Structural2dPainter extends CustomPainter {
         canvas.drawPath(path, pBorder);
         canvas.drawLine(
             cadToScene(wallStartPos!), cadToScene(currentCursorCad!), pBorder);
+      }
+    } else if (activeTool == StructuralDrawTool.beam &&
+        beamStartPos != null &&
+        currentCursorCad != null) {
+      final previewBeam = StructuralBeam(
+        id: 'preview_beam',
+        start: beamStartPos!,
+        end: currentCursorCad!,
+        width: beamPreviewWidth,
+      );
+      final pts = previewBeam.polygonVertices.map(cadToScene).toList();
+      if (pts.length >= 4) {
+        final path = Path()..moveTo(pts[0].dx, pts[0].dy);
+        for (int i = 1; i < pts.length; i++) {
+          path.lineTo(pts[i].dx, pts[i].dy);
+        }
+        path.close();
+
+        final pFill = Paint()
+          ..color = const Color(0x66FFB300)
+          ..style = PaintingStyle.fill;
+        final pBorder = Paint()
+          ..color = const Color(0xFFFFB300)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0 / zoomScale;
+
+        canvas.drawPath(path, pFill);
+        canvas.drawPath(path, pBorder);
+        canvas.drawLine(
+            cadToScene(beamStartPos!), cadToScene(currentCursorCad!), pBorder);
       }
     } else if (activeTool == StructuralDrawTool.slab) {
       if (slabStartCornerCad != null && currentCursorCad != null) {
@@ -647,6 +937,81 @@ class Structural2dPainter extends CustomPainter {
         for (final p in pts) {
           canvas.drawCircle(p, 4.0 / zoomScale, vDot);
         }
+      }
+    } else if (activeTool == StructuralDrawTool.slabOpening &&
+        openingStartCornerCad != null &&
+        currentCursorCad != null) {
+      final c1 = openingStartCornerCad!;
+      final c2 = currentCursorCad!;
+      final minX = math.min(c1.dx, c2.dx);
+      final maxX = math.max(c1.dx, c2.dx);
+      final minY = math.min(c1.dy, c2.dy);
+      final maxY = math.max(c1.dy, c2.dy);
+
+      final p1 = cadToScene(Offset(minX, maxY));
+      final p2 = cadToScene(Offset(maxX, maxY));
+      final p3 = cadToScene(Offset(maxX, minY));
+      final p4 = cadToScene(Offset(minX, minY));
+
+      final path = Path()
+        ..moveTo(p1.dx, p1.dy)
+        ..lineTo(p2.dx, p2.dy)
+        ..lineTo(p3.dx, p3.dy)
+        ..lineTo(p4.dx, p4.dy)
+        ..close();
+
+      final opFill = Paint()
+        ..color = const Color(0x33FF9800)
+        ..style = PaintingStyle.fill;
+      final opBorder = Paint()
+        ..color = const Color(0xFFFF9800)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0 / zoomScale;
+
+      canvas.drawPath(path, opFill);
+      canvas.drawPath(path, opBorder);
+      // Architectural X cross
+      canvas.drawLine(p1, p3, opBorder);
+      canvas.drawLine(p2, p4, opBorder);
+    } else if (activeTool == StructuralDrawTool.gridAxis) {
+      // 1. Highlight first selected wall edge
+      if (firstWallEdgeStartCad != null && firstWallEdgeEndCad != null) {
+        final p1 = cadToScene(firstWallEdgeStartCad!);
+        final p2 = cadToScene(firstWallEdgeEndCad!);
+
+        final haloPaint = Paint()
+          ..color = const Color(0x6600E5FF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 6.0 / zoomScale;
+        final edgePaint = Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5 / zoomScale;
+
+        canvas.drawLine(p1, p2, haloPaint);
+        canvas.drawLine(p1, p2, edgePaint);
+
+        final dotPaint = Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(p1, 4.0 / zoomScale, dotPaint);
+        canvas.drawCircle(p2, 4.0 / zoomScale, dotPaint);
+      }
+
+      // 2. Live preview of resulting grid axis centerline
+      if (gridAxisPreviewStartCad != null && gridAxisPreviewEndCad != null) {
+        final p1 = cadToScene(gridAxisPreviewStartCad!);
+        final p2 = cadToScene(gridAxisPreviewEndCad!);
+        final previewPaint = Paint()
+          ..color = const Color(0xCCFF453A)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0 / zoomScale;
+
+        _drawDashDotLine(canvas, p1, p2, previewPaint);
+        final dir = (p2 - p1);
+        final len = dir.distance;
+        final uDir = len > 1e-4 ? dir / len : const Offset(1, 0);
+        _drawAxisBubble(canvas, p2, uDir, '?', isSelected: true, isGhost: false);
       }
     }
   }

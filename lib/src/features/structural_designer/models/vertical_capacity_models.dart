@@ -1,0 +1,207 @@
+import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
+import 'structural_element.dart';
+
+/// Status of structural vertical capacity safety according to Eurocode 2 (EC2).
+enum VerticalCapacityStatus {
+  /// Utilization <= 80%, fully compliant.
+  safe('В норма', Color(0xFF00E676), Color(0x3300E676)),
+
+  /// Utilization between 80% and 100%, approaching limit.
+  warning('Повишено натоварване', Color(0xFFFFB300), Color(0x33FFB300)),
+
+  /// Utilization > 100% or punching shear failure, requires section enlargement.
+  critical('Критично претоварване', Color(0xFFFF1744), Color(0x33FF1744));
+
+  final String label;
+  final Color color;
+  final Color fillColor;
+
+  const VerticalCapacityStatus(this.label, this.color, this.fillColor);
+
+  String localizedLabel(AppLocalizations l10n) {
+    switch (this) {
+      case VerticalCapacityStatus.safe:
+        return l10n.statusSafe;
+      case VerticalCapacityStatus.warning:
+        return l10n.statusWarning;
+      case VerticalCapacityStatus.critical:
+        return l10n.statusCritical;
+    }
+  }
+}
+
+/// Detailed vertical axial compression and punching shear check for an individual column.
+class ColumnVerticalCheck {
+  final String columnId;
+  final String columnName;
+  final String storeyId;
+  final String storeyName;
+  final int storeyIndex;
+  final int numStoreysAbove;
+  final Offset center;
+  final ColumnShape shape;
+  final double widthM;
+  final double heightM;
+  final double crossSectionAreaM2;
+  final double tributaryAreaM2;
+
+  /// Accumulated axial design load Ned accumulating from top down to this storey level (in kN).
+  final double accumulatedLoadNedKn;
+
+  /// Vertical shear force transferred from slab at this specific storey (in kN).
+  final double floorShearForceVedKn;
+
+  /// Design axial compression resistance Nrd according to EC2 (in kN).
+  final double axialCapacityNrdKn;
+
+  /// Utilization ratio Ned / Nrd.
+  final double axialUtilization;
+
+  /// Punching shear stress v_Ed at 2d perimeter (in MPa).
+  final double punchingShearStressVedMpa;
+
+  /// Concrete punching shear resistance v_Rd,c without shear rebar (in MPa).
+  final double punchingShearResistanceVrdMpa;
+
+  /// Punching shear utilization v_Ed / v_Rd,c.
+  final double punchingUtilization;
+
+  /// Overall safety status (safe, warning, or critical).
+  final VerticalCapacityStatus status;
+
+  /// Minimum required column cross-section (e.g. "40x40 cm" or "шайба 25x60 cm").
+  final String minRequiredSectionCm;
+
+  /// Actionable recommendation crafted specifically for the architect.
+  final String architectRecommendation;
+
+  /// Punching shear recommendation (if at risk).
+  final String? punchingRecommendation;
+
+  const ColumnVerticalCheck({
+    required this.columnId,
+    required this.columnName,
+    required this.storeyId,
+    required this.storeyName,
+    required this.storeyIndex,
+    required this.numStoreysAbove,
+    required this.center,
+    required this.shape,
+    required this.widthM,
+    required this.heightM,
+    required this.crossSectionAreaM2,
+    required this.tributaryAreaM2,
+    required this.accumulatedLoadNedKn,
+    required this.floorShearForceVedKn,
+    required this.axialCapacityNrdKn,
+    required this.axialUtilization,
+    required this.punchingShearStressVedMpa,
+    required this.punchingShearResistanceVrdMpa,
+    required this.punchingUtilization,
+    required this.status,
+    required this.minRequiredSectionCm,
+    required this.architectRecommendation,
+    this.punchingRecommendation,
+  });
+
+  bool get isAxiallyOverloaded => axialUtilization > 1.0;
+  bool get isPunchingCritical => punchingUtilization > 1.0;
+  bool get hasWarning => status == VerticalCapacityStatus.warning;
+  bool get hasCritical => status == VerticalCapacityStatus.critical;
+}
+
+/// Span-to-depth deflection feasibility check for floor slabs according to EC2 §7.4.
+class SlabDeflectionCheck {
+  final String storeyId;
+  final String storeyName;
+  final double currentThicknessM;
+  final double maxSpanM;
+  final double recommendedMinThicknessM;
+  final bool isDeflectionSafe;
+  final double deflectionRatio;
+  final String recommendation;
+
+  const SlabDeflectionCheck({
+    required this.storeyId,
+    required this.storeyName,
+    required this.currentThicknessM,
+    required this.maxSpanM,
+    required this.recommendedMinThicknessM,
+    required this.isDeflectionSafe,
+    required this.deflectionRatio,
+    required this.recommendation,
+  });
+}
+
+/// Comprehensive vertical gravitational capacity report for the entire project.
+class VerticalCapacityReport {
+  /// Total vertical building weight accumulating at foundation level (kN).
+  final double totalVerticalLoadBaseKn;
+
+  /// Average foundation base pressure sigma_base (kPa = kN/m²).
+  final double basePressureKpa;
+
+  /// Total building footprint area (m²).
+  final double footprintAreaM2;
+
+  /// List of checks for every column across all storeys.
+  final List<ColumnVerticalCheck> columnChecks;
+
+  /// List of slab deflection checks for each storey.
+  final List<SlabDeflectionCheck> slabChecks;
+
+  /// Total count of critically overloaded columns.
+  final int criticalColumnsCount;
+
+  /// Total count of warning columns.
+  final int warningColumnsCount;
+
+  /// Count of columns exhibiting punching shear risk.
+  final int punchingRiskCount;
+
+  /// Highest axial compression utilization ratio in the building.
+  final double maxAxialUtilization;
+
+  /// Highest punching shear utilization ratio in the building.
+  final double maxPunchingUtilization;
+
+  /// Overall building gravitational status.
+  final VerticalCapacityStatus overallStatus;
+
+  const VerticalCapacityReport({
+    required this.totalVerticalLoadBaseKn,
+    required this.basePressureKpa,
+    required this.footprintAreaM2,
+    required this.columnChecks,
+    required this.slabChecks,
+    required this.criticalColumnsCount,
+    required this.warningColumnsCount,
+    required this.punchingRiskCount,
+    required this.maxAxialUtilization,
+    required this.maxPunchingUtilization,
+    required this.overallStatus,
+  });
+
+  static const VerticalCapacityReport empty = VerticalCapacityReport(
+    totalVerticalLoadBaseKn: 0.0,
+    basePressureKpa: 0.0,
+    footprintAreaM2: 0.0,
+    columnChecks: [],
+    slabChecks: [],
+    criticalColumnsCount: 0,
+    warningColumnsCount: 0,
+    punchingRiskCount: 0,
+    maxAxialUtilization: 0.0,
+    maxPunchingUtilization: 0.0,
+    overallStatus: VerticalCapacityStatus.safe,
+  );
+
+  /// Returns column check for a given columnId in the active storey, if present.
+  ColumnVerticalCheck? getCheckForColumn(String columnId) {
+    for (final check in columnChecks) {
+      if (check.columnId == columnId) return check;
+    }
+    return null;
+  }
+}

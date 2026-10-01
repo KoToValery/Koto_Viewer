@@ -230,6 +230,231 @@ class StructuralShearWall {
   }
 }
 
+/// Represents a structural reinforced concrete beam (греда).
+class StructuralBeam {
+  final String id;
+  final Offset start;
+  final Offset end;
+  final double width; // in meters (b, e.g. 0.25)
+  final double depth; // in meters (h, e.g. 0.50)
+  final bool isSecondary;
+
+  const StructuralBeam({
+    required this.id,
+    required this.start,
+    required this.end,
+    this.width = 0.25,
+    this.depth = 0.50,
+    this.isSecondary = false,
+  });
+
+  double get length {
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    return math.sqrt(dx * dx + dy * dy);
+  }
+
+  double get angleRad => math.atan2(end.dy - start.dy, end.dx - start.dx);
+
+  /// 4 corner vertices forming the thick beam box centered along the axis.
+  List<Offset> get polygonVertices {
+    final double l = length;
+    if (l < 1e-6) {
+      return [start, start, start, start];
+    }
+    final double dx = end.dx - start.dx;
+    final double dy = end.dy - start.dy;
+    final normal = Offset(dy / l, -dx / l);
+    final halfW = width / 2.0;
+    final ox = normal.dx * halfW;
+    final oy = normal.dy * halfW;
+
+    return [
+      Offset(start.dx - ox, start.dy - oy),
+      Offset(end.dx - ox, end.dy - oy),
+      Offset(end.dx + ox, end.dy + oy),
+      Offset(start.dx + ox, start.dy + oy),
+    ];
+  }
+
+  Rect get bounds {
+    final pts = polygonVertices;
+    double minX = pts.first.dx, maxX = pts.first.dx;
+    double minY = pts.first.dy, maxY = pts.first.dy;
+    for (final p in pts) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+    return Rect.fromLTRB(minX, minY, maxX, maxY);
+  }
+
+  StructuralBeam copyWith({
+    String? id,
+    Offset? start,
+    Offset? end,
+    double? width,
+    double? depth,
+    bool? isSecondary,
+  }) {
+    return StructuralBeam(
+      id: id ?? this.id,
+      start: start ?? this.start,
+      end: end ?? this.end,
+      width: width ?? this.width,
+      depth: depth ?? this.depth,
+      isSecondary: isSecondary ?? this.isSecondary,
+    );
+  }
+}
+
+/// Represents a structural grid / axis line (осова линия).
+/// Rendered with an architectural dash-dot pattern and an end circular bubble with label.
+class StructuralGridAxis {
+  final String id;
+  final String name; // e.g. "1", "2", "A", "B"
+  final Offset start;
+  final Offset end;
+  final bool bubbleAtStart;
+  final bool bubbleAtEnd;
+
+  const StructuralGridAxis({
+    required this.id,
+    required this.name,
+    required this.start,
+    required this.end,
+    this.bubbleAtStart = false,
+    this.bubbleAtEnd = true,
+  });
+
+  double get length {
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    return math.sqrt(dx * dx + dy * dy);
+  }
+
+  double get angleRad => math.atan2(end.dy - start.dy, end.dx - start.dx);
+
+  Offset get direction {
+    final len = length;
+    if (len < 1e-6) return const Offset(1, 0);
+    return Offset((end.dx - start.dx) / len, (end.dy - start.dy) / len);
+  }
+
+  Offset get normal {
+    final dir = direction;
+    return Offset(-dir.dy, dir.dx);
+  }
+
+  Rect get bounds {
+    final minX = math.min(start.dx, end.dx);
+    final maxX = math.max(start.dx, end.dx);
+    final minY = math.min(start.dy, end.dy);
+    final maxY = math.max(start.dy, end.dy);
+    return Rect.fromLTRB(minX, minY, maxX, maxY);
+  }
+
+  /// Calculates orthogonal projection of [pt] onto the infinite axis line.
+  Offset projectPoint(Offset pt) {
+    final dir = direction;
+    final v = pt - start;
+    final dot = v.dx * dir.dx + v.dy * dir.dy;
+    return start + dir * dot;
+  }
+
+  /// Shortest distance from [pt] to the finite axis segment.
+  double distanceToSegment(Offset pt) {
+    final dir = direction;
+    final v = pt - start;
+    final dot = v.dx * dir.dx + v.dy * dir.dy;
+    final clampedDot = dot.clamp(0.0, length);
+    final proj = start + dir * clampedDot;
+    return (pt - proj).distance;
+  }
+
+  /// Calculates intersection point with another axis line, or null if parallel.
+  Offset? intersectionWith(StructuralGridAxis other) {
+    final p1 = start;
+    final p2 = end;
+    final p3 = other.start;
+    final p4 = other.end;
+
+    final d = (p1.dx - p2.dx) * (p3.dy - p4.dy) - (p1.dy - p2.dy) * (p3.dx - p4.dx);
+    if (d.abs() < 1e-6) return null; // Parallel
+
+    final t = ((p1.dx - p3.dx) * (p3.dy - p4.dy) - (p1.dy - p3.dy) * (p3.dx - p4.dx)) / d;
+    return Offset(
+      p1.dx + t * (p2.dx - p1.dx),
+      p1.dy + t * (p2.dy - p1.dy),
+    );
+  }
+
+  /// Computes the centerline bisector between two line segments (wall faces).
+  static StructuralGridAxis? fromTwoSegments({
+    required String id,
+    required String name,
+    required Offset a1,
+    required Offset a2,
+    required Offset b1,
+    required Offset b2,
+    double extensionLength = 1.5,
+  }) {
+    final vA = a2 - a1;
+    final vB = b2 - b1;
+    final lenA = vA.distance;
+    final lenB = vB.distance;
+    if (lenA < 1e-4 || lenB < 1e-4) return null;
+
+    final uA = vA / lenA;
+    var uB = vB / lenB;
+    if (uA.dx * uB.dx + uA.dy * uB.dy < 0) {
+      uB = -uB;
+    }
+
+    final avgDir = uA + uB;
+    final avgLen = avgDir.distance;
+    if (avgLen < 1e-4) return null;
+    final dir = avgDir / avgLen;
+
+    final midA = (a1 + a2) / 2.0;
+    final midB = (b1 + b2) / 2.0;
+    final center = (midA + midB) / 2.0;
+
+    final projs = [a1, a2, b1, b2]
+        .map((p) => (p - center).dx * dir.dx + (p - center).dy * dir.dy)
+        .toList();
+    final minProj = projs.reduce(math.min) - extensionLength;
+    final maxProj = projs.reduce(math.max) + extensionLength;
+
+    return StructuralGridAxis(
+      id: id,
+      name: name,
+      start: center + dir * minProj,
+      end: center + dir * maxProj,
+      bubbleAtEnd: true,
+    );
+  }
+
+  StructuralGridAxis copyWith({
+    String? id,
+    String? name,
+    Offset? start,
+    Offset? end,
+    bool? bubbleAtStart,
+    bool? bubbleAtEnd,
+  }) {
+    return StructuralGridAxis(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      start: start ?? this.start,
+      end: end ?? this.end,
+      bubbleAtStart: bubbleAtStart ?? this.bubbleAtStart,
+      bubbleAtEnd: bubbleAtEnd ?? this.bubbleAtEnd,
+    );
+  }
+}
+
 /// Represents a reinforced concrete slab (плоча).
 class StructuralSlab {
   final String id;
@@ -322,6 +547,148 @@ class StructuralSlab {
     if (polygon.length <= 3 || index < 0 || index >= polygon.length) return null;
     final updated = List<Offset>.from(polygon)..removeAt(index);
     return copyWith(polygon: updated);
+  }
+
+  /// Adds an opening polygon (cutout) to the slab.
+  StructuralSlab addOpening(List<Offset> opening) {
+    if (opening.length < 3) return this;
+    final updated = List<List<Offset>>.from(openings)..add(opening);
+    return copyWith(openings: updated);
+  }
+
+  /// Removes opening at [index].
+  StructuralSlab removeOpening(int index) {
+    if (index < 0 || index >= openings.length) return this;
+    final updated = List<List<Offset>>.from(openings)..removeAt(index);
+    return copyWith(openings: updated);
+  }
+
+  /// Updates opening at [index].
+  StructuralSlab updateOpening(int index, List<Offset> newOpening) {
+    if (index < 0 || index >= openings.length || newOpening.length < 3) return this;
+    final updated = List<List<Offset>>.from(openings);
+    updated[index] = newOpening;
+    return copyWith(openings: updated);
+  }
+
+  /// Checks whether two 2D line segments strictly cross/intersect.
+  static bool doSegmentsIntersect(Offset p1, Offset p2, Offset p3, Offset p4) {
+    double ccw(Offset a, Offset b, Offset c) {
+      return (b.dx - a.dx) * (c.dy - a.dy) - (b.dy - a.dy) * (c.dx - a.dx);
+    }
+    final d1 = ccw(p3, p4, p1);
+    final d2 = ccw(p3, p4, p2);
+    final d3 = ccw(p1, p2, p3);
+    final d4 = ccw(p1, p2, p4);
+
+    if (((d1 > 1e-6 && d2 < -1e-6) || (d1 < -1e-6 && d2 > 1e-6)) &&
+        ((d3 > 1e-6 && d4 < -1e-6) || (d3 < -1e-6 && d4 > 1e-6))) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Checks whether polygon edges self-intersect (X-shaped crossing / bowtie).
+  static bool hasSelfIntersections(List<Offset> pts) {
+    final n = pts.length;
+    if (n < 4) return false;
+    for (int i = 0; i < n; i++) {
+      final p1 = pts[i];
+      final p2 = pts[(i + 1) % n];
+      for (int j = i + 2; j < n; j++) {
+        if (i == 0 && j == n - 1) continue;
+        final p3 = pts[j];
+        final p4 = pts[(j + 1) % n];
+        if (doSegmentsIntersect(p1, p2, p3, p4)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Cleans a polygon by removing orphan (0,0) / NaN points, collapsing overlapping vertices,
+  /// and eliminating redundant collinear vertices.
+  static List<Offset> cleanPolygon(List<Offset> rawPts, {double minDistance = 0.05}) {
+    if (rawPts.length < 3) return List.from(rawPts);
+
+    // 1. Filter out NaN and Infinite points
+    final nonNanPts = <Offset>[];
+    for (final p in rawPts) {
+      if (!p.dx.isNaN && !p.dy.isNaN && !p.dx.isInfinite && !p.dy.isInfinite) {
+        nonNanPts.add(p);
+      }
+    }
+    if (nonNanPts.length < 3) return nonNanPts;
+
+    // Check for orphan (0, 0): only drop (0, 0) if the non-zero points form a coherent
+    // contour (>= 3 points) and (0, 0) is well outside their bounding box (isolated stray point).
+    final nonZeroPts = nonNanPts.where((p) => p.dx.abs() > 1e-4 || p.dy.abs() > 1e-4).toList();
+    bool dropZero = false;
+    if (nonZeroPts.length >= 3) {
+      double minX = nonZeroPts[0].dx, maxX = nonZeroPts[0].dx;
+      double minY = nonZeroPts[0].dy, maxY = nonZeroPts[0].dy;
+      for (final p in nonZeroPts) {
+        if (p.dx < minX) minX = p.dx;
+        if (p.dx > maxX) maxX = p.dx;
+        if (p.dy < minY) minY = p.dy;
+        if (p.dy > maxY) maxY = p.dy;
+      }
+      final bbox = Rect.fromLTRB(minX, minY, maxX, maxY);
+      final margin = math.max(0.5, math.min(bbox.width, bbox.height) * 0.1);
+      if (!bbox.inflate(margin).contains(Offset.zero)) {
+        dropZero = true;
+      }
+    }
+
+    final validPts = <Offset>[];
+    for (final p in nonNanPts) {
+      if (dropZero && p.dx.abs() < 1e-4 && p.dy.abs() < 1e-4) {
+        continue;
+      }
+      validPts.add(p);
+    }
+
+    if (validPts.length < 3) return validPts;
+
+    // 2. Collapse overlapping / duplicate adjacent points
+    bool changed = true;
+    while (changed && validPts.length > 3) {
+      changed = false;
+      for (int i = 0; i < validPts.length; i++) {
+        final next = (i + 1) % validPts.length;
+        if ((validPts[i] - validPts[next]).distance < minDistance) {
+          validPts.removeAt(next);
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    // 3. Remove collinear points
+    changed = true;
+    while (changed && validPts.length > 3) {
+      changed = false;
+      for (int i = 0; i < validPts.length; i++) {
+        final prev = (i - 1 + validPts.length) % validPts.length;
+        final next = (i + 1) % validPts.length;
+        final v1 = validPts[i] - validPts[prev];
+        final v2 = validPts[next] - validPts[i];
+        final l1 = v1.distance;
+        final l2 = v2.distance;
+        if (l1 > 1e-4 && l2 > 1e-4) {
+          final cross = (v1.dx * v2.dy - v1.dy * v2.dx) / (l1 * l2);
+          final dot = (v1.dx * v2.dx + v1.dy * v2.dy) / (l1 * l2);
+          if (cross.abs() < 0.015 && dot > 0.99) {
+            validPts.removeAt(i);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+
+    return validPts;
   }
 
   /// Uniform parallel offset of all edges by [distance] in CAD units.
@@ -533,6 +900,7 @@ class StoreyLevel {
   final double height; // Clear floor-to-floor height (m)
   final List<StructuralColumn> columns;
   final List<StructuralShearWall> shearWalls;
+  final List<StructuralBeam> beams;
   final List<StructuralSlab> slabs;
 
   const StoreyLevel({
@@ -542,8 +910,12 @@ class StoreyLevel {
     this.height = 2.80,
     this.columns = const [],
     this.shearWalls = const [],
+    this.beams = const [],
     this.slabs = const [],
+    this.gridAxes = const [],
   });
+
+  final List<StructuralGridAxis> gridAxes;
 
   /// Duplicates current storey elements to a new level above.
   StoreyLevel cloneToNextLevel({
@@ -562,8 +934,14 @@ class StoreyLevel {
       shearWalls: shearWalls
           .map((w) => w.copyWith(id: '${w.id}_lvl_${newElevation.toInt()}'))
           .toList(),
+      beams: beams
+          .map((b) => b.copyWith(id: '${b.id}_lvl_${newElevation.toInt()}'))
+          .toList(),
       slabs: slabs
           .map((s) => s.copyWith(id: '${s.id}_lvl_${newElevation.toInt()}'))
+          .toList(),
+      gridAxes: gridAxes
+          .map((a) => a.copyWith(id: '${a.id}_lvl_${newElevation.toInt()}'))
           .toList(),
     );
   }
@@ -575,7 +953,9 @@ class StoreyLevel {
     double? height,
     List<StructuralColumn>? columns,
     List<StructuralShearWall>? shearWalls,
+    List<StructuralBeam>? beams,
     List<StructuralSlab>? slabs,
+    List<StructuralGridAxis>? gridAxes,
   }) {
     return StoreyLevel(
       id: id ?? this.id,
@@ -584,7 +964,9 @@ class StoreyLevel {
       height: height ?? this.height,
       columns: columns ?? this.columns,
       shearWalls: shearWalls ?? this.shearWalls,
+      beams: beams ?? this.beams,
       slabs: slabs ?? this.slabs,
+      gridAxes: gridAxes ?? this.gridAxes,
     );
   }
 }

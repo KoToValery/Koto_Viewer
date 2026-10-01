@@ -7,8 +7,10 @@ import '../models/structural_element.dart';
 /// Interactive tool modes for structural drawing.
 enum StructuralDrawTool {
   select(Icons.pan_tool_rounded),
+  gridAxis(Icons.grid_3x3_rounded),
   column(Icons.view_column_rounded),
   shearWall(Icons.line_weight_rounded),
+  beam(Icons.horizontal_rule_rounded),
   slab(Icons.crop_square_rounded),
   slabOpening(Icons.tab_unselected_rounded);
 
@@ -19,10 +21,14 @@ enum StructuralDrawTool {
     switch (this) {
       case StructuralDrawTool.select:
         return l10n.toolNavigation;
+      case StructuralDrawTool.gridAxis:
+        return l10n.toolGridAxis;
       case StructuralDrawTool.column:
         return l10n.toolColumn;
       case StructuralDrawTool.shearWall:
         return l10n.toolShearWall;
+      case StructuralDrawTool.beam:
+        return l10n.toolBeam;
       case StructuralDrawTool.slab:
         return l10n.toolSlab;
       case StructuralDrawTool.slabOpening:
@@ -42,7 +48,9 @@ class StructuralPointerPainter extends CustomPainter {
   final StructuralDrawTool activeTool;
   final StructuralColumn? previewColumn;
   final Offset? wallStartPos;
+  final Offset? beamStartPos;
   final Offset? slabStartCornerPos;
+  final Offset? openingStartCornerPos;
   final List<Offset>? slabPoints;
   final String? liveDimensionText;
   final double scale;
@@ -57,7 +65,9 @@ class StructuralPointerPainter extends CustomPainter {
     required this.activeTool,
     this.previewColumn,
     this.wallStartPos,
+    this.beamStartPos,
     this.slabStartCornerPos,
+    this.openingStartCornerPos,
     this.slabPoints,
     this.liveDimensionText,
     this.scale = 1.0,
@@ -125,9 +135,29 @@ class StructuralPointerPainter extends CustomPainter {
       canvas.drawRect(rect, slabBorder);
     }
 
-    // 5. Dimension badge snapped to 10 cm (only when drawing wall)
-    if (liveDimensionText != null && wallStartPos != null) {
-      _drawDimensionBadge(canvas, wallStartPos!, effectiveTip, liveDimensionText!);
+    // 4b. Live rectangular opening preview on pointer overlay (if drawing slab opening)
+    if (activeTool == StructuralDrawTool.slabOpening && openingStartCornerPos != null) {
+      final rect = Rect.fromPoints(openingStartCornerPos!, effectiveTip);
+      final opFill = Paint()
+        ..color = const Color(0x33FF9800)
+        ..style = PaintingStyle.fill;
+      final opBorder = Paint()
+        ..color = const Color(0xFFFF9800)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+      canvas.drawRect(rect, opFill);
+      canvas.drawRect(rect, opBorder);
+      // Architectural X cross
+      canvas.drawLine(rect.topLeft, rect.bottomRight, opBorder);
+      canvas.drawLine(rect.topRight, rect.bottomLeft, opBorder);
+    }
+
+    // 5. Dimension badge snapped to 10 cm (when drawing wall or beam)
+    if (liveDimensionText != null) {
+      final startPos = wallStartPos ?? beamStartPos;
+      if (startPos != null) {
+        _drawDimensionBadge(canvas, startPos, effectiveTip, liveDimensionText!);
+      }
     }
   }
 
@@ -231,7 +261,9 @@ class StructuralPointerPainter extends CustomPainter {
         oldDelegate.activeTool != activeTool ||
         oldDelegate.previewColumn != previewColumn ||
         oldDelegate.wallStartPos != wallStartPos ||
+        oldDelegate.beamStartPos != beamStartPos ||
         oldDelegate.slabStartCornerPos != slabStartCornerPos ||
+        oldDelegate.openingStartCornerPos != openingStartCornerPos ||
         oldDelegate.slabPoints != slabPoints ||
         oldDelegate.liveDimensionText != liveDimensionText;
   }

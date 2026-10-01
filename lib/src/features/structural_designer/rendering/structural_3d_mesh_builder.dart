@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/cantilever_analysis_models.dart';
 import '../models/structural_element.dart';
+import '../models/vertical_capacity_models.dart';
 
 /// Builds a real-time hardware-accelerated 3D polygon mesh from the 2D BIM storeys,
 /// columns, shear walls, and slabs.
@@ -12,6 +13,7 @@ class Structural3dMeshBuilder {
   static Mesh3D buildProjectMesh(
     StructuralProject project, {
     List<CantileverZone> cantileverZones = const [],
+    VerticalCapacityReport? verticalReport,
     int? highlightStoreyIndex,
     double cadUnitsPerMeter = 1.0,
   }) {
@@ -27,18 +29,44 @@ class Structural3dMeshBuilder {
       final double zTop = (storey.elevation + storey.height) * cadUnitsPerMeter;
       final List<Triangle3D> storeyTriangles = [];
 
-      // 1. Extrude Columns
+      // 1. Extrude Columns (with EC2 vertical capacity color tinting)
       for (final col in storey.columns) {
+        final vCheck = verticalReport?.getCheckForColumn(col.id);
+        final Color topColor;
+        final Color sideColor;
+
+        if (vCheck != null && vCheck.status == VerticalCapacityStatus.critical) {
+          // Red glowing alert for overloaded columns
+          topColor = isCurrentStorey
+              ? const Color(0xFFFF1744)
+              : const Color(0x99FF1744);
+          sideColor = isCurrentStorey
+              ? const Color(0xFFD50000)
+              : const Color(0x99D50000);
+        } else if (vCheck != null && vCheck.status == VerticalCapacityStatus.warning) {
+          // Amber/Orange alert for near-capacity columns
+          topColor = isCurrentStorey
+              ? const Color(0xFFFFD54F)
+              : const Color(0x99FFD54F);
+          sideColor = isCurrentStorey
+              ? const Color(0xFFFF8F00)
+              : const Color(0x99FF8F00);
+        } else {
+          // Standard blue BIM column styling
+          topColor = isCurrentStorey
+              ? const Color(0xFF1E88E5)
+              : const Color(0x661E88E5);
+          sideColor = isCurrentStorey
+              ? const Color(0xFF1565C0)
+              : const Color(0x661565C0);
+        }
+
         final colTris = _extrudePolygon(
           col.polygonVertices,
           zBase,
           zTop,
-          topColor: isCurrentStorey
-              ? const Color(0xFF1E88E5)
-              : const Color(0x661E88E5),
-          sideColor: isCurrentStorey
-              ? const Color(0xFF1565C0)
-              : const Color(0x661565C0),
+          topColor: topColor,
+          sideColor: sideColor,
         );
         storeyTriangles.addAll(colTris);
       }
@@ -59,6 +87,24 @@ class Structural3dMeshBuilder {
         storeyTriangles.addAll(wallTris);
       }
 
+      // 2b. Extrude Beams (reinforced concrete beams underneath the slab)
+      for (final beam in storey.beams) {
+        final double beamZTop = zBase;
+        final double beamZBottom = zBase - beam.depth * cadUnitsPerMeter;
+        final beamTris = _extrudePolygon(
+          beam.polygonVertices,
+          beamZBottom,
+          beamZTop,
+          topColor: isCurrentStorey
+              ? const Color(0xFFFB8C00)
+              : const Color(0x66FB8C00),
+          sideColor: isCurrentStorey
+              ? const Color(0xFFE65100)
+              : const Color(0x66E65100),
+        );
+        storeyTriangles.addAll(beamTris);
+      }
+
       // 3. Extrude Slabs (plate with slab thickness)
       for (final slab in storey.slabs) {
         final double slabZTop = zBase;
@@ -76,6 +122,21 @@ class Structural3dMeshBuilder {
               : const Color(0x6690A4AE),
         );
         storeyTriangles.addAll(slabTris);
+
+        // Extrude vertical void walls for slab openings (shafts, stairwells)
+        for (final op in slab.openings) {
+          if (op.length >= 3) {
+            final opSides = _extrudeSidesOnly(
+              op,
+              slabZBottom,
+              slabZTop,
+              sideColor: isCurrentStorey
+                  ? const Color(0xFF78909C)
+                  : const Color(0x6678909C),
+            );
+            storeyTriangles.addAll(opSides);
+          }
+        }
       }
 
       triangles.addAll(storeyTriangles);
@@ -179,6 +240,44 @@ class Structural3dMeshBuilder {
       }
     }
 
+    return tris;
+  }
+
+  /// Extrudes only the vertical side perimeter faces of a polygon in 3D (for slab openings).
+  static List<Triangle3D> _extrudeSidesOnly(
+    List<Offset> poly,
+    double zMin,
+    double zMax, {
+    required Color sideColor,
+  }) {
+    final List<Triangle3D> tris = [];
+    final int n = poly.length;
+    if (n < 3) return tris;
+
+    for (int i = 0; i < n; i++) {
+      final p1 = poly[i];
+      final p2 = poly[(i + 1) % n];
+
+      final v0 = Vector3(p1.dx, p1.dy, zMin);
+      final v1 = Vector3(p2.dx, p2.dy, zMin);
+      final v2 = Vector3(p2.dx, p2.dy, zMax);
+      final v3 = Vector3(p1.dx, p1.dy, zMax);
+
+      tris.add(Triangle3D(
+        v0: v0,
+        v1: v1,
+        v2: v2,
+        color: sideColor,
+        isDoubleSided: true,
+      ));
+      tris.add(Triangle3D(
+        v0: v0,
+        v1: v2,
+        v2: v3,
+        color: sideColor,
+        isDoubleSided: true,
+      ));
+    }
     return tris;
   }
 }

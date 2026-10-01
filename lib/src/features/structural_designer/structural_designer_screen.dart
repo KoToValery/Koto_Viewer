@@ -10,14 +10,17 @@ import '../dxf_viewer/rendering/dxf_painter.dart';
 import '../dxf_viewer/rendering/dxf_snap_helper.dart';
 import 'analysis/cantilever_detector.dart';
 import 'analysis/structural_underlay_filter.dart';
+import 'analysis/vertical_capacity_calculator.dart';
 import 'models/cantilever_analysis_models.dart';
 import 'models/structural_element.dart';
+import 'models/vertical_capacity_models.dart';
 import 'rendering/structural_2d_painter.dart';
 import 'rendering/structural_pointer_painter.dart';
 import 'widgets/cantilever_analysis_sheet.dart';
 import 'widgets/element_palette_bar.dart';
 import 'widgets/storey_manager_sheet.dart';
 import 'widgets/structural_3d_viewport.dart';
+import 'widgets/vertical_capacity_sheet.dart';
 
 /// Main CAD/BIM Structural Designer workspace screen.
 /// Enables placing columns, shear walls, and slabs over DWG/DXF underlay,
@@ -63,7 +66,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   // In-progress drawing states
   Offset? _wallStartCad;
+  Offset? _beamStartCad;
+  double _currentBeamWidth = 0.25;
+  double _currentBeamDepth = 0.50;
   Offset? _slabStartCornerCad;
+  Offset? _openingStartCad;
+  String _selectedOpeningPreset = 'shaft';
   final List<Offset> _slabPointsCad = [];
 
   // Midpoint edge extrusion states (Cantilever / еркер drag)
@@ -83,9 +91,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   bool _isPlacingWithHold = false;
   bool _initializedStoreyName = false;
 
-  // Selection and move states (Column & Shear Wall edit/drag)
+  // Selection and move states (Column, Shear Wall, Beam, Opening)
   StructuralColumn? _selectedColumn;
   StructuralShearWall? _selectedShearWall;
+  StructuralBeam? _selectedBeam;
+  (String, int)? _selectedOpening;
+  StructuralGridAxis? _selectedGridAxis;
+  String _currentAxisName = '1';
+  Offset? _firstWallEdgeStartCad;
+  Offset? _firstWallEdgeEndCad;
+  bool _isDraggingAxisHandle = false;
+  bool _draggingAxisStart = false;
   bool _isMovingColumn = false;
   bool _hasMovedSelectedColumn = false;
 
@@ -97,6 +113,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   int? _draggingSlabVertexIndex;
   Offset? _draggingSlabVertexCad;
   int? _mergeCandidateSlabVertexIndex;
+  int? _selectedSlabVertexIndex;
   Offset? _midpointTouchDownPos;
 
   // History for Undo
@@ -116,6 +133,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   // Analysis result
   StructuralAnalysisSummary _analysisSummary = StructuralAnalysisSummary.empty;
+  VerticalCapacityReport _verticalCapacityReport = VerticalCapacityReport.empty;
 
   @override
   void initState() {
@@ -217,6 +235,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _runAnalysis() {
     _analysisSummary = CantileverDetector.analyzeProject(
+      _project,
+      cadUnitsPerMeter: _cadUnitsPerMeter,
+    );
+    _verticalCapacityReport = VerticalCapacityCalculator.analyzeProject(
       _project,
       cadUnitsPerMeter: _cadUnitsPerMeter,
     );
@@ -345,6 +367,84 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (rect.contains(screenPos)) {
         return wall;
       }
+    }
+    return null;
+  }
+
+  StructuralBeam? _hitTestBeam(Offset screenPos) {
+    const double hitMarginScreen = 24.0;
+    for (final beam in _project.activeStorey.beams.reversed) {
+      final pts = beam.polygonVertices.map(_cadToScreen).toList();
+      if (pts.isEmpty) continue;
+      double minX = pts.first.dx, maxX = pts.first.dx;
+      double minY = pts.first.dy, maxY = pts.first.dy;
+      for (final p in pts) {
+        minX = math.min(minX, p.dx);
+        maxX = math.max(maxX, p.dx);
+        minY = math.min(minY, p.dy);
+        maxY = math.max(maxY, p.dy);
+      }
+      final rect = Rect.fromLTRB(minX, minY, maxX, maxY).inflate(hitMarginScreen);
+      if (rect.contains(screenPos)) {
+        return beam;
+      }
+    }
+    return null;
+  }
+
+  (String, int)? _hitTestOpening(Offset screenPos) {
+    const double hitMarginScreen = 20.0;
+    for (final slab in _project.activeStorey.slabs.reversed) {
+      for (int i = 0; i < slab.openings.length; i++) {
+        final op = slab.openings[i];
+        if (op.length < 3) continue;
+        final pts = op.map(_cadToScreen).toList();
+        double minX = pts.first.dx, maxX = pts.first.dx;
+        double minY = pts.first.dy, maxY = pts.first.dy;
+        for (final p in pts) {
+          minX = math.min(minX, p.dx);
+          maxX = math.max(maxX, p.dx);
+          minY = math.min(minY, p.dy);
+          maxY = math.max(maxY, p.dy);
+        }
+        final rect = Rect.fromLTRB(minX, minY, maxX, maxY).inflate(hitMarginScreen);
+        if (rect.contains(screenPos)) {
+          return (slab.id, i);
+        }
+      }
+    }
+    return null;
+  }
+
+  StructuralGridAxis? _hitTestGridAxis(Offset screenPos) {
+    const double hitMarginScreen = 24.0;
+    for (final axis in _project.activeStorey.gridAxes.reversed) {
+      final p1 = _cadToScreen(axis.start);
+      final p2 = _cadToScreen(axis.end);
+      final closest = DxfSnapHelper.closestPointOnSegment(screenPos, p1, p2);
+      if ((screenPos - closest).distance <= hitMarginScreen) {
+        return axis;
+      }
+      if (axis.bubbleAtEnd && (screenPos - p2).distance <= hitMarginScreen * 1.5) {
+        return axis;
+      }
+      if (axis.bubbleAtStart && (screenPos - p1).distance <= hitMarginScreen * 1.5) {
+        return axis;
+      }
+    }
+    return null;
+  }
+
+  (StructuralGridAxis, bool)? _hitTestGridAxisHandle(Offset screenPos) {
+    if (_selectedGridAxis == null) return null;
+    const double hitMarginScreen = 28.0;
+    final p1 = _cadToScreen(_selectedGridAxis!.start);
+    final p2 = _cadToScreen(_selectedGridAxis!.end);
+    if ((screenPos - p1).distance <= hitMarginScreen) {
+      return (_selectedGridAxis!, true); // start handle
+    }
+    if ((screenPos - p2).distance <= hitMarginScreen) {
+      return (_selectedGridAxis!, false); // end handle
     }
     return null;
   }
@@ -576,6 +676,256 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
   }
 
+  void _deleteSelectedBeam() {
+    if (_selectedBeam == null) return;
+    _pushUndo();
+    final active = _project.activeStorey;
+    final updatedBeams =
+        active.beams.where((b) => b.id != _selectedBeam!.id).toList();
+    _updateActiveStorey(active.copyWith(beams: updatedBeams));
+    setState(() {
+      _selectedBeam = null;
+    });
+    HapticFeedback.heavyImpact();
+  }
+
+  void _duplicateSelectedBeam() {
+    if (_selectedBeam == null) return;
+    _pushUndo();
+    final beam = _selectedBeam!;
+    final active = _project.activeStorey;
+    final offset = Offset(0.25 * _cadUnitsPerMeter, -0.25 * _cadUnitsPerMeter);
+    final dup = StructuralBeam(
+      id: 'beam_${DateTime.now().millisecondsSinceEpoch}',
+      start: beam.start + offset,
+      end: beam.end + offset,
+      width: beam.width,
+      depth: beam.depth,
+      isSecondary: beam.isSecondary,
+    );
+    final updatedBeams = List<StructuralBeam>.from(active.beams)..add(dup);
+    _updateActiveStorey(active.copyWith(beams: updatedBeams));
+    setState(() {
+      _selectedBeam = dup;
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  void _updateSelectedBeamLength(double deltaMeters) {
+    if (_selectedBeam == null) return;
+    _pushUndo();
+    final beam = _selectedBeam!;
+    final active = _project.activeStorey;
+    final l = beam.length;
+    final newL = math.max(0.30 * _cadUnitsPerMeter, l + deltaMeters * _cadUnitsPerMeter);
+    final dir = (beam.end - beam.start) / (l > 1e-6 ? l : 1.0);
+    final newEnd = beam.start + dir * newL;
+    final updatedBeam = beam.copyWith(end: newEnd);
+    final updatedBeams = active.beams
+        .map((b) => b.id == updatedBeam.id ? updatedBeam : b)
+        .toList();
+    _updateActiveStorey(active.copyWith(beams: updatedBeams));
+    setState(() {
+      _selectedBeam = updatedBeam;
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _updateSelectedBeamDimensions(double wMeters, double dMeters) {
+    if (_selectedBeam == null) return;
+    _pushUndo();
+    final beam = _selectedBeam!;
+    final active = _project.activeStorey;
+    final updatedBeam = beam.copyWith(
+      width: wMeters * _cadUnitsPerMeter,
+      depth: dMeters * _cadUnitsPerMeter,
+    );
+    final updatedBeams = active.beams
+        .map((b) => b.id == updatedBeam.id ? updatedBeam : b)
+        .toList();
+    _updateActiveStorey(active.copyWith(beams: updatedBeams));
+    setState(() {
+      _selectedBeam = updatedBeam;
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _deleteSelectedOpening() {
+    if (_selectedOpening == null) return;
+    _pushUndo();
+    final (slabId, opIdx) = _selectedOpening!;
+    final active = _project.activeStorey;
+    final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+    if (slabIdx != -1) {
+      final updatedSlab = active.slabs[slabIdx].removeOpening(opIdx);
+      final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+      updatedSlabs[slabIdx] = updatedSlab;
+      _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+      if (_isEditingSlab && _editingSlab!.id == slabId) {
+        _editingSlab = updatedSlab;
+      }
+      setState(() {
+        _selectedOpening = null;
+      });
+      HapticFeedback.heavyImpact();
+    }
+  }
+
+  void _deleteSelectedGridAxis() {
+    if (_selectedGridAxis == null) return;
+    _pushUndo();
+    final active = _project.activeStorey;
+    final updated = active.gridAxes.where((a) => a.id != _selectedGridAxis!.id).toList();
+    _updateActiveStorey(active.copyWith(gridAxes: updated));
+    setState(() => _selectedGridAxis = null);
+    HapticFeedback.heavyImpact();
+  }
+
+  void _renameSelectedGridAxis() {
+    if (_selectedGridAxis == null) return;
+    final nextName = _getNextAxisName(_selectedGridAxis!.name);
+    _pushUndo();
+    final updated = _selectedGridAxis!.copyWith(name: nextName);
+    final active = _project.activeStorey;
+    final axes = active.gridAxes.map((a) => a.id == updated.id ? updated : a).toList();
+    _updateActiveStorey(active.copyWith(gridAxes: axes));
+    setState(() => _selectedGridAxis = updated);
+    HapticFeedback.selectionClick();
+  }
+
+  void _updateSelectedAxisLength(double deltaMeters) {
+    if (_selectedGridAxis == null) return;
+    _pushUndo();
+    final axis = _selectedGridAxis!;
+    final l = axis.length;
+    final scale = _cadUnitsPerMeter;
+    final newL = math.max(0.50 * scale, l + deltaMeters * scale);
+    final dir = axis.direction;
+    final newEnd = axis.start + dir * newL;
+    final updated = axis.copyWith(end: newEnd);
+    final active = _project.activeStorey;
+    final axes = active.gridAxes.map((a) => a.id == updated.id ? updated : a).toList();
+    _updateActiveStorey(active.copyWith(gridAxes: axes));
+    setState(() => _selectedGridAxis = updated);
+    HapticFeedback.selectionClick();
+  }
+
+  String _getNextAxisName(String current) {
+    final num = int.tryParse(current);
+    if (num != null) {
+      return (num + 1).toString();
+    }
+    const cyrillic = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т'];
+    final idxC = cyrillic.indexOf(current.toUpperCase());
+    if (idxC != -1 && idxC + 1 < cyrillic.length) {
+      return cyrillic[idxC + 1];
+    }
+    const latin = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T'];
+    final idxL = latin.indexOf(current.toUpperCase());
+    if (idxL != -1 && idxL + 1 < latin.length) {
+      return latin[idxL + 1];
+    }
+    return '${current}_1';
+  }
+
+  (Offset, Offset)? _findClosestSegmentInCad(Offset cadPt, double toleranceCad) {
+    double minDistance = toleranceCad;
+    (Offset, Offset)? bestSeg;
+
+    void checkSegment(Offset p1, Offset p2) {
+      final closest = DxfSnapHelper.closestPointOnSegment(cadPt, p1, p2);
+      final d = (cadPt - closest).distance;
+      if (d < minDistance) {
+        minDistance = d;
+        bestSeg = (p1, p2);
+      }
+    }
+
+    for (final w in _project.activeStorey.shearWalls) {
+      final poly = w.polygonVertices;
+      if (poly.length >= 4) {
+        checkSegment(poly[0], poly[1]);
+        checkSegment(poly[3], poly[2]);
+      }
+    }
+
+    final entities = widget.document.layoutEntities['Model'] ?? widget.document.entities;
+    for (final entity in entities) {
+      final layer = widget.document.layers[entity.layer];
+      if (layer != null && !layer.isVisible) continue;
+      if (entity is DxfLine) {
+        checkSegment(entity.p1, entity.p2);
+      } else if (entity is DxfLwPolyline) {
+        final v = entity.vertices;
+        for (int i = 0; i < v.length; i++) {
+          if (i + 1 < v.length || entity.isClosed) {
+            checkSegment(v[i].offset, v[(i + 1) % v.length].offset);
+          }
+        }
+      } else if (entity is DxfPolyline) {
+        final v = entity.vertices;
+        for (int i = 0; i < v.length; i++) {
+          if (i + 1 < v.length || entity.isClosed) {
+            checkSegment(v[i].offset, v[(i + 1) % v.length].offset);
+          }
+        }
+      } else if (entity is DxfInsert) {
+        final block = widget.document.blocks[entity.blockName];
+        if (block != null && block.entities.isNotEmpty) {
+          final rad = entity.rotationDeg * math.pi / 180.0;
+          final cosA = math.cos(rad);
+          final sinA = math.sin(rad);
+          final bx = block.basePoint.dx;
+          final by = block.basePoint.dy;
+
+          Offset transformPt(Offset pt) {
+            final lx = (pt.dx - bx) * entity.scaleX;
+            final ly = (pt.dy - by) * entity.scaleY;
+            final rx = lx * cosA - ly * sinA;
+            final ry = lx * sinA + ly * cosA;
+            return Offset(entity.insertPoint.dx + rx, entity.insertPoint.dy + ry);
+          }
+
+          for (final child in block.entities) {
+            final childLayer = widget.document.layers[child.layer];
+            if (childLayer != null && !childLayer.isVisible) continue;
+            if (child is DxfLine) {
+              checkSegment(transformPt(child.p1), transformPt(child.p2));
+            } else if (child is DxfLwPolyline) {
+              final v = child.vertices;
+              for (int i = 0; i < v.length; i++) {
+                if (i + 1 < v.length || child.isClosed) {
+                  checkSegment(transformPt(v[i].offset), transformPt(v[(i + 1) % v.length].offset));
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return bestSeg;
+  }
+
+  void _deleteSelectedSlabVertex() {
+    if (_editingSlab == null) return;
+    final vIdx = _selectedSlabVertexIndex;
+    if (vIdx == null || vIdx >= _editingSlab!.polygon.length) return;
+    if (_editingSlab!.polygon.length <= 3) {
+      HapticFeedback.vibrate();
+      return;
+    }
+    _pushSlabCorrectionUndo();
+    final updated = _editingSlab!.removeVertex(vIdx);
+    if (updated != null) {
+      final cleaned = _cleanSlabPolygon(updated);
+      _editingSlab = cleaned;
+      _updateActiveStoreySlab(cleaned);
+      _selectedSlabVertexIndex = null;
+      HapticFeedback.heavyImpact();
+    }
+  }
+
   void _mirrorEditingSlab() {
     if (_editingSlab == null) return;
     _pushSlabCorrectionUndo();
@@ -704,47 +1054,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   StructuralSlab _cleanSlabPolygon(StructuralSlab slab) {
     if (slab.polygon.length <= 3) return slab;
-    final List<Offset> pts = List.from(slab.polygon);
     final minDistanceCad = 0.05 * _cadUnitsPerMeter;
-
-    // 1. Remove duplicate adjacent points
-    bool changed = true;
-    while (changed && pts.length > 3) {
-      changed = false;
-      for (int i = 0; i < pts.length; i++) {
-        final next = (i + 1) % pts.length;
-        if ((pts[i] - pts[next]).distance < minDistanceCad) {
-          pts.removeAt(next);
-          changed = true;
-          break;
-        }
-      }
-    }
-
-    // 2. Remove collinear points
-    changed = true;
-    while (changed && pts.length > 3) {
-      changed = false;
-      for (int i = 0; i < pts.length; i++) {
-        final prev = (i - 1 + pts.length) % pts.length;
-        final next = (i + 1) % pts.length;
-        final v1 = pts[i] - pts[prev];
-        final v2 = pts[next] - pts[i];
-        final l1 = v1.distance;
-        final l2 = v2.distance;
-        if (l1 > 1e-4 && l2 > 1e-4) {
-          final cross = (v1.dx * v2.dy - v1.dy * v2.dx) / (l1 * l2);
-          final dot = (v1.dx * v2.dx + v1.dy * v2.dy) / (l1 * l2);
-          if (cross.abs() < 0.015 && dot > 0.99) {
-            pts.removeAt(i);
-            changed = true;
-            break;
-          }
-        }
-      }
-    }
-
-    return slab.copyWith(polygon: pts);
+    final cleaned = StructuralSlab.cleanPolygon(slab.polygon, minDistance: minDistanceCad);
+    return slab.copyWith(polygon: cleaned);
   }
 
   void _updateSlabVertexDrag(Offset screenPos) {
@@ -764,28 +1076,37 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       );
       snap ??= _findStructuralSnap(rawCad, toleranceCad);
     }
-    final effectiveCad = snap?.point ?? rawCad;
+    Offset effectiveCad = snap?.point ?? rawCad;
 
-    // Check snap-to-merge with adjacent vertices
+    // Check snap-to-merge with ANY other vertex in the slab polygon
     final polygon = _editingSlab!.polygon;
     final count = polygon.length;
     final idx = _draggingSlabVertexIndex!;
-    final prevIdx = (idx - 1 + count) % count;
-    final nextIdx = (idx + 1) % count;
-
-    final sPrev = _cadToScreen(polygon[prevIdx]);
-    final sNext = _cadToScreen(polygon[nextIdx]);
     const double mergeSnapRadiusScreen = 28.0;
 
     int? candidate;
-    if ((screenPos - sPrev).distance <= mergeSnapRadiusScreen) {
-      candidate = prevIdx;
-    } else if ((screenPos - sNext).distance <= mergeSnapRadiusScreen) {
-      candidate = nextIdx;
+    for (int j = 0; j < count; j++) {
+      if (j == idx) continue;
+      final sPt = _cadToScreen(polygon[j]);
+      if ((screenPos - sPt).distance <= mergeSnapRadiusScreen) {
+        candidate = j;
+        effectiveCad = polygon[j];
+        break;
+      }
     }
 
     if (candidate != _mergeCandidateSlabVertexIndex) {
       HapticFeedback.selectionClick();
+    }
+
+    // Check for self-intersections (X-crossing)
+    if (candidate == null) {
+      final testPts = List<Offset>.from(polygon);
+      testPts[idx] = effectiveCad;
+      if (StructuralSlab.hasSelfIntersections(testPts)) {
+        // Prevent forming bowtie / X-crossing geometry
+        return;
+      }
     }
 
     setState(() {
@@ -887,6 +1208,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
+    // Grid Axis handle dragging check
+    if (_selectedGridAxis != null) {
+      final handle = _hitTestGridAxisHandle(event.localPosition);
+      if (handle != null) {
+        setState(() {
+          _isDraggingAxisHandle = true;
+          _draggingAxisStart = handle.$2;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      }
+    }
+
     // 3. Selection mode taps on column or slab
     if (!_isEditingSlab && _activeTool == StructuralDrawTool.select) {
       final hitCol = _hitTestColumn(event.localPosition);
@@ -953,6 +1287,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
 
+    // Dragging grid axis handle (extend/shorten along axis line)
+    if (_isDraggingAxisHandle && _selectedGridAxis != null) {
+      final cadPt = _screenToCad(event.localPosition);
+      final proj = _selectedGridAxis!.projectPoint(cadPt);
+      final updatedAxis = _draggingAxisStart
+          ? _selectedGridAxis!.copyWith(start: proj)
+          : _selectedGridAxis!.copyWith(end: proj);
+      final active = _project.activeStorey;
+      final axes = active.gridAxes
+          .map((a) => a.id == updatedAxis.id ? updatedAxis : a)
+          .toList();
+      _updateActiveStorey(active.copyWith(gridAxes: axes));
+      setState(() {
+        _selectedGridAxis = updatedAxis;
+      });
+      return;
+    }
+
     // A. Dragging slab vertex
     if (_draggingSlabVertexIndex != null) {
       _updateSlabVertexDrag(event.localPosition);
@@ -979,7 +1331,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _updatePointer(event.localPosition, isMouse: true);
       final effectiveCad = _activeSnap?.point ?? _currentCadCoord;
       if (effectiveCad != null) {
-        final dist = (effectiveCad - _selectedColumn!.topLeft).distance;
+        final dist = (effectiveCad - _selectedColumn!.center).distance;
         if (dist > 0.05 * _cadUnitsPerMeter) {
           _hasMovedSelectedColumn = true;
         }
@@ -1087,39 +1439,43 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         );
 
         final cornerOffsets = tempCol.polygonVertices;
-        final midOffsets = <Offset>[];
-        for (int i = 0; i < cornerOffsets.length; i++) {
-          final next = cornerOffsets[(i + 1) % cornerOffsets.length];
-          midOffsets.add((cornerOffsets[i] + next) / 2.0);
-        }
 
         // 1. Gather candidate column centers:
         final candidateCenters = <Offset>{rawCad};
+
+        // A. Corner snapping (Corners only! User request: "Колоните да имат снап само в ъглите")
         for (final cornerOffset in cornerOffsets) {
           final p = rawCad + cornerOffset;
-          final s = DxfSnapHelper.findSnapPoint(
-            document: widget.document,
-            cadPoint: p,
-            toleranceCad: toleranceCad,
-          ) ?? _findStructuralSnap(p, toleranceCad);
+          final s = _findStructuralSnap(p, toleranceCad, cornersOnly: true) ??
+              DxfSnapHelper.findSnapPoint(
+                document: widget.document,
+                cadPoint: p,
+                toleranceCad: toleranceCad,
+                allowNearest: false,
+              );
           if (s != null) {
             candidateCenters.add(s.point - cornerOffset);
           }
         }
-        for (final midOffset in midOffsets) {
-          final p = rawCad + midOffset;
-          final s = DxfSnapHelper.findSnapPoint(
-            document: widget.document,
-            cadPoint: p,
-            toleranceCad: toleranceCad * 0.7,
-          ) ?? _findStructuralSnap(p, toleranceCad * 0.7);
-          if (s != null) {
-            candidateCenters.add(s.point - midOffset);
+
+        // B. Center snapping to Grid Axes ONLY (User request: "Колоните ще хващат среден снап само към елемент ОС")
+        final gridAxesList = _project.activeStorey.gridAxes;
+        for (final axis in gridAxesList) {
+          final proj = axis.projectPoint(rawCad);
+          if ((rawCad - proj).distance <= toleranceCad) {
+            candidateCenters.add(proj);
+          }
+        }
+        for (int i = 0; i < gridAxesList.length; i++) {
+          for (int j = i + 1; j < gridAxesList.length; j++) {
+            final inter = gridAxesList[i].intersectionWith(gridAxesList[j]);
+            if (inter != null && (rawCad - inter).distance <= toleranceCad * 1.5) {
+              candidateCenters.add(inter);
+            }
           }
         }
 
         // 2. Score candidate centers with weighted snap priorities:
-        // Endpoints have highest weight (+120), multi-endpoint corner locks (+1000 per endpoint)
         double bestScore = -1.0;
         Offset bestCenter = rawCad;
         List<Offset> bestSnappedScreenPts = [];
@@ -1133,11 +1489,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
           for (final cornerOffset in cornerOffsets) {
             final pt = candCenter + cornerOffset;
-            final match = DxfSnapHelper.findSnapPoint(
-              document: widget.document,
-              cadPoint: pt,
-              toleranceCad: toleranceCad * 0.8,
-            ) ?? _findStructuralSnap(pt, toleranceCad * 0.8);
+            final match = _findStructuralSnap(pt, toleranceCad * 0.8, cornersOnly: true) ??
+                DxfSnapHelper.findSnapPoint(
+                  document: widget.document,
+                  cadPoint: pt,
+                  toleranceCad: toleranceCad * 0.8,
+                  allowNearest: false,
+                );
 
             if (match != null) {
               if (match.type == DxfSnapType.endpoint) {
@@ -1156,18 +1514,26 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             candScore += 1000.0 * endpointMatches;
           }
 
-          for (final midOffset in midOffsets) {
-            final pt = candCenter + midOffset;
-            final match = DxfSnapHelper.findSnapPoint(
-              document: widget.document,
-              cadPoint: pt,
-              toleranceCad: toleranceCad * 0.5,
-            ) ?? _findStructuralSnap(pt, toleranceCad * 0.5);
-
-            if (match != null) {
-              candScore += 25.0;
-              candScreens.add(_cadToScreen(match.point));
-              candSnaps.add(match);
+          // Bonus for center aligning with Grid Axis
+          for (final axis in gridAxesList) {
+            final distToAxis = (candCenter - axis.projectPoint(candCenter)).distance;
+            if (distToAxis < 1e-3) {
+              candScore += 400.0;
+              candScreens.add(_cadToScreen(candCenter));
+              candSnaps.add(DxfSnapResult(point: candCenter, type: DxfSnapType.center, distance: 0));
+              break;
+            }
+          }
+          // Bonus for center locking on Grid Axis intersection
+          for (int i = 0; i < gridAxesList.length; i++) {
+            for (int j = i + 1; j < gridAxesList.length; j++) {
+              final inter = gridAxesList[i].intersectionWith(gridAxesList[j]);
+              if (inter != null && (candCenter - inter).distance < 1e-3) {
+                candScore += 1500.0;
+                candScreens.add(_cadToScreen(inter));
+                candSnaps.add(DxfSnapResult(point: inter, type: DxfSnapType.endpoint, distance: 0));
+                break;
+              }
             }
           }
 
@@ -1187,20 +1553,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           snap = bestActiveSnaps.isNotEmpty ? bestActiveSnaps.first : null;
           snappedScreen = bestSnappedScreenPts.isNotEmpty ? bestSnappedScreenPts.first : null;
           _snappedScreenPositions = bestSnappedScreenPts;
-          effectiveCad = Offset(bestCenter.dx - colW / 2.0, bestCenter.dy + colH / 2.0);
+          effectiveCad = bestCenter;
         } else {
           _snappedScreenPositions = [];
-          effectiveCad = Offset(rawCad.dx - colW / 2.0, rawCad.dy + colH / 2.0);
+          effectiveCad = rawCad;
         }
         _liveDimensionText = null;
-      } else if (_activeTool == StructuralDrawTool.shearWall) {
-        // Shear wall drawing with 10 cm snapping and live dimensioning
-        if (_wallStartCad == null) {
-          snap = DxfSnapHelper.findSnapPoint(
-            document: widget.document,
-            cadPoint: rawCad,
-            toleranceCad: toleranceCad,
-          ) ?? _findStructuralSnap(rawCad, toleranceCad);
+      } else if (_activeTool == StructuralDrawTool.shearWall || _activeTool == StructuralDrawTool.beam) {
+        // Shear wall or Beam drawing with 10 cm snapping and live dimensioning
+        final startCad = _activeTool == StructuralDrawTool.shearWall ? _wallStartCad : _beamStartCad;
+        if (startCad == null) {
+          snap = _findStructuralSnap(rawCad, toleranceCad) ??
+              DxfSnapHelper.findSnapPoint(
+                document: widget.document,
+                cadPoint: rawCad,
+                toleranceCad: toleranceCad,
+                allowNearest: false,
+              );
 
           if (snap != null) {
             effectiveCad = snap.point;
@@ -1211,11 +1580,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           }
           _liveDimensionText = null;
         } else {
-          snap = DxfSnapHelper.findSnapPoint(
-            document: widget.document,
-            cadPoint: rawCad,
-            toleranceCad: toleranceCad,
-          ) ?? _findStructuralSnap(rawCad, toleranceCad);
+          snap = _findStructuralSnap(rawCad, toleranceCad) ??
+              DxfSnapHelper.findSnapPoint(
+                document: widget.document,
+                cadPoint: rawCad,
+                toleranceCad: toleranceCad,
+                allowNearest: false,
+              );
 
           if (snap != null) {
             effectiveCad = snap.point;
@@ -1223,30 +1594,48 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             _snappedScreenPositions = [snappedScreen];
           } else {
             // Free length snapped to 10 cm increments (0.10 m)
-            final v = rawCad - _wallStartCad!;
+            final v = rawCad - startCad;
             final distCad = v.distance;
             final distM = distCad / _cadUnitsPerMeter;
             final snappedM = math.max(0.10, (distM / 0.10).round() * 0.10);
             final snappedDistCad = snappedM * _cadUnitsPerMeter;
             if (distCad > 1e-6) {
               final unitDir = v / distCad;
-              effectiveCad = _wallStartCad! + unitDir * snappedDistCad;
+              effectiveCad = startCad + unitDir * snappedDistCad;
             } else {
               effectiveCad = rawCad;
             }
             snappedScreen = _cadToScreen(effectiveCad);
             _snappedScreenPositions = [];
           }
-          final wallLenM = (effectiveCad - _wallStartCad!).distance / _cadUnitsPerMeter;
-          _liveDimensionText = '${wallLenM.toStringAsFixed(2)} m';
+          final lenM = (effectiveCad - startCad).distance / _cadUnitsPerMeter;
+          _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
         }
+      } else if (_activeTool == StructuralDrawTool.gridAxis) {
+        snap = _findStructuralSnap(rawCad, toleranceCad) ??
+            DxfSnapHelper.findSnapPoint(
+              document: widget.document,
+              cadPoint: rawCad,
+              toleranceCad: toleranceCad,
+              allowNearest: false,
+            );
+        if (snap != null) {
+          effectiveCad = snap.point;
+          snappedScreen = _cadToScreen(snap.point);
+          _snappedScreenPositions = [snappedScreen];
+        } else {
+          _snappedScreenPositions = [];
+        }
+        _liveDimensionText = null;
       } else {
-        // Single point snap for slabs
-        snap = DxfSnapHelper.findSnapPoint(
-          document: widget.document,
-          cadPoint: rawCad,
-          toleranceCad: toleranceCad,
-        ) ?? _findStructuralSnap(rawCad, toleranceCad);
+        // Single point snap for slabs & openings
+        snap = _findStructuralSnap(rawCad, toleranceCad) ??
+            DxfSnapHelper.findSnapPoint(
+              document: widget.document,
+              cadPoint: rawCad,
+              toleranceCad: toleranceCad,
+              allowNearest: false,
+            );
 
         if (snap != null) {
           effectiveCad = snap.point;
@@ -1266,28 +1655,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     } else {
       _snappedScreenPositions = [];
       if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
-        final double colW = (_isMovingColumn && _selectedColumn != null)
-            ? _selectedColumn!.width
-            : _currentColumnPreset.width * _cadUnitsPerMeter;
-        final double colH = (_isMovingColumn && _selectedColumn != null)
-            ? _selectedColumn!.height
-            : _currentColumnPreset.height * _cadUnitsPerMeter;
-        effectiveCad = Offset(rawCad.dx - colW / 2.0, rawCad.dy + colH / 2.0);
+        effectiveCad = rawCad;
         _liveDimensionText = null;
-      } else if (_activeTool == StructuralDrawTool.shearWall && _wallStartCad != null) {
-        final v = rawCad - _wallStartCad!;
+      } else if ((_activeTool == StructuralDrawTool.shearWall && _wallStartCad != null) ||
+                 (_activeTool == StructuralDrawTool.beam && _beamStartCad != null)) {
+        final startCad = _activeTool == StructuralDrawTool.shearWall ? _wallStartCad! : _beamStartCad!;
+        final v = rawCad - startCad;
         final distCad = v.distance;
         final distM = distCad / _cadUnitsPerMeter;
         final snappedM = math.max(0.10, (distM / 0.10).round() * 0.10);
         final snappedDistCad = snappedM * _cadUnitsPerMeter;
         if (distCad > 1e-6) {
           final unitDir = v / distCad;
-          effectiveCad = _wallStartCad! + unitDir * snappedDistCad;
+          effectiveCad = startCad + unitDir * snappedDistCad;
         } else {
           effectiveCad = rawCad;
         }
-        final wallLenM = (effectiveCad - _wallStartCad!).distance / _cadUnitsPerMeter;
-        _liveDimensionText = '${wallLenM.toStringAsFixed(2)} m';
+        final lenM = (effectiveCad - startCad).distance / _cadUnitsPerMeter;
+        _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
       } else {
         _liveDimensionText = null;
       }
@@ -1302,7 +1687,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     });
   }
 
-  DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad) {
+  DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad, {bool cornersOnly = false}) {
     double minDist = toleranceCad;
     DxfSnapResult? bestSnap;
 
@@ -1312,18 +1697,49 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     ];
 
     for (final s in allStoreysToSnap) {
-      // Column centers and corners
-      for (final col in s.columns) {
-        if (_isMovingColumn && col.id == _selectedColumn?.id) continue;
-        final dCenter = (cadPt - col.center).distance;
-        if (dCenter < minDist) {
-          minDist = dCenter;
+      // 1. Grid Axis Intersections (HIGHEST precedence: 0.00 mm precision!)
+      for (int i = 0; i < s.gridAxes.length; i++) {
+        for (int j = i + 1; j < s.gridAxes.length; j++) {
+          final inter = s.gridAxes[i].intersectionWith(s.gridAxes[j]);
+          if (inter != null) {
+            final d = (cadPt - inter).distance;
+            if (d < minDist) {
+              minDist = d;
+              bestSnap = DxfSnapResult(
+                point: inter,
+                type: DxfSnapType.endpoint,
+                distance: d,
+              );
+            }
+          }
+        }
+      }
+
+      // 2. Grid Axis Endpoints
+      for (final axis in s.gridAxes) {
+        final d1 = (cadPt - axis.start).distance;
+        if (d1 < minDist) {
+          minDist = d1;
           bestSnap = DxfSnapResult(
-            point: col.center,
-            type: DxfSnapType.center,
-            distance: dCenter,
+            point: axis.start,
+            type: DxfSnapType.endpoint,
+            distance: d1,
           );
         }
+        final d2 = (cadPt - axis.end).distance;
+        if (d2 < minDist) {
+          minDist = d2;
+          bestSnap = DxfSnapResult(
+            point: axis.end,
+            type: DxfSnapType.endpoint,
+            distance: d2,
+          );
+        }
+      }
+
+      // 3. Column corners ONLY (User request: "Колоните да имат снап само в ъглите")
+      for (final col in s.columns) {
+        if (_isMovingColumn && col.id == _selectedColumn?.id) continue;
         for (final v in col.polygonVertices) {
           final d = (cadPt - v).distance;
           if (d < minDist) {
@@ -1337,7 +1753,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
       }
 
-      // Wall endpoints and midpoints
+      // 4. Wall endpoints
       for (final w in s.shearWalls) {
         final d1 = (cadPt - w.start).distance;
         if (d1 < minDist) {
@@ -1359,7 +1775,40 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
       }
 
-      // Slab polygon vertices and edge midpoints
+      // 5. Beam endpoints and midpoints
+      for (final b in s.beams) {
+        final d1 = (cadPt - b.start).distance;
+        if (d1 < minDist) {
+          minDist = d1;
+          bestSnap = DxfSnapResult(
+            point: b.start,
+            type: DxfSnapType.endpoint,
+            distance: d1,
+          );
+        }
+        final d2 = (cadPt - b.end).distance;
+        if (d2 < minDist) {
+          minDist = d2;
+          bestSnap = DxfSnapResult(
+            point: b.end,
+            type: DxfSnapType.endpoint,
+            distance: d2,
+          );
+        }
+        if (!cornersOnly) {
+          final dMid = (cadPt - (b.start + b.end) / 2.0).distance;
+          if (dMid < minDist) {
+            minDist = dMid;
+            bestSnap = DxfSnapResult(
+              point: (b.start + b.end) / 2.0,
+              type: DxfSnapType.midpoint,
+              distance: dMid,
+            );
+          }
+        }
+      }
+
+      // 6. Slab polygon vertices and edge midpoints
       for (final slab in s.slabs) {
         for (final v in slab.polygon) {
           final d = (cadPt - v).distance;
@@ -1372,15 +1821,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             );
           }
         }
-        for (final g in slab.edgeGrips) {
-          final d = (cadPt - g.midpoint).distance;
-          if (d < minDist) {
-            minDist = d;
-            bestSnap = DxfSnapResult(
-              point: g.midpoint,
-              type: DxfSnapType.midpoint,
-              distance: d,
-            );
+        if (!cornersOnly) {
+          for (final g in slab.edgeGrips) {
+            final d = (cadPt - g.midpoint).distance;
+            if (d < minDist) {
+              minDist = d;
+              bestSnap = DxfSnapResult(
+                point: g.midpoint,
+                type: DxfSnapType.midpoint,
+                distance: d,
+              );
+            }
           }
         }
       }
@@ -1397,6 +1848,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
+    // 0. Dragging grid axis handle commit on release
+    if (_isDraggingAxisHandle) {
+      _pushUndo();
+      setState(() {
+        _isDraggingAxisHandle = false;
+      });
+      HapticFeedback.lightImpact();
+      return;
+    }
+
     // 1. Slab vertex dragging commit or merge on release
     if (_draggingSlabVertexIndex != null && _editingSlab != null) {
       final idx = _draggingSlabVertexIndex!;
@@ -1405,16 +1866,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _pushSlabCorrectionUndo();
         final updated = _editingSlab!.removeVertex(idx);
         if (updated != null) {
-          _editingSlab = updated;
-          _updateActiveStoreySlab(updated);
+          final cleaned = _cleanSlabPolygon(updated);
+          _editingSlab = cleaned;
+          _updateActiveStoreySlab(cleaned);
           HapticFeedback.heavyImpact();
         }
       } else if (_draggingSlabVertexCad != null) {
-        _pushSlabCorrectionUndo();
-        final updated = _editingSlab!.moveVertex(idx, _draggingSlabVertexCad!);
-        _editingSlab = updated;
-        _updateActiveStoreySlab(updated);
-        HapticFeedback.mediumImpact();
+        final testPts = List<Offset>.from(_editingSlab!.polygon);
+        testPts[idx] = _draggingSlabVertexCad!;
+        if (!StructuralSlab.hasSelfIntersections(testPts)) {
+          _pushSlabCorrectionUndo();
+          final updated = _editingSlab!.moveVertex(idx, _draggingSlabVertexCad!);
+          final cleaned = _cleanSlabPolygon(updated);
+          _editingSlab = cleaned;
+          _updateActiveStoreySlab(cleaned);
+          HapticFeedback.mediumImpact();
+        } else {
+          HapticFeedback.vibrate();
+        }
       }
       setState(() {
         _draggingSlabVertexIndex = null;
@@ -1481,18 +1950,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // 3. Moving column with mouse or touch release
     if (_isMovingColumn && _selectedColumn != null) {
       if (_hasMovedSelectedColumn) {
-        final newTopLeft = _currentCadCoord;
-        if (newTopLeft != null) {
+        final newCenter = _currentCadCoord;
+        if (newCenter != null) {
           _pushUndo();
-          final updatedCol = StructuralColumn.fromTopLeft(
-            id: _selectedColumn!.id,
-            topLeft: newTopLeft,
-            shape: _selectedColumn!.shape,
-            width: _selectedColumn!.width,
-            height: _selectedColumn!.height,
-            rotationRad: _selectedColumn!.rotationRad,
-            thickness: _selectedColumn!.thickness,
-            isMirrored: _selectedColumn!.isMirrored,
+          final updatedCol = _selectedColumn!.copyWith(
+            center: newCenter,
           );
           final active = _project.activeStorey;
           final updatedCols = active.columns
@@ -1537,6 +1999,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _activePointersCount = 0;
     _activePointerKind = null;
     _isMultiTouchGesture = false;
+    _isDraggingAxisHandle = false;
     setState(() {
       _isPlacingWithHold = false;
       _isMovingColumn = false;
@@ -1625,7 +2088,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _updatePointer(details.localPosition, isMouse: false);
       final effectiveCad = _currentCadCoord;
       if (effectiveCad != null) {
-        final dist = (effectiveCad - _selectedColumn!.topLeft).distance;
+        final dist = (effectiveCad - _selectedColumn!.center).distance;
         if (dist > 0.05 * _cadUnitsPerMeter) {
           _hasMovedSelectedColumn = true;
         }
@@ -1641,16 +2104,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isMovingColumn && _selectedColumn != null) {
       if (_hasMovedSelectedColumn) {
-        final newTopLeft = _currentCadCoord;
-        if (newTopLeft != null) {
+        final newCenter = _currentCadCoord;
+        if (newCenter != null) {
           _pushUndo();
-          final updatedCol = StructuralColumn.fromTopLeft(
-            id: _selectedColumn!.id,
-            topLeft: newTopLeft,
-            shape: _selectedColumn!.shape,
-            width: _selectedColumn!.width,
-            height: _selectedColumn!.height,
-            rotationRad: _selectedColumn!.rotationRad,
+          final updatedCol = _selectedColumn!.copyWith(
+            center: newCenter,
           );
           final active = _project.activeStorey;
           final updatedCols = active.columns
@@ -1709,13 +2167,59 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handleTapUp(TapUpDetails details) {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
-    if (_isEditingSlab) return;
+    if (_isEditingSlab) {
+      final hitVIdx = _hitTestSlabVertex(details.localPosition, _editingSlab!);
+      setState(() {
+        _selectedSlabVertexIndex = hitVIdx;
+      });
+      if (hitVIdx != null) {
+        HapticFeedback.selectionClick();
+      }
+      return;
+    }
+
+    if (_activeTool == StructuralDrawTool.gridAxis) {
+      final cadPt = _screenToCad(details.localPosition);
+      _commitPlacement(cadPt);
+      return;
+    }
+
+    final hitOpening = _hitTestOpening(details.localPosition);
+    if (hitOpening != null) {
+      setState(() {
+        _selectedOpening = hitOpening;
+        _selectedBeam = null;
+        _selectedColumn = null;
+        _selectedShearWall = null;
+        _selectedGridAxis = null;
+        _isMovingColumn = false;
+      });
+      HapticFeedback.selectionClick();
+      return;
+    }
+
+    final hitBeam = _hitTestBeam(details.localPosition);
+    if (hitBeam != null) {
+      setState(() {
+        _selectedBeam = hitBeam;
+        _selectedOpening = null;
+        _selectedColumn = null;
+        _selectedShearWall = null;
+        _selectedGridAxis = null;
+        _isMovingColumn = false;
+      });
+      HapticFeedback.selectionClick();
+      return;
+    }
 
     final hitCol = _hitTestColumn(details.localPosition);
     if (hitCol != null) {
       setState(() {
         _selectedColumn = hitCol;
         _selectedShearWall = null;
+        _selectedBeam = null;
+        _selectedOpening = null;
+        _selectedGridAxis = null;
         _isMovingColumn = false;
       });
       HapticFeedback.selectionClick();
@@ -1727,6 +2231,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       setState(() {
         _selectedShearWall = hitWall;
         _selectedColumn = null;
+        _selectedBeam = null;
+        _selectedOpening = null;
+        _selectedGridAxis = null;
+        _isMovingColumn = false;
+      });
+      HapticFeedback.selectionClick();
+      return;
+    }
+
+    final hitAxis = _hitTestGridAxis(details.localPosition);
+    if (hitAxis != null) {
+      setState(() {
+        _selectedGridAxis = hitAxis;
+        _selectedColumn = null;
+        _selectedShearWall = null;
+        _selectedBeam = null;
+        _selectedOpening = null;
         _isMovingColumn = false;
       });
       HapticFeedback.selectionClick();
@@ -1739,10 +2260,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    if (_selectedColumn != null || _selectedShearWall != null) {
+    if (_selectedColumn != null ||
+        _selectedShearWall != null ||
+        _selectedBeam != null ||
+        _selectedOpening != null ||
+        _selectedGridAxis != null) {
       setState(() {
         _selectedColumn = null;
         _selectedShearWall = null;
+        _selectedBeam = null;
+        _selectedOpening = null;
+        _selectedGridAxis = null;
       });
     }
   }
@@ -1755,10 +2283,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     if (_activeTool == StructuralDrawTool.column) {
       _pushUndo();
-      // Anchor column at Top-Left corner in CAD coordinates
-      final newCol = StructuralColumn.fromTopLeft(
+      final newCol = StructuralColumn(
         id: 'col_${DateTime.now().millisecondsSinceEpoch}',
-        topLeft: cadCoord,
+        center: cadCoord,
         shape: _currentColumnPreset.shape,
         width: _currentColumnPreset.width * scale,
         height: _currentColumnPreset.height * scale,
@@ -1771,6 +2298,42 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final updatedStorey = active.copyWith(columns: updatedColumns);
       _updateActiveStorey(updatedStorey);
       HapticFeedback.mediumImpact();
+    } else if (_activeTool == StructuralDrawTool.gridAxis) {
+      final double fitScale = _getCadFitScale();
+      final double currentScale = _transformController.value.getMaxScaleOnAxis();
+      final double toleranceCad = 36.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+      final seg = _findClosestSegmentInCad(cadCoord, toleranceCad);
+      if (seg != null) {
+        if (_firstWallEdgeStartCad == null) {
+          setState(() {
+            _firstWallEdgeStartCad = seg.$1;
+            _firstWallEdgeEndCad = seg.$2;
+          });
+          HapticFeedback.lightImpact();
+        } else {
+          final axis = StructuralGridAxis.fromTwoSegments(
+            id: 'axis_${DateTime.now().millisecondsSinceEpoch}',
+            name: _currentAxisName,
+            a1: _firstWallEdgeStartCad!,
+            a2: _firstWallEdgeEndCad!,
+            b1: seg.$1,
+            b2: seg.$2,
+            extensionLength: 1.5 * scale,
+          );
+          if (axis != null) {
+            _pushUndo();
+            final updatedAxes = List<StructuralGridAxis>.from(active.gridAxes)..add(axis);
+            _updateActiveStorey(active.copyWith(gridAxes: updatedAxes));
+            setState(() {
+              _firstWallEdgeStartCad = null;
+              _firstWallEdgeEndCad = null;
+              _currentAxisName = _getNextAxisName(_currentAxisName);
+              _selectedGridAxis = axis;
+            });
+            HapticFeedback.mediumImpact();
+          }
+        }
+      }
     } else if (_activeTool == StructuralDrawTool.shearWall) {
       if (_wallStartCad == null) {
         // Step 1: Set wall start point
@@ -1839,6 +2402,111 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _slabPointsCad.clear();
         });
       }
+    } else if (_activeTool == StructuralDrawTool.beam) {
+      if (_beamStartCad == null) {
+        // Step 1: Set beam start point
+        setState(() => _beamStartCad = cadCoord);
+        HapticFeedback.lightImpact();
+      } else {
+        // Step 2: Set beam end point and commit
+        if ((cadCoord - _beamStartCad!).distance >= 0.3 * scale) {
+          _pushUndo();
+          final newBeam = StructuralBeam(
+            id: 'beam_${DateTime.now().millisecondsSinceEpoch}',
+            start: _beamStartCad!,
+            end: cadCoord,
+            width: _currentBeamWidth * scale,
+            depth: _currentBeamDepth * scale,
+          );
+          final updatedBeams = List<StructuralBeam>.from(active.beams)
+            ..add(newBeam);
+          final updatedStorey = active.copyWith(beams: updatedBeams);
+          _updateActiveStorey(updatedStorey);
+          HapticFeedback.mediumImpact();
+        }
+        setState(() {
+          _beamStartCad = null;
+          _liveDimensionText = null;
+        });
+      }
+    } else if (_activeTool == StructuralDrawTool.slabOpening) {
+      if (_selectedOpeningPreset == 'custom') {
+        if (_openingStartCad == null) {
+          setState(() => _openingStartCad = cadCoord);
+          HapticFeedback.lightImpact();
+        } else {
+          final c1 = _openingStartCad!;
+          final c2 = cadCoord;
+          final minX = math.min(c1.dx, c2.dx);
+          final maxX = math.max(c1.dx, c2.dx);
+          final minY = math.min(c1.dy, c2.dy);
+          final maxY = math.max(c1.dy, c2.dy);
+          final w = maxX - minX;
+          final h = maxY - minY;
+          if (w >= 0.2 * scale && h >= 0.2 * scale) {
+            final opPoly = [
+              Offset(minX, minY),
+              Offset(maxX, minY),
+              Offset(maxX, maxY),
+              Offset(minX, maxY),
+            ];
+            _addOpeningToSlab(opPoly);
+          }
+          setState(() {
+            _openingStartCad = null;
+            _liveDimensionText = null;
+          });
+        }
+      } else {
+        // Presets: shaft (0.40x0.60), elevator (1.80x2.00), stairs (2.40x4.50)
+        double wM = 0.40;
+        double hM = 0.60;
+        if (_selectedOpeningPreset == 'elevator') {
+          wM = 1.80;
+          hM = 2.00;
+        } else if (_selectedOpeningPreset == 'stairs') {
+          wM = 2.40;
+          hM = 4.50;
+        }
+        final halfW = (wM * scale) / 2.0;
+        final halfH = (hM * scale) / 2.0;
+        final opPoly = [
+          Offset(cadCoord.dx - halfW, cadCoord.dy - halfH),
+          Offset(cadCoord.dx + halfW, cadCoord.dy - halfH),
+          Offset(cadCoord.dx + halfW, cadCoord.dy + halfH),
+          Offset(cadCoord.dx - halfW, cadCoord.dy + halfH),
+        ];
+        _addOpeningToSlab(opPoly);
+      }
+    }
+  }
+
+  void _addOpeningToSlab(List<Offset> opPoly) {
+    final active = _project.activeStorey;
+    final center = Offset(
+      opPoly.map((p) => p.dx).reduce((a, b) => a + b) / opPoly.length,
+      opPoly.map((p) => p.dy).reduce((a, b) => a + b) / opPoly.length,
+    );
+
+    int targetSlabIdx = -1;
+    for (int i = 0; i < active.slabs.length; i++) {
+      if (active.slabs[i].containsPoint(center)) {
+        targetSlabIdx = i;
+        break;
+      }
+    }
+    if (targetSlabIdx == -1 && active.slabs.isNotEmpty) {
+      targetSlabIdx = 0;
+    }
+
+    if (targetSlabIdx != -1) {
+      _pushUndo();
+      final slab = active.slabs[targetSlabIdx];
+      final updatedSlab = slab.addOpening(opPoly);
+      final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+      updatedSlabs[targetSlabIdx] = updatedSlab;
+      _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+      HapticFeedback.heavyImpact();
     }
   }
 
@@ -2020,12 +2688,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
+  void _openVerticalCapacityReport() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => VerticalCapacitySheet(report: _verticalCapacityReport),
+    );
+  }
+
   void _open3dViewport() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Structural3dViewport(
           project: _project,
           cantileverZones: _analysisSummary.zones,
+          verticalReport: _verticalCapacityReport,
           cadUnitsPerMeter: _cadUnitsPerMeter,
           onExit: () => Navigator.of(context).pop(),
         ),
@@ -2119,6 +2797,33 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+
+          Offset? previewAxisStart;
+          Offset? previewAxisEnd;
+          if (_activeTool == StructuralDrawTool.gridAxis &&
+              _firstWallEdgeStartCad != null &&
+              _firstWallEdgeEndCad != null &&
+              _currentCadCoord != null) {
+            final double fitScale = _getCadFitScale();
+            final double currentScale = _transformController.value.getMaxScaleOnAxis();
+            final double toleranceCad = 36.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+            final seg2 = _findClosestSegmentInCad(_currentCadCoord!, toleranceCad * 2.0);
+            if (seg2 != null) {
+              final previewAxis = StructuralGridAxis.fromTwoSegments(
+                id: 'preview',
+                name: _currentAxisName,
+                a1: _firstWallEdgeStartCad!,
+                a2: _firstWallEdgeEndCad!,
+                b1: seg2.$1,
+                b2: seg2.$2,
+                extensionLength: 1.5 * _cadUnitsPerMeter,
+              );
+              if (previewAxis != null) {
+                previewAxisStart = previewAxis.start;
+                previewAxisEnd = previewAxis.end;
+              }
+            }
+          }
 
           return Stack(
             fit: StackFit.expand,
@@ -2221,6 +2926,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   currentStorey: _project.activeStorey,
                                   ghostStorey: _project.ghostStorey,
                                   cantileverZones: _analysisSummary.zones,
+                                  verticalReport: _verticalCapacityReport,
                                   showCantileverHeatmap: true,
                                   activeTool: _activeTool,
                                   previewColumn: _currentColumnPreset.copyWith(
@@ -2229,6 +2935,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   ),
                                   previewColumnPos: _isPlacingWithHold ? _currentCadCoord : null,
                                   wallStartPos: _wallStartCad,
+                                  beamStartPos: _beamStartCad,
+                                  beamPreviewWidth: _currentBeamWidth * _cadUnitsPerMeter,
+                                  openingStartCornerCad: _openingStartCad,
+                                  selectedOpening: _selectedOpening,
                                   currentCursorCad: _currentCadCoord,
                                   slabStartCornerCad: _slabStartCornerCad,
                                   slabPointsInProgress: _slabPointsCad,
@@ -2236,6 +2946,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   extrusionDistance: _isExtrudingEdge ? _extrusionDistanceCad : null,
                                   selectedColumnId: _selectedColumn?.id,
                                   selectedShearWallId: _selectedShearWall?.id,
+                                  selectedBeamId: _selectedBeam?.id,
+                                  selectedGridAxisId: _selectedGridAxis?.id,
+                                  firstWallEdgeStartCad: _firstWallEdgeStartCad,
+                                  firstWallEdgeEndCad: _firstWallEdgeEndCad,
+                                  gridAxisPreviewStartCad: previewAxisStart,
+                                  gridAxisPreviewEndCad: previewAxisEnd,
                                   movingColumn: _isMovingColumn ? _selectedColumn : null,
                                   movingColumnPos: _isMovingColumn ? (_activeSnap?.point ?? _currentCadCoord) : null,
                                   selectedSlabId: _editingSlab?.id,
@@ -2280,7 +2996,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               )
                             : _currentColumnPreset,
                         wallStartPos: _wallStartCad != null ? _cadToScreen(_wallStartCad!) : null,
+                        beamStartPos: _beamStartCad != null ? _cadToScreen(_beamStartCad!) : null,
                         slabStartCornerPos: _slabStartCornerCad != null ? _cadToScreen(_slabStartCornerCad!) : null,
+                        openingStartCornerPos: _openingStartCad != null ? _cadToScreen(_openingStartCad!) : null,
                         slabPoints: _slabPointsCad.map(_cadToScreen).toList(),
                         liveDimensionText: _liveDimensionText,
                         l10n: context.l10n,
@@ -2321,11 +3039,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                 ),
 
-              // 4. Floating Contextual Action Card for Selected Column or Shear Wall
+              // 4. Floating Contextual Action Card for Selected Column, Shear Wall, Beam, Opening, or Grid Axis
               if (_selectedColumn != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
                 _buildSelectedColumnActionCard(context),
               if (_selectedShearWall != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
                 _buildSelectedWallActionCard(context),
+              if (_selectedBeam != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
+                _buildSelectedBeamActionCard(context),
+              if (_selectedOpening != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
+                _buildSelectedOpeningActionCard(context),
+              if (_selectedGridAxis != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
+                _buildSelectedGridAxisActionCard(context),
 
               // 5. Bottom Dock Bar (Switches to Slab Correction Bar when editing slab)
               Positioned(
@@ -2340,6 +3064,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           setState(() {
                             _activeTool = tool;
                             _wallStartCad = null;
+                            _beamStartCad = null;
+                            _openingStartCad = null;
+                            _selectedBeam = null;
+                            _selectedOpening = null;
+                            _selectedGridAxis = null;
+                            _firstWallEdgeStartCad = null;
+                            _firstWallEdgeEndCad = null;
                             _slabStartCornerCad = null;
                             _slabPointsCad.clear();
                           });
@@ -2352,9 +3083,30 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         onUpdateWallThickness: (t) {
                           setState(() => _currentWallThickness = t);
                         },
+                        currentBeamWidth: _currentBeamWidth,
+                        currentBeamDepth: _currentBeamDepth,
+                        onUpdateBeamDimensions: (w, d) {
+                          setState(() {
+                            _currentBeamWidth = w;
+                            _currentBeamDepth = d;
+                          });
+                        },
                         currentSlabThickness: _currentSlabThickness,
                         onUpdateSlabThickness: (t) {
                           setState(() => _currentSlabThickness = t);
+                        },
+                        currentOpeningPreset: _selectedOpeningPreset,
+                        onUpdateOpeningPreset: (preset) {
+                          setState(() => _selectedOpeningPreset = preset);
+                        },
+                        currentAxisName: _currentAxisName,
+                        onUpdateAxisName: (name) => setState(() => _currentAxisName = name),
+                        hasFirstWallEdge: _firstWallEdgeStartCad != null,
+                        onClearAxis: () {
+                          setState(() {
+                            _firstWallEdgeStartCad = null;
+                            _firstWallEdgeEndCad = null;
+                          });
                         },
                         isDrawingSlab: _activeTool == StructuralDrawTool.slab,
                         hasSlabStartCorner: _slabStartCornerCad != null,
@@ -2363,12 +3115,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         onUndoPoint: () {
                           setState(() {
                             _slabStartCornerCad = null;
+                            _openingStartCad = null;
                             if (_slabPointsCad.isNotEmpty) _slabPointsCad.removeLast();
                           });
                         },
                         onClearSlab: () {
                           setState(() {
                             _slabStartCornerCad = null;
+                            _openingStartCad = null;
                             _slabPointsCad.clear();
                           });
                         },
@@ -2385,6 +3139,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         },
                         onOpenCantileverReport: _openCantileverReport,
                         analysisSummary: _analysisSummary,
+                        onOpenVerticalCapacityReport: _openVerticalCapacityReport,
+                        verticalCapacityReport: _verticalCapacityReport,
                       ),
               ),
             ],
@@ -2876,6 +3632,567 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
+  Widget _buildSelectedBeamActionCard(BuildContext context) {
+    if (_selectedBeam == null || _isPlacingWithHold || _isEditingSlab) {
+      return const SizedBox.shrink();
+    }
+
+    final midCad = (_selectedBeam!.start + _selectedBeam!.end) / 2.0;
+    final beamScreen = _cadToScreen(midCad);
+    const double cardWidth = 350.0;
+    const double cardHeight = 88.0;
+
+    final double left = (beamScreen.dx - cardWidth / 2.0).clamp(
+      16.0,
+      math.max(16.0, _viewportSize.width - cardWidth - 16.0),
+    );
+
+    double top = beamScreen.dy - cardHeight - 28.0;
+    if (top < 12.0) {
+      top = beamScreen.dy + 32.0;
+    }
+    top = top.clamp(
+        12.0, math.max(12.0, _viewportSize.height - cardHeight - 160.0));
+
+    final int wCm = (_selectedBeam!.width / _cadUnitsPerMeter * 100).round();
+    final int dCm = (_selectedBeam!.depth / _cadUnitsPerMeter * 100).round();
+    final double lenM = _selectedBeam!.length / _cadUnitsPerMeter;
+    final String dimStr = '$wCm x $dCm cm, L = ${lenM.toStringAsFixed(2)} m';
+
+    return Positioned(
+      left: left,
+      top: top,
+      child: Material(
+        color: Colors.transparent,
+        elevation: 8,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: cardWidth,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xF01E1E24),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFB8C00), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header Row: Title & Close + [-10 cm] [+10 cm]
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFB8C00),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      context.l10n.selectedBeamTitle(dimStr),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Length step buttons [-10 cm] [+10 cm]
+                  InkWell(
+                    onTap: () => _updateSelectedBeamLength(-0.10),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '-10 cm',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _updateSelectedBeamLength(0.10),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '+10 cm',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () => setState(() => _selectedBeam = null),
+                    borderRadius: BorderRadius.circular(12),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2.0),
+                      child: Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Action Buttons Row: Presets, Delete, Duplicate
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Presets
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final (w, d, lbl) in [
+                        (0.25, 0.50, '25x50'),
+                        (0.25, 0.60, '25x60'),
+                        (0.25, 0.40, '25x40'),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: InkWell(
+                            onTap: () => _updateSelectedBeamDimensions(w, d),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
+                                    ? const Color(0x33FB8C00)
+                                    : Colors.white10,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
+                                      ? const Color(0xFFFB8C00)
+                                      : Colors.transparent,
+                                ),
+                              ),
+                              child: Text(
+                                lbl,
+                                style: TextStyle(
+                                  color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
+                                      ? const Color(0xFFFFB74D)
+                                      : Colors.white70,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Delete Button
+                      InkWell(
+                        onTap: _deleteSelectedBeam,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0x29FF5252),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFFF5252), width: 1),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFFF5252)),
+                              const SizedBox(width: 4),
+                              Text(
+                                context.l10n.delete,
+                                style: const TextStyle(
+                                  color: Color(0xFFFF5252),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Duplicate Button
+                      InkWell(
+                        onTap: _duplicateSelectedBeam,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0x29B388FF),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFB388FF), width: 1),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.copy_rounded, size: 14, color: Color(0xFFB388FF)),
+                              const SizedBox(width: 4),
+                              Text(
+                                context.l10n.duplicateElement,
+                                style: const TextStyle(
+                                  color: Color(0xFFB388FF),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedOpeningActionCard(BuildContext context) {
+    if (_selectedOpening == null || _isPlacingWithHold || _isEditingSlab) {
+      return const SizedBox.shrink();
+    }
+
+    final (slabId, opIdx) = _selectedOpening!;
+    final active = _project.activeStorey;
+    final slab = active.slabs.firstWhere((s) => s.id == slabId, orElse: () => active.slabs.first);
+    if (opIdx >= slab.openings.length) return const SizedBox.shrink();
+    final op = slab.openings[opIdx];
+    final centerCad = Offset(
+      op.map((p) => p.dx).reduce((a, b) => a + b) / op.length,
+      op.map((p) => p.dy).reduce((a, b) => a + b) / op.length,
+    );
+    final opScreen = _cadToScreen(centerCad);
+    const double cardWidth = 280.0;
+    const double cardHeight = 56.0;
+
+    final double left = (opScreen.dx - cardWidth / 2.0).clamp(
+      16.0,
+      math.max(16.0, _viewportSize.width - cardWidth - 16.0),
+    );
+
+    double top = opScreen.dy - cardHeight - 28.0;
+    if (top < 12.0) {
+      top = opScreen.dy + 32.0;
+    }
+    top = top.clamp(
+        12.0, math.max(12.0, _viewportSize.height - cardHeight - 160.0));
+
+    double minX = op.first.dx, maxX = op.first.dx;
+    double minY = op.first.dy, maxY = op.first.dy;
+    for (final p in op) {
+      minX = math.min(minX, p.dx);
+      maxX = math.max(maxX, p.dx);
+      minY = math.min(minY, p.dy);
+      maxY = math.max(maxY, p.dy);
+    }
+    final double wM = (maxX - minX) / _cadUnitsPerMeter;
+    final double hM = (maxY - minY) / _cadUnitsPerMeter;
+    final String dimStr = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
+
+    return Positioned(
+      left: left,
+      top: top,
+      child: Material(
+        color: Colors.transparent,
+        elevation: 8,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: cardWidth,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xF01E1E24),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFF9800), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF9800),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    context.l10n.selectedOpeningTitle(dimStr),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Delete Button (Red)
+                  InkWell(
+                    onTap: _deleteSelectedOpening,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0x29FF5252),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFF5252), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFFF5252)),
+                          const SizedBox(width: 4),
+                          Text(
+                            context.l10n.delete,
+                            style: const TextStyle(
+                              color: Color(0xFFFF5252),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () => setState(() => _selectedOpening = null),
+                    borderRadius: BorderRadius.circular(12),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2.0),
+                      child: Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedGridAxisActionCard(BuildContext context) {
+    if (_selectedGridAxis == null || _isPlacingWithHold || _isEditingSlab) {
+      return const SizedBox.shrink();
+    }
+
+    final midCad = (_selectedGridAxis!.start + _selectedGridAxis!.end) / 2.0;
+    final axisScreen = _cadToScreen(midCad);
+    const double cardWidth = 320.0;
+    const double cardHeight = 84.0;
+
+    final double left = (axisScreen.dx - cardWidth / 2.0).clamp(
+      16.0,
+      math.max(16.0, _viewportSize.width - cardWidth - 16.0),
+    );
+
+    double top = axisScreen.dy - cardHeight - 28.0;
+    if (top < 12.0) {
+      top = axisScreen.dy + 32.0;
+    }
+    top = top.clamp(
+        12.0, math.max(12.0, _viewportSize.height - cardHeight - 160.0));
+
+    final double lenM = _selectedGridAxis!.length / _cadUnitsPerMeter;
+    final String title = '${context.l10n.selectedGridAxisTitle(_selectedGridAxis!.name)} (L = ${lenM.toStringAsFixed(2)} m)';
+
+    return Positioned(
+      left: left,
+      top: top,
+      child: Material(
+        color: Colors.transparent,
+        elevation: 8,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: cardWidth,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xF01E1E24),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFF5252), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header Row: Title, Close, [-0.5m] [+0.5m]
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF5252),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _updateSelectedAxisLength(-0.50),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '-0.5 m',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _updateSelectedAxisLength(0.50),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '+0.5 m',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () => setState(() => _selectedGridAxis = null),
+                    borderRadius: BorderRadius.circular(12),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2.0),
+                      child: Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Action Buttons Row: Rename, Delete
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Rename button (cycle name)
+                  InkWell(
+                    onTap: _renameSelectedGridAxis,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0x2900E5FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF00E5FF), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF00E5FF)),
+                          const SizedBox(width: 4),
+                          Text(
+                            context.l10n.renameGridAxis,
+                            style: const TextStyle(
+                              color: Color(0xFF00E5FF),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Delete Button
+                  InkWell(
+                    onTap: _deleteSelectedGridAxis,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0x29FF5252),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFF5252), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFFF5252)),
+                          const SizedBox(width: 4),
+                          Text(
+                            context.l10n.deleteGridAxis,
+                            style: const TextStyle(
+                              color: Color(0xFFFF5252),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSlabCorrectionBottomBar(BuildContext context) {
     if (_editingSlab == null) return const SizedBox.shrink();
     final areaM2 =
@@ -2924,6 +4241,29 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               ),
             ),
             const SizedBox(width: 8),
+
+            // Delete Selected Vertex Button
+            if (_selectedSlabVertexIndex != null && _editingSlab != null && _editingSlab!.polygon.length > 3) ...[
+              OutlinedButton.icon(
+                onPressed: _deleteSelectedSlabVertex,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFFFB300),
+                  side: const BorderSide(color: Color(0xFFFFB300), width: 1.2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.remove_circle_outline, size: 16),
+                label: Text(
+                  context.l10n.deleteVertex,
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
 
             // Center Stats Pill
             Expanded(

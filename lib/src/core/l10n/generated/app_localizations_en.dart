@@ -1211,4 +1211,129 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get columnShapeLShape => 'L-Shape 50x50/25';
+
+  @override
+  String get toolBeam => 'Beam';
+
+  @override
+  String selectedBeamTitle(String dimensions) {
+    return 'Selected Beam $dimensions';
+  }
+
+  @override
+  String selectedOpeningTitle(String dimensions) {
+    return 'Selected Opening $dimensions';
+  }
+
+  @override
+  String get deleteVertex => 'Delete Vertex';
+
+  @override
+  String get beamPreset25x50 => '25x50';
+
+  @override
+  String get beamPreset25x60 => '25x60';
+
+  @override
+  String get beamPreset25x40 => '25x40';
+
+  @override
+  String get openingPresetShaft => 'Shaft 0.40x0.60';
+
+  @override
+  String get openingPresetStairs => 'Stairwell 2.40x4.50';
+
+  @override
+  String get openingPresetElevator => 'Elevator 1.80x2.00';
+
+  @override
+  String get openingPresetCustom => 'Custom Opening';
+
+  @override
+  String get deleteOpening => 'Delete Opening';
+
+  @override
+  String get toolGridAxis => 'Grid Axis';
+
+  @override
+  String selectedGridAxisTitle(String name) {
+    return 'Grid Axis $name';
+  }
+
+  @override
+  String get deleteGridAxis => 'Delete Axis';
+
+  @override
+  String get renameGridAxis => 'Rename';
+
+  @override
+  String get firstWallSidePrompt => 'Select first wall side';
+
+  @override
+  String get secondWallSidePrompt => 'Select opposite wall side';
+
+  @override
+  String get snapIntersection => 'Intersection';
+
+  @override
+  String get verticalCapacityTitle => 'Vertical Capacity (EC2)';
+
+  @override
+  String get verticalCapacitySubtitle =>
+      'Column crushing, punching shear and slab deflection';
+
+  @override
+  String get columnCrushingTitle => 'Column Crushing';
+
+  @override
+  String get punchingShearTitle => 'Punching Shear';
+
+  @override
+  String get slabDeflectionTitle => 'Recommended Slab Thickness';
+
+  @override
+  String get foundationPressureTitle => 'Foundation Load';
+
+  @override
+  String get totalBaseLoad => 'Total Vertical Load';
+
+  @override
+  String get criticalColumns => 'Critical Columns';
+
+  @override
+  String get punchingRisks => 'Punching Risks';
+
+  @override
+  String get maxSpanLabel => 'Max Span';
+
+  @override
+  String get recommendedThicknessLabel => 'Recommended Thickness';
+
+  @override
+  String get axialUtilizationLabel => 'Axial Compression (EC2)';
+
+  @override
+  String get punchingStressLabel => 'Punching Shear Stress';
+
+  @override
+  String get statusSafe => 'Safe';
+
+  @override
+  String get statusWarning => 'Warning';
+
+  @override
+  String get statusCritical => 'Critical Overload';
+
+  @override
+  String get ec2FeasibilityButton => 'EC2 Capacity';
+
+  @override
+  String columnRequiredSection(String section) {
+    return 'Requires min $section';
+  }
+
+  @override
+  String storeyColumnLoad(String storey, String ned, String nrd, String ratio) {
+    return '$storey: Ned = $ned kN / Nrd = $nrd kN ($ratio%)';
+  }
 }

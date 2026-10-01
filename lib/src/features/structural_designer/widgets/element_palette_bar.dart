@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/cantilever_analysis_models.dart';
 import '../models/structural_element.dart';
+import '../models/vertical_capacity_models.dart';
 import '../rendering/structural_pointer_painter.dart';
 
 /// Bottom dock palette bar for choosing structural elements (columns, walls, slabs),
@@ -13,8 +14,17 @@ class ElementPaletteBar extends StatelessWidget {
   final ValueChanged<StructuralColumn> onUpdateColumnPreset;
   final double currentWallThickness;
   final ValueChanged<double> onUpdateWallThickness;
+  final double currentBeamWidth;
+  final double currentBeamDepth;
+  final void Function(double width, double depth)? onUpdateBeamDimensions;
   final double currentSlabThickness;
   final ValueChanged<double> onUpdateSlabThickness;
+  final String currentOpeningPreset;
+  final ValueChanged<String>? onUpdateOpeningPreset;
+  final String currentAxisName;
+  final ValueChanged<String>? onUpdateAxisName;
+  final bool hasFirstWallEdge;
+  final VoidCallback? onClearAxis;
   final bool isDrawingSlab;
   final bool hasSlabStartCorner;
   final int slabPointCount;
@@ -24,6 +34,8 @@ class ElementPaletteBar extends StatelessWidget {
   final VoidCallback onRotateColumn;
   final VoidCallback onOpenCantileverReport;
   final StructuralAnalysisSummary analysisSummary;
+  final VoidCallback? onOpenVerticalCapacityReport;
+  final VerticalCapacityReport? verticalCapacityReport;
 
   const ElementPaletteBar({
     super.key,
@@ -33,8 +45,17 @@ class ElementPaletteBar extends StatelessWidget {
     required this.onUpdateColumnPreset,
     required this.currentWallThickness,
     required this.onUpdateWallThickness,
+    this.currentBeamWidth = 0.25,
+    this.currentBeamDepth = 0.50,
+    this.onUpdateBeamDimensions,
     required this.currentSlabThickness,
     required this.onUpdateSlabThickness,
+    this.currentOpeningPreset = 'shaft',
+    this.onUpdateOpeningPreset,
+    this.currentAxisName = '1',
+    this.onUpdateAxisName,
+    this.hasFirstWallEdge = false,
+    this.onClearAxis,
     required this.isDrawingSlab,
     this.hasSlabStartCorner = false,
     required this.slabPointCount,
@@ -44,6 +65,8 @@ class ElementPaletteBar extends StatelessWidget {
     required this.onRotateColumn,
     required this.onOpenCantileverReport,
     required this.analysisSummary,
+    this.onOpenVerticalCapacityReport,
+    this.verticalCapacityReport,
   });
 
   @override
@@ -62,44 +85,72 @@ class ElementPaletteBar extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Dynamic Sub-bar for Active Tool parameters
-            if (activeTool == StructuralDrawTool.column)
+            if (activeTool == StructuralDrawTool.gridAxis)
+              _buildGridAxisOptionsBar(context)
+            else if (activeTool == StructuralDrawTool.column)
               _buildColumnOptionsBar(context)
             else if (activeTool == StructuralDrawTool.shearWall)
               _buildWallOptionsBar(context)
+            else if (activeTool == StructuralDrawTool.beam)
+              _buildBeamOptionsBar(context)
             else if (activeTool == StructuralDrawTool.slab)
-              _buildSlabOptionsBar(context),
+              _buildSlabOptionsBar(context)
+            else if (activeTool == StructuralDrawTool.slabOpening)
+              _buildOpeningOptionsBar(context),
 
             const SizedBox(height: 6),
 
             // Main Tools Row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildToolButton(
-                  tool: StructuralDrawTool.column,
-                  icon: Icons.view_column_rounded,
-                  label: l10n.toolColumn,
-                ),
-                _buildToolButton(
-                  tool: StructuralDrawTool.shearWall,
-                  icon: Icons.line_weight_rounded,
-                  label: l10n.toolShearWall,
-                ),
-                _buildToolButton(
-                  tool: StructuralDrawTool.slab,
-                  icon: Icons.crop_square_rounded,
-                  label: l10n.toolSlab,
-                ),
-                // Cantilever Analysis report launcher with badge
-                _buildCantileverAnalysisButton(context),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Row(
+                children: [
+                  _buildToolButton(
+                    tool: StructuralDrawTool.gridAxis,
+                    icon: Icons.grid_3x3_rounded,
+                    label: l10n.toolGridAxis,
+                  ),
+                  _buildToolButton(
+                    tool: StructuralDrawTool.column,
+                    icon: Icons.view_column_rounded,
+                    label: l10n.toolColumn,
+                  ),
+                  _buildToolButton(
+                    tool: StructuralDrawTool.shearWall,
+                    icon: Icons.line_weight_rounded,
+                    label: l10n.toolShearWall,
+                  ),
+                  _buildToolButton(
+                    tool: StructuralDrawTool.beam,
+                    icon: Icons.horizontal_rule_rounded,
+                    label: l10n.toolBeam,
+                  ),
+                  _buildToolButton(
+                    tool: StructuralDrawTool.slab,
+                    icon: Icons.crop_square_rounded,
+                    label: l10n.toolSlab,
+                  ),
+                  _buildToolButton(
+                    tool: StructuralDrawTool.slabOpening,
+                    icon: Icons.tab_unselected_rounded,
+                    label: l10n.toolOpening,
+                  ),
+                  const SizedBox(width: 4),
+                  // Cantilever Analysis report launcher with badge
+                  _buildCantileverAnalysisButton(context),
+                  const SizedBox(width: 4),
+                  // EC2 Vertical Capacity report launcher with badge
+                  _buildVerticalCapacityButton(context),
+                ],
+              ),
             ),
           ],
         ),
@@ -115,7 +166,9 @@ class ElementPaletteBar extends StatelessWidget {
     final bool isSelected = activeTool == tool;
     final color = isSelected ? const Color(0xFF00E5FF) : Colors.white70;
 
-    return Expanded(
+    return Container(
+      constraints: const BoxConstraints(minWidth: 46),
+      margin: const EdgeInsets.symmetric(horizontal: 2),
       child: InkWell(
         onTap: () => onSelectTool(tool),
         borderRadius: BorderRadius.circular(10),
@@ -157,7 +210,9 @@ class ElementPaletteBar extends StatelessWidget {
         ? const Color(0xFFFF1744)
         : const Color(0xFFFFB300);
 
-    return Expanded(
+    return Container(
+      constraints: const BoxConstraints(minWidth: 50),
+      margin: const EdgeInsets.symmetric(horizontal: 2),
       child: InkWell(
         onTap: onOpenCantileverReport,
         borderRadius: BorderRadius.circular(10),
@@ -195,6 +250,72 @@ class ElementPaletteBar extends StatelessWidget {
                 context.l10n.toolCantilevers,
                 style: TextStyle(
                   color: warningCount > 0 ? badgeColor : Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVerticalCapacityButton(BuildContext context) {
+    final report = verticalCapacityReport;
+    final int alertCount =
+        (report?.criticalColumnsCount ?? 0) + (report?.punchingRiskCount ?? 0);
+    final Color badgeColor = (report?.criticalColumnsCount ?? 0) > 0
+        ? const Color(0xFFFF1744)
+        : ((report?.warningColumnsCount ?? 0) > 0 || (report?.punchingRiskCount ?? 0) > 0
+            ? const Color(0xFFFFB300)
+            : const Color(0xFF00E676));
+
+    final bool hasAlerts = alertCount > 0;
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 52),
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      child: InkWell(
+        onTap: onOpenVerticalCapacityReport,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          decoration: BoxDecoration(
+            color: hasAlerts ? badgeColor.withValues(alpha: 0.18) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: hasAlerts ? badgeColor : Colors.white24,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Badge(
+                isLabelVisible: hasAlerts,
+                backgroundColor: badgeColor,
+                label: Text(
+                  '$alertCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
+                ),
+                child: Icon(
+                  Icons.domain_rounded,
+                  color: hasAlerts ? badgeColor : const Color(0xFF00E5FF),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                context.l10n.ec2FeasibilityButton,
+                style: TextStyle(
+                  color: hasAlerts ? badgeColor : const Color(0xFF00E5FF),
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                 ),
@@ -321,6 +442,140 @@ class ElementPaletteBar extends StatelessWidget {
             tooltip: context.l10n.cancelSlab,
             onPressed: onClearSlab,
             visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBeamOptionsBar(BuildContext context) {
+    final beamSizes = [
+      (0.25, 0.50, '25x50'),
+      (0.25, 0.60, '25x60'),
+      (0.25, 0.40, '25x40'),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final (w, d, label) in beamSizes)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: ChoiceChip(
+                label: Text(label),
+                selected: (currentBeamWidth - w).abs() < 1e-4 &&
+                    (currentBeamDepth - d).abs() < 1e-4,
+                onSelected: (selected) {
+                  if (selected && onUpdateBeamDimensions != null) {
+                    onUpdateBeamDimensions!(w, d);
+                  }
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOpeningOptionsBar(BuildContext context) {
+    final l10n = context.l10n;
+    final presets = [
+      ('shaft', l10n.openingPresetShaft),
+      ('elevator', l10n.openingPresetElevator),
+      ('stairs', l10n.openingPresetStairs),
+      ('custom', l10n.openingPresetCustom),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final (key, label) in presets)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: ChoiceChip(
+                label: Text(label),
+                selected: currentOpeningPreset == key,
+                onSelected: (selected) {
+                  if (selected && onUpdateOpeningPreset != null) {
+                    onUpdateOpeningPreset!(key);
+                  }
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGridAxisOptionsBar(BuildContext context) {
+    final l10n = context.l10n;
+    final quickNames = ['1', '2', '3', '4', '5', 'А', 'Б', 'В', 'Г', 'Д'];
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0x33FF453A),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: const Color(0xFFFF453A)),
+          ),
+          child: Text(
+            '${l10n.toolGridAxis}: $currentAxisName',
+            style: const TextStyle(
+              color: Color(0xFFFF453A),
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final name in quickNames)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: ActionChip(
+                      label: Text(name, style: const TextStyle(fontSize: 11)),
+                      backgroundColor: currentAxisName == name ? const Color(0x44FF453A) : null,
+                      onPressed: () => onUpdateAxisName?.call(name),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (hasFirstWallEdge) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0x3300E5FF),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF00E5FF)),
+            ),
+            child: Text(
+              l10n.secondWallSidePrompt,
+              style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 11),
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.close, size: 16),
+            onPressed: onClearAxis,
+            visualDensity: VisualDensity.compact,
+          ),
+        ] else ...[
+          Text(
+            l10n.firstWallSidePrompt,
+            style: const TextStyle(color: Colors.white54, fontSize: 11),
           ),
         ],
       ],

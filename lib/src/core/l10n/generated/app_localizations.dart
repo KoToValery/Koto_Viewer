@@ -1676,7 +1676,7 @@ abstract class AppLocalizations {
   /// **'Slab'**
   String get toolSlab;
 
-  /// Opening tool mode label
+  /// Slab opening cutout drawing tool
   ///
   /// In en, this message translates to:
   /// **'Opening'**
@@ -2214,6 +2214,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'L-Shape 50x50/25'**
   String get columnShapeLShape;
+
+  /// Structural beam drawing tool
+  ///
+  /// In en, this message translates to:
+  /// **'Beam'**
+  String get toolBeam;
+
+  /// Title badge for selected beam
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Beam {dimensions}'**
+  String selectedBeamTitle(String dimensions);
+
+  /// Title badge for selected slab opening
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Opening {dimensions}'**
+  String selectedOpeningTitle(String dimensions);
+
+  /// Button to delete a vertex in slab editor
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Vertex'**
+  String get deleteVertex;
+
+  /// 25x50 cm beam preset
+  ///
+  /// In en, this message translates to:
+  /// **'25x50'**
+  String get beamPreset25x50;
+
+  /// 25x60 cm beam preset
+  ///
+  /// In en, this message translates to:
+  /// **'25x60'**
+  String get beamPreset25x60;
+
+  /// 25x40 cm beam preset
+  ///
+  /// In en, this message translates to:
+  /// **'25x40'**
+  String get beamPreset25x40;
+
+  /// Riser shaft opening preset
+  ///
+  /// In en, this message translates to:
+  /// **'Shaft 0.40x0.60'**
+  String get openingPresetShaft;
+
+  /// Staircase opening preset
+  ///
+  /// In en, this message translates to:
+  /// **'Stairwell 2.40x4.50'**
+  String get openingPresetStairs;
+
+  /// Elevator shaft opening preset
+  ///
+  /// In en, this message translates to:
+  /// **'Elevator 1.80x2.00'**
+  String get openingPresetElevator;
+
+  /// Freeform/custom rectangular opening
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Opening'**
+  String get openingPresetCustom;
+
+  /// Button to delete opening
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Opening'**
+  String get deleteOpening;
+
+  /// Structural grid axis line drawing tool
+  ///
+  /// In en, this message translates to:
+  /// **'Grid Axis'**
+  String get toolGridAxis;
+
+  /// Title badge for selected grid axis
+  ///
+  /// In en, this message translates to:
+  /// **'Grid Axis {name}'**
+  String selectedGridAxisTitle(String name);
+
+  /// Button to delete grid axis
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Axis'**
+  String get deleteGridAxis;
+
+  /// Button to rename grid axis
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get renameGridAxis;
+
+  /// Prompt to select first side of wall
+  ///
+  /// In en, this message translates to:
+  /// **'Select first wall side'**
+  String get firstWallSidePrompt;
+
+  /// Prompt to select opposite side of wall
+  ///
+  /// In en, this message translates to:
+  /// **'Select opposite wall side'**
+  String get secondWallSidePrompt;
+
+  /// Intersection snap label
+  ///
+  /// In en, this message translates to:
+  /// **'Intersection'**
+  String get snapIntersection;
+
+  /// Title for Eurocode 2 vertical capacity analysis
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical Capacity (EC2)'**
+  String get verticalCapacityTitle;
+
+  /// Subtitle for vertical capacity sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Column crushing, punching shear and slab deflection'**
+  String get verticalCapacitySubtitle;
+
+  /// Title for column crushing check
+  ///
+  /// In en, this message translates to:
+  /// **'Column Crushing'**
+  String get columnCrushingTitle;
+
+  /// Title for punching shear check
+  ///
+  /// In en, this message translates to:
+  /// **'Punching Shear'**
+  String get punchingShearTitle;
+
+  /// Title for slab deflection check
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended Slab Thickness'**
+  String get slabDeflectionTitle;
+
+  /// Title for foundation load check
+  ///
+  /// In en, this message translates to:
+  /// **'Foundation Load'**
+  String get foundationPressureTitle;
+
+  /// Label for total base load
+  ///
+  /// In en, this message translates to:
+  /// **'Total Vertical Load'**
+  String get totalBaseLoad;
+
+  /// Label for critical columns count
+  ///
+  /// In en, this message translates to:
+  /// **'Critical Columns'**
+  String get criticalColumns;
+
+  /// Label for punching shear risks count
+  ///
+  /// In en, this message translates to:
+  /// **'Punching Risks'**
+  String get punchingRisks;
+
+  /// Label for max clear span
+  ///
+  /// In en, this message translates to:
+  /// **'Max Span'**
+  String get maxSpanLabel;
+
+  /// Label for recommended slab thickness
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended Thickness'**
+  String get recommendedThicknessLabel;
+
+  /// Label for axial compression utilization
+  ///
+  /// In en, this message translates to:
+  /// **'Axial Compression (EC2)'**
+  String get axialUtilizationLabel;
+
+  /// Label for punching shear stress
+  ///
+  /// In en, this message translates to:
+  /// **'Punching Shear Stress'**
+  String get punchingStressLabel;
+
+  /// Status safe label
+  ///
+  /// In en, this message translates to:
+  /// **'Safe'**
+  String get statusSafe;
+
+  /// Status warning label
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get statusWarning;
+
+  /// Status critical label
+  ///
+  /// In en, this message translates to:
+  /// **'Critical Overload'**
+  String get statusCritical;
+
+  /// Button label for EC2 vertical capacity
+  ///
+  /// In en, this message translates to:
+  /// **'EC2 Capacity'**
+  String get ec2FeasibilityButton;
+
+  /// Label for required column section
+  ///
+  /// In en, this message translates to:
+  /// **'Requires min {section}'**
+  String columnRequiredSection(String section);
+
+  /// Storey column load summary
+  ///
+  /// In en, this message translates to:
+  /// **'{storey}: Ned = {ned} kN / Nrd = {nrd} kN ({ratio}%)'**
+  String storeyColumnLoad(String storey, String ned, String nrd, String ratio);
 }
 
 class _AppLocalizationsDelegate

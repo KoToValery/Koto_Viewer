@@ -193,4 +193,249 @@ void main() {
     expect(snap!.type, DxfSnapType.endpoint);
     expect(snap.point, const Offset(0, 0));
   });
+
+  test('StructuralBeam geometry, bounds, polygon, and StoreyLevel support', () {
+    final beam = StructuralBeam(
+      id: 'beam_1',
+      start: const Offset(1.0, 2.0),
+      end: const Offset(5.0, 2.0),
+      width: 0.25,
+      depth: 0.50,
+    );
+
+    expect(beam.length, closeTo(4.0, 1e-4));
+    expect(beam.angleRad, closeTo(0.0, 1e-4));
+
+    // Centered width 0.25 means ±0.125 in Y
+    final poly = beam.polygonVertices;
+    expect(poly.length, 4);
+    expect(poly[0].dy, closeTo(2.125, 1e-4));
+    expect(poly[1].dy, closeTo(2.125, 1e-4));
+    expect(poly[2].dy, closeTo(1.875, 1e-4));
+    expect(poly[3].dy, closeTo(1.875, 1e-4));
+
+    final level = StoreyLevel(
+      id: 'storey_1',
+      name: 'Етаж 1',
+      beams: [beam],
+    );
+    expect(level.beams.length, 1);
+    expect(level.beams.first.depth, 0.50);
+
+    final nextLevel = level.cloneToNextLevel(
+      newId: 'storey_2',
+      newName: 'Етаж 2',
+      newElevation: 3.0,
+    );
+    expect(nextLevel.beams.length, 1);
+    expect(nextLevel.beams.first.id, 'beam_1_lvl_3');
+  });
+
+  test('StructuralSlab opening manipulation and containsPoint cutout logic', () {
+    final opening = [
+      const Offset(2.0, 2.0),
+      const Offset(4.0, 2.0),
+      const Offset(4.0, 4.0),
+      const Offset(2.0, 4.0),
+    ];
+    final slab = StructuralSlab(
+      id: 'slab_1',
+      polygon: const [
+        Offset(0.0, 0.0),
+        Offset(10.0, 0.0),
+        Offset(10.0, 10.0),
+        Offset(0.0, 10.0),
+      ],
+      thickness: 0.20,
+    );
+
+    // Without opening, (3, 3) is inside
+    expect(slab.containsPoint(const Offset(3.0, 3.0)), isTrue);
+
+    // Add opening
+    final slabWithOpening = slab.addOpening(opening);
+    expect(slabWithOpening.openings.length, 1);
+
+    // Inside opening cutout should now return false
+    expect(slabWithOpening.containsPoint(const Offset(3.0, 3.0)), isFalse);
+    // Outside opening but inside slab should return true
+    expect(slabWithOpening.containsPoint(const Offset(6.0, 6.0)), isTrue);
+    // Outside slab should return false
+    expect(slabWithOpening.containsPoint(const Offset(15.0, 15.0)), isFalse);
+
+    // Remove opening
+    final slabRemoved = slabWithOpening.removeOpening(0);
+    expect(slabRemoved.openings.isEmpty, isTrue);
+    expect(slabRemoved.containsPoint(const Offset(3.0, 3.0)), isTrue);
+  });
+
+  test('StructuralSlab cleanPolygon removes orphan (0,0), collapsed points, and collinear vertices', () {
+    // Polygon with orphan (0, 0) point in middle of non-zero contour
+    final rawWithZero = [
+      const Offset(10.0, 10.0),
+      const Offset(20.0, 10.0),
+      const Offset(0.0, 0.0), // Orphan (0, 0) error point
+      const Offset(20.0, 20.0),
+      const Offset(10.0, 20.0),
+    ];
+    final cleanedZero = StructuralSlab.cleanPolygon(rawWithZero);
+    expect(cleanedZero.contains(const Offset(0.0, 0.0)), isFalse);
+    expect(cleanedZero.length, 4);
+
+    // Polygon with duplicate / overlapping adjacent vertices (< 0.05m apart)
+    final rawWithOverlap = [
+      const Offset(0.0, 0.0),
+      const Offset(10.0, 0.0),
+      const Offset(10.01, 0.01), // Overlapping vertex to be merged
+      const Offset(10.0, 10.0),
+      const Offset(0.0, 10.0),
+    ];
+    final cleanedOverlap = StructuralSlab.cleanPolygon(rawWithOverlap, minDistance: 0.05);
+    expect(cleanedOverlap.length, 4);
+
+    // Polygon with redundant collinear points
+    final rawCollinear = [
+      const Offset(0.0, 0.0),
+      const Offset(5.0, 0.0), // Midpoint along straight edge
+      const Offset(10.0, 0.0),
+      const Offset(10.0, 10.0),
+      const Offset(0.0, 10.0),
+    ];
+    final cleanedCollinear = StructuralSlab.cleanPolygon(rawCollinear);
+    expect(cleanedCollinear.length, 4);
+    expect(cleanedCollinear.contains(const Offset(5.0, 0.0)), isFalse);
+  });
+
+  test('StructuralSlab self-intersection detection prevents bowtie / X-crossings', () {
+    // Simple convex square -> no self-intersection
+    final validSquare = [
+      const Offset(0.0, 0.0),
+      const Offset(5.0, 0.0),
+      const Offset(5.0, 5.0),
+      const Offset(0.0, 5.0),
+    ];
+    expect(StructuralSlab.hasSelfIntersections(validSquare), isFalse);
+
+    // Bowtie shape (crossed diagonals: (0,0)->(5,5) and (5,0)->(0,5))
+    final bowTie = [
+      const Offset(0.0, 0.0),
+      const Offset(5.0, 5.0),
+      const Offset(5.0, 0.0),
+      const Offset(0.0, 5.0),
+    ];
+    expect(StructuralSlab.hasSelfIntersections(bowTie), isTrue);
+  });
+
+  test('StructuralGridAxis.fromTwoSegments calculates centerline bisector correctly', () {
+    // Two parallel horizontal wall faces 25 cm apart from X=0 to X=10:
+    // Face 1: Y = 2.0
+    // Face 2: Y = 2.25
+    final axis = StructuralGridAxis.fromTwoSegments(
+      id: 'axis_1',
+      name: '1',
+      a1: const Offset(0.0, 2.0),
+      a2: const Offset(10.0, 2.0),
+      b1: const Offset(0.0, 2.25),
+      b2: const Offset(10.0, 2.25),
+      extensionLength: 1.0,
+    );
+
+    expect(axis, isNotNull);
+    // Centerline Y should be (2.0 + 2.25)/2 = 2.125
+    expect(axis!.start.dy, closeTo(2.125, 1e-4));
+    expect(axis.end.dy, closeTo(2.125, 1e-4));
+    // Extended beyond 0..10 by 1.0 on each end -> length = 10 + 2 = 12
+    expect(axis.length, closeTo(12.0, 1e-4));
+  });
+
+  test('StructuralGridAxis.intersectionWith finds perpendicular intersection', () {
+    // Horizontal axis along Y = 5.0
+    const axisH = StructuralGridAxis(
+      id: 'h',
+      name: 'A',
+      start: Offset(-2.0, 5.0),
+      end: Offset(12.0, 5.0),
+    );
+
+    // Vertical axis along X = 4.0
+    const axisV = StructuralGridAxis(
+      id: 'v',
+      name: '1',
+      start: Offset(4.0, -1.0),
+      end: Offset(4.0, 10.0),
+    );
+
+    final inter = axisH.intersectionWith(axisV);
+    expect(inter, isNotNull);
+    expect(inter!.dx, closeTo(4.0, 1e-4));
+    expect(inter.dy, closeTo(5.0, 1e-4));
+  });
+
+  test('L-shaped column maintains center, thickness, mirror, and rotation upon move', () {
+    const originalCol = StructuralColumn(
+      id: 'col_L',
+      center: Offset(5.0, 5.0),
+      shape: ColumnShape.lShape,
+      width: 0.50,
+      height: 0.50,
+      thickness: 0.25,
+      rotationRad: math.pi / 2.0,
+      isMirrored: true,
+    );
+
+    // Moving column to (8.0, 12.0) using copyWith
+    final movedCol = originalCol.copyWith(center: const Offset(8.0, 12.0));
+
+    expect(movedCol.center, const Offset(8.0, 12.0));
+    expect(movedCol.shape, ColumnShape.lShape);
+    expect(movedCol.width, 0.50);
+    expect(movedCol.height, 0.50);
+    expect(movedCol.thickness, 0.25);
+    expect(movedCol.rotationRad, math.pi / 2.0);
+    expect(movedCol.isMirrored, isTrue);
+
+    // Polygon vertices count is strictly 6 for L-shape
+    final vertices = movedCol.polygonVertices;
+    expect(vertices.length, 6);
+  });
+
+  test('DxfSnapHelper with allowNearest: false skips arbitrary line points', () {
+    final doc = DxfDocument(
+      entities: [
+        const DxfLine(
+          layer: '0',
+          p1: Offset(0, 0),
+          p2: Offset(10, 0),
+        ),
+      ],
+      layers: {
+        '0': DxfLayer(name: '0', isVisible: true),
+      },
+      blocks: const {},
+      headerVars: const {},
+      bounds: const Rect.fromLTWH(0, 0, 10, 0),
+      entityStats: const {'LINE': 1},
+    );
+
+    // Query near middle of line at (5.0, 0.05), far from endpoints (0,0) and (10,0)
+    // and slightly away from midpoint (5,0)
+    final snapWithNearest = DxfSnapHelper.findSnapPoint(
+      document: doc,
+      cadPoint: const Offset(4.2, 0.05),
+      toleranceCad: 0.5,
+      allowNearest: true,
+    );
+    expect(snapWithNearest, isNotNull);
+    expect(snapWithNearest!.type, DxfSnapType.nearest);
+
+    // With allowNearest: false, arbitrary point on line is NOT snapped, preventing beam divergence
+    final snapWithoutNearest = DxfSnapHelper.findSnapPoint(
+      document: doc,
+      cadPoint: const Offset(4.2, 0.05),
+      toleranceCad: 0.5,
+      allowNearest: false,
+    );
+    expect(snapWithoutNearest, isNull);
+  });
 }
+

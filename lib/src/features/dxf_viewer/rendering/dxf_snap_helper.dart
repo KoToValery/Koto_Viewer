@@ -127,6 +127,7 @@ class DxfSnapHelper {
     required Offset cadPoint,
     required double toleranceCad,
     Offset? basePoint,
+    bool allowNearest = true,
   }) {
     if (toleranceCad <= 0) return null;
 
@@ -534,7 +535,7 @@ class DxfSnapHelper {
     }
 
     // 5. Nearest line segment
-    if (bestNearestSnap != null) {
+    if (allowNearest && bestNearestSnap != null) {
       return bestNearestSnap;
     }
 

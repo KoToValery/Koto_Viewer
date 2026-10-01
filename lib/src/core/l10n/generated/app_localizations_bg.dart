@@ -1219,4 +1219,129 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get columnShapeLShape => 'Г-образна 50x50/25';
+
+  @override
+  String get toolBeam => 'Греда';
+
+  @override
+  String selectedBeamTitle(String dimensions) {
+    return 'Избрана греда $dimensions';
+  }
+
+  @override
+  String selectedOpeningTitle(String dimensions) {
+    return 'Избран отвор $dimensions';
+  }
+
+  @override
+  String get deleteVertex => 'Изтрий точка';
+
+  @override
+  String get beamPreset25x50 => '25x50';
+
+  @override
+  String get beamPreset25x60 => '25x60';
+
+  @override
+  String get beamPreset25x40 => '25x40';
+
+  @override
+  String get openingPresetShaft => 'Щранг 0.40x0.60';
+
+  @override
+  String get openingPresetStairs => 'Стълбище 2.40x4.50';
+
+  @override
+  String get openingPresetElevator => 'Асансьор 1.80x2.00';
+
+  @override
+  String get openingPresetCustom => 'Свободен отвор';
+
+  @override
+  String get deleteOpening => 'Изтрий отвор';
+
+  @override
+  String get toolGridAxis => 'Осова линия';
+
+  @override
+  String selectedGridAxisTitle(String name) {
+    return 'Осова линия $name';
+  }
+
+  @override
+  String get deleteGridAxis => 'Изтрий ос';
+
+  @override
+  String get renameGridAxis => 'Преименувай';
+
+  @override
+  String get firstWallSidePrompt => 'Изберете първа страна на стена';
+
+  @override
+  String get secondWallSidePrompt => 'Изберете срещуположна страна';
+
+  @override
+  String get snapIntersection => 'Пресечна точка';
+
+  @override
+  String get verticalCapacityTitle => 'Вертикален капацитет (EC2)';
+
+  @override
+  String get verticalCapacitySubtitle =>
+      'Смачкване на колони, пробиване на плоча и провисване';
+
+  @override
+  String get columnCrushingTitle => 'Смачкване на колони';
+
+  @override
+  String get punchingShearTitle => 'Пробиване на плоча';
+
+  @override
+  String get slabDeflectionTitle => 'Препоръчителна дебелина на плоча';
+
+  @override
+  String get foundationPressureTitle => 'Натоварване на основите';
+
+  @override
+  String get totalBaseLoad => 'Общ вертикален товар';
+
+  @override
+  String get criticalColumns => 'Критични колони';
+
+  @override
+  String get punchingRisks => 'Риск от пробиване';
+
+  @override
+  String get maxSpanLabel => 'Макс. светъл отвор';
+
+  @override
+  String get recommendedThicknessLabel => 'Препоръчителна дебелина';
+
+  @override
+  String get axialUtilizationLabel => 'Осов натиск (EC2)';
+
+  @override
+  String get punchingStressLabel => 'Срязване при пробиване';
+
+  @override
+  String get statusSafe => 'В норма';
+
+  @override
+  String get statusWarning => 'Повишено натоварване';
+
+  @override
+  String get statusCritical => 'Критично претоварване';
+
+  @override
+  String get ec2FeasibilityButton => 'EC2 Капацитет';
+
+  @override
+  String columnRequiredSection(String section) {
+    return 'Изисква минимум $section';
+  }
+
+  @override
+  String storeyColumnLoad(String storey, String ned, String nrd, String ratio) {
+    return '$storey: Ned = $ned kN / Nrd = $nrd kN ($ratio%)';
+  }
 }
