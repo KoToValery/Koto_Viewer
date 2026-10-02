@@ -1535,7 +1535,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get hiddenBeamLabel => 'скрита';
 
   @override
-  String get shaftOpeningLabel => 'Шахта (40×60)';
+  String get shaftOpeningLabel => 'Щранг (40×60 cm)';
 
   @override
   String get elevatorOpeningLabel => 'Асансьор (1.8×2.0)';
@@ -1548,4 +1548,10 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get pointsAbbr => 'т.';
+
+  @override
+  String get previewOpeningCorner2Tag => 'Отвор: избери срещуположен ъгъл';
+
+  @override
+  String get cancelOpening => 'Отказ от отвор';
 }

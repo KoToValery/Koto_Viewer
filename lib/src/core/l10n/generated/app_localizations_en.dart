@@ -1541,4 +1541,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pointsAbbr => 'pts';
+
+  @override
+  String get previewOpeningCorner2Tag => 'Opening: pick opposite corner';
+
+  @override
+  String get cancelOpening => 'Cancel opening';
 }

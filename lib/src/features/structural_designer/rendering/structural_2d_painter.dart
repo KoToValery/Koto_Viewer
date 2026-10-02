@@ -38,6 +38,7 @@ class Structural2dPainter extends CustomPainter {
   final double beamPreviewWidth;
   final Offset? openingStartCornerCad;
   final (String, int)? selectedOpening;
+  final List<Offset>? movingOpeningPolygon;
   final StructuralColumn? movingColumn;
   final Offset? movingColumnPos;
   final String? selectedSlabId;
@@ -64,6 +65,7 @@ class Structural2dPainter extends CustomPainter {
     this.beamPreviewWidth = 0.25,
     this.openingStartCornerCad,
     this.selectedOpening,
+    this.movingOpeningPolygon,
     this.axisOffsetPreview,
     this.columnOffsetPreview,
     this.selectedGridAxisId,
@@ -391,11 +393,14 @@ class Structural2dPainter extends CustomPainter {
             selectedOpening != null &&
             selectedOpening!.$1 == slab.id &&
             selectedOpening!.$2 == oIdx;
+        final bool isMovingThis = isOpSelected && movingOpeningPolygon != null;
 
         final opBorderPaint = Paint()
           ..color = isGhost
               ? const Color(0x66FFB74D)
-              : (isOpSelected ? const Color(0xFFFF5252) : const Color(0xFFFF9800))
+              : (isMovingThis
+                  ? const Color(0x55FFFFFF)
+                  : (isOpSelected ? const Color(0xFFFF5252) : const Color(0xFFFF9800)))
           ..style = PaintingStyle.stroke
           ..strokeWidth = isOpSelected ? (2.5 / zoomScale) : (1.5 / zoomScale);
 
@@ -1046,6 +1051,31 @@ class Structural2dPainter extends CustomPainter {
 
         canvas.drawPath(path, movingFill);
         canvas.drawPath(path, movingBorder);
+      }
+    }
+
+    // 1b. Moving opening live preview
+    if (movingOpeningPolygon != null && movingOpeningPolygon!.length >= 3) {
+      final pts = movingOpeningPolygon!.map(cadToScene).toList();
+      final path = Path()..moveTo(pts[0].dx, pts[0].dy);
+      for (int i = 1; i < pts.length; i++) {
+        path.lineTo(pts[i].dx, pts[i].dy);
+      }
+      path.close();
+
+      final movingFill = Paint()
+        ..color = const Color(0x99FFB300)
+        ..style = PaintingStyle.fill;
+      final movingBorder = Paint()
+        ..color = const Color(0xFFFFD54F)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5 / zoomScale;
+
+      canvas.drawPath(path, movingFill);
+      canvas.drawPath(path, movingBorder);
+      if (pts.length >= 4) {
+        canvas.drawLine(pts[0], pts[2], movingBorder);
+        canvas.drawLine(pts[1], pts[3], movingBorder);
       }
     }
 

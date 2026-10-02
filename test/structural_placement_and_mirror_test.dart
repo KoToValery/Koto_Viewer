@@ -977,6 +977,180 @@ void main() {
     expect(storey1.elevation, closeTo(3.0, 1e-4));
     expect(storey1.floorFinishThickness, closeTo(0.06, 1e-4));
   });
+
+  test('Standard MEP riser shaft opening (40x60 cm) geometry and 90 deg rotation', () {
+    // Standard plumbing / HVAC / electrical utility riser shaft is 40 x 60 cm (0.40 x 0.60 m)
+    double shaftW = 0.40;
+    double shaftH = 0.60;
+    const center = Offset(2.0, 2.0);
+
+    List<Offset> makeShaftPoly(double w, double h, Offset c) {
+      final halfW = w / 2.0;
+      final halfH = h / 2.0;
+      return [
+        Offset(c.dx - halfW, c.dy - halfH),
+        Offset(c.dx + halfW, c.dy - halfH),
+        Offset(c.dx + halfW, c.dy + halfH),
+        Offset(c.dx - halfW, c.dy + halfH),
+      ];
+    }
+
+    final poly0 = makeShaftPoly(shaftW, shaftH, center);
+    expect(poly0.length, equals(4));
+    expect((poly0[1].dx - poly0[0].dx).abs(), closeTo(0.40, 1e-4));
+    expect((poly0[2].dy - poly0[1].dy).abs(), closeTo(0.60, 1e-4));
+
+    // 90 degree rotation toggles width and height: 40x60 -> 60x40 cm
+    final temp = shaftW;
+    shaftW = shaftH;
+    shaftH = temp;
+
+    final polyRotated = makeShaftPoly(shaftW, shaftH, center);
+    expect((polyRotated[1].dx - polyRotated[0].dx).abs(), closeTo(0.60, 1e-4));
+    expect((polyRotated[2].dy - polyRotated[1].dy).abs(), closeTo(0.40, 1e-4));
+  });
+
+  test('Slab opening rotation 90 deg CCW around its centroid', () {
+    final poly = [
+      const Offset(1.8, 1.7),
+      const Offset(2.2, 1.7),
+      const Offset(2.2, 2.3),
+      const Offset(1.8, 2.3),
+    ];
+    final center = Offset(
+      poly.map((p) => p.dx).reduce((a, b) => a + b) / poly.length,
+      poly.map((p) => p.dy).reduce((a, b) => a + b) / poly.length,
+    );
+    expect(center.dx, closeTo(2.0, 1e-4));
+    expect(center.dy, closeTo(2.0, 1e-4));
+
+    // Rotate 90 deg CCW around center: (dx, dy) -> (-dy, dx)
+    final rotated = poly.map((p) {
+      final d = p - center;
+      return center + Offset(-d.dy, d.dx);
+    }).toList();
+
+    // Verify center is unchanged
+    final rotatedCenter = Offset(
+      rotated.map((p) => p.dx).reduce((a, b) => a + b) / rotated.length,
+      rotated.map((p) => p.dy).reduce((a, b) => a + b) / rotated.length,
+    );
+    expect(rotatedCenter.dx, closeTo(2.0, 1e-4));
+    expect(rotatedCenter.dy, closeTo(2.0, 1e-4));
+
+    // Dimensions swapped: original width was 0.40, height was 0.60
+    // After 90 deg CCW rotation, width is 0.60, height is 0.40
+    final minX = rotated.map((p) => p.dx).reduce(math.min);
+    final maxX = rotated.map((p) => p.dx).reduce(math.max);
+    final minY = rotated.map((p) => p.dy).reduce(math.min);
+    final maxY = rotated.map((p) => p.dy).reduce(math.max);
+    expect(maxX - minX, closeTo(0.60, 1e-4));
+    expect(maxY - minY, closeTo(0.40, 1e-4));
+  });
+
+  test('Slab opening relocation / move translates relative corner offsets to new center', () {
+    const slab = StructuralSlab(
+      id: 'slab_1',
+      polygon: [Offset(0, 0), Offset(6, 0), Offset(6, 6), Offset(0, 6)],
+      thickness: 0.20,
+      openings: [
+        [
+          Offset(1.8, 1.7),
+          Offset(2.2, 1.7),
+          Offset(2.2, 2.3),
+          Offset(1.8, 2.3),
+        ],
+      ],
+    );
+
+    final op = slab.openings.first;
+    final origCenter = Offset(
+      op.map((p) => p.dx).reduce((a, b) => a + b) / op.length,
+      op.map((p) => p.dy).reduce((a, b) => a + b) / op.length,
+    );
+    final relativeOffsets = op.map((p) => p - origCenter).toList();
+
+    // Move opening to new center (4.0, 4.5)
+    const newCenter = Offset(4.0, 4.5);
+    final movedPoly = relativeOffsets.map((r) => newCenter + r).toList();
+
+    final movedSlab = slab.copyWith(openings: [movedPoly]);
+    expect(movedSlab.containsPoint(newCenter), isFalse); // Center of cutout is outside slab material
+    expect(movedSlab.containsPoint(const Offset(1.0, 1.0)), isTrue); // Rest of slab is solid
+    expect(movedSlab.containsPoint(origCenter), isTrue); // Old spot is now solid again!
+  });
+
+  testWidgets('ElementPaletteBar renders standard shaft (40x60 cm) and custom opening tools', (tester) async {
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    bool rotatedCalled = false;
+    String selectedPreset = 'shaft';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('bg'),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              return ElementPaletteBar(
+                activeTool: StructuralDrawTool.slabOpening,
+                onSelectTool: (_) {},
+                currentColumnPreset: const StructuralColumn(
+                  id: 'c1',
+                  center: Offset.zero,
+                  width: 0.25,
+                  height: 0.50,
+                  thickness: 0.25,
+                ),
+                onUpdateColumnPreset: (_) {},
+                currentWallThickness: 0.25,
+                onUpdateWallThickness: (_) {},
+                currentBeamWidth: 0.25,
+                currentBeamDepth: 0.50,
+                currentSlabThickness: 0.20,
+                onUpdateSlabThickness: (_) {},
+                currentOpeningPreset: selectedPreset,
+                onUpdateOpeningPreset: (p) => setState(() => selectedPreset = p),
+                onRotateOpening: () => rotatedCalled = true,
+                hasOpeningStartCorner: false,
+                currentAxisName: '1',
+                isDrawingSlab: false,
+                hasSlabStartCorner: false,
+                slabPointCount: 0,
+                onCloseSlab: () {},
+                onUndoPoint: () {},
+                onClearSlab: () {},
+                onRotateColumn: () {},
+                onOpenCantileverReport: () {},
+                analysisSummary: StructuralAnalysisSummary.empty,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify shaft opening preset exists with 40x60 label
+    expect(find.textContaining('40×60'), findsOneWidget);
+
+    // Verify rotate 90 button exists and can be tapped
+    final rotateButton = find.byIcon(Icons.rotate_90_degrees_ccw);
+    expect(rotateButton, findsOneWidget);
+    await tester.tap(rotateButton);
+    expect(rotatedCalled, isTrue);
+
+    // Verify custom opening preset exists
+    final customButton = find.textContaining('Свободен');
+    expect(customButton, findsOneWidget);
+    await tester.tap(customButton);
+    await tester.pumpAndSettle();
+    expect(selectedPreset, equals('custom'));
+  });
 }
 
 

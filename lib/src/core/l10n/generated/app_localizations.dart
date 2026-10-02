@@ -2820,6 +2820,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'pts'**
   String get pointsAbbr;
+
+  /// Tag for picking opposite corner of opening
+  ///
+  /// In en, this message translates to:
+  /// **'Opening: pick opposite corner'**
+  String get previewOpeningCorner2Tag;
+
+  /// Button to cancel custom opening
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel opening'**
+  String get cancelOpening;
 }
 
 class _AppLocalizationsDelegate

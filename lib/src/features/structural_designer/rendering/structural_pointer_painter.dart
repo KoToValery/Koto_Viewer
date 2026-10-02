@@ -51,6 +51,8 @@ class StructuralPointerPainter extends CustomPainter {
   final Offset? beamStartPos;
   final Offset? slabStartCornerPos;
   final Offset? openingStartCornerPos;
+  final Size? previewOpeningSize;
+  final List<Offset>? previewOpeningPolygon;
   final List<Offset>? slabPoints;
   final String? liveDimensionText;
   final double scale;
@@ -68,6 +70,8 @@ class StructuralPointerPainter extends CustomPainter {
     this.beamStartPos,
     this.slabStartCornerPos,
     this.openingStartCornerPos,
+    this.previewOpeningSize,
+    this.previewOpeningPolygon,
     this.slabPoints,
     this.liveDimensionText,
     this.scale = 1.0,
@@ -136,8 +140,7 @@ class StructuralPointerPainter extends CustomPainter {
     }
 
     // 4b. Live rectangular opening preview on pointer overlay (if drawing slab opening)
-    if (activeTool == StructuralDrawTool.slabOpening && openingStartCornerPos != null) {
-      final rect = Rect.fromPoints(openingStartCornerPos!, effectiveTip);
+    if (activeTool == StructuralDrawTool.slabOpening) {
       final opFill = Paint()
         ..color = const Color(0x33FF9800)
         ..style = PaintingStyle.fill;
@@ -145,16 +148,47 @@ class StructuralPointerPainter extends CustomPainter {
         ..color = const Color(0xFFFF9800)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0;
-      canvas.drawRect(rect, opFill);
-      canvas.drawRect(rect, opBorder);
-      // Architectural X cross
-      canvas.drawLine(rect.topLeft, rect.bottomRight, opBorder);
-      canvas.drawLine(rect.topRight, rect.bottomLeft, opBorder);
+
+      if (openingStartCornerPos != null) {
+        final rect = Rect.fromPoints(openingStartCornerPos!, effectiveTip);
+        canvas.drawRect(rect, opFill);
+        canvas.drawRect(rect, opBorder);
+        // Architectural X cross
+        canvas.drawLine(rect.topLeft, rect.bottomRight, opBorder);
+        canvas.drawLine(rect.topRight, rect.bottomLeft, opBorder);
+      } else if (previewOpeningPolygon != null && previewOpeningPolygon!.length >= 3) {
+        final path = Path();
+        for (int i = 0; i < previewOpeningPolygon!.length; i++) {
+          final pt = effectiveTip + previewOpeningPolygon![i];
+          if (i == 0) {
+            path.moveTo(pt.dx, pt.dy);
+          } else {
+            path.lineTo(pt.dx, pt.dy);
+          }
+        }
+        path.close();
+        canvas.drawPath(path, opFill);
+        canvas.drawPath(path, opBorder);
+        if (previewOpeningPolygon!.length >= 4) {
+          canvas.drawLine(effectiveTip + previewOpeningPolygon![0], effectiveTip + previewOpeningPolygon![2], opBorder);
+          canvas.drawLine(effectiveTip + previewOpeningPolygon![1], effectiveTip + previewOpeningPolygon![3], opBorder);
+        }
+      } else if (previewOpeningSize != null) {
+        final rect = Rect.fromCenter(
+          center: effectiveTip,
+          width: previewOpeningSize!.width,
+          height: previewOpeningSize!.height,
+        );
+        canvas.drawRect(rect, opFill);
+        canvas.drawRect(rect, opBorder);
+        canvas.drawLine(rect.topLeft, rect.bottomRight, opBorder);
+        canvas.drawLine(rect.topRight, rect.bottomLeft, opBorder);
+      }
     }
 
-    // 5. Dimension badge snapped to 10 cm (when drawing wall or beam)
+    // 5. Dimension badge snapped to 10 cm (when drawing wall, beam, slab, or custom opening)
     if (liveDimensionText != null) {
-      final startPos = wallStartPos ?? beamStartPos;
+      final startPos = wallStartPos ?? beamStartPos ?? slabStartCornerPos ?? openingStartCornerPos;
       if (startPos != null) {
         _drawDimensionBadge(canvas, startPos, effectiveTip, liveDimensionText!);
       }
@@ -264,6 +298,8 @@ class StructuralPointerPainter extends CustomPainter {
         oldDelegate.beamStartPos != beamStartPos ||
         oldDelegate.slabStartCornerPos != slabStartCornerPos ||
         oldDelegate.openingStartCornerPos != openingStartCornerPos ||
+        oldDelegate.previewOpeningSize != previewOpeningSize ||
+        oldDelegate.previewOpeningPolygon != previewOpeningPolygon ||
         oldDelegate.slabPoints != slabPoints ||
         oldDelegate.liveDimensionText != liveDimensionText;
   }

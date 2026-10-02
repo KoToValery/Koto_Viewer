@@ -455,9 +455,11 @@
   "dimensionsEllipsis": "Размери...",
   "otherEllipsis": "Друга...",
   "hiddenBeamLabel": "скрита",
-  "shaftOpeningLabel": "Шахта (40×60)",
+  "shaftOpeningLabel": "Щранг (40×60 cm)",
   "elevatorOpeningLabel": "Асансьор (1.8×2.0)",
   "stairsOpeningLabel": "Стълби (2.4×4.5)",
   "nameEllipsis": "Име...",
-  "pointsAbbr": "т."
+  "pointsAbbr": "т.",
+  "previewOpeningCorner2Tag": "Отвор: избери срещуположен ъгъл",
+  "cancelOpening": "Отказ от отвор"
 }

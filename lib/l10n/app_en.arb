@@ -1288,5 +1288,9 @@
   "nameEllipsis": "Name...",
   "@nameEllipsis": { "description": "Name button in toolbar" },
   "pointsAbbr": "pts",
-  "@pointsAbbr": { "description": "Abbreviation for points" }
+  "@pointsAbbr": { "description": "Abbreviation for points" },
+  "previewOpeningCorner2Tag": "Opening: pick opposite corner",
+  "@previewOpeningCorner2Tag": { "description": "Tag for picking opposite corner of opening" },
+  "cancelOpening": "Cancel opening",
+  "@cancelOpening": { "description": "Button to cancel custom opening" }
 }
