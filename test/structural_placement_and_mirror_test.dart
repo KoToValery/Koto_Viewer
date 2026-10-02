@@ -499,9 +499,6 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify guidance banner text is present
-    expect(find.text('Плоча: посочете 1-ви ъгъл'), findsOneWidget);
-
     // Verify slab preset chips exist
     expect(find.text('h=18 cm'), findsOneWidget);
     expect(find.text('h=20 cm'), findsOneWidget);
@@ -511,5 +508,233 @@ void main() {
     // Verify there are no Flutter overflow errors!
     expect(tester.takeException(), isNull);
   });
+
+  test('StructuralColumn displayName and auto-increment naming', () {
+    const colDefault = StructuralColumn(
+      id: 'c1',
+      center: Offset(5, 5),
+    );
+    expect(colDefault.displayName, 'К');
+
+    const colNamed = StructuralColumn(
+      id: 'c2',
+      name: 'К1',
+      center: Offset(5, 5),
+    );
+    expect(colNamed.displayName, 'К1');
+
+    final copy = colNamed.copyWith(name: 'К5');
+    expect(copy.displayName, 'К5');
+  });
+
+  test('4-edge cycle mirror offsets column across outer faces in sequence', () {
+    // Column placed at (10, 10), width = 0.25, height = 0.50, L-shape
+    final base = StructuralColumn(
+      id: 'col_L',
+      name: 'К1',
+      center: const Offset(10.0, 10.0),
+      shape: ColumnShape.lShape,
+      width: 0.25,
+      height: 0.50,
+      rotationRad: 0.0,
+      isMirrored: false,
+    );
+
+    // Cycle 1: Right outer face (+W along uX, flip X)
+    final rightOffset = base.copyWith(
+      center: base.center + Offset(base.width, 0),
+      isMirrored: !base.isMirrored,
+    );
+    expect(rightOffset.center.dx, closeTo(10.25, 1e-4));
+    expect(rightOffset.center.dy, closeTo(10.0, 1e-4));
+    expect(rightOffset.isMirrored, isTrue);
+
+    // Cycle 2: Top outer face (+H along uY, flip Y -> isMirrored + pi rotation)
+    final topOffset = base.copyWith(
+      center: base.center + Offset(0, base.height),
+      isMirrored: !base.isMirrored,
+      rotationRad: math.pi,
+    );
+    expect(topOffset.center.dx, closeTo(10.0, 1e-4));
+    expect(topOffset.center.dy, closeTo(10.50, 1e-4));
+    expect(topOffset.rotationRad, closeTo(math.pi, 1e-4));
+
+    // Cycle 3: Left outer face (-W along uX, flip X)
+    final leftOffset = base.copyWith(
+      center: base.center - Offset(base.width, 0),
+      isMirrored: !base.isMirrored,
+    );
+    expect(leftOffset.center.dx, closeTo(9.75, 1e-4));
+    expect(leftOffset.center.dy, closeTo(10.0, 1e-4));
+
+    // Cycle 4: Bottom outer face (-H along uY, flip Y)
+    final bottomOffset = base.copyWith(
+      center: base.center - Offset(0, base.height),
+      isMirrored: !base.isMirrored,
+      rotationRad: math.pi,
+    );
+    expect(bottomOffset.center.dx, closeTo(10.0, 1e-4));
+    expect(bottomOffset.center.dy, closeTo(9.50, 1e-4));
+  });
+
+  test('Grid axis offset with duplication creates parallel axis at exact distance', () {
+    const verticalAxis = StructuralGridAxis(
+      id: 'ax_1',
+      name: '1',
+      start: Offset(5.0, 0.0),
+      end: Offset(5.0, 10.0),
+    );
+
+    // Normal to vertical axis pointing up is (-1, 0)
+    expect(verticalAxis.direction.dx, closeTo(0.0, 1e-4));
+    expect(verticalAxis.direction.dy, closeTo(1.0, 1e-4));
+    expect(verticalAxis.normal.dx, closeTo(-1.0, 1e-4));
+    expect(verticalAxis.normal.dy, closeTo(0.0, 1e-4));
+
+    // Offset to the right by 3.0 m:
+    // With right direction, normal * (-3.0) gives (+3.0, 0.0)
+    final offsetRightVec = const Offset(3.0, 0.0);
+    final dupAxis = StructuralGridAxis(
+      id: 'ax_2',
+      name: '2',
+      start: verticalAxis.start + offsetRightVec,
+      end: verticalAxis.end + offsetRightVec,
+    );
+
+    expect(dupAxis.start.dx, closeTo(8.0, 1e-4));
+    expect(dupAxis.start.dy, closeTo(0.0, 1e-4));
+    expect(dupAxis.end.dx, closeTo(8.0, 1e-4));
+    expect(dupAxis.end.dy, closeTo(10.0, 1e-4));
+    expect(dupAxis.length, closeTo(verticalAxis.length, 1e-4));
+  });
+
+  test('Column offset calculation across directional vectors and auto-increment naming', () {
+    const col1 = StructuralColumn(
+      id: 'c_1',
+      name: 'К1',
+      center: Offset(10.0, 10.0),
+      width: 0.25,
+      height: 0.50,
+    );
+
+    // 1. Offset to +X by 4.0 m
+    const distM = 4.0;
+    final offX = col1.copyWith(
+      id: 'c_2',
+      name: 'К2',
+      center: col1.center + const Offset(distM, 0),
+    );
+    expect(offX.center.dx, closeTo(14.0, 1e-4));
+    expect(offX.center.dy, closeTo(10.0, 1e-4));
+    expect(offX.displayName, 'К2');
+
+    // 2. Offset to +Y by 5.0 m
+    final offY = offX.copyWith(
+      id: 'c_3',
+      name: 'К3',
+      center: offX.center + const Offset(0, 5.0),
+    );
+    expect(offY.center.dx, closeTo(14.0, 1e-4));
+    expect(offY.center.dy, closeTo(15.0, 1e-4));
+    expect(offY.displayName, 'К3');
+
+    // 3. Offset to -X by 4.0 m
+    final offMinusX = offY.copyWith(
+      id: 'c_4',
+      name: 'К4',
+      center: offY.center + const Offset(-4.0, 0),
+    );
+    expect(offMinusX.center.dx, closeTo(10.0, 1e-4));
+    expect(offMinusX.center.dy, closeTo(15.0, 1e-4));
+    expect(offMinusX.displayName, 'К4');
+  });
+
+  testWidgets('StructuralDesignerScreen renders contextual bottom dock with actions when column is selected', (tester) async {
+    final doc = DxfDocument(
+      entities: [
+        const DxfLine(
+          layer: '0',
+          p1: Offset(0, 0),
+          p2: Offset(100, 100),
+        ),
+      ],
+      layers: {
+        '0': DxfLayer(name: '0', isVisible: true),
+      },
+      blocks: const {},
+      headerVars: const {},
+      bounds: const Rect.fromLTWH(0, 0, 100, 100),
+      entityStats: const {'LINE': 1},
+    );
+
+    const initialCol = StructuralColumn(
+      id: 'c_test_1',
+      name: 'К1',
+      center: Offset(50.0, 50.0),
+      width: 0.25,
+      height: 0.50,
+    );
+
+    final project = StructuralProject(
+      storeys: [
+        StoreyLevel(
+          id: 'storey_1',
+          name: 'Ниво 1',
+          elevation: 0.0,
+          height: 3.0,
+          columns: const [initialCol],
+        ),
+      ],
+      activeStoreyIndex: 0,
+    );
+
+    tester.view.physicalSize = const Size(500, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('bg'),
+        home: StructuralDesignerScreen(
+          document: doc,
+          initialProject: project,
+          initialCadBounds: const Rect.fromLTWH(0, 0, 100, 100),
+          title: 'Test CAD',
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Palette is initially shown
+    expect(find.text('Колона'), findsOneWidget);
+
+    // Tap on the placed column (center of canvas) to select it
+    await tester.tapAt(const Offset(250, 450));
+    await tester.pumpAndSettle();
+
+    // When the column is selected, the Contextual Bottom Action Dock replaces the palette!
+    // It contains the actions: Изтрий, Завърти 90°, Огледало, Офсет, Дублирай
+    expect(find.text('Офсет'), findsOneWidget);
+    expect(find.text('Завърти 90°'), findsOneWidget);
+    expect(find.text('Огледало'), findsOneWidget);
+    expect(find.text('Дублирай'), findsOneWidget);
+    expect(find.text('Изтрий'), findsOneWidget);
+
+    // Verify there are no overflows
+    expect(tester.takeException(), isNull);
+
+    // Tap the deselect (X) button on the dock
+    await tester.tap(find.byIcon(Icons.close_rounded).first);
+    await tester.pumpAndSettle();
+
+    // After deselecting, ElementPaletteBar returns
+    expect(find.text('Колона'), findsOneWidget);
+    expect(find.text('Шайба'), findsOneWidget);
+    expect(find.text('Плоча'), findsOneWidget);
+  });
 }
+
 

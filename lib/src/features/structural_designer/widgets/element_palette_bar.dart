@@ -110,10 +110,7 @@ class ElementPaletteBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. Dynamic Action Guidance Hint Banner
-            _buildGuidanceBanner(context),
-
-            // 2. Dynamic Scrollable Sub-bar for Active Tool parameters
+            // Dynamic Scrollable Sub-bar for Active Tool parameters
             if (activeTool == StructuralDrawTool.gridAxis)
               _buildGridAxisOptionsBar(context)
             else if (activeTool == StructuralDrawTool.column)
@@ -184,100 +181,6 @@ class ElementPaletteBar extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildGuidanceBanner(BuildContext context) {
-    final l10n = context.l10n;
-    final (IconData icon, String message, Color color) = switch (activeTool) {
-      StructuralDrawTool.column => (
-          Icons.adjust_rounded,
-          'Посочете място или задръжте за визьор',
-          const Color(0xFF00E5FF),
-        ),
-      StructuralDrawTool.shearWall => hasWallStart
-          ? (
-              Icons.straighten_rounded,
-              'Посочете крайна точка на шайбата',
-              const Color(0xFFFFB300),
-            )
-          : (
-              Icons.place_outlined,
-              'Посочете начална точка на шайбата',
-              const Color(0xFF00E5FF),
-            ),
-      StructuralDrawTool.beam => hasBeamStart
-          ? (
-              Icons.straighten_rounded,
-              'Посочете крайна точка на гредата',
-              const Color(0xFFFFB300),
-            )
-          : (
-              Icons.place_outlined,
-              'Посочете начална точка на гредата',
-              const Color(0xFF00E5FF),
-            ),
-      StructuralDrawTool.slab => hasSlabStartCorner
-          ? (
-              Icons.check_circle_outline,
-              l10n.previewSlabCorner2Tag,
-              const Color(0xFFFFB300),
-            )
-          : (
-              Icons.crop_square_rounded,
-              l10n.previewSlabCorner1Tag,
-              const Color(0xFF00E5FF),
-            ),
-      StructuralDrawTool.slabOpening => (
-          Icons.tab_unselected_rounded,
-          'Посочете отвор върху съществуваща плоча',
-          const Color(0xFFFF9800),
-        ),
-      StructuralDrawTool.gridAxis => hasFirstWallEdge
-          ? (
-              Icons.filter_2_rounded,
-              l10n.secondWallSidePrompt,
-              const Color(0xFFFFB300),
-            )
-          : (
-              Icons.filter_1_rounded,
-              l10n.firstWallSidePrompt,
-              const Color(0xFFFF453A),
-            ),
-      _ => (
-          Icons.touch_app_outlined,
-          'Изберете инструмент за чертане или редакция',
-          Colors.white70,
-        ),
-    };
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
       ),
     );
   }

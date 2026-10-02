@@ -27,6 +27,8 @@ class Structural2dPainter extends CustomPainter {
   final String? selectedColumnId;
   final String? selectedShearWallId;
   final String? selectedBeamId;
+  final StructuralGridAxis? axisOffsetPreview;
+  final StructuralColumn? columnOffsetPreview;
   final String? selectedGridAxisId;
   final Offset? firstWallEdgeStartCad;
   final Offset? firstWallEdgeEndCad;
@@ -62,6 +64,8 @@ class Structural2dPainter extends CustomPainter {
     this.beamPreviewWidth = 0.25,
     this.openingStartCornerCad,
     this.selectedOpening,
+    this.axisOffsetPreview,
+    this.columnOffsetPreview,
     this.selectedGridAxisId,
     this.firstWallEdgeStartCad,
     this.firstWallEdgeEndCad,
@@ -109,6 +113,11 @@ class Structural2dPainter extends CustomPainter {
       _drawGridAxis(canvas, axis, isGhost: false);
     }
 
+    // 2d. Draw Grid Axis Offset Preview (Live duplication guidance)
+    if (axisOffsetPreview != null) {
+      _drawGridAxis(canvas, axisOffsetPreview!, isGhost: false, isPreview: true);
+    }
+
     // 3. Draw Active Storey Shear Walls
     for (final wall in currentStorey.shearWalls) {
       _drawShearWall(canvas, wall, isGhost: false);
@@ -117,6 +126,11 @@ class Structural2dPainter extends CustomPainter {
     // 4. Draw Active Storey Columns
     for (final col in currentStorey.columns) {
       _drawColumn(canvas, col, isGhost: false);
+    }
+
+    // 4b. Draw Column Offset Preview (Live duplication guidance)
+    if (columnOffsetPreview != null) {
+      _drawColumn(canvas, columnOffsetPreview!, isGhost: false, isPreview: true);
     }
 
     // 5. Draw Interactive In-Progress Elements
@@ -488,25 +502,27 @@ class Structural2dPainter extends CustomPainter {
     }
   }
 
-  void _drawGridAxis(Canvas canvas, StructuralGridAxis axis, {required bool isGhost}) {
+  void _drawGridAxis(Canvas canvas, StructuralGridAxis axis, {required bool isGhost, bool isPreview = false}) {
     final p1 = cadToScene(axis.start);
     final p2 = cadToScene(axis.end);
-    final isSelected = !isGhost && (axis.id == selectedGridAxisId);
+    final isSelected = !isGhost && !isPreview && (axis.id == selectedGridAxisId);
 
     final axisPaint = Paint()
       ..color = isGhost
           ? const Color(0x66FF453A)
-          : (isSelected ? const Color(0xFFFF9F0A) : const Color(0xFFFF453A))
+          : isPreview
+              ? const Color(0xFF00E5FF)
+              : (isSelected ? const Color(0xFFFF9F0A) : const Color(0xFFFF453A))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (isSelected ? 2.5 : 1.5) / zoomScale;
+      ..strokeWidth = (isSelected || isPreview ? 2.5 : 1.5) / zoomScale;
 
     _drawDashDotLine(canvas, p1, p2, axisPaint);
 
     if (axis.bubbleAtEnd) {
-      _drawAxisBubble(canvas, p2, axis.direction, axis.name, isSelected: isSelected, isGhost: isGhost);
+      _drawAxisBubble(canvas, p2, axis.direction, axis.name, isSelected: isSelected || isPreview, isGhost: isGhost);
     }
     if (axis.bubbleAtStart) {
-      _drawAxisBubble(canvas, p1, -axis.direction, axis.name, isSelected: isSelected, isGhost: isGhost);
+      _drawAxisBubble(canvas, p1, -axis.direction, axis.name, isSelected: isSelected || isPreview, isGhost: isGhost);
     }
 
     if (isSelected) {
@@ -653,7 +669,7 @@ class Structural2dPainter extends CustomPainter {
   }
 
   void _drawColumn(Canvas canvas, StructuralColumn col,
-      {required bool isGhost}) {
+      {required bool isGhost, bool isPreview = false}) {
     final pts = col.polygonVertices.map(cadToScene).toList();
     if (pts.isEmpty) return;
     final path = Path()..moveTo(pts[0].dx, pts[0].dy);
@@ -663,17 +679,20 @@ class Structural2dPainter extends CustomPainter {
     path.close();
 
     final bool isMovingThis = movingColumn != null && movingColumn!.id == col.id;
-    final bool isSelected = !isGhost && (col.id == selectedColumnId);
-    final vCheck = (!isGhost && !isMovingThis)
+    final bool isSelected = !isGhost && !isPreview && (col.id == selectedColumnId);
+    final vCheck = (!isGhost && !isPreview && !isMovingThis)
         ? verticalReport?.getCheckForColumn(col.id)
         : null;
-    final bool isFloating = (!isGhost && !isMovingThis)
+    final bool isFloating = (!isGhost && !isPreview && !isMovingThis)
         ? (seismicReport?.isColumnFloating(col.id) ?? false)
         : false;
 
     final Color fillColor;
     final Color borderColor;
-    if (isGhost) {
+    if (isPreview) {
+      fillColor = const Color(0x6600E5FF);
+      borderColor = const Color(0xFF00E5FF);
+    } else if (isGhost) {
       fillColor = const Color(0x4D64B5F6);
       borderColor = const Color(0x8090CAF9);
     } else if (isMovingThis) {
@@ -717,7 +736,9 @@ class Structural2dPainter extends CustomPainter {
     final borderPaint = Paint()
       ..color = borderColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (isFloating || (vCheck != null && vCheck.status == VerticalCapacityStatus.critical)) ? (2.4 / zoomScale) : (1.5 / zoomScale);
+      ..strokeWidth = isPreview
+          ? (2.2 / zoomScale)
+          : ((isFloating || (vCheck != null && vCheck.status == VerticalCapacityStatus.critical)) ? (2.4 / zoomScale) : (1.5 / zoomScale));
 
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
@@ -807,6 +828,44 @@ class Structural2dPainter extends CustomPainter {
       Offset(centerScene.dx, centerScene.dy + crossLen),
       crossPaint,
     );
+
+    // Column designation / number badge (e.g. "К1", "К2") - compact, screen-space scaled so it doesn't obstruct
+    if (!isGhost && !isMovingThis && col.displayName.isNotEmpty) {
+      canvas.save();
+      canvas.translate(centerScene.dx, centerScene.dy);
+      canvas.scale(1.0 / zoomScale);
+
+      final textSpan = TextSpan(
+        text: col.displayName,
+        style: TextStyle(
+          color: isPreview
+              ? const Color(0xFF00E5FF)
+              : (isSelected ? const Color(0xFFFFD54F) : Colors.white),
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      );
+      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+      final bgRect = Rect.fromCenter(
+        center: Offset.zero,
+        width: tp.width + 6.0,
+        height: tp.height + 2.5,
+      );
+      final labelBgPaint = Paint()
+        ..color = const Color(0xCC1E1E24)
+        ..style = PaintingStyle.fill;
+      final labelBorderPaint = Paint()
+        ..color = isPreview
+            ? const Color(0xFF00E5FF)
+            : (isSelected ? const Color(0xFFFFB300) : const Color(0x66FFFFFF))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8;
+      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), labelBgPaint);
+      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), labelBorderPaint);
+      tp.paint(canvas, Offset(-tp.width / 2.0, -tp.height / 2.0));
+      canvas.restore();
+    }
   }
 
   void _drawInteractivePreview(Canvas canvas) {

@@ -18,6 +18,7 @@ enum GhostStoreyMode {
 /// Represents a structural reinforced concrete column.
 class StructuralColumn {
   final String id;
+  final String? name;
   final Offset center;
   final ColumnShape shape;
   final double width; // in meters (or diameter if circular, or Leg 1 for L-shape)
@@ -28,6 +29,7 @@ class StructuralColumn {
 
   const StructuralColumn({
     required this.id,
+    this.name,
     required this.center,
     this.shape = ColumnShape.rectangular,
     this.width = 0.25,
@@ -37,12 +39,16 @@ class StructuralColumn {
     this.isMirrored = false,
   });
 
+  /// User-facing column display name (e.g. "К1", "К2"). Falls back to "К" if empty.
+  String get displayName => (name != null && name!.trim().isNotEmpty) ? name!.trim() : 'К';
+
   /// Top-left corner of the column bounding box in CAD coordinates.
   Offset get topLeft => Offset(center.dx - width / 2.0, center.dy + height / 2.0);
 
   /// Creates a column with its top-left corner positioned at [topLeft] in CAD coordinates.
   factory StructuralColumn.fromTopLeft({
     required String id,
+    String? name,
     required Offset topLeft,
     ColumnShape shape = ColumnShape.rectangular,
     double width = 0.25,
@@ -54,6 +60,7 @@ class StructuralColumn {
     final center = Offset(topLeft.dx + width / 2.0, topLeft.dy - height / 2.0);
     return StructuralColumn(
       id: id,
+      name: name,
       center: center,
       shape: shape,
       width: width,
@@ -142,6 +149,7 @@ class StructuralColumn {
 
   StructuralColumn copyWith({
     String? id,
+    String? name,
     Offset? center,
     ColumnShape? shape,
     double? width,
@@ -152,6 +160,7 @@ class StructuralColumn {
   }) {
     return StructuralColumn(
       id: id ?? this.id,
+      name: name ?? this.name,
       center: center ?? this.center,
       shape: shape ?? this.shape,
       width: width ?? this.width,

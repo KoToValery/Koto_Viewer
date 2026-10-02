@@ -31,6 +31,7 @@ import 'widgets/vertical_capacity_sheet.dart';
 /// and automated real-time cantilever and deflection checks.
 class StructuralDesignerScreen extends StatefulWidget {
   final DxfDocument document;
+  final StructuralProject? initialProject;
   final Rect? initialCadBounds;
   final Matrix4? initialTransform;
   final String? title;
@@ -38,6 +39,7 @@ class StructuralDesignerScreen extends StatefulWidget {
   const StructuralDesignerScreen({
     super.key,
     required this.document,
+    this.initialProject,
     this.initialCadBounds,
     this.initialTransform,
     this.title,
@@ -107,6 +109,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   bool _draggingAxisStart = false;
   bool _isMovingColumn = false;
   bool _hasMovedSelectedColumn = false;
+  StructuralColumn? _columnMirrorBase;
+  int _columnMirrorCycle = 0;
+  bool _isOffsettingAxisWithDrag = false;
+  double _axisOffsetDistanceMeters = 3.0;
+  StructuralGridAxis? _axisBeingOffset;
+  double _currentOffsetSign = 1.0;
+
+  bool _isOffsettingColumnWithDrag = false;
+  double _columnOffsetDistanceMeters = 4.0;
+  StructuralColumn? _columnBeingOffset;
+  Offset _columnOffsetDirection = const Offset(1, 0);
+
+  bool get _hasSelectedElement =>
+      _selectedColumn != null ||
+      _selectedShearWall != null ||
+      _selectedBeam != null ||
+      _selectedOpening != null ||
+      _selectedGridAxis != null;
 
   // Slab Correction States (Kotocadastre object correction workflow)
   StructuralSlab? _editingSlab;
@@ -158,7 +178,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // Underlay filter starts off (all layers visible as in commit e781d51).
     // The user can manually toggle structural underlay filtering via the AppBar funnel icon.
 
-    _project = const StructuralProject();
+    _project = widget.initialProject ?? const StructuralProject();
     _runAnalysis();
   }
 
@@ -444,15 +464,28 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   (StructuralGridAxis, bool)? _hitTestGridAxisHandle(Offset screenPos) {
-    if (_selectedGridAxis == null) return null;
     const double hitMarginScreen = 28.0;
-    final p1 = _cadToScreen(_selectedGridAxis!.start);
-    final p2 = _cadToScreen(_selectedGridAxis!.end);
-    if ((screenPos - p1).distance <= hitMarginScreen) {
-      return (_selectedGridAxis!, true); // start handle
+    if (_selectedGridAxis != null) {
+      final p1 = _cadToScreen(_selectedGridAxis!.start);
+      final p2 = _cadToScreen(_selectedGridAxis!.end);
+      if ((screenPos - p1).distance <= hitMarginScreen) {
+        return (_selectedGridAxis!, true); // start handle
+      }
+      if ((screenPos - p2).distance <= hitMarginScreen) {
+        return (_selectedGridAxis!, false); // end handle
+      }
     }
-    if ((screenPos - p2).distance <= hitMarginScreen) {
-      return (_selectedGridAxis!, false); // end handle
+    // Also test endpoints of all other grid axes in the active storey
+    for (final axis in _project.activeStorey.gridAxes) {
+      if (_selectedGridAxis != null && axis.id == _selectedGridAxis!.id) continue;
+      final p1 = _cadToScreen(axis.start);
+      final p2 = _cadToScreen(axis.end);
+      if ((screenPos - p1).distance <= hitMarginScreen) {
+        return (axis, true);
+      }
+      if ((screenPos - p2).distance <= hitMarginScreen) {
+        return (axis, false);
+      }
     }
     return null;
   }
@@ -519,6 +552,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _rotateSelectedColumn() {
     if (_selectedColumn == null) return;
+    _columnMirrorBase = null;
+    _columnMirrorCycle = 0;
     _pushUndo();
     final active = _project.activeStorey;
     final col = _selectedColumn!;
@@ -539,20 +574,104 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_selectedColumn == null) return;
     _pushUndo();
     final active = _project.activeStorey;
-    final col = _selectedColumn!;
+    final current = _selectedColumn!;
+
+    // Initialize or continue the outer-edge reflection sequence
+    if (_columnMirrorBase == null || _columnMirrorBase!.id != current.id) {
+      _columnMirrorBase = current;
+      _columnMirrorCycle = 0;
+    }
+
+    // Sequence cycles through 4 outer bounding faces, then loops back to original:
+    // 1: Right face (+W offset along uX, flip X)
+    // 2: Top face (+H offset along uY, flip Y)
+    // 3: Left face (-W offset along uX, flip X)
+    // 4: Bottom face (-H offset along uY, flip Y)
+    // 0: Reset to original baseline
+    _columnMirrorCycle = (_columnMirrorCycle + 1) % 5;
 
     final StructuralColumn updatedCol;
-    if (col.shape == ColumnShape.lShape) {
-      // Mirroring L-shaped column flips the orientation of the L
-      updatedCol = col.copyWith(
-        isMirrored: !col.isMirrored,
-      );
+    if (_columnMirrorCycle == 0) {
+      // Loop back to initial baseline element
+      updatedCol = _columnMirrorBase!;
+      _columnMirrorBase = null;
     } else {
-      // True geometric reflection across vertical axis: theta -> (pi - theta)
-      final double newRot = (math.pi - col.rotationRad) % (2 * math.pi);
-      updatedCol = col.copyWith(
-        rotationRad: newRot,
-      );
+      final base = _columnMirrorBase!;
+      final double rot = base.rotationRad;
+      final cosA = math.cos(rot);
+      final sinA = math.sin(rot);
+      // Unit vectors along column width (uX) and column height (uY)
+      final uX = Offset(cosA, sinA);
+      final uY = Offset(-sinA, cosA);
+
+      final double w = base.width;
+      final double h = base.height;
+
+      switch (_columnMirrorCycle) {
+        case 1:
+          // 1. Right outer face (+W offset along uX)
+          final newCenter = base.center + uX * w;
+          if (base.shape == ColumnShape.lShape) {
+            updatedCol = base.copyWith(
+              center: newCenter,
+              isMirrored: !base.isMirrored,
+            );
+          } else {
+            updatedCol = base.copyWith(
+              center: newCenter,
+              rotationRad: (math.pi - rot) % (2 * math.pi),
+            );
+          }
+          break;
+        case 2:
+          // 2. Top outer face (+H offset along uY)
+          final newCenter = base.center + uY * h;
+          if (base.shape == ColumnShape.lShape) {
+            updatedCol = base.copyWith(
+              center: newCenter,
+              isMirrored: !base.isMirrored,
+              rotationRad: (rot + math.pi) % (2 * math.pi),
+            );
+          } else {
+            updatedCol = base.copyWith(
+              center: newCenter,
+              rotationRad: (-rot) % (2 * math.pi),
+            );
+          }
+          break;
+        case 3:
+          // 3. Left outer face (-W offset along uX)
+          final newCenter = base.center - uX * w;
+          if (base.shape == ColumnShape.lShape) {
+            updatedCol = base.copyWith(
+              center: newCenter,
+              isMirrored: !base.isMirrored,
+            );
+          } else {
+            updatedCol = base.copyWith(
+              center: newCenter,
+              rotationRad: (math.pi - rot) % (2 * math.pi),
+            );
+          }
+          break;
+        case 4:
+        default:
+          // 4. Bottom outer face (-H offset along uY)
+          final newCenter = base.center - uY * h;
+          if (base.shape == ColumnShape.lShape) {
+            updatedCol = base.copyWith(
+              center: newCenter,
+              isMirrored: !base.isMirrored,
+              rotationRad: (rot + math.pi) % (2 * math.pi),
+            );
+          } else {
+            updatedCol = base.copyWith(
+              center: newCenter,
+              rotationRad: (-rot) % (2 * math.pi),
+            );
+          }
+          break;
+      }
     }
 
     final updatedCols = active.columns
@@ -565,38 +684,103 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
   }
 
-  void _updateSelectedColumnDimensions(double deltaWMeters, double deltaHMeters) {
+  String _generateNextColumnName(List<StructuralColumn> existing) {
+    int maxNum = 0;
+    final regExp = RegExp(r'^[КKkк](\d+)$');
+    for (final col in existing) {
+      final name = col.name ?? '';
+      final match = regExp.firstMatch(name.trim());
+      if (match != null) {
+        final val = int.tryParse(match.group(1)!);
+        if (val != null && val > maxNum) {
+          maxNum = val;
+        }
+      }
+    }
+    if (maxNum == 0 && existing.isNotEmpty) {
+      maxNum = existing.length;
+    }
+    return 'К${maxNum + 1}';
+  }
+
+  void _renameSelectedColumn() {
     if (_selectedColumn == null) return;
-    _pushUndo();
-    final col = _selectedColumn!;
-    final active = _project.activeStorey;
-    final scale = _cadUnitsPerMeter;
-    final currentWM = col.width / scale;
-    final currentHM = col.height / scale;
-    final newWM = (currentWM + deltaWMeters).clamp(0.15, 3.0);
-    final newHM = (currentHM + deltaHMeters).clamp(0.15, 3.0);
-    final updatedCol = col.copyWith(
-      width: double.parse(newWM.toStringAsFixed(2)) * scale,
-      height: double.parse(newHM.toStringAsFixed(2)) * scale,
-    );
-    final updatedCols = active.columns
-        .map((c) => c.id == updatedCol.id ? updatedCol : c)
-        .toList();
-    _updateActiveStorey(active.copyWith(columns: updatedCols));
-    setState(() {
-      _selectedColumn = updatedCol;
+    final current = _selectedColumn!;
+    final controller = TextEditingController(text: current.displayName);
+    showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFFFB300), width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_outlined, color: Color(0xFFFFB300), size: 20),
+            SizedBox(width: 8),
+            Text('Преименуване на колона', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          decoration: const InputDecoration(
+            labelText: 'Обозначение (напр. К1, К2, С1)',
+            labelStyle: TextStyle(color: Color(0xFFFFB300)),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300))),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300), width: 2)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отказ', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFB300),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              final val = controller.text.trim();
+              Navigator.of(ctx).pop(val.isNotEmpty ? val : current.displayName);
+            },
+            child: const Text('Запази', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ).then((newName) {
+      if (newName != null && newName.isNotEmpty && newName != current.displayName) {
+        _pushUndo();
+        final updated = current.copyWith(name: newName);
+        final active = _project.activeStorey;
+        final updatedCols = active.columns
+            .map((c) => c.id == updated.id ? updated : c)
+            .toList();
+        _updateActiveStorey(active.copyWith(columns: updatedCols));
+        setState(() {
+          _selectedColumn = updated;
+        });
+        HapticFeedback.selectionClick();
+      }
     });
-    HapticFeedback.selectionClick();
   }
 
   void _duplicateSelectedColumn() {
     if (_selectedColumn == null) return;
+    _columnMirrorBase = null;
+    _columnMirrorCycle = 0;
     _pushUndo();
     final col = _selectedColumn!;
     final active = _project.activeStorey;
     final offset = Offset(0.20 * _cadUnitsPerMeter, -0.20 * _cadUnitsPerMeter);
+    final nextName = _generateNextColumnName(active.columns);
     final dup = StructuralColumn(
       id: 'col_${DateTime.now().millisecondsSinceEpoch}',
+      name: nextName,
       center: col.center + offset,
       shape: col.shape,
       width: col.width,
@@ -662,26 +846,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _selectedShearWall = dup;
     });
     HapticFeedback.mediumImpact();
-  }
-
-  void _updateSelectedWallLength(double deltaMeters) {
-    if (_selectedShearWall == null) return;
-    _pushUndo();
-    final wall = _selectedShearWall!;
-    final active = _project.activeStorey;
-    final l = wall.length;
-    final newL = math.max(0.30 * _cadUnitsPerMeter, l + deltaMeters * _cadUnitsPerMeter);
-    final dir = (wall.end - wall.start) / (l > 1e-6 ? l : 1.0);
-    final newEnd = wall.start + dir * newL;
-    final updatedWall = wall.copyWith(end: newEnd);
-    final updatedWalls = active.shearWalls
-        .map((w) => w.id == updatedWall.id ? updatedWall : w)
-        .toList();
-    _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
-    setState(() {
-      _selectedShearWall = updatedWall;
-    });
-    HapticFeedback.selectionClick();
   }
 
   void _deleteSelectedBeam() {
@@ -801,23 +965,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
   }
 
-  void _updateSelectedAxisLength(double deltaMeters) {
-    if (_selectedGridAxis == null) return;
-    _pushUndo();
-    final axis = _selectedGridAxis!;
-    final l = axis.length;
-    final scale = _cadUnitsPerMeter;
-    final newL = math.max(0.50 * scale, l + deltaMeters * scale);
-    final dir = axis.direction;
-    final newEnd = axis.start + dir * newL;
-    final updated = axis.copyWith(end: newEnd);
-    final active = _project.activeStorey;
-    final axes = active.gridAxes.map((a) => a.id == updated.id ? updated : a).toList();
-    _updateActiveStorey(active.copyWith(gridAxes: axes));
-    setState(() => _selectedGridAxis = updated);
-    HapticFeedback.selectionClick();
-  }
-
   String _getNextAxisName(String current) {
     final num = int.tryParse(current);
     if (num != null) {
@@ -834,6 +981,701 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return latin[idxL + 1];
     }
     return '${current}_1';
+  }
+
+  Offset _computeAxisOffsetVector(StructuralGridAxis axis, double distanceMeters, double directionSign) {
+    final scale = _cadUnitsPerMeter;
+    final distCad = distanceMeters * scale;
+    final normal = axis.normal;
+    final angle = axis.angleRad;
+    final isVertical = (math.cos(angle).abs() < math.sin(angle).abs());
+
+    if (isVertical) {
+      // directionSign: -1 for Left, +1 for Right
+      final double sign = normal.dx > 0 ? (directionSign > 0 ? 1.0 : -1.0) : (directionSign > 0 ? -1.0 : 1.0);
+      return normal * (distCad * sign);
+    } else {
+      // directionSign: +1 for Up, -1 for Down
+      final double sign = normal.dy > 0 ? (directionSign > 0 ? 1.0 : -1.0) : (directionSign > 0 ? -1.0 : 1.0);
+      return normal * (distCad * sign);
+    }
+  }
+
+  void _updateAxisOffsetDrag(Offset screenPos) {
+    if (!_isOffsettingAxisWithDrag || _axisBeingOffset == null) return;
+    final cadPt = _screenToCad(screenPos);
+    final axis = _axisBeingOffset!;
+    final mid = (axis.start + axis.end) / 2.0;
+    final angle = axis.angleRad;
+    final isVertical = (math.cos(angle).abs() < math.sin(angle).abs());
+
+    final double newSign;
+    if (isVertical) {
+      newSign = (cadPt.dx >= mid.dx) ? 1.0 : -1.0;
+    } else {
+      newSign = (cadPt.dy >= mid.dy) ? 1.0 : -1.0;
+    }
+
+    if (newSign != _currentOffsetSign) {
+      setState(() {
+        _currentOffsetSign = newSign;
+      });
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  StructuralGridAxis? _getAxisOffsetPreview() {
+    if (!_isOffsettingAxisWithDrag || _axisBeingOffset == null) return null;
+    final axis = _axisBeingOffset!;
+    final offsetVec = _computeAxisOffsetVector(axis, _axisOffsetDistanceMeters, _currentOffsetSign);
+    return StructuralGridAxis(
+      id: 'preview_offset',
+      name: _getNextAxisName(axis.name),
+      start: axis.start + offsetVec,
+      end: axis.end + offsetVec,
+      bubbleAtStart: axis.bubbleAtStart,
+      bubbleAtEnd: axis.bubbleAtEnd,
+    );
+  }
+
+  void _startAxisOffsetDragMode(StructuralGridAxis axis, double distanceMeters) {
+    setState(() {
+      _isOffsettingAxisWithDrag = true;
+      _axisBeingOffset = axis;
+      _axisOffsetDistanceMeters = distanceMeters;
+      _currentOffsetSign = 1.0;
+    });
+  }
+
+  void _applyAxisOffset(StructuralGridAxis originalAxis, double distanceMeters, double directionSign) {
+    _axisOffsetDistanceMeters = distanceMeters;
+    final offsetVec = _computeAxisOffsetVector(originalAxis, distanceMeters, directionSign);
+    final nextName = _getNextAxisName(originalAxis.name);
+    final newAxis = StructuralGridAxis(
+      id: 'axis_${DateTime.now().millisecondsSinceEpoch}',
+      name: nextName,
+      start: originalAxis.start + offsetVec,
+      end: originalAxis.end + offsetVec,
+      bubbleAtStart: originalAxis.bubbleAtStart,
+      bubbleAtEnd: originalAxis.bubbleAtEnd,
+    );
+
+    _pushUndo();
+    final active = _project.activeStorey;
+    final updatedAxes = List<StructuralGridAxis>.from(active.gridAxes)..add(newAxis);
+    _updateActiveStorey(active.copyWith(gridAxes: updatedAxes));
+
+    setState(() {
+      _selectedGridAxis = newAxis;
+      _isOffsettingAxisWithDrag = false;
+      _axisBeingOffset = null;
+    });
+    HapticFeedback.mediumImpact();
+
+    // Ask user whether to delete previous axis
+    _promptDeletePreviousAxis(originalAxis);
+  }
+
+  void _promptDeletePreviousAxis(StructuralGridAxis previousAxis) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: Color(0xFF00E5FF), size: 20),
+            SizedBox(width: 8),
+            Text('Офсетът е създаден', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: Text(
+          'Желаете ли да изтриете предишната ос "${previousAxis.name}"?',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Запази и двете', style: TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF5252),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Изтрий предишната', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ).then((deletePrev) {
+      if (deletePrev == true) {
+        _deleteSpecificGridAxis(previousAxis.id);
+      }
+    });
+  }
+
+  void _deleteSpecificGridAxis(String axisId) {
+    _pushUndo();
+    final active = _project.activeStorey;
+    final updated = active.gridAxes.where((a) => a.id != axisId).toList();
+    _updateActiveStorey(active.copyWith(gridAxes: updated));
+    setState(() {
+      if (_selectedGridAxis?.id == axisId) {
+        _selectedGridAxis = null;
+      }
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  void _showGridAxisOffsetDialog() {
+    if (_selectedGridAxis == null) return;
+    final axis = _selectedGridAxis!;
+    final controller = TextEditingController(text: _axisOffsetDistanceMeters.toStringAsFixed(2));
+
+    final angle = axis.angleRad;
+    final isVertical = (math.cos(angle).abs() < math.sin(angle).abs());
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            double currentDist = double.tryParse(controller.text) ?? _axisOffsetDistanceMeters;
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Icons.straighten_rounded, color: Color(0xFF00E5FF), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Офсет с дублиране: Ос "${axis.name}"',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      decoration: const InputDecoration(
+                        labelText: 'Разстояние (метри)',
+                        labelStyle: TextStyle(color: Color(0xFF00E5FF)),
+                        suffixText: 'm',
+                        suffixStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2)),
+                      ),
+                      onChanged: (val) {
+                        final parsed = double.tryParse(val);
+                        if (parsed != null && parsed > 0) {
+                          setDialogState(() {
+                            currentDist = parsed;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    // Quick distance chips
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0].map((d) {
+                        final isSel = (currentDist - d).abs() < 1e-3;
+                        return ChoiceChip(
+                          label: Text('${d.toStringAsFixed(1)} m'),
+                          selected: isSel,
+                          selectedColor: const Color(0xFF00E5FF),
+                          backgroundColor: Colors.white12,
+                          labelStyle: TextStyle(
+                            color: isSel ? Colors.black : Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          onSelected: (_) {
+                            controller.text = d.toStringAsFixed(2);
+                            setDialogState(() {
+                              currentDist = d;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Посока на дублиране:',
+                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    // Direction buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white12,
+                              foregroundColor: const Color(0xFF00E5FF),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: const BorderSide(color: Color(0xFF00E5FF)),
+                              ),
+                            ),
+                            icon: Icon(isVertical ? Icons.arrow_back_rounded : Icons.arrow_upward_rounded, size: 16),
+                            label: Text(
+                              isVertical ? 'Наляво' : 'Нагоре',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            onPressed: () {
+                              final d = double.tryParse(controller.text) ?? currentDist;
+                              Navigator.of(dialogCtx).pop();
+                              _applyAxisOffset(axis, d, isVertical ? -1.0 : 1.0);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white12,
+                              foregroundColor: const Color(0xFF00E5FF),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: const BorderSide(color: Color(0xFF00E5FF)),
+                              ),
+                            ),
+                            icon: Icon(isVertical ? Icons.arrow_forward_rounded : Icons.arrow_downward_rounded, size: 16),
+                            label: Text(
+                              isVertical ? 'Надясно' : 'Надолу',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            onPressed: () {
+                              final d = double.tryParse(controller.text) ?? currentDist;
+                              Navigator.of(dialogCtx).pop();
+                              _applyAxisOffset(axis, d, isVertical ? 1.0 : -1.0);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        side: const BorderSide(color: Colors.white24),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.touch_app_outlined, size: 16),
+                      label: const Text(
+                        'Укажи посока с влачене на екрана',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                      onPressed: () {
+                        final d = double.tryParse(controller.text) ?? currentDist;
+                        Navigator.of(dialogCtx).pop();
+                        _startAxisOffsetDragMode(axis, d);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Отказ', style: TextStyle(color: Colors.white54)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _getNextColumnName(String baseName) {
+    final active = _project.activeStorey;
+    final existingNames = active.columns.map((c) => c.displayName.trim()).toSet();
+    final match = RegExp(r'^([^\d]*)(\d+)$').firstMatch(baseName.trim());
+
+    if (match != null) {
+      final prefix = match.group(1) ?? 'К';
+      int num = int.tryParse(match.group(2) ?? '1') ?? 1;
+      while (true) {
+        num++;
+        final candidate = '$prefix$num';
+        if (!existingNames.contains(candidate)) {
+          return candidate;
+        }
+      }
+    } else {
+      int maxNum = active.columns.length;
+      for (final c in active.columns) {
+        final m = RegExp(r'\d+').firstMatch(c.displayName);
+        if (m != null) {
+          final n = int.tryParse(m.group(0)!);
+          if (n != null && n > maxNum) maxNum = n;
+        }
+      }
+      return 'К${maxNum + 1}';
+    }
+  }
+
+  void _startColumnOffsetDragMode(StructuralColumn col, double distanceMeters) {
+    setState(() {
+      _isOffsettingColumnWithDrag = true;
+      _columnBeingOffset = col;
+      _columnOffsetDistanceMeters = distanceMeters;
+      _columnOffsetDirection = const Offset(1, 0);
+    });
+  }
+
+  void _updateColumnOffsetDrag(Offset screenPos) {
+    if (!_isOffsettingColumnWithDrag || _columnBeingOffset == null) return;
+    final cadPt = _screenToCad(screenPos);
+    final col = _columnBeingOffset!;
+    final delta = cadPt - col.center;
+
+    final Offset newDir;
+    if (delta.dx.abs() >= delta.dy.abs()) {
+      newDir = delta.dx >= 0 ? const Offset(1, 0) : const Offset(-1, 0);
+    } else {
+      newDir = delta.dy >= 0 ? const Offset(0, 1) : const Offset(0, -1);
+    }
+
+    if (newDir != _columnOffsetDirection) {
+      setState(() {
+        _columnOffsetDirection = newDir;
+      });
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  StructuralColumn? _getColumnOffsetPreview() {
+    if (!_isOffsettingColumnWithDrag || _columnBeingOffset == null) return null;
+    final col = _columnBeingOffset!;
+    final distCad = _columnOffsetDistanceMeters * _cadUnitsPerMeter;
+    final offsetVec = _columnOffsetDirection * distCad;
+    return col.copyWith(
+      id: 'preview_offset_col',
+      name: _getNextColumnName(col.displayName),
+      center: col.center + offsetVec,
+    );
+  }
+
+  void _applyColumnOffset(StructuralColumn originalCol, double distanceMeters, Offset direction) {
+    _columnOffsetDistanceMeters = distanceMeters;
+    final distCad = distanceMeters * _cadUnitsPerMeter;
+    final dirLen = direction.distance;
+    final normDir = dirLen > 1e-4 ? direction / dirLen : const Offset(1, 0);
+    final offsetVec = normDir * distCad;
+
+    final nextName = _getNextColumnName(originalCol.displayName);
+    final newCol = originalCol.copyWith(
+      id: 'col_${DateTime.now().millisecondsSinceEpoch}',
+      name: nextName,
+      center: originalCol.center + offsetVec,
+    );
+
+    _pushUndo();
+    final active = _project.activeStorey;
+    final updatedColumns = List<StructuralColumn>.from(active.columns)..add(newCol);
+    _updateActiveStorey(active.copyWith(columns: updatedColumns));
+
+    setState(() {
+      _selectedColumn = newCol;
+      _isOffsettingColumnWithDrag = false;
+      _columnBeingOffset = null;
+    });
+    HapticFeedback.mediumImpact();
+
+    _promptDeletePreviousColumn(originalCol);
+  }
+
+  void _promptDeletePreviousColumn(StructuralColumn previousCol) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: Color(0xFF00E5FF), size: 20),
+            SizedBox(width: 8),
+            Text('Офсетът е създаден', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: Text(
+          'Желаете ли да изтриете предишната колона "${previousCol.displayName}"?',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Запази и двете', style: TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF5252),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Изтрий предишната', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ).then((deletePrev) {
+      if (deletePrev == true) {
+        _deleteSpecificColumn(previousCol.id);
+      }
+    });
+  }
+
+  void _deleteSpecificColumn(String colId) {
+    _pushUndo();
+    final active = _project.activeStorey;
+    final updatedCols = active.columns.where((c) => c.id != colId).toList();
+    _updateActiveStorey(active.copyWith(columns: updatedCols));
+    setState(() {
+      if (_selectedColumn?.id == colId) {
+        _selectedColumn = null;
+      }
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  void _showColumnOffsetDialog() {
+    if (_selectedColumn == null) return;
+    final col = _selectedColumn!;
+    final controller = TextEditingController(text: _columnOffsetDistanceMeters.toStringAsFixed(2));
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            double currentDist = double.tryParse(controller.text) ?? _columnOffsetDistanceMeters;
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Icons.straighten_rounded, color: Color(0xFF00E5FF), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Офсет с дублиране: Колона "${col.displayName}"',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      decoration: const InputDecoration(
+                        labelText: 'Разстояние (метри)',
+                        labelStyle: TextStyle(color: Color(0xFF00E5FF)),
+                        suffixText: 'm',
+                        suffixStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2)),
+                      ),
+                      onChanged: (val) {
+                        final parsed = double.tryParse(val);
+                        if (parsed != null && parsed > 0) {
+                          setDialogState(() {
+                            currentDist = parsed;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0].map((d) {
+                        final isSel = (currentDist - d).abs() < 1e-3;
+                        return ChoiceChip(
+                          label: Text('${d.toStringAsFixed(1)} m'),
+                          selected: isSel,
+                          selectedColor: const Color(0xFF00E5FF),
+                          backgroundColor: Colors.white12,
+                          labelStyle: TextStyle(
+                            color: isSel ? Colors.black : Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          onSelected: (_) {
+                            controller.text = d.toStringAsFixed(2);
+                            setDialogState(() {
+                              currentDist = d;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Посока на дублиране:',
+                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white12,
+                              foregroundColor: const Color(0xFF00E5FF),
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: const BorderSide(color: Color(0xFF00E5FF)),
+                              ),
+                            ),
+                            icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                            label: const Text('← -X', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            onPressed: () {
+                              final d = double.tryParse(controller.text) ?? currentDist;
+                              Navigator.of(dialogCtx).pop();
+                              _applyColumnOffset(col, d, const Offset(-1, 0));
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white12,
+                              foregroundColor: const Color(0xFF00E5FF),
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: const BorderSide(color: Color(0xFF00E5FF)),
+                              ),
+                            ),
+                            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                            label: const Text('→ +X', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            onPressed: () {
+                              final d = double.tryParse(controller.text) ?? currentDist;
+                              Navigator.of(dialogCtx).pop();
+                              _applyColumnOffset(col, d, const Offset(1, 0));
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white12,
+                              foregroundColor: const Color(0xFF00E5FF),
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: const BorderSide(color: Color(0xFF00E5FF)),
+                              ),
+                            ),
+                            icon: const Icon(Icons.arrow_upward_rounded, size: 16),
+                            label: const Text('↑ +Y', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            onPressed: () {
+                              final d = double.tryParse(controller.text) ?? currentDist;
+                              Navigator.of(dialogCtx).pop();
+                              _applyColumnOffset(col, d, const Offset(0, 1));
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white12,
+                              foregroundColor: const Color(0xFF00E5FF),
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: const BorderSide(color: Color(0xFF00E5FF)),
+                              ),
+                            ),
+                            icon: const Icon(Icons.arrow_downward_rounded, size: 16),
+                            label: const Text('↓ -Y', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            onPressed: () {
+                              final d = double.tryParse(controller.text) ?? currentDist;
+                              Navigator.of(dialogCtx).pop();
+                              _applyColumnOffset(col, d, const Offset(0, -1));
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        side: const BorderSide(color: Colors.white24),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.touch_app_outlined, size: 16),
+                      label: const Text(
+                        'Укажи посока с влачене на екрана',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                      onPressed: () {
+                        final d = double.tryParse(controller.text) ?? currentDist;
+                        Navigator.of(dialogCtx).pop();
+                        _startColumnOffsetDragMode(col, d);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Отказ', style: TextStyle(color: Colors.white54)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showCustomColumnDialog() {
@@ -1459,17 +2301,31 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    // Grid Axis handle dragging check
-    if (_selectedGridAxis != null) {
-      final handle = _hitTestGridAxisHandle(event.localPosition);
-      if (handle != null) {
-        setState(() {
-          _isDraggingAxisHandle = true;
-          _draggingAxisStart = handle.$2;
-        });
-        HapticFeedback.selectionClick();
-        return;
-      }
+    // Grid Axis handle dragging check (works on selected or any existing grid axis)
+    final handle = _hitTestGridAxisHandle(event.localPosition);
+    if (handle != null) {
+      setState(() {
+        _selectedGridAxis = handle.$1;
+        _isDraggingAxisHandle = true;
+        _draggingAxisStart = handle.$2;
+        _selectedColumn = null;
+        _selectedShearWall = null;
+        _selectedBeam = null;
+      });
+      HapticFeedback.selectionClick();
+      return;
+    }
+
+    // Grid axis offset drag mode check
+    if (_isOffsettingAxisWithDrag && _axisBeingOffset != null) {
+      _updateAxisOffsetDrag(event.localPosition);
+      return;
+    }
+
+    // Column offset drag mode check
+    if (_isOffsettingColumnWithDrag && _columnBeingOffset != null) {
+      _updateColumnOffsetDrag(event.localPosition);
+      return;
     }
 
     // 3. Selection mode taps on column or slab
@@ -1537,6 +2393,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
+
+    // Updating grid axis offset drag direction
+    if (_isOffsettingAxisWithDrag && _axisBeingOffset != null) {
+      _updateAxisOffsetDrag(event.localPosition);
+      return;
+    }
+
+    // Updating column offset drag direction
+    if (_isOffsettingColumnWithDrag && _columnBeingOffset != null) {
+      _updateColumnOffsetDrag(event.localPosition);
+      return;
+    }
 
     // Dragging grid axis handle (extend/shorten along axis line)
     if (_isDraggingAxisHandle && _selectedGridAxis != null) {
@@ -2099,6 +2967,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
+    // Grid axis offset drag mode commit on release
+    if (_isOffsettingAxisWithDrag && _axisBeingOffset != null) {
+      final axis = _axisBeingOffset!;
+      final dist = _axisOffsetDistanceMeters;
+      final sign = _currentOffsetSign;
+      _applyAxisOffset(axis, dist, sign);
+      return;
+    }
+
+    // Column offset drag mode commit on release
+    if (_isOffsettingColumnWithDrag && _columnBeingOffset != null) {
+      final col = _columnBeingOffset!;
+      final dist = _columnOffsetDistanceMeters;
+      final dir = _columnOffsetDirection;
+      _applyColumnOffset(col, dist, dir);
+      return;
+    }
+
     // 0. Dragging grid axis handle commit on release
     if (_isDraggingAxisHandle) {
       _pushUndo();
@@ -2295,6 +3181,34 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
 
+    // 0b. Check if holding on an axis handle -> immediately drag endpoint
+    final axisHandle = _hitTestGridAxisHandle(details.localPosition);
+    if (axisHandle != null) {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _selectedGridAxis = axisHandle.$1;
+        _isDraggingAxisHandle = true;
+        _draggingAxisStart = axisHandle.$2;
+        _selectedColumn = null;
+        _selectedShearWall = null;
+        _selectedBeam = null;
+      });
+      return;
+    }
+
+    // 0c. Check if holding on an axis line -> select axis and open card
+    final hitAxis = _hitTestGridAxis(details.localPosition);
+    if (hitAxis != null) {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _selectedGridAxis = hitAxis;
+        _selectedColumn = null;
+        _selectedShearWall = null;
+        _selectedBeam = null;
+      });
+      return;
+    }
+
     // 1. Check if holding on an existing placed column
     final hitCol = _hitTestColumn(details.localPosition);
     if (hitCol != null) {
@@ -2335,6 +3249,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handleLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
+    if (_isDraggingAxisHandle && _selectedGridAxis != null) {
+      final cadPt = _screenToCad(details.localPosition);
+      final proj = _selectedGridAxis!.projectPoint(cadPt);
+      final updatedAxis = _draggingAxisStart
+          ? _selectedGridAxis!.copyWith(start: proj)
+          : _selectedGridAxis!.copyWith(end: proj);
+      final active = _project.activeStorey;
+      final axes = active.gridAxes
+          .map((a) => a.id == updatedAxis.id ? updatedAxis : a)
+          .toList();
+      _updateActiveStorey(active.copyWith(gridAxes: axes));
+      setState(() {
+        _selectedGridAxis = updatedAxis;
+      });
+      return;
+    }
     if (_isMovingColumn && _selectedColumn != null) {
       _updatePointer(details.localPosition, isMouse: false);
       final effectiveCad = _currentCadCoord;
@@ -2353,6 +3283,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handleLongPressEnd(LongPressEndDetails details) {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
+    if (_isDraggingAxisHandle) {
+      _pushUndo();
+      setState(() {
+        _isDraggingAxisHandle = false;
+      });
+      HapticFeedback.lightImpact();
+      return;
+    }
     if (_isMovingColumn && _selectedColumn != null) {
       if (_hasMovedSelectedColumn) {
         final newCenter = _currentCadCoord;
@@ -2534,8 +3472,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     if (_activeTool == StructuralDrawTool.column) {
       _pushUndo();
+      final nextColName = _generateNextColumnName(active.columns);
       final newCol = StructuralColumn(
         id: 'col_${DateTime.now().millisecondsSinceEpoch}',
+        name: nextColName,
         center: cadCoord,
         shape: _currentColumnPreset.shape,
         width: _currentColumnPreset.width * scale,
@@ -3210,6 +4150,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   selectedShearWallId: _selectedShearWall?.id,
                                   selectedBeamId: _selectedBeam?.id,
                                   selectedGridAxisId: _selectedGridAxis?.id,
+                                  axisOffsetPreview: _getAxisOffsetPreview(),
+                                  columnOffsetPreview: _getColumnOffsetPreview(),
                                   firstWallEdgeStartCad: _firstWallEdgeStartCad,
                                   firstWallEdgeEndCad: _firstWallEdgeEndCad,
                                   gridAxisPreviewStartCad: previewAxisStart,
@@ -3301,26 +4243,96 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                 ),
 
-              // 4. Floating Contextual Action Card for Selected Column, Shear Wall, Beam, Opening, or Grid Axis
-              if (_selectedColumn != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
-                _buildSelectedColumnActionCard(context),
-              if (_selectedShearWall != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
-                _buildSelectedWallActionCard(context),
-              if (_selectedBeam != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
-                _buildSelectedBeamActionCard(context),
-              if (_selectedOpening != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
-                _buildSelectedOpeningActionCard(context),
-              if (_selectedGridAxis != null && !_isMovingColumn && !_isPlacingWithHold && !_isEditingSlab)
-                _buildSelectedGridAxisActionCard(context),
+              // 3b. Grid Axis Offset Direction Drag Guide Banner
+              if (_isOffsettingAxisWithDrag && _axisBeingOffset != null)
+                Positioned(
+                  top: 10,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xEE1E1E24),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 3)),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF00E5FF)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Плъзнете за посока • Пуснете за офсет (${_axisOffsetDistanceMeters.toStringAsFixed(2)} m)',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => setState(() {
+                              _isOffsettingAxisWithDrag = false;
+                              _axisBeingOffset = null;
+                            }),
+                            child: const Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
-              // 5. Bottom Dock Bar (Switches to Slab Correction Bar when editing slab)
+              // 3c. Column Offset Direction Drag Guide Banner
+              if (_isOffsettingColumnWithDrag && _columnBeingOffset != null)
+                Positioned(
+                  top: 10,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xEE1E1E24),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 3)),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF00E5FF)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Плъзнете за посока • Пуснете за офсет (${_columnOffsetDistanceMeters.toStringAsFixed(2)} m)',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => setState(() {
+                              _isOffsettingColumnWithDrag = false;
+                              _columnBeingOffset = null;
+                            }),
+                            child: const Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              // 5. Bottom Dock Bar (Switches to Slab Correction Bar when editing slab, or Contextual Element Dock when element is selected)
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
                 child: _isEditingSlab
                     ? _buildSlabCorrectionBottomBar(context)
-                    : ElementPaletteBar(
+                    : (_hasSelectedElement && !_isMovingColumn && !_isPlacingWithHold)
+                        ? _buildContextualElementBottomDock(context)
+                        : ElementPaletteBar(
                         activeTool: _activeTool,
                         onSelectTool: (tool) {
                           setState(() {
@@ -3421,1044 +4433,379 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
-  Widget _buildSelectedColumnActionCard(BuildContext context) {
-    if (_selectedColumn == null || _isMovingColumn || _isPlacingWithHold || _isEditingSlab) {
+  Widget _buildContextualElementBottomDock(BuildContext context) {
+    if (!_hasSelectedElement || _isMovingColumn || _isPlacingWithHold || _isEditingSlab) {
       return const SizedBox.shrink();
     }
 
-    final colScreen = _cadToScreen(_selectedColumn!.center);
-    const double cardWidth = 350.0;
-    const double cardHeight = 88.0;
+    final Color primaryColor;
+    final String title;
+    final String subtitle;
+    final VoidCallback onDeselect;
+    final VoidCallback? onRename;
+    final List<Widget> actionButtons = [];
 
-    // Horizontal centering over column, clamped to viewport margins
-    final double left = (colScreen.dx - cardWidth / 2.0).clamp(
-      16.0,
-      math.max(16.0, _viewportSize.width - cardWidth - 16.0),
-    );
+    if (_selectedColumn != null) {
+      final col = _selectedColumn!;
+      primaryColor = const Color(0xFFFFB300);
+      final int wCm = (col.width / _cadUnitsPerMeter * 100).round();
+      final int hCm = (col.height / _cadUnitsPerMeter * 100).round();
+      final String dimStr = col.shape == ColumnShape.lShape
+          ? 'Г $wCm x $hCm / 25 cm'
+          : col.shape == ColumnShape.circular
+              ? 'Ø$wCm cm'
+              : '$wCm x $hCm cm';
+      title = col.displayName;
+      subtitle = dimStr;
+      onDeselect = () => setState(() {
+        _selectedColumn = null;
+        _columnMirrorBase = null;
+        _columnMirrorCycle = 0;
+      });
+      onRename = _renameSelectedColumn;
 
-    // Prefer positioning 30px above column top, or below if near top edge
-    double top = colScreen.dy - cardHeight - 28.0;
-    if (top < 12.0) {
-      top = colScreen.dy + 32.0;
-    }
-    // Prevent overlapping bottom dock bar
-    top = top.clamp(
-        12.0, math.max(12.0, _viewportSize.height - cardHeight - 160.0));
+      actionButtons.addAll([
+        _buildDockActionButton(
+          icon: Icons.delete_outline_rounded,
+          label: context.l10n.delete,
+          color: const Color(0xFFFF5252),
+          onTap: _deleteSelectedColumn,
+        ),
+        _buildDockActionButton(
+          icon: Icons.rotate_right_rounded,
+          label: context.l10n.rotateElement,
+          color: const Color(0xFFFFB300),
+          onTap: _rotateSelectedColumn,
+        ),
+        _buildDockActionButton(
+          icon: Icons.flip_rounded,
+          label: context.l10n.mirrorElement,
+          color: const Color(0xFFB388FF),
+          onTap: _mirrorSelectedColumn,
+        ),
+        _buildDockActionButton(
+          icon: Icons.straighten_rounded,
+          label: 'Офсет',
+          color: const Color(0xFF00E5FF),
+          onTap: _showColumnOffsetDialog,
+        ),
+        _buildDockActionButton(
+          icon: Icons.copy_rounded,
+          label: context.l10n.duplicateElement,
+          color: const Color(0xFF448AFF),
+          onTap: _duplicateSelectedColumn,
+        ),
+      ]);
+    } else if (_selectedShearWall != null) {
+      final wall = _selectedShearWall!;
+      primaryColor = const Color(0xFF00E5FF);
+      final double lengthM = wall.length / _cadUnitsPerMeter;
+      final int thickCm = (wall.thickness / _cadUnitsPerMeter * 100).round();
+      title = 'Шайба';
+      subtitle = '${lengthM.toStringAsFixed(2)} m (d=$thickCm cm)';
+      onDeselect = () => setState(() => _selectedShearWall = null);
+      onRename = null;
 
-    final int wCm =
-        (_selectedColumn!.width / _cadUnitsPerMeter * 100).round();
-    final int hCm =
-        (_selectedColumn!.height / _cadUnitsPerMeter * 100).round();
-    final String dimStr = _selectedColumn!.shape == ColumnShape.lShape
-        ? 'Г $wCm x $hCm / 25 cm'
-        : _selectedColumn!.shape == ColumnShape.circular
-            ? 'Ø$wCm cm'
-            : '$wCm x $hCm cm';
+      actionButtons.addAll([
+        _buildDockActionButton(
+          icon: Icons.delete_outline_rounded,
+          label: context.l10n.delete,
+          color: const Color(0xFFFF5252),
+          onTap: _deleteSelectedWall,
+        ),
+        _buildDockActionButton(
+          icon: Icons.swap_horiz_rounded,
+          label: context.l10n.flipSide,
+          color: const Color(0xFF00E5FF),
+          onTap: _flipSelectedWall,
+        ),
+        _buildDockActionButton(
+          icon: Icons.copy_rounded,
+          label: context.l10n.duplicateElement,
+          color: const Color(0xFFB388FF),
+          onTap: _duplicateSelectedWall,
+        ),
+      ]);
+    } else if (_selectedBeam != null) {
+      final beam = _selectedBeam!;
+      primaryColor = const Color(0xFFFB8C00);
+      final int wCm = (beam.width / _cadUnitsPerMeter * 100).round();
+      final int dCm = (beam.depth / _cadUnitsPerMeter * 100).round();
+      final double lenM = beam.length / _cadUnitsPerMeter;
+      title = 'Греда';
+      subtitle = '$wCm x $dCm cm, L = ${lenM.toStringAsFixed(2)} m';
+      onDeselect = () => setState(() => _selectedBeam = null);
+      onRename = null;
 
-    return Positioned(
-      left: left,
-      top: top,
-      child: Material(
-        color: Colors.transparent,
-        elevation: 8,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: cardWidth,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xF01E1E24),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFFFB300), width: 1.5),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x66000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
+      actionButtons.addAll([
+        _buildDockActionButton(
+          icon: Icons.delete_outline_rounded,
+          label: context.l10n.delete,
+          color: const Color(0xFFFF5252),
+          onTap: _deleteSelectedBeam,
+        ),
+        for (final (w, d, lbl) in [
+          (0.25, 0.50, '25x50'),
+          (0.25, 0.60, '25x60'),
+          (0.25, 0.40, '25x40'),
+        ])
+          InkWell(
+            onTap: () => _updateSelectedBeamDimensions(w, d),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
+                    ? const Color(0x33FB8C00)
+                    : Colors.white10,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
+                      ? const Color(0xFFFB8C00)
+                      : Colors.white24,
+                  width: 1,
+                ),
               ),
-            ],
+              child: Text(
+                lbl,
+                style: TextStyle(
+                  color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
+                      ? const Color(0xFFFFB74D)
+                      : Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header Row: Type & Dimensions badge + Modeling +/- 5cm buttons + Close
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFB300),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      context.l10n.selectedColumnTitle(dimStr),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // In-place modeling 5 cm buttons
-                  InkWell(
-                    onTap: () => _updateSelectedColumnDimensions(-0.05, -0.05),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        '-5 cm',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => _updateSelectedColumnDimensions(0.05, 0.05),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        '+5 cm',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () => setState(() => _selectedColumn = null),
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Padding(
-                      padding: EdgeInsets.all(2.0),
-                      child: Icon(Icons.close_rounded,
-                          size: 16, color: Colors.white54),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // Action Buttons Row: Delete, Rotate 90°, Mirror, Duplicate
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // 1. Delete Button (Red)
-                  InkWell(
-                    onTap: _deleteSelectedColumn,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x29FF5252),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: const Color(0xFFFF5252), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.delete_outline_rounded,
-                              size: 15, color: Color(0xFFFF5252)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.delete,
-                            style: const TextStyle(
-                              color: Color(0xFFFF5252),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // 2. Rotate 90° Button (Amber)
-                  InkWell(
-                    onTap: _rotateSelectedColumn,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x29FFB300),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: const Color(0xFFFFB300), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.rotate_right_rounded,
-                              size: 15, color: Color(0xFFFFB300)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.rotateElement,
-                            style: const TextStyle(
-                              color: Color(0xFFFFB300),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // 3. Mirror Button (Purple)
-                  InkWell(
-                    onTap: _mirrorSelectedColumn,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x29B388FF),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: const Color(0xFFB388FF), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.flip_rounded,
-                              size: 15, color: Color(0xFFB388FF)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.mirrorElement,
-                            style: const TextStyle(
-                              color: Color(0xFFB388FF),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // 4. Duplicate Button (Teal / Cyan)
-                  InkWell(
-                    onTap: _duplicateSelectedColumn,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x2900E5FF),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: const Color(0xFF00E5FF), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.copy_rounded,
-                              size: 14, color: Color(0xFF00E5FF)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.duplicateElement,
-                            style: const TextStyle(
-                              color: Color(0xFF00E5FF),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+        InkWell(
+          onTap: () => _updateSelectedBeamLength(-0.10),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            margin: const EdgeInsets.only(right: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white10,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white24, width: 1),
+            ),
+            child: const Text(
+              '-10 cm',
+              style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSelectedWallActionCard(BuildContext context) {
-    if (_selectedShearWall == null || _isMovingColumn || _isPlacingWithHold || _isEditingSlab) {
-      return const SizedBox.shrink();
-    }
-
-    final wall = _selectedShearWall!;
-    final wallMidCad = (wall.start + wall.end) / 2.0;
-    final wallScreen = _cadToScreen(wallMidCad);
-    const double cardWidth = 350.0;
-    const double cardHeight = 88.0;
-
-    final double left = (wallScreen.dx - cardWidth / 2.0).clamp(
-      16.0,
-      math.max(16.0, _viewportSize.width - cardWidth - 16.0),
-    );
-
-    double top = wallScreen.dy - cardHeight - 28.0;
-    if (top < 12.0) {
-      top = wallScreen.dy + 32.0;
-    }
-    top = top.clamp(
-        12.0, math.max(12.0, _viewportSize.height - cardHeight - 160.0));
-
-    final double lengthM = wall.length / _cadUnitsPerMeter;
-    final int thickCm = (wall.thickness / _cadUnitsPerMeter * 100).round();
-    final String dimStr = '${lengthM.toStringAsFixed(2)} m (d=$thickCm cm)';
-
-    return Positioned(
-      left: left,
-      top: top,
-      child: Material(
-        color: Colors.transparent,
-        elevation: 8,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: cardWidth,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xF01E1E24),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x66000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header Row: Title & Close + [-10 cm] [+10 cm]
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF00E5FF),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      context.l10n.selectedWallTitle(dimStr),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // Length step buttons [-10 cm] [+10 cm]
-                  InkWell(
-                    onTap: () => _updateSelectedWallLength(-0.10),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        '-10 cm',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => _updateSelectedWallLength(0.10),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        '+10 cm',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () => setState(() => _selectedShearWall = null),
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Padding(
-                      padding: EdgeInsets.all(2.0),
-                      child: Icon(Icons.close_rounded, size: 16, color: Colors.white54),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // Action Buttons Row: Delete, Flip Side, Duplicate
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // 1. Delete Button (Red)
-                  InkWell(
-                    onTap: _deleteSelectedWall,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x29FF5252),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFF5252), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFFF5252)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.delete,
-                            style: const TextStyle(
-                              color: Color(0xFFFF5252),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // 2. Flip Side Button (Teal / Cyan)
-                  InkWell(
-                    onTap: _flipSelectedWall,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x2900E5FF),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF00E5FF), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.swap_horiz_rounded, size: 15, color: Color(0xFF00E5FF)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.flipSide,
-                            style: const TextStyle(
-                              color: Color(0xFF00E5FF),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // 3. Duplicate Button (Purple)
-                  InkWell(
-                    onTap: _duplicateSelectedWall,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x29B388FF),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFB388FF), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.copy_rounded, size: 14, color: Color(0xFFB388FF)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.duplicateElement,
-                            style: const TextStyle(
-                              color: Color(0xFFB388FF),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+        InkWell(
+          onTap: () => _updateSelectedBeamLength(0.10),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            margin: const EdgeInsets.only(right: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white10,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white24, width: 1),
+            ),
+            child: const Text(
+              '+10 cm',
+              style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSelectedBeamActionCard(BuildContext context) {
-    if (_selectedBeam == null || _isPlacingWithHold || _isEditingSlab) {
-      return const SizedBox.shrink();
-    }
-
-    final midCad = (_selectedBeam!.start + _selectedBeam!.end) / 2.0;
-    final beamScreen = _cadToScreen(midCad);
-    const double cardWidth = 350.0;
-    const double cardHeight = 88.0;
-
-    final double left = (beamScreen.dx - cardWidth / 2.0).clamp(
-      16.0,
-      math.max(16.0, _viewportSize.width - cardWidth - 16.0),
-    );
-
-    double top = beamScreen.dy - cardHeight - 28.0;
-    if (top < 12.0) {
-      top = beamScreen.dy + 32.0;
-    }
-    top = top.clamp(
-        12.0, math.max(12.0, _viewportSize.height - cardHeight - 160.0));
-
-    final int wCm = (_selectedBeam!.width / _cadUnitsPerMeter * 100).round();
-    final int dCm = (_selectedBeam!.depth / _cadUnitsPerMeter * 100).round();
-    final double lenM = _selectedBeam!.length / _cadUnitsPerMeter;
-    final String dimStr = '$wCm x $dCm cm, L = ${lenM.toStringAsFixed(2)} m';
-
-    return Positioned(
-      left: left,
-      top: top,
-      child: Material(
-        color: Colors.transparent,
-        elevation: 8,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: cardWidth,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xF01E1E24),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFFB8C00), width: 1.5),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x66000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header Row: Title & Close + [-10 cm] [+10 cm]
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFB8C00),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      context.l10n.selectedBeamTitle(dimStr),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // Length step buttons [-10 cm] [+10 cm]
-                  InkWell(
-                    onTap: () => _updateSelectedBeamLength(-0.10),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        '-10 cm',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => _updateSelectedBeamLength(0.10),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        '+10 cm',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () => setState(() => _selectedBeam = null),
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Padding(
-                      padding: EdgeInsets.all(2.0),
-                      child: Icon(Icons.close_rounded, size: 16, color: Colors.white54),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // Action Buttons Row: Presets, Delete, Duplicate
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Presets
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final (w, d, lbl) in [
-                        (0.25, 0.50, '25x50'),
-                        (0.25, 0.60, '25x60'),
-                        (0.25, 0.40, '25x40'),
-                      ])
-                        Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: InkWell(
-                            onTap: () => _updateSelectedBeamDimensions(w, d),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
-                                    ? const Color(0x33FB8C00)
-                                    : Colors.white10,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
-                                      ? const Color(0xFFFB8C00)
-                                      : Colors.transparent,
-                                ),
-                              ),
-                              child: Text(
-                                lbl,
-                                style: TextStyle(
-                                  color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
-                                      ? const Color(0xFFFFB74D)
-                                      : Colors.white70,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Delete Button
-                      InkWell(
-                        onTap: _deleteSelectedBeam,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: const Color(0x29FF5252),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFFF5252), width: 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFFF5252)),
-                              const SizedBox(width: 4),
-                              Text(
-                                context.l10n.delete,
-                                style: const TextStyle(
-                                  color: Color(0xFFFF5252),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Duplicate Button
-                      InkWell(
-                        onTap: _duplicateSelectedBeam,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: const Color(0x29B388FF),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFB388FF), width: 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.copy_rounded, size: 14, color: Color(0xFFB388FF)),
-                              const SizedBox(width: 4),
-                              Text(
-                                context.l10n.duplicateElement,
-                                style: const TextStyle(
-                                  color: Color(0xFFB388FF),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
+        _buildDockActionButton(
+          icon: Icons.copy_rounded,
+          label: context.l10n.duplicateElement,
+          color: const Color(0xFFB388FF),
+          onTap: _duplicateSelectedBeam,
         ),
-      ),
-    );
-  }
+      ]);
+    } else if (_selectedOpening != null) {
+      final (slabId, opIdx) = _selectedOpening!;
+      final active = _project.activeStorey;
+      final slab = active.slabs.firstWhere((s) => s.id == slabId, orElse: () => active.slabs.first);
+      final op = opIdx < slab.openings.length ? slab.openings[opIdx] : <Offset>[];
+      double minX = op.isNotEmpty ? op.first.dx : 0, maxX = op.isNotEmpty ? op.first.dx : 0;
+      double minY = op.isNotEmpty ? op.first.dy : 0, maxY = op.isNotEmpty ? op.first.dy : 0;
+      for (final p in op) {
+        minX = math.min(minX, p.dx);
+        maxX = math.max(maxX, p.dx);
+        minY = math.min(minY, p.dy);
+        maxY = math.max(maxY, p.dy);
+      }
+      final double wM = (maxX - minX) / _cadUnitsPerMeter;
+      final double hM = (maxY - minY) / _cadUnitsPerMeter;
+      primaryColor = const Color(0xFFFF9800);
+      title = 'Отвор в плоча';
+      subtitle = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
+      onDeselect = () => setState(() => _selectedOpening = null);
+      onRename = null;
 
-  Widget _buildSelectedOpeningActionCard(BuildContext context) {
-    if (_selectedOpening == null || _isPlacingWithHold || _isEditingSlab) {
+      actionButtons.add(
+        _buildDockActionButton(
+          icon: Icons.delete_outline_rounded,
+          label: context.l10n.delete,
+          color: const Color(0xFFFF5252),
+          onTap: _deleteSelectedOpening,
+        ),
+      );
+    } else if (_selectedGridAxis != null) {
+      final axis = _selectedGridAxis!;
+      primaryColor = const Color(0xFFFF453A);
+      final double lenM = axis.length / _cadUnitsPerMeter;
+      title = 'Ос "${axis.name}"';
+      subtitle = 'L = ${lenM.toStringAsFixed(2)} m';
+      onDeselect = () => setState(() => _selectedGridAxis = null);
+      onRename = _renameSelectedGridAxis;
+
+      actionButtons.addAll([
+        _buildDockActionButton(
+          icon: Icons.delete_outline_rounded,
+          label: context.l10n.deleteGridAxis,
+          color: const Color(0xFFFF5252),
+          onTap: _deleteSelectedGridAxis,
+        ),
+        _buildDockActionButton(
+          icon: Icons.straighten_rounded,
+          label: 'Офсет',
+          color: const Color(0xFF00E5FF),
+          onTap: _showGridAxisOffsetDialog,
+        ),
+        _buildDockActionButton(
+          icon: Icons.edit_outlined,
+          label: context.l10n.renameGridAxis,
+          color: const Color(0xFFFFB300),
+          onTap: _renameSelectedGridAxis,
+        ),
+      ]);
+    } else {
       return const SizedBox.shrink();
     }
 
-    final (slabId, opIdx) = _selectedOpening!;
-    final active = _project.activeStorey;
-    final slab = active.slabs.firstWhere((s) => s.id == slabId, orElse: () => active.slabs.first);
-    if (opIdx >= slab.openings.length) return const SizedBox.shrink();
-    final op = slab.openings[opIdx];
-    final centerCad = Offset(
-      op.map((p) => p.dx).reduce((a, b) => a + b) / op.length,
-      op.map((p) => p.dy).reduce((a, b) => a + b) / op.length,
-    );
-    final opScreen = _cadToScreen(centerCad);
-    const double cardWidth = 280.0;
-    const double cardHeight = 56.0;
-
-    final double left = (opScreen.dx - cardWidth / 2.0).clamp(
-      16.0,
-      math.max(16.0, _viewportSize.width - cardWidth - 16.0),
-    );
-
-    double top = opScreen.dy - cardHeight - 28.0;
-    if (top < 12.0) {
-      top = opScreen.dy + 32.0;
-    }
-    top = top.clamp(
-        12.0, math.max(12.0, _viewportSize.height - cardHeight - 160.0));
-
-    double minX = op.first.dx, maxX = op.first.dx;
-    double minY = op.first.dy, maxY = op.first.dy;
-    for (final p in op) {
-      minX = math.min(minX, p.dx);
-      maxX = math.max(maxX, p.dx);
-      minY = math.min(minY, p.dy);
-      maxY = math.max(maxY, p.dy);
-    }
-    final double wM = (maxX - minX) / _cadUnitsPerMeter;
-    final double hM = (maxY - minY) / _cadUnitsPerMeter;
-    final String dimStr = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
-
-    return Positioned(
-      left: left,
-      top: top,
-      child: Material(
-        color: Colors.transparent,
-        elevation: 8,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: cardWidth,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xF01E1E24),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFFF9800), width: 1.5),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x66000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFA1E1E24),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(
+          top: BorderSide(color: primaryColor.withValues(alpha: 0.8), width: 1.5),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 14,
+            offset: Offset(0, -4),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFF9800),
-                      shape: BoxShape.circle,
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Row 1: Header (Element Badge & Subtitle, optional Rename, Close X button)
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (onRename != null) ...[
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: onRename,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2.0),
+                      child: Icon(Icons.edit_outlined, size: 14, color: primaryColor),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    context.l10n.selectedOpeningTitle(dimStr),
+                ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '•  $subtitle',
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Colors.white70,
                       fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w500,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+                ),
+                InkWell(
+                  onTap: onDeselect,
+                  borderRadius: BorderRadius.circular(12),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4.0),
+                    child: Icon(Icons.close_rounded, size: 18, color: Colors.white54),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Row 2: Action Buttons (Scrollable horizontally)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
                 children: [
-                  // Delete Button (Red)
-                  InkWell(
-                    onTap: _deleteSelectedOpening,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x29FF5252),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFF5252), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFFF5252)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.delete,
-                            style: const TextStyle(
-                              color: Color(0xFFFF5252),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () => setState(() => _selectedOpening = null),
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Padding(
-                      padding: EdgeInsets.all(2.0),
-                      child: Icon(Icons.close_rounded, size: 16, color: Colors.white54),
-                    ),
-                  ),
+                  for (int i = 0; i < actionButtons.length; i++) ...[
+                    actionButtons[i],
+                    if (i < actionButtons.length - 1) const SizedBox(width: 8),
+                  ],
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSelectedGridAxisActionCard(BuildContext context) {
-    if (_selectedGridAxis == null || _isPlacingWithHold || _isEditingSlab) {
-      return const SizedBox.shrink();
-    }
-
-    final midCad = (_selectedGridAxis!.start + _selectedGridAxis!.end) / 2.0;
-    final axisScreen = _cadToScreen(midCad);
-    const double cardWidth = 320.0;
-    const double cardHeight = 84.0;
-
-    final double left = (axisScreen.dx - cardWidth / 2.0).clamp(
-      16.0,
-      math.max(16.0, _viewportSize.width - cardWidth - 16.0),
-    );
-
-    double top = axisScreen.dy - cardHeight - 28.0;
-    if (top < 12.0) {
-      top = axisScreen.dy + 32.0;
-    }
-    top = top.clamp(
-        12.0, math.max(12.0, _viewportSize.height - cardHeight - 160.0));
-
-    final double lenM = _selectedGridAxis!.length / _cadUnitsPerMeter;
-    final String title = '${context.l10n.selectedGridAxisTitle(_selectedGridAxis!.name)} (L = ${lenM.toStringAsFixed(2)} m)';
-
-    return Positioned(
-      left: left,
-      top: top,
-      child: Material(
-        color: Colors.transparent,
-        elevation: 8,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: cardWidth,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xF01E1E24),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFFF5252), width: 1.5),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x66000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
+  Widget _buildDockActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color, width: 1.0),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header Row: Title, Close, [-0.5m] [+0.5m]
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFF5252),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => _updateSelectedAxisLength(-0.50),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        '-0.5 m',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => _updateSelectedAxisLength(0.50),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        '+0.5 m',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () => setState(() => _selectedGridAxis = null),
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Padding(
-                      padding: EdgeInsets.all(2.0),
-                      child: Icon(Icons.close_rounded, size: 16, color: Colors.white54),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // Action Buttons Row: Rename, Delete
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Rename button (cycle name)
-                  InkWell(
-                    onTap: _renameSelectedGridAxis,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x2900E5FF),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF00E5FF), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF00E5FF)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.renameGridAxis,
-                            style: const TextStyle(
-                              color: Color(0xFF00E5FF),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Delete Button
-                  InkWell(
-                    onTap: _deleteSelectedGridAxis,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0x29FF5252),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFF5252), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFFF5252)),
-                          const SizedBox(width: 4),
-                          Text(
-                            context.l10n.deleteGridAxis,
-                            style: const TextStyle(
-                              color: Color(0xFFFF5252),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
