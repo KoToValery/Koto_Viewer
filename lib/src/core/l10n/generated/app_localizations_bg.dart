@@ -1554,4 +1554,366 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get cancelOpening => 'Отказ от отвор';
+
+  @override
+  String get seismicStatMaxEccentricity => 'Макс. ексц.';
+
+  @override
+  String get seismicStatTorsion => 'Усукване';
+
+  @override
+  String get seismicStatusHigh => 'ВИСОКО';
+
+  @override
+  String get seismicStatusNormal => 'В норма';
+
+  @override
+  String get seismicStatFloatingColumns => 'Насадени колони';
+
+  @override
+  String get seismicStatShearWallsEc8 => 'Шайби (EC8)';
+
+  @override
+  String get seismicStatusDeficit => 'ДЕФИЦИТ';
+
+  @override
+  String get seismicStatusOkCoverage => 'ОК >=1%';
+
+  @override
+  String get seismicTabBalance => 'Баланс (CM/CR)';
+
+  @override
+  String get seismicTabWalls => 'Шайби (%)';
+
+  @override
+  String get seismicTabRegularity => 'Регулярност';
+
+  @override
+  String get seismicTabBeamsOpenings => 'Греди/Отвори';
+
+  @override
+  String get seismicNoStoreys => 'Няма данни за етажи в проекта.';
+
+  @override
+  String get seismicEccentricityTitle => 'Сеизмичен ексцентрицитет';
+
+  @override
+  String get seismicTorsionSensitive => 'Усуквателно чувствителна';
+
+  @override
+  String get seismicBalanced => 'Балансирана';
+
+  @override
+  String get seismicEccentricityXLabel => 'Ексцентрицитет X (ex)';
+
+  @override
+  String get seismicEccentricityYLabel => 'Ексцентрицитет Y (ey)';
+
+  @override
+  String get seismicLimitEc8Label => 'Лимит по EC8';
+
+  @override
+  String get seismicShearWallCoverageTitle => 'Покритие със земетръсни шайби';
+
+  @override
+  String get seismicOkMinCoverage => 'ОК (≥ 1.0%)';
+
+  @override
+  String get seismicDeficitMinCoverage => 'ДЕФИЦИТ (< 1.0%)';
+
+  @override
+  String get seismicWallCoverageXLabel => 'Покритие по X (ρ_wx):';
+
+  @override
+  String get seismicWallCoverageYLabel => 'Покритие по Y (ρ_wy):';
+
+  @override
+  String seismicWallRecommendationText(String area) {
+    return 'Препоръка по Eurocode 8 за България: минимум 1.0% - 1.5% шайби във всяко от двете направления спрямо етажна площ ($area m²).';
+  }
+
+  @override
+  String get seismicFloatingColumnsTitle =>
+      'Насадени колони (Floating / Transfer Columns)';
+
+  @override
+  String seismicCountFound(int count) {
+    return '$count открити';
+  }
+
+  @override
+  String get seismicNoFloatingColumnsText =>
+      'Няма насадени колони. Всички колони по височината стъпват надеждно върху вертикални опори на долните етажи.';
+
+  @override
+  String get seismicCriticalEc8FloatingText =>
+      'КРИТИЧНО ЗА ЗЕМЕТРЪС (EC8 §4.2.3.3): Насадените колони предават целия си сеизмичен и вертикален товар точково върху плочата!';
+
+  @override
+  String seismicFloatingColItem(String storey, String columns) {
+    return '• $storey: Колони $columns са насадени без колона отдолу.';
+  }
+
+  @override
+  String get seismicSoftStoreyTitle => 'Проверка за Мек етаж (Soft Storey)';
+
+  @override
+  String get seismicDanger => 'ОПАСНОСТ';
+
+  @override
+  String get seismicNone => 'НЯМА';
+
+  @override
+  String get seismicSoftStoreyDangerText =>
+      'Установена е рязка загуба на коравина (> 30%) между съседни етажи. Това създава предпоставка за етажен механизъм на разрушение при земетръс.';
+
+  @override
+  String get seismicSoftStoreyOkText =>
+      'Коравината между етажите се изменя плавно по височина (без меки етажи).';
+
+  @override
+  String get seismicNoBeamsOrOpenings =>
+      'Няма дефинирани греди или отвори в плочите.';
+
+  @override
+  String get seismicBeamSizingTitle =>
+      'Предварително оразмеряване на греди (h = L/10 - L/12):';
+
+  @override
+  String seismicSpanM(String span) {
+    return 'Отвор L = $span m';
+  }
+
+  @override
+  String get seismicOpeningsProximityTitle =>
+      'Инсталационни отвори близо до опори (< 4d):';
+
+  @override
+  String seismicRecFloatingCols(String names) {
+    return 'Колони $names са НАСАДЕНИ върху плочата (без колона отдолу). Това е сериозна сеизмична уязвимост! ';
+  }
+
+  @override
+  String seismicRecHighTorsion(String ecc, int pct) {
+    return 'Силно усукване: ексцентрицитет $ecc m ($pct%). ';
+  }
+
+  @override
+  String get seismicRecAddWallEast =>
+      'Препоръка: добавете шайба в източната (дясна) част. ';
+
+  @override
+  String get seismicRecAddWallWest =>
+      'Препоръка: добавете шайба в западната (лява) част. ';
+
+  @override
+  String get seismicRecAddWallNorth =>
+      'Препоръка: добавете шайба в северната част. ';
+
+  @override
+  String get seismicRecAddWallSouth =>
+      'Препоръка: добавете шайба в южната част. ';
+
+  @override
+  String seismicRecDeficitBoth(String rx, String ry) {
+    return 'Дефицит на шайби в двете направления (X: $rx%, Y: $ry% < 1.0%). Препоръчват се допълнителни шайби. ';
+  }
+
+  @override
+  String seismicRecDeficitX(String rx) {
+    return 'Дефицит на шайби по X ($rx% < 1.0%). Препоръчва се шайба по направление X. ';
+  }
+
+  @override
+  String seismicRecDeficitY(String ry) {
+    return 'Дефицит на шайби по Y ($ry% < 1.0%). Препоръчва се шайба по направление Y. ';
+  }
+
+  @override
+  String get seismicRecBalanced =>
+      'Сеизмичният баланс и процентното покритие с шайби са отлични. ';
+
+  @override
+  String get seismicRecSoftStoreyPrefix =>
+      'ВНИМАНИЕ: МЕК ЕТАЖ! Коравината на този етаж е с над 30% по-ниска от горния. ';
+
+  @override
+  String seismicRecBeamDepthInsufficient(
+    String span,
+    int depth,
+    int recW,
+    int recH,
+  ) {
+    return 'За отвор L = $span m, височина $depth cm е недостатъчна. Препоръчва се греда ${recW}x$recH cm.';
+  }
+
+  @override
+  String seismicRecBeamWidthInsufficient(int width, int depth) {
+    return 'Ширина $width cm е под сеизмичния минимум (25 cm по EC8). Препоръчва се 25x$depth cm.';
+  }
+
+  @override
+  String seismicRecBeamSizingOk(int width, int depth, String span) {
+    return 'Сечение ${width}x$depth cm е напълно оразмерено за отвор L = $span m.';
+  }
+
+  @override
+  String seismicRecOpeningClose(String dist, String support) {
+    return 'Отворът е на $dist m от $support (< 0.70 m), нарушава конуса на пробиване и изисква специално окантване!';
+  }
+
+  @override
+  String seismicRecOpeningSafe(String dist, String support) {
+    return 'Отворът е на безопасно разстояние ($dist m от $support).';
+  }
+
+  @override
+  String get verticalBasePressure => 'Базисен натиск';
+
+  @override
+  String get verticalNoColumns => 'Няма дефинирани колони в проекта.';
+
+  @override
+  String get verticalPunchingCheckLabel => 'Пробиване (EC2 §6.4):';
+
+  @override
+  String verticalRecSlabInsufficient(String span, int cur, int req) {
+    return 'При отвор L = $span m, дебелина $cur cm е недостатъчна. Препоръчва се плоча минимум $req cm.';
+  }
+
+  @override
+  String verticalRecSlabBeamlessDeflection(String span, int cur, int req) {
+    return 'При светъл отвор L = $span m без греди, плоча $cur cm ще провисне недопустимо. Препоръчва се минимум $req cm или главни греди 25x50 cm.';
+  }
+
+  @override
+  String verticalRecSlabSafe(int cur, String span) {
+    return 'Дебелината на плочата ($cur cm) е напълно достатъчна за светъл отвор L = $span m.';
+  }
+
+  @override
+  String verticalRecColOverloaded(
+    String name,
+    String storey,
+    int curW,
+    int curH,
+    String minSec,
+    int storeys,
+    String ned,
+    String nrd,
+  ) {
+    return 'Колона $name в $storey не може да е ${curW}x$curH cm, трябва да е минимум $minSec, за да носи $storeys етажа (Ned = $ned kN, капацитет Nrd = $nrd kN).';
+  }
+
+  @override
+  String verticalRecColWarning(
+    String name,
+    String storey,
+    int util,
+    String minSec,
+  ) {
+    return 'Колона $name в $storey е близо до капацитета си ($util%). Препоръчва се преминаване към $minSec.';
+  }
+
+  @override
+  String verticalRecColSafe(
+    String name,
+    int curW,
+    int curH,
+    String storey,
+    int storeys,
+    int util,
+  ) {
+    return 'Колона $name (${curW}x$curH cm) в $storey поема $storeys етажа напълно безопасно ($util%).';
+  }
+
+  @override
+  String verticalRecPunchingRisk(
+    String name,
+    String ved,
+    String vrdc,
+    int slabH,
+  ) {
+    return 'Риск от пробиване на плочата при $name (v_Ed = $ved MPa > v_Rd,c = $vrdc MPa). Препоръчва се капител (drop panel), плоча $slabH cm или по-голяма колона.';
+  }
+
+  @override
+  String verticalTabColumns(int count) {
+    return 'Колони ($count)';
+  }
+
+  @override
+  String verticalTabSlabs(int count) {
+    return 'Плочи ($count)';
+  }
+
+  @override
+  String get verticalTabFoundations => 'Основи';
+
+  @override
+  String verticalStoreysCarried(
+    String storey,
+    int storeys,
+    String storeysLabel,
+    String area,
+  ) {
+    return '$storey • Носи $storeys $storeysLabel • Atrib = $area m²';
+  }
+
+  @override
+  String get verticalStoreySingle => 'етаж';
+
+  @override
+  String get verticalStoreyPlural => 'етажа';
+
+  @override
+  String get verticalAxialCompressionLabel => 'Осов натиск (EC2 §5.8):';
+
+  @override
+  String get verticalNoSlabs => 'Няма данни за плочи в проекта.';
+
+  @override
+  String verticalSlabStoreyTitle(String storey) {
+    return 'Плоча - $storey';
+  }
+
+  @override
+  String get verticalSlabStatusOk => 'В норма';
+
+  @override
+  String get verticalSlabStatusEnlarge => 'Препоръчва се уголемяване';
+
+  @override
+  String get verticalClearSpanLmax => 'Светъл отвор (Lmax)';
+
+  @override
+  String get verticalCurrentThicknessH => 'Текуща дебелина (h)';
+
+  @override
+  String get verticalRequiredThicknessEc2 => 'Изисквана (EC2 §7.4)';
+
+  @override
+  String get verticalFoundationsEvaluation =>
+      'Оценка на натоварването върху основите';
+
+  @override
+  String get verticalTotalBaseLoadNed =>
+      'Общ вертикален товар в основата (Ned,base):';
+
+  @override
+  String get verticalFootprintArea => 'Застроена площ (фундаментна основа):';
+
+  @override
+  String get verticalMeanBasePressure =>
+      'Среден базисен натиск върху почвата (σ_base):';
+
+  @override
+  String verticalBasePressureSafeText(String pressure) {
+    return 'Базисният натиск ($pressure kPa) е в стандартните граници за фундаментна плоча/ивични основи в умерени до добри почви (R0 >= 200 kPa).';
+  }
+
+  @override
+  String verticalBasePressureHighText(String pressure) {
+    return 'Базисният натиск ($pressure kPa) е висок. Препоръчва се цялостна фундаментна плоча (mat foundation) или пилотно фундиране след геоложки доклад.';
+  }
 }

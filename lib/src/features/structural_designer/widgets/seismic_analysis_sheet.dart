@@ -108,7 +108,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             Row(
               children: [
                 _buildStatCard(
-                  title: 'Макс. ексцентр.',
+                  title: context.l10n.seismicStatMaxEccentricity,
                   value: '${(report.maxEccentricityRatio * 100).round()}%',
                   color: report.hasTorsionalSensitivity
                       ? const Color(0xFFFF1744)
@@ -116,26 +116,30 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                           ? const Color(0xFFFFB300)
                           : const Color(0xFF00E676)),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _buildStatCard(
-                  title: 'Усукване',
-                  value: report.hasTorsionalSensitivity ? 'ВИСОКО' : 'В норма',
+                  title: context.l10n.seismicStatTorsion,
+                  value: report.hasTorsionalSensitivity
+                      ? context.l10n.seismicStatusHigh
+                      : context.l10n.seismicStatusNormal,
                   color: report.hasTorsionalSensitivity
                       ? const Color(0xFFFF1744)
                       : const Color(0xFF00E676),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _buildStatCard(
-                  title: 'Насадени колони',
+                  title: context.l10n.seismicStatFloatingColumns,
                   value: '${report.totalFloatingColumnsCount}',
                   color: report.totalFloatingColumnsCount > 0
                       ? const Color(0xFFD500F9)
                       : const Color(0xFF00E676),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _buildStatCard(
-                  title: 'Шайби (EC8)',
-                  value: report.hasWallDeficit ? 'ДЕФИЦИТ' : 'ОК >=1%',
+                  title: context.l10n.seismicStatShearWallsEc8,
+                  value: report.hasWallDeficit
+                      ? context.l10n.seismicStatusDeficit
+                      : context.l10n.seismicStatusOkCoverage,
                   color: report.hasWallDeficit
                       ? const Color(0xFFFFB300)
                       : const Color(0xFF00E676),
@@ -144,22 +148,24 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             ),
             const SizedBox(height: 12),
 
-            // Tab Bar
+            // Tab Bar - scrollable with intrinsic tab widths to prevent overflow
             TabBar(
               controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               indicatorColor: const Color(0xFFD500F9),
               labelColor: const Color(0xFFD500F9),
               unselectedLabelColor: Colors.white60,
               labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               unselectedLabelStyle: const TextStyle(fontSize: 11),
-              tabs: const [
+              tabs: [
                 Tab(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.track_changes_rounded, size: 15),
-                      SizedBox(width: 4),
-                      Text('Баланс (CM/CR)'),
+                      const Icon(Icons.track_changes_rounded, size: 15),
+                      const SizedBox(width: 4),
+                      Text(context.l10n.seismicTabBalance),
                     ],
                   ),
                 ),
@@ -167,9 +173,9 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.line_weight_rounded, size: 15),
-                      SizedBox(width: 4),
-                      Text('Шайби (%)'),
+                      const Icon(Icons.line_weight_rounded, size: 15),
+                      const SizedBox(width: 4),
+                      Text(context.l10n.seismicTabWalls),
                     ],
                   ),
                 ),
@@ -177,9 +183,9 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.vertical_align_bottom_rounded, size: 15),
-                      SizedBox(width: 4),
-                      Text('Регулярност'),
+                      const Icon(Icons.vertical_align_bottom_rounded, size: 15),
+                      const SizedBox(width: 4),
+                      Text(context.l10n.seismicTabRegularity),
                     ],
                   ),
                 ),
@@ -187,9 +193,9 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.horizontal_rule_rounded, size: 15),
-                      SizedBox(width: 4),
-                      Text('Греди/Отвори'),
+                      const Icon(Icons.horizontal_rule_rounded, size: 15),
+                      const SizedBox(width: 4),
+                      Text(context.l10n.seismicTabBeamsOpenings),
                     ],
                   ),
                 ),
@@ -223,23 +229,26 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
   }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           color: const Color(0xFF282828),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
             Text(
@@ -257,9 +266,9 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
 
   Widget _buildTorsionalTab(BuildContext context, SeismicAnalysisReport report) {
     if (report.storeyChecks.isEmpty) {
-      return const Center(
-        child: Text('Няма данни за етажи в проекта.',
-            style: TextStyle(color: Colors.white60, fontSize: 13)),
+      return Center(
+        child: Text(context.l10n.seismicNoStoreys,
+            style: const TextStyle(color: Colors.white60, fontSize: 13)),
       );
     }
 
@@ -289,7 +298,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${check.storeyName} — Сеизмичен ексцентрицитет',
+                      '${check.storeyName} — ${context.l10n.seismicEccentricityTitle}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -305,7 +314,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       border: Border.all(color: color),
                     ),
                     child: Text(
-                      isSensitive ? 'Усуквателно чувствителна' : 'Балансирана',
+                      isSensitive ? context.l10n.seismicTorsionSensitive : context.l10n.seismicBalanced,
                       style: TextStyle(
                         color: color,
                         fontSize: 10,
@@ -321,9 +330,9 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSubmetric('Ексцентрицитет X (ex)', '${check.eccentricityM.dx.toStringAsFixed(2)} m (${(check.eccentricityRatioX * 100).round()}%)'),
-                  _buildSubmetric('Ексцентрицитет Y (ey)', '${check.eccentricityM.dy.toStringAsFixed(2)} m (${(check.eccentricityRatioY * 100).round()}%)'),
-                  _buildSubmetric('Лимит по EC8', '≤ 15%'),
+                  _buildSubmetric(context.l10n.seismicEccentricityXLabel, '${check.eccentricityM.dx.toStringAsFixed(2)} m (${(check.eccentricityRatioX * 100).round()}%)'),
+                  _buildSubmetric(context.l10n.seismicEccentricityYLabel, '${check.eccentricityM.dy.toStringAsFixed(2)} m (${(check.eccentricityRatioY * 100).round()}%)'),
+                  _buildSubmetric(context.l10n.seismicLimitEc8Label, '≤ 15%'),
                 ],
               ),
               const SizedBox(height: 8),
@@ -347,7 +356,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        check.architectRecommendation,
+                        check.localizedRecommendation(context.l10n),
                         style: TextStyle(
                           color: isSensitive ? const Color(0xFFFF8A80) : Colors.white,
                           fontSize: 11,
@@ -367,9 +376,9 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
 
   Widget _buildWallsTab(BuildContext context, SeismicAnalysisReport report) {
     if (report.storeyChecks.isEmpty) {
-      return const Center(
-        child: Text('Няма данни за етажи в проекта.',
-            style: TextStyle(color: Colors.white60, fontSize: 13)),
+      return Center(
+        child: Text(context.l10n.seismicNoStoreys,
+            style: const TextStyle(color: Colors.white60, fontSize: 13)),
       );
     }
 
@@ -399,7 +408,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${check.storeyName} — Покритие със земетръсни шайби',
+                      '${check.storeyName} — ${context.l10n.seismicShearWallCoverageTitle}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -415,7 +424,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       border: Border.all(color: cardColor),
                     ),
                     child: Text(
-                      (okX && okY) ? 'ОК (≥ 1.0%)' : 'ДЕФИЦИТ (< 1.0%)',
+                      (okX && okY) ? context.l10n.seismicOkMinCoverage : context.l10n.seismicDeficitMinCoverage,
                       style: TextStyle(
                         color: cardColor,
                         fontSize: 10,
@@ -429,7 +438,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
 
               // Coverage Bar X
               _buildRatioRow(
-                label: 'Покритие по X (ρ_wx):',
+                label: context.l10n.seismicWallCoverageXLabel,
                 valueText: '${check.wallRatioX.toStringAsFixed(2)}% (${check.wallAreaXM2.toStringAsFixed(1)} m²)',
                 ratio: check.wallRatioX / 1.5,
                 color: okX ? const Color(0xFF00E676) : const Color(0xFFFFB300),
@@ -438,7 +447,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
 
               // Coverage Bar Y
               _buildRatioRow(
-                label: 'Покритие по Y (ρ_wy):',
+                label: context.l10n.seismicWallCoverageYLabel,
                 valueText: '${check.wallRatioY.toStringAsFixed(2)}% (${check.wallAreaYM2.toStringAsFixed(1)} m²)',
                 ratio: check.wallRatioY / 1.5,
                 color: okY ? const Color(0xFF00E676) : const Color(0xFFFFB300),
@@ -446,7 +455,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               const SizedBox(height: 8),
 
               Text(
-                'Препоръка по Eurocode 8 за България: минимум 1.0% - 1.5% шайби във всяко от двете направления спрямо етажна площ (${check.floorAreaM2.toStringAsFixed(0)} m²).',
+                context.l10n.seismicWallRecommendationText(check.floorAreaM2.toStringAsFixed(0)),
                 style: const TextStyle(color: Colors.white60, fontSize: 10),
               ),
             ],
@@ -488,10 +497,10 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       size: 22,
                     ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Насадени колони (Floating / Transfer Columns)',
-                        style: TextStyle(
+                        context.l10n.seismicFloatingColumnsTitle,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -508,7 +517,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '${report.totalFloatingColumnsCount} открити',
+                        context.l10n.seismicCountFound(report.totalFloatingColumnsCount),
                         style: TextStyle(
                           color: report.totalFloatingColumnsCount > 0
                               ? const Color(0xFFEA80FC)
@@ -522,14 +531,14 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 ),
                 const SizedBox(height: 8),
                 if (report.totalFloatingColumnsCount == 0)
-                  const Text(
-                    'Няма насадени колони. Всички колони по височината стъпват надеждно върху вертикални опори на долните етажи.',
-                    style: TextStyle(color: Colors.white70, fontSize: 11),
+                  Text(
+                    context.l10n.seismicNoFloatingColumnsText,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
                   )
                 else ...[
-                  const Text(
-                    'КРИТИЧНО ЗА ЗЕМЕТРЪС (EC8 §4.2.3.3): Насадените колони предават целия си сеизмичен и вертикален товар точково върху плочата!',
-                    style: TextStyle(
+                  Text(
+                    context.l10n.seismicCriticalEc8FloatingText,
+                    style: const TextStyle(
                         color: Color(0xFFEA80FC),
                         fontSize: 11,
                         fontWeight: FontWeight.bold),
@@ -540,7 +549,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         child: Text(
-                          '• ${s.storeyName}: Колони ${s.floatingColumnNames.join(", ")} са насадени без колона отдолу.',
+                          context.l10n.seismicFloatingColItem(s.storeyName, s.floatingColumnNames.join(", ")),
                           style: const TextStyle(color: Colors.white, fontSize: 11),
                         ),
                       ),
@@ -576,10 +585,10 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       size: 20,
                     ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Проверка за Мек етаж (Soft Storey)',
-                        style: TextStyle(
+                        context.l10n.seismicSoftStoreyTitle,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -587,7 +596,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       ),
                     ),
                     Text(
-                      report.hasSoftStorey ? 'ОПАСНОСТ' : 'НЯМА',
+                      report.hasSoftStorey ? context.l10n.seismicDanger : context.l10n.seismicNone,
                       style: TextStyle(
                         color: report.hasSoftStorey
                             ? const Color(0xFFFF1744)
@@ -601,8 +610,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 const SizedBox(height: 6),
                 Text(
                   report.hasSoftStorey
-                      ? 'Установена е рязка загуба на коравина (> 30%) между съседни етажи. Това създава предпоставка за етажен механизъм на разрушение при земетръс.'
-                      : 'Коравината между етажите се изменя плавно по височина (без меки етажи).',
+                      ? context.l10n.seismicSoftStoreyDangerText
+                      : context.l10n.seismicSoftStoreyOkText,
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
               ],
@@ -615,10 +624,10 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
 
   Widget _buildBeamsAndOpeningsTab(BuildContext context, SeismicAnalysisReport report) {
     if (report.beamChecks.isEmpty && report.openingChecks.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'Няма дефинирани греди или отвори в плочите.',
-          style: TextStyle(color: Colors.white60, fontSize: 13),
+          context.l10n.seismicNoBeamsOrOpenings,
+          style: const TextStyle(color: Colors.white60, fontSize: 13),
         ),
       );
     }
@@ -627,11 +636,11 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
       padding: const EdgeInsets.symmetric(vertical: 6),
       children: [
         if (report.beamChecks.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.only(bottom: 6),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
             child: Text(
-              'Предварително оразмеряване на греди (h = L/10 - L/12):',
-              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              context.l10n.seismicBeamSizingTitle,
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ),
           for (final b in report.beamChecks)
@@ -653,12 +662,12 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                     children: [
                       Text('${b.beamName} (${b.storeyName})',
                           style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                      Text('Отвор L = ${b.spanM.toStringAsFixed(2)} m',
+                      Text(context.l10n.seismicSpanM(b.spanM.toStringAsFixed(2)),
                           style: const TextStyle(color: Colors.white70, fontSize: 11)),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(b.recommendation, style: TextStyle(
+                  Text(b.localizedRecommendation(context.l10n), style: TextStyle(
                     color: b.isDepthSufficient ? Colors.white70 : const Color(0xFFFFD54F),
                     fontSize: 11,
                   )),
@@ -668,11 +677,11 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
         ],
 
         if (report.openingChecks.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.only(top: 8, bottom: 6),
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 6),
             child: Text(
-              'Инсталационни отвори близо до опори (< 4d):',
-              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              context.l10n.seismicOpeningsProximityTitle,
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ),
           for (final op in report.openingChecks)
@@ -686,7 +695,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   color: op.isTooClose ? const Color(0xFFFF1744) : const Color(0xFF00E676),
                 ),
               ),
-              child: Text(op.recommendation, style: TextStyle(
+              child: Text(op.localizedRecommendation(context.l10n), style: TextStyle(
                 color: op.isTooClose ? const Color(0xFFFF8A80) : Colors.white70,
                 fontSize: 11,
               )),
@@ -708,10 +717,26 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            Text(
-              valueText,
-              style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+            Expanded(
+              flex: 2,
+              child: Text(
+                label,
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  valueText,
+                  style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
           ],
         ),
@@ -730,16 +755,27 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
   }
 
   Widget _buildSubmetric(String title, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(color: Colors.white60, fontSize: 10)),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-        ),
-      ],
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(color: Colors.white60, fontSize: 10),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

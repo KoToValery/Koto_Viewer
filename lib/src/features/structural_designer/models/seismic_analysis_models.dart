@@ -135,6 +135,48 @@ class StoreySeismicCheck {
       (eccentricityRatioX > eccentricityRatioY)
           ? eccentricityRatioX
           : eccentricityRatioY;
+
+  String localizedRecommendation(AppLocalizations l10n) {
+    final StringBuffer rec = StringBuffer();
+    if (floatingColumnNames.isNotEmpty) {
+      rec.write(l10n.seismicRecFloatingCols(floatingColumnNames.join(', ')));
+    }
+    if (isTorsionallySensitive) {
+      rec.write(l10n.seismicRecHighTorsion(
+        maxEccentricityM.toStringAsFixed(2),
+        (maxEccentricityRatio * 100).round(),
+      ));
+      if (centerOfRigidityCad.dx < centerOfMassCad.dx) {
+        rec.write(l10n.seismicRecAddWallEast);
+      } else if (centerOfRigidityCad.dx > centerOfMassCad.dx) {
+        rec.write(l10n.seismicRecAddWallWest);
+      }
+      if (centerOfRigidityCad.dy < centerOfMassCad.dy) {
+        rec.write(l10n.seismicRecAddWallNorth);
+      } else if (centerOfRigidityCad.dy > centerOfMassCad.dy) {
+        rec.write(l10n.seismicRecAddWallSouth);
+      }
+    } else if (!isWallCoverageSufficientX || !isWallCoverageSufficientY) {
+      if (!isWallCoverageSufficientX && !isWallCoverageSufficientY) {
+        rec.write(l10n.seismicRecDeficitBoth(
+          wallRatioX.toStringAsFixed(1),
+          wallRatioY.toStringAsFixed(1),
+        ));
+      } else if (!isWallCoverageSufficientX) {
+        rec.write(l10n.seismicRecDeficitX(wallRatioX.toStringAsFixed(1)));
+      } else {
+        rec.write(l10n.seismicRecDeficitY(wallRatioY.toStringAsFixed(1)));
+      }
+    } else {
+      rec.write(l10n.seismicRecBalanced);
+    }
+
+    String result = rec.toString().trim();
+    if (isSoftStorey) {
+      result = '${l10n.seismicRecSoftStoreyPrefix}$result';
+    }
+    return result;
+  }
 }
 
 /// Preliminary sizing check for reinforced concrete beams (EC2 & EC8).
@@ -166,6 +208,29 @@ class BeamSizingCheck {
     required this.isWidthSufficient,
     required this.recommendation,
   });
+
+  String localizedRecommendation(AppLocalizations l10n) {
+    final int recH = (recommendedMinDepthM * 100).ceil();
+    final int wCm = (currentWidthM * 100).round();
+    final int dCm = (currentDepthM * 100).round();
+
+    if (!isDepthSufficient) {
+      return l10n.seismicRecBeamDepthInsufficient(
+        spanM.toStringAsFixed(2),
+        dCm,
+        wCm,
+        recH,
+      );
+    } else if (!isWidthSufficient) {
+      return l10n.seismicRecBeamWidthInsufficient(wCm, dCm);
+    } else {
+      return l10n.seismicRecBeamSizingOk(
+        wCm,
+        dCm,
+        spanM.toStringAsFixed(2),
+      );
+    }
+  }
 }
 
 /// Safety check for slab penetration openings near columns and shear walls.
@@ -187,6 +252,21 @@ class OpeningProximityCheck {
     required this.isTooClose,
     required this.recommendation,
   });
+
+  String localizedRecommendation(AppLocalizations l10n) {
+    final support = nearestSupportName ?? '';
+    if (isTooClose) {
+      return l10n.seismicRecOpeningClose(
+        distanceToSupportM.toStringAsFixed(2),
+        support,
+      );
+    } else {
+      return l10n.seismicRecOpeningSafe(
+        distanceToSupportM.toStringAsFixed(2),
+        support,
+      );
+    }
+  }
 }
 
 /// Comprehensive Eurocode 8 Seismic & Structural Regularity Report.

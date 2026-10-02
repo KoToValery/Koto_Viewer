@@ -1292,5 +1292,325 @@
   "previewOpeningCorner2Tag": "Opening: pick opposite corner",
   "@previewOpeningCorner2Tag": { "description": "Tag for picking opposite corner of opening" },
   "cancelOpening": "Cancel opening",
-  "@cancelOpening": { "description": "Button to cancel custom opening" }
+  "@cancelOpening": { "description": "Button to cancel custom opening" },
+  "seismicStatMaxEccentricity": "Max. Ecc.",
+  "@seismicStatMaxEccentricity": { "description": "Title for max eccentricity stat card" },
+  "seismicStatTorsion": "Torsion",
+  "@seismicStatTorsion": { "description": "Title for torsional sensitivity stat card" },
+  "seismicStatusHigh": "HIGH",
+  "@seismicStatusHigh": { "description": "High status indicator" },
+  "seismicStatusNormal": "Normal",
+  "@seismicStatusNormal": { "description": "Normal status indicator" },
+  "seismicStatFloatingColumns": "Floating Cols",
+  "@seismicStatFloatingColumns": { "description": "Title for floating columns stat card" },
+  "seismicStatShearWallsEc8": "Shear Walls (EC8)",
+  "@seismicStatShearWallsEc8": { "description": "Title for shear walls EC8 stat card" },
+  "seismicStatusDeficit": "DEFICIT",
+  "@seismicStatusDeficit": { "description": "Deficit status indicator" },
+  "seismicStatusOkCoverage": "OK >=1%",
+  "@seismicStatusOkCoverage": { "description": "OK coverage status indicator" },
+  "seismicTabBalance": "Balance (CM/CR)",
+  "@seismicTabBalance": { "description": "Tab title for seismic balance CM/CR" },
+  "seismicTabWalls": "Walls (%)",
+  "@seismicTabWalls": { "description": "Tab title for shear walls" },
+  "seismicTabRegularity": "Regularity",
+  "@seismicTabRegularity": { "description": "Tab title for structural regularity" },
+  "seismicTabBeamsOpenings": "Beams/Openings",
+  "@seismicTabBeamsOpenings": { "description": "Tab title for beams and openings" },
+  "seismicNoStoreys": "No storeys defined in the project.",
+  "@seismicNoStoreys": { "description": "Message when no storeys exist in project" },
+  "seismicEccentricityTitle": "Seismic Eccentricity",
+  "@seismicEccentricityTitle": { "description": "Header title for seismic eccentricity" },
+  "seismicTorsionSensitive": "Torsionally Sensitive",
+  "@seismicTorsionSensitive": { "description": "Badge for torsionally sensitive storey" },
+  "seismicBalanced": "Balanced",
+  "@seismicBalanced": { "description": "Badge for balanced storey" },
+  "seismicEccentricityXLabel": "Eccentricity X (ex)",
+  "@seismicEccentricityXLabel": { "description": "Label for eccentricity in X" },
+  "seismicEccentricityYLabel": "Eccentricity Y (ey)",
+  "@seismicEccentricityYLabel": { "description": "Label for eccentricity in Y" },
+  "seismicLimitEc8Label": "EC8 Limit",
+  "@seismicLimitEc8Label": { "description": "Label for Eurocode 8 limit" },
+  "seismicShearWallCoverageTitle": "Shear Wall Coverage",
+  "@seismicShearWallCoverageTitle": { "description": "Header title for shear wall coverage" },
+  "seismicOkMinCoverage": "OK (≥ 1.0%)",
+  "@seismicOkMinCoverage": { "description": "Badge for OK wall coverage" },
+  "seismicDeficitMinCoverage": "DEFICIT (< 1.0%)",
+  "@seismicDeficitMinCoverage": { "description": "Badge for deficient wall coverage" },
+  "seismicWallCoverageXLabel": "X Coverage (ρ_wx):",
+  "@seismicWallCoverageXLabel": { "description": "Label for X wall coverage" },
+  "seismicWallCoverageYLabel": "Y Coverage (ρ_wy):",
+  "@seismicWallCoverageYLabel": { "description": "Label for Y wall coverage" },
+  "seismicWallRecommendationText": "Eurocode 8 recommendation: minimum 1.0% - 1.5% shear walls in each direction relative to floor area ({area} m²).",
+  "@seismicWallRecommendationText": {
+    "description": "EC8 wall recommendation explanation",
+    "placeholders": { "area": { "type": "String" } }
+  },
+  "seismicFloatingColumnsTitle": "Floating / Transfer Columns",
+  "@seismicFloatingColumnsTitle": { "description": "Header title for floating columns" },
+  "seismicCountFound": "{count} found",
+  "@seismicCountFound": {
+    "description": "Count of items found badge",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "seismicNoFloatingColumnsText": "No floating columns detected. All columns transfer loads directly to lower supports.",
+  "@seismicNoFloatingColumnsText": { "description": "Text when no floating columns exist" },
+  "seismicCriticalEc8FloatingText": "CRITICAL FOR SEISMIC SAFETY (EC8 §4.2.3.3): Floating columns transfer high concentrated loads directly onto the slab!",
+  "@seismicCriticalEc8FloatingText": { "description": "Warning about floating columns" },
+  "seismicFloatingColItem": "• {storey}: Columns {columns} are floating without lower column.",
+  "@seismicFloatingColItem": {
+    "description": "List item describing floating columns on a storey",
+    "placeholders": {
+      "storey": { "type": "String" },
+      "columns": { "type": "String" }
+    }
+  },
+  "seismicSoftStoreyTitle": "Soft Storey Check",
+  "@seismicSoftStoreyTitle": { "description": "Title for soft storey check" },
+  "seismicDanger": "DANGER",
+  "@seismicDanger": { "description": "Danger badge" },
+  "seismicNone": "NONE",
+  "@seismicNone": { "description": "None badge" },
+  "seismicSoftStoreyDangerText": "Stiffness drop detected (> 30%) between adjacent storeys. This creates a risk of soft storey collapse mechanism during earthquakes.",
+  "@seismicSoftStoreyDangerText": { "description": "Danger text for soft storey" },
+  "seismicSoftStoreyOkText": "Stiffness changes smoothly across storeys (no soft storeys detected).",
+  "@seismicSoftStoreyOkText": { "description": "OK text for soft storey" },
+  "seismicNoBeamsOrOpenings": "No beams or slab openings defined.",
+  "@seismicNoBeamsOrOpenings": { "description": "Text when no beams or openings exist" },
+  "seismicBeamSizingTitle": "Preliminary beam sizing (h = L/10 - L/12):",
+  "@seismicBeamSizingTitle": { "description": "Title for preliminary beam sizing" },
+  "seismicSpanM": "Span L = {span} m",
+  "@seismicSpanM": {
+    "description": "Span length in meters",
+    "placeholders": { "span": { "type": "String" } }
+  },
+  "seismicOpeningsProximityTitle": "Slab openings near supports (< 4d):",
+  "@seismicOpeningsProximityTitle": { "description": "Title for openings near supports check" },
+  "seismicRecFloatingCols": "Columns {names} are FLOATING on the slab (no column underneath). This is a serious seismic vulnerability! ",
+  "@seismicRecFloatingCols": {
+    "description": "Recommendation text for floating columns",
+    "placeholders": { "names": { "type": "String" } }
+  },
+  "seismicRecHighTorsion": "High torsional sensitivity: eccentricity {ecc} m ({pct}%). ",
+  "@seismicRecHighTorsion": {
+    "description": "Recommendation text for high torsion",
+    "placeholders": {
+      "ecc": { "type": "String" },
+      "pct": { "type": "int" }
+    }
+  },
+  "seismicRecAddWallEast": "Recommendation: add a shear wall in the eastern (right) part. ",
+  "@seismicRecAddWallEast": { "description": "Add wall east recommendation" },
+  "seismicRecAddWallWest": "Recommendation: add a shear wall in the western (left) part. ",
+  "@seismicRecAddWallWest": { "description": "Add wall west recommendation" },
+  "seismicRecAddWallNorth": "Recommendation: add a shear wall in the northern part. ",
+  "@seismicRecAddWallNorth": { "description": "Add wall north recommendation" },
+  "seismicRecAddWallSouth": "Recommendation: add a shear wall in the southern part. ",
+  "@seismicRecAddWallSouth": { "description": "Add wall south recommendation" },
+  "seismicRecDeficitBoth": "Shear wall deficit in both directions (X: {rx}%, Y: {ry}% < 1.0%). Additional shear walls recommended. ",
+  "@seismicRecDeficitBoth": {
+    "description": "Deficit in both directions",
+    "placeholders": {
+      "rx": { "type": "String" },
+      "ry": { "type": "String" }
+    }
+  },
+  "seismicRecDeficitX": "Shear wall deficit in X ({rx}% < 1.0%). Additional X-direction shear wall recommended. ",
+  "@seismicRecDeficitX": {
+    "description": "Deficit in X direction",
+    "placeholders": { "rx": { "type": "String" } }
+  },
+  "seismicRecDeficitY": "Shear wall deficit in Y ({ry}% < 1.0%). Additional Y-direction shear wall recommended. ",
+  "@seismicRecDeficitY": {
+    "description": "Deficit in Y direction",
+    "placeholders": { "ry": { "type": "String" } }
+  },
+  "seismicRecBalanced": "Seismic balance and shear wall percentage coverage are excellent. ",
+  "@seismicRecBalanced": { "description": "Balanced seismic layout" },
+  "seismicRecSoftStoreyPrefix": "WARNING: SOFT STOREY! Lateral stiffness of this storey is > 30% lower than the storey above. ",
+  "@seismicRecSoftStoreyPrefix": { "description": "Soft storey warning prefix" },
+  "seismicRecBeamDepthInsufficient": "For span L = {span} m, depth {depth} cm is insufficient. Recommended beam {recW}x{recH} cm.",
+  "@seismicRecBeamDepthInsufficient": {
+    "description": "Beam depth insufficient recommendation",
+    "placeholders": {
+      "span": { "type": "String" },
+      "depth": { "type": "int" },
+      "recW": { "type": "int" },
+      "recH": { "type": "int" }
+    }
+  },
+  "seismicRecBeamWidthInsufficient": "Width {width} cm is below seismic minimum (25 cm under EC8). Recommended 25x{depth} cm.",
+  "@seismicRecBeamWidthInsufficient": {
+    "description": "Beam width insufficient recommendation",
+    "placeholders": {
+      "width": { "type": "int" },
+      "depth": { "type": "int" }
+    }
+  },
+  "seismicRecBeamSizingOk": "Cross-section {width}x{depth} cm is adequately sized for span L = {span} m.",
+  "@seismicRecBeamSizingOk": {
+    "description": "Beam sizing adequate recommendation",
+    "placeholders": {
+      "width": { "type": "int" },
+      "depth": { "type": "int" },
+      "span": { "type": "String" }
+    }
+  },
+  "seismicRecOpeningClose": "Opening is {dist} m from {support} (< 0.70 m), penetrating the punching cone and requiring special edge trimming!",
+  "@seismicRecOpeningClose": {
+    "description": "Opening too close to support recommendation",
+    "placeholders": {
+      "dist": { "type": "String" },
+      "support": { "type": "String" }
+    }
+  },
+  "seismicRecOpeningSafe": "Opening is at a safe distance ({dist} m from {support}).",
+  "@seismicRecOpeningSafe": {
+    "description": "Opening at safe distance recommendation",
+    "placeholders": {
+      "dist": { "type": "String" },
+      "support": { "type": "String" }
+    }
+  },
+  "verticalBasePressure": "Base Pressure",
+  "@verticalBasePressure": { "description": "Foundation base pressure stat card title" },
+  "verticalNoColumns": "No columns defined in the project.",
+  "@verticalNoColumns": { "description": "Message when no columns exist" },
+  "verticalPunchingCheckLabel": "Punching Shear (EC2 §6.4):",
+  "@verticalPunchingCheckLabel": { "description": "Label for punching shear check" },
+  "verticalRecSlabInsufficient": "For span L = {span} m, slab thickness {cur} cm is insufficient. Minimum {req} cm recommended.",
+  "@verticalRecSlabInsufficient": {
+    "description": "Slab thickness insufficient",
+    "placeholders": {
+      "span": { "type": "String" },
+      "cur": { "type": "int" },
+      "req": { "type": "int" }
+    }
+  },
+  "verticalRecSlabBeamlessDeflection": "For clear span L = {span} m without beams, slab {cur} cm will deflect excessively. Minimum {req} cm or main beams 25x50 cm recommended.",
+  "@verticalRecSlabBeamlessDeflection": {
+    "description": "Beamless slab excessive deflection warning",
+    "placeholders": {
+      "span": { "type": "String" },
+      "cur": { "type": "int" },
+      "req": { "type": "int" }
+    }
+  },
+  "verticalRecSlabSafe": "Slab thickness ({cur} cm) is adequate for clear span L = {span} m.",
+  "@verticalRecSlabSafe": {
+    "description": "Slab thickness safe",
+    "placeholders": {
+      "cur": { "type": "int" },
+      "span": { "type": "String" }
+    }
+  },
+  "verticalRecColOverloaded": "Column {name} in {storey} cannot be {curW}x{curH} cm; must be at least {minSec} to support {storeys} storeys (Ned = {ned} kN, capacity Nrd = {nrd} kN).",
+  "@verticalRecColOverloaded": {
+    "description": "Column overloaded recommendation",
+    "placeholders": {
+      "name": { "type": "String" },
+      "storey": { "type": "String" },
+      "curW": { "type": "int" },
+      "curH": { "type": "int" },
+      "minSec": { "type": "String" },
+      "storeys": { "type": "int" },
+      "ned": { "type": "String" },
+      "nrd": { "type": "String" }
+    }
+  },
+  "verticalRecColWarning": "Column {name} in {storey} is near capacity ({util}%). Upgrading to {minSec} is recommended.",
+  "@verticalRecColWarning": {
+    "description": "Column near capacity warning",
+    "placeholders": {
+      "name": { "type": "String" },
+      "storey": { "type": "String" },
+      "util": { "type": "int" },
+      "minSec": { "type": "String" }
+    }
+  },
+  "verticalRecColSafe": "Column {name} ({curW}x{curH} cm) in {storey} safely carries {storeys} storeys ({util}%).",
+  "@verticalRecColSafe": {
+    "description": "Column safe recommendation",
+    "placeholders": {
+      "name": { "type": "String" },
+      "curW": { "type": "int" },
+      "curH": { "type": "int" },
+      "storey": { "type": "String" },
+      "storeys": { "type": "int" },
+      "util": { "type": "int" }
+    }
+  },
+  "verticalRecPunchingRisk": "Risk of slab punching at {name} (v_Ed = {ved} MPa > v_Rd,c = {vrdc} MPa). Recommended: drop panel, slab {slabH} cm or larger column.",
+  "@verticalRecPunchingRisk": {
+    "description": "Punching shear risk recommendation",
+    "placeholders": {
+      "name": { "type": "String" },
+      "ved": { "type": "String" },
+      "vrdc": { "type": "String" },
+      "slabH": { "type": "int" }
+    }
+  },
+  "verticalTabColumns": "Columns ({count})",
+  "@verticalTabColumns": {
+    "description": "Columns tab title",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "verticalTabSlabs": "Slabs ({count})",
+  "@verticalTabSlabs": {
+    "description": "Slabs tab title",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "verticalTabFoundations": "Foundations",
+  "@verticalTabFoundations": { "description": "Foundations tab title" },
+  "verticalStoreysCarried": "{storey} • Carries {storeys} {storeysLabel} • Atrib = {area} m²",
+  "@verticalStoreysCarried": {
+    "description": "Storeys carried summary",
+    "placeholders": {
+      "storey": { "type": "String" },
+      "storeys": { "type": "int" },
+      "storeysLabel": { "type": "String" },
+      "area": { "type": "String" }
+    }
+  },
+  "verticalStoreySingle": "storey",
+  "@verticalStoreySingle": { "description": "Singular storey word" },
+  "verticalStoreyPlural": "storeys",
+  "@verticalStoreyPlural": { "description": "Plural storeys word" },
+  "verticalAxialCompressionLabel": "Axial Compression (EC2 §5.8):",
+  "@verticalAxialCompressionLabel": { "description": "Axial compression label" },
+  "verticalNoSlabs": "No slabs defined in the project.",
+  "@verticalNoSlabs": { "description": "Message when no slabs exist" },
+  "verticalSlabStoreyTitle": "Slab - {storey}",
+  "@verticalSlabStoreyTitle": {
+    "description": "Slab storey card title",
+    "placeholders": { "storey": { "type": "String" } }
+  },
+  "verticalSlabStatusOk": "Normal",
+  "@verticalSlabStatusOk": { "description": "Slab status safe" },
+  "verticalSlabStatusEnlarge": "Enlargement recommended",
+  "@verticalSlabStatusEnlarge": { "description": "Slab status enlarge" },
+  "verticalClearSpanLmax": "Clear span (Lmax)",
+  "@verticalClearSpanLmax": { "description": "Clear span label" },
+  "verticalCurrentThicknessH": "Current thickness (h)",
+  "@verticalCurrentThicknessH": { "description": "Current thickness label" },
+  "verticalRequiredThicknessEc2": "Required (EC2 §7.4)",
+  "@verticalRequiredThicknessEc2": { "description": "Required thickness label" },
+  "verticalFoundationsEvaluation": "Foundation Load Assessment",
+  "@verticalFoundationsEvaluation": { "description": "Foundation evaluation header" },
+  "verticalTotalBaseLoadNed": "Total vertical load at foundation (Ned,base):",
+  "@verticalTotalBaseLoadNed": { "description": "Total base load label" },
+  "verticalFootprintArea": "Footprint area (foundation):",
+  "@verticalFootprintArea": { "description": "Footprint area label" },
+  "verticalMeanBasePressure": "Average soil base pressure (σ_base):",
+  "@verticalMeanBasePressure": { "description": "Average base pressure label" },
+  "verticalBasePressureSafeText": "Base pressure ({pressure} kPa) is within standard limits for mat/strip foundations in moderate to good soils (R0 >= 200 kPa).",
+  "@verticalBasePressureSafeText": {
+    "description": "Base pressure safe text",
+    "placeholders": { "pressure": { "type": "String" } }
+  },
+  "verticalBasePressureHighText": "Base pressure ({pressure} kPa) is high. A full mat foundation or piling is recommended following a geotechnical report.",
+  "@verticalBasePressureHighText": {
+    "description": "Base pressure high text",
+    "placeholders": { "pressure": { "type": "String" } }
+  }
 }

@@ -109,6 +109,51 @@ class ColumnVerticalCheck {
   bool get isPunchingCritical => punchingUtilization > 1.0;
   bool get hasWarning => status == VerticalCapacityStatus.warning;
   bool get hasCritical => status == VerticalCapacityStatus.critical;
+
+  String localizedRecommendation(AppLocalizations l10n) {
+    final int curWCm = (widthM * 100).round();
+    final int curHCm = (heightM * 100).round();
+    final int util = (axialUtilization * 100).round();
+
+    if (hasCritical) {
+      return l10n.verticalRecColOverloaded(
+        columnName,
+        storeyName,
+        curWCm,
+        curHCm,
+        minRequiredSectionCm,
+        numStoreysAbove,
+        accumulatedLoadNedKn.toStringAsFixed(0),
+        axialCapacityNrdKn.toStringAsFixed(0),
+      );
+    } else if (hasWarning) {
+      return l10n.verticalRecColWarning(
+        columnName,
+        storeyName,
+        util,
+        minRequiredSectionCm,
+      );
+    } else {
+      return l10n.verticalRecColSafe(
+        columnName,
+        curWCm,
+        curHCm,
+        storeyName,
+        numStoreysAbove,
+        util,
+      );
+    }
+  }
+
+  String? localizedPunchingRecommendation(AppLocalizations l10n) {
+    if (punchingRecommendation == null) return null;
+    return l10n.verticalRecPunchingRisk(
+      columnName,
+      punchingShearStressVedMpa.toStringAsFixed(2),
+      punchingShearResistanceVrdMpa.toStringAsFixed(2),
+      20,
+    );
+  }
 }
 
 /// Span-to-depth deflection feasibility check for floor slabs according to EC2 §7.4.
@@ -132,6 +177,23 @@ class SlabDeflectionCheck {
     required this.deflectionRatio,
     required this.recommendation,
   });
+
+  String localizedRecommendation(AppLocalizations l10n) {
+    final int curCm = (currentThicknessM * 100).round();
+    final int reqCm = (recommendedMinThicknessM * 100).ceil();
+    if (!isDeflectionSafe) {
+      return l10n.verticalRecSlabInsufficient(
+        maxSpanM.toStringAsFixed(2),
+        curCm,
+        reqCm,
+      );
+    } else {
+      return l10n.verticalRecSlabSafe(
+        curCm,
+        maxSpanM.toStringAsFixed(2),
+      );
+    }
+  }
 }
 
 /// Comprehensive vertical gravitational capacity report for the entire project.

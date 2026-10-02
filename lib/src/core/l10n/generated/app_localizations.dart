@@ -2832,6 +2832,552 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel opening'**
   String get cancelOpening;
+
+  /// Title for max eccentricity stat card
+  ///
+  /// In en, this message translates to:
+  /// **'Max. Ecc.'**
+  String get seismicStatMaxEccentricity;
+
+  /// Title for torsional sensitivity stat card
+  ///
+  /// In en, this message translates to:
+  /// **'Torsion'**
+  String get seismicStatTorsion;
+
+  /// High status indicator
+  ///
+  /// In en, this message translates to:
+  /// **'HIGH'**
+  String get seismicStatusHigh;
+
+  /// Normal status indicator
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get seismicStatusNormal;
+
+  /// Title for floating columns stat card
+  ///
+  /// In en, this message translates to:
+  /// **'Floating Cols'**
+  String get seismicStatFloatingColumns;
+
+  /// Title for shear walls EC8 stat card
+  ///
+  /// In en, this message translates to:
+  /// **'Shear Walls (EC8)'**
+  String get seismicStatShearWallsEc8;
+
+  /// Deficit status indicator
+  ///
+  /// In en, this message translates to:
+  /// **'DEFICIT'**
+  String get seismicStatusDeficit;
+
+  /// OK coverage status indicator
+  ///
+  /// In en, this message translates to:
+  /// **'OK >=1%'**
+  String get seismicStatusOkCoverage;
+
+  /// Tab title for seismic balance CM/CR
+  ///
+  /// In en, this message translates to:
+  /// **'Balance (CM/CR)'**
+  String get seismicTabBalance;
+
+  /// Tab title for shear walls
+  ///
+  /// In en, this message translates to:
+  /// **'Walls (%)'**
+  String get seismicTabWalls;
+
+  /// Tab title for structural regularity
+  ///
+  /// In en, this message translates to:
+  /// **'Regularity'**
+  String get seismicTabRegularity;
+
+  /// Tab title for beams and openings
+  ///
+  /// In en, this message translates to:
+  /// **'Beams/Openings'**
+  String get seismicTabBeamsOpenings;
+
+  /// Message when no storeys exist in project
+  ///
+  /// In en, this message translates to:
+  /// **'No storeys defined in the project.'**
+  String get seismicNoStoreys;
+
+  /// Header title for seismic eccentricity
+  ///
+  /// In en, this message translates to:
+  /// **'Seismic Eccentricity'**
+  String get seismicEccentricityTitle;
+
+  /// Badge for torsionally sensitive storey
+  ///
+  /// In en, this message translates to:
+  /// **'Torsionally Sensitive'**
+  String get seismicTorsionSensitive;
+
+  /// Badge for balanced storey
+  ///
+  /// In en, this message translates to:
+  /// **'Balanced'**
+  String get seismicBalanced;
+
+  /// Label for eccentricity in X
+  ///
+  /// In en, this message translates to:
+  /// **'Eccentricity X (ex)'**
+  String get seismicEccentricityXLabel;
+
+  /// Label for eccentricity in Y
+  ///
+  /// In en, this message translates to:
+  /// **'Eccentricity Y (ey)'**
+  String get seismicEccentricityYLabel;
+
+  /// Label for Eurocode 8 limit
+  ///
+  /// In en, this message translates to:
+  /// **'EC8 Limit'**
+  String get seismicLimitEc8Label;
+
+  /// Header title for shear wall coverage
+  ///
+  /// In en, this message translates to:
+  /// **'Shear Wall Coverage'**
+  String get seismicShearWallCoverageTitle;
+
+  /// Badge for OK wall coverage
+  ///
+  /// In en, this message translates to:
+  /// **'OK (≥ 1.0%)'**
+  String get seismicOkMinCoverage;
+
+  /// Badge for deficient wall coverage
+  ///
+  /// In en, this message translates to:
+  /// **'DEFICIT (< 1.0%)'**
+  String get seismicDeficitMinCoverage;
+
+  /// Label for X wall coverage
+  ///
+  /// In en, this message translates to:
+  /// **'X Coverage (ρ_wx):'**
+  String get seismicWallCoverageXLabel;
+
+  /// Label for Y wall coverage
+  ///
+  /// In en, this message translates to:
+  /// **'Y Coverage (ρ_wy):'**
+  String get seismicWallCoverageYLabel;
+
+  /// EC8 wall recommendation explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Eurocode 8 recommendation: minimum 1.0% - 1.5% shear walls in each direction relative to floor area ({area} m²).'**
+  String seismicWallRecommendationText(String area);
+
+  /// Header title for floating columns
+  ///
+  /// In en, this message translates to:
+  /// **'Floating / Transfer Columns'**
+  String get seismicFloatingColumnsTitle;
+
+  /// Count of items found badge
+  ///
+  /// In en, this message translates to:
+  /// **'{count} found'**
+  String seismicCountFound(int count);
+
+  /// Text when no floating columns exist
+  ///
+  /// In en, this message translates to:
+  /// **'No floating columns detected. All columns transfer loads directly to lower supports.'**
+  String get seismicNoFloatingColumnsText;
+
+  /// Warning about floating columns
+  ///
+  /// In en, this message translates to:
+  /// **'CRITICAL FOR SEISMIC SAFETY (EC8 §4.2.3.3): Floating columns transfer high concentrated loads directly onto the slab!'**
+  String get seismicCriticalEc8FloatingText;
+
+  /// List item describing floating columns on a storey
+  ///
+  /// In en, this message translates to:
+  /// **'• {storey}: Columns {columns} are floating without lower column.'**
+  String seismicFloatingColItem(String storey, String columns);
+
+  /// Title for soft storey check
+  ///
+  /// In en, this message translates to:
+  /// **'Soft Storey Check'**
+  String get seismicSoftStoreyTitle;
+
+  /// Danger badge
+  ///
+  /// In en, this message translates to:
+  /// **'DANGER'**
+  String get seismicDanger;
+
+  /// None badge
+  ///
+  /// In en, this message translates to:
+  /// **'NONE'**
+  String get seismicNone;
+
+  /// Danger text for soft storey
+  ///
+  /// In en, this message translates to:
+  /// **'Stiffness drop detected (> 30%) between adjacent storeys. This creates a risk of soft storey collapse mechanism during earthquakes.'**
+  String get seismicSoftStoreyDangerText;
+
+  /// OK text for soft storey
+  ///
+  /// In en, this message translates to:
+  /// **'Stiffness changes smoothly across storeys (no soft storeys detected).'**
+  String get seismicSoftStoreyOkText;
+
+  /// Text when no beams or openings exist
+  ///
+  /// In en, this message translates to:
+  /// **'No beams or slab openings defined.'**
+  String get seismicNoBeamsOrOpenings;
+
+  /// Title for preliminary beam sizing
+  ///
+  /// In en, this message translates to:
+  /// **'Preliminary beam sizing (h = L/10 - L/12):'**
+  String get seismicBeamSizingTitle;
+
+  /// Span length in meters
+  ///
+  /// In en, this message translates to:
+  /// **'Span L = {span} m'**
+  String seismicSpanM(String span);
+
+  /// Title for openings near supports check
+  ///
+  /// In en, this message translates to:
+  /// **'Slab openings near supports (< 4d):'**
+  String get seismicOpeningsProximityTitle;
+
+  /// Recommendation text for floating columns
+  ///
+  /// In en, this message translates to:
+  /// **'Columns {names} are FLOATING on the slab (no column underneath). This is a serious seismic vulnerability! '**
+  String seismicRecFloatingCols(String names);
+
+  /// Recommendation text for high torsion
+  ///
+  /// In en, this message translates to:
+  /// **'High torsional sensitivity: eccentricity {ecc} m ({pct}%). '**
+  String seismicRecHighTorsion(String ecc, int pct);
+
+  /// Add wall east recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Recommendation: add a shear wall in the eastern (right) part. '**
+  String get seismicRecAddWallEast;
+
+  /// Add wall west recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Recommendation: add a shear wall in the western (left) part. '**
+  String get seismicRecAddWallWest;
+
+  /// Add wall north recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Recommendation: add a shear wall in the northern part. '**
+  String get seismicRecAddWallNorth;
+
+  /// Add wall south recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Recommendation: add a shear wall in the southern part. '**
+  String get seismicRecAddWallSouth;
+
+  /// Deficit in both directions
+  ///
+  /// In en, this message translates to:
+  /// **'Shear wall deficit in both directions (X: {rx}%, Y: {ry}% < 1.0%). Additional shear walls recommended. '**
+  String seismicRecDeficitBoth(String rx, String ry);
+
+  /// Deficit in X direction
+  ///
+  /// In en, this message translates to:
+  /// **'Shear wall deficit in X ({rx}% < 1.0%). Additional X-direction shear wall recommended. '**
+  String seismicRecDeficitX(String rx);
+
+  /// Deficit in Y direction
+  ///
+  /// In en, this message translates to:
+  /// **'Shear wall deficit in Y ({ry}% < 1.0%). Additional Y-direction shear wall recommended. '**
+  String seismicRecDeficitY(String ry);
+
+  /// Balanced seismic layout
+  ///
+  /// In en, this message translates to:
+  /// **'Seismic balance and shear wall percentage coverage are excellent. '**
+  String get seismicRecBalanced;
+
+  /// Soft storey warning prefix
+  ///
+  /// In en, this message translates to:
+  /// **'WARNING: SOFT STOREY! Lateral stiffness of this storey is > 30% lower than the storey above. '**
+  String get seismicRecSoftStoreyPrefix;
+
+  /// Beam depth insufficient recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'For span L = {span} m, depth {depth} cm is insufficient. Recommended beam {recW}x{recH} cm.'**
+  String seismicRecBeamDepthInsufficient(
+    String span,
+    int depth,
+    int recW,
+    int recH,
+  );
+
+  /// Beam width insufficient recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Width {width} cm is below seismic minimum (25 cm under EC8). Recommended 25x{depth} cm.'**
+  String seismicRecBeamWidthInsufficient(int width, int depth);
+
+  /// Beam sizing adequate recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Cross-section {width}x{depth} cm is adequately sized for span L = {span} m.'**
+  String seismicRecBeamSizingOk(int width, int depth, String span);
+
+  /// Opening too close to support recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Opening is {dist} m from {support} (< 0.70 m), penetrating the punching cone and requiring special edge trimming!'**
+  String seismicRecOpeningClose(String dist, String support);
+
+  /// Opening at safe distance recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Opening is at a safe distance ({dist} m from {support}).'**
+  String seismicRecOpeningSafe(String dist, String support);
+
+  /// Foundation base pressure stat card title
+  ///
+  /// In en, this message translates to:
+  /// **'Base Pressure'**
+  String get verticalBasePressure;
+
+  /// Message when no columns exist
+  ///
+  /// In en, this message translates to:
+  /// **'No columns defined in the project.'**
+  String get verticalNoColumns;
+
+  /// Label for punching shear check
+  ///
+  /// In en, this message translates to:
+  /// **'Punching Shear (EC2 §6.4):'**
+  String get verticalPunchingCheckLabel;
+
+  /// Slab thickness insufficient
+  ///
+  /// In en, this message translates to:
+  /// **'For span L = {span} m, slab thickness {cur} cm is insufficient. Minimum {req} cm recommended.'**
+  String verticalRecSlabInsufficient(String span, int cur, int req);
+
+  /// Beamless slab excessive deflection warning
+  ///
+  /// In en, this message translates to:
+  /// **'For clear span L = {span} m without beams, slab {cur} cm will deflect excessively. Minimum {req} cm or main beams 25x50 cm recommended.'**
+  String verticalRecSlabBeamlessDeflection(String span, int cur, int req);
+
+  /// Slab thickness safe
+  ///
+  /// In en, this message translates to:
+  /// **'Slab thickness ({cur} cm) is adequate for clear span L = {span} m.'**
+  String verticalRecSlabSafe(int cur, String span);
+
+  /// Column overloaded recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Column {name} in {storey} cannot be {curW}x{curH} cm; must be at least {minSec} to support {storeys} storeys (Ned = {ned} kN, capacity Nrd = {nrd} kN).'**
+  String verticalRecColOverloaded(
+    String name,
+    String storey,
+    int curW,
+    int curH,
+    String minSec,
+    int storeys,
+    String ned,
+    String nrd,
+  );
+
+  /// Column near capacity warning
+  ///
+  /// In en, this message translates to:
+  /// **'Column {name} in {storey} is near capacity ({util}%). Upgrading to {minSec} is recommended.'**
+  String verticalRecColWarning(
+    String name,
+    String storey,
+    int util,
+    String minSec,
+  );
+
+  /// Column safe recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Column {name} ({curW}x{curH} cm) in {storey} safely carries {storeys} storeys ({util}%).'**
+  String verticalRecColSafe(
+    String name,
+    int curW,
+    int curH,
+    String storey,
+    int storeys,
+    int util,
+  );
+
+  /// Punching shear risk recommendation
+  ///
+  /// In en, this message translates to:
+  /// **'Risk of slab punching at {name} (v_Ed = {ved} MPa > v_Rd,c = {vrdc} MPa). Recommended: drop panel, slab {slabH} cm or larger column.'**
+  String verticalRecPunchingRisk(
+    String name,
+    String ved,
+    String vrdc,
+    int slabH,
+  );
+
+  /// Columns tab title
+  ///
+  /// In en, this message translates to:
+  /// **'Columns ({count})'**
+  String verticalTabColumns(int count);
+
+  /// Slabs tab title
+  ///
+  /// In en, this message translates to:
+  /// **'Slabs ({count})'**
+  String verticalTabSlabs(int count);
+
+  /// Foundations tab title
+  ///
+  /// In en, this message translates to:
+  /// **'Foundations'**
+  String get verticalTabFoundations;
+
+  /// Storeys carried summary
+  ///
+  /// In en, this message translates to:
+  /// **'{storey} • Carries {storeys} {storeysLabel} • Atrib = {area} m²'**
+  String verticalStoreysCarried(
+    String storey,
+    int storeys,
+    String storeysLabel,
+    String area,
+  );
+
+  /// Singular storey word
+  ///
+  /// In en, this message translates to:
+  /// **'storey'**
+  String get verticalStoreySingle;
+
+  /// Plural storeys word
+  ///
+  /// In en, this message translates to:
+  /// **'storeys'**
+  String get verticalStoreyPlural;
+
+  /// Axial compression label
+  ///
+  /// In en, this message translates to:
+  /// **'Axial Compression (EC2 §5.8):'**
+  String get verticalAxialCompressionLabel;
+
+  /// Message when no slabs exist
+  ///
+  /// In en, this message translates to:
+  /// **'No slabs defined in the project.'**
+  String get verticalNoSlabs;
+
+  /// Slab storey card title
+  ///
+  /// In en, this message translates to:
+  /// **'Slab - {storey}'**
+  String verticalSlabStoreyTitle(String storey);
+
+  /// Slab status safe
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get verticalSlabStatusOk;
+
+  /// Slab status enlarge
+  ///
+  /// In en, this message translates to:
+  /// **'Enlargement recommended'**
+  String get verticalSlabStatusEnlarge;
+
+  /// Clear span label
+  ///
+  /// In en, this message translates to:
+  /// **'Clear span (Lmax)'**
+  String get verticalClearSpanLmax;
+
+  /// Current thickness label
+  ///
+  /// In en, this message translates to:
+  /// **'Current thickness (h)'**
+  String get verticalCurrentThicknessH;
+
+  /// Required thickness label
+  ///
+  /// In en, this message translates to:
+  /// **'Required (EC2 §7.4)'**
+  String get verticalRequiredThicknessEc2;
+
+  /// Foundation evaluation header
+  ///
+  /// In en, this message translates to:
+  /// **'Foundation Load Assessment'**
+  String get verticalFoundationsEvaluation;
+
+  /// Total base load label
+  ///
+  /// In en, this message translates to:
+  /// **'Total vertical load at foundation (Ned,base):'**
+  String get verticalTotalBaseLoadNed;
+
+  /// Footprint area label
+  ///
+  /// In en, this message translates to:
+  /// **'Footprint area (foundation):'**
+  String get verticalFootprintArea;
+
+  /// Average base pressure label
+  ///
+  /// In en, this message translates to:
+  /// **'Average soil base pressure (σ_base):'**
+  String get verticalMeanBasePressure;
+
+  /// Base pressure safe text
+  ///
+  /// In en, this message translates to:
+  /// **'Base pressure ({pressure} kPa) is within standard limits for mat/strip foundations in moderate to good soils (R0 >= 200 kPa).'**
+  String verticalBasePressureSafeText(String pressure);
+
+  /// Base pressure high text
+  ///
+  /// In en, this message translates to:
+  /// **'Base pressure ({pressure} kPa) is high. A full mat foundation or piling is recommended following a geotechnical report.'**
+  String verticalBasePressureHighText(String pressure);
 }
 
 class _AppLocalizationsDelegate

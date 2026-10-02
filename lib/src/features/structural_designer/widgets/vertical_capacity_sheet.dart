@@ -114,7 +114,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 ),
                 const SizedBox(width: 8),
                 _buildStatCard(
-                  title: 'Базисен натиск',
+                  title: context.l10n.verticalBasePressure,
                   value: '${report.basePressureKpa.toStringAsFixed(0)} kPa',
                   color: report.basePressureKpa > 250
                       ? const Color(0xFFFFB300)
@@ -143,6 +143,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
             // Tab Bar
             TabBar(
               controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               indicatorColor: const Color(0xFF00E5FF),
               labelColor: const Color(0xFF00E5FF),
               unselectedLabelColor: Colors.white60,
@@ -155,7 +157,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                     children: [
                       const Icon(Icons.view_column_rounded, size: 16),
                       const SizedBox(width: 4),
-                      Text('Колони (${report.columnChecks.length})'),
+                      Text(context.l10n.verticalTabColumns(report.columnChecks.length)),
                     ],
                   ),
                 ),
@@ -165,17 +167,17 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                     children: [
                       const Icon(Icons.layers_rounded, size: 16),
                       const SizedBox(width: 4),
-                      Text('Плочи (${report.slabChecks.length})'),
+                      Text(context.l10n.verticalTabSlabs(report.slabChecks.length)),
                     ],
                   ),
                 ),
-                const Tab(
+                Tab(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.foundation_rounded, size: 16),
-                      SizedBox(width: 4),
-                      Text('Основи'),
+                      const Icon(Icons.foundation_rounded, size: 16),
+                      const SizedBox(width: 4),
+                      Text(context.l10n.verticalTabFoundations),
                     ],
                   ),
                 ),
@@ -244,7 +246,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
     if (report.columnChecks.isEmpty) {
       return Center(
         child: Text(
-          'Няма дефинирани колони в проекта.',
+          context.l10n.verticalNoColumns,
           style: const TextStyle(color: Colors.white60, fontSize: 13),
         ),
       );
@@ -310,7 +312,12 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                       ),
                     ),
                     Text(
-                      '${col.storeyName} • Носи ${col.numStoreysAbove} ${col.numStoreysAbove == 1 ? "етаж" : "етажа"} • Atrib = ${col.tributaryAreaM2.toStringAsFixed(1)} m²',
+                      context.l10n.verticalStoreysCarried(
+                        col.storeyName,
+                        col.numStoreysAbove,
+                        col.numStoreysAbove == 1 ? context.l10n.verticalStoreySingle : context.l10n.verticalStoreyPlural,
+                        col.tributaryAreaM2.toStringAsFixed(1),
+                      ),
                       style: const TextStyle(color: Colors.white60, fontSize: 11),
                     ),
                   ],
@@ -339,7 +346,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
           // Utilization Metrics
           // 1. Axial Compression N_Ed vs N_Rd
           _buildUtilizationRow(
-            label: 'Осов натиск (EC2 §5.8):',
+            label: context.l10n.verticalAxialCompressionLabel,
             valueText:
                 'Ned = ${col.accumulatedLoadNedKn.toStringAsFixed(0)} kN / Nrd = ${col.axialCapacityNrdKn.toStringAsFixed(0)} kN',
             ratio: col.axialUtilization,
@@ -353,7 +360,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
 
           // 2. Punching Shear v_Ed vs v_Rd,c
           _buildUtilizationRow(
-            label: 'Пробиване (EC2 §6.4):',
+            label: context.l10n.verticalPunchingCheckLabel,
             valueText:
                 'v_Ed = ${col.punchingShearStressVedMpa.toStringAsFixed(2)} MPa / v_Rd,c = ${col.punchingShearResistanceVrdMpa.toStringAsFixed(2)} MPa',
             ratio: col.punchingUtilization,
@@ -386,7 +393,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    col.architectRecommendation,
+                    col.localizedRecommendation(context.l10n),
                     style: TextStyle(
                       color: col.hasCritical ? const Color(0xFFFF8A80) : Colors.white,
                       fontSize: 11,
@@ -415,7 +422,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      col.punchingRecommendation!,
+                      col.localizedPunchingRecommendation(context.l10n) ?? col.punchingRecommendation!,
                       style: const TextStyle(
                         color: Color(0xFFFFD180),
                         fontSize: 11,
@@ -444,13 +451,29 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            Text(
-              '$valueText ($percent%)',
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+            Expanded(
+              flex: 2,
+              child: Text(
+                label,
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '$valueText ($percent%)',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ],
@@ -473,7 +496,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
     if (report.slabChecks.isEmpty) {
       return Center(
         child: Text(
-          'Няма данни за плочи в проекта.',
+          context.l10n.verticalNoSlabs,
           style: const TextStyle(color: Colors.white60, fontSize: 13),
         ),
       );
@@ -507,7 +530,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Плоча - ${slab.storeyName}',
+                      context.l10n.verticalSlabStoreyTitle(slab.storeyName),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -523,7 +546,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                       border: Border.all(color: color),
                     ),
                     child: Text(
-                      isSafe ? 'В норма' : 'Препоръчва се уголемяване',
+                      isSafe ? context.l10n.verticalSlabStatusOk : context.l10n.verticalSlabStatusEnlarge,
                       style: TextStyle(
                         color: color,
                         fontSize: 10,
@@ -539,15 +562,15 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildSubmetric(
-                    'Светъл отвор (Lmax)',
+                    context.l10n.verticalClearSpanLmax,
                     '${slab.maxSpanM.toStringAsFixed(2)} m',
                   ),
                   _buildSubmetric(
-                    'Текуща дебелина (h)',
+                    context.l10n.verticalCurrentThicknessH,
                     '${(slab.currentThicknessM * 100).round()} cm',
                   ),
                   _buildSubmetric(
-                    'Изисквана (EC2 §7.4)',
+                    context.l10n.verticalRequiredThicknessEc2,
                     '${(slab.recommendedMinThicknessM * 100).round()} cm',
                     color: !isSafe ? const Color(0xFFFF1744) : Colors.white70,
                   ),
@@ -573,7 +596,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        slab.recommendation,
+                        slab.localizedRecommendation(context.l10n),
                         style: TextStyle(
                           color: isSafe ? Colors.white70 : const Color(0xFFFF8A80),
                           fontSize: 11,
@@ -607,13 +630,13 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.foundation_rounded, color: Color(0xFF00E5FF), size: 22),
-                    SizedBox(width: 8),
+                    const Icon(Icons.foundation_rounded, color: Color(0xFF00E5FF), size: 22),
+                    const SizedBox(width: 8),
                     Text(
-                      'Оценка на натоварването върху основите',
-                      style: TextStyle(
+                      context.l10n.verticalFoundationsEvaluation,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -622,13 +645,13 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   ],
                 ),
                 const SizedBox(height: 12),
-                _buildInfoLine('Общ вертикален товар в основата (Ned,base):',
+                _buildInfoLine(context.l10n.verticalTotalBaseLoadNed,
                     '${report.totalVerticalLoadBaseKn.toStringAsFixed(1)} kN'),
                 const SizedBox(height: 6),
-                _buildInfoLine('Застроена площ (фундаментна основа):',
+                _buildInfoLine(context.l10n.verticalFootprintArea,
                     '${report.footprintAreaM2.toStringAsFixed(1)} m²'),
                 const SizedBox(height: 6),
-                _buildInfoLine('Среден базисен натиск върху почвата (σ_base):',
+                _buildInfoLine(context.l10n.verticalMeanBasePressure,
                     '${report.basePressureKpa.toStringAsFixed(1)} kPa (${(report.basePressureKpa / 100).toStringAsFixed(2)} kg/cm²)'),
                 const SizedBox(height: 14),
 
@@ -647,8 +670,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                       Expanded(
                         child: Text(
                           report.basePressureKpa <= 200
-                              ? 'Базисният натиск (${report.basePressureKpa.toStringAsFixed(0)} kPa) е в стандартните граници за фундаментна плоча/ивични основи в умерени до добри почви (R0 >= 200 kPa).'
-                              : 'Базисният натиск (${report.basePressureKpa.toStringAsFixed(0)} kPa) е висок. Препоръчва се цялостна фундаментна плоча (mat foundation) или пилотно фундиране след геоложки доклад.',
+                              ? context.l10n.verticalBasePressureSafeText(report.basePressureKpa.toStringAsFixed(0))
+                              : context.l10n.verticalBasePressureHighText(report.basePressureKpa.toStringAsFixed(0)),
                           style: const TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                       ),
@@ -664,20 +687,31 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
   }
 
   Widget _buildSubmetric(String title, String value, {Color? color}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(color: Colors.white60, fontSize: 10)),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            color: color ?? Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(color: Colors.white60, fontSize: 10),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: color ?? Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

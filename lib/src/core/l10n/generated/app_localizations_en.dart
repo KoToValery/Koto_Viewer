@@ -1547,4 +1547,362 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cancelOpening => 'Cancel opening';
+
+  @override
+  String get seismicStatMaxEccentricity => 'Max. Ecc.';
+
+  @override
+  String get seismicStatTorsion => 'Torsion';
+
+  @override
+  String get seismicStatusHigh => 'HIGH';
+
+  @override
+  String get seismicStatusNormal => 'Normal';
+
+  @override
+  String get seismicStatFloatingColumns => 'Floating Cols';
+
+  @override
+  String get seismicStatShearWallsEc8 => 'Shear Walls (EC8)';
+
+  @override
+  String get seismicStatusDeficit => 'DEFICIT';
+
+  @override
+  String get seismicStatusOkCoverage => 'OK >=1%';
+
+  @override
+  String get seismicTabBalance => 'Balance (CM/CR)';
+
+  @override
+  String get seismicTabWalls => 'Walls (%)';
+
+  @override
+  String get seismicTabRegularity => 'Regularity';
+
+  @override
+  String get seismicTabBeamsOpenings => 'Beams/Openings';
+
+  @override
+  String get seismicNoStoreys => 'No storeys defined in the project.';
+
+  @override
+  String get seismicEccentricityTitle => 'Seismic Eccentricity';
+
+  @override
+  String get seismicTorsionSensitive => 'Torsionally Sensitive';
+
+  @override
+  String get seismicBalanced => 'Balanced';
+
+  @override
+  String get seismicEccentricityXLabel => 'Eccentricity X (ex)';
+
+  @override
+  String get seismicEccentricityYLabel => 'Eccentricity Y (ey)';
+
+  @override
+  String get seismicLimitEc8Label => 'EC8 Limit';
+
+  @override
+  String get seismicShearWallCoverageTitle => 'Shear Wall Coverage';
+
+  @override
+  String get seismicOkMinCoverage => 'OK (≥ 1.0%)';
+
+  @override
+  String get seismicDeficitMinCoverage => 'DEFICIT (< 1.0%)';
+
+  @override
+  String get seismicWallCoverageXLabel => 'X Coverage (ρ_wx):';
+
+  @override
+  String get seismicWallCoverageYLabel => 'Y Coverage (ρ_wy):';
+
+  @override
+  String seismicWallRecommendationText(String area) {
+    return 'Eurocode 8 recommendation: minimum 1.0% - 1.5% shear walls in each direction relative to floor area ($area m²).';
+  }
+
+  @override
+  String get seismicFloatingColumnsTitle => 'Floating / Transfer Columns';
+
+  @override
+  String seismicCountFound(int count) {
+    return '$count found';
+  }
+
+  @override
+  String get seismicNoFloatingColumnsText =>
+      'No floating columns detected. All columns transfer loads directly to lower supports.';
+
+  @override
+  String get seismicCriticalEc8FloatingText =>
+      'CRITICAL FOR SEISMIC SAFETY (EC8 §4.2.3.3): Floating columns transfer high concentrated loads directly onto the slab!';
+
+  @override
+  String seismicFloatingColItem(String storey, String columns) {
+    return '• $storey: Columns $columns are floating without lower column.';
+  }
+
+  @override
+  String get seismicSoftStoreyTitle => 'Soft Storey Check';
+
+  @override
+  String get seismicDanger => 'DANGER';
+
+  @override
+  String get seismicNone => 'NONE';
+
+  @override
+  String get seismicSoftStoreyDangerText =>
+      'Stiffness drop detected (> 30%) between adjacent storeys. This creates a risk of soft storey collapse mechanism during earthquakes.';
+
+  @override
+  String get seismicSoftStoreyOkText =>
+      'Stiffness changes smoothly across storeys (no soft storeys detected).';
+
+  @override
+  String get seismicNoBeamsOrOpenings => 'No beams or slab openings defined.';
+
+  @override
+  String get seismicBeamSizingTitle =>
+      'Preliminary beam sizing (h = L/10 - L/12):';
+
+  @override
+  String seismicSpanM(String span) {
+    return 'Span L = $span m';
+  }
+
+  @override
+  String get seismicOpeningsProximityTitle =>
+      'Slab openings near supports (< 4d):';
+
+  @override
+  String seismicRecFloatingCols(String names) {
+    return 'Columns $names are FLOATING on the slab (no column underneath). This is a serious seismic vulnerability! ';
+  }
+
+  @override
+  String seismicRecHighTorsion(String ecc, int pct) {
+    return 'High torsional sensitivity: eccentricity $ecc m ($pct%). ';
+  }
+
+  @override
+  String get seismicRecAddWallEast =>
+      'Recommendation: add a shear wall in the eastern (right) part. ';
+
+  @override
+  String get seismicRecAddWallWest =>
+      'Recommendation: add a shear wall in the western (left) part. ';
+
+  @override
+  String get seismicRecAddWallNorth =>
+      'Recommendation: add a shear wall in the northern part. ';
+
+  @override
+  String get seismicRecAddWallSouth =>
+      'Recommendation: add a shear wall in the southern part. ';
+
+  @override
+  String seismicRecDeficitBoth(String rx, String ry) {
+    return 'Shear wall deficit in both directions (X: $rx%, Y: $ry% < 1.0%). Additional shear walls recommended. ';
+  }
+
+  @override
+  String seismicRecDeficitX(String rx) {
+    return 'Shear wall deficit in X ($rx% < 1.0%). Additional X-direction shear wall recommended. ';
+  }
+
+  @override
+  String seismicRecDeficitY(String ry) {
+    return 'Shear wall deficit in Y ($ry% < 1.0%). Additional Y-direction shear wall recommended. ';
+  }
+
+  @override
+  String get seismicRecBalanced =>
+      'Seismic balance and shear wall percentage coverage are excellent. ';
+
+  @override
+  String get seismicRecSoftStoreyPrefix =>
+      'WARNING: SOFT STOREY! Lateral stiffness of this storey is > 30% lower than the storey above. ';
+
+  @override
+  String seismicRecBeamDepthInsufficient(
+    String span,
+    int depth,
+    int recW,
+    int recH,
+  ) {
+    return 'For span L = $span m, depth $depth cm is insufficient. Recommended beam ${recW}x$recH cm.';
+  }
+
+  @override
+  String seismicRecBeamWidthInsufficient(int width, int depth) {
+    return 'Width $width cm is below seismic minimum (25 cm under EC8). Recommended 25x$depth cm.';
+  }
+
+  @override
+  String seismicRecBeamSizingOk(int width, int depth, String span) {
+    return 'Cross-section ${width}x$depth cm is adequately sized for span L = $span m.';
+  }
+
+  @override
+  String seismicRecOpeningClose(String dist, String support) {
+    return 'Opening is $dist m from $support (< 0.70 m), penetrating the punching cone and requiring special edge trimming!';
+  }
+
+  @override
+  String seismicRecOpeningSafe(String dist, String support) {
+    return 'Opening is at a safe distance ($dist m from $support).';
+  }
+
+  @override
+  String get verticalBasePressure => 'Base Pressure';
+
+  @override
+  String get verticalNoColumns => 'No columns defined in the project.';
+
+  @override
+  String get verticalPunchingCheckLabel => 'Punching Shear (EC2 §6.4):';
+
+  @override
+  String verticalRecSlabInsufficient(String span, int cur, int req) {
+    return 'For span L = $span m, slab thickness $cur cm is insufficient. Minimum $req cm recommended.';
+  }
+
+  @override
+  String verticalRecSlabBeamlessDeflection(String span, int cur, int req) {
+    return 'For clear span L = $span m without beams, slab $cur cm will deflect excessively. Minimum $req cm or main beams 25x50 cm recommended.';
+  }
+
+  @override
+  String verticalRecSlabSafe(int cur, String span) {
+    return 'Slab thickness ($cur cm) is adequate for clear span L = $span m.';
+  }
+
+  @override
+  String verticalRecColOverloaded(
+    String name,
+    String storey,
+    int curW,
+    int curH,
+    String minSec,
+    int storeys,
+    String ned,
+    String nrd,
+  ) {
+    return 'Column $name in $storey cannot be ${curW}x$curH cm; must be at least $minSec to support $storeys storeys (Ned = $ned kN, capacity Nrd = $nrd kN).';
+  }
+
+  @override
+  String verticalRecColWarning(
+    String name,
+    String storey,
+    int util,
+    String minSec,
+  ) {
+    return 'Column $name in $storey is near capacity ($util%). Upgrading to $minSec is recommended.';
+  }
+
+  @override
+  String verticalRecColSafe(
+    String name,
+    int curW,
+    int curH,
+    String storey,
+    int storeys,
+    int util,
+  ) {
+    return 'Column $name (${curW}x$curH cm) in $storey safely carries $storeys storeys ($util%).';
+  }
+
+  @override
+  String verticalRecPunchingRisk(
+    String name,
+    String ved,
+    String vrdc,
+    int slabH,
+  ) {
+    return 'Risk of slab punching at $name (v_Ed = $ved MPa > v_Rd,c = $vrdc MPa). Recommended: drop panel, slab $slabH cm or larger column.';
+  }
+
+  @override
+  String verticalTabColumns(int count) {
+    return 'Columns ($count)';
+  }
+
+  @override
+  String verticalTabSlabs(int count) {
+    return 'Slabs ($count)';
+  }
+
+  @override
+  String get verticalTabFoundations => 'Foundations';
+
+  @override
+  String verticalStoreysCarried(
+    String storey,
+    int storeys,
+    String storeysLabel,
+    String area,
+  ) {
+    return '$storey • Carries $storeys $storeysLabel • Atrib = $area m²';
+  }
+
+  @override
+  String get verticalStoreySingle => 'storey';
+
+  @override
+  String get verticalStoreyPlural => 'storeys';
+
+  @override
+  String get verticalAxialCompressionLabel => 'Axial Compression (EC2 §5.8):';
+
+  @override
+  String get verticalNoSlabs => 'No slabs defined in the project.';
+
+  @override
+  String verticalSlabStoreyTitle(String storey) {
+    return 'Slab - $storey';
+  }
+
+  @override
+  String get verticalSlabStatusOk => 'Normal';
+
+  @override
+  String get verticalSlabStatusEnlarge => 'Enlargement recommended';
+
+  @override
+  String get verticalClearSpanLmax => 'Clear span (Lmax)';
+
+  @override
+  String get verticalCurrentThicknessH => 'Current thickness (h)';
+
+  @override
+  String get verticalRequiredThicknessEc2 => 'Required (EC2 §7.4)';
+
+  @override
+  String get verticalFoundationsEvaluation => 'Foundation Load Assessment';
+
+  @override
+  String get verticalTotalBaseLoadNed =>
+      'Total vertical load at foundation (Ned,base):';
+
+  @override
+  String get verticalFootprintArea => 'Footprint area (foundation):';
+
+  @override
+  String get verticalMeanBasePressure => 'Average soil base pressure (σ_base):';
+
+  @override
+  String verticalBasePressureSafeText(String pressure) {
+    return 'Base pressure ($pressure kPa) is within standard limits for mat/strip foundations in moderate to good soils (R0 >= 200 kPa).';
+  }
+
+  @override
+  String verticalBasePressureHighText(String pressure) {
+    return 'Base pressure ($pressure kPa) is high. A full mat foundation or piling is recommended following a geotechnical report.';
+  }
 }
