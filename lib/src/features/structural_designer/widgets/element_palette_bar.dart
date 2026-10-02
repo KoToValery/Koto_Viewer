@@ -496,7 +496,7 @@ class ElementPaletteBar extends StatelessWidget {
             const SizedBox(width: 4),
             ActionChip(
               avatar: const Icon(Icons.tune_rounded, size: 14),
-              label: const Text('Размери...', style: TextStyle(fontSize: 11)),
+              label: Text(context.l10n.dimensionsEllipsis, style: const TextStyle(fontSize: 11)),
               onPressed: onCustomColumnDimensions,
               visualDensity: VisualDensity.compact,
             ),
@@ -546,7 +546,7 @@ class ElementPaletteBar extends StatelessWidget {
           if (onCustomWallThickness != null)
             ActionChip(
               avatar: const Icon(Icons.tune_rounded, size: 14),
-              label: const Text('Друга...', style: TextStyle(fontSize: 11)),
+              label: Text(context.l10n.otherEllipsis, style: const TextStyle(fontSize: 11)),
               onPressed: onCustomWallThickness,
               visualDensity: VisualDensity.compact,
             ),
@@ -590,7 +590,7 @@ class ElementPaletteBar extends StatelessWidget {
           if (onCustomSlabThickness != null) ...[
             ActionChip(
               avatar: const Icon(Icons.tune_rounded, size: 14),
-              label: const Text('Друга...', style: TextStyle(fontSize: 11)),
+              label: Text(context.l10n.otherEllipsis, style: const TextStyle(fontSize: 11)),
               onPressed: onCustomSlabThickness,
               visualDensity: VisualDensity.compact,
             ),
@@ -627,7 +627,7 @@ class ElementPaletteBar extends StatelessWidget {
       (0.25, 0.50, '25×50'),
       (0.25, 0.60, '25×60'),
       (0.25, 0.40, '25×40'),
-      (0.25, 0.30, '25×30 (скрита)'),
+      (0.25, 0.30, '25×30 (${context.l10n.hiddenBeamLabel})'),
       (0.30, 0.50, '30×50'),
       (0.30, 0.60, '30×60'),
     ];
@@ -670,7 +670,7 @@ class ElementPaletteBar extends StatelessWidget {
           if (onCustomBeamDimensions != null)
             ActionChip(
               avatar: const Icon(Icons.tune_rounded, size: 14),
-              label: const Text('Размери...', style: TextStyle(fontSize: 11)),
+              label: Text(context.l10n.dimensionsEllipsis, style: const TextStyle(fontSize: 11)),
               onPressed: onCustomBeamDimensions,
               visualDensity: VisualDensity.compact,
             ),
@@ -682,9 +682,9 @@ class ElementPaletteBar extends StatelessWidget {
   Widget _buildOpeningOptionsBar(BuildContext context) {
     final l10n = context.l10n;
     final presets = [
-      ('shaft', 'Шахта (40×60)'),
-      ('elevator', 'Асансьор (1.8×2.0)'),
-      ('stairs', 'Стълби (2.4×4.5)'),
+      ('shaft', l10n.shaftOpeningLabel),
+      ('elevator', l10n.elevatorOpeningLabel),
+      ('stairs', l10n.stairsOpeningLabel),
       ('custom', l10n.openingPresetCustom),
     ];
 
@@ -756,7 +756,7 @@ class ElementPaletteBar extends StatelessWidget {
             const SizedBox(width: 4),
             ActionChip(
               avatar: const Icon(Icons.edit_note_rounded, size: 14),
-              label: const Text('Име...', style: TextStyle(fontSize: 11)),
+              label: Text(l10n.nameEllipsis, style: const TextStyle(fontSize: 11)),
               onPressed: onCustomAxisName,
               visualDensity: VisualDensity.compact,
             ),

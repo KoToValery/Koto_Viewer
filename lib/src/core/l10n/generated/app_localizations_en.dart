@@ -1389,4 +1389,156 @@ class AppLocalizationsEn extends AppLocalizations {
   String floatingColumnWarning(String name, String storey) {
     return 'Column $name on $storey is floating on the slab (no lower support)!';
   }
+
+  @override
+  String get applyAction => 'Apply';
+
+  @override
+  String get offsetAction => 'Offset';
+
+  @override
+  String get renameColumnTitle => 'Rename Column';
+
+  @override
+  String get designationLabel => 'Designation (e.g. C1, C2, W1)';
+
+  @override
+  String get keepBoth => 'Keep Both';
+
+  @override
+  String get deletePrevious => 'Delete Previous';
+
+  @override
+  String get offsetCreatedTitle => 'Offset Created';
+
+  @override
+  String deletePreviousAxisPrompt(String name) {
+    return 'Do you want to delete the previous axis \"$name\"?';
+  }
+
+  @override
+  String deletePreviousColumnPrompt(String name) {
+    return 'Do you want to delete the previous column \"$name\"?';
+  }
+
+  @override
+  String offsetWithDuplication(String item) {
+    return 'Offset with duplication: $item';
+  }
+
+  @override
+  String get distanceMeters => 'Distance (meters)';
+
+  @override
+  String get duplicationDirection => 'Duplication Direction:';
+
+  @override
+  String get directionLeft => 'Left';
+
+  @override
+  String get directionRight => 'Right';
+
+  @override
+  String get directionUp => 'Up';
+
+  @override
+  String get directionDown => 'Down';
+
+  @override
+  String get specifyDirectionByDrag =>
+      'Specify direction by dragging on canvas';
+
+  @override
+  String dragForDirectionReleaseToOffset(String distance) {
+    return 'Drag for direction • Release to offset ($distance m)';
+  }
+
+  @override
+  String get columnDimensionsTitle => 'Column Dimensions';
+
+  @override
+  String get widthCm => 'Width (cm)';
+
+  @override
+  String get heightCm => 'Height (cm)';
+
+  @override
+  String get shapeRectangular => 'Rectangular';
+
+  @override
+  String get shapeCircular => 'Circular';
+
+  @override
+  String get shapeLShape => 'L-shaped';
+
+  @override
+  String get shearWallThicknessTitle => 'Shear Wall Thickness';
+
+  @override
+  String get thicknessCm => 'Thickness (cm)';
+
+  @override
+  String get beamDimensionsTitle => 'Beam Dimensions';
+
+  @override
+  String get widthBCm => 'Width b (cm)';
+
+  @override
+  String get depthHCm => 'Depth h (cm)';
+
+  @override
+  String get slabThicknessTitle => 'Slab Thickness';
+
+  @override
+  String get slabThicknessHCm => 'Thickness h (cm)';
+
+  @override
+  String get axisNameTitle => 'Grid Axis Name';
+
+  @override
+  String get axisNameLabel => 'Axis Name / Number (e.g. 1, A, 1-1)';
+
+  @override
+  String get shearWallTitle => 'Shear Wall';
+
+  @override
+  String get beamTitle => 'Beam';
+
+  @override
+  String get slabOpeningTitle => 'Slab Opening';
+
+  @override
+  String gridAxisTitle(String name) {
+    return 'Axis \"$name\"';
+  }
+
+  @override
+  String get structuralElevationLabel => 'S.L.';
+
+  @override
+  String get layersTooltip => 'CAD Underlay Layers';
+
+  @override
+  String get dimensionsEllipsis => 'Dimensions...';
+
+  @override
+  String get otherEllipsis => 'Other...';
+
+  @override
+  String get hiddenBeamLabel => 'hidden';
+
+  @override
+  String get shaftOpeningLabel => 'Shaft (40×60)';
+
+  @override
+  String get elevatorOpeningLabel => 'Elevator (1.8×2.0)';
+
+  @override
+  String get stairsOpeningLabel => 'Stairs (2.4×4.5)';
+
+  @override
+  String get nameEllipsis => 'Name...';
+
+  @override
+  String get pointsAbbr => 'pts';
 }

@@ -8,6 +8,7 @@ import '../../core/l10n/l10n_extensions.dart';
 import '../dxf_viewer/models/dxf_models.dart';
 import '../dxf_viewer/rendering/dxf_painter.dart';
 import '../dxf_viewer/rendering/dxf_snap_helper.dart';
+import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
 import 'analysis/cantilever_detector.dart';
 import 'analysis/seismic_analysis_calculator.dart';
 import 'analysis/structural_underlay_filter.dart';
@@ -715,28 +716,28 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFFFFB300), width: 1.5),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.edit_outlined, color: Color(0xFFFFB300), size: 20),
-            SizedBox(width: 8),
-            Text('Преименуване на колона', style: TextStyle(color: Colors.white, fontSize: 16)),
+            const Icon(Icons.edit_outlined, color: Color(0xFFFFB300), size: 20),
+            const SizedBox(width: 8),
+            Text(context.l10n.renameColumnTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
           ],
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-          decoration: const InputDecoration(
-            labelText: 'Обозначение (напр. К1, К2, С1)',
-            labelStyle: TextStyle(color: Color(0xFFFFB300)),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300))),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300), width: 2)),
+          decoration: InputDecoration(
+            labelText: context.l10n.designationLabel,
+            labelStyle: const TextStyle(color: Color(0xFFFFB300)),
+            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300))),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFFB300), width: 2)),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отказ', style: TextStyle(color: Colors.white54)),
+            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -748,7 +749,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               final val = controller.text.trim();
               Navigator.of(ctx).pop(val.isNotEmpty ? val : current.displayName);
             },
-            child: const Text('Запази', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.save, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -983,6 +984,63 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return '${current}_1';
   }
 
+  /// Automatically assigns axis names: numbers in one direction, letters in the other.
+  String _getSuggestedAxisName(Offset start, Offset end) {
+    final angle = math.atan2(end.dy - start.dy, end.dx - start.dx);
+    final isVertical = (math.cos(angle).abs() <= math.sin(angle).abs());
+    final activeAxes = _project.activeStorey.gridAxes;
+
+    // Find all existing axes in this orientation
+    final sameDirAxes = activeAxes.where((a) {
+      final aAngle = a.angleRad;
+      final aIsVert = (math.cos(aAngle).abs() <= math.sin(aAngle).abs());
+      return aIsVert == isVertical;
+    }).toList();
+
+    const cyrillic = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т'];
+
+    if (sameDirAxes.isNotEmpty) {
+      final hasNumbers = sameDirAxes.any((a) => int.tryParse(a.name) != null);
+      if (hasNumbers) {
+        int maxNum = 0;
+        for (final a in sameDirAxes) {
+          final val = int.tryParse(a.name);
+          if (val != null && val > maxNum) maxNum = val;
+        }
+        return (maxNum + 1).toString();
+      } else {
+        int maxIdx = -1;
+        for (final a in sameDirAxes) {
+          final idx = cyrillic.indexOf(a.name.toUpperCase());
+          if (idx > maxIdx) maxIdx = idx;
+        }
+        if (maxIdx != -1 && maxIdx + 1 < cyrillic.length) {
+          return cyrillic[maxIdx + 1];
+        }
+        return _getNextAxisName(sameDirAxes.last.name);
+      }
+    }
+
+    // First axis in this direction: Check what the OTHER direction uses
+    final otherDirAxes = activeAxes.where((a) {
+      final aAngle = a.angleRad;
+      final aIsVert = (math.cos(aAngle).abs() <= math.sin(aAngle).abs());
+      return aIsVert != isVertical;
+    }).toList();
+
+    if (otherDirAxes.isNotEmpty) {
+      final otherHasNumbers = otherDirAxes.any((a) => int.tryParse(a.name) != null);
+      if (otherHasNumbers) {
+        return 'А';
+      } else {
+        return '1';
+      }
+    }
+
+    // Default convention: Vertical axes are 1, 2, 3... and Horizontal axes are А, Б, В...
+    return isVertical ? '1' : 'А';
+  }
+
   Offset _computeAxisOffsetVector(StructuralGridAxis axis, double distanceMeters, double directionSign) {
     final scale = _cadUnitsPerMeter;
     final distCad = distanceMeters * scale;
@@ -1085,21 +1143,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.check_circle_outline, color: Color(0xFF00E5FF), size: 20),
-            SizedBox(width: 8),
-            Text('Офсетът е създаден', style: TextStyle(color: Colors.white, fontSize: 16)),
+            const Icon(Icons.check_circle_outline, color: Color(0xFF00E5FF), size: 20),
+            const SizedBox(width: 8),
+            Text(context.l10n.offsetCreatedTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
           ],
         ),
         content: Text(
-          'Желаете ли да изтриете предишната ос "${previousAxis.name}"?',
+          context.l10n.deletePreviousAxisPrompt(previousAxis.name),
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Запази и двете', style: TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.keepBoth, style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1108,7 +1166,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Изтрий предишната', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.deletePrevious, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1158,7 +1216,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Офсет с дублиране: Ос "${axis.name}"',
+                      context.l10n.offsetWithDuplication(context.l10n.gridAxisTitle(axis.name)),
                       style: const TextStyle(color: Colors.white, fontSize: 16),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1174,13 +1232,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       controller: controller,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                      decoration: const InputDecoration(
-                        labelText: 'Разстояние (метри)',
-                        labelStyle: TextStyle(color: Color(0xFF00E5FF)),
+                      decoration: InputDecoration(
+                        labelText: context.l10n.distanceMeters,
+                        labelStyle: const TextStyle(color: Color(0xFF00E5FF)),
                         suffixText: 'm',
-                        suffixStyle: TextStyle(color: Colors.white70),
-                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
-                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2)),
+                        suffixStyle: const TextStyle(color: Colors.white70),
+                        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
+                        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2)),
                       ),
                       onChanged: (val) {
                         final parsed = double.tryParse(val);
@@ -1218,9 +1276,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       }).toList(),
                     ),
                     const SizedBox(height: 18),
-                    const Text(
-                      'Посока на дублиране:',
-                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                    Text(
+                      context.l10n.duplicationDirection,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     // Direction buttons
@@ -1239,7 +1297,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             ),
                             icon: Icon(isVertical ? Icons.arrow_back_rounded : Icons.arrow_upward_rounded, size: 16),
                             label: Text(
-                              isVertical ? 'Наляво' : 'Нагоре',
+                              isVertical ? context.l10n.directionLeft : context.l10n.directionUp,
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                             onPressed: () {
@@ -1263,7 +1321,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             ),
                             icon: Icon(isVertical ? Icons.arrow_forward_rounded : Icons.arrow_downward_rounded, size: 16),
                             label: Text(
-                              isVertical ? 'Надясно' : 'Надолу',
+                              isVertical ? context.l10n.directionRight : context.l10n.directionDown,
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                             onPressed: () {
@@ -1284,9 +1342,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       icon: const Icon(Icons.touch_app_outlined, size: 16),
-                      label: const Text(
-                        'Укажи посока с влачене на екрана',
-                        style: TextStyle(fontSize: 11),
+                      label: Text(
+                        context.l10n.specifyDirectionByDrag,
+                        style: const TextStyle(fontSize: 11),
                       ),
                       onPressed: () {
                         final d = double.tryParse(controller.text) ?? currentDist;
@@ -1300,7 +1358,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Отказ', style: TextStyle(color: Colors.white54)),
+                  child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54)),
                 ),
               ],
             );
@@ -1418,21 +1476,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.check_circle_outline, color: Color(0xFF00E5FF), size: 20),
-            SizedBox(width: 8),
-            Text('Офсетът е създаден', style: TextStyle(color: Colors.white, fontSize: 16)),
+            const Icon(Icons.check_circle_outline, color: Color(0xFF00E5FF), size: 20),
+            const SizedBox(width: 8),
+            Text(context.l10n.offsetCreatedTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
           ],
         ),
         content: Text(
-          'Желаете ли да изтриете предишната колона "${previousCol.displayName}"?',
+          context.l10n.deletePreviousColumnPrompt(previousCol.displayName),
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Запази и двете', style: TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.keepBoth, style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1441,7 +1499,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Изтрий предишната', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(context.l10n.deletePrevious, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1488,7 +1546,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Офсет с дублиране: Колона "${col.displayName}"',
+                      context.l10n.offsetWithDuplication(col.displayName),
                       style: const TextStyle(color: Colors.white, fontSize: 16),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1504,13 +1562,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       controller: controller,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                      decoration: const InputDecoration(
-                        labelText: 'Разстояние (метри)',
-                        labelStyle: TextStyle(color: Color(0xFF00E5FF)),
+                      decoration: InputDecoration(
+                        labelText: context.l10n.distanceMeters,
+                        labelStyle: const TextStyle(color: Color(0xFF00E5FF)),
                         suffixText: 'm',
-                        suffixStyle: TextStyle(color: Colors.white70),
-                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
-                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2)),
+                        suffixStyle: const TextStyle(color: Colors.white70),
+                        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
+                        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2)),
                       ),
                       onChanged: (val) {
                         final parsed = double.tryParse(val);
@@ -1547,9 +1605,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       }).toList(),
                     ),
                     const SizedBox(height: 18),
-                    const Text(
-                      'Посока на дублиране:',
-                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                    Text(
+                      context.l10n.duplicationDirection,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -1566,7 +1624,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               ),
                             ),
                             icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                            label: const Text('← -X', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            label: Text('← ${context.l10n.directionLeft}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             onPressed: () {
                               final d = double.tryParse(controller.text) ?? currentDist;
                               Navigator.of(dialogCtx).pop();
@@ -1587,7 +1645,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               ),
                             ),
                             icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                            label: const Text('→ +X', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            label: Text('→ ${context.l10n.directionRight}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             onPressed: () {
                               final d = double.tryParse(controller.text) ?? currentDist;
                               Navigator.of(dialogCtx).pop();
@@ -1612,7 +1670,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               ),
                             ),
                             icon: const Icon(Icons.arrow_upward_rounded, size: 16),
-                            label: const Text('↑ +Y', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            label: Text('↑ ${context.l10n.directionUp}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             onPressed: () {
                               final d = double.tryParse(controller.text) ?? currentDist;
                               Navigator.of(dialogCtx).pop();
@@ -1633,7 +1691,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               ),
                             ),
                             icon: const Icon(Icons.arrow_downward_rounded, size: 16),
-                            label: const Text('↓ -Y', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            label: Text('↓ ${context.l10n.directionDown}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             onPressed: () {
                               final d = double.tryParse(controller.text) ?? currentDist;
                               Navigator.of(dialogCtx).pop();
@@ -1652,9 +1710,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       icon: const Icon(Icons.touch_app_outlined, size: 16),
-                      label: const Text(
-                        'Укажи посока с влачене на екрана',
-                        style: TextStyle(fontSize: 11),
+                      label: Text(
+                        context.l10n.specifyDirectionByDrag,
+                        style: const TextStyle(fontSize: 11),
                       ),
                       onPressed: () {
                         final d = double.tryParse(controller.text) ?? currentDist;
@@ -1668,7 +1726,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Отказ', style: TextStyle(color: Colors.white54)),
+                  child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54)),
                 ),
               ],
             );
@@ -1690,7 +1748,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlgState) => AlertDialog(
           backgroundColor: const Color(0xFF1E1E24),
-          title: const Text('Размери на колона', style: TextStyle(color: Colors.white, fontSize: 16)),
+          title: Text(context.l10n.columnDimensionsTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1701,11 +1759,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       controller: wCtrl,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Ширина (cm)',
-                        labelStyle: TextStyle(color: Colors.white70),
+                      decoration: InputDecoration(
+                        labelText: context.l10n.widthCm,
+                        labelStyle: const TextStyle(color: Colors.white70),
                         suffixText: 'cm',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                   ),
@@ -1715,11 +1773,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       controller: hCtrl,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Височина (cm)',
-                        labelStyle: TextStyle(color: Colors.white70),
+                      decoration: InputDecoration(
+                        labelText: context.l10n.heightCm,
+                        labelStyle: const TextStyle(color: Colors.white70),
                         suffixText: 'cm',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                   ),
@@ -1727,10 +1785,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               ),
               const SizedBox(height: 12),
               SegmentedButton<ColumnShape>(
-                segments: const [
-                  ButtonSegment(value: ColumnShape.rectangular, label: Text('Правоъгълна', style: TextStyle(fontSize: 11))),
-                  ButtonSegment(value: ColumnShape.circular, label: Text('Кръгла', style: TextStyle(fontSize: 11))),
-                  ButtonSegment(value: ColumnShape.lShape, label: Text('L-образна', style: TextStyle(fontSize: 11))),
+                segments: [
+                  ButtonSegment(value: ColumnShape.rectangular, label: Text(context.l10n.shapeRectangular, style: const TextStyle(fontSize: 11))),
+                  ButtonSegment(value: ColumnShape.circular, label: Text(context.l10n.shapeCircular, style: const TextStyle(fontSize: 11))),
+                  ButtonSegment(value: ColumnShape.lShape, label: Text(context.l10n.shapeLShape, style: const TextStyle(fontSize: 11))),
                 ],
                 selected: {shape},
                 onSelectionChanged: (val) => setDlgState(() => shape = val.first),
@@ -1740,7 +1798,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Отказ'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: () {
@@ -1755,7 +1813,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 });
                 Navigator.of(ctx).pop();
               },
-              child: const Text('Приложи'),
+              child: Text(context.l10n.applyAction),
             ),
           ],
         ),
@@ -1769,27 +1827,27 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
-        title: const Text('Дебелина на шайба', style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(context.l10n.shearWallThicknessTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
         content: TextField(
           controller: tCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Дебелина (cm)',
-            labelStyle: TextStyle(color: Colors.white70),
+          decoration: InputDecoration(
+            labelText: context.l10n.thicknessCm,
+            labelStyle: const TextStyle(color: Colors.white70),
             suffixText: 'cm',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отказ')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel)),
           FilledButton(
             onPressed: () {
               final t = (double.tryParse(tCtrl.text) ?? 25.0) / 100.0;
               setState(() => _currentWallThickness = t.clamp(0.10, 1.50));
               Navigator.of(ctx).pop();
             },
-            child: const Text('Приложи'),
+            child: Text(context.l10n.applyAction),
           ),
         ],
       ),
@@ -1803,7 +1861,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
-        title: const Text('Размери на греда', style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(context.l10n.beamDimensionsTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
         content: Row(
           children: [
             Expanded(
@@ -1811,11 +1869,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 controller: wCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Ширина b (cm)',
-                  labelStyle: TextStyle(color: Colors.white70),
+                decoration: InputDecoration(
+                  labelText: context.l10n.widthBCm,
+                  labelStyle: const TextStyle(color: Colors.white70),
                   suffixText: 'cm',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ),
@@ -1825,18 +1883,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 controller: dCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Височина h (cm)',
-                  labelStyle: TextStyle(color: Colors.white70),
+                decoration: InputDecoration(
+                  labelText: context.l10n.depthHCm,
+                  labelStyle: const TextStyle(color: Colors.white70),
                   suffixText: 'cm',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отказ')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel)),
           FilledButton(
             onPressed: () {
               final w = (double.tryParse(wCtrl.text) ?? 25.0) / 100.0;
@@ -1847,7 +1905,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               });
               Navigator.of(ctx).pop();
             },
-            child: const Text('Приложи'),
+            child: Text(context.l10n.applyAction),
           ),
         ],
       ),
@@ -1855,32 +1913,41 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _showCustomSlabDialog() {
-    final tCtrl = TextEditingController(text: (_currentSlabThickness * 100).toInt().toString());
+    final double initialThickness = _editingSlab?.thickness ?? _currentSlabThickness;
+    final tCtrl = TextEditingController(text: (initialThickness * 100).toInt().toString());
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
-        title: const Text('Дебелина на плоча', style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(context.l10n.slabThicknessTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
         content: TextField(
           controller: tCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Дебелина h (cm)',
-            labelStyle: TextStyle(color: Colors.white70),
+          decoration: InputDecoration(
+            labelText: context.l10n.slabThicknessHCm,
+            labelStyle: const TextStyle(color: Colors.white70),
             suffixText: 'cm',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отказ')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel)),
           FilledButton(
             onPressed: () {
               final t = (double.tryParse(tCtrl.text) ?? 20.0) / 100.0;
-              setState(() => _currentSlabThickness = t.clamp(0.08, 1.0));
+              final clamped = t.clamp(0.08, 1.0);
+              setState(() {
+                _currentSlabThickness = clamped;
+                if (_editingSlab != null) {
+                  _pushSlabCorrectionUndo();
+                  _editingSlab = _editingSlab!.copyWith(thickness: clamped);
+                  _updateActiveStoreySlab(_editingSlab!);
+                }
+              });
               Navigator.of(ctx).pop();
             },
-            child: const Text('Приложи'),
+            child: Text(context.l10n.applyAction),
           ),
         ],
       ),
@@ -1893,19 +1960,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E24),
-        title: const Text('Име на ос', style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(context.l10n.axisNameTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
         content: TextField(
           controller: nameCtrl,
           autofocus: true,
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Име / номер на ос (напр. 1, A, 1-1)',
-            labelStyle: TextStyle(color: Colors.white70),
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: context.l10n.axisNameLabel,
+            labelStyle: const TextStyle(color: Colors.white70),
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отказ')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.cancel)),
           FilledButton(
             onPressed: () {
               final text = nameCtrl.text.trim();
@@ -1914,7 +1981,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               }
               Navigator.of(ctx).pop();
             },
-            child: const Text('Запази'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -2288,32 +2355,37 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     // 2. Check hit test on slab midpoint grips for edge extrusion or edit mode
-    final grip = _hitTestSlabMidpoint(event.localPosition);
-    if (grip != null) {
-      setState(() {
-        _activeGrip = grip;
-        _midpointTouchDownPos = event.localPosition;
-        _isExtrudingEdge = false;
-        _extrusionDistanceCad = 0.0;
-        _selectedColumn = null;
-      });
-      HapticFeedback.selectionClick();
-      return;
+    if (_activeTool == StructuralDrawTool.slab || _activeTool == StructuralDrawTool.select) {
+      final grip = _hitTestSlabMidpoint(event.localPosition);
+      if (grip != null) {
+        setState(() {
+          _activeGrip = grip;
+          _midpointTouchDownPos = event.localPosition;
+          _isExtrudingEdge = false;
+          _extrusionDistanceCad = 0.0;
+          _selectedColumn = null;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      }
     }
 
     // Grid Axis handle dragging check (works on selected or any existing grid axis)
-    final handle = _hitTestGridAxisHandle(event.localPosition);
-    if (handle != null) {
-      setState(() {
-        _selectedGridAxis = handle.$1;
-        _isDraggingAxisHandle = true;
-        _draggingAxisStart = handle.$2;
-        _selectedColumn = null;
-        _selectedShearWall = null;
-        _selectedBeam = null;
-      });
-      HapticFeedback.selectionClick();
-      return;
+    if (_activeTool == StructuralDrawTool.gridAxis || _activeTool == StructuralDrawTool.select) {
+      final handle = _hitTestGridAxisHandle(event.localPosition);
+      if (handle != null) {
+        _pushUndo();
+        setState(() {
+          _selectedGridAxis = handle.$1;
+          _isDraggingAxisHandle = true;
+          _draggingAxisStart = handle.$2;
+          _selectedColumn = null;
+          _selectedShearWall = null;
+          _selectedBeam = null;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      }
     }
 
     // Grid axis offset drag mode check
@@ -2363,22 +2435,26 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // 5. Mouse interactions
     if (event.kind == PointerDeviceKind.mouse) {
-      final hitCol = _hitTestColumn(event.localPosition);
-      if (hitCol != null) {
-        setState(() {
-          _selectedColumn = hitCol;
-          _isMovingColumn = true;
-          _hasMovedSelectedColumn = false;
-          _isPlacingWithHold = false;
-        });
-        _updatePointer(event.localPosition, isMouse: true);
-        HapticFeedback.selectionClick();
-        return;
+      if (_activeTool == StructuralDrawTool.column || _activeTool == StructuralDrawTool.select) {
+        final hitCol = _hitTestColumn(event.localPosition);
+        if (hitCol != null) {
+          setState(() {
+            _selectedColumn = hitCol;
+            _isMovingColumn = true;
+            _hasMovedSelectedColumn = false;
+            _isPlacingWithHold = false;
+          });
+          _updatePointer(event.localPosition, isMouse: true);
+          HapticFeedback.selectionClick();
+          return;
+        }
       }
-      final hitSlab = _hitTestSlab(event.localPosition);
-      if (hitSlab != null) {
-        _startSlabCorrection(hitSlab);
-        return;
+      if (_activeTool == StructuralDrawTool.slab || _activeTool == StructuralDrawTool.select) {
+        final hitSlab = _hitTestSlab(event.localPosition);
+        if (hitSlab != null) {
+          _startSlabCorrection(hitSlab);
+          return;
+        }
       }
       if (!_isEditingSlab) {
         _isPlacingWithHold = true;
@@ -2406,7 +2482,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    // Dragging grid axis handle (extend/shorten along axis line)
+    // Dragging grid axis handle (extend/shorten along axis line, harmonizing all parallel axes)
     if (_isDraggingAxisHandle && _selectedGridAxis != null) {
       final cadPt = _screenToCad(event.localPosition);
       final proj = _selectedGridAxis!.projectPoint(cadPt);
@@ -2414,9 +2490,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           ? _selectedGridAxis!.copyWith(start: proj)
           : _selectedGridAxis!.copyWith(end: proj);
       final active = _project.activeStorey;
-      final axes = active.gridAxes
-          .map((a) => a.id == updatedAxis.id ? updatedAxis : a)
-          .toList();
+      final axes = active.gridAxes.map((a) {
+        if (a.id == updatedAxis.id) return updatedAxis;
+        if (a.isParallelTo(updatedAxis)) return a.alignWith(updatedAxis);
+        return a;
+      }).toList();
       _updateActiveStorey(active.copyWith(gridAxes: axes));
       setState(() {
         _selectedGridAxis = updatedAxis;
@@ -2987,7 +3065,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // 0. Dragging grid axis handle commit on release
     if (_isDraggingAxisHandle) {
-      _pushUndo();
       setState(() {
         _isDraggingAxisHandle = false;
       });
@@ -3182,58 +3259,105 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     // 0b. Check if holding on an axis handle -> immediately drag endpoint
-    final axisHandle = _hitTestGridAxisHandle(details.localPosition);
-    if (axisHandle != null) {
-      HapticFeedback.heavyImpact();
-      setState(() {
-        _selectedGridAxis = axisHandle.$1;
-        _isDraggingAxisHandle = true;
-        _draggingAxisStart = axisHandle.$2;
-        _selectedColumn = null;
-        _selectedShearWall = null;
-        _selectedBeam = null;
-      });
-      return;
-    }
+    if (_activeTool == StructuralDrawTool.gridAxis || _activeTool == StructuralDrawTool.select) {
+      final axisHandle = _hitTestGridAxisHandle(details.localPosition);
+      if (axisHandle != null) {
+        _pushUndo();
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _selectedGridAxis = axisHandle.$1;
+          _isDraggingAxisHandle = true;
+          _draggingAxisStart = axisHandle.$2;
+          _selectedColumn = null;
+          _selectedShearWall = null;
+          _selectedBeam = null;
+        });
+        return;
+      }
 
-    // 0c. Check if holding on an axis line -> select axis and open card
-    final hitAxis = _hitTestGridAxis(details.localPosition);
-    if (hitAxis != null) {
-      HapticFeedback.heavyImpact();
-      setState(() {
-        _selectedGridAxis = hitAxis;
-        _selectedColumn = null;
-        _selectedShearWall = null;
-        _selectedBeam = null;
-      });
-      return;
+      // 0c. Check if holding on an axis line -> select axis and open card
+      final hitAxis = _hitTestGridAxis(details.localPosition);
+      if (hitAxis != null) {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _selectedGridAxis = hitAxis;
+          _selectedColumn = null;
+          _selectedShearWall = null;
+          _selectedBeam = null;
+        });
+        return;
+      }
     }
 
     // 1. Check if holding on an existing placed column
-    final hitCol = _hitTestColumn(details.localPosition);
-    if (hitCol != null) {
-      HapticFeedback.heavyImpact();
-      setState(() {
-        _selectedColumn = hitCol;
-        _isMovingColumn = true;
-        _hasMovedSelectedColumn = false;
-        _isPlacingWithHold = false;
-      });
-      _updatePointer(details.localPosition, isMouse: false);
-      return;
+    if (_activeTool == StructuralDrawTool.column || _activeTool == StructuralDrawTool.select) {
+      final hitCol = _hitTestColumn(details.localPosition);
+      if (hitCol != null) {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _selectedColumn = hitCol;
+          _isMovingColumn = true;
+          _hasMovedSelectedColumn = false;
+          _isPlacingWithHold = false;
+        });
+        _updatePointer(details.localPosition, isMouse: false);
+        return;
+      }
     }
 
-    // 1b. Check if holding on an existing slab -> start slab correction!
-    final hitSlab = _hitTestSlab(details.localPosition);
-    if (hitSlab != null) {
-      _startSlabCorrection(hitSlab);
-      return;
+    // 1b. Check if holding on an existing shear wall
+    if (_activeTool == StructuralDrawTool.shearWall || _activeTool == StructuralDrawTool.select) {
+      final hitWall = _hitTestShearWall(details.localPosition);
+      if (hitWall != null) {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _selectedShearWall = hitWall;
+          _selectedColumn = null;
+          _selectedBeam = null;
+          _selectedOpening = null;
+          _selectedGridAxis = null;
+          _isMovingColumn = false;
+        });
+        return;
+      }
+    }
+
+    // 1c. Check if holding on an existing beam
+    if (_activeTool == StructuralDrawTool.beam || _activeTool == StructuralDrawTool.select) {
+      final hitBeam = _hitTestBeam(details.localPosition);
+      if (hitBeam != null) {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _selectedBeam = hitBeam;
+          _selectedColumn = null;
+          _selectedShearWall = null;
+          _selectedOpening = null;
+          _selectedGridAxis = null;
+          _isMovingColumn = false;
+        });
+        return;
+      }
+    }
+
+    // 1d. Check if holding on an existing slab -> start slab correction!
+    if (_activeTool == StructuralDrawTool.slab || _activeTool == StructuralDrawTool.select) {
+      final hitSlab = _hitTestSlab(details.localPosition);
+      if (hitSlab != null) {
+        _startSlabCorrection(hitSlab);
+        return;
+      }
     }
 
     // 2. Otherwise deselect previous selection
     if (_activeTool == StructuralDrawTool.select) {
-      if (_selectedColumn != null) {
-        setState(() => _selectedColumn = null);
+      if (_hasSelectedElement) {
+        setState(() {
+          _selectedColumn = null;
+          _selectedShearWall = null;
+          _selectedBeam = null;
+          _selectedOpening = null;
+          _selectedGridAxis = null;
+        });
       }
       return;
     }
@@ -3241,6 +3365,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
     setState(() {
       _selectedColumn = null;
+      _selectedShearWall = null;
+      _selectedBeam = null;
+      _selectedOpening = null;
+      _selectedGridAxis = null;
       _isMovingColumn = false;
       _isPlacingWithHold = true;
     });
@@ -3256,9 +3384,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           ? _selectedGridAxis!.copyWith(start: proj)
           : _selectedGridAxis!.copyWith(end: proj);
       final active = _project.activeStorey;
-      final axes = active.gridAxes
-          .map((a) => a.id == updatedAxis.id ? updatedAxis : a)
-          .toList();
+      final axes = active.gridAxes.map((a) {
+        if (a.id == updatedAxis.id) return updatedAxis;
+        if (a.isParallelTo(updatedAxis)) return a.alignWith(updatedAxis);
+        return a;
+      }).toList();
       _updateActiveStorey(active.copyWith(gridAxes: axes));
       setState(() {
         _selectedGridAxis = updatedAxis;
@@ -3284,7 +3414,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _handleLongPressEnd(LongPressEndDetails details) {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isDraggingAxisHandle) {
-      _pushUndo();
       setState(() {
         _isDraggingAxisHandle = false;
       });
@@ -3368,11 +3497,105 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     if (_activeTool == StructuralDrawTool.gridAxis) {
+      final hitAxis = _hitTestGridAxis(details.localPosition);
+      if (hitAxis != null) {
+        setState(() {
+          _selectedGridAxis = hitAxis;
+          _selectedColumn = null;
+          _selectedShearWall = null;
+          _selectedBeam = null;
+          _selectedOpening = null;
+          _isMovingColumn = false;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      }
       final cadPt = _screenToCad(details.localPosition);
       _commitPlacement(cadPt);
       return;
     }
 
+    if (_activeTool == StructuralDrawTool.column) {
+      final hitCol = _hitTestColumn(details.localPosition);
+      setState(() {
+        _selectedColumn = hitCol;
+        _selectedShearWall = null;
+        _selectedBeam = null;
+        _selectedOpening = null;
+        _selectedGridAxis = null;
+        _isMovingColumn = false;
+      });
+      if (hitCol != null) {
+        HapticFeedback.selectionClick();
+      }
+      return;
+    }
+
+    if (_activeTool == StructuralDrawTool.shearWall) {
+      final hitWall = _hitTestShearWall(details.localPosition);
+      setState(() {
+        _selectedShearWall = hitWall;
+        _selectedColumn = null;
+        _selectedBeam = null;
+        _selectedOpening = null;
+        _selectedGridAxis = null;
+        _isMovingColumn = false;
+      });
+      if (hitWall != null) {
+        HapticFeedback.selectionClick();
+      }
+      return;
+    }
+
+    if (_activeTool == StructuralDrawTool.beam) {
+      final hitBeam = _hitTestBeam(details.localPosition);
+      setState(() {
+        _selectedBeam = hitBeam;
+        _selectedColumn = null;
+        _selectedShearWall = null;
+        _selectedOpening = null;
+        _selectedGridAxis = null;
+        _isMovingColumn = false;
+      });
+      if (hitBeam != null) {
+        HapticFeedback.selectionClick();
+      }
+      return;
+    }
+
+    if (_activeTool == StructuralDrawTool.slab) {
+      final hitSlab = _hitTestSlab(details.localPosition);
+      if (hitSlab != null) {
+        _startSlabCorrection(hitSlab);
+      } else {
+        setState(() {
+          _selectedColumn = null;
+          _selectedShearWall = null;
+          _selectedBeam = null;
+          _selectedOpening = null;
+          _selectedGridAxis = null;
+        });
+      }
+      return;
+    }
+
+    if (_activeTool == StructuralDrawTool.slabOpening) {
+      final hitOpening = _hitTestOpening(details.localPosition);
+      setState(() {
+        _selectedOpening = hitOpening;
+        _selectedColumn = null;
+        _selectedShearWall = null;
+        _selectedBeam = null;
+        _selectedGridAxis = null;
+        _isMovingColumn = false;
+      });
+      if (hitOpening != null) {
+        HapticFeedback.selectionClick();
+      }
+      return;
+    }
+
+    // Default (select tool mode): check in priority order
     final hitOpening = _hitTestOpening(details.localPosition);
     if (hitOpening != null) {
       setState(() {
@@ -3449,11 +3672,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    if (_selectedColumn != null ||
-        _selectedShearWall != null ||
-        _selectedBeam != null ||
-        _selectedOpening != null ||
-        _selectedGridAxis != null) {
+    if (_hasSelectedElement) {
       setState(() {
         _selectedColumn = null;
         _selectedShearWall = null;
@@ -3502,23 +3721,31 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           });
           HapticFeedback.lightImpact();
         } else {
-          final axis = StructuralGridAxis.fromTwoSegments(
+          final suggestedName = _getSuggestedAxisName(_firstWallEdgeStartCad!, _firstWallEdgeEndCad!);
+          final rawAxis = StructuralGridAxis.fromTwoSegments(
             id: 'axis_${DateTime.now().millisecondsSinceEpoch}',
-            name: _currentAxisName,
+            name: suggestedName,
             a1: _firstWallEdgeStartCad!,
             a2: _firstWallEdgeEndCad!,
             b1: seg.$1,
             b2: seg.$2,
             extensionLength: 1.5 * scale,
           );
-          if (axis != null) {
+          if (rawAxis != null) {
+            final existingParallel = active.gridAxes
+                .where((a) => a.isParallelTo(rawAxis))
+                .firstOrNull;
+            final axis = existingParallel != null
+                ? rawAxis.alignWith(existingParallel)
+                : rawAxis;
+
             _pushUndo();
             final updatedAxes = List<StructuralGridAxis>.from(active.gridAxes)..add(axis);
             _updateActiveStorey(active.copyWith(gridAxes: updatedAxes));
             setState(() {
               _firstWallEdgeStartCad = null;
               _firstWallEdgeEndCad = null;
-              _currentAxisName = _getNextAxisName(_currentAxisName);
+              _currentAxisName = _getNextAxisName(axis.name);
               _selectedGridAxis = axis;
             });
             HapticFeedback.mediumImpact();
@@ -3775,6 +4002,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
+  void _showLayersSheet() {
+    DxfLayerSheet.show(
+      context: context,
+      document: widget.document,
+      isDark: true,
+      onLayersChanged: () {
+        setState(() {});
+      },
+    );
+  }
+
   void _toggleUnderlayFilter() {
     setState(() {
       _applyUnderlayFilter(!_underlayFilterActive);
@@ -3951,6 +4189,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           ),
         ),
         actions: [
+          // CAD Underlay Layers Launcher
+          IconButton(
+            icon: const Icon(Icons.layers_outlined, color: Colors.white70),
+            tooltip: context.l10n.layersTooltip,
+            onPressed: _showLayersSheet,
+          ),
           // Underlay Filter Toggle (Walls & Axes focus)
           IconButton(
             icon: Icon(
@@ -4010,16 +4254,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             final double toleranceCad = 36.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
             final seg2 = _findClosestSegmentInCad(_currentCadCoord!, toleranceCad * 2.0);
             if (seg2 != null) {
-              final previewAxis = StructuralGridAxis.fromTwoSegments(
+              final rawPreviewAxis = StructuralGridAxis.fromTwoSegments(
                 id: 'preview',
-                name: _currentAxisName,
+                name: _getSuggestedAxisName(_firstWallEdgeStartCad!, _firstWallEdgeEndCad!),
                 a1: _firstWallEdgeStartCad!,
                 a2: _firstWallEdgeEndCad!,
                 b1: seg2.$1,
                 b2: seg2.$2,
                 extensionLength: 1.5 * _cadUnitsPerMeter,
               );
-              if (previewAxis != null) {
+              if (rawPreviewAxis != null) {
+                final existingParallel = _project.activeStorey.gridAxes
+                    .where((a) => a.isParallelTo(rawPreviewAxis))
+                    .firstOrNull;
+                final previewAxis = existingParallel != null
+                    ? rawPreviewAxis.alignWith(existingParallel)
+                    : rawPreviewAxis;
                 previewAxisStart = previewAxis.start;
                 previewAxisEnd = previewAxis.end;
               }
@@ -4266,7 +4516,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF00E5FF)),
                           const SizedBox(width: 8),
                           Text(
-                            'Плъзнете за посока • Пуснете за офсет (${_axisOffsetDistanceMeters.toStringAsFixed(2)} m)',
+                            context.l10n.dragForDirectionReleaseToOffset(_axisOffsetDistanceMeters.toStringAsFixed(2)),
                             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(width: 8),
@@ -4306,7 +4556,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF00E5FF)),
                           const SizedBox(width: 8),
                           Text(
-                            'Плъзнете за посока • Пуснете за офсет (${_columnOffsetDistanceMeters.toStringAsFixed(2)} m)',
+                            context.l10n.dragForDirectionReleaseToOffset(_columnOffsetDistanceMeters.toStringAsFixed(2)),
                             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(width: 8),
@@ -4485,7 +4735,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         _buildDockActionButton(
           icon: Icons.straighten_rounded,
-          label: 'Офсет',
+          label: context.l10n.offsetAction,
           color: const Color(0xFF00E5FF),
           onTap: _showColumnOffsetDialog,
         ),
@@ -4501,7 +4751,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       primaryColor = const Color(0xFF00E5FF);
       final double lengthM = wall.length / _cadUnitsPerMeter;
       final int thickCm = (wall.thickness / _cadUnitsPerMeter * 100).round();
-      title = 'Шайба';
+      title = context.l10n.shearWallTitle;
       subtitle = '${lengthM.toStringAsFixed(2)} m (d=$thickCm cm)';
       onDeselect = () => setState(() => _selectedShearWall = null);
       onRename = null;
@@ -4532,7 +4782,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final int wCm = (beam.width / _cadUnitsPerMeter * 100).round();
       final int dCm = (beam.depth / _cadUnitsPerMeter * 100).round();
       final double lenM = beam.length / _cadUnitsPerMeter;
-      title = 'Греда';
+      title = context.l10n.beamTitle;
       subtitle = '$wCm x $dCm cm, L = ${lenM.toStringAsFixed(2)} m';
       onDeselect = () => setState(() => _selectedBeam = null);
       onRename = null;
@@ -4562,7 +4812,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: (wCm == (w * 100).toInt() && dCm == (d * 100).toInt())
-                      ? const Color(0xFFFB8C00)
+                       ? const Color(0xFFFB8C00)
                       : Colors.white24,
                   width: 1,
                 ),
@@ -4636,7 +4886,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final double wM = (maxX - minX) / _cadUnitsPerMeter;
       final double hM = (maxY - minY) / _cadUnitsPerMeter;
       primaryColor = const Color(0xFFFF9800);
-      title = 'Отвор в плоча';
+      title = context.l10n.slabOpeningTitle;
       subtitle = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
       onDeselect = () => setState(() => _selectedOpening = null);
       onRename = null;
@@ -4653,7 +4903,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final axis = _selectedGridAxis!;
       primaryColor = const Color(0xFFFF453A);
       final double lenM = axis.length / _cadUnitsPerMeter;
-      title = 'Ос "${axis.name}"';
+      title = context.l10n.gridAxisTitle(axis.name);
       subtitle = 'L = ${lenM.toStringAsFixed(2)} m';
       onDeselect = () => setState(() => _selectedGridAxis = null);
       onRename = _renameSelectedGridAxis;
@@ -4667,7 +4917,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         _buildDockActionButton(
           icon: Icons.straighten_rounded,
-          label: 'Офсет',
+          label: context.l10n.offsetAction,
           color: const Color(0xFF00E5FF),
           onTap: _showGridAxisOffsetDialog,
         ),
@@ -4908,20 +5158,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          context.l10n.slabCorrectionTitle,
-                          style: const TextStyle(
-                            color: Color(0xFFB388FF),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                        InkWell(
+                          onTap: _showCustomSlabDialog,
+                          child: Text(
+                            '${context.l10n.slabCorrectionTitle} (h=${(_editingSlab!.thickness * 100).toInt()} cm)',
+                            style: const TextStyle(
+                              color: Color(0xFFB388FF),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'S: ${areaM2.toStringAsFixed(1)} m²  P: ${perimM.toStringAsFixed(1)} m  ($numPts т.)',
+                      'S: ${areaM2.toStringAsFixed(1)} m²  P: ${perimM.toStringAsFixed(1)} m  ($numPts ${context.l10n.pointsAbbr})',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 10,

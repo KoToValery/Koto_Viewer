@@ -399,6 +399,43 @@ class StructuralGridAxis {
     );
   }
 
+  /// Checks whether this axis is parallel to [other] within an angular tolerance (~2.8 degrees).
+  bool isParallelTo(StructuralGridAxis other, {double toleranceRad = 0.05}) {
+    final d1 = direction;
+    final d2 = other.direction;
+    // Cross product of 2D unit vectors equals sin(theta)
+    final cross = (d1.dx * d2.dy - d1.dy * d2.dx).abs();
+    return cross < math.sin(toleranceRad);
+  }
+
+  /// Aligns this axis's start and end extents with [reference] along their common direction,
+  /// preserving this axis's line position and orientation.
+  StructuralGridAxis alignWith(StructuralGridAxis reference) {
+    final refStart = reference.start;
+    final refEnd = reference.end;
+    final refDir = reference.direction;
+    final refNormal = reference.normal;
+
+    // Perpendicular offset of this axis's midpoint from reference's start
+    final mid = (start + end) / 2.0;
+    final dPerp = (mid - refStart).dx * refNormal.dx + (mid - refStart).dy * refNormal.dy;
+
+    // Preserve orientation (whether this axis points in same or opposite direction as reference)
+    final dot = direction.dx * refDir.dx + direction.dy * refDir.dy;
+
+    final Offset newStart;
+    final Offset newEnd;
+    if (dot >= 0) {
+      newStart = refStart + refNormal * dPerp;
+      newEnd = refEnd + refNormal * dPerp;
+    } else {
+      newStart = refEnd + refNormal * dPerp;
+      newEnd = refStart + refNormal * dPerp;
+    }
+
+    return copyWith(start: newStart, end: newEnd);
+  }
+
   /// Computes the centerline bisector between two line segments (wall faces).
   static StructuralGridAxis? fromTwoSegments({
     required String id,
@@ -471,12 +508,14 @@ class StructuralSlab {
   final List<Offset> polygon; // Outer perimeter boundary
   final List<List<Offset>> openings; // Staircase, elevator, shaft cutouts
   final double thickness; // in meters (default 0.20)
+  final double? floorFinish; // in meters (flooring/screed finish thickness, default 0.05)
 
   const StructuralSlab({
     required this.id,
     required this.polygon,
     this.openings = const [],
     this.thickness = 0.20,
+    this.floorFinish,
   });
 
   /// Signed area of polygon using shoelace formula.
@@ -873,12 +912,14 @@ class StructuralSlab {
     List<Offset>? polygon,
     List<List<Offset>>? openings,
     double? thickness,
+    double? floorFinish,
   }) {
     return StructuralSlab(
       id: id ?? this.id,
       polygon: polygon ?? this.polygon,
       openings: openings ?? this.openings,
       thickness: thickness ?? this.thickness,
+      floorFinish: floorFinish ?? this.floorFinish,
     );
   }
 }
@@ -906,17 +947,20 @@ class SlabEdgeGripInfo {
 class StoreyLevel {
   final String id;
   final String name;
-  final double elevation; // Z height above ground (m)
+  final double elevation; // Architectural Z height above ground (m)
+  final double floorFinishThickness; // in meters (flooring screed/finish thickness, default 0.05 m / 5 cm)
   final double height; // Clear floor-to-floor height (m)
   final List<StructuralColumn> columns;
   final List<StructuralShearWall> shearWalls;
   final List<StructuralBeam> beams;
   final List<StructuralSlab> slabs;
+  final List<StructuralGridAxis> gridAxes;
 
   const StoreyLevel({
     required this.id,
     required this.name,
     this.elevation = 0.0,
+    this.floorFinishThickness = 0.05,
     this.height = 2.80,
     this.columns = const [],
     this.shearWalls = const [],
@@ -925,7 +969,12 @@ class StoreyLevel {
     this.gridAxes = const [],
   });
 
-  final List<StructuralGridAxis> gridAxes;
+  /// Computes the structural elevation (Конструктивна кота) for [slab].
+  /// Calculated as architectural elevation minus flooring finish thickness.
+  double structuralElevationFor(StructuralSlab slab) {
+    final finish = slab.floorFinish ?? floorFinishThickness;
+    return elevation - finish;
+  }
 
   /// Duplicates current storey elements to a new level above.
   StoreyLevel cloneToNextLevel({
@@ -937,6 +986,7 @@ class StoreyLevel {
       id: newId,
       name: newName,
       elevation: newElevation,
+      floorFinishThickness: floorFinishThickness,
       height: height,
       columns: columns
           .map((c) => c.copyWith(id: '${c.id}_lvl_${newElevation.toInt()}'))
@@ -960,6 +1010,7 @@ class StoreyLevel {
     String? id,
     String? name,
     double? elevation,
+    double? floorFinishThickness,
     double? height,
     List<StructuralColumn>? columns,
     List<StructuralShearWall>? shearWalls,
@@ -971,6 +1022,7 @@ class StoreyLevel {
       id: id ?? this.id,
       name: name ?? this.name,
       elevation: elevation ?? this.elevation,
+      floorFinishThickness: floorFinishThickness ?? this.floorFinishThickness,
       height: height ?? this.height,
       columns: columns ?? this.columns,
       shearWalls: shearWalls ?? this.shearWalls,

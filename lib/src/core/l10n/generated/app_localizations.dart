@@ -2538,6 +2538,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Column {name} on {storey} is floating on the slab (no lower support)!'**
   String floatingColumnWarning(String name, String storey);
+
+  /// Apply action button
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get applyAction;
+
+  /// Offset action button
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get offsetAction;
+
+  /// Title for renaming column dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Rename Column'**
+  String get renameColumnTitle;
+
+  /// Input label for designation
+  ///
+  /// In en, this message translates to:
+  /// **'Designation (e.g. C1, C2, W1)'**
+  String get designationLabel;
+
+  /// Keep both button in offset dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Both'**
+  String get keepBoth;
+
+  /// Delete previous button in offset dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Previous'**
+  String get deletePrevious;
+
+  /// Title for offset confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Offset Created'**
+  String get offsetCreatedTitle;
+
+  /// Prompt to delete previous axis after offset
+  ///
+  /// In en, this message translates to:
+  /// **'Do you want to delete the previous axis \"{name}\"?'**
+  String deletePreviousAxisPrompt(String name);
+
+  /// Prompt to delete previous column after offset
+  ///
+  /// In en, this message translates to:
+  /// **'Do you want to delete the previous column \"{name}\"?'**
+  String deletePreviousColumnPrompt(String name);
+
+  /// Offset dialog title
+  ///
+  /// In en, this message translates to:
+  /// **'Offset with duplication: {item}'**
+  String offsetWithDuplication(String item);
+
+  /// Distance in meters label
+  ///
+  /// In en, this message translates to:
+  /// **'Distance (meters)'**
+  String get distanceMeters;
+
+  /// Direction prompt for duplication
+  ///
+  /// In en, this message translates to:
+  /// **'Duplication Direction:'**
+  String get duplicationDirection;
+
+  /// Left direction button
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get directionLeft;
+
+  /// Right direction button
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get directionRight;
+
+  /// Up direction button
+  ///
+  /// In en, this message translates to:
+  /// **'Up'**
+  String get directionUp;
+
+  /// Down direction button
+  ///
+  /// In en, this message translates to:
+  /// **'Down'**
+  String get directionDown;
+
+  /// Drag instruction for offset direction
+  ///
+  /// In en, this message translates to:
+  /// **'Specify direction by dragging on canvas'**
+  String get specifyDirectionByDrag;
+
+  /// Overlay banner text for drag offset
+  ///
+  /// In en, this message translates to:
+  /// **'Drag for direction • Release to offset ({distance} m)'**
+  String dragForDirectionReleaseToOffset(String distance);
+
+  /// Title for column dimensions dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Column Dimensions'**
+  String get columnDimensionsTitle;
+
+  /// Width in cm label
+  ///
+  /// In en, this message translates to:
+  /// **'Width (cm)'**
+  String get widthCm;
+
+  /// Height in cm label
+  ///
+  /// In en, this message translates to:
+  /// **'Height (cm)'**
+  String get heightCm;
+
+  /// Rectangular shape label
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangular'**
+  String get shapeRectangular;
+
+  /// Circular shape label
+  ///
+  /// In en, this message translates to:
+  /// **'Circular'**
+  String get shapeCircular;
+
+  /// L-shaped shape label
+  ///
+  /// In en, this message translates to:
+  /// **'L-shaped'**
+  String get shapeLShape;
+
+  /// Title for shear wall thickness dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Shear Wall Thickness'**
+  String get shearWallThicknessTitle;
+
+  /// Thickness in cm label
+  ///
+  /// In en, this message translates to:
+  /// **'Thickness (cm)'**
+  String get thicknessCm;
+
+  /// Title for beam dimensions dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Beam Dimensions'**
+  String get beamDimensionsTitle;
+
+  /// Width b in cm label
+  ///
+  /// In en, this message translates to:
+  /// **'Width b (cm)'**
+  String get widthBCm;
+
+  /// Depth h in cm label
+  ///
+  /// In en, this message translates to:
+  /// **'Depth h (cm)'**
+  String get depthHCm;
+
+  /// Title for slab thickness dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Slab Thickness'**
+  String get slabThicknessTitle;
+
+  /// Slab thickness in cm label
+  ///
+  /// In en, this message translates to:
+  /// **'Thickness h (cm)'**
+  String get slabThicknessHCm;
+
+  /// Title for grid axis name dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Grid Axis Name'**
+  String get axisNameTitle;
+
+  /// Label for grid axis name input
+  ///
+  /// In en, this message translates to:
+  /// **'Axis Name / Number (e.g. 1, A, 1-1)'**
+  String get axisNameLabel;
+
+  /// Title for shear wall
+  ///
+  /// In en, this message translates to:
+  /// **'Shear Wall'**
+  String get shearWallTitle;
+
+  /// Title for beam
+  ///
+  /// In en, this message translates to:
+  /// **'Beam'**
+  String get beamTitle;
+
+  /// Title for slab opening
+  ///
+  /// In en, this message translates to:
+  /// **'Slab Opening'**
+  String get slabOpeningTitle;
+
+  /// Title for grid axis
+  ///
+  /// In en, this message translates to:
+  /// **'Axis \"{name}\"'**
+  String gridAxisTitle(String name);
+
+  /// Prefix for structural level elevation
+  ///
+  /// In en, this message translates to:
+  /// **'S.L.'**
+  String get structuralElevationLabel;
+
+  /// Tooltip for CAD underlay layers button
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Underlay Layers'**
+  String get layersTooltip;
+
+  /// Dimensions button in toolbar
+  ///
+  /// In en, this message translates to:
+  /// **'Dimensions...'**
+  String get dimensionsEllipsis;
+
+  /// Other button in toolbar
+  ///
+  /// In en, this message translates to:
+  /// **'Other...'**
+  String get otherEllipsis;
+
+  /// Hidden beam label
+  ///
+  /// In en, this message translates to:
+  /// **'hidden'**
+  String get hiddenBeamLabel;
+
+  /// Shaft opening preset label
+  ///
+  /// In en, this message translates to:
+  /// **'Shaft (40×60)'**
+  String get shaftOpeningLabel;
+
+  /// Elevator opening preset label
+  ///
+  /// In en, this message translates to:
+  /// **'Elevator (1.8×2.0)'**
+  String get elevatorOpeningLabel;
+
+  /// Stairs opening preset label
+  ///
+  /// In en, this message translates to:
+  /// **'Stairs (2.4×4.5)'**
+  String get stairsOpeningLabel;
+
+  /// Name button in toolbar
+  ///
+  /// In en, this message translates to:
+  /// **'Name...'**
+  String get nameEllipsis;
+
+  /// Abbreviation for points
+  ///
+  /// In en, this message translates to:
+  /// **'pts'**
+  String get pointsAbbr;
 }
 
 class _AppLocalizationsDelegate

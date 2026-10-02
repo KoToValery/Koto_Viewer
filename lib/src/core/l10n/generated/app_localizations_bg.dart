@@ -1397,4 +1397,155 @@ class AppLocalizationsBg extends AppLocalizations {
   String floatingColumnWarning(String name, String storey) {
     return 'Колона $name на $storey е насадена върху плочата (липсва долна опора)!';
   }
+
+  @override
+  String get applyAction => 'Приложи';
+
+  @override
+  String get offsetAction => 'Офсет';
+
+  @override
+  String get renameColumnTitle => 'Преименуване на колона';
+
+  @override
+  String get designationLabel => 'Обозначение (напр. К1, К2, С1)';
+
+  @override
+  String get keepBoth => 'Запази и двете';
+
+  @override
+  String get deletePrevious => 'Изтрий предишната';
+
+  @override
+  String get offsetCreatedTitle => 'Офсетът е създаден';
+
+  @override
+  String deletePreviousAxisPrompt(String name) {
+    return 'Желаете ли да изтриете предишната ос \"$name\"?';
+  }
+
+  @override
+  String deletePreviousColumnPrompt(String name) {
+    return 'Желаете ли да изтриете предишната колона \"$name\"?';
+  }
+
+  @override
+  String offsetWithDuplication(String item) {
+    return 'Офсет с дублиране: $item';
+  }
+
+  @override
+  String get distanceMeters => 'Разстояние (метри)';
+
+  @override
+  String get duplicationDirection => 'Посока на дублиране:';
+
+  @override
+  String get directionLeft => 'Наляво';
+
+  @override
+  String get directionRight => 'Надясно';
+
+  @override
+  String get directionUp => 'Нагоре';
+
+  @override
+  String get directionDown => 'Надолу';
+
+  @override
+  String get specifyDirectionByDrag => 'Укажи посока с влачене на екрана';
+
+  @override
+  String dragForDirectionReleaseToOffset(String distance) {
+    return 'Плъзнете за посока • Пуснете за офсет ($distance m)';
+  }
+
+  @override
+  String get columnDimensionsTitle => 'Размери на колона';
+
+  @override
+  String get widthCm => 'Ширина (cm)';
+
+  @override
+  String get heightCm => 'Височина (cm)';
+
+  @override
+  String get shapeRectangular => 'Правоъгълна';
+
+  @override
+  String get shapeCircular => 'Кръгла';
+
+  @override
+  String get shapeLShape => 'L-образна';
+
+  @override
+  String get shearWallThicknessTitle => 'Дебелина на шайба';
+
+  @override
+  String get thicknessCm => 'Дебелина (cm)';
+
+  @override
+  String get beamDimensionsTitle => 'Размери на греда';
+
+  @override
+  String get widthBCm => 'Ширина b (cm)';
+
+  @override
+  String get depthHCm => 'Височина h (cm)';
+
+  @override
+  String get slabThicknessTitle => 'Дебелина на плоча';
+
+  @override
+  String get slabThicknessHCm => 'Дебелина h (cm)';
+
+  @override
+  String get axisNameTitle => 'Име на ос';
+
+  @override
+  String get axisNameLabel => 'Име / номер на ос (напр. 1, A, 1-1)';
+
+  @override
+  String get shearWallTitle => 'Шайба';
+
+  @override
+  String get beamTitle => 'Греда';
+
+  @override
+  String get slabOpeningTitle => 'Отвор в плоча';
+
+  @override
+  String gridAxisTitle(String name) {
+    return 'Ос \"$name\"';
+  }
+
+  @override
+  String get structuralElevationLabel => 'К.К.';
+
+  @override
+  String get layersTooltip => 'Слоеве на подложката';
+
+  @override
+  String get dimensionsEllipsis => 'Размери...';
+
+  @override
+  String get otherEllipsis => 'Друга...';
+
+  @override
+  String get hiddenBeamLabel => 'скрита';
+
+  @override
+  String get shaftOpeningLabel => 'Шахта (40×60)';
+
+  @override
+  String get elevatorOpeningLabel => 'Асансьор (1.8×2.0)';
+
+  @override
+  String get stairsOpeningLabel => 'Стълби (2.4×4.5)';
+
+  @override
+  String get nameEllipsis => 'Име...';
+
+  @override
+  String get pointsAbbr => 'т.';
 }

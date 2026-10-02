@@ -6,6 +6,7 @@ import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_snap_helper.dart';
 import 'package:kotoview/src/features/structural_designer/models/cantilever_analysis_models.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
+import 'package:kotoview/src/features/structural_designer/rendering/structural_2d_painter.dart';
 import 'package:kotoview/src/features/structural_designer/rendering/structural_pointer_painter.dart';
 import 'package:kotoview/src/features/structural_designer/structural_designer_screen.dart';
 import 'package:kotoview/src/features/structural_designer/widgets/element_palette_bar.dart';
@@ -734,6 +735,247 @@ void main() {
     expect(find.text('Колона'), findsOneWidget);
     expect(find.text('Шайба'), findsOneWidget);
     expect(find.text('Плоча'), findsOneWidget);
+  });
+
+  test('StructuralGridAxis isParallelTo and alignWith geometry', () {
+    const axis1 = StructuralGridAxis(
+      id: 'a1',
+      name: '1',
+      start: Offset(0, 0),
+      end: Offset(10, 0),
+    );
+    const axis2 = StructuralGridAxis(
+      id: 'a2',
+      name: '2',
+      start: Offset(2, 5),
+      end: Offset(8, 5),
+    );
+    const axis3Opposite = StructuralGridAxis(
+      id: 'a3',
+      name: '3',
+      start: Offset(9, -4),
+      end: Offset(1, -4),
+    );
+    const axisPerp = StructuralGridAxis(
+      id: 'aPerp',
+      name: 'A',
+      start: Offset(0, 0),
+      end: Offset(0, 10),
+    );
+    const axisSlanted = StructuralGridAxis(
+      id: 'aSlanted',
+      name: 'S',
+      start: Offset(0, 0),
+      end: Offset(10, 5),
+    );
+
+    // Parallelism check
+    expect(axis1.isParallelTo(axis2), isTrue);
+    expect(axis1.isParallelTo(axis3Opposite), isTrue);
+    expect(axis1.isParallelTo(axisPerp), isFalse);
+    expect(axis1.isParallelTo(axisSlanted), isFalse);
+
+    // Harmonization / Alignment with reference axis
+    final aligned2 = axis2.alignWith(axis1);
+    expect(aligned2.start.dx, closeTo(0.0, 1e-4));
+    expect(aligned2.start.dy, closeTo(5.0, 1e-4));
+    expect(aligned2.end.dx, closeTo(10.0, 1e-4));
+    expect(aligned2.end.dy, closeTo(5.0, 1e-4));
+    expect(aligned2.length, closeTo(axis1.length, 1e-4));
+
+    // Opposite orientation alignment
+    final aligned3 = axis3Opposite.alignWith(axis1);
+    expect(aligned3.start.dx, closeTo(10.0, 1e-4));
+    expect(aligned3.start.dy, closeTo(-4.0, 1e-4));
+    expect(aligned3.end.dx, closeTo(0.0, 1e-4));
+    expect(aligned3.end.dy, closeTo(-4.0, 1e-4));
+    expect(aligned3.length, closeTo(axis1.length, 1e-4));
+  });
+
+  testWidgets('Harmonize parallel grid axes when one axis handle is dragged', (tester) async {
+    final doc = DxfDocument(
+      entities: const [],
+      layers: {'0': DxfLayer(name: '0', isVisible: true)},
+      blocks: const {},
+      headerVars: const {},
+      bounds: const Rect.fromLTWH(-10, -10, 50, 50),
+      entityStats: const {},
+    );
+
+    const axisA = StructuralGridAxis(
+      id: 'axis_a',
+      name: '1',
+      start: Offset(0, 0),
+      end: Offset(10, 0),
+      bubbleAtStart: true,
+      bubbleAtEnd: true,
+    );
+    const axisB = StructuralGridAxis(
+      id: 'axis_b',
+      name: '2',
+      start: Offset(2, 6),
+      end: Offset(8, 6),
+      bubbleAtStart: true,
+      bubbleAtEnd: true,
+    );
+    const axisCPerp = StructuralGridAxis(
+      id: 'axis_c',
+      name: 'A',
+      start: Offset(0, -5),
+      end: Offset(0, 15),
+      bubbleAtStart: true,
+      bubbleAtEnd: true,
+    );
+
+    final project = StructuralProject(
+      storeys: [
+        StoreyLevel(
+          id: 'storey_1',
+          name: 'Кота +0.00',
+          elevation: 0.0,
+          height: 3.0,
+          gridAxes: const [axisA, axisB, axisCPerp],
+        ),
+      ],
+      activeStoreyIndex: 0,
+    );
+
+    tester.view.physicalSize = const Size(600, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('bg'),
+        home: StructuralDesignerScreen(
+          document: doc,
+          initialProject: project,
+          initialCadBounds: const Rect.fromLTWH(-10, -10, 50, 50),
+          title: 'Axis Harmonization CAD',
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify CustomPaint with Structural2dPainter renders the axes
+    final customPaint = tester.widget<CustomPaint>(
+      find.byWidgetPredicate((w) => w is CustomPaint && w.painter is Structural2dPainter),
+    );
+    final painter = customPaint.painter as Structural2dPainter;
+    expect(painter.currentStorey.gridAxes.length, 3);
+
+    final initialA = painter.currentStorey.gridAxes.firstWhere((a) => a.id == 'axis_a');
+    final initialB = painter.currentStorey.gridAxes.firstWhere((a) => a.id == 'axis_b');
+    final initialC = painter.currentStorey.gridAxes.firstWhere((a) => a.id == 'axis_c');
+
+    expect(initialA.length, closeTo(10.0, 1e-4));
+    expect(initialB.length, closeTo(6.0, 1e-4));
+    expect(initialC.length, closeTo(20.0, 1e-4));
+
+    // When Axis A is extended/adjusted via its handle (from length 10 to length 15):
+    final extendedA = initialA.copyWith(end: const Offset(15, 0));
+    final harmonizedAxes = painter.currentStorey.gridAxes.map((a) {
+      if (a.id == extendedA.id) return extendedA;
+      if (a.isParallelTo(extendedA)) return a.alignWith(extendedA);
+      return a;
+    }).toList();
+
+    // Axis B (parallel) is harmonized to the exact same length (15.0) and aligned bounds (0 to 15):
+    final harmonizedB = harmonizedAxes.firstWhere((a) => a.id == 'axis_b');
+    expect(harmonizedB.length, closeTo(15.0, 1e-4));
+    expect(harmonizedB.start, const Offset(0, 6));
+    expect(harmonizedB.end, const Offset(15, 6));
+
+    // Axis C (perpendicular) remains completely unchanged:
+    final unchangedC = harmonizedAxes.firstWhere((a) => a.id == 'axis_c');
+    expect(unchangedC.length, closeTo(20.0, 1e-4));
+    expect(unchangedC.start, const Offset(0, -5));
+    expect(unchangedC.end, const Offset(0, 15));
+  });
+
+  test('Subsequent parallel axis automatically adopts reference axis length and alignment on placement', () {
+    const referenceAxis = StructuralGridAxis(
+      id: 'axis_1',
+      name: '1',
+      start: Offset(-2.0, 0.0),
+      end: Offset(18.0, 0.0),
+    );
+    expect(referenceAxis.length, closeTo(20.0, 1e-4));
+
+    // New parallel axis placed between wall segments with an arbitrary shorter span:
+    const rawSecondAxis = StructuralGridAxis(
+      id: 'axis_2',
+      name: '2',
+      start: Offset(3.0, 7.0),
+      end: Offset(11.0, 7.0),
+    );
+    expect(rawSecondAxis.length, closeTo(8.0, 1e-4));
+
+    // Verify rawSecondAxis is parallel to referenceAxis
+    expect(rawSecondAxis.isParallelTo(referenceAxis), isTrue);
+
+    // When aligned with the existing reference axis:
+    final adoptedAxis = rawSecondAxis.alignWith(referenceAxis);
+
+    // It automatically snaps to length 20.0 and aligns bounds [-2.0, 18.0] at Y = 7.0
+    expect(adoptedAxis.length, closeTo(20.0, 1e-4));
+    expect(adoptedAxis.start, const Offset(-2.0, 7.0));
+    expect(adoptedAxis.end, const Offset(18.0, 7.0));
+  });
+
+  test('StoreyLevel computes structural elevation correctly taking floor finish into account', () {
+    const storey0 = StoreyLevel(
+      id: 'storey_0',
+      name: 'Ground Floor',
+      elevation: 0.0,
+      height: 2.80,
+      floorFinishThickness: 0.05,
+    );
+
+    const slabStandard = StructuralSlab(
+      id: 'slab_1',
+      polygon: [Offset(0, 0), Offset(5, 0), Offset(5, 5), Offset(0, 5)],
+      thickness: 0.20,
+    );
+
+    // Architectural elevation 0.00 with 5cm screed gives structural elevation -0.05m
+    expect(storey0.structuralElevationFor(slabStandard), closeTo(-0.05, 1e-4));
+
+    const storey1 = StoreyLevel(
+      id: 'storey_1',
+      name: 'Level 1',
+      elevation: 2.80,
+      height: 2.80,
+      floorFinishThickness: 0.05,
+    );
+
+    // Architectural elevation 2.80 gives structural elevation 2.75m
+    expect(storey1.structuralElevationFor(slabStandard), closeTo(2.75, 1e-4));
+
+    // Custom slab finish (e.g. 8cm / 0.08m thick finish for terraces/bathrooms)
+    final slabCustomFinish = slabStandard.copyWith(floorFinish: 0.08);
+    expect(storey1.structuralElevationFor(slabCustomFinish), closeTo(2.72, 1e-4));
+  });
+
+  test('StoreyLevel cloneToNextLevel preserves floorFinishThickness', () {
+    const storey0 = StoreyLevel(
+      id: 's0',
+      name: 'Floor 1',
+      elevation: 0.0,
+      height: 3.0,
+      floorFinishThickness: 0.06,
+    );
+
+    final storey1 = storey0.cloneToNextLevel(
+      newId: 's1',
+      newName: 'Floor 2',
+      newElevation: 3.0,
+    );
+    expect(storey1.elevation, closeTo(3.0, 1e-4));
+    expect(storey1.floorFinishThickness, closeTo(0.06, 1e-4));
   });
 }
 

@@ -99,8 +99,8 @@ class Structural2dPainter extends CustomPainter {
     }
 
     // 2. Draw Active Storey Slabs
-    for (final slab in currentStorey.slabs) {
-      _drawSlab(canvas, slab, isGhost: false);
+    for (int i = 0; i < currentStorey.slabs.length; i++) {
+      _drawSlab(canvas, currentStorey.slabs[i], slabIndex: i, isGhost: false);
     }
 
     // 2b. Draw Active Storey Beams
@@ -153,8 +153,8 @@ class Structural2dPainter extends CustomPainter {
   }
 
   void _drawGhostStorey(Canvas canvas, StoreyLevel ghost) {
-    for (final slab in ghost.slabs) {
-      _drawSlab(canvas, slab, isGhost: true);
+    for (int i = 0; i < ghost.slabs.length; i++) {
+      _drawSlab(canvas, ghost.slabs[i], slabIndex: i, isGhost: true);
     }
     for (final beam in ghost.beams) {
       _drawBeam(canvas, beam, isGhost: true);
@@ -170,7 +170,152 @@ class Structural2dPainter extends CustomPainter {
     }
   }
 
-  void _drawSlab(Canvas canvas, StructuralSlab slab, {required bool isGhost}) {
+  Color _getSlabBaseColor(StructuralSlab slab, int slabIndex) {
+    // Distinct color palette for different slab fields / thicknesses:
+    final tCm = (slab.thickness * 100).round();
+    switch (tCm) {
+      case 15:
+        return const Color(0xFFFFB300); // Warm Amber
+      case 18:
+        return const Color(0xFF00E676); // Emerald Green
+      case 20:
+        return const Color(0xFF00B0FF); // Sky Blue (Standard)
+      case 22:
+        return const Color(0xFFAA00FF); // Vivid Purple
+      case 25:
+        return const Color(0xFFFF6D00); // Deep Orange
+      case 30:
+        return const Color(0xFF3D5AFE); // Royal Blue
+      default:
+        const palette = [
+          Color(0xFF00B0FF), // Sky Blue
+          Color(0xFF00E676), // Emerald
+          Color(0xFFFFB300), // Amber
+          Color(0xFFAA00FF), // Purple
+          Color(0xFFFF5252), // Coral
+          Color(0xFF00E5FF), // Cyan
+          Color(0xFF7C4DFF), // Deep Purple
+          Color(0xFFFF9100), // Orange
+        ];
+        return palette[slabIndex % palette.length];
+    }
+  }
+
+  void _drawSlabHatch(Canvas canvas, Path clipPath, Color color, {required bool isGhost}) {
+    canvas.save();
+    canvas.clipPath(clipPath);
+
+    final bounds = clipPath.getBounds();
+    final hatchPaint = Paint()
+      ..color = color.withValues(alpha: isGhost ? 0.05 : 0.16)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0 / zoomScale;
+
+    // Spacing between diagonal hatch lines in scene pixels:
+    final spacing = (28.0 / zoomScale).clamp(0.4, 200.0);
+    final minX = bounds.left - bounds.height;
+    final maxX = bounds.right + bounds.height;
+
+    for (double x = minX; x <= maxX; x += spacing) {
+      canvas.drawLine(
+        Offset(x, bounds.top),
+        Offset(x + bounds.height, bounds.bottom),
+        hatchPaint,
+      );
+    }
+    canvas.restore();
+  }
+
+  void _drawSlabLevelMarker(Canvas canvas, StructuralSlab slab, Color slabColor, {required bool isGhost}) {
+    if (isGhost || slab.polygon.length < 3) return;
+
+    final centroidScene = cadToScene(slab.centroid);
+    final structElev = currentStorey.structuralElevationFor(slab);
+    final int thickCm = (slab.thickness * 100).round();
+
+    final sign = structElev > 0 ? '+' : (structElev == 0 ? '±' : '');
+    final elevStr = '$sign${structElev.toStringAsFixed(2)}';
+
+    canvas.save();
+    canvas.translate(centroidScene.dx, centroidScene.dy);
+    canvas.scale(1.0 / zoomScale);
+
+    // Render central badge with downward structural level symbol:
+    // Line 1: ▼ К.К. -0.05
+    // Line 2: d = 20 cm
+    final titleSpan = TextSpan(
+      children: [
+        const TextSpan(
+          text: '▼ ',
+          style: TextStyle(
+            color: Color(0xFF00E5FF),
+            fontSize: 10.5,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        TextSpan(
+          text: 'К.К. $elevStr',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10.5,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    );
+    final titlePainter = TextPainter(
+      text: titleSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final subSpan = TextSpan(
+      text: 'd = $thickCm cm',
+      style: TextStyle(
+        color: slabColor.withValues(alpha: 0.95),
+        fontSize: 9.5,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    final subPainter = TextPainter(
+      text: subSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final badgeWidth = math.max(titlePainter.width, subPainter.width) + 16.0;
+    final badgeHeight = titlePainter.height + subPainter.height + 10.0;
+    final badgeRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: badgeWidth,
+      height: badgeHeight,
+    );
+
+    // Translucent dark card pill with subtle border in slab color
+    final bgPaint = Paint()
+      ..color = const Color(0xEE1A1A22)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = slabColor.withValues(alpha: 0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    final rrect = RRect.fromRectAndRadius(badgeRect, const Radius.circular(6.0));
+    canvas.drawRRect(rrect, bgPaint);
+    canvas.drawRRect(rrect, borderPaint);
+
+    titlePainter.paint(
+      canvas,
+      Offset(-titlePainter.width / 2.0, -badgeHeight / 2.0 + 4.0),
+    );
+    subPainter.paint(
+      canvas,
+      Offset(-subPainter.width / 2.0, -badgeHeight / 2.0 + titlePainter.height + 5.0),
+    );
+
+    canvas.restore();
+  }
+
+  void _drawSlab(Canvas canvas, StructuralSlab slab, {required int slabIndex, required bool isGhost}) {
     if (slab.polygon.length < 3) return;
 
     final isSelected = !isGhost && (slab.id == selectedSlabId);
@@ -205,22 +350,30 @@ class Structural2dPainter extends CustomPainter {
       }
     }
 
+    final slabColor = _getSlabBaseColor(slab, slabIndex);
+
     final fillPaint = Paint()
       ..color = isGhost
-          ? const Color(0x1A90CAF9)
-          : (isSelected ? const Color(0x3D7C4DFF) : const Color(0x2803A9F4))
+          ? slabColor.withValues(alpha: 0.08)
+          : (isSelected
+              ? slabColor.withValues(alpha: 0.35)
+              : slabColor.withValues(alpha: 0.18))
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
       ..color = isGhost
-          ? const Color(0x6664B5F6)
-          : (isSelected ? const Color(0xFFB388FF) : const Color(0xFF0288D1))
+          ? slabColor.withValues(alpha: 0.35)
+          : (isSelected ? Colors.white : slabColor)
       ..style = PaintingStyle.stroke
       ..strokeWidth = isGhost
           ? (1.0 / zoomScale)
-          : (isSelected ? (2.5 / zoomScale) : (2.0 / zoomScale));
+          : (isSelected ? (2.5 / zoomScale) : (1.8 / zoomScale));
 
     canvas.drawPath(path, fillPaint);
+
+    // Light transparent diagonal hatch pattern (щриховка) for clear slab distinction
+    _drawSlabHatch(canvas, path, slabColor, isGhost: isGhost);
+
     canvas.drawPath(path, borderPaint);
 
     // Draw openings outline & architectural X cross
@@ -255,6 +408,9 @@ class Structural2dPainter extends CustomPainter {
         }
       }
     }
+
+    // Central structural elevation marker (конструктивен разрез с конструктивна кота)
+    _drawSlabLevelMarker(canvas, slab, slabColor, isGhost: isGhost);
 
     // If selected, draw corner vertex handles
     if (isSelected) {
