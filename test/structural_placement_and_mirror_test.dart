@@ -4,8 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_snap_helper.dart';
+import 'package:kotoview/src/features/structural_designer/models/cantilever_analysis_models.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
+import 'package:kotoview/src/features/structural_designer/rendering/structural_pointer_painter.dart';
 import 'package:kotoview/src/features/structural_designer/structural_designer_screen.dart';
+import 'package:kotoview/src/features/structural_designer/widgets/element_palette_bar.dart';
 
 void main() {
   test('StructuralColumn geometry and corner offsets', () {
@@ -436,6 +439,77 @@ void main() {
       allowNearest: false,
     );
     expect(snapWithoutNearest, isNull);
+  });
+
+  test('StructuralGridAxis has bubbles at both ends by default and fromTwoSegments', () {
+    const axis = StructuralGridAxis(
+      id: 'ax_1',
+      name: 'A',
+      start: Offset(0, 0),
+      end: Offset(10, 0),
+    );
+    expect(axis.bubbleAtStart, isTrue);
+    expect(axis.bubbleAtEnd, isTrue);
+
+    final fromSegments = StructuralGridAxis.fromTwoSegments(
+      id: 'ax_2',
+      name: '1',
+      a1: const Offset(0, 0),
+      a2: const Offset(5, 0),
+      b1: const Offset(0, 0.25),
+      b2: const Offset(5, 0.25),
+    );
+    expect(fromSegments, isNotNull);
+    expect(fromSegments!.bubbleAtStart, isTrue);
+    expect(fromSegments.bubbleAtEnd, isTrue);
+  });
+
+  testWidgets('ElementPaletteBar renders guidance banner, scrollable presets, and does not overflow on 360px screen', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('bg'),
+        home: Scaffold(
+          bottomNavigationBar: ElementPaletteBar(
+            activeTool: StructuralDrawTool.slab,
+            onSelectTool: (_) {},
+            currentColumnPreset: const StructuralColumn(id: 'col', center: Offset.zero),
+            onUpdateColumnPreset: (_) {},
+            currentWallThickness: 0.25,
+            onUpdateWallThickness: (_) {},
+            currentSlabThickness: 0.20,
+            onUpdateSlabThickness: (_) {},
+            isDrawingSlab: false,
+            slabPointCount: 0,
+            onCloseSlab: () {},
+            onUndoPoint: () {},
+            onClearSlab: () {},
+            onRotateColumn: () {},
+            onOpenCantileverReport: () {},
+            analysisSummary: StructuralAnalysisSummary.empty,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify guidance banner text is present
+    expect(find.text('Плоча: посочете 1-ви ъгъл'), findsOneWidget);
+
+    // Verify slab preset chips exist
+    expect(find.text('h=18 cm'), findsOneWidget);
+    expect(find.text('h=20 cm'), findsOneWidget);
+    expect(find.text('h=22 cm'), findsOneWidget);
+    expect(find.text('h=25 cm'), findsOneWidget);
+
+    // Verify there are no Flutter overflow errors!
+    expect(tester.takeException(), isNull);
   });
 }
 

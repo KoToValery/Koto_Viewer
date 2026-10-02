@@ -396,13 +396,17 @@ class Structural2dPainter extends CustomPainter {
     canvas.drawCircle(sMidNew, gripRadius, gripPaint);
     canvas.drawCircle(sMidNew, gripRadius + 3.0 / zoomScale, ringPaint);
 
-    // Distance badge text
+    // Distance badge text in crisp screen-space pixels
+    canvas.save();
+    canvas.translate(sMidNew.dx, sMidNew.dy);
+    canvas.scale(1.0 / zoomScale);
+
     final distText = '${d.abs().toStringAsFixed(2)} m';
     final textSpan = TextSpan(
       text: distText,
-      style: TextStyle(
+      style: const TextStyle(
         color: Colors.white,
-        fontSize: (11.0 / zoomScale).clamp(8.0, 16.0),
+        fontSize: 10.0,
         fontWeight: FontWeight.bold,
       ),
     );
@@ -411,21 +415,22 @@ class Structural2dPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final badgeOffset = sMidNew + Offset(12.0 / zoomScale, -12.0 / zoomScale);
+    const badgeOffset = Offset(12.0, -12.0);
     final bgRect = Rect.fromLTWH(
-      badgeOffset.dx - 4.0 / zoomScale,
-      badgeOffset.dy - 2.0 / zoomScale,
-      textPainter.width + 8.0 / zoomScale,
-      textPainter.height + 4.0 / zoomScale,
+      badgeOffset.dx - 4.0,
+      badgeOffset.dy - 2.0,
+      textPainter.width + 8.0,
+      textPainter.height + 4.0,
     );
     final badgeBgPaint = Paint()
       ..color = const Color(0xCC000000)
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
-      RRect.fromRectAndRadius(bgRect, Radius.circular(4.0 / zoomScale)),
+      RRect.fromRectAndRadius(bgRect, const Radius.circular(4.0)),
       badgeBgPaint,
     );
     textPainter.paint(canvas, badgeOffset);
+    canvas.restore();
   }
 
   void _drawBeam(Canvas canvas, StructuralBeam beam, {required bool isGhost}) {
@@ -530,7 +535,11 @@ class Structural2dPainter extends CustomPainter {
     required bool isSelected,
     required bool isGhost,
   }) {
-    final radius = 13.0 / zoomScale;
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(1.0 / zoomScale);
+
+    const radius = 13.0;
     final bgPaint = Paint()
       ..color = isGhost ? const Color(0xCC2C2C2E) : const Color(0xFF1C1C1E)
       ..style = PaintingStyle.fill;
@@ -539,17 +548,16 @@ class Structural2dPainter extends CustomPainter {
           ? const Color(0x66FF453A)
           : (isSelected ? const Color(0xFFFF9F0A) : const Color(0xFFFF453A))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (isSelected ? 2.5 : 1.8) / zoomScale;
+      ..strokeWidth = isSelected ? 2.5 : 1.8;
 
-    canvas.drawCircle(center, radius, bgPaint);
-    canvas.drawCircle(center, radius, borderPaint);
+    canvas.drawCircle(Offset.zero, radius, bgPaint);
+    canvas.drawCircle(Offset.zero, radius, borderPaint);
 
-    final fontSize = (11.0 / zoomScale).clamp(8.0, 16.0);
     final textSpan = TextSpan(
       text: label,
       style: TextStyle(
         color: isGhost ? const Color(0xAAFFFFFF) : Colors.white,
-        fontSize: fontSize,
+        fontSize: 11.0,
         fontWeight: FontWeight.bold,
       ),
     );
@@ -559,10 +567,11 @@ class Structural2dPainter extends CustomPainter {
     )..layout();
 
     final textOffset = Offset(
-      center.dx - textPainter.width / 2.0,
-      center.dy - textPainter.height / 2.0,
+      -textPainter.width / 2.0,
+      -textPainter.height / 2.0,
     );
     textPainter.paint(canvas, textOffset);
+    canvas.restore();
   }
 
   void _drawDashDotLine(Canvas canvas, Offset p1, Offset p2, Paint paint) {
@@ -727,30 +736,32 @@ class Structural2dPainter extends CustomPainter {
     // Floating column badge (EC8 vertical regularity alert)
     if (isFloating && !isGhost && !isMovingThis) {
       final centerScene = cadToScene(col.center);
-      final textSpan = TextSpan(
+      final badgeAnchorY = centerScene.dy - (col.height * cadScale / 2.0);
+      canvas.save();
+      canvas.translate(centerScene.dx, badgeAnchorY);
+      canvas.scale(1.0 / zoomScale);
+
+      const textSpan = TextSpan(
         text: 'НАСАДЕНА',
         style: TextStyle(
           color: Colors.white,
-          fontSize: (9.0 / zoomScale).clamp(7.0, 14.0),
+          fontSize: 9.0,
           fontWeight: FontWeight.bold,
         ),
       );
       final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
-      final badgeOffset = Offset(
-        centerScene.dx - tp.width / 2.0,
-        centerScene.dy - (col.height * cadScale / 2.0) - tp.height - 4.0 / zoomScale,
-      );
-      final bgRect = Rect.fromLTWH(
-        badgeOffset.dx - 3.0 / zoomScale,
-        badgeOffset.dy - 1.0 / zoomScale,
-        tp.width + 6.0 / zoomScale,
-        tp.height + 2.0 / zoomScale,
+      final badgeCenter = Offset(0, -tp.height / 2.0 - 4.0);
+      final bgRect = Rect.fromCenter(
+        center: badgeCenter,
+        width: tp.width + 6.0,
+        height: tp.height + 2.0,
       );
       final badgeBgPaint = Paint()
         ..color = const Color(0xEEAA00FF)
         ..style = PaintingStyle.fill;
-      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, Radius.circular(3.0 / zoomScale)), badgeBgPaint);
-      tp.paint(canvas, badgeOffset);
+      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), badgeBgPaint);
+      tp.paint(canvas, Offset(-tp.width / 2.0, badgeCenter.dy - tp.height / 2.0));
+      canvas.restore();
     }
 
     // Selected highlight halo & corner grip handles
@@ -1057,6 +1068,7 @@ class Structural2dPainter extends CustomPainter {
         final dir = (p2 - p1);
         final len = dir.distance;
         final uDir = len > 1e-4 ? dir / len : const Offset(1, 0);
+        _drawAxisBubble(canvas, p1, -uDir, '?', isSelected: true, isGhost: false);
         _drawAxisBubble(canvas, p2, uDir, '?', isSelected: true, isGhost: false);
       }
     }
@@ -1128,21 +1140,25 @@ class Structural2dPainter extends CustomPainter {
         ..strokeWidth = 1.8 / zoomScale;
       _drawDashDotLine(canvas, cmScene, crScene, linePaint);
 
-      // Eccentricity label in the middle of line
+      // Eccentricity label in the middle of line (crisp screen-space pixels)
       final mid = (cmScene + crScene) / 2.0;
+      canvas.save();
+      canvas.translate(mid.dx, mid.dy);
+      canvas.scale(1.0 / zoomScale);
+
       final textSpan = TextSpan(
         text: 'e = ${check.maxEccentricityM.toStringAsFixed(2)} m (${(check.maxEccentricityRatio * 100).round()}%)',
-        style: TextStyle(
+        style: const TextStyle(
           color: Colors.white,
-          fontSize: (10.0 / zoomScale).clamp(8.0, 14.0),
+          fontSize: 10.0,
           fontWeight: FontWeight.bold,
         ),
       );
       final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
       final badgeRect = Rect.fromCenter(
-        center: mid,
-        width: tp.width + 8.0 / zoomScale,
-        height: tp.height + 4.0 / zoomScale,
+        center: Offset.zero,
+        width: tp.width + 10.0,
+        height: tp.height + 4.0,
       );
       final bgPaint = Paint()
         ..color = (check.isTorsionallySensitive ? const Color(0xDD000000) : const Color(0xCC1E1E1E))
@@ -1150,10 +1166,11 @@ class Structural2dPainter extends CustomPainter {
       final borderPaint = Paint()
         ..color = check.isTorsionallySensitive ? const Color(0xFFFF1744) : const Color(0xFFD500F9)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0 / zoomScale;
-      canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, Radius.circular(4.0 / zoomScale)), bgPaint);
-      canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, Radius.circular(4.0 / zoomScale)), borderPaint);
-      tp.paint(canvas, Offset(mid.dx - tp.width / 2.0, mid.dy - tp.height / 2.0));
+        ..strokeWidth = 1.0;
+      canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, const Radius.circular(4.0)), bgPaint);
+      canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, const Radius.circular(4.0)), borderPaint);
+      tp.paint(canvas, Offset(-tp.width / 2.0, -tp.height / 2.0));
+      canvas.restore();
     }
 
     // Draw Center of Mass (CM) marker: Cyan/Blue target
@@ -1164,38 +1181,53 @@ class Structural2dPainter extends CustomPainter {
   }
 
   void _drawCenterTarget(Canvas canvas, Offset pos, String label, Color color) {
-    final r = 12.0 / zoomScale;
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
+    canvas.scale(1.0 / zoomScale);
+
+    const double r = 11.0;
     final fillPaint = Paint()
       ..color = color.withValues(alpha: 0.25)
       ..style = PaintingStyle.fill;
     final strokePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0 / zoomScale;
+      ..strokeWidth = 1.5;
 
-    canvas.drawCircle(pos, r, fillPaint);
-    canvas.drawCircle(pos, r, strokePaint);
+    canvas.drawCircle(Offset.zero, r, fillPaint);
+    canvas.drawCircle(Offset.zero, r, strokePaint);
 
     // Crosshairs
-    final chLen = r * 1.5;
-    canvas.drawLine(Offset(pos.dx - chLen, pos.dy), Offset(pos.dx + chLen, pos.dy), strokePaint);
-    canvas.drawLine(Offset(pos.dx, pos.dy - chLen), Offset(pos.dx, pos.dy + chLen), strokePaint);
+    const double chLen = r * 1.4;
+    canvas.drawLine(const Offset(-chLen, 0), const Offset(chLen, 0), strokePaint);
+    canvas.drawLine(const Offset(0, -chLen), const Offset(0, chLen), strokePaint);
 
     // Label badge above
     final textSpan = TextSpan(
       text: label,
-      style: TextStyle(
+      style: const TextStyle(
         color: Colors.white,
-        fontSize: (10.0 / zoomScale).clamp(8.0, 14.0),
+        fontSize: 10.0,
         fontWeight: FontWeight.bold,
       ),
     );
     final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
-    final badgeCenter = Offset(pos.dx, pos.dy - r - tp.height / 2.0 - 4.0 / zoomScale);
-    final bgRect = Rect.fromCenter(center: badgeCenter, width: tp.width + 6.0 / zoomScale, height: tp.height + 2.0 / zoomScale);
+    final badgeCenter = Offset(0, -r - tp.height / 2.0 - 4.0);
+    final bgRect = Rect.fromCenter(
+      center: badgeCenter,
+      width: tp.width + 6.0,
+      height: tp.height + 2.0,
+    );
     final bgPaint = Paint()..color = const Color(0xCC000000)..style = PaintingStyle.fill;
-    canvas.drawRRect(RRect.fromRectAndRadius(bgRect, Radius.circular(3.0 / zoomScale)), bgPaint);
-    tp.paint(canvas, Offset(badgeCenter.dx - tp.width / 2.0, badgeCenter.dy - tp.height / 2.0));
+    final badgeBorder = Paint()
+      ..color = color.withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), bgPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), badgeBorder);
+    tp.paint(canvas, Offset(-tp.width / 2.0, badgeCenter.dy - tp.height / 2.0));
+
+    canvas.restore();
   }
 
   @override

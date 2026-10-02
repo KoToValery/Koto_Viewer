@@ -324,7 +324,7 @@ class StructuralGridAxis {
     required this.name,
     required this.start,
     required this.end,
-    this.bubbleAtStart = false,
+    this.bubbleAtStart = true,
     this.bubbleAtEnd = true,
   });
 
@@ -432,6 +432,7 @@ class StructuralGridAxis {
       name: name,
       start: center + dir * minProj,
       end: center + dir * maxProj,
+      bubbleAtStart: true,
       bubbleAtEnd: true,
     );
   }

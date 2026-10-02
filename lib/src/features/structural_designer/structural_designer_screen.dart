@@ -836,6 +836,249 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return '${current}_1';
   }
 
+  void _showCustomColumnDialog() {
+    final double widthCm = (_currentColumnPreset.width * 100).roundToDouble();
+    final double heightCm = (_currentColumnPreset.height * 100).roundToDouble();
+    ColumnShape shape = _currentColumnPreset.shape;
+    final wCtrl = TextEditingController(text: widthCm.toInt().toString());
+    final hCtrl = TextEditingController(text: heightCm.toInt().toString());
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E24),
+          title: const Text('Размери на колона', style: TextStyle(color: Colors.white, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: wCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Ширина (cm)',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        suffixText: 'cm',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: hCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Височина (cm)',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        suffixText: 'cm',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<ColumnShape>(
+                segments: const [
+                  ButtonSegment(value: ColumnShape.rectangular, label: Text('Правоъгълна', style: TextStyle(fontSize: 11))),
+                  ButtonSegment(value: ColumnShape.circular, label: Text('Кръгла', style: TextStyle(fontSize: 11))),
+                  ButtonSegment(value: ColumnShape.lShape, label: Text('L-образна', style: TextStyle(fontSize: 11))),
+                ],
+                selected: {shape},
+                onSelectionChanged: (val) => setDlgState(() => shape = val.first),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Отказ'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final w = (double.tryParse(wCtrl.text) ?? 25.0) / 100.0;
+                final h = (double.tryParse(hCtrl.text) ?? 25.0) / 100.0;
+                setState(() {
+                  _currentColumnPreset = _currentColumnPreset.copyWith(
+                    shape: shape,
+                    width: w.clamp(0.15, 3.0),
+                    height: (shape == ColumnShape.circular ? w : h).clamp(0.15, 3.0),
+                  );
+                });
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('Приложи'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCustomWallDialog() {
+    final tCtrl = TextEditingController(text: (_currentWallThickness * 100).toInt().toString());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        title: const Text('Дебелина на шайба', style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: TextField(
+          controller: tCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Дебелина (cm)',
+            labelStyle: TextStyle(color: Colors.white70),
+            suffixText: 'cm',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отказ')),
+          FilledButton(
+            onPressed: () {
+              final t = (double.tryParse(tCtrl.text) ?? 25.0) / 100.0;
+              setState(() => _currentWallThickness = t.clamp(0.10, 1.50));
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Приложи'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCustomBeamDialog() {
+    final wCtrl = TextEditingController(text: (_currentBeamWidth * 100).toInt().toString());
+    final dCtrl = TextEditingController(text: (_currentBeamDepth * 100).toInt().toString());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        title: const Text('Размери на греда', style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: wCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Ширина b (cm)',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  suffixText: 'cm',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: dCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Височина h (cm)',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  suffixText: 'cm',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отказ')),
+          FilledButton(
+            onPressed: () {
+              final w = (double.tryParse(wCtrl.text) ?? 25.0) / 100.0;
+              final d = (double.tryParse(dCtrl.text) ?? 50.0) / 100.0;
+              setState(() {
+                _currentBeamWidth = w.clamp(0.15, 2.0);
+                _currentBeamDepth = d.clamp(0.20, 3.0);
+              });
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Приложи'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCustomSlabDialog() {
+    final tCtrl = TextEditingController(text: (_currentSlabThickness * 100).toInt().toString());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        title: const Text('Дебелина на плоча', style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: TextField(
+          controller: tCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Дебелина h (cm)',
+            labelStyle: TextStyle(color: Colors.white70),
+            suffixText: 'cm',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отказ')),
+          FilledButton(
+            onPressed: () {
+              final t = (double.tryParse(tCtrl.text) ?? 20.0) / 100.0;
+              setState(() => _currentSlabThickness = t.clamp(0.08, 1.0));
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Приложи'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCustomAxisDialog() {
+    final nameCtrl = TextEditingController(text: _currentAxisName);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        title: const Text('Име на ос', style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Име / номер на ос (напр. 1, A, 1-1)',
+            labelStyle: TextStyle(color: Colors.white70),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отказ')),
+          FilledButton(
+            onPressed: () {
+              final text = nameCtrl.text.trim();
+              if (text.isNotEmpty) {
+                setState(() => _currentAxisName = text);
+              }
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Запази'),
+          ),
+        ],
+      ),
+    );
+  }
+
   (Offset, Offset)? _findClosestSegmentInCad(Offset cadPt, double toleranceCad) {
     double minDistance = toleranceCad;
     (Offset, Offset)? bestSeg;
@@ -3162,6 +3405,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         verticalCapacityReport: _verticalCapacityReport,
                         onOpenSeismicReport: _openSeismicReport,
                         seismicReport: _seismicAnalysisReport,
+                        hasWallStart: _wallStartCad != null,
+                        hasBeamStart: _beamStartCad != null,
+                        onCustomColumnDimensions: _showCustomColumnDialog,
+                        onCustomWallThickness: _showCustomWallDialog,
+                        onCustomBeamDimensions: _showCustomBeamDialog,
+                        onCustomSlabThickness: _showCustomSlabDialog,
+                        onCustomAxisName: _showCustomAxisDialog,
                       ),
               ),
             ],
