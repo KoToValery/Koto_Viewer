@@ -1336,4 +1336,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String storeyColumnLoad(String storey, String ned, String nrd, String ratio) {
     return '$storey: Ned = $ned kN / Nrd = $nrd kN ($ratio%)';
   }
+
+  @override
+  String get seismicAnalysisTitle => 'Seismic Analysis (EC8)';
+
+  @override
+  String get seismicAnalysisSubtitle =>
+      'Eccentricity, shear walls, transfer columns & beams';
+
+  @override
+  String get centerOfMass => 'Center of Mass (CM)';
+
+  @override
+  String get centerOfRigidity => 'Center of Rigidity (CR)';
+
+  @override
+  String get seismicEccentricity => 'Seismic Eccentricity';
+
+  @override
+  String get torsionalSensitivity => 'Torsional Sensitivity';
+
+  @override
+  String get shearWallRatio => 'Shear Wall Ratio';
+
+  @override
+  String get floatingColumnsTitle => 'Transfer / Floating Columns';
+
+  @override
+  String get floatingColumnBadge => 'FLOATING';
+
+  @override
+  String get discontinuousWallsTitle => 'Discontinuous Shear Walls';
+
+  @override
+  String get softStoreyTitle => 'Soft Storey';
+
+  @override
+  String get beamSizingTitle => 'Beam Sizing';
+
+  @override
+  String get openingsProximityTitle => 'Slab Openings Proximity';
+
+  @override
+  String get ec8SeismicButton => 'EC8 Seismic';
+
+  @override
+  String beamDepthWarning(int depth) {
+    return 'Recommended depth: min $depth cm';
+  }
+
+  @override
+  String floatingColumnWarning(String name, String storey) {
+    return 'Column $name on $storey is floating on the slab (no lower support)!';
+  }
 }

@@ -396,5 +396,21 @@
   "statusCritical": "Критично претоварване",
   "ec2FeasibilityButton": "EC2 Капацитет",
   "columnRequiredSection": "Изисква минимум {section}",
-  "storeyColumnLoad": "{storey}: Ned = {ned} kN / Nrd = {nrd} kN ({ratio}%)"
+  "storeyColumnLoad": "{storey}: Ned = {ned} kN / Nrd = {nrd} kN ({ratio}%)",
+  "seismicAnalysisTitle": "Сеизмичен анализ (EC8)",
+  "seismicAnalysisSubtitle": "Ексцентрицитет, шайби, насадени колони и греди",
+  "centerOfMass": "Център на масите (CM)",
+  "centerOfRigidity": "Център на коравините (CR)",
+  "seismicEccentricity": "Сеизмичен ексцентрицитет",
+  "torsionalSensitivity": "Усуквателна чувствителност",
+  "shearWallRatio": "Покритие с шайби",
+  "floatingColumnsTitle": "Насадени колони",
+  "floatingColumnBadge": "НАСАДЕНА",
+  "discontinuousWallsTitle": "Прекъснати шайби",
+  "softStoreyTitle": "Мек етаж",
+  "beamSizingTitle": "Сечения на греди",
+  "openingsProximityTitle": "Отвори в плочата",
+  "ec8SeismicButton": "EC8 Сеизмичност",
+  "beamDepthWarning": "Препоръчителна височина: мин. {depth} cm",
+  "floatingColumnWarning": "Колона {name} на {storey} е насадена върху плочата (липсва долна опора)!"
 }

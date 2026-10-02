@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/cantilever_analysis_models.dart';
+import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 
@@ -14,6 +15,7 @@ class Structural3dMeshBuilder {
     StructuralProject project, {
     List<CantileverZone> cantileverZones = const [],
     VerticalCapacityReport? verticalReport,
+    SeismicAnalysisReport? seismicReport,
     int? highlightStoreyIndex,
     double cadUnitsPerMeter = 1.0,
   }) {
@@ -29,13 +31,22 @@ class Structural3dMeshBuilder {
       final double zTop = (storey.elevation + storey.height) * cadUnitsPerMeter;
       final List<Triangle3D> storeyTriangles = [];
 
-      // 1. Extrude Columns (with EC2 vertical capacity color tinting)
+      // 1. Extrude Columns (with EC2 vertical capacity & EC8 floating column color tinting)
       for (final col in storey.columns) {
         final vCheck = verticalReport?.getCheckForColumn(col.id);
+        final bool isFloating = seismicReport?.isColumnFloating(col.id) ?? false;
         final Color topColor;
         final Color sideColor;
 
-        if (vCheck != null && vCheck.status == VerticalCapacityStatus.critical) {
+        if (isFloating) {
+          // Magenta / Purple alert for floating (transfer) columns in 3D
+          topColor = isCurrentStorey
+              ? const Color(0xFFE040FB)
+              : const Color(0x99E040FB);
+          sideColor = isCurrentStorey
+              ? const Color(0xFFAA00FF)
+              : const Color(0x99AA00FF);
+        } else if (vCheck != null && vCheck.status == VerticalCapacityStatus.critical) {
           // Red glowing alert for overloaded columns
           topColor = isCurrentStorey
               ? const Color(0xFFFF1744)

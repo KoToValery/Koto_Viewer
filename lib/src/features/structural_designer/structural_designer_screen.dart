@@ -9,15 +9,18 @@ import '../dxf_viewer/models/dxf_models.dart';
 import '../dxf_viewer/rendering/dxf_painter.dart';
 import '../dxf_viewer/rendering/dxf_snap_helper.dart';
 import 'analysis/cantilever_detector.dart';
+import 'analysis/seismic_analysis_calculator.dart';
 import 'analysis/structural_underlay_filter.dart';
 import 'analysis/vertical_capacity_calculator.dart';
 import 'models/cantilever_analysis_models.dart';
+import 'models/seismic_analysis_models.dart';
 import 'models/structural_element.dart';
 import 'models/vertical_capacity_models.dart';
 import 'rendering/structural_2d_painter.dart';
 import 'rendering/structural_pointer_painter.dart';
 import 'widgets/cantilever_analysis_sheet.dart';
 import 'widgets/element_palette_bar.dart';
+import 'widgets/seismic_analysis_sheet.dart';
 import 'widgets/storey_manager_sheet.dart';
 import 'widgets/structural_3d_viewport.dart';
 import 'widgets/vertical_capacity_sheet.dart';
@@ -134,6 +137,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   // Analysis result
   StructuralAnalysisSummary _analysisSummary = StructuralAnalysisSummary.empty;
   VerticalCapacityReport _verticalCapacityReport = VerticalCapacityReport.empty;
+  SeismicAnalysisReport _seismicAnalysisReport = SeismicAnalysisReport.empty;
 
   @override
   void initState() {
@@ -239,6 +243,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       cadUnitsPerMeter: _cadUnitsPerMeter,
     );
     _verticalCapacityReport = VerticalCapacityCalculator.analyzeProject(
+      _project,
+      cadUnitsPerMeter: _cadUnitsPerMeter,
+    );
+    _seismicAnalysisReport = SeismicAnalysisCalculator.analyzeProject(
       _project,
       cadUnitsPerMeter: _cadUnitsPerMeter,
     );
@@ -2697,6 +2705,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
+  void _openSeismicReport() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => SeismicAnalysisSheet(report: _seismicAnalysisReport),
+    );
+  }
+
   void _open3dViewport() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -2704,6 +2721,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           project: _project,
           cantileverZones: _analysisSummary.zones,
           verticalReport: _verticalCapacityReport,
+          seismicReport: _seismicAnalysisReport,
           cadUnitsPerMeter: _cadUnitsPerMeter,
           onExit: () => Navigator.of(context).pop(),
         ),
@@ -2927,6 +2945,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   ghostStorey: _project.ghostStorey,
                                   cantileverZones: _analysisSummary.zones,
                                   verticalReport: _verticalCapacityReport,
+                                  seismicReport: _seismicAnalysisReport,
                                   showCantileverHeatmap: true,
                                   activeTool: _activeTool,
                                   previewColumn: _currentColumnPreset.copyWith(
@@ -3141,6 +3160,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         analysisSummary: _analysisSummary,
                         onOpenVerticalCapacityReport: _openVerticalCapacityReport,
                         verticalCapacityReport: _verticalCapacityReport,
+                        onOpenSeismicReport: _openSeismicReport,
+                        seismicReport: _seismicAnalysisReport,
                       ),
               ),
             ],

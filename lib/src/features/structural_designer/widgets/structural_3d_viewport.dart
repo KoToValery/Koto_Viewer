@@ -8,6 +8,7 @@ import '../../dxf_3d_viewer/rendering/cad_3d_camera.dart';
 import '../../dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
 import '../../dxf_3d_viewer/rendering/cad_3d_gpu_bindings.dart';
 import '../models/cantilever_analysis_models.dart';
+import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 import '../rendering/structural_3d_mesh_builder.dart';
@@ -17,6 +18,7 @@ class Structural3dViewport extends StatefulWidget {
   final StructuralProject project;
   final List<CantileverZone> cantileverZones;
   final VerticalCapacityReport? verticalReport;
+  final SeismicAnalysisReport? seismicReport;
   final VoidCallback onExit;
   final double cadUnitsPerMeter;
 
@@ -25,6 +27,7 @@ class Structural3dViewport extends StatefulWidget {
     required this.project,
     this.cantileverZones = const [],
     this.verticalReport,
+    this.seismicReport,
     required this.onExit,
     this.cadUnitsPerMeter = 1.0,
   });
@@ -75,6 +78,7 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
       widget.project,
       cantileverZones: widget.cantileverZones,
       verticalReport: widget.verticalReport,
+      seismicReport: widget.seismicReport,
       highlightStoreyIndex: _highlightStoreyIndex,
       cadUnitsPerMeter: widget.cadUnitsPerMeter,
     );
@@ -135,7 +139,8 @@ class _Structural3dViewportState extends State<Structural3dViewport> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.project != widget.project ||
         oldWidget.cantileverZones != widget.cantileverZones ||
-        oldWidget.verticalReport != widget.verticalReport) {
+        oldWidget.verticalReport != widget.verticalReport ||
+        oldWidget.seismicReport != widget.seismicReport) {
       _rebuildMesh();
     }
   }

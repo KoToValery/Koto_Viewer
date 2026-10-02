@@ -1138,5 +1138,46 @@
       "nrd": { "type": "String" },
       "ratio": { "type": "String" }
     }
+  },
+  "seismicAnalysisTitle": "Seismic Analysis (EC8)",
+  "@seismicAnalysisTitle": { "description": "Title for EC8 seismic analysis" },
+  "seismicAnalysisSubtitle": "Eccentricity, shear walls, transfer columns & beams",
+  "@seismicAnalysisSubtitle": { "description": "Subtitle for EC8 seismic analysis" },
+  "centerOfMass": "Center of Mass (CM)",
+  "@centerOfMass": { "description": "Label for center of mass" },
+  "centerOfRigidity": "Center of Rigidity (CR)",
+  "@centerOfRigidity": { "description": "Label for center of rigidity" },
+  "seismicEccentricity": "Seismic Eccentricity",
+  "@seismicEccentricity": { "description": "Label for seismic eccentricity" },
+  "torsionalSensitivity": "Torsional Sensitivity",
+  "@torsionalSensitivity": { "description": "Label for torsional sensitivity" },
+  "shearWallRatio": "Shear Wall Ratio",
+  "@shearWallRatio": { "description": "Label for shear wall ratio" },
+  "floatingColumnsTitle": "Transfer / Floating Columns",
+  "@floatingColumnsTitle": { "description": "Title for floating columns check" },
+  "floatingColumnBadge": "FLOATING",
+  "@floatingColumnBadge": { "description": "Badge label for floating columns" },
+  "discontinuousWallsTitle": "Discontinuous Shear Walls",
+  "@discontinuousWallsTitle": { "description": "Title for discontinuous walls" },
+  "softStoreyTitle": "Soft Storey",
+  "@softStoreyTitle": { "description": "Title for soft storey check" },
+  "beamSizingTitle": "Beam Sizing",
+  "@beamSizingTitle": { "description": "Title for beam preliminary sizing" },
+  "openingsProximityTitle": "Slab Openings Proximity",
+  "@openingsProximityTitle": { "description": "Title for slab openings proximity" },
+  "ec8SeismicButton": "EC8 Seismic",
+  "@ec8SeismicButton": { "description": "Button label for EC8 seismic analysis" },
+  "beamDepthWarning": "Recommended depth: min {depth} cm",
+  "@beamDepthWarning": {
+    "description": "Warning for beam depth",
+    "placeholders": { "depth": { "type": "int" } }
+  },
+  "floatingColumnWarning": "Column {name} on {storey} is floating on the slab (no lower support)!",
+  "@floatingColumnWarning": {
+    "description": "Warning for floating column",
+    "placeholders": {
+      "name": { "type": "String" },
+      "storey": { "type": "String" }
+    }
   }
 }

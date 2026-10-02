@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/cantilever_analysis_models.dart';
+import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 import 'structural_pointer_painter.dart';
@@ -12,6 +13,7 @@ class Structural2dPainter extends CustomPainter {
   final StoreyLevel? ghostStorey;
   final List<CantileverZone> cantileverZones;
   final VerticalCapacityReport? verticalReport;
+  final SeismicAnalysisReport? seismicReport;
   final bool showCantileverHeatmap;
   final StructuralDrawTool activeTool;
   final StructuralColumn? previewColumn;
@@ -50,6 +52,7 @@ class Structural2dPainter extends CustomPainter {
     this.ghostStorey,
     this.cantileverZones = const [],
     this.verticalReport,
+    this.seismicReport,
     this.showCantileverHeatmap = true,
     this.activeTool = StructuralDrawTool.select,
     this.previewColumn,
@@ -127,6 +130,11 @@ class Structural2dPainter extends CustomPainter {
     // 6. Draw Cantilever Overhangs & Warning Zones (Heatmap)
     if (showCantileverHeatmap && cantileverZones.isNotEmpty) {
       _drawCantileverOverlays(canvas);
+    }
+
+    // 7. Draw Eurocode 8 Seismic Centers (CM, CR) and Eccentricity
+    if (seismicReport != null) {
+      _drawSeismicCenters(canvas);
     }
   }
 
@@ -650,6 +658,9 @@ class Structural2dPainter extends CustomPainter {
     final vCheck = (!isGhost && !isMovingThis)
         ? verticalReport?.getCheckForColumn(col.id)
         : null;
+    final bool isFloating = (!isGhost && !isMovingThis)
+        ? (seismicReport?.isColumnFloating(col.id) ?? false)
+        : false;
 
     final Color fillColor;
     final Color borderColor;
@@ -659,6 +670,10 @@ class Structural2dPainter extends CustomPainter {
     } else if (isMovingThis) {
       fillColor = const Color(0x331565C0);
       borderColor = const Color(0x66FFFFFF);
+    } else if (isFloating) {
+      // Glows MAGENTA for floating / transfer columns
+      fillColor = const Color(0xEEAA00FF);
+      borderColor = const Color(0xFFE040FB);
     } else if (vCheck != null && vCheck.status == VerticalCapacityStatus.critical) {
       // Glows RED for critical crushing or punching failure
       fillColor = const Color(0xEEB71C1C);
@@ -672,15 +687,17 @@ class Structural2dPainter extends CustomPainter {
       borderColor = Colors.white;
     }
 
-    // Glowing aura behind critical/warning columns
-    if (vCheck != null && vCheck.status != VerticalCapacityStatus.safe && !isGhost && !isMovingThis) {
+    // Glowing aura behind critical, warning, or floating columns
+    if ((isFloating || (vCheck != null && vCheck.status != VerticalCapacityStatus.safe)) && !isGhost && !isMovingThis) {
+      final Color auraColor = isFloating
+          ? const Color(0xFFE040FB)
+          : (vCheck!.status == VerticalCapacityStatus.critical
+              ? const Color(0xFFFF1744)
+              : const Color(0xFFFFB300));
       final glowPaint = Paint()
-        ..color = (vCheck.status == VerticalCapacityStatus.critical
-                ? const Color(0xFFFF1744)
-                : const Color(0xFFFFB300))
-            .withValues(alpha: 0.45)
+        ..color = auraColor.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 5.0 / zoomScale;
+        ..strokeWidth = 5.5 / zoomScale;
       canvas.drawPath(path, glowPaint);
     }
 
@@ -691,7 +708,7 @@ class Structural2dPainter extends CustomPainter {
     final borderPaint = Paint()
       ..color = borderColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (vCheck != null && vCheck.status == VerticalCapacityStatus.critical ? 2.2 : 1.5) / zoomScale;
+      ..strokeWidth = (isFloating || (vCheck != null && vCheck.status == VerticalCapacityStatus.critical)) ? (2.4 / zoomScale) : (1.5 / zoomScale);
 
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
@@ -705,6 +722,35 @@ class Structural2dPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4 / zoomScale;
       canvas.drawCircle(centerScene, rPunching, punchPaint);
+    }
+
+    // Floating column badge (EC8 vertical regularity alert)
+    if (isFloating && !isGhost && !isMovingThis) {
+      final centerScene = cadToScene(col.center);
+      final textSpan = TextSpan(
+        text: 'НАСАДЕНА',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: (9.0 / zoomScale).clamp(7.0, 14.0),
+          fontWeight: FontWeight.bold,
+        ),
+      );
+      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+      final badgeOffset = Offset(
+        centerScene.dx - tp.width / 2.0,
+        centerScene.dy - (col.height * cadScale / 2.0) - tp.height - 4.0 / zoomScale,
+      );
+      final bgRect = Rect.fromLTWH(
+        badgeOffset.dx - 3.0 / zoomScale,
+        badgeOffset.dy - 1.0 / zoomScale,
+        tp.width + 6.0 / zoomScale,
+        tp.height + 2.0 / zoomScale,
+      );
+      final badgeBgPaint = Paint()
+        ..color = const Color(0xEEAA00FF)
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, Radius.circular(3.0 / zoomScale)), badgeBgPaint);
+      tp.paint(canvas, badgeOffset);
     }
 
     // Selected highlight halo & corner grip handles
@@ -1060,6 +1106,96 @@ class Structural2dPainter extends CustomPainter {
         canvas.drawCircle(tip, 10.0 / zoomScale, cornerRing);
       }
     }
+  }
+
+  void _drawSeismicCenters(Canvas canvas) {
+    if (seismicReport == null) return;
+    final check = seismicReport!.getCheckForStorey(currentStorey.id);
+    if (check == null) return;
+
+    final cmScene = cadToScene(check.centerOfMassCad);
+    final crScene = cadToScene(check.centerOfRigidityCad);
+
+    final double distScene = (cmScene - crScene).distance;
+
+    // Draw line of eccentricity between CM and CR
+    if (distScene > 4.0 / zoomScale) {
+      final linePaint = Paint()
+        ..color = check.isTorsionallySensitive
+            ? const Color(0xFFFF1744)
+            : const Color(0xFFD500F9)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8 / zoomScale;
+      _drawDashDotLine(canvas, cmScene, crScene, linePaint);
+
+      // Eccentricity label in the middle of line
+      final mid = (cmScene + crScene) / 2.0;
+      final textSpan = TextSpan(
+        text: 'e = ${check.maxEccentricityM.toStringAsFixed(2)} m (${(check.maxEccentricityRatio * 100).round()}%)',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: (10.0 / zoomScale).clamp(8.0, 14.0),
+          fontWeight: FontWeight.bold,
+        ),
+      );
+      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+      final badgeRect = Rect.fromCenter(
+        center: mid,
+        width: tp.width + 8.0 / zoomScale,
+        height: tp.height + 4.0 / zoomScale,
+      );
+      final bgPaint = Paint()
+        ..color = (check.isTorsionallySensitive ? const Color(0xDD000000) : const Color(0xCC1E1E1E))
+        ..style = PaintingStyle.fill;
+      final borderPaint = Paint()
+        ..color = check.isTorsionallySensitive ? const Color(0xFFFF1744) : const Color(0xFFD500F9)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0 / zoomScale;
+      canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, Radius.circular(4.0 / zoomScale)), bgPaint);
+      canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, Radius.circular(4.0 / zoomScale)), borderPaint);
+      tp.paint(canvas, Offset(mid.dx - tp.width / 2.0, mid.dy - tp.height / 2.0));
+    }
+
+    // Draw Center of Mass (CM) marker: Cyan/Blue target
+    _drawCenterTarget(canvas, cmScene, 'CM', const Color(0xFF00E5FF));
+
+    // Draw Center of Rigidity (CR) marker: Magenta/Purple target
+    _drawCenterTarget(canvas, crScene, 'CR', const Color(0xFFD500F9));
+  }
+
+  void _drawCenterTarget(Canvas canvas, Offset pos, String label, Color color) {
+    final r = 12.0 / zoomScale;
+    final fillPaint = Paint()
+      ..color = color.withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
+    final strokePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 / zoomScale;
+
+    canvas.drawCircle(pos, r, fillPaint);
+    canvas.drawCircle(pos, r, strokePaint);
+
+    // Crosshairs
+    final chLen = r * 1.5;
+    canvas.drawLine(Offset(pos.dx - chLen, pos.dy), Offset(pos.dx + chLen, pos.dy), strokePaint);
+    canvas.drawLine(Offset(pos.dx, pos.dy - chLen), Offset(pos.dx, pos.dy + chLen), strokePaint);
+
+    // Label badge above
+    final textSpan = TextSpan(
+      text: label,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: (10.0 / zoomScale).clamp(8.0, 14.0),
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+    final badgeCenter = Offset(pos.dx, pos.dy - r - tp.height / 2.0 - 4.0 / zoomScale);
+    final bgRect = Rect.fromCenter(center: badgeCenter, width: tp.width + 6.0 / zoomScale, height: tp.height + 2.0 / zoomScale);
+    final bgPaint = Paint()..color = const Color(0xCC000000)..style = PaintingStyle.fill;
+    canvas.drawRRect(RRect.fromRectAndRadius(bgRect, Radius.circular(3.0 / zoomScale)), bgPaint);
+    tp.paint(canvas, Offset(badgeCenter.dx - tp.width / 2.0, badgeCenter.dy - tp.height / 2.0));
   }
 
   @override

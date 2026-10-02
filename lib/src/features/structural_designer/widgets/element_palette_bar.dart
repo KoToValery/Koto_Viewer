@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/cantilever_analysis_models.dart';
+import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 import '../rendering/structural_pointer_painter.dart';
@@ -36,6 +37,8 @@ class ElementPaletteBar extends StatelessWidget {
   final StructuralAnalysisSummary analysisSummary;
   final VoidCallback? onOpenVerticalCapacityReport;
   final VerticalCapacityReport? verticalCapacityReport;
+  final VoidCallback? onOpenSeismicReport;
+  final SeismicAnalysisReport? seismicReport;
 
   const ElementPaletteBar({
     super.key,
@@ -67,6 +70,8 @@ class ElementPaletteBar extends StatelessWidget {
     required this.analysisSummary,
     this.onOpenVerticalCapacityReport,
     this.verticalCapacityReport,
+    this.onOpenSeismicReport,
+    this.seismicReport,
   });
 
   @override
@@ -149,6 +154,9 @@ class ElementPaletteBar extends StatelessWidget {
                   const SizedBox(width: 4),
                   // EC2 Vertical Capacity report launcher with badge
                   _buildVerticalCapacityButton(context),
+                  const SizedBox(width: 4),
+                  // EC8 Seismic Analysis report launcher with badge
+                  _buildSeismicAnalysisButton(context),
                 ],
               ),
             ),
@@ -316,6 +324,77 @@ class ElementPaletteBar extends StatelessWidget {
                 context.l10n.ec2FeasibilityButton,
                 style: TextStyle(
                   color: hasAlerts ? badgeColor : const Color(0xFF00E5FF),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeismicAnalysisButton(BuildContext context) {
+    final report = seismicReport;
+    final int alertCount = (report?.totalFloatingColumnsCount ?? 0) +
+        (report?.hasTorsionalSensitivity == true ? 1 : 0) +
+        (report?.hasSoftStorey == true ? 1 : 0);
+
+    final Color badgeColor = (report?.totalFloatingColumnsCount ?? 0) > 0 ||
+            (report?.hasSoftStorey == true)
+        ? const Color(0xFFD500F9)
+        : (report?.hasTorsionalSensitivity == true
+            ? const Color(0xFFFF1744)
+            : (report?.hasWallDeficit == true
+                ? const Color(0xFFFFB300)
+                : const Color(0xFF00E676)));
+
+    final bool hasAlerts = alertCount > 0 || (report?.hasWallDeficit == true);
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 52),
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      child: InkWell(
+        onTap: onOpenSeismicReport,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          decoration: BoxDecoration(
+            color: hasAlerts ? badgeColor.withValues(alpha: 0.18) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: hasAlerts ? badgeColor : Colors.white24,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Badge(
+                isLabelVisible: alertCount > 0,
+                backgroundColor: badgeColor,
+                label: Text(
+                  '$alertCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
+                ),
+                child: Icon(
+                  Icons.waves_rounded,
+                  color: hasAlerts ? badgeColor : const Color(0xFFD500F9),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                context.l10n.ec8SeismicButton,
+                style: TextStyle(
+                  color: hasAlerts ? badgeColor : const Color(0xFFD500F9),
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                 ),

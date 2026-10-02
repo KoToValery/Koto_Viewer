@@ -1344,4 +1344,57 @@ class AppLocalizationsBg extends AppLocalizations {
   String storeyColumnLoad(String storey, String ned, String nrd, String ratio) {
     return '$storey: Ned = $ned kN / Nrd = $nrd kN ($ratio%)';
   }
+
+  @override
+  String get seismicAnalysisTitle => 'Сеизмичен анализ (EC8)';
+
+  @override
+  String get seismicAnalysisSubtitle =>
+      'Ексцентрицитет, шайби, насадени колони и греди';
+
+  @override
+  String get centerOfMass => 'Център на масите (CM)';
+
+  @override
+  String get centerOfRigidity => 'Център на коравините (CR)';
+
+  @override
+  String get seismicEccentricity => 'Сеизмичен ексцентрицитет';
+
+  @override
+  String get torsionalSensitivity => 'Усуквателна чувствителност';
+
+  @override
+  String get shearWallRatio => 'Покритие с шайби';
+
+  @override
+  String get floatingColumnsTitle => 'Насадени колони';
+
+  @override
+  String get floatingColumnBadge => 'НАСАДЕНА';
+
+  @override
+  String get discontinuousWallsTitle => 'Прекъснати шайби';
+
+  @override
+  String get softStoreyTitle => 'Мек етаж';
+
+  @override
+  String get beamSizingTitle => 'Сечения на греди';
+
+  @override
+  String get openingsProximityTitle => 'Отвори в плочата';
+
+  @override
+  String get ec8SeismicButton => 'EC8 Сеизмичност';
+
+  @override
+  String beamDepthWarning(int depth) {
+    return 'Препоръчителна височина: мин. $depth cm';
+  }
+
+  @override
+  String floatingColumnWarning(String name, String storey) {
+    return 'Колона $name на $storey е насадена върху плочата (липсва долна опора)!';
+  }
 }

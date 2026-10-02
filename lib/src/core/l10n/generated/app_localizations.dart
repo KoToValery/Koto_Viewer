@@ -2442,6 +2442,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{storey}: Ned = {ned} kN / Nrd = {nrd} kN ({ratio}%)'**
   String storeyColumnLoad(String storey, String ned, String nrd, String ratio);
+
+  /// Title for EC8 seismic analysis
+  ///
+  /// In en, this message translates to:
+  /// **'Seismic Analysis (EC8)'**
+  String get seismicAnalysisTitle;
+
+  /// Subtitle for EC8 seismic analysis
+  ///
+  /// In en, this message translates to:
+  /// **'Eccentricity, shear walls, transfer columns & beams'**
+  String get seismicAnalysisSubtitle;
+
+  /// Label for center of mass
+  ///
+  /// In en, this message translates to:
+  /// **'Center of Mass (CM)'**
+  String get centerOfMass;
+
+  /// Label for center of rigidity
+  ///
+  /// In en, this message translates to:
+  /// **'Center of Rigidity (CR)'**
+  String get centerOfRigidity;
+
+  /// Label for seismic eccentricity
+  ///
+  /// In en, this message translates to:
+  /// **'Seismic Eccentricity'**
+  String get seismicEccentricity;
+
+  /// Label for torsional sensitivity
+  ///
+  /// In en, this message translates to:
+  /// **'Torsional Sensitivity'**
+  String get torsionalSensitivity;
+
+  /// Label for shear wall ratio
+  ///
+  /// In en, this message translates to:
+  /// **'Shear Wall Ratio'**
+  String get shearWallRatio;
+
+  /// Title for floating columns check
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer / Floating Columns'**
+  String get floatingColumnsTitle;
+
+  /// Badge label for floating columns
+  ///
+  /// In en, this message translates to:
+  /// **'FLOATING'**
+  String get floatingColumnBadge;
+
+  /// Title for discontinuous walls
+  ///
+  /// In en, this message translates to:
+  /// **'Discontinuous Shear Walls'**
+  String get discontinuousWallsTitle;
+
+  /// Title for soft storey check
+  ///
+  /// In en, this message translates to:
+  /// **'Soft Storey'**
+  String get softStoreyTitle;
+
+  /// Title for beam preliminary sizing
+  ///
+  /// In en, this message translates to:
+  /// **'Beam Sizing'**
+  String get beamSizingTitle;
+
+  /// Title for slab openings proximity
+  ///
+  /// In en, this message translates to:
+  /// **'Slab Openings Proximity'**
+  String get openingsProximityTitle;
+
+  /// Button label for EC8 seismic analysis
+  ///
+  /// In en, this message translates to:
+  /// **'EC8 Seismic'**
+  String get ec8SeismicButton;
+
+  /// Warning for beam depth
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended depth: min {depth} cm'**
+  String beamDepthWarning(int depth);
+
+  /// Warning for floating column
+  ///
+  /// In en, this message translates to:
+  /// **'Column {name} on {storey} is floating on the slab (no lower support)!'**
+  String floatingColumnWarning(String name, String storey);
 }
 
 class _AppLocalizationsDelegate
