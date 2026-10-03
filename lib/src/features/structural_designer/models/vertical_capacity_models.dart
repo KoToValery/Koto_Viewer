@@ -166,6 +166,7 @@ class SlabDeflectionCheck {
   final bool isDeflectionSafe;
   final double deflectionRatio;
   final String recommendation;
+  final (Offset, Offset)? criticalSpanSegment;
 
   const SlabDeflectionCheck({
     required this.storeyId,
@@ -176,6 +177,7 @@ class SlabDeflectionCheck {
     required this.isDeflectionSafe,
     required this.deflectionRatio,
     required this.recommendation,
+    this.criticalSpanSegment,
   });
 
   String localizedRecommendation(AppLocalizations l10n) {
@@ -258,6 +260,12 @@ class VerticalCapacityReport {
     maxPunchingUtilization: 0.0,
     overallStatus: VerticalCapacityStatus.safe,
   );
+
+  /// Count of storeys exhibiting slab deflection issues (insufficient thickness).
+  int get slabIssuesCount => slabChecks.where((s) => !s.isDeflectionSafe).length;
+
+  /// Total number of alerts across columns, punching, and slabs.
+  int get totalAlertCount => criticalColumnsCount + punchingRiskCount + slabIssuesCount;
 
   /// Returns column check for a given columnId in the active storey, if present.
   ColumnVerticalCheck? getCheckForColumn(String columnId) {

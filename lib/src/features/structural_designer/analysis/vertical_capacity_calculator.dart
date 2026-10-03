@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/material.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 
@@ -99,19 +100,169 @@ class VerticalCapacityCalculator {
     return math.max(2.0, aTrib);
   }
 
-  /// Calculates max clear span between supports in the storey (meters).
-  static double calculateMaxSpanM(StoreyLevel storey, double scale) {
-    double maxSpan = 4.0;
-    final cols = storey.columns;
-    for (int i = 0; i < cols.length; i++) {
-      for (int j = i + 1; j < cols.length; j++) {
-        final dM = (cols[i].center - cols[j].center).distance / scale;
-        if (dM <= 12.0 && dM > maxSpan) {
-          maxSpan = dM;
+  /// Calculates max clear span between adjacent supports in the storey (meters)
+  /// and returns the coordinates of the critical span segment.
+  static ({double maxSpanM, (Offset, Offset)? criticalSpanSegment}) calculateClearSpan(
+    StoreyLevel storey,
+    double scale,
+  ) {
+    final List<({double spanM, (Offset, Offset) segment})> candidateSpans = [];
+
+    // 1. Clear Spans along Beams (if beams exist)
+    for (final beam in storey.beams) {
+      final lenM = (beam.end - beam.start).distance / scale;
+      if (lenM >= 0.5) {
+        candidateSpans.add((spanM: lenM, segment: (beam.start, beam.end)));
+      }
+    }
+
+    // 2. Clear Spans along Grid Axes (if columns lie on grid axes)
+    for (final axis in storey.gridAxes) {
+      final aVec = axis.end - axis.start;
+      final aLen = aVec.distance;
+      if (aLen < 1e-4) continue;
+      final uAxis = aVec / aLen;
+      final nAxis = Offset(-uAxis.dy, uAxis.dx);
+
+      final colsOnAxis = <({StructuralColumn col, double t})>[];
+      for (final col in storey.columns) {
+        final distPerp = ((col.center - axis.start).dx * nAxis.dx +
+                (col.center - axis.start).dy * nAxis.dy)
+            .abs();
+        if (distPerp <= 0.35 * scale) {
+          final t = (col.center - axis.start).dx * uAxis.dx +
+              (col.center - axis.start).dy * uAxis.dy;
+          colsOnAxis.add((col: col, t: t));
+        }
+      }
+
+      colsOnAxis.sort((a, b) => a.t.compareTo(b.t));
+
+      for (int i = 0; i < colsOnAxis.length - 1; i++) {
+        final distM = (colsOnAxis[i + 1].t - colsOnAxis[i].t) / scale;
+        if (distM >= 1.0) {
+          candidateSpans.add((
+            spanM: distM,
+            segment: (colsOnAxis[i].col.center, colsOnAxis[i + 1].col.center),
+          ));
         }
       }
     }
-    return maxSpan;
+
+    // 3. Spans between adjacent Column pairs (checking for intermediate supports & diagonals)
+    final cols = storey.columns;
+    for (int i = 0; i < cols.length; i++) {
+      for (int j = i + 1; j < cols.length; j++) {
+        final c1 = cols[i].center;
+        final c2 = cols[j].center;
+        final vec = c2 - c1;
+        final len = vec.distance;
+        final dM = len / scale;
+        if (dM < 1.0 || dM > 16.0) continue;
+
+        final u = vec / len;
+
+        // Check if another column lies between c1 and c2 (eliminates false 8m, 12m spans across multiple bays)
+        bool hasIntermediateSupport = false;
+        for (int k = 0; k < cols.length; k++) {
+          if (k == i || k == j) continue;
+          final ck = cols[k].center;
+          final t = (ck - c1).dx * u.dx + (ck - c1).dy * u.dy;
+          if (t > 0.35 * scale && t < len - 0.35 * scale) {
+            final perpDist = ((ck - c1).dx * (-u.dy) + (ck - c1).dy * u.dx).abs();
+            if (perpDist <= 0.40 * scale) {
+              hasIntermediateSupport = true;
+              break;
+            }
+          }
+        }
+        if (hasIntermediateSupport) continue;
+
+        // Check if a shear wall intersects or lies along segment c1-c2
+        for (final wall in storey.shearWalls) {
+          final mid = (wall.start + wall.end) / 2.0;
+          final t = (mid - c1).dx * u.dx + (mid - c1).dy * u.dy;
+          if (t > 0.35 * scale && t < len - 0.35 * scale) {
+            final perpDist = ((mid - c1).dx * (-u.dy) + (mid - c1).dy * u.dx).abs();
+            if (perpDist <= 0.40 * scale) {
+              hasIntermediateSupport = true;
+              break;
+            }
+          }
+        }
+        if (hasIntermediateSupport) continue;
+
+        // Check if c1-c2 is a diagonal of an orthogonal 4-column bay
+        bool isDiagonal = false;
+        for (int k = 0; k < cols.length; k++) {
+          if (k == i || k == j) continue;
+          final ck = cols[k].center;
+          final v1 = ck - c1;
+          final v2 = c2 - ck;
+          final d1 = v1.distance;
+          final d2 = v2.distance;
+          if (d1 > 0.8 * scale && d2 > 0.8 * scale && d1 < len - 0.2 * scale && d2 < len - 0.2 * scale) {
+            final u1 = v1 / d1;
+            final u2 = v2 / d2;
+            final dot = (u1.dx * u2.dx + u1.dy * u2.dy).abs();
+            if (dot < 0.35 && (math.sqrt(d1 * d1 + d2 * d2) - len).abs() < 0.20 * len) {
+              isDiagonal = true;
+              break;
+            }
+          }
+        }
+        if (isDiagonal) continue;
+
+        candidateSpans.add((spanM: dM, segment: (c1, c2)));
+      }
+    }
+
+    // 4. Also check distances from columns to adjacent shear walls
+    for (final col in storey.columns) {
+      for (final wall in storey.shearWalls) {
+        final mid = (wall.start + wall.end) / 2.0;
+        final dM = (col.center - mid).distance / scale;
+        if (dM >= 1.0 && dM <= 12.0) {
+          final vec = mid - col.center;
+          final len = vec.distance;
+          final u = vec / len;
+          bool hasInter = false;
+          for (final other in storey.columns) {
+            if (other.id == col.id) continue;
+            final t = (other.center - col.center).dx * u.dx + (other.center - col.center).dy * u.dy;
+            if (t > 0.35 * scale && t < len - 0.35 * scale) {
+              final perpDist = ((other.center - col.center).dx * (-u.dy) + (other.center - col.center).dy * u.dx).abs();
+              if (perpDist <= 0.40 * scale) {
+                hasInter = true;
+                break;
+              }
+            }
+          }
+          if (!hasInter) {
+            candidateSpans.add((spanM: dM, segment: (col.center, mid)));
+          }
+        }
+      }
+    }
+
+    if (candidateSpans.isEmpty) {
+      return (maxSpanM: 4.0, criticalSpanSegment: null);
+    }
+
+    // Find the critical (maximum) clear span
+    var maxSpan = candidateSpans.first;
+    for (final span in candidateSpans) {
+      if (span.spanM > maxSpan.spanM) {
+        maxSpan = span;
+      }
+    }
+
+    return (maxSpanM: maxSpan.spanM, criticalSpanSegment: maxSpan.segment);
+  }
+
+  /// Calculates max clear span between supports in the storey (meters).
+  static double calculateMaxSpanM(StoreyLevel storey, double scale) {
+    return calculateClearSpan(storey, scale).maxSpanM;
   }
 
   /// Runs comprehensive Eurocode 2 vertical capacity analysis for the given project.
@@ -183,7 +334,8 @@ class VerticalCapacityCalculator {
     for (int sIdx = 0; sIdx < numStoreys; sIdx++) {
       final storey = project.storeys[sIdx];
       final hCurrent = storeySlabThicknessM[sIdx];
-      final maxSpanM = calculateMaxSpanM(storey, scale);
+      final spanRes = calculateClearSpan(storey, scale);
+      final maxSpanM = spanRes.maxSpanM;
       final hasBeams = storey.beams.isNotEmpty;
       // Basic span-to-depth ratio L/d (EC2 Table 7.4N)
       final double basicRatio = hasBeams ? 28.0 : 22.0;
@@ -212,6 +364,7 @@ class VerticalCapacityCalculator {
         isDeflectionSafe: isSafe,
         deflectionRatio: ratio,
         recommendation: rec,
+        criticalSpanSegment: spanRes.criticalSpanSegment,
       ));
     }
 
@@ -380,10 +533,11 @@ class VerticalCapacityCalculator {
         ? (totalAccumulatedBaseLoadKn / totalFootprintAreaM2)
         : 0.0;
 
+    final int slabIssuesCount = allSlabChecks.where((s) => !s.isDeflectionSafe).length;
     final VerticalCapacityStatus overallStatus;
-    if (criticalCount > 0) {
+    if (criticalCount > 0 || allSlabChecks.any((s) => !s.isDeflectionSafe && s.deflectionRatio >= 1.25)) {
       overallStatus = VerticalCapacityStatus.critical;
-    } else if (warningCount > 0) {
+    } else if (warningCount > 0 || slabIssuesCount > 0) {
       overallStatus = VerticalCapacityStatus.warning;
     } else {
       overallStatus = VerticalCapacityStatus.safe;

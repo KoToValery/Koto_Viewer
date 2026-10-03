@@ -17,6 +17,7 @@ class Structural2dPainter extends CustomPainter {
   final VerticalCapacityReport? verticalReport;
   final SeismicAnalysisReport? seismicReport;
   final bool showCantileverHeatmap;
+  final bool showSlabSpanOverlay;
   final StructuralDrawTool activeTool;
   final StructuralColumn? previewColumn;
   final Offset? previewColumnPos;
@@ -73,6 +74,7 @@ class Structural2dPainter extends CustomPainter {
     this.verticalReport,
     this.seismicReport,
     this.showCantileverHeatmap = true,
+    this.showSlabSpanOverlay = true,
     this.activeTool = StructuralDrawTool.select,
     this.previewColumn,
     this.previewColumnPos,
@@ -190,6 +192,11 @@ class Structural2dPainter extends CustomPainter {
       _drawSeismicCenters(canvas);
     }
 
+    // 7b. Draw Eurocode 2 Critical Slab Span Dimension Line
+    if (showSlabSpanOverlay && verticalReport != null) {
+      _drawCriticalSlabSpan(canvas);
+    }
+
     // 8. Draw Distance Measurement Dimension Line & Badge
     if (activeMeasurement != null) {
       _drawMeasurementLine(canvas, activeMeasurement!.$1, activeMeasurement!.$2, activeMeasurement!.$3);
@@ -271,6 +278,30 @@ class Structural2dPainter extends CustomPainter {
     tp.paint(canvas, Offset(-tp.width / 2.0, -tp.height / 2.0));
 
     canvas.restore();
+  }
+
+  void _drawCriticalSlabSpan(Canvas canvas) {
+    if (verticalReport == null) return;
+    final check = verticalReport!.slabChecks
+        .where((s) => s.storeyId == currentStorey.id)
+        .firstOrNull;
+    if (check == null || check.criticalSpanSegment == null) return;
+
+    final seg = check.criticalSpanSegment!;
+    final isSafe = check.isDeflectionSafe;
+    final color = isSafe ? const Color(0xFF00E676) : const Color(0xFFFF5252);
+    final spanM = check.maxSpanM;
+    final label = isSafe
+        ? 'L = ${spanM.toStringAsFixed(2)} m'
+        : 'L = ${spanM.toStringAsFixed(2)} m ⚠️ (d ≥ ${(check.recommendedMinThicknessM * 100).ceil()} cm)';
+
+    _drawMeasurementLine(
+      canvas,
+      seg.$1,
+      seg.$2,
+      label,
+      color: color,
+    );
   }
 
   void _drawGhostStorey(Canvas canvas, StoreyLevel ghost) {

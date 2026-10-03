@@ -159,17 +159,33 @@ class StructuralMagneticAlignmentHelper {
         final inter = axes[i].intersectionWith(axes[j]);
         if (inter == null) continue;
 
+        // Pass 1: Geometric center and 12.5 cm modular nodes have highest priority
         for (final anchor in anchors) {
+          final isPrimary = anchor.name == 'center' || anchor.name.startsWith('wallModule');
+          if (!isPrimary) continue;
           final anchorWorld = rawCenter + anchor.offset;
           final d = (anchorWorld - inter).distance;
-          final isCenterOrMod = anchor.name == 'center' || anchor.name.startsWith('wallModule');
-          final maxDist = isCenterOrMod ? toleranceCad * 1.5 : toleranceCad * 0.9;
-
-          if (d <= maxDist && d < bestInterDist) {
+          if (d <= toleranceCad * 1.5 && d < bestInterDist) {
             bestInterDist = d;
             bestSnappedCenter = inter - anchor.offset;
             bestInterPoint = inter;
             bestAxes = (axes[i], axes[j]);
+          }
+        }
+
+        // Pass 2: Secondary anchors (edges and corners for flush outer face alignment)
+        if (bestSnappedCenter == null) {
+          for (final anchor in anchors) {
+            final isPrimary = anchor.name == 'center' || anchor.name.startsWith('wallModule');
+            if (isPrimary) continue;
+            final anchorWorld = rawCenter + anchor.offset;
+            final d = (anchorWorld - inter).distance;
+            if (d <= toleranceCad * 0.7 && d < bestInterDist) {
+              bestInterDist = d;
+              bestSnappedCenter = inter - anchor.offset;
+              bestInterPoint = inter;
+              bestAxes = (axes[i], axes[j]);
+            }
           }
         }
       }
@@ -733,14 +749,14 @@ class StructuralMagneticAlignmentHelper {
         final m1 = wall.start + u * mod12_5;
         final m2 = wall.end - u * mod12_5;
         final d1 = (rawPoint - m1).distance;
-        if (d1 <= toleranceCad && d1 < bestNodeDist) {
+        if (d1 <= toleranceCad && d1 < bestNodeDist && dStart > 0.10 * cadUnitsPerMeter) {
           bestNodeDist = d1;
           bestNodePt = m1;
           bestNodeWall = wall;
           bestNodeType = 'shearWallModule';
         }
         final d2 = (rawPoint - m2).distance;
-        if (d2 <= toleranceCad && d2 < bestNodeDist) {
+        if (d2 <= toleranceCad && d2 < bestNodeDist && dEnd > 0.10 * cadUnitsPerMeter) {
           bestNodeDist = d2;
           bestNodePt = m2;
           bestNodeWall = wall;

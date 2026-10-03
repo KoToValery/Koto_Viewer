@@ -5442,6 +5442,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   verticalReport: _verticalCapacityReport,
                                   seismicReport: _seismicAnalysisReport,
                                   showCantileverHeatmap: true,
+                                  showSlabSpanOverlay: true,
                                   activeTool: _activeTool,
                                   previewColumn: _currentColumnPreset.copyWith(
                                     width: _currentColumnPreset.width * _cadUnitsPerMeter,

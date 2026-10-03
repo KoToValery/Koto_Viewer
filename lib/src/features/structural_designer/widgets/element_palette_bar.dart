@@ -317,11 +317,12 @@ class ElementPaletteBar extends StatelessWidget {
 
   Widget _buildVerticalCapacityButton(BuildContext context) {
     final report = verticalCapacityReport;
-    final int alertCount =
-        (report?.criticalColumnsCount ?? 0) + (report?.punchingRiskCount ?? 0);
-    final Color badgeColor = (report?.criticalColumnsCount ?? 0) > 0
+    final int alertCount = report?.totalAlertCount ?? 0;
+    final bool hasSevereSlabIssue =
+        report?.slabChecks.any((s) => !s.isDeflectionSafe && s.deflectionRatio >= 1.25) ?? false;
+    final Color badgeColor = ((report?.criticalColumnsCount ?? 0) > 0 || hasSevereSlabIssue)
         ? const Color(0xFFFF1744)
-        : ((report?.warningColumnsCount ?? 0) > 0 || (report?.punchingRiskCount ?? 0) > 0
+        : (alertCount > 0
             ? const Color(0xFFFFB300)
             : const Color(0xFF00E676));
 

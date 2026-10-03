@@ -275,5 +275,126 @@ void main() {
       expect(interiorCheck.punchingShearStressVedMpa, greaterThan(0.0));
       expect(interiorCheck.punchingShearResistanceVrdMpa, greaterThan(0.0));
     });
+
+    test('4m axis raster with 25x25 columns calculates 4.0m span (not 12m) and confirms 20cm slab is safe', () {
+      // 4 axes spaced 4m apart along X (0, 4, 8, 12) and 4 axes along Y (0, 4, 8, 12)
+      // Total 16 columns 25x25 on every intersection
+      final List<StructuralColumn> cols = [];
+      int idx = 1;
+      for (double y = 0.0; y <= 12.0; y += 4.0) {
+        for (double x = 0.0; x <= 12.0; x += 4.0) {
+          cols.add(StructuralColumn(
+            id: 'col_$idx',
+            name: 'К$idx',
+            center: Offset(x, y),
+            width: 0.25,
+            height: 0.25,
+            shape: ColumnShape.rectangular,
+          ));
+          idx++;
+        }
+      }
+
+      final storeys = [
+        StoreyLevel(
+          id: 'storey_1',
+          name: 'Етаж 1',
+          elevation: 0.0,
+          height: 3.0,
+          columns: cols,
+          slabs: const [
+            StructuralSlab(
+              id: 'slab_1',
+              polygon: [
+                Offset(0, 0),
+                Offset(12, 0),
+                Offset(12, 12),
+                Offset(0, 12),
+              ],
+              thickness: 0.20, // 20 cm flat slab
+            ),
+          ],
+        ),
+      ];
+
+      final project = StructuralProject(
+        title: '4m Grid Test',
+        storeys: storeys,
+      );
+
+      final report = VerticalCapacityCalculator.analyzeProject(project);
+      expect(report.slabChecks.isNotEmpty, true);
+
+      final slabCheck = report.slabChecks.first;
+
+      // Span must be 4.00 m, NOT 12.00 m!
+      expect(slabCheck.maxSpanM, closeTo(4.00, 0.05));
+      expect(slabCheck.criticalSpanSegment, isNotNull);
+
+      // Distance of critical span segment must be 4.0 m
+      final seg = slabCheck.criticalSpanSegment!;
+      expect((seg.$2 - seg.$1).distance, closeTo(4.00, 0.05));
+
+      // Recommended minimum thickness for 4m flat slab:
+      // d_req = 4.0 / 22 = 0.1818 m -> h_req = 0.1818 + 0.03 = 0.21 m (21 cm)
+      // Since 20 cm is within 1 cm of 21 cm, 20 cm is safe!
+      expect(slabCheck.isDeflectionSafe, true);
+      expect(slabCheck.recommendation, contains('напълно достатъчна'));
+
+      // Slabs has no issues, so slabIssuesCount is 0
+      expect(report.slabIssuesCount, 0);
+    });
+
+    test('Large 6.5m clear span with 20cm slab flags warning and populates criticalSpanSegment', () {
+      final storeys = [
+        StoreyLevel(
+          id: 'storey_1',
+          name: 'Етаж 1',
+          elevation: 0.0,
+          height: 3.0,
+          columns: const [
+            StructuralColumn(
+              id: 'c1',
+              center: Offset(0.0, 0.0),
+              width: 0.30,
+              height: 0.30,
+            ),
+            StructuralColumn(
+              id: 'c2',
+              center: Offset(6.50, 0.0),
+              width: 0.30,
+              height: 0.30,
+            ),
+          ],
+          slabs: const [
+            StructuralSlab(
+              id: 'slab_1',
+              polygon: [
+                Offset(0, 0),
+                Offset(7, 0),
+                Offset(7, 5),
+                Offset(0, 5),
+              ],
+              thickness: 0.20, // 20 cm slab for 6.5m span is insufficient
+            ),
+          ],
+        ),
+      ];
+
+      final project = StructuralProject(
+        title: '6.5m Span Test',
+        storeys: storeys,
+      );
+
+      final report = VerticalCapacityCalculator.analyzeProject(project);
+      final slabCheck = report.slabChecks.first;
+
+      expect(slabCheck.maxSpanM, closeTo(6.50, 0.05));
+      expect(slabCheck.isDeflectionSafe, false);
+      expect(slabCheck.criticalSpanSegment, isNotNull);
+      expect(report.slabIssuesCount, 1);
+      expect(report.totalAlertCount, greaterThanOrEqualTo(1));
+      expect(report.overallStatus, isNot(VerticalCapacityStatus.safe));
+    });
   });
 }
