@@ -59,6 +59,8 @@ class Structural2dPainter extends CustomPainter {
   final StructuralShearWall? movingShearWall;
   final Offset? movingShearWallPos;
   final List<(Offset, Offset)>? magneticGuideLines;
+  final (Offset, Offset)? dynamicDimensionLine;
+  final String? dynamicDimensionText;
   final double cadUnitsPerMeter;
   final double zoomScale;
   final Offset Function(Offset) cadToScene;
@@ -102,6 +104,8 @@ class Structural2dPainter extends CustomPainter {
     this.movingShearWall,
     this.movingShearWallPos,
     this.magneticGuideLines,
+    this.dynamicDimensionLine,
+    this.dynamicDimensionText,
     this.selectedColumnId,
     this.selectedShearWallId,
     this.selectedBeamId,
@@ -196,13 +200,24 @@ class Structural2dPainter extends CustomPainter {
       final thickCm = (lenM * 100).round();
       _drawMeasurementLine(canvas, p1, p2, '${lenM.toStringAsFixed(2)} m ($thickCm cm)');
     }
+
+    // 8b. Draw Dynamic Dimension Line (e.g. 5cm-snapped dimension to nearest wall/column/axis)
+    if (dynamicDimensionLine != null && dynamicDimensionText != null) {
+      _drawMeasurementLine(
+        canvas,
+        dynamicDimensionLine!.$1,
+        dynamicDimensionLine!.$2,
+        dynamicDimensionText!,
+        color: const Color(0xFF00E5FF),
+      );
+    }
   }
 
-  void _drawMeasurementLine(Canvas canvas, Offset p1Cad, Offset p2Cad, String label) {
+  void _drawMeasurementLine(Canvas canvas, Offset p1Cad, Offset p2Cad, String label, {Color color = const Color(0xFFFF5252)}) {
     final p1 = cadToScene(p1Cad);
     final p2 = cadToScene(p2Cad);
     final linePaint = Paint()
-      ..color = const Color(0xFFFF5252)
+      ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0 / zoomScale;
     canvas.drawLine(p1, p2, linePaint);
@@ -238,8 +253,8 @@ class Structural2dPainter extends CustomPainter {
 
     final span = TextSpan(
       text: label,
-      style: const TextStyle(
-        color: Color(0xFFFF5252),
+      style: TextStyle(
+        color: color,
         fontSize: 11,
         fontWeight: FontWeight.bold,
       ),
@@ -248,7 +263,7 @@ class Structural2dPainter extends CustomPainter {
     final bgRect = Rect.fromCenter(center: Offset.zero, width: tp.width + 12.0, height: tp.height + 6.0);
     final bgPaint = Paint()..color = const Color(0xEE1E1E24);
     final borderPaint = Paint()
-      ..color = const Color(0xFFFF5252)
+      ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
     canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(5.0)), bgPaint);
@@ -1072,14 +1087,14 @@ class Structural2dPainter extends CustomPainter {
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
 
-    // Leading reference line on the left edge of the wall
-    final leadingLinePaint = Paint()
+    // Axial centerline of the shear wall (for beam connections and grid axis alignment)
+    final centerLinePaint = Paint()
       ..color = isPreview || isMoving
           ? const Color(0xFF00E5FF)
-          : (isGhost ? const Color(0x40FFFFFF) : const Color(0xFF00E5FF))
+          : (isGhost ? const Color(0x40FFFFFF) : const Color(0xFF00E5FF).withValues(alpha: 0.8))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0 / zoomScale;
-    canvas.drawLine(cadToScene(wall.start), cadToScene(wall.end), leadingLinePaint);
+      ..strokeWidth = (isPreview || isMoving ? 2.0 : 1.5) / zoomScale;
+    canvas.drawLine(cadToScene(wall.start), cadToScene(wall.end), centerLinePaint);
 
     final isSelected = !isGhost && (wall.id == selectedShearWallId);
     if (isSelected) {

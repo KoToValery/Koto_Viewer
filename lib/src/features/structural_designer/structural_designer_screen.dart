@@ -104,6 +104,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   List<Offset> _snappedScreenPositions = [];
   DxfSnapResult? _activeSnap;
   String? _liveDimensionText;
+  (Offset, Offset)? _activeDynamicDimensionLine;
   Offset? _currentCadCoord;
   bool _isPlacingWithHold = false;
   bool _initializedStoreyName = false;
@@ -3173,8 +3174,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
 
       if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
+        final colW = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.width
+            : _currentColumnPreset.width * _cadUnitsPerMeter;
+        final colH = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.height
+            : _currentColumnPreset.height * _cadUnitsPerMeter;
+        final colRot = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.rotationRad
+            : _currentColumnPreset.rotationRad;
+
         final mag = StructuralMagneticAlignmentHelper.alignColumn(
           rawCenter: rawCad,
+          columnWidth: colW,
+          columnHeight: colH,
+          columnRotationRad: colRot,
           toleranceCad: toleranceCad,
           activeStorey: _project.activeStorey,
           movingColumnId: _isMovingColumn ? _selectedColumn?.id : null,
@@ -3184,13 +3198,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         if (mag != null) {
           effectiveCad = mag.snappedCenter;
           _activeMagneticGuides = mag.guideLines;
-          HapticFeedback.selectionClick();
+          _liveDimensionText = mag.liveDimensionText;
+          _activeDynamicDimensionLine = mag.dimensionLine;
         } else {
           effectiveCad = rawCad;
           _activeMagneticGuides = null;
+          _liveDimensionText = null;
+          _activeDynamicDimensionLine = null;
         }
         _snappedScreenPositions = [];
-        _liveDimensionText = null;
       } else if (_isMovingOpening ||
                  (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset == 'shaft')) {
         // Multi-corner weighted snapping for openings (standard shaft 40x60 cm or moving opening)
@@ -3394,13 +3410,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         if (mag != null) {
           effectiveCad = mag.snappedCenter;
           _activeMagneticGuides = mag.guideLines;
-          HapticFeedback.selectionClick();
+          _liveDimensionText = mag.liveDimensionText;
+          _activeDynamicDimensionLine = mag.dimensionLine;
         } else {
           effectiveCad = rawCad;
           _activeMagneticGuides = null;
+          _liveDimensionText = null;
+          _activeDynamicDimensionLine = null;
         }
         _snappedScreenPositions = [];
-        _liveDimensionText = null;
       } else if (_activeTool == StructuralDrawTool.beam) {
         // Magnetic axial alignment for beams (column center, shear wall center/axis, other beams, grid axes, and ortho-lock)
         final startCad = _beamStartCad;
@@ -3417,7 +3435,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _activeMagneticGuides = mag.guideLines;
           snappedScreen = _cadToScreen(mag.snappedPoint);
           _snappedScreenPositions = [snappedScreen];
-          HapticFeedback.selectionClick();
         } else {
           _activeMagneticGuides = null;
           if (startCad != null) {
@@ -3892,6 +3909,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _activeSnap = null;
         _activeMagneticGuides = null;
         _liveDimensionText = null;
+        _activeDynamicDimensionLine = null;
       });
       return;
     }
@@ -3927,6 +3945,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _activeSnap = null;
         _activeMagneticGuides = null;
         _liveDimensionText = null;
+        _activeDynamicDimensionLine = null;
       });
       return;
     }
@@ -3969,6 +3988,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _snappedScreenPositions = [];
         _activeSnap = null;
         _liveDimensionText = null;
+        _activeDynamicDimensionLine = null;
       });
     }
   }
@@ -3998,6 +4018,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _snappedScreenPositions = [];
       _activeSnap = null;
       _liveDimensionText = null;
+      _activeDynamicDimensionLine = null;
     });
   }
 
@@ -4320,6 +4341,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _snappedScreenPos = null;
         _activeSnap = null;
         _activeMagneticGuides = null;
+        _liveDimensionText = null;
+        _activeDynamicDimensionLine = null;
       });
     }
   }
@@ -5432,6 +5455,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   movingShearWall: _isMovingShearWall ? _selectedShearWall : null,
                                   movingShearWallPos: _isMovingShearWall ? _currentCadCoord : null,
                                   magneticGuideLines: _activeMagneticGuides,
+                                  dynamicDimensionLine: _activeDynamicDimensionLine,
+                                  dynamicDimensionText: _liveDimensionText,
                                   wallStartPos: _wallStartCad,
                                   beamStartPos: _beamStartCad,
                                   beamPreviewWidth: _currentBeamWidth * _cadUnitsPerMeter,

@@ -314,11 +314,14 @@ class StructuralPointerPainter extends CustomPainter {
       }
     }
 
-    // 5. Dimension badge snapped to 10 cm (when drawing wall, beam, slab, custom opening, or measuring)
+    // 5. Dimension badge (when drawing wall, beam, slab, custom opening, column/wall axis snap, or measuring)
     if (liveDimensionText != null) {
       final startPos = wallStartPos ?? beamStartPos ?? slabStartCornerPos ?? openingStartCornerPos ?? measureStartPos;
       if (startPos != null) {
         _drawDimensionBadge(canvas, startPos, effectiveTip, liveDimensionText!);
+      } else {
+        // Floating badge directly above element when positioning along an axis
+        _drawDimensionBadge(canvas, effectiveTip, Offset(effectiveTip.dx, effectiveTip.dy - 35.0), liveDimensionText!);
       }
     }
   }

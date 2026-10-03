@@ -9,6 +9,7 @@ import 'package:kotoview/src/features/structural_designer/models/structural_elem
 import 'package:kotoview/src/features/structural_designer/rendering/structural_2d_painter.dart';
 import 'package:kotoview/src/features/structural_designer/rendering/structural_pointer_painter.dart';
 import 'package:kotoview/src/features/structural_designer/structural_designer_screen.dart';
+import 'package:kotoview/src/features/structural_designer/analysis/structural_magnetic_alignment_helper.dart';
 import 'package:kotoview/src/features/structural_designer/widgets/element_palette_bar.dart';
 
 void main() {
@@ -136,7 +137,7 @@ void main() {
     expect(mirroredVerts[0].dx, closeTo(5.0 + 0.25, 1e-4));
   });
 
-  test('Shear wall leading reference line is on the left by default', () {
+  test('Shear wall baseline is symmetrically centered across axial centerline', () {
     // Wall going from (0, 0) upwards along +Y to (0, 3) in CAD coords
     const wall = StructuralShearWall(
       id: 'w1',
@@ -148,20 +149,15 @@ void main() {
 
     final poly = wall.polygonVertices;
     expect(poly.length, 4);
-    // start and end are on the left reference line (X = 0)
-    expect(poly[0], const Offset(0, 0));
-    expect(poly[1], const Offset(0, 3));
-    // wall body is offset to the right: right normal of (0, 1) is (1, 0)
-    expect(poly[2].dx, closeTo(0.25, 1e-4));
+    // Baseline (0, 0) to (0, 3) is the axial centerline; thickness 0.25 is centered (-0.125 to +0.125)
+    expect(poly[0].dx, closeTo(-0.125, 1e-4));
+    expect(poly[0].dy, closeTo(0.0, 1e-4));
+    expect(poly[1].dx, closeTo(-0.125, 1e-4));
+    expect(poly[1].dy, closeTo(3.0, 1e-4));
+    expect(poly[2].dx, closeTo(0.125, 1e-4));
     expect(poly[2].dy, closeTo(3.0, 1e-4));
-    expect(poly[3].dx, closeTo(0.25, 1e-4));
+    expect(poly[3].dx, closeTo(0.125, 1e-4));
     expect(poly[3].dy, closeTo(0.0, 1e-4));
-
-    // When flipped, wall body extends to the left (X = -0.25)
-    final flippedWall = wall.copyWith(isFlipped: true);
-    final flippedPoly = flippedWall.polygonVertices;
-    expect(flippedPoly[2].dx, closeTo(-0.25, 1e-4));
-    expect(flippedPoly[3].dx, closeTo(-0.25, 1e-4));
   });
 
   test('CAD snapping endpoint priority over nearest on overlapping tolerance', () {
@@ -711,9 +707,11 @@ void main() {
 
     // Palette is initially shown
     expect(find.text('Колона'), findsOneWidget);
+    await tester.tap(find.text('Колона'));
+    await tester.pumpAndSettle();
 
     // Tap on the placed column (center of canvas) to select it
-    await tester.tapAt(const Offset(250, 450));
+    await tester.tap(find.byType(InteractiveViewer));
     await tester.pumpAndSettle();
 
     // When the column is selected, the Contextual Bottom Action Dock replaces the palette!
@@ -1150,6 +1148,163 @@ void main() {
     await tester.tap(customButton);
     await tester.pumpAndSettle();
     expect(selectedPreset, equals('custom'));
+  });
+
+  test('Column magnetic alignment snaps 12.5 cm modular wall-axis centers to grid intersections', () {
+    // Grid intersection at (10.0, 10.0)
+    const axisX = StructuralGridAxis(
+      id: 'ax_x',
+      name: '1',
+      start: Offset(0.0, 10.0),
+      end: Offset(20.0, 10.0),
+    );
+    const axisY = StructuralGridAxis(
+      id: 'ax_y',
+      name: 'A',
+      start: Offset(10.0, 0.0),
+      end: Offset(10.0, 20.0),
+    );
+    final storey = StoreyLevel(
+      id: 's1',
+      name: 'Ниво 1',
+      elevation: 0.0,
+      height: 3.0,
+      gridAxes: const [axisX, axisY],
+    );
+
+    // Column 25x50 cm (width=0.25, height=0.50).
+    // Center near (10.01, 10.12) so modular 12.5 cm wall node (offset (0, -0.125)) aligns to (10.0, 10.0)
+    final res = StructuralMagneticAlignmentHelper.alignColumn(
+      rawCenter: const Offset(10.01, 10.12),
+      columnWidth: 0.25,
+      columnHeight: 0.50,
+      toleranceCad: 0.20,
+      activeStorey: storey,
+    );
+
+    expect(res, isNotNull);
+    expect(res!.snappedCenter.dx, closeTo(10.0, 1e-4));
+    expect(res.snappedCenter.dy, closeTo(10.125, 1e-4));
+    expect(res.markerPoint!.dx, closeTo(10.0, 1e-4));
+    expect(res.markerPoint!.dy, closeTo(10.0, 1e-4));
+    expect(res.guideLines.length, 2);
+  });
+
+  test('Column single grid axis alignment snaps in 5 cm steps and calculates dynamic dimension line', () {
+    const axisX = StructuralGridAxis(
+      id: 'ax_x',
+      name: '1',
+      start: Offset(0.0, 10.0),
+      end: Offset(20.0, 10.0),
+    );
+    // Obstacle column placed at (5.0, 10.0)
+    const obstacleCol = StructuralColumn(
+      id: 'c_obs',
+      name: 'К1',
+      center: Offset(5.0, 10.0),
+      width: 0.25,
+      height: 0.25,
+    );
+    final storey = StoreyLevel(
+      id: 's1',
+      name: 'Ниво 1',
+      elevation: 0.0,
+      height: 3.0,
+      gridAxes: const [axisX],
+      columns: const [obstacleCol],
+    );
+
+    // Column near (8.12, 10.03) -> distance to obstacle is ~3.12m
+    // Snapped to 5 cm increments: 3.12 / 0.05 = 62.4 -> 62 * 0.05 = 3.10m.
+    // Snapped position from obstacle (5.0, 10.0): 5.0 + 3.10 = 8.10.
+    final res = StructuralMagneticAlignmentHelper.alignColumn(
+      rawCenter: const Offset(8.12, 10.03),
+      columnWidth: 0.25,
+      columnHeight: 0.25,
+      toleranceCad: 0.20,
+      activeStorey: storey,
+    );
+
+    expect(res, isNotNull);
+    expect(res!.snappedCenter.dy, closeTo(10.0, 1e-4));
+    expect(res.snappedCenter.dx, closeTo(8.10, 1e-4));
+    expect(res.liveDimensionText, '3.10 m');
+    expect(res.dimensionLine, isNotNull);
+    expect(res.dimensionLine!.$1, const Offset(5.0, 10.0));
+    expect(res.dimensionLine!.$2.dx, closeTo(8.10, 1e-4));
+  });
+
+  test('Shear wall snaps symmetrically along axial centerline with 5 cm steps and dynamic dimension', () {
+    const axisY = StructuralGridAxis(
+      id: 'ax_y',
+      name: 'A',
+      start: Offset(10.0, 0.0),
+      end: Offset(10.0, 20.0),
+    );
+    final storey = StoreyLevel(
+      id: 's1',
+      name: 'Ниво 1',
+      elevation: 0.0,
+      height: 3.0,
+      gridAxes: const [axisY],
+    );
+
+    // Wall 2.0m long, vertical (rotation = pi/2), placed near (10.04, 4.38)
+    // Snapped along axis in 5 cm step: 4.38 / 0.05 = 87.6 -> 88 * 0.05 = 4.40m.
+    final res = StructuralMagneticAlignmentHelper.alignShearWall(
+      rawCenter: const Offset(10.04, 4.38),
+      wallLength: 2.0,
+      wallThickness: 0.25,
+      wallRotationRad: math.pi / 2,
+      toleranceCad: 0.20,
+      activeStorey: storey,
+    );
+
+    expect(res, isNotNull);
+    expect(res!.snappedCenter.dx, closeTo(10.0, 1e-4));
+    expect(res.snappedCenter.dy, closeTo(4.40, 1e-4));
+    expect(res.liveDimensionText, '4.40 m');
+    expect(res.dimensionLine, isNotNull);
+  });
+
+  test('Beam endpoint magnetically snaps to shear wall axial centerline and 12.5 cm modular nodes', () {
+    // Shear wall from (0, 0) to (4.0, 0)
+    const wall = StructuralShearWall(
+      id: 'w1',
+      name: 'Ш1',
+      start: Offset(0.0, 0.0),
+      end: Offset(4.0, 0.0),
+      thickness: 0.25,
+    );
+    final storey = StoreyLevel(
+      id: 's1',
+      name: 'Ниво 1',
+      elevation: 0.0,
+      height: 3.0,
+      shearWalls: const [wall],
+    );
+
+    // 1. Raw point near modular node at 12.5 cm from start: (0.125, 0.0)
+    final resMod = StructuralMagneticAlignmentHelper.alignBeamEndpoint(
+      rawPoint: const Offset(0.12, 0.04),
+      toleranceCad: 0.15,
+      activeStorey: storey,
+    );
+    expect(resMod, isNotNull);
+    expect(resMod!.snappedPoint.dx, closeTo(0.125, 1e-4));
+    expect(resMod.snappedPoint.dy, closeTo(0.0, 1e-4));
+    expect(resMod.description, 'shearWallModule');
+
+    // 2. Raw point near axial centerline at (2.5, 0.06)
+    final resAxis = StructuralMagneticAlignmentHelper.alignBeamEndpoint(
+      rawPoint: const Offset(2.5, 0.06),
+      toleranceCad: 0.15,
+      activeStorey: storey,
+    );
+    expect(resAxis, isNotNull);
+    expect(resAxis!.snappedPoint.dx, closeTo(2.5, 1e-4));
+    expect(resAxis.snappedPoint.dy, closeTo(0.0, 1e-4));
+    expect(resAxis.description, 'shearWallAxis');
   });
 }
 

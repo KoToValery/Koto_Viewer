@@ -241,25 +241,22 @@ class StructuralShearWall {
   Offset get center => Offset((start.dx + end.dx) / 2.0, (start.dy + end.dy) / 2.0);
 
   /// 4 corner vertices forming the thick wall box in CAD coordinates.
-  /// The line from [start] to [end] is the leading line on the LEFT (or right if flipped).
+  /// Symmetrically centered along the axial baseline from [start] to [end].
   List<Offset> get polygonVertices {
     final double l = length;
     if (l < 1e-6) {
       return [start, start, start, start];
     }
-    // In CAD coordinates (Y up):
-    // Direction vector is (dx/l, dy/l)
-    // Left normal is (-dy/l, dx/l)
-    // Right normal is (dy/l, -dx/l)
     final double dx = end.dx - start.dx;
     final double dy = end.dy - start.dy;
-    final normal = isFlipped ? Offset(-dy / l, dx / l) : Offset(dy / l, -dx / l);
-    final ox = normal.dx * thickness;
-    final oy = normal.dy * thickness;
+    final normal = Offset(dy / l, -dx / l);
+    final halfT = thickness / 2.0;
+    final ox = normal.dx * halfT;
+    final oy = normal.dy * halfT;
 
     return [
-      start,
-      end,
+      Offset(start.dx - ox, start.dy - oy),
+      Offset(end.dx - ox, end.dy - oy),
       Offset(end.dx + ox, end.dy + oy),
       Offset(start.dx + ox, start.dy + oy),
     ];
