@@ -58,6 +58,9 @@ class StructuralPointerPainter extends CustomPainter {
   final List<Offset>? previewOpeningPolygon;
   final List<Offset>? slabPoints;
   final Offset? measureStartPos;
+  final double? previewWallLengthScreen;
+  final double? previewWallThicknessScreen;
+  final double? previewWallRotationRad;
   final String? liveDimensionText;
   final double scale;
   final AppLocalizations? l10n;
@@ -78,6 +81,9 @@ class StructuralPointerPainter extends CustomPainter {
     this.previewOpeningPolygon,
     this.slabPoints,
     this.measureStartPos,
+    this.previewWallLengthScreen,
+    this.previewWallThicknessScreen,
+    this.previewWallRotationRad,
     this.liveDimensionText,
     this.scale = 1.0,
     this.l10n,
@@ -228,6 +234,55 @@ class StructuralPointerPainter extends CustomPainter {
       }
     }
 
+    // 4d. Live shear wall preview on pointer overlay (clearly visible above finger)
+    if (activeTool == StructuralDrawTool.shearWall && previewWallLengthScreen != null) {
+      final wallFill = Paint()
+        ..color = themeColor.withValues(alpha: 0.35)
+        ..style = PaintingStyle.fill;
+      final wallBorder = Paint()
+        ..color = themeColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+
+      final rot = previewWallRotationRad ?? 0.0;
+      final u = Offset(math.cos(rot), math.sin(rot));
+      final n = Offset(-u.dy, u.dx);
+      final halfLen = previewWallLengthScreen! / 2.0;
+      final halfThick = (previewWallThicknessScreen ?? 10.0) / 2.0;
+
+      final p1 = effectiveTip - u * halfLen - n * halfThick;
+      final p2 = effectiveTip + u * halfLen - n * halfThick;
+      final p3 = effectiveTip + u * halfLen + n * halfThick;
+      final p4 = effectiveTip - u * halfLen + n * halfThick;
+
+      final path = Path()
+        ..moveTo(p1.dx, p1.dy)
+        ..lineTo(p2.dx, p2.dy)
+        ..lineTo(p3.dx, p3.dy)
+        ..lineTo(p4.dx, p4.dy)
+        ..close();
+
+      canvas.drawPath(path, wallFill);
+      canvas.drawPath(path, wallBorder);
+      canvas.drawLine(effectiveTip - u * halfLen, effectiveTip + u * halfLen, wallBorder);
+    }
+
+    // 4e. Live column preview on pointer overlay
+    if (activeTool == StructuralDrawTool.column && previewColumn != null) {
+      final colFill = Paint()
+        ..color = themeColor.withValues(alpha: 0.35)
+        ..style = PaintingStyle.fill;
+      final colBorder = Paint()
+        ..color = themeColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+      final w = previewColumn!.width * scale;
+      final h = previewColumn!.height * scale;
+      final rect = Rect.fromCenter(center: effectiveTip, width: w, height: h);
+      canvas.drawRect(rect, colFill);
+      canvas.drawRect(rect, colBorder);
+    }
+
     // 4c. Active measurement ruler line and architectural ticks
     if (activeTool == StructuralDrawTool.measure && measureStartPos != null) {
       final p1 = measureStartPos!;
@@ -374,6 +429,9 @@ class StructuralPointerPainter extends CustomPainter {
         oldDelegate.previewOpeningSize != previewOpeningSize ||
         oldDelegate.previewOpeningPolygon != previewOpeningPolygon ||
         oldDelegate.slabPoints != slabPoints ||
+        oldDelegate.previewWallLengthScreen != previewWallLengthScreen ||
+        oldDelegate.previewWallThicknessScreen != previewWallThicknessScreen ||
+        oldDelegate.previewWallRotationRad != previewWallRotationRad ||
         oldDelegate.liveDimensionText != liveDimensionText;
   }
 }

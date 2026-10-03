@@ -418,6 +418,7 @@
   "applyAction": "Приложи",
   "offsetAction": "Офсет",
   "renameColumnTitle": "Преименуване на колона",
+  "renameBeamTitle": "Преименуване на греда",
   "designationLabel": "Обозначение (напр. К1, К2, С1)",
   "keepBoth": "Запази и двете",
   "deletePrevious": "Изтрий предишната",

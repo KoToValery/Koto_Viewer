@@ -13,6 +13,7 @@ import 'analysis/seismic_analysis_calculator.dart';
 import 'analysis/structural_underlay_filter.dart';
 import 'analysis/vertical_capacity_calculator.dart';
 import 'analysis/slab_parallel_alignment_helper.dart';
+import 'analysis/structural_magnetic_alignment_helper.dart';
 import 'models/cantilever_analysis_models.dart';
 import 'models/seismic_analysis_models.dart';
 import 'models/structural_element.dart';
@@ -120,6 +121,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   bool _draggingAxisStart = false;
   bool _isMovingColumn = false;
   bool _hasMovedSelectedColumn = false;
+  bool _isMovingShearWall = false;
+  bool _hasMovedSelectedShearWall = false;
+  List<(Offset, Offset)>? _activeMagneticGuides;
   bool _isMovingOpening = false;
   bool _hasMovedSelectedOpening = false;
   List<Offset>? _movingOpeningRelativeOffsets;
@@ -269,6 +273,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       setState(() {
         _selectedColumn = null;
         _isMovingColumn = false;
+        _selectedShearWall = null;
+        _isMovingShearWall = false;
         _editingSlab = null;
         _initialSlabBeforeCorrection = null;
         _project = _undoStack.removeLast();
@@ -870,6 +876,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
     setState(() {
       _selectedShearWall = null;
+      _isMovingShearWall = false;
     });
     HapticFeedback.heavyImpact();
   }
@@ -1000,12 +1007,97 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.mediumImpact();
   }
 
+  String _generateNextBeamName(List<StructuralBeam> existing, {required bool isBulgarian}) {
+    final defaultPrefix = isBulgarian ? 'Г' : 'B';
+    int maxNum = 0;
+    for (final beam in existing) {
+      final val = extractElementNumber(beam.displayName);
+      if (val != null && val > maxNum) {
+        maxNum = val;
+      }
+    }
+    return '$defaultPrefix${maxNum + 1}';
+  }
+
+  void _renameSelectedBeam() {
+    if (_selectedBeam == null) return;
+    final current = _selectedBeam!;
+    final controller = TextEditingController(text: current.displayName);
+    showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFFB8C00), width: 1.5),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.edit_outlined, color: Color(0xFFFB8C00), size: 20),
+            const SizedBox(width: 8),
+            Text(context.l10n.renameBeamTitle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            labelText: context.l10n.beamTitle,
+            labelStyle: const TextStyle(color: Color(0xFFFB8C00)),
+            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFB8C00))),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFB8C00), width: 2)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFB8C00),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              final val = controller.text.trim();
+              Navigator.of(ctx).pop(val.isNotEmpty ? val : current.displayName);
+            },
+            child: Text(context.l10n.save, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ).then((newName) {
+      if (newName != null && newName.isNotEmpty && newName != current.displayName) {
+        _pushUndo();
+        final updated = current.copyWith(name: newName);
+        final active = _project.activeStorey;
+        final updatedBeams = active.beams
+            .map((b) => b.id == updated.id ? updated : b)
+            .toList();
+        _updateActiveStorey(active.copyWith(beams: updatedBeams));
+        setState(() {
+          _selectedBeam = updated;
+        });
+        HapticFeedback.selectionClick();
+      }
+    });
+  }
+
   void _deleteSelectedBeam() {
     if (_selectedBeam == null) return;
     _pushUndo();
     final active = _project.activeStorey;
-    final updatedBeams =
-        active.beams.where((b) => b.id != _selectedBeam!.id).toList();
+    final deleted = _selectedBeam!;
+    final remainingBeams =
+        active.beams.where((b) => b.id != deleted.id).toList();
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+    final updatedBeams = renumberBeamsAfterDeletion(
+      remainingBeams,
+      deleted,
+      defaultPrefix: isBg ? 'Г' : 'B',
+    );
     _updateActiveStorey(active.copyWith(beams: updatedBeams));
     setState(() {
       _selectedBeam = null;
@@ -1019,8 +1111,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final beam = _selectedBeam!;
     final active = _project.activeStorey;
     final offset = Offset(0.25 * _cadUnitsPerMeter, -0.25 * _cadUnitsPerMeter);
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+    final nextName = _generateNextBeamName(active.beams, isBulgarian: isBg);
     final dup = StructuralBeam(
       id: 'beam_${DateTime.now().millisecondsSinceEpoch}',
+      name: nextName,
       start: beam.start + offset,
       end: beam.end + offset,
       width: beam.width,
@@ -2438,6 +2533,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     setState(() {
       _selectedColumn = null;
       _isMovingColumn = false;
+      _selectedShearWall = null;
+      _isMovingShearWall = false;
       _isPlacingWithHold = false;
       _wallStartCad = null;
       _slabStartCornerCad = null;
@@ -2617,6 +2714,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _activeSnap = null;
         });
       }
+      if (_isMovingShearWall) {
+        setState(() {
+          _isMovingShearWall = false;
+          _touchScreenPos = null;
+          _targetScreenPos = null;
+          _snappedScreenPos = null;
+          _activeSnap = null;
+          _activeMagneticGuides = null;
+        });
+      }
       if (_draggingSlabVertexIndex != null) {
         setState(() {
           _draggingSlabVertexIndex = null;
@@ -2726,6 +2833,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         return;
       }
 
+      final hitWall = _hitTestShearWall(event.localPosition);
+      if (hitWall != null) {
+        setState(() {
+          _selectedShearWall = hitWall;
+          _isMovingShearWall = true;
+          _hasMovedSelectedShearWall = false;
+          _isPlacingWithHold = false;
+        });
+        _updatePointer(event.localPosition,
+            isMouse: event.kind == PointerDeviceKind.mouse);
+        HapticFeedback.selectionClick();
+        return;
+      }
+
       final hitOpening = _hitTestOpening(event.localPosition);
       if (hitOpening != null) {
         _startMovingOpening(hitOpening, event.localPosition,
@@ -2740,12 +2861,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
 
-    // 4. If a column or opening was already selected and user taps somewhere outside
+    // 4. If a column, shear wall or opening was already selected and user taps somewhere outside
     if (_selectedColumn != null && !_isMovingColumn) {
       final hit = _hitTestColumn(event.localPosition);
       if (hit == null) {
         setState(() {
           _selectedColumn = null;
+        });
+      }
+    }
+    if (_selectedShearWall != null && !_isMovingShearWall) {
+      final hit = _hitTestShearWall(event.localPosition);
+      if (hit == null) {
+        setState(() {
+          _selectedShearWall = null;
         });
       }
     }
@@ -2767,6 +2896,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             _selectedColumn = hitCol;
             _isMovingColumn = true;
             _hasMovedSelectedColumn = false;
+            _isPlacingWithHold = false;
+          });
+          _updatePointer(event.localPosition, isMouse: true);
+          HapticFeedback.selectionClick();
+          return;
+        }
+      }
+      if (_activeTool == StructuralDrawTool.shearWall || _activeTool == StructuralDrawTool.select) {
+        final hitWall = _hitTestShearWall(event.localPosition);
+        if (hitWall != null) {
+          setState(() {
+            _selectedShearWall = hitWall;
+            _isMovingShearWall = true;
+            _hasMovedSelectedShearWall = false;
             _isPlacingWithHold = false;
           });
           _updatePointer(event.localPosition, isMouse: true);
@@ -2863,6 +3006,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final dist = (effectiveCad - _selectedColumn!.center).distance;
         if (dist > 0.05 * _cadUnitsPerMeter) {
           _hasMovedSelectedColumn = true;
+        }
+      }
+      return;
+    }
+
+    // C1b. Moving shear wall with mouse
+    if (event.kind == PointerDeviceKind.mouse &&
+        _isMovingShearWall &&
+        _selectedShearWall != null) {
+      _updatePointer(event.localPosition, isMouse: true);
+      final effectiveCad = _currentCadCoord;
+      if (effectiveCad != null) {
+        final dist = (effectiveCad - _selectedShearWall!.center).distance;
+        if (dist > 0.05 * _cadUnitsPerMeter) {
+          _hasMovedSelectedShearWall = true;
         }
       }
       return;
@@ -2978,6 +3136,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final double maxDimScreen = math.max(colW, colH) * cadScale;
       // Entire column (including bottom edge) is clearly above the finger touch area
       offsetAboveFinger = math.max(80.0, maxDimScreen + 36.0);
+    } else if (!isMouse && (_activeTool == StructuralDrawTool.shearWall || _isMovingShearWall)) {
+      final double fitScale = _getCadFitScale();
+      final double currentScale = _transformController.value.getMaxScaleOnAxis();
+      final double cadScale = fitScale * currentScale.clamp(0.001, 10000.0);
+      final double wallL = (_isMovingShearWall && _selectedShearWall != null)
+          ? _selectedShearWall!.length
+          : _currentWallLength * _cadUnitsPerMeter;
+      final double maxDimScreen = wallL * cadScale;
+      offsetAboveFinger = math.max(80.0, maxDimScreen / 2.0 + 36.0);
     } else if (!isMouse && (_isMovingOpening || (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset == 'shaft'))) {
       final double fitScale = _getCadFitScale();
       final double currentScale = _transformController.value.getMaxScaleOnAxis();
@@ -3006,158 +3173,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
 
       if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
-        // Multi-corner weighted snapping for columns:
-        // Key points: all polygon vertices/corners, edge midpoints, and center
-        final ColumnShape colShape = (_isMovingColumn && _selectedColumn != null)
-            ? _selectedColumn!.shape
-            : _currentColumnPreset.shape;
-        final double colW = (_isMovingColumn && _selectedColumn != null)
-            ? _selectedColumn!.width
-            : _currentColumnPreset.width * _cadUnitsPerMeter;
-        final double colH = (_isMovingColumn && _selectedColumn != null)
-            ? _selectedColumn!.height
-            : _currentColumnPreset.height * _cadUnitsPerMeter;
-        final double colThick = (_isMovingColumn && _selectedColumn != null)
-            ? _selectedColumn!.thickness
-            : _currentColumnPreset.thickness * _cadUnitsPerMeter;
-        final double rot = (_isMovingColumn && _selectedColumn != null)
-            ? _selectedColumn!.rotationRad
-            : _currentColumnPreset.rotationRad;
-        final bool colMirrored = (_isMovingColumn && _selectedColumn != null)
-            ? _selectedColumn!.isMirrored
-            : _currentColumnPreset.isMirrored;
-
-        final tempCol = StructuralColumn(
-          id: 'temp_calc',
-          center: Offset.zero,
-          shape: colShape,
-          width: colW,
-          height: colH,
-          thickness: colThick,
-          rotationRad: rot,
-          isMirrored: colMirrored,
+        final mag = StructuralMagneticAlignmentHelper.alignColumn(
+          rawCenter: rawCad,
+          toleranceCad: toleranceCad,
+          activeStorey: _project.activeStorey,
+          movingColumnId: _isMovingColumn ? _selectedColumn?.id : null,
+          dxfDocument: widget.document,
+          cadUnitsPerMeter: _cadUnitsPerMeter,
         );
-
-        final cornerOffsets = tempCol.polygonVertices;
-
-        // 1. Gather candidate column centers:
-        final candidateCenters = <Offset>{rawCad};
-
-        // A. Corner snapping (Corners only! User request: "Колоните да имат снап само в ъглите")
-        for (final cornerOffset in cornerOffsets) {
-          final p = rawCad + cornerOffset;
-          final s = _findStructuralSnap(p, toleranceCad, cornersOnly: true) ??
-              DxfSnapHelper.findSnapPoint(
-                document: widget.document,
-                cadPoint: p,
-                toleranceCad: toleranceCad,
-                allowNearest: false,
-              );
-          if (s != null) {
-            candidateCenters.add(s.point - cornerOffset);
-          }
-        }
-
-        // B. Center snapping to Grid Axes ONLY (User request: "Колоните ще хващат среден снап само към елемент ОС")
-        final gridAxesList = _project.activeStorey.gridAxes;
-        for (final axis in gridAxesList) {
-          final proj = axis.projectPoint(rawCad);
-          if ((rawCad - proj).distance <= toleranceCad) {
-            candidateCenters.add(proj);
-          }
-        }
-        for (int i = 0; i < gridAxesList.length; i++) {
-          for (int j = i + 1; j < gridAxesList.length; j++) {
-            final inter = gridAxesList[i].intersectionWith(gridAxesList[j]);
-            if (inter != null && (rawCad - inter).distance <= toleranceCad * 1.5) {
-              candidateCenters.add(inter);
-            }
-          }
-        }
-
-        // 2. Score candidate centers with weighted snap priorities:
-        double bestScore = -1.0;
-        Offset bestCenter = rawCad;
-        List<Offset> bestSnappedScreenPts = [];
-        List<DxfSnapResult> bestActiveSnaps = [];
-
-        for (final candCenter in candidateCenters) {
-          double candScore = 0.0;
-          int endpointMatches = 0;
-          final List<Offset> candScreens = [];
-          final List<DxfSnapResult> candSnaps = [];
-
-          for (final cornerOffset in cornerOffsets) {
-            final pt = candCenter + cornerOffset;
-            final match = _findStructuralSnap(pt, toleranceCad * 0.8, cornersOnly: true) ??
-                DxfSnapHelper.findSnapPoint(
-                  document: widget.document,
-                  cadPoint: pt,
-                  toleranceCad: toleranceCad * 0.8,
-                  allowNearest: false,
-                );
-
-            if (match != null) {
-              if (match.type == DxfSnapType.endpoint) {
-                candScore += 120.0;
-                endpointMatches++;
-              } else {
-                candScore += 40.0;
-              }
-              candScreens.add(_cadToScreen(match.point));
-              candSnaps.add(match);
-            }
-          }
-
-          // Bonus for locking into corner (multiple endpoints simultaneously):
-          if (endpointMatches >= 2) {
-            candScore += 1000.0 * endpointMatches;
-          }
-
-          // Bonus for center aligning with Grid Axis
-          for (final axis in gridAxesList) {
-            final distToAxis = (candCenter - axis.projectPoint(candCenter)).distance;
-            if (distToAxis < 1e-3) {
-              candScore += 400.0;
-              candScreens.add(_cadToScreen(candCenter));
-              candSnaps.add(DxfSnapResult(point: candCenter, type: DxfSnapType.center, distance: 0));
-              break;
-            }
-          }
-          // Bonus for center locking on Grid Axis intersection
-          for (int i = 0; i < gridAxesList.length; i++) {
-            for (int j = i + 1; j < gridAxesList.length; j++) {
-              final inter = gridAxesList[i].intersectionWith(gridAxesList[j]);
-              if (inter != null && (candCenter - inter).distance < 1e-3) {
-                candScore += 1500.0;
-                candScreens.add(_cadToScreen(inter));
-                candSnaps.add(DxfSnapResult(point: inter, type: DxfSnapType.endpoint, distance: 0));
-                break;
-              }
-            }
-          }
-
-          // Distance penalty from target position:
-          final dist = (candCenter - rawCad).distance;
-          candScore -= (dist / toleranceCad) * 8.0;
-
-          if (candScore > bestScore && candScore > 0.0) {
-            bestScore = candScore;
-            bestCenter = candCenter;
-            bestSnappedScreenPts = candScreens;
-            bestActiveSnaps = candSnaps;
-          }
-        }
-
-        if (bestScore > 0.0) {
-          snap = bestActiveSnaps.isNotEmpty ? bestActiveSnaps.first : null;
-          snappedScreen = bestSnappedScreenPts.isNotEmpty ? bestSnappedScreenPts.first : null;
-          _snappedScreenPositions = bestSnappedScreenPts;
-          effectiveCad = bestCenter;
+        if (mag != null) {
+          effectiveCad = mag.snappedCenter;
+          _activeMagneticGuides = mag.guideLines;
+          HapticFeedback.selectionClick();
         } else {
-          _snappedScreenPositions = [];
           effectiveCad = rawCad;
+          _activeMagneticGuides = null;
         }
+        _snappedScreenPositions = [];
         _liveDimensionText = null;
       } else if (_isMovingOpening ||
                  (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset == 'shaft')) {
@@ -3337,40 +3369,58 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           final hM = (effectiveCad.dy - _openingStartCad!.dy).abs() / _cadUnitsPerMeter;
           _liveDimensionText = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
         }
-      } else if (_activeTool == StructuralDrawTool.shearWall || _activeTool == StructuralDrawTool.beam) {
-        // Shear wall or Beam drawing with 10 cm snapping and live dimensioning
-        final startCad = _activeTool == StructuralDrawTool.shearWall ? _wallStartCad : _beamStartCad;
-        if (startCad == null) {
-          snap = _findStructuralSnap(rawCad, toleranceCad) ??
-              DxfSnapHelper.findSnapPoint(
-                document: widget.document,
-                cadPoint: rawCad,
-                toleranceCad: toleranceCad,
-                allowNearest: false,
-              );
+      } else if (_activeTool == StructuralDrawTool.shearWall || _isMovingShearWall) {
+        final wallL = (_isMovingShearWall && _selectedShearWall != null)
+            ? _selectedShearWall!.length
+            : _currentWallLength * _cadUnitsPerMeter;
+        final wallT = (_isMovingShearWall && _selectedShearWall != null)
+            ? _selectedShearWall!.thickness
+            : _currentWallThickness * _cadUnitsPerMeter;
+        final wallRot = (_isMovingShearWall && _selectedShearWall != null)
+            ? _selectedShearWall!.angleRad
+            : _currentWallRotationRad;
 
-          if (snap != null) {
-            effectiveCad = snap.point;
-            snappedScreen = _cadToScreen(snap.point);
-            _snappedScreenPositions = [snappedScreen];
-          } else {
-            _snappedScreenPositions = [];
-          }
-          _liveDimensionText = null;
+        final mag = StructuralMagneticAlignmentHelper.alignShearWall(
+          rawCenter: rawCad,
+          wallLength: wallL,
+          wallThickness: wallT,
+          wallRotationRad: wallRot,
+          toleranceCad: toleranceCad,
+          activeStorey: _project.activeStorey,
+          movingWallId: _isMovingShearWall ? _selectedShearWall?.id : null,
+          dxfDocument: widget.document,
+          cadUnitsPerMeter: _cadUnitsPerMeter,
+        );
+        if (mag != null) {
+          effectiveCad = mag.snappedCenter;
+          _activeMagneticGuides = mag.guideLines;
+          HapticFeedback.selectionClick();
         } else {
-          snap = _findStructuralSnap(rawCad, toleranceCad) ??
-              DxfSnapHelper.findSnapPoint(
-                document: widget.document,
-                cadPoint: rawCad,
-                toleranceCad: toleranceCad,
-                allowNearest: false,
-              );
+          effectiveCad = rawCad;
+          _activeMagneticGuides = null;
+        }
+        _snappedScreenPositions = [];
+        _liveDimensionText = null;
+      } else if (_activeTool == StructuralDrawTool.beam) {
+        // Magnetic axial alignment for beams (column center, shear wall center/axis, other beams, grid axes, and ortho-lock)
+        final startCad = _beamStartCad;
+        final mag = StructuralMagneticAlignmentHelper.alignBeamEndpoint(
+          rawPoint: rawCad,
+          beamStart: startCad,
+          toleranceCad: toleranceCad,
+          activeStorey: _project.activeStorey,
+          cadUnitsPerMeter: _cadUnitsPerMeter,
+        );
 
-          if (snap != null) {
-            effectiveCad = snap.point;
-            snappedScreen = _cadToScreen(snap.point);
-            _snappedScreenPositions = [snappedScreen];
-          } else {
+        if (mag != null) {
+          effectiveCad = mag.snappedPoint;
+          _activeMagneticGuides = mag.guideLines;
+          snappedScreen = _cadToScreen(mag.snappedPoint);
+          _snappedScreenPositions = [snappedScreen];
+          HapticFeedback.selectionClick();
+        } else {
+          _activeMagneticGuides = null;
+          if (startCad != null) {
             // Free length snapped to 10 cm increments (0.10 m)
             final v = rawCad - startCad;
             final distCad = v.distance;
@@ -3385,9 +3435,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             }
             snappedScreen = _cadToScreen(effectiveCad);
             _snappedScreenPositions = [];
+          } else {
+            effectiveCad = rawCad;
+            _snappedScreenPositions = [];
           }
+        }
+
+        if (startCad != null) {
           final lenM = (effectiveCad - startCad).distance / _cadUnitsPerMeter;
           _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
+        } else {
+          _liveDimensionText = null;
         }
       } else if (_activeTool == StructuralDrawTool.gridAxis) {
         snap = _findStructuralSnap(rawCad, toleranceCad) ??
@@ -3832,6 +3890,42 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _snappedScreenPos = null;
         _snappedScreenPositions = [];
         _activeSnap = null;
+        _activeMagneticGuides = null;
+        _liveDimensionText = null;
+      });
+      return;
+    }
+
+    // 3b. Moving shear wall with mouse or touch release
+    if (_isMovingShearWall && _selectedShearWall != null) {
+      if (_hasMovedSelectedShearWall) {
+        final newCenter = _currentCadCoord;
+        if (newCenter != null) {
+          _pushUndo();
+          final halfLen = _selectedShearWall!.length / 2.0;
+          final rot = _selectedShearWall!.rotationRad;
+          final u = Offset(math.cos(rot), math.sin(rot));
+          final updatedWall = _selectedShearWall!.copyWith(
+            start: newCenter - u * halfLen,
+            end: newCenter + u * halfLen,
+          );
+          final active = _project.activeStorey;
+          final updatedWalls = active.shearWalls
+              .map((w) => w.id == updatedWall.id ? updatedWall : w)
+              .toList();
+          _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
+          _selectedShearWall = updatedWall;
+          HapticFeedback.mediumImpact();
+        }
+      }
+      setState(() {
+        _isMovingShearWall = false;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _snappedScreenPositions = [];
+        _activeSnap = null;
+        _activeMagneticGuides = null;
         _liveDimensionText = null;
       });
       return;
@@ -3887,6 +3981,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     setState(() {
       _isPlacingWithHold = false;
       _isMovingColumn = false;
+      _isMovingShearWall = false;
+      _activeMagneticGuides = null;
       _isMovingOpening = false;
       _isExtrudingEdge = false;
       _activeGrip = null;
@@ -3983,12 +4079,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         HapticFeedback.heavyImpact();
         setState(() {
           _selectedShearWall = hitWall;
+          _isMovingShearWall = true;
+          _hasMovedSelectedShearWall = false;
+          _isPlacingWithHold = false;
           _selectedColumn = null;
           _selectedBeam = null;
           _selectedOpening = null;
           _selectedGridAxis = null;
           _isMovingColumn = false;
         });
+        _updatePointer(details.localPosition, isMouse: false);
         return;
       }
     }
@@ -4005,6 +4105,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _selectedOpening = null;
           _selectedGridAxis = null;
           _isMovingColumn = false;
+          _isMovingShearWall = false;
         });
         return;
       }
@@ -4038,6 +4139,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _selectedBeam = null;
           _selectedOpening = null;
           _selectedGridAxis = null;
+          _isMovingColumn = false;
+          _isMovingShearWall = false;
         });
       }
       return;
@@ -4051,6 +4154,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _selectedOpening = null;
       _selectedGridAxis = null;
       _isMovingColumn = false;
+      _isMovingShearWall = false;
       _isPlacingWithHold = true;
     });
     _updatePointer(details.localPosition, isMouse: false);
@@ -4083,6 +4187,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final dist = (effectiveCad - _selectedColumn!.center).distance;
         if (dist > 0.05 * _cadUnitsPerMeter) {
           _hasMovedSelectedColumn = true;
+        }
+      }
+      return;
+    }
+    if (_isMovingShearWall && _selectedShearWall != null) {
+      _updatePointer(details.localPosition, isMouse: false);
+      final effectiveCad = _currentCadCoord;
+      if (effectiveCad != null) {
+        final dist = (effectiveCad - _selectedShearWall!.center).distance;
+        if (dist > 0.05 * _cadUnitsPerMeter) {
+          _hasMovedSelectedShearWall = true;
         }
       }
       return;
@@ -4135,6 +4250,39 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _targetScreenPos = null;
         _snappedScreenPos = null;
         _activeSnap = null;
+        _activeMagneticGuides = null;
+      });
+      return;
+    }
+
+    if (_isMovingShearWall && _selectedShearWall != null) {
+      if (_hasMovedSelectedShearWall) {
+        final newCenter = _currentCadCoord;
+        if (newCenter != null) {
+          _pushUndo();
+          final halfLen = _selectedShearWall!.length / 2.0;
+          final rot = _selectedShearWall!.rotationRad;
+          final u = Offset(math.cos(rot), math.sin(rot));
+          final updatedWall = _selectedShearWall!.copyWith(
+            start: newCenter - u * halfLen,
+            end: newCenter + u * halfLen,
+          );
+          final active = _project.activeStorey;
+          final updatedWalls = active.shearWalls
+              .map((w) => w.id == updatedWall.id ? updatedWall : w)
+              .toList();
+          _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
+          _selectedShearWall = updatedWall;
+          HapticFeedback.mediumImpact();
+        }
+      }
+      setState(() {
+        _isMovingShearWall = false;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _activeSnap = null;
+        _activeMagneticGuides = null;
       });
       return;
     }
@@ -4171,6 +4319,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _targetScreenPos = null;
         _snappedScreenPos = null;
         _activeSnap = null;
+        _activeMagneticGuides = null;
       });
     }
   }
@@ -4183,6 +4332,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _targetScreenPos = null;
         _snappedScreenPos = null;
         _activeSnap = null;
+        _activeMagneticGuides = null;
+      });
+    }
+    if (_isMovingShearWall) {
+      setState(() {
+        _isMovingShearWall = false;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _activeSnap = null;
+        _activeMagneticGuides = null;
       });
     }
     if (_isMovingOpening) {
@@ -4201,6 +4361,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _targetScreenPos = null;
         _snappedScreenPos = null;
         _activeSnap = null;
+        _activeMagneticGuides = null;
       });
     }
   }
@@ -4228,6 +4389,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _selectedBeam = null;
           _selectedOpening = null;
           _isMovingColumn = false;
+          _isMovingShearWall = false;
         });
         HapticFeedback.selectionClick();
         return;
@@ -4246,6 +4408,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedOpening = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
+        _isMovingShearWall = false;
       });
       if (hitCol != null) {
         HapticFeedback.selectionClick();
@@ -4262,6 +4425,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedOpening = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
+        _isMovingShearWall = false;
       });
       if (hitWall != null) {
         HapticFeedback.selectionClick();
@@ -4270,18 +4434,27 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     if (_activeTool == StructuralDrawTool.beam) {
-      final hitBeam = _hitTestBeam(details.localPosition);
-      setState(() {
-        _selectedBeam = hitBeam;
-        _selectedColumn = null;
-        _selectedShearWall = null;
-        _selectedOpening = null;
-        _selectedGridAxis = null;
-        _isMovingColumn = false;
-      });
-      if (hitBeam != null) {
-        HapticFeedback.selectionClick();
+      if (_beamStartCad != null) {
+        final cadPt = _currentCadCoord ?? _screenToCad(details.localPosition);
+        _commitPlacement(cadPt);
+        return;
       }
+      final hitBeam = _hitTestBeam(details.localPosition);
+      if (hitBeam != null) {
+        setState(() {
+          _selectedBeam = hitBeam;
+          _selectedColumn = null;
+          _selectedShearWall = null;
+          _selectedOpening = null;
+          _selectedGridAxis = null;
+          _isMovingColumn = false;
+          _isMovingShearWall = false;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      }
+      final cadPt = _currentCadCoord ?? _screenToCad(details.localPosition);
+      _commitPlacement(cadPt);
       return;
     }
 
@@ -4317,6 +4490,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedBeam = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
+        _isMovingShearWall = false;
         _isMovingOpening = false;
       });
       if (hitOpening != null) {
@@ -4338,6 +4512,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedShearWall = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
+        _isMovingShearWall = false;
       });
       HapticFeedback.selectionClick();
       return;
@@ -4352,6 +4527,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedShearWall = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
+        _isMovingShearWall = false;
       });
       HapticFeedback.selectionClick();
       return;
@@ -4366,6 +4542,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedOpening = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
+        _isMovingShearWall = false;
       });
       HapticFeedback.selectionClick();
       return;
@@ -4380,6 +4557,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedOpening = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
+        _isMovingShearWall = false;
       });
       HapticFeedback.selectionClick();
       return;
@@ -4394,6 +4572,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedBeam = null;
         _selectedOpening = null;
         _isMovingColumn = false;
+        _isMovingShearWall = false;
       });
       HapticFeedback.selectionClick();
       return;
@@ -4531,8 +4710,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         // Step 2: Set beam end point and commit
         if ((cadCoord - _beamStartCad!).distance >= 0.3 * scale) {
           _pushUndo();
+          final isBg = Localizations.localeOf(context).languageCode == 'bg';
+          final nextBeamName = _generateNextBeamName(active.beams, isBulgarian: isBg);
           final newBeam = StructuralBeam(
             id: 'beam_${DateTime.now().millisecondsSinceEpoch}',
+            name: nextBeamName,
             start: _beamStartCad!,
             end: cadCoord,
             width: _currentBeamWidth * scale,
@@ -4547,6 +4729,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         setState(() {
           _beamStartCad = null;
           _liveDimensionText = null;
+          _activeMagneticGuides = null;
         });
       }
     } else if (_activeTool == StructuralDrawTool.slabOpening) {
@@ -5167,11 +5350,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       panEnabled: !_isPlacingWithHold &&
                           !_isExtrudingEdge &&
                           !_isMovingColumn &&
+                          !_isMovingShearWall &&
                           !_isMovingOpening &&
                           _draggingSlabVertexIndex == null,
                       scaleEnabled: !_isPlacingWithHold &&
                           !_isExtrudingEdge &&
                           !_isMovingColumn &&
+                          !_isMovingShearWall &&
                           !_isMovingOpening &&
                           _draggingSlabVertexIndex == null,
                       scaleFactor: 350.0,
@@ -5185,6 +5370,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             _isMultiTouchGesture = true;
                             _isPlacingWithHold = false;
                             _isMovingColumn = false;
+                            _isMovingShearWall = false;
                             _isMovingOpening = false;
                             _isExtrudingEdge = false;
                             _activeGrip = null;
@@ -5238,7 +5424,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                     width: _currentColumnPreset.width * _cadUnitsPerMeter,
                                     height: _currentColumnPreset.height * _cadUnitsPerMeter,
                                   ),
-                                  previewColumnPos: _isPlacingWithHold ? _currentCadCoord : null,
+                                  previewColumnPos: (_isPlacingWithHold && _activeTool == StructuralDrawTool.column) ? _currentCadCoord : null,
+                                  previewShearWallPos: (_isPlacingWithHold && _activeTool == StructuralDrawTool.shearWall) ? _currentCadCoord : null,
+                                  previewWallLength: _currentWallLength * _cadUnitsPerMeter,
+                                  previewWallThickness: _currentWallThickness * _cadUnitsPerMeter,
+                                  previewWallRotationRad: _currentWallRotationRad,
+                                  movingShearWall: _isMovingShearWall ? _selectedShearWall : null,
+                                  movingShearWallPos: _isMovingShearWall ? _currentCadCoord : null,
+                                  magneticGuideLines: _activeMagneticGuides,
                                   wallStartPos: _wallStartCad,
                                   beamStartPos: _beamStartCad,
                                   beamPreviewWidth: _currentBeamWidth * _cadUnitsPerMeter,
@@ -5268,7 +5461,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   gridAxisPreviewStartCad: previewAxisStart,
                                   gridAxisPreviewEndCad: previewAxisEnd,
                                   movingColumn: _isMovingColumn ? _selectedColumn : null,
-                                  movingColumnPos: _isMovingColumn ? (_activeSnap?.point ?? _currentCadCoord) : null,
+                                  movingColumnPos: _isMovingColumn ? _currentCadCoord : null,
                                   selectedSlabId: _editingSlab?.id,
                                   draggingSlabVertexIndex: _draggingSlabVertexIndex,
                                   draggingSlabVertexPos: _draggingSlabVertexCad,
@@ -5293,6 +5486,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               // 2. Screen-Space Offset Target Pointer with Stem Guideline & Live Dimensioning
               if ((_isPlacingWithHold ||
                       _isMovingColumn ||
+                      _isMovingShearWall ||
                       _isMovingOpening ||
                       (_activeTool == StructuralDrawTool.measure &&
                           _measurementStartCad != null)) &&
@@ -5311,13 +5505,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             ? StructuralDrawTool.slabOpening
                             : (_isMovingColumn
                                 ? StructuralDrawTool.column
-                                : _activeTool),
+                                : (_isMovingShearWall
+                                    ? StructuralDrawTool.shearWall
+                                    : _activeTool)),
                         previewColumn: _isMovingColumn
                             ? _selectedColumn!.copyWith(
                                 width: _selectedColumn!.width / _cadUnitsPerMeter,
                                 height: _selectedColumn!.height / _cadUnitsPerMeter,
                               )
                             : _currentColumnPreset,
+                        previewWallLengthScreen: _isMovingShearWall
+                            ? (_selectedShearWall!.length * _getCadFitScale() * _transformController.value.getMaxScaleOnAxis())
+                            : (_currentWallLength * _cadUnitsPerMeter * _getCadFitScale() * _transformController.value.getMaxScaleOnAxis()),
+                        previewWallThicknessScreen: _isMovingShearWall
+                            ? (_selectedShearWall!.thickness * _getCadFitScale() * _transformController.value.getMaxScaleOnAxis())
+                            : (_currentWallThickness * _cadUnitsPerMeter * _getCadFitScale() * _transformController.value.getMaxScaleOnAxis()),
+                        previewWallRotationRad: _isMovingShearWall
+                            ? _selectedShearWall!.rotationRad
+                            : _currentWallRotationRad,
                         wallStartPos: _wallStartCad != null ? _cadToScreen(_wallStartCad!) : null,
                         beamStartPos: _beamStartCad != null ? _cadToScreen(_beamStartCad!) : null,
                         slabStartCornerPos: _slabStartCornerCad != null ? _cadToScreen(_slabStartCornerCad!) : null,
@@ -5327,6 +5532,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         previewOpeningPolygon: _getPreviewOpeningScreenPolygon(),
                         slabPoints: _slabPointsCad.map(_cadToScreen).toList(),
                         liveDimensionText: _liveDimensionText,
+                        scale: _cadUnitsPerMeter * _getCadFitScale() * _transformController.value.getMaxScaleOnAxis(),
                         l10n: context.l10n,
                       ),
                     ),
@@ -5452,7 +5658,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 right: 0,
                 child: _isEditingSlab
                     ? _buildSlabCorrectionBottomBar(context)
-                    : (_hasSelectedElement && !_isMovingColumn && !_isMovingOpening && !_isPlacingWithHold)
+                    : (_hasSelectedElement && !_isMovingColumn && !_isMovingShearWall && !_isMovingOpening && !_isPlacingWithHold)
                         ? _buildContextualElementBottomDock(context)
                         : ElementPaletteBar(
                         activeTool: _activeTool,
@@ -5468,6 +5674,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             _selectedOpening = null;
                             _selectedGridAxis = null;
                             _isMovingOpening = false;
+                            _isMovingShearWall = false;
                             _firstWallEdgeStartCad = null;
                             _firstWallEdgeEndCad = null;
                             _slabStartCornerCad = null;
@@ -5595,7 +5802,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   Widget _buildContextualElementBottomDock(BuildContext context) {
-    if (!_hasSelectedElement || _isMovingColumn || _isMovingOpening || _isPlacingWithHold || _isEditingSlab) {
+    if (!_hasSelectedElement || _isMovingColumn || _isMovingShearWall || _isMovingOpening || _isPlacingWithHold || _isEditingSlab) {
       return const SizedBox.shrink();
     }
 
@@ -5699,10 +5906,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final int wCm = (beam.width / _cadUnitsPerMeter * 100).round();
       final int dCm = (beam.depth / _cadUnitsPerMeter * 100).round();
       final double lenM = beam.length / _cadUnitsPerMeter;
-      title = context.l10n.beamTitle;
+      title = '${beam.displayName} ($wCm/$dCm)';
       subtitle = '$wCm x $dCm cm, L = ${lenM.toStringAsFixed(2)} m';
       onDeselect = () => setState(() => _selectedBeam = null);
-      onRename = null;
+      onRename = _renameSelectedBeam;
 
       actionButtons.addAll([
         _buildDockActionButton(

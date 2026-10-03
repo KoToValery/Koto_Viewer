@@ -52,6 +52,13 @@ class Structural2dPainter extends CustomPainter {
   final SlabParallelAlignmentResult? activeParallelSnap;
   final List<Offset>? previewSlabOffsetPolygon;
   final AppLocalizations? l10n;
+  final Offset? previewShearWallPos;
+  final double previewWallLength;
+  final double previewWallThickness;
+  final double previewWallRotationRad;
+  final StructuralShearWall? movingShearWall;
+  final Offset? movingShearWallPos;
+  final List<(Offset, Offset)>? magneticGuideLines;
   final double cadUnitsPerMeter;
   final double zoomScale;
   final Offset Function(Offset) cadToScene;
@@ -88,6 +95,13 @@ class Structural2dPainter extends CustomPainter {
     this.activeParallelSnap,
     this.previewSlabOffsetPolygon,
     this.l10n,
+    this.previewShearWallPos,
+    this.previewWallLength = 1.5,
+    this.previewWallThickness = 0.25,
+    this.previewWallRotationRad = 0.0,
+    this.movingShearWall,
+    this.movingShearWallPos,
+    this.magneticGuideLines,
     this.selectedColumnId,
     this.selectedShearWallId,
     this.selectedBeamId,
@@ -134,17 +148,24 @@ class Structural2dPainter extends CustomPainter {
 
     // 3. Draw Active Storey Shear Walls
     for (final wall in currentStorey.shearWalls) {
+      if (movingShearWall?.id == wall.id) continue;
       _drawShearWall(canvas, wall, isGhost: false);
     }
 
     // 4. Draw Active Storey Columns
     for (final col in currentStorey.columns) {
+      if (movingColumn?.id == col.id) continue;
       _drawColumn(canvas, col, isGhost: false);
     }
 
     // 4b. Draw Column Offset Preview (Live duplication guidance)
     if (columnOffsetPreview != null) {
       _drawColumn(canvas, columnOffsetPreview!, isGhost: false, isPreview: true);
+    }
+
+    // 4c. Draw Magnetic Guidelines (ArchiCAD style cyan guides with diamond markers)
+    if (magneticGuideLines != null && magneticGuideLines!.isNotEmpty) {
+      _drawMagneticGuidelines(canvas, magneticGuideLines!);
     }
 
     // 5. Draw Interactive In-Progress Elements
@@ -865,6 +886,52 @@ class Structural2dPainter extends CustomPainter {
         );
       }
     }
+
+    // Beam designation / number badge (e.g. "Г1", "Г2" or "B1", "B2")
+    if (!isGhost && beam.displayName.isNotEmpty) {
+      final sStart = cadToScene(beam.start);
+      final sEnd = cadToScene(beam.end);
+      final midScene = Offset((sStart.dx + sEnd.dx) / 2.0, (sStart.dy + sEnd.dy) / 2.0);
+
+      canvas.save();
+      canvas.translate(midScene.dx, midScene.dy);
+      canvas.scale(1.0 / zoomScale);
+
+      final textSpan = TextSpan(
+        text: beam.displayName,
+        style: TextStyle(
+          color: isSelected ? const Color(0xFFFFD54F) : Colors.white,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      );
+      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+      final bgRect = Rect.fromCenter(
+        center: Offset.zero,
+        width: tp.width + 6.0,
+        height: tp.height + 2.5,
+      );
+      final labelBgPaint = Paint()
+        ..color = const Color(0xCC1E1E24)
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bgRect, const Radius.circular(3.5)),
+        labelBgPaint,
+      );
+
+      final labelBorderPaint = Paint()
+        ..color = isSelected ? const Color(0xFFFFD54F) : const Color(0xFFFB8C00)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bgRect, const Radius.circular(3.5)),
+        labelBorderPaint,
+      );
+
+      tp.paint(canvas, Offset(-tp.width / 2.0, -tp.height / 2.0));
+      canvas.restore();
+    }
   }
 
   void _drawGridAxis(Canvas canvas, StructuralGridAxis axis, {required bool isGhost, bool isPreview = false}) {
@@ -979,7 +1046,7 @@ class Structural2dPainter extends CustomPainter {
   }
 
   void _drawShearWall(Canvas canvas, StructuralShearWall wall,
-      {required bool isGhost}) {
+      {required bool isGhost, bool isPreview = false, bool isMoving = false}) {
     final pts = wall.polygonVertices.map(cadToScene).toList();
     if (pts.length < 4) return;
     final path = Path()
@@ -990,24 +1057,26 @@ class Structural2dPainter extends CustomPainter {
       ..close();
 
     final fillPaint = Paint()
-      ..color = isGhost
-          ? const Color(0x4D78909C)
-          : const Color(0xE637474F)
+      ..color = isPreview || isMoving
+          ? const Color(0xB300E5FF)
+          : (isGhost ? const Color(0x4D78909C) : const Color(0xE637474F))
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = isGhost
-          ? const Color(0x8090A4AE)
-          : const Color(0xFFCFD8DC)
+      ..color = isPreview || isMoving
+          ? const Color(0xFF00E5FF)
+          : (isGhost ? const Color(0x8090A4AE) : const Color(0xFFCFD8DC))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2 / zoomScale;
+      ..strokeWidth = (isPreview || isMoving ? 2.5 : 1.2) / zoomScale;
 
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
 
     // Leading reference line on the left edge of the wall
     final leadingLinePaint = Paint()
-      ..color = isGhost ? const Color(0x40FFFFFF) : const Color(0xFF00E5FF)
+      ..color = isPreview || isMoving
+          ? const Color(0xFF00E5FF)
+          : (isGhost ? const Color(0x40FFFFFF) : const Color(0xFF00E5FF))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0 / zoomScale;
     canvas.drawLine(cadToScene(wall.start), cadToScene(wall.end), leadingLinePaint);
@@ -1070,6 +1139,42 @@ class Structural2dPainter extends CustomPainter {
       tp.paint(canvas, Offset(-tp.width / 2.0, -tp.height / 2.0));
 
       canvas.restore();
+    }
+  }
+
+  void _drawMagneticGuidelines(Canvas canvas, List<(Offset, Offset)> guides) {
+    final guidePaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..strokeWidth = 1.8 / zoomScale
+      ..style = PaintingStyle.stroke;
+    final diamondPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.fill;
+
+    for (final guide in guides) {
+      final s1 = cadToScene(guide.$1);
+      final s2 = cadToScene(guide.$2);
+      final v = s2 - s1;
+      final len = v.distance;
+      if (len > 1e-4) {
+        final u = v / len;
+        final gStart = s1 - u * (150.0 / zoomScale);
+        final gEnd = s2 + u * (150.0 / zoomScale);
+        canvas.drawLine(gStart, gEnd, guidePaint);
+
+        final s = 4.5 / zoomScale;
+        void drawDiamond(Offset pt) {
+          final p = Path()
+            ..moveTo(pt.dx, pt.dy - s)
+            ..lineTo(pt.dx + s, pt.dy)
+            ..lineTo(pt.dx, pt.dy + s)
+            ..lineTo(pt.dx - s, pt.dy)
+            ..close();
+          canvas.drawPath(p, diamondPaint);
+        }
+        drawDiamond(s1);
+        drawDiamond(s2);
+      }
     }
   }
 
@@ -1323,6 +1428,18 @@ class Structural2dPainter extends CustomPainter {
       }
     }
 
+    // 1c. Moving shear wall live preview
+    if (movingShearWall != null && movingShearWallPos != null) {
+      final dir = movingShearWall!.end - movingShearWall!.start;
+      final halfLen = dir.distance / 2.0;
+      final u = dir.distance > 1e-4 ? dir / dir.distance : const Offset(1, 0);
+      final movedWall = movingShearWall!.copyWith(
+        start: movingShearWallPos! - u * halfLen,
+        end: movingShearWallPos! + u * halfLen,
+      );
+      _drawShearWall(canvas, movedWall, isGhost: false, isMoving: true);
+    }
+
     // 2. New column placement live preview
     if (activeTool == StructuralDrawTool.column &&
         previewColumn != null &&
@@ -1348,35 +1465,17 @@ class Structural2dPainter extends CustomPainter {
         canvas.drawPath(path, previewFill);
         canvas.drawPath(path, previewBorder);
       }
-    } else if (activeTool == StructuralDrawTool.shearWall &&
-        wallStartPos != null &&
-        currentCursorCad != null) {
-      final previewWall = StructuralShearWall(
-        id: 'preview',
-        start: wallStartPos!,
-        end: currentCursorCad!,
-        thickness: 0.25,
-      );
-      final pts = previewWall.polygonVertices.map(cadToScene).toList();
-      if (pts.length >= 4) {
-        final path = Path()..moveTo(pts[0].dx, pts[0].dy);
-        for (int i = 1; i < pts.length; i++) {
-          path.lineTo(pts[i].dx, pts[i].dy);
-        }
-        path.close();
-
-        final pFill = Paint()
-          ..color = const Color(0x66FFB300)
-          ..style = PaintingStyle.fill;
-        final pBorder = Paint()
-          ..color = const Color(0xFFFFB300)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.0 / zoomScale;
-
-        canvas.drawPath(path, pFill);
-        canvas.drawPath(path, pBorder);
-        canvas.drawLine(
-            cadToScene(wallStartPos!), cadToScene(currentCursorCad!), pBorder);
+    } else if (activeTool == StructuralDrawTool.shearWall) {
+      if (previewShearWallPos != null && movingShearWall == null) {
+        final dir = Offset(math.cos(previewWallRotationRad), math.sin(previewWallRotationRad));
+        final halfLen = previewWallLength / 2.0;
+        final previewWall = StructuralShearWall(
+          id: 'preview_wall',
+          start: previewShearWallPos! - dir * halfLen,
+          end: previewShearWallPos! + dir * halfLen,
+          thickness: previewWallThickness,
+        );
+        _drawShearWall(canvas, previewWall, isGhost: false, isPreview: true);
       }
     } else if (activeTool == StructuralDrawTool.beam &&
         beamStartPos != null &&

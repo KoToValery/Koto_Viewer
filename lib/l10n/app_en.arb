@@ -1197,6 +1197,8 @@
   "@offsetAction": { "description": "Offset action button" },
   "renameColumnTitle": "Rename Column",
   "@renameColumnTitle": { "description": "Title for renaming column dialog" },
+  "renameBeamTitle": "Rename Beam",
+  "@renameBeamTitle": { "description": "Title for renaming beam dialog" },
   "designationLabel": "Designation (e.g. C1, C2, W1)",
   "@designationLabel": { "description": "Input label for designation" },
   "keepBoth": "Keep Both",

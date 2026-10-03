@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/features/structural_designer/analysis/seismic_analysis_calculator.dart';
+import 'package:kotoview/src/features/structural_designer/analysis/structural_magnetic_alignment_helper.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
 import 'package:kotoview/src/features/structural_designer/rendering/structural_2d_painter.dart';
 import 'package:kotoview/src/features/structural_designer/rendering/structural_3d_mesh_builder.dart';
@@ -52,6 +54,31 @@ void main() {
       expect(renumbered.length, equals(2));
       expect(renumbered[0].displayName, equals('Ш1'));
       expect(renumbered[1].displayName, equals('Ш2')); // Was Ш3
+    });
+
+    test('renumberBeamsAfterDeletion removes numbering gaps (Г1..Гn and B1..Bn)', () {
+      const beam1 = StructuralBeam(id: 'b1', name: 'Г1', start: Offset(0, 0), end: Offset(5, 0), width: 0.25, depth: 0.50);
+      const beam2 = StructuralBeam(id: 'b2', name: 'Г2', start: Offset(0, 4), end: Offset(5, 4), width: 0.25, depth: 0.50);
+      const beam3 = StructuralBeam(id: 'b3', name: 'Г3', start: Offset(0, 8), end: Offset(5, 8), width: 0.25, depth: 0.50);
+
+      // Delete beam Г2
+      final remaining = [beam1, beam3];
+      final renumberedBg = renumberBeamsAfterDeletion(remaining, beam2, defaultPrefix: 'Г');
+
+      expect(renumberedBg.length, equals(2));
+      expect(renumberedBg[0].displayName, equals('Г1'));
+      expect(renumberedBg[1].displayName, equals('Г2')); // Was Г3
+
+      // English B1..Bn
+      const beamEn1 = StructuralBeam(id: 'be1', name: 'B1', start: Offset(0, 0), end: Offset(5, 0));
+      const beamEn2 = StructuralBeam(id: 'be2', name: 'B2', start: Offset(0, 4), end: Offset(5, 4));
+      const beamEn3 = StructuralBeam(id: 'be3', name: 'B3', start: Offset(0, 8), end: Offset(5, 8));
+
+      final remainingEn = [beamEn2, beamEn3];
+      final renumberedEn = renumberBeamsAfterDeletion(remainingEn, beamEn1, defaultPrefix: 'B');
+      expect(renumberedEn.length, equals(2));
+      expect(renumberedEn[0].displayName, equals('B1')); // Was B2
+      expect(renumberedEn[1].displayName, equals('B2')); // Was B3
     });
 
     test('resequenceGridAxes renumbers spatially: vertical axes -> 1, 2, 3; horizontal -> letters', () {
@@ -295,6 +322,142 @@ void main() {
       if (await file.exists()) {
         await file.delete();
       }
+    });
+  });
+
+  group('Structural BiM Designer - Beam Magnetic Axial Alignment & 3D Depth Tests', () {
+    test('alignBeamEndpoint magnetically snaps axially to column centers', () {
+      const col1 = StructuralColumn(id: 'c1', name: 'К1', center: Offset(10.0, 10.0), width: 0.25, height: 0.25);
+      final storey = StoreyLevel(id: 'st0', name: 'Кота +2.80', elevation: 2.80, height: 2.80, columns: [col1]);
+
+      // Pointer near col1 center (distance = 0.15, within tolerance 0.30)
+      final snap = StructuralMagneticAlignmentHelper.alignBeamEndpoint(
+        rawPoint: const Offset(10.15, 10.05),
+        toleranceCad: 0.30,
+        activeStorey: storey,
+      );
+
+      expect(snap, isNotNull);
+      expect(snap!.description, equals('columnCenter'));
+      expect(snap.snappedPoint, equals(const Offset(10.0, 10.0)));
+      expect(snap.guideLines, isNotEmpty);
+    });
+
+    test('alignBeamEndpoint magnetically snaps to shear wall center and endpoints', () {
+      const wall1 = StructuralShearWall(id: 'w1', name: 'Ш1', start: Offset(0.0, 5.0), end: Offset(4.0, 5.0), thickness: 0.25);
+      final storey = StoreyLevel(id: 'st0', name: 'Кота +2.80', elevation: 2.80, height: 2.80, shearWalls: [wall1]);
+
+      // Snap to wall center (2.0, 5.0)
+      final snapCenter = StructuralMagneticAlignmentHelper.alignBeamEndpoint(
+        rawPoint: const Offset(2.1, 5.08),
+        toleranceCad: 0.30,
+        activeStorey: storey,
+      );
+      expect(snapCenter, isNotNull);
+      expect(snapCenter!.description, equals('shearWallCenter'));
+      expect(snapCenter.snappedPoint, equals(const Offset(2.0, 5.0)));
+
+      // Snap to wall start (0.0, 5.0)
+      final snapStart = StructuralMagneticAlignmentHelper.alignBeamEndpoint(
+        rawPoint: const Offset(0.08, 4.95),
+        toleranceCad: 0.30,
+        activeStorey: storey,
+      );
+      expect(snapStart, isNotNull);
+      expect(snapStart!.description, equals('shearWallEnd'));
+      expect(snapStart.snappedPoint, equals(const Offset(0.0, 5.0)));
+    });
+
+    test('alignBeamEndpoint snaps orthogonally with 10 cm increments when beamStart is provided', () {
+      final storey = StoreyLevel(id: 'st0', name: 'Кота +2.80', elevation: 2.80, height: 2.80);
+
+      // beamStart at (0, 0), rawPoint at (3.44, 0.05) - nearly horizontal
+      final snapOrtho = StructuralMagneticAlignmentHelper.alignBeamEndpoint(
+        rawPoint: const Offset(3.44, 0.05),
+        beamStart: const Offset(0, 0),
+        toleranceCad: 0.20,
+        activeStorey: storey,
+        cadUnitsPerMeter: 1.0,
+      );
+
+      expect(snapOrtho, isNotNull);
+      expect(snapOrtho!.description, equals('orthoLock'));
+      expect(snapOrtho.snappedPoint.dy, equals(0.0)); // Y locked to beamStart
+      expect(snapOrtho.snappedPoint.dx, closeTo(3.40, 1e-4)); // 3.44 rounded to 3.40m
+    });
+
+    test('Structural3dMeshBuilder positions beams at ceiling level without double-scaling depth', () {
+      // In cm DXF units: cadUnitsPerMeter = 100
+      // Beam depth = 50 cm (0.50 m) -> beam.depth = 50.0 in CAD units
+      const beam = StructuralBeam(
+        id: 'b1',
+        name: 'Г1',
+        start: Offset(0, 0),
+        end: Offset(400, 0),
+        width: 25.0,
+        depth: 50.0,
+      );
+      final storey = StoreyLevel(
+        id: 'st0',
+        name: 'Кота +2.80',
+        elevation: 0.0,
+        height: 2.80, // 2.80 m
+        beams: [beam],
+      );
+      final project = StructuralProject(storeys: [storey]);
+
+      final mesh = Structural3dMeshBuilder.buildProjectMesh(
+        project,
+        cadUnitsPerMeter: 100.0,
+      );
+
+      expect(mesh.triangles, isNotEmpty);
+      // zTop is height * cadUnitsPerMeter = 2.80 * 100 = 280.0
+      // beamZBottom must be zTop - beam.depth = 280.0 - 50.0 = 230.0 (NOT 280 - 5000 = -4720!)
+      final beamZValues = <double>{};
+      for (final tri in mesh.triangles) {
+        beamZValues.add(tri.v0.z);
+        beamZValues.add(tri.v1.z);
+        beamZValues.add(tri.v2.z);
+      }
+      expect(beamZValues.contains(280.0), isTrue); // ceiling level
+      expect(beamZValues.contains(230.0), isTrue); // beam bottom level: 50 cm below ceiling
+      // Check that it didn't plunge into deep negative distance
+      expect(beamZValues.any((z) => z < 0), isFalse);
+    });
+
+    test('SeismicAnalysisCalculator correctly calculates beam dimensions with scale', () {
+      // In cm DXF units: scale = 100
+      const beam = StructuralBeam(
+        id: 'b1',
+        name: 'Г1',
+        start: Offset(0, 0),
+        end: Offset(400, 0), // 4.00 m span
+        width: 25.0, // 25 cm
+        depth: 50.0, // 50 cm
+      );
+      final storey = StoreyLevel(
+        id: 'st0',
+        name: 'Кота +2.80',
+        elevation: 0.0,
+        height: 2.80,
+        beams: [beam],
+      );
+      final project = StructuralProject(storeys: [storey]);
+
+      final report = SeismicAnalysisCalculator.analyzeProject(
+        project,
+        cadUnitsPerMeter: 100.0,
+      );
+
+      expect(report.beamChecks.length, equals(1));
+      final check = report.beamChecks.first;
+      expect(check.beamName, equals('Г1'));
+      expect(check.currentWidthM, closeTo(0.25, 1e-4)); // 0.25 m, NOT 25.0 m!
+      expect(check.currentDepthM, closeTo(0.50, 1e-4)); // 0.50 m, NOT 50.0 m!
+      expect(check.spanM, closeTo(4.00, 1e-4));
+      expect(check.isDepthSufficient, isTrue); // 50 cm >= 400/12 = 33.3 cm
+      expect(check.isWidthSufficient, isTrue); // 25 cm >= 25 cm
     });
   });
 }

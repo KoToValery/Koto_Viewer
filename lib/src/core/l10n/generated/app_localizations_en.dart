@@ -1409,6 +1409,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get renameColumnTitle => 'Rename Column';
 
   @override
+  String get renameBeamTitle => 'Rename Beam';
+
+  @override
   String get designationLabel => 'Designation (e.g. C1, C2, W1)';
 
   @override

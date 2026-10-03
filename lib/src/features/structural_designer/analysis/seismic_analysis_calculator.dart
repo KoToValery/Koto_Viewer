@@ -519,8 +519,8 @@ class SeismicAnalysisCalculator {
       for (int bIdx = 0; bIdx < storey.beams.length; bIdx++) {
         final beam = storey.beams[bIdx];
         final spanM = (beam.end - beam.start).distance / scale;
-        final wM = beam.width;
-        final dM = beam.depth;
+        final wM = beam.width / scale;
+        final dM = beam.depth / scale;
 
         final minDepthM = (spanM / 12.0);
         final optimalDepthM = (spanM / 10.0);
@@ -534,12 +534,14 @@ class SeismicAnalysisCalculator {
         } else if (!isWidthOk) {
           beamRec = 'Ширина ${(wM * 100).round()} cm е под сеизмичния минимум (25 cm по EC8). Препоръчва се 25x${(dM * 100).round()} cm.';
         } else {
-          beamRec = 'Сечение ${(wM * 100).round()}x${(dM * 100).round()} cm е напълно оразмерено за отвор L = ${spanM.toStringAsFixed(2)} m.';
+          final int roundedW = (wM * 100).round();
+          final int roundedD = (dM * 100).round();
+          beamRec = 'Сечение ${roundedW}x$roundedD cm е напълно оразмерено за отвор L = ${spanM.toStringAsFixed(2)} m.';
         }
 
         beamChecks.add(BeamSizingCheck(
           beamId: beam.id,
-          beamName: 'Греда B${bIdx + 1}',
+          beamName: beam.displayName,
           storeyId: storey.id,
           storeyName: storey.name,
           spanM: spanM,

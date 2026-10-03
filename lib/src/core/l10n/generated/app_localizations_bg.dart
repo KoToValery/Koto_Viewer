@@ -1416,6 +1416,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get renameColumnTitle => 'Преименуване на колона';
 
   @override
+  String get renameBeamTitle => 'Преименуване на греда';
+
+  @override
   String get designationLabel => 'Обозначение (напр. К1, К2, С1)';
 
   @override

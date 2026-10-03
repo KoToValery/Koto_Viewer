@@ -2569,6 +2569,12 @@ abstract class AppLocalizations {
   /// **'Rename Column'**
   String get renameColumnTitle;
 
+  /// Title for renaming beam dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Rename Beam'**
+  String get renameBeamTitle;
+
   /// Input label for designation
   ///
   /// In en, this message translates to:

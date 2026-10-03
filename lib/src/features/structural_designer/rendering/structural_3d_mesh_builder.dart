@@ -98,10 +98,10 @@ class Structural3dMeshBuilder {
         storeyTriangles.addAll(wallTris);
       }
 
-      // 2b. Extrude Beams (reinforced concrete beams underneath the slab)
+      // 2b. Extrude Beams (reinforced concrete beams underneath the slab at ceiling level)
       for (final beam in storey.beams) {
-        final double beamZTop = zBase;
-        final double beamZBottom = zBase - beam.depth * cadUnitsPerMeter;
+        final double beamZTop = zTop;
+        final double beamZBottom = zTop - beam.depth;
         final beamTris = _extrudePolygon(
           beam.polygonVertices,
           beamZBottom,
@@ -116,7 +116,7 @@ class Structural3dMeshBuilder {
         storeyTriangles.addAll(beamTris);
       }
 
-      // 3. Extrude Slabs (plate with slab thickness in distinct vibrant colors)
+      // 3. Extrude Slabs (plate with slab thickness at ceiling level / таван)
       const slab3dPalette = [
         Color(0xFF00B0FF), // Sky Blue
         Color(0xFF00E676), // Emerald Green
@@ -134,8 +134,8 @@ class Structural3dMeshBuilder {
             ? Color(slab.colorValue!)
             : slab3dPalette[slabIdx % slab3dPalette.length];
 
-        final double slabZTop = zBase;
-        final double slabZBottom = zBase - slab.thickness * cadUnitsPerMeter;
+        final double slabZTop = zTop;
+        final double slabZBottom = zTop - slab.thickness * cadUnitsPerMeter;
 
         final slabTris = _extrudePolygon(
           slab.polygon,

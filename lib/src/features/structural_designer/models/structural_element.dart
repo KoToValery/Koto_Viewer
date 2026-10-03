@@ -234,6 +234,12 @@ class StructuralShearWall {
 
   double get angleRad => math.atan2(end.dy - start.dy, end.dx - start.dx);
 
+  /// Rotation angle in radians (synonym for [angleRad]).
+  double get rotationRad => angleRad;
+
+  /// Geometric center of the shear wall baseline.
+  Offset get center => Offset((start.dx + end.dx) / 2.0, (start.dy + end.dy) / 2.0);
+
   /// 4 corner vertices forming the thick wall box in CAD coordinates.
   /// The line from [start] to [end] is the leading line on the LEFT (or right if flipped).
   List<Offset> get polygonVertices {
@@ -307,20 +313,25 @@ class StructuralShearWall {
 /// Represents a structural reinforced concrete beam (греда).
 class StructuralBeam {
   final String id;
+  final String? name; // e.g. "Г1", "B1"
   final Offset start;
   final Offset end;
-  final double width; // in meters (b, e.g. 0.25)
-  final double depth; // in meters (h, e.g. 0.50)
+  final double width; // in CAD units (b, e.g. 0.25 * cadUnitsPerMeter)
+  final double depth; // in CAD units (h, e.g. 0.50 * cadUnitsPerMeter)
   final bool isSecondary;
 
   const StructuralBeam({
     required this.id,
+    this.name,
     required this.start,
     required this.end,
     this.width = 0.25,
     this.depth = 0.50,
     this.isSecondary = false,
   });
+
+  /// User-facing beam display name (e.g. "Г1", "B1"). Falls back to "Г" if empty.
+  String get displayName => (name != null && name!.trim().isNotEmpty) ? name!.trim() : 'Г';
 
   double get length {
     final dx = end.dx - start.dx;
@@ -366,6 +377,7 @@ class StructuralBeam {
 
   StructuralBeam copyWith({
     String? id,
+    String? name,
     Offset? start,
     Offset? end,
     double? width,
@@ -374,6 +386,7 @@ class StructuralBeam {
   }) {
     return StructuralBeam(
       id: id ?? this.id,
+      name: name ?? this.name,
       start: start ?? this.start,
       end: end ?? this.end,
       width: width ?? this.width,
@@ -384,6 +397,7 @@ class StructuralBeam {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    if (name != null) 'name': name,
     'start': {'dx': start.dx, 'dy': start.dy},
     'end': {'dx': end.dx, 'dy': end.dy},
     'width': width,
@@ -394,6 +408,7 @@ class StructuralBeam {
   factory StructuralBeam.fromJson(Map<String, dynamic> json) {
     return StructuralBeam(
       id: json['id'] as String,
+      name: json['name'] as String?,
       start: Offset(
         (json['start']['dx'] as num).toDouble(),
         (json['start']['dy'] as num).toDouble(),
@@ -1492,6 +1507,25 @@ List<StructuralShearWall> renumberShearWallsAfterDeletion(
       return wall.copyWith(name: '$pfx${curNum - 1}');
     }
     return wall;
+  }).toList();
+}
+
+/// Renumbers beams after a beam has been deleted, ensuring no gaps in indices.
+List<StructuralBeam> renumberBeamsAfterDeletion(
+  List<StructuralBeam> remainingBeams,
+  StructuralBeam deletedBeam, {
+  String defaultPrefix = 'Г',
+}) {
+  final deletedNum = extractElementNumber(deletedBeam.displayName);
+  if (deletedNum == null) return remainingBeams;
+
+  return remainingBeams.map((beam) {
+    final curNum = extractElementNumber(beam.displayName);
+    if (curNum != null && curNum > deletedNum) {
+      final pfx = extractElementPrefix(beam.displayName) ?? defaultPrefix;
+      return beam.copyWith(name: '$pfx${curNum - 1}');
+    }
+    return beam;
   }).toList();
 }
 
