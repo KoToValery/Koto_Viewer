@@ -37,6 +37,7 @@ class SeismicAnalysisCalculator {
     int totalDisconnectedWallsCount = 0;
     int totalDisconnectedColsCount = 0;
     bool anyTorsionalSensitivity = false;
+    bool anyStructuralEccentricity = false;
     bool anySoftStorey = false;
     bool anyWallDeficit = false;
     double maxGlobalEccRatio = 0.0;
@@ -292,15 +293,80 @@ class SeismicAnalysisCalculator {
         crCad = cmCad;
       }
 
-      // Eccentricity vector in meters
+      // Eurocode 8 §4.2.3.2 Torsional Rigidity, Radii & Regularity Engine
+      // 1. Floor mass polar radius of gyration in plan: l_s = sqrt((Lx^2 + Ly^2) / 12)
+      final double ls = math.sqrt((dimXM * dimXM + dimYM * dimYM) / 12.0);
+
+      // 2. Eccentricity vector in meters
       final double exM = (cmCad.dx - crCad.dx).abs() / scale;
       final double eyM = (cmCad.dy - crCad.dy).abs() / scale;
       final double eRatioX = exM / dimXM;
       final double eRatioY = eyM / dimYM;
-      final bool isTorsionallySensitive = (eRatioX > 0.15) || (eRatioY > 0.15);
-      if (isTorsionallySensitive) anyTorsionalSensitivity = true;
       if (eRatioX > maxGlobalEccRatio) maxGlobalEccRatio = eRatioX;
       if (eRatioY > maxGlobalEccRatio) maxGlobalEccRatio = eRatioY;
+
+      // 3. Torsional rigidity I_p,R about CR (sum [Kxi * dy^2 + Kyi * dx^2] + sum [I_p0])
+      double sumIpR = 0.0;
+      final crM = Offset(crCad.dx / scale, crCad.dy / scale);
+
+      for (final cw in connectedWalls) {
+        final wall = cw.wall;
+        final conn = cw.connection;
+        final lenM = math.max(0.40, conn.effectiveLengthM);
+        final tM = math.max(0.15, wall.thickness / scale);
+        final centerM = Offset(conn.effectiveCenterCad.dx / scale, conn.effectiveCenterCad.dy / scale);
+
+        final iStrong = (tM * math.pow(lenM, 3)) / 12.0;
+        final iWeak = (lenM * math.pow(tM, 3)) / 12.0;
+
+        final delta = wall.end - wall.start;
+        final angle = math.atan2(delta.dy, delta.dx);
+        final cosA = math.cos(angle);
+        final sinA = math.sin(angle);
+
+        final kX = (iStrong * cosA * cosA + iWeak * sinA * sinA);
+        final kY = (iStrong * sinA * sinA + iWeak * cosA * cosA);
+
+        final dx = centerM.dx - crM.dx;
+        final dy = centerM.dy - crM.dy;
+
+        // Bending inertia around element's own centroid + Huygens/Steiner transfer to CR
+        sumIpR += (kX * dy * dy + kY * dx * dx) + iStrong;
+      }
+
+      for (final col in connectedCols) {
+        final wM = math.max(0.20, col.width / scale);
+        final hColM = math.max(0.20, col.height / scale);
+        final posM = Offset(col.center.dx / scale, col.center.dy / scale);
+
+        final double iX = (hColM * math.pow(wM, 3)) / 12.0;
+        final double iY = (wM * math.pow(hColM, 3)) / 12.0;
+
+        final dx = posM.dx - crM.dx;
+        final dy = posM.dy - crM.dy;
+
+        sumIpR += (iX * dy * dy + iY * dx * dx);
+      }
+
+      // 4. Eurocode 8 Torsional radii: r_x = sqrt(I_p,R / Ky), r_y = sqrt(I_p,R / Kx)
+      final double rx = (sumKy > 1e-6) ? math.sqrt(sumIpR / sumKy) : 0.0;
+      final double ry = (sumKx > 1e-6) ? math.sqrt(sumIpR / sumKx) : 0.0;
+
+      // 5. Eurocode 8 Plan Regularity & Torsional Sensitivity checks:
+      // Condition 1: Torsionally stiff structure (r_x >= l_s and r_y >= l_s per EC8 §4.2.3.2(4) & (6))
+      final bool isTorsionallyStiff = (rx >= ls * 0.90) && (ry >= ls * 0.90);
+
+      // Condition 2: Structural eccentricity limits (e_0x <= 0.30*rx and e_0y <= 0.30*ry per EC8 §4.2.3.2(4))
+      final bool hasSignificantEccentricity = (exM > 0.30 * rx) || (eyM > 0.30 * ry) || (eRatioX > 0.15) || (eRatioY > 0.15);
+      if (hasSignificantEccentricity) anyStructuralEccentricity = true;
+
+      // Condition 3: Plan regularity per EC8
+      final bool isPlanRegularEC8 = isTorsionallyStiff && !hasSignificantEccentricity;
+
+      // Condition 4: True torsional sensitivity (unbalanced layout with torsional flexibility)
+      final bool isSymmetric = (eRatioX <= 0.05) && (eRatioY <= 0.05);
+      final bool isTorsionallySensitive = !isSymmetric && (!isTorsionallyStiff || (eRatioX > 0.25 || eRatioY > 0.25));
+      if (isTorsionallySensitive) anyTorsionalSensitivity = true;
 
       // Shear wall ratios (%)
       final double wallRatioX = (totalWallAreaX / floorAreaM2) * 100.0;
@@ -396,6 +462,8 @@ class SeismicAnalysisCalculator {
         } else if (crCad.dy > cmCad.dy) {
           rec.write('Препоръка: добавете шайба в южната част. ');
         }
+      } else if (isTorsionallyStiff && hasSignificantEccentricity) {
+        rec.write('Торзионно устойчива схема (rx=${rx.toStringAsFixed(2)} m, ry=${ry.toStringAsFixed(2)} m ≥ ls=${ls.toStringAsFixed(2)} m), но структурният ексцентрицитет (${math.max(exM, eyM).toStringAsFixed(2)} m) надвишава 0.30·r. Изисква се 3D пространствен динамичен модален анализ съгласно Еврокод 8. ');
       } else if (!wallOkX || !wallOkY) {
         if (!wallOkX && !wallOkY) {
           rec.write('Дефицит на шайби в двете направления (X: ${wallRatioX.toStringAsFixed(1)}%, Y: ${wallRatioY.toStringAsFixed(1)}% < 1.0%). Препоръчват се допълнителни шайби. ');
@@ -410,9 +478,9 @@ class SeismicAnalysisCalculator {
 
       // Storey risk level
       final SeismicRiskLevel risk;
-      if (floatingIds.isNotEmpty || isTorsionallySensitive) {
+      if (floatingIds.isNotEmpty) {
         risk = SeismicRiskLevel.critical;
-      } else if (!wallOkX || !wallOkY || eRatioX > 0.08 || eRatioY > 0.08 || disconnectedWallIds.isNotEmpty || disconnectedColIds.isNotEmpty) {
+      } else if (isTorsionallySensitive || !wallOkX || !wallOkY || hasSignificantEccentricity || eRatioX > 0.08 || eRatioY > 0.08 || disconnectedWallIds.isNotEmpty || disconnectedColIds.isNotEmpty) {
         risk = SeismicRiskLevel.warning;
       } else {
         risk = SeismicRiskLevel.regular;
@@ -431,6 +499,13 @@ class SeismicAnalysisCalculator {
         eccentricityRatioX: eRatioX,
         eccentricityRatioY: eRatioY,
         isTorsionallySensitive: isTorsionallySensitive,
+        torsionalRadiusX: rx,
+        torsionalRadiusY: ry,
+        massRadiusOfGyration: ls,
+        torsionalRigidity: sumIpR,
+        isTorsionallyStiff: isTorsionallyStiff,
+        hasSignificantEccentricity: hasSignificantEccentricity,
+        isPlanRegularEC8: isPlanRegularEC8,
         wallAreaXM2: totalWallAreaX,
         wallAreaYM2: totalWallAreaY,
         floorAreaM2: floorAreaM2,
@@ -492,6 +567,13 @@ class SeismicAnalysisCalculator {
         eccentricityRatioX: cur.eccentricityRatioX,
         eccentricityRatioY: cur.eccentricityRatioY,
         isTorsionallySensitive: cur.isTorsionallySensitive,
+        torsionalRadiusX: cur.torsionalRadiusX,
+        torsionalRadiusY: cur.torsionalRadiusY,
+        massRadiusOfGyration: cur.massRadiusOfGyration,
+        torsionalRigidity: cur.torsionalRigidity,
+        isTorsionallyStiff: cur.isTorsionallyStiff,
+        hasSignificantEccentricity: cur.hasSignificantEccentricity,
+        isPlanRegularEC8: cur.isPlanRegularEC8,
         wallAreaXM2: cur.wallAreaXM2,
         wallAreaYM2: cur.wallAreaYM2,
         floorAreaM2: cur.floorAreaM2,
@@ -519,8 +601,8 @@ class SeismicAnalysisCalculator {
       for (int bIdx = 0; bIdx < storey.beams.length; bIdx++) {
         final beam = storey.beams[bIdx];
         final spanM = (beam.end - beam.start).distance / scale;
-        final wM = beam.width / scale;
-        final dM = beam.depth / scale;
+        final wM = (scale > 1.5 && beam.width <= 2.0) ? beam.width : beam.width / scale;
+        final dM = (scale > 1.5 && beam.depth <= 2.0) ? beam.depth : beam.depth / scale;
 
         final minDepthM = (spanM / 12.0);
         final optimalDepthM = (spanM / 10.0);
@@ -594,9 +676,9 @@ class SeismicAnalysisCalculator {
     }
 
     final SeismicRiskLevel overallRisk;
-    if (totalFloatingColsCount > 0 || anyTorsionalSensitivity || anySoftStorey) {
+    if (totalFloatingColsCount > 0 || anySoftStorey) {
       overallRisk = SeismicRiskLevel.critical;
-    } else if (anyWallDeficit || maxGlobalEccRatio > 0.08 || totalDisconnectedWallsCount > 0 || totalDisconnectedColsCount > 0) {
+    } else if (anyTorsionalSensitivity || anyWallDeficit || anyStructuralEccentricity || maxGlobalEccRatio > 0.08 || totalDisconnectedWallsCount > 0 || totalDisconnectedColsCount > 0) {
       overallRisk = SeismicRiskLevel.warning;
     } else {
       overallRisk = SeismicRiskLevel.regular;
@@ -611,6 +693,7 @@ class SeismicAnalysisCalculator {
       totalDisconnectedWallsCount: totalDisconnectedWallsCount,
       totalDisconnectedColumnsCount: totalDisconnectedColsCount,
       hasTorsionalSensitivity: anyTorsionalSensitivity,
+      hasStructuralEccentricity: anyStructuralEccentricity,
       hasSoftStorey: anySoftStorey,
       hasWallDeficit: anyWallDeficit,
       maxEccentricityRatio: maxGlobalEccRatio,

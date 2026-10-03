@@ -1624,6 +1624,21 @@ class AppLocalizationsBg extends AppLocalizations {
   String get seismicLimitEc8Label => 'Лимит по EC8';
 
   @override
+  String get seismicTorsionStiffEccentric => 'Торзионно устойчива (e > 0.30·r)';
+
+  @override
+  String get seismicStatusEccentricShort => 'Ексцентрична';
+
+  @override
+  String get seismicTorsionalRadiiLabel => 'Торзионни радиуси (rx, ry)';
+
+  @override
+  String get seismicMassRadiusLabel => 'Инерционен радиус (ls)';
+
+  @override
+  String get seismicLimitEc8Formula => '≤ 0.30·r (EC8)';
+
+  @override
   String get seismicShearWallCoverageTitle => 'Покритие със земетръсни шайби';
 
   @override
@@ -1743,6 +1758,26 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get seismicRecBalanced =>
       'Сеизмичният баланс и процентното покритие с шайби са отлични. ';
+
+  @override
+  String seismicRecTorsionStiffEccentric(
+    String rx,
+    String ry,
+    String ls,
+    String ecc,
+  ) {
+    return 'Торзионно устойчива схема (rx=$rx m, ry=$ry m ≥ ls=$ls m), но структурният ексцентрицитет ($ecc m) надвишава 0.30·r. Изисква се 3D пространствен динамичен модален анализ съгласно Еврокод 8. ';
+  }
+
+  @override
+  String seismicRecTorsionRegular(String rx, String ry, String ls) {
+    return 'Регулярна в план по EC8 §4.2.3.2 (rx=$rx m, ry=$ry m ≥ ls=$ls m, e ≤ 0.30·r). Отличен сеизмичен баланс. ';
+  }
+
+  @override
+  String seismicRecTorsionFlexible(String rx, String ry, String ls) {
+    return 'Усукващо податлива система по EC8 §4.2.3.2 (rx=$rx m, ry=$ry m < ls=$ls m). Недостатъчна периферна торзионна коравина! Препоръчват се допълнителни периферни шайби/колони. ';
+  }
 
   @override
   String get seismicRecSoftStoreyPrefix =>
@@ -1881,6 +1916,11 @@ class AppLocalizationsBg extends AppLocalizations {
     int slabH,
   ) {
     return 'Риск от пробиване на плочата при $name (v_Ed = $ved MPa > v_Rd,c = $vrdc MPa). Препоръчва се капител (drop panel), плоча $slabH cm или по-голяма колона.';
+  }
+
+  @override
+  String verticalRecPunchingProtectedByBeams(String name) {
+    return 'Колона $name е защитена от пробиване: товарът от плочата се поема директно от главните носещи греди.';
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/seismic_analysis_models.dart';
@@ -123,10 +124,14 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   title: context.l10n.seismicStatTorsion,
                   value: report.hasTorsionalSensitivity
                       ? context.l10n.seismicStatusHigh
-                      : context.l10n.seismicStatusNormal,
+                      : (report.hasStructuralEccentricity
+                          ? context.l10n.seismicStatusEccentricShort
+                          : context.l10n.seismicStatusNormal),
                   color: report.hasTorsionalSensitivity
                       ? const Color(0xFFFF1744)
-                      : const Color(0xFF00E676),
+                      : (report.hasStructuralEccentricity
+                          ? const Color(0xFFFFB300)
+                          : const Color(0xFF00E676)),
                 ),
                 const SizedBox(width: 6),
                 _buildStatCard(
@@ -367,9 +372,18 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
         }
 
         final isSensitive = check.isTorsionallySensitive;
-        final color = isSensitive ? const Color(0xFFFF1744) : (check.maxEccentricityRatio > 0.08 ? const Color(0xFFFFB300) : const Color(0xFF00E676));
+        final color = isSensitive
+            ? const Color(0xFFFF1744)
+            : (check.hasSignificantEccentricity || check.maxEccentricityRatio > 0.08
+                ? const Color(0xFFFFB300)
+                : const Color(0xFF00E676));
         final eccX = check.eccentricityM?.dx ?? 0.0;
         final eccY = check.eccentricityM?.dy ?? 0.0;
+        final String badgeText = isSensitive
+            ? context.l10n.seismicTorsionSensitive
+            : (check.hasSignificantEccentricity
+                ? context.l10n.seismicTorsionStiffEccentric
+                : context.l10n.seismicBalanced);
 
         return Container(
           padding: const EdgeInsets.all(12),
@@ -404,7 +418,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                       border: Border.all(color: color),
                     ),
                     child: Text(
-                      isSensitive ? context.l10n.seismicTorsionSensitive : context.l10n.seismicBalanced,
+                      badgeText,
                       style: TextStyle(
                         color: color,
                         fontSize: 10,
@@ -416,15 +430,36 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               ),
               const SizedBox(height: 8),
 
-              // Detailed metrics
+              // Detailed metrics Row 1: Structural Eccentricity
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildSubmetric(context.l10n.seismicEccentricityXLabel, '${eccX.toStringAsFixed(2)} m (${(check.eccentricityRatioX * 100).round()}%)'),
                   _buildSubmetric(context.l10n.seismicEccentricityYLabel, '${eccY.toStringAsFixed(2)} m (${(check.eccentricityRatioY * 100).round()}%)'),
-                  _buildSubmetric(context.l10n.seismicLimitEc8Label, '≤ 15%'),
+                  _buildSubmetric(
+                    context.l10n.seismicLimitEc8Label,
+                    check.torsionalRadiusX > 0 && check.torsionalRadiusY > 0
+                        ? '≤ 0.30·r (≤ ${(0.30 * math.min(check.torsionalRadiusX, check.torsionalRadiusY)).toStringAsFixed(2)} m)'
+                        : '≤ 15%',
+                  ),
                 ],
               ),
+              if (check.torsionalRadiusX > 0 && check.massRadiusOfGyration > 0) ...[
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSubmetric(
+                      context.l10n.seismicTorsionalRadiiLabel,
+                      'rx=${check.torsionalRadiusX.toStringAsFixed(2)} m, ry=${check.torsionalRadiusY.toStringAsFixed(2)} m',
+                    ),
+                    _buildSubmetric(
+                      context.l10n.seismicMassRadiusLabel,
+                      'ls=${check.massRadiusOfGyration.toStringAsFixed(2)} m (${check.isTorsionallyStiff ? "r ≥ ls ✓" : "r < ls ⚠️"})',
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
 
               // Architectural Recommendation

@@ -396,5 +396,244 @@ void main() {
       expect(report.totalAlertCount, greaterThanOrEqualTo(1));
       expect(report.overallStatus, isNot(VerticalCapacityStatus.safe));
     });
+
+    test('Test 8: Framing beams relieve punching shear around column (no false punching risk)', () {
+      final storeys = [
+        StoreyLevel(
+          id: 'storey_1',
+          name: 'Етаж 1',
+          elevation: 0.0,
+          height: 3.0,
+          columns: const [
+            StructuralColumn(
+              id: 'col_beam_supported',
+              center: Offset(5.0, 5.0),
+              width: 0.25,
+              height: 0.25,
+            ),
+            StructuralColumn(
+              id: 'c_left',
+              center: Offset(0.0, 5.0),
+              width: 0.25,
+              height: 0.25,
+            ),
+            StructuralColumn(
+              id: 'c_right',
+              center: Offset(10.0, 5.0),
+              width: 0.25,
+              height: 0.25,
+            ),
+          ],
+          beams: const [
+            StructuralBeam(
+              id: 'b1',
+              start: Offset(0.0, 5.0),
+              end: Offset(5.0, 5.0),
+              width: 0.25,
+              depth: 0.50,
+            ),
+            StructuralBeam(
+              id: 'b2',
+              start: Offset(5.0, 5.0),
+              end: Offset(10.0, 5.0),
+              width: 0.25,
+              depth: 0.50,
+            ),
+          ],
+          slabs: const [
+            StructuralSlab(
+              id: 'slab_1',
+              polygon: [
+                Offset(0, 0),
+                Offset(10, 0),
+                Offset(10, 10),
+                Offset(0, 10),
+              ],
+              thickness: 0.16, // Thin 16 cm slab would punch without beams
+            ),
+          ],
+        ),
+      ];
+
+      final project = StructuralProject(
+        title: 'Beam Punching Relief Test',
+        storeys: storeys,
+        liveLoad: 4.0, // High load
+      );
+
+      final report = VerticalCapacityCalculator.analyzeProject(project);
+      final check = report.columnChecks.firstWhere((c) => c.columnId == 'col_beam_supported');
+
+      expect(check.hasConnectedBeams, true);
+      expect(check.punchingUtilization, 0.0);
+      expect(check.isPunchingCritical, false);
+      expect(report.punchingRiskCount, 0);
+    });
+
+    test('Test 9: Tributary area hierarchy accurately differentiates corner, edge, and interior columns', () {
+      final List<StructuralColumn> cols = [];
+      for (double y = 0.0; y <= 8.0; y += 4.0) {
+        for (double x = 0.0; x <= 8.0; x += 4.0) {
+          cols.add(StructuralColumn(
+            id: 'c_${x.toInt()}_${y.toInt()}',
+            center: Offset(x, y),
+            width: 0.25,
+            height: 0.25,
+          ));
+        }
+      }
+
+      final storeys = [
+        StoreyLevel(
+          id: 'storey_1',
+          name: 'Етаж 1',
+          elevation: 0.0,
+          height: 3.0,
+          columns: cols,
+          slabs: const [
+            StructuralSlab(
+              id: 'slab_1',
+              polygon: [
+                Offset(0, 0),
+                Offset(8, 0),
+                Offset(8, 8),
+                Offset(0, 8),
+              ],
+              thickness: 0.20,
+            ),
+          ],
+        ),
+      ];
+
+      final project = StructuralProject(
+        title: 'Tributary Hierarchy Test',
+        storeys: storeys,
+      );
+
+      final report = VerticalCapacityCalculator.analyzeProject(project);
+
+      final interior = report.columnChecks.firstWhere((c) => c.columnId == 'c_4_4');
+      final edge = report.columnChecks.firstWhere((c) => c.columnId == 'c_4_0');
+      final corner = report.columnChecks.firstWhere((c) => c.columnId == 'c_0_0');
+
+      // Interior column carries full 4x4 bay ≈ 16 m²
+      expect(interior.tributaryAreaM2, closeTo(16.0, 1.0));
+
+      // Edge column carries approximately half of interior (around 7 - 10 m²)
+      expect(edge.tributaryAreaM2, lessThan(interior.tributaryAreaM2));
+      expect(edge.tributaryAreaM2, greaterThan(6.0));
+
+      // Corner column carries approximately quarter of interior (around 3 - 6 m²)
+      expect(corner.tributaryAreaM2, lessThan(edge.tributaryAreaM2));
+      expect(corner.tributaryAreaM2, greaterThan(2.0));
+    });
+
+    test('Test 10: Multi-storey column rundown tracks setbacks and canopy columns correctly', () {
+      // 3-storey building:
+      // - Ground floor has 'col_main' at (0, 0) and 'col_canopy' at (4, 0)
+      // - 1st floor has ONLY 'col_main' at (0, 0)
+      // - 2nd floor has ONLY 'col_main' at (0, 0)
+      final storeys = [
+        const StoreyLevel(
+          id: 's_0',
+          name: 'Партер',
+          elevation: 0.0,
+          height: 3.0,
+          columns: [
+            StructuralColumn(id: 'col_main', center: Offset(0, 0), width: 0.30, height: 0.30),
+            StructuralColumn(id: 'col_canopy', center: Offset(4, 0), width: 0.25, height: 0.25),
+          ],
+        ),
+        const StoreyLevel(
+          id: 's_1',
+          name: 'Етаж 1',
+          elevation: 3.0,
+          height: 3.0,
+          columns: [
+            StructuralColumn(id: 'col_main', center: Offset(0, 0), width: 0.30, height: 0.30),
+          ],
+        ),
+        const StoreyLevel(
+          id: 's_2',
+          name: 'Етаж 2',
+          elevation: 6.0,
+          height: 3.0,
+          columns: [
+            StructuralColumn(id: 'col_main', center: Offset(0, 0), width: 0.30, height: 0.30),
+          ],
+        ),
+      ];
+
+      final project = StructuralProject(
+        title: 'Canopy Setback Test',
+        storeys: storeys,
+      );
+
+      final report = VerticalCapacityCalculator.analyzeProject(project);
+
+      // col_main at ground floor carries all 3 storeys
+      final mainGround = report.columnChecks.firstWhere(
+        (c) => c.columnId == 'col_main' && c.storeyIndex == 0,
+      );
+      expect(mainGround.numStoreysAbove, 3);
+
+      // col_canopy at ground floor carries ONLY 1 storey (the canopy itself)
+      final canopyGround = report.columnChecks.firstWhere(
+        (c) => c.columnId == 'col_canopy' && c.storeyIndex == 0,
+      );
+      expect(canopyGround.numStoreysAbove, 1);
+      expect(canopyGround.accumulatedLoadNedKn, lessThan(mainGround.accumulatedLoadNedKn));
+    });
+
+    test('Test 11: Total foundation load incorporates shear walls and beams self-weight', () {
+      const wall = StructuralShearWall(
+        id: 'w1',
+        start: Offset(0, 0),
+        end: Offset(4, 0),
+        thickness: 0.25,
+      );
+      const beam = StructuralBeam(
+        id: 'b1',
+        start: Offset(0, 0),
+        end: Offset(4, 0),
+        width: 0.25,
+        depth: 0.50,
+      );
+      final storeysWithout = [
+        const StoreyLevel(
+          id: 's1',
+          name: 'Етаж 1',
+          elevation: 0.0,
+          height: 3.0,
+          columns: [
+            StructuralColumn(id: 'c1', center: Offset(2, 2), width: 0.25, height: 0.25),
+          ],
+        ),
+      ];
+      final storeysWith = [
+        const StoreyLevel(
+          id: 's1',
+          name: 'Етаж 1',
+          elevation: 0.0,
+          height: 3.0,
+          columns: [
+            StructuralColumn(id: 'c1', center: Offset(2, 2), width: 0.25, height: 0.25),
+          ],
+          shearWalls: [wall],
+          beams: [beam],
+        ),
+      ];
+
+      final repWithout = VerticalCapacityCalculator.analyzeProject(
+        StructuralProject(title: 'Without', storeys: storeysWithout),
+      );
+      final repWith = VerticalCapacityCalculator.analyzeProject(
+        StructuralProject(title: 'With', storeys: storeysWith),
+      );
+
+      // The project with shear walls and beams must have significantly higher foundation vertical load
+      expect(repWith.totalVerticalLoadBaseKn, greaterThan(repWithout.totalVerticalLoadBaseKn));
+      expect(repWith.basePressureKpa, greaterThan(repWithout.basePressureKpa));
+    });
   });
 }

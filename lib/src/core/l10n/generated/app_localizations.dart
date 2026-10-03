@@ -2965,6 +2965,36 @@ abstract class AppLocalizations {
   /// **'EC8 Limit'**
   String get seismicLimitEc8Label;
 
+  /// Status badge for building that is torsionally stiff but has eccentricity
+  ///
+  /// In en, this message translates to:
+  /// **'Torsionally Stiff (e > 0.30·r)'**
+  String get seismicTorsionStiffEccentric;
+
+  /// Short stat card value for eccentric building
+  ///
+  /// In en, this message translates to:
+  /// **'Eccentric'**
+  String get seismicStatusEccentricShort;
+
+  /// Label for Eurocode 8 torsional radii
+  ///
+  /// In en, this message translates to:
+  /// **'Torsional radii (rx, ry)'**
+  String get seismicTorsionalRadiiLabel;
+
+  /// Label for Eurocode 8 floor mass gyration radius
+  ///
+  /// In en, this message translates to:
+  /// **'Floor mass radius (ls)'**
+  String get seismicMassRadiusLabel;
+
+  /// Formula label for EC8 eccentricity limit
+  ///
+  /// In en, this message translates to:
+  /// **'≤ 0.30·r (EC8)'**
+  String get seismicLimitEc8Formula;
+
   /// Header title for shear wall coverage
   ///
   /// In en, this message translates to:
@@ -3145,6 +3175,29 @@ abstract class AppLocalizations {
   /// **'Seismic balance and shear wall percentage coverage are excellent. '**
   String get seismicRecBalanced;
 
+  /// Recommendation text when building is torsionally stiff but has structural eccentricity
+  ///
+  /// In en, this message translates to:
+  /// **'Torsionally stiff layout (rx={rx} m, ry={ry} m ≥ ls={ls} m), but structural eccentricity ({ecc} m) exceeds 0.30·r. Requires 3D spatial dynamic modal response spectrum analysis per Eurocode 8. '**
+  String seismicRecTorsionStiffEccentric(
+    String rx,
+    String ry,
+    String ls,
+    String ecc,
+  );
+
+  /// Recommendation text when building satisfies EC8 plan regularity
+  ///
+  /// In en, this message translates to:
+  /// **'Regular in plan per EC8 §4.2.3.2 (rx={rx} m, ry={ry} m ≥ ls={ls} m, e ≤ 0.30·r). Excellent torsional balance. '**
+  String seismicRecTorsionRegular(String rx, String ry, String ls);
+
+  /// Recommendation text when building is torsionally flexible
+  ///
+  /// In en, this message translates to:
+  /// **'Torsionally flexible system per EC8 §4.2.3.2 (rx={rx} m, ry={ry} m < ls={ls} m). Insufficient perimeter torsional stiffness! Additional perimeter shear walls/columns recommended. '**
+  String seismicRecTorsionFlexible(String rx, String ry, String ls);
+
   /// Soft storey warning prefix
   ///
   /// In en, this message translates to:
@@ -3313,6 +3366,12 @@ abstract class AppLocalizations {
     String vrdc,
     int slabH,
   );
+
+  /// Column protected from punching due to connected beams
+  ///
+  /// In en, this message translates to:
+  /// **'Column {name} is protected from punching: slab loads are carried directly by framing beams.'**
+  String verticalRecPunchingProtectedByBeams(String name);
 
   /// Columns tab title
   ///

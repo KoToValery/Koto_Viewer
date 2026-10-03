@@ -79,6 +79,12 @@ class ColumnVerticalCheck {
   /// Punching shear recommendation (if at risk).
   final String? punchingRecommendation;
 
+  /// Whether column is connected to downstand beams (relieving punching shear).
+  final bool hasConnectedBeams;
+
+  /// Recommended slab thickness in cm if punching is critical.
+  final int recommendedPunchingSlabThicknessCm;
+
   const ColumnVerticalCheck({
     required this.columnId,
     required this.columnName,
@@ -103,10 +109,12 @@ class ColumnVerticalCheck {
     required this.minRequiredSectionCm,
     required this.architectRecommendation,
     this.punchingRecommendation,
+    this.hasConnectedBeams = false,
+    this.recommendedPunchingSlabThicknessCm = 20,
   });
 
   bool get isAxiallyOverloaded => axialUtilization > 1.0;
-  bool get isPunchingCritical => punchingUtilization > 1.0;
+  bool get isPunchingCritical => !hasConnectedBeams && punchingUtilization > 1.0;
   bool get hasWarning => status == VerticalCapacityStatus.warning;
   bool get hasCritical => status == VerticalCapacityStatus.critical;
 
@@ -146,12 +154,15 @@ class ColumnVerticalCheck {
   }
 
   String? localizedPunchingRecommendation(AppLocalizations l10n) {
+    if (hasConnectedBeams) {
+      return l10n.verticalRecPunchingProtectedByBeams(columnName);
+    }
     if (punchingRecommendation == null) return null;
     return l10n.verticalRecPunchingRisk(
       columnName,
       punchingShearStressVedMpa.toStringAsFixed(2),
       punchingShearResistanceVrdMpa.toStringAsFixed(2),
-      20,
+      recommendedPunchingSlabThicknessCm,
     );
   }
 }
@@ -167,6 +178,7 @@ class SlabDeflectionCheck {
   final double deflectionRatio;
   final String recommendation;
   final (Offset, Offset)? criticalSpanSegment;
+  final bool hasBeams;
 
   const SlabDeflectionCheck({
     required this.storeyId,
@@ -178,17 +190,26 @@ class SlabDeflectionCheck {
     required this.deflectionRatio,
     required this.recommendation,
     this.criticalSpanSegment,
+    this.hasBeams = false,
   });
 
   String localizedRecommendation(AppLocalizations l10n) {
     final int curCm = (currentThicknessM * 100).round();
     final int reqCm = (recommendedMinThicknessM * 100).ceil();
     if (!isDeflectionSafe) {
-      return l10n.verticalRecSlabInsufficient(
-        maxSpanM.toStringAsFixed(2),
-        curCm,
-        reqCm,
-      );
+      if (hasBeams) {
+        return l10n.verticalRecSlabInsufficient(
+          maxSpanM.toStringAsFixed(2),
+          curCm,
+          reqCm,
+        );
+      } else {
+        return l10n.verticalRecSlabBeamlessDeflection(
+          maxSpanM.toStringAsFixed(2),
+          curCm,
+          reqCm,
+        );
+      }
     } else {
       return l10n.verticalRecSlabSafe(
         curCm,

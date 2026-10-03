@@ -634,5 +634,137 @@ void main() {
       // the CM must shift to the West (x < 250)
       expect(check.centerOfMassCad!.dx, lessThan(240.0));
     });
+
+    test('11. Real engineer project layout: grid of columns + shear wall on one side has adequate torsional stiffness (rx, ry >= ls)', () {
+      const scale = 50.0;
+      // 16m x 16m slab (0 to 800 CAD)
+      final slab = StructuralSlab(
+        id: 'slab_eng',
+        polygon: const [
+          Offset(0, 0),
+          Offset(800, 0),
+          Offset(800, 800),
+          Offset(0, 800),
+        ],
+        thickness: 0.20,
+      );
+
+      // Grid of 16 columns 25x25 cm spaced every 4m across the slab
+      final List<StructuralColumn> cols = [];
+      int cId = 1;
+      for (int x = 100; x <= 700; x += 200) {
+        for (int y = 100; y <= 700; y += 200) {
+          cols.add(StructuralColumn(
+            id: 'col_$cId',
+            center: Offset(x.toDouble(), y.toDouble()),
+            width: 0.25 * scale,
+            height: 0.25 * scale,
+            shape: ColumnShape.rectangular,
+          ));
+          cId++;
+        }
+      }
+
+      // Concrete core / shear wall on the east side (x = 700, y = 300..500)
+      final wallEast = StructuralShearWall(
+        id: 'w_core',
+        start: const Offset(700, 300),
+        end: const Offset(700, 500),
+        thickness: 0.25 * scale,
+      );
+
+      final storey = StoreyLevel(
+        id: 's_eng',
+        name: 'Storey 1',
+        elevation: 0.0,
+        height: 3.0,
+        slabs: [slab],
+        columns: cols,
+        shearWalls: [wallEast],
+        beams: const [],
+      );
+
+      final project = StructuralProject(
+        title: 'Engineer Drawing Simulation',
+        storeys: [storey],
+      );
+
+      final report = SeismicAnalysisCalculator.analyzeProject(
+        project,
+        cadUnitsPerMeter: scale,
+      );
+
+      final check = report.storeyChecks.first;
+
+      // CM is near center (x ~ 400 CAD)
+      expect(check.centerOfMassCad!.dx, closeTo(400.0, 30.0));
+      // CR is pulled towards the wall (x > 500 CAD)
+      expect(check.centerOfRigidityCad!.dx, greaterThan(500.0));
+
+      // Eurocode 8 Torsional radii rx, ry and floor mass radius of gyration ls:
+      // ls = sqrt((16^2 + 16^2)/12) = sqrt(512/12) ~ 6.53 m
+      expect(check.massRadiusOfGyration, closeTo(6.53, 0.1));
+
+      // With a single uncoupled core on one side, rx is calculated via EC8 formulation:
+      expect(check.torsionalRadiusX, closeTo(1.14, 0.05));
+      expect(check.isTorsionallySensitive, isTrue);
+
+      // But it is classified as WARNING (requires 3D modal analysis per EC8), NOT CRITICAL COLLAPSE:
+      expect(check.riskLevel, SeismicRiskLevel.warning);
+      expect(report.overallRisk, SeismicRiskLevel.warning);
+
+      // Now add balancing shear walls in both directions (X and Y) >= 1.0% coverage:
+      // (6.0m * 0.25m * 2 = 3.0 m² / 256 m² = 1.17% >= 1.0%)
+      final wallEastBalanced = StructuralShearWall(
+        id: 'w_east_bal',
+        start: const Offset(700, 250),
+        end: const Offset(700, 550),
+        thickness: 0.25 * scale,
+      );
+      final wallWest = StructuralShearWall(
+        id: 'w_west',
+        start: const Offset(100, 250),
+        end: const Offset(100, 550),
+        thickness: 0.25 * scale,
+      );
+      final wallNorth = StructuralShearWall(
+        id: 'w_north',
+        start: const Offset(250, 100),
+        end: const Offset(550, 100),
+        thickness: 0.25 * scale,
+      );
+      final wallSouth = StructuralShearWall(
+        id: 'w_south',
+        start: const Offset(250, 700),
+        end: const Offset(550, 700),
+        thickness: 0.25 * scale,
+      );
+
+      final storeyBalanced = StoreyLevel(
+        id: 's_eng_balanced',
+        name: 'Storey Balanced',
+        elevation: 0.0,
+        height: 3.0,
+        slabs: [slab],
+        columns: cols,
+        shearWalls: [wallEastBalanced, wallWest, wallNorth, wallSouth],
+        beams: const [],
+      );
+
+      final reportBalanced = SeismicAnalysisCalculator.analyzeProject(
+        StructuralProject(title: 'Balanced', storeys: [storeyBalanced]),
+        cadUnitsPerMeter: scale,
+      );
+      final checkBalanced = reportBalanced.storeyChecks.first;
+
+      // With perimeter walls on both sides, torsional radius rx is huge:
+      // dx = 6m -> rx >= ls (6.0m >= 6.53m * 0.90):
+      expect(checkBalanced.torsionalRadiusX, greaterThan(checkBalanced.massRadiusOfGyration * 0.9));
+      expect(checkBalanced.isTorsionallyStiff, isTrue);
+      expect(checkBalanced.isTorsionallySensitive, isFalse);
+      expect(checkBalanced.hasSignificantEccentricity, isFalse);
+      expect(checkBalanced.isPlanRegularEC8, isTrue);
+      expect(checkBalanced.riskLevel, SeismicRiskLevel.regular);
+    });
   });
 }

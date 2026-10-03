@@ -36,7 +36,8 @@ class VerticalCapacityCalculator {
     }
   }
 
-  /// Estimates the tributary area A_trib in m² for a column based on surrounding supports.
+  /// Estimates the tributary area A_trib in m² for a column based on surrounding supports
+  /// and building/slab perimeter boundaries.
   static double calculateColumnTributaryAreaM2({
     required StructuralColumn col,
     required StoreyLevel storey,
@@ -44,10 +45,10 @@ class VerticalCapacityCalculator {
     required double totalFloorAreaM2,
   }) {
     final cPos = col.center;
-    double minDxPos = 8.0 * scale;
-    double minDxNeg = 8.0 * scale;
-    double minDyPos = 8.0 * scale;
-    double minDyNeg = 8.0 * scale;
+    double minDxPos = double.infinity;
+    double minDxNeg = double.infinity;
+    double minDyPos = double.infinity;
+    double minDyNeg = double.infinity;
 
     // 1. Check distance to other columns
     for (final other in storey.columns) {
@@ -82,22 +83,79 @@ class VerticalCapacityCalculator {
       }
     }
 
-    // Half span tributary width & length
-    final spanX = (minDxPos + minDxNeg) / 2.0;
-    final spanY = (minDyPos + minDyNeg) / 2.0;
+    // 3. Distance to slab boundary in 4 cardinal directions (if slab polygon exists)
+    final double colWM = col.width / scale;
+    final double colHM = col.height / scale;
+    final double defaultEdgeOverhangM = math.max(0.20, math.min(colWM, colHM) * 0.5 + 0.15);
 
-    final spanXM = (spanX / scale).clamp(1.5, 7.5);
-    final spanYM = (spanY / scale).clamp(1.5, 7.5);
+    double slabEdgeDxPos = double.infinity;
+    double slabEdgeDxNeg = double.infinity;
+    double slabEdgeDyPos = double.infinity;
+    double slabEdgeDyNeg = double.infinity;
+
+    for (final slab in storey.slabs) {
+      final poly = slab.polygon;
+      final n = poly.length;
+      if (n < 3) continue;
+      for (int i = 0; i < n; i++) {
+        final p1 = poly[i];
+        final p2 = poly[(i + 1) % n];
+
+        // Horizontal ray at y = cPos.dy (checks +X and -X)
+        if ((p1.dy <= cPos.dy && p2.dy > cPos.dy) || (p2.dy <= cPos.dy && p1.dy > cPos.dy)) {
+          final dyTotal = p2.dy - p1.dy;
+          if (dyTotal.abs() > 1e-4) {
+            final t = (cPos.dy - p1.dy) / dyTotal;
+            final xInt = p1.dx + t * (p2.dx - p1.dx);
+            final dx = (xInt - cPos.dx) / scale;
+            if (dx > 0 && dx < slabEdgeDxPos) slabEdgeDxPos = dx;
+            if (dx < 0 && -dx < slabEdgeDxNeg) slabEdgeDxNeg = -dx;
+          }
+        }
+
+        // Vertical ray at x = cPos.dx (checks +Y and -Y)
+        if ((p1.dx <= cPos.dx && p2.dx > cPos.dx) || (p2.dx <= cPos.dx && p1.dx > cPos.dx)) {
+          final dxTotal = p2.dx - p1.dx;
+          if (dxTotal.abs() > 1e-4) {
+            final t = (cPos.dx - p1.dx) / dxTotal;
+            final yInt = p1.dy + t * (p2.dy - p1.dy);
+            final dy = (yInt - cPos.dy) / scale;
+            if (dy > 0 && dy < slabEdgeDyPos) slabEdgeDyPos = dy;
+            if (dy < 0 && -dy < slabEdgeDyNeg) slabEdgeDyNeg = -dy;
+          }
+        }
+      }
+    }
+
+    // Determine tributary half-spans in all 4 directions
+    final double halfDxPos = minDxPos.isFinite
+        ? (minDxPos / scale) / 2.0
+        : (slabEdgeDxPos.isFinite ? slabEdgeDxPos.clamp(0.15, 4.0) : defaultEdgeOverhangM);
+
+    final double halfDxNeg = minDxNeg.isFinite
+        ? (minDxNeg / scale) / 2.0
+        : (slabEdgeDxNeg.isFinite ? slabEdgeDxNeg.clamp(0.15, 4.0) : defaultEdgeOverhangM);
+
+    final double halfDyPos = minDyPos.isFinite
+        ? (minDyPos / scale) / 2.0
+        : (slabEdgeDyPos.isFinite ? slabEdgeDyPos.clamp(0.15, 4.0) : defaultEdgeOverhangM);
+
+    final double halfDyNeg = minDyNeg.isFinite
+        ? (minDyNeg / scale) / 2.0
+        : (slabEdgeDyNeg.isFinite ? slabEdgeDyNeg.clamp(0.15, 4.0) : defaultEdgeOverhangM);
+
+    final double spanXM = (halfDxPos + halfDxNeg).clamp(1.0, 8.0);
+    final double spanYM = (halfDyPos + halfDyNeg).clamp(1.0, 8.0);
 
     double aTrib = spanXM * spanYM;
 
     // Clamp to realistic maximum fraction of floor area if floor area is defined
     if (totalFloorAreaM2 > 5.0 && storey.columns.isNotEmpty) {
-      final maxShare = (totalFloorAreaM2 / storey.columns.length) * 1.6;
+      final maxShare = (totalFloorAreaM2 / storey.columns.length) * 2.5;
       aTrib = math.min(aTrib, maxShare);
     }
 
-    return math.max(2.0, aTrib);
+    return math.max(1.5, aTrib);
   }
 
   /// Calculates max clear span between adjacent supports in the storey (meters)
@@ -191,6 +249,23 @@ class VerticalCapacityCalculator {
           }
         }
         if (hasIntermediateSupport) continue;
+
+        // Gabriel disc check: if any other column center is strictly inside the disc with diameter c1-c2,
+        // then c1-c2 is not an adjacent span (eliminates knight's moves and multi-bay jumps)
+        final midCol = (c1 + c2) / 2.0;
+        final radiusCol = len / 2.0;
+        final radiusLimit = math.max(0.0, radiusCol - 0.25 * scale);
+        final radiusLimitSq = radiusLimit * radiusLimit;
+        bool hasGabrielInterferer = false;
+        for (int k = 0; k < cols.length; k++) {
+          if (k == i || k == j) continue;
+          final distSq = (cols[k].center - midCol).distanceSquared;
+          if (distSq < radiusLimitSq) {
+            hasGabrielInterferer = true;
+            break;
+          }
+        }
+        if (hasGabrielInterferer) continue;
 
         // Check if c1-c2 is a diagonal of an orthogonal 4-column bay
         bool isDiagonal = false;
@@ -365,20 +440,74 @@ class VerticalCapacityCalculator {
         deflectionRatio: ratio,
         recommendation: rec,
         criticalSpanSegment: spanRes.criticalSpanSegment,
+        hasBeams: hasBeams,
       ));
     }
 
-    // 3. Multi-storey load accumulation for columns from top floor down to foundation
-    // Map cumulative load by column index/grid position
+    // 3. Complete building vertical load accumulating at foundation level
+    // Includes all slabs (dead + superimposed + live loads), columns, shear walls, and beams
+    totalAccumulatedBaseLoadKn = 0.0;
+    for (int sIdx = 0; sIdx < numStoreys; sIdx++) {
+      final s = project.storeys[sIdx];
+      final wd = storeyFloorLoadKnM2[sIdx];
+      final hSlabM = storeySlabThicknessM[sIdx];
+
+      // A. Slabs
+      double floorSlabAreaM2 = 0.0;
+      for (final slab in s.slabs) {
+        floorSlabAreaM2 += slab.netArea / (scale * scale);
+      }
+      if (floorSlabAreaM2 <= 1.0) floorSlabAreaM2 = totalFootprintAreaM2;
+      totalAccumulatedBaseLoadKn += floorSlabAreaM2 * wd;
+
+      // B. Columns self-weight
+      for (final col in s.columns) {
+        final acM2 = getColumnAreaM2(col, scale);
+        totalAccumulatedBaseLoadKn += 25.0 * acM2 * s.height * 1.35;
+      }
+
+      // C. Shear walls self-weight
+      for (final wall in s.shearWalls) {
+        final tM = wall.thickness / scale;
+        final lM = (wall.end - wall.start).distance / scale;
+        totalAccumulatedBaseLoadKn += 25.0 * (tM * lM) * s.height * 1.35;
+      }
+
+      // D. Beams self-weight (downstand part below slab)
+      for (final beam in s.beams) {
+        final wM = beam.width / scale;
+        final hM = beam.depth / scale;
+        final netHM = math.max(0.10, hM - hSlabM);
+        final lM = (beam.end - beam.start).distance / scale;
+        totalAccumulatedBaseLoadKn += 25.0 * (wM * netHM) * lM * 1.35;
+      }
+    }
+
+    // 4. Calculate single-storey floor shear and self-weight for each column
+    final List<List<({
+      StructuralColumn col,
+      double acM2,
+      double aTribM2,
+      double floorShearKn,
+      double colSelfWeightKn,
+      double singleNedKn,
+      bool hasConnectedBeams,
+    })>> storeyColumnData = [];
+
     for (int sIdx = 0; sIdx < numStoreys; sIdx++) {
       final storey = project.storeys[sIdx];
-      final double hSlab = storeySlabThicknessM[sIdx];
       final double floorWd = storeyFloorLoadKnM2[sIdx];
-      final int storeysAbove = numStoreys - sIdx;
+      final list = <({
+        StructuralColumn col,
+        double acM2,
+        double aTribM2,
+        double floorShearKn,
+        double colSelfWeightKn,
+        double singleNedKn,
+        bool hasConnectedBeams,
+      })>[];
 
-      for (int cIdx = 0; cIdx < storey.columns.length; cIdx++) {
-        final col = storey.columns[cIdx];
-        final colName = 'C${cIdx + 1}';
+      for (final col in storey.columns) {
         final double acM2 = getColumnAreaM2(col, scale);
         final double aTribM2 = calculateColumnTributaryAreaM2(
           col: col,
@@ -386,30 +515,107 @@ class VerticalCapacityCalculator {
           scale: scale,
           totalFloorAreaM2: totalFootprintAreaM2,
         );
-
         final double floorShearKn = floorWd * aTribM2;
         final double colSelfWeightKn = 25.0 * acM2 * storey.height * 1.35;
+        final double singleNedKn = floorShearKn + colSelfWeightKn;
 
-        // Cumulative vertical load Ned from all storeys above
-        // Load accumulates per floor above + self weight
-        double accumulatedNedKn = (floorShearKn + colSelfWeightKn) * storeysAbove;
+        bool connectedBeams = false;
+        for (final beam in storey.beams) {
+          final dStart = (col.center - beam.start).distance / scale;
+          final dEnd = (col.center - beam.end).distance / scale;
+          if (dStart <= 0.40 || dEnd <= 0.40) {
+            connectedBeams = true;
+            break;
+          }
+        }
+
+        list.add((
+          col: col,
+          acM2: acM2,
+          aTribM2: aTribM2,
+          floorShearKn: floorShearKn,
+          colSelfWeightKn: colSelfWeightKn,
+          singleNedKn: singleNedKn,
+          hasConnectedBeams: connectedBeams,
+        ));
+      }
+      storeyColumnData.add(list);
+    }
+
+    // 5. Multi-storey vertical load accumulation (top-to-bottom load rundown)
+    final Map<int, List<({double accumulatedNedKn, int numStoreysAbove})>> accumulatedByStorey = {};
+
+    // Start with top storey
+    final int topIdx = numStoreys - 1;
+    accumulatedByStorey[topIdx] = storeyColumnData[topIdx].map((c) => (
+      accumulatedNedKn: c.singleNedKn,
+      numStoreysAbove: 1,
+    )).toList();
+
+    for (int sIdx = numStoreys - 2; sIdx >= 0; sIdx--) {
+      final currentList = storeyColumnData[sIdx];
+      final upperData = storeyColumnData[sIdx + 1];
+      final upperAcc = accumulatedByStorey[sIdx + 1]!;
+
+      final List<({double accumulatedNedKn, int numStoreysAbove})> accList = [];
+      for (int i = 0; i < currentList.length; i++) {
+        final col = currentList[i].col;
+        int matchUpperIdx = -1;
+        double minUpperDist = 0.40 * scale;
+        for (int u = 0; u < upperData.length; u++) {
+          final dist = (col.center - upperData[u].col.center).distance;
+          if (dist <= minUpperDist) {
+            minUpperDist = dist;
+            matchUpperIdx = u;
+          }
+        }
+
+        if (matchUpperIdx != -1) {
+          final uInfo = upperAcc[matchUpperIdx];
+          accList.add((
+            accumulatedNedKn: uInfo.accumulatedNedKn + currentList[i].singleNedKn,
+            numStoreysAbove: uInfo.numStoreysAbove + 1,
+          ));
+        } else {
+          accList.add((
+            accumulatedNedKn: currentList[i].singleNedKn,
+            numStoreysAbove: 1,
+          ));
+        }
+      }
+      accumulatedByStorey[sIdx] = accList;
+    }
+
+    // 6. Comprehensive EC2 axial compression & punching checks for all columns
+    for (int sIdx = 0; sIdx < numStoreys; sIdx++) {
+      final storey = project.storeys[sIdx];
+      final double hSlab = storeySlabThicknessM[sIdx];
+      final currentCols = storeyColumnData[sIdx];
+      final currentAcc = accumulatedByStorey[sIdx]!;
+
+      for (int cIdx = 0; cIdx < currentCols.length; cIdx++) {
+        final colData = currentCols[cIdx];
+        final col = colData.col;
+        final colName = 'C${cIdx + 1}';
+        final accInfo = currentAcc[cIdx];
+        final double accumulatedNedKn = accInfo.accumulatedNedKn;
+        final int storeysAbove = accInfo.numStoreysAbove;
 
         // EC2 Axial compression resistance N_Rd
         // N_Rd = eta * [A_c * f_cd + A_s * f_yd]
-        final double asRebarM2 = acM2 * rhoMin;
+        final double asRebarM2 = colData.acM2 * rhoMin;
         final double nrdKn = etaReduction *
-            (acM2 * fcdMpa * 1000.0 + asRebarM2 * fydMpa * 1000.0);
+            (colData.acM2 * fcdMpa * 1000.0 + asRebarM2 * fydMpa * 1000.0);
 
         final double axialUtil = nrdKn > 0 ? (accumulatedNedKn / nrdKn) : 1.0;
         if (axialUtil > maxAxialUtil) maxAxialUtil = axialUtil;
 
         // Punching shear at slab-column connection (EC2 §6.4)
-        // d = h_slab - 30mm
+        // If column has connected beams framing into it, punching shear failure is relieved by beam shear
         final double dEffM = math.max(0.12, hSlab - 0.03);
         final double colWM = col.width / scale;
         final double colHM = col.height / scale;
 
-        // Determine if corner, edge, or interior based on slab boundary
         double distToEdgeM = 3.0;
         if (storey.slabs.isNotEmpty) {
           for (final slab in storey.slabs) {
@@ -437,18 +643,20 @@ class VerticalCapacityCalculator {
         }
 
         // Punching shear stress v_Ed in MPa
-        final double vedMpa = (betaPunching * floorShearKn) /
+        final double vedMpa = (betaPunching * colData.floorShearKn) /
             (u1PerimeterM * dEffM * 1000.0);
 
-        // Concrete resistance v_Rd,c
+        // Concrete punching resistance v_Rd,c
         final double kSize = math.min(2.0, 1.0 + math.sqrt(200.0 / (dEffM * 1000.0)));
         const double cRdc = 0.12;
-        const double rhoL = 0.006; // nominal rebar ratio
+        const double rhoL = 0.006; // nominal flexural rebar ratio
         double vrdcMpa = cRdc * kSize * math.pow(100.0 * rhoL * fck, 1.0 / 3.0);
         final double vMin = 0.035 * math.pow(kSize, 1.5) * math.sqrt(fck);
         vrdcMpa = math.max(vrdcMpa, vMin);
 
-        final double punchingUtil = vrdcMpa > 0 ? (vedMpa / vrdcMpa) : 1.0;
+        final double punchingUtil = colData.hasConnectedBeams
+            ? 0.0
+            : (vrdcMpa > 0 ? (vedMpa / vrdcMpa) : 1.0);
         if (punchingUtil > maxPunchingUtil) maxPunchingUtil = punchingUtil;
 
         // Overall status for this column
@@ -478,7 +686,6 @@ class VerticalCapacityCalculator {
             ? '${minSideCm.toInt()}x${minSideCm.toInt()} cm (или шайба 25x${wallLengthCm.toInt()} cm)'
             : '${minSideCm.toInt()}x${minSideCm.toInt()} cm';
 
-        // Actionable recommendation for the architect
         final curWCm = (colWM * 100).round();
         final curHCm = (colHM * 100).round();
         final String rec;
@@ -490,9 +697,12 @@ class VerticalCapacityCalculator {
           rec = 'Колона $colName (${curWCm}x$curHCm cm) в ${storey.name} поема $storeysAbove етажа напълно безопасно (${(axialUtil * 100).round()}%).';
         }
 
+        final int recSlabH = (hSlab * 100).round() + 4;
         String? punchRec;
-        if (punchingUtil > 1.0) {
-          punchRec = 'Риск от пробиване на плочата при $colName (v_Ed = ${vedMpa.toStringAsFixed(2)} MPa > v_Rd,c = ${vrdcMpa.toStringAsFixed(2)} MPa). Препоръчва се капител (drop panel), плоча ${(hSlab * 100).round() + 4} cm или по-голяма колона.';
+        if (colData.hasConnectedBeams) {
+          punchRec = null;
+        } else if (punchingUtil > 1.0) {
+          punchRec = 'Риск от пробиване на плочата при $colName (v_Ed = ${vedMpa.toStringAsFixed(2)} MPa > v_Rd,c = ${vrdcMpa.toStringAsFixed(2)} MPa). Препоръчва се капител (drop panel), плоча $recSlabH cm или по-голяма колона.';
         }
 
         allColumnChecks.add(ColumnVerticalCheck(
@@ -506,10 +716,10 @@ class VerticalCapacityCalculator {
           shape: col.shape,
           widthM: colWM,
           heightM: colHM,
-          crossSectionAreaM2: acM2,
-          tributaryAreaM2: aTribM2,
+          crossSectionAreaM2: colData.acM2,
+          tributaryAreaM2: colData.aTribM2,
           accumulatedLoadNedKn: accumulatedNedKn,
-          floorShearForceVedKn: floorShearKn,
+          floorShearForceVedKn: colData.floorShearKn,
           axialCapacityNrdKn: nrdKn,
           axialUtilization: axialUtil,
           punchingShearStressVedMpa: vedMpa,
@@ -519,12 +729,9 @@ class VerticalCapacityCalculator {
           minRequiredSectionCm: minSectionStr,
           architectRecommendation: rec,
           punchingRecommendation: punchRec,
+          hasConnectedBeams: colData.hasConnectedBeams,
+          recommendedPunchingSlabThicknessCm: recSlabH,
         ));
-
-        // Accumulate base load from ground storey
-        if (sIdx == 0) {
-          totalAccumulatedBaseLoadKn += accumulatedNedKn;
-        }
       }
     }
 

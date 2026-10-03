@@ -1344,6 +1344,16 @@
   "@seismicEccentricityYLabel": { "description": "Label for eccentricity in Y" },
   "seismicLimitEc8Label": "EC8 Limit",
   "@seismicLimitEc8Label": { "description": "Label for Eurocode 8 limit" },
+  "seismicTorsionStiffEccentric": "Torsionally Stiff (e > 0.30·r)",
+  "@seismicTorsionStiffEccentric": { "description": "Status badge for building that is torsionally stiff but has eccentricity" },
+  "seismicStatusEccentricShort": "Eccentric",
+  "@seismicStatusEccentricShort": { "description": "Short stat card value for eccentric building" },
+  "seismicTorsionalRadiiLabel": "Torsional radii (rx, ry)",
+  "@seismicTorsionalRadiiLabel": { "description": "Label for Eurocode 8 torsional radii" },
+  "seismicMassRadiusLabel": "Floor mass radius (ls)",
+  "@seismicMassRadiusLabel": { "description": "Label for Eurocode 8 floor mass gyration radius" },
+  "seismicLimitEc8Formula": "≤ 0.30·r (EC8)",
+  "@seismicLimitEc8Formula": { "description": "Formula label for EC8 eccentricity limit" },
   "seismicShearWallCoverageTitle": "Shear Wall Coverage",
   "@seismicShearWallCoverageTitle": { "description": "Header title for shear wall coverage" },
   "seismicOkMinCoverage": "OK (≥ 1.0%)",
@@ -1440,6 +1450,34 @@
   },
   "seismicRecBalanced": "Seismic balance and shear wall percentage coverage are excellent. ",
   "@seismicRecBalanced": { "description": "Balanced seismic layout" },
+  "seismicRecTorsionStiffEccentric": "Torsionally stiff layout (rx={rx} m, ry={ry} m ≥ ls={ls} m), but structural eccentricity ({ecc} m) exceeds 0.30·r. Requires 3D spatial dynamic modal response spectrum analysis per Eurocode 8. ",
+  "@seismicRecTorsionStiffEccentric": {
+    "description": "Recommendation text when building is torsionally stiff but has structural eccentricity",
+    "placeholders": {
+      "rx": { "type": "String" },
+      "ry": { "type": "String" },
+      "ls": { "type": "String" },
+      "ecc": { "type": "String" }
+    }
+  },
+  "seismicRecTorsionRegular": "Regular in plan per EC8 §4.2.3.2 (rx={rx} m, ry={ry} m ≥ ls={ls} m, e ≤ 0.30·r). Excellent torsional balance. ",
+  "@seismicRecTorsionRegular": {
+    "description": "Recommendation text when building satisfies EC8 plan regularity",
+    "placeholders": {
+      "rx": { "type": "String" },
+      "ry": { "type": "String" },
+      "ls": { "type": "String" }
+    }
+  },
+  "seismicRecTorsionFlexible": "Torsionally flexible system per EC8 §4.2.3.2 (rx={rx} m, ry={ry} m < ls={ls} m). Insufficient perimeter torsional stiffness! Additional perimeter shear walls/columns recommended. ",
+  "@seismicRecTorsionFlexible": {
+    "description": "Recommendation text when building is torsionally flexible",
+    "placeholders": {
+      "rx": { "type": "String" },
+      "ry": { "type": "String" },
+      "ls": { "type": "String" }
+    }
+  },
   "seismicRecSoftStoreyPrefix": "WARNING: SOFT STOREY! Lateral stiffness of this storey is > 30% lower than the storey above. ",
   "@seismicRecSoftStoreyPrefix": { "description": "Soft storey warning prefix" },
   "seismicRecBeamDepthInsufficient": "For span L = {span} m, depth {depth} cm is insufficient. Recommended beam {recW}x{recH} cm.",
@@ -1584,6 +1622,13 @@
       "ved": { "type": "String" },
       "vrdc": { "type": "String" },
       "slabH": { "type": "int" }
+    }
+  },
+  "verticalRecPunchingProtectedByBeams": "Column {name} is protected from punching: slab loads are carried directly by framing beams.",
+  "@verticalRecPunchingProtectedByBeams": {
+    "description": "Column protected from punching due to connected beams",
+    "placeholders": {
+      "name": { "type": "String" }
     }
   },
   "verticalTabColumns": "Columns ({count})",

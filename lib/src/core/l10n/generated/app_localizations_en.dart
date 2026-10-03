@@ -1618,6 +1618,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seismicLimitEc8Label => 'EC8 Limit';
 
   @override
+  String get seismicTorsionStiffEccentric => 'Torsionally Stiff (e > 0.30·r)';
+
+  @override
+  String get seismicStatusEccentricShort => 'Eccentric';
+
+  @override
+  String get seismicTorsionalRadiiLabel => 'Torsional radii (rx, ry)';
+
+  @override
+  String get seismicMassRadiusLabel => 'Floor mass radius (ls)';
+
+  @override
+  String get seismicLimitEc8Formula => '≤ 0.30·r (EC8)';
+
+  @override
   String get seismicShearWallCoverageTitle => 'Shear Wall Coverage';
 
   @override
@@ -1735,6 +1750,26 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get seismicRecBalanced =>
       'Seismic balance and shear wall percentage coverage are excellent. ';
+
+  @override
+  String seismicRecTorsionStiffEccentric(
+    String rx,
+    String ry,
+    String ls,
+    String ecc,
+  ) {
+    return 'Torsionally stiff layout (rx=$rx m, ry=$ry m ≥ ls=$ls m), but structural eccentricity ($ecc m) exceeds 0.30·r. Requires 3D spatial dynamic modal response spectrum analysis per Eurocode 8. ';
+  }
+
+  @override
+  String seismicRecTorsionRegular(String rx, String ry, String ls) {
+    return 'Regular in plan per EC8 §4.2.3.2 (rx=$rx m, ry=$ry m ≥ ls=$ls m, e ≤ 0.30·r). Excellent torsional balance. ';
+  }
+
+  @override
+  String seismicRecTorsionFlexible(String rx, String ry, String ls) {
+    return 'Torsionally flexible system per EC8 §4.2.3.2 (rx=$rx m, ry=$ry m < ls=$ls m). Insufficient perimeter torsional stiffness! Additional perimeter shear walls/columns recommended. ';
+  }
 
   @override
   String get seismicRecSoftStoreyPrefix =>
@@ -1873,6 +1908,11 @@ class AppLocalizationsEn extends AppLocalizations {
     int slabH,
   ) {
     return 'Risk of slab punching at $name (v_Ed = $ved MPa > v_Rd,c = $vrdc MPa). Recommended: drop panel, slab $slabH cm or larger column.';
+  }
+
+  @override
+  String verticalRecPunchingProtectedByBeams(String name) {
+    return 'Column $name is protected from punching: slab loads are carried directly by framing beams.';
   }
 
   @override

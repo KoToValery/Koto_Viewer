@@ -56,8 +56,29 @@ class StoreySeismicCheck {
   final double eccentricityRatioX;
   final double eccentricityRatioY;
 
-  /// True if building is torsionally sensitive (e0 > 0.15 or e > 0.30 r).
+  /// True if building is torsionally sensitive (r_x < l_s or r_y < l_s) per EC8 §4.2.3.2.
   final bool isTorsionallySensitive;
+
+  /// Eurocode 8 Torsional radius in X direction: r_x = sqrt(I_p,R / K_y).
+  final double torsionalRadiusX;
+
+  /// Eurocode 8 Torsional radius in Y direction: r_y = sqrt(I_p,R / K_x).
+  final double torsionalRadiusY;
+
+  /// Eurocode 8 Floor mass radius of gyration: l_s = sqrt((L_x^2 + L_y^2) / 12).
+  final double massRadiusOfGyration;
+
+  /// Torsional rigidity of vertical elements about CR (I_p,R in m^4 or stiffness units).
+  final double torsionalRigidity;
+
+  /// True if building is torsionally stiff (r_x >= l_s and r_y >= l_s) per EC8 §4.2.3.2.
+  final bool isTorsionallyStiff;
+
+  /// True if building has structural eccentricity exceeding 0.30*r per EC8 §4.2.3.2.
+  final bool hasSignificantEccentricity;
+
+  /// True if building is regular in plan per EC8 §4.2.3.2 (r >= l_s and e_0 <= 0.30*r).
+  final bool isPlanRegularEC8;
 
   /// Total cross-sectional area of shear walls oriented along X axis (m²).
   final double wallAreaXM2;
@@ -121,6 +142,13 @@ class StoreySeismicCheck {
     required this.eccentricityRatioX,
     required this.eccentricityRatioY,
     required this.isTorsionallySensitive,
+    this.torsionalRadiusX = 0.0,
+    this.torsionalRadiusY = 0.0,
+    this.massRadiusOfGyration = 0.0,
+    this.torsionalRigidity = 0.0,
+    this.isTorsionallyStiff = false,
+    this.hasSignificantEccentricity = false,
+    this.isPlanRegularEC8 = false,
     required this.wallAreaXM2,
     required this.wallAreaYM2,
     required this.floorAreaM2,
@@ -188,6 +216,13 @@ class StoreySeismicCheck {
       } else if (centerOfRigidityCad!.dy > centerOfMassCad!.dy) {
         rec.write(l10n.seismicRecAddWallSouth);
       }
+    } else if (isTorsionallyStiff && hasSignificantEccentricity) {
+      rec.write(l10n.seismicRecTorsionStiffEccentric(
+        torsionalRadiusX.toStringAsFixed(2),
+        torsionalRadiusY.toStringAsFixed(2),
+        massRadiusOfGyration.toStringAsFixed(2),
+        maxEccentricityM.toStringAsFixed(2),
+      ));
     } else if (!isWallCoverageSufficientX || !isWallCoverageSufficientY) {
       if (!isWallCoverageSufficientX && !isWallCoverageSufficientY) {
         rec.write(l10n.seismicRecDeficitBoth(
@@ -311,6 +346,7 @@ class SeismicAnalysisReport {
   final int totalDisconnectedWallsCount;
   final int totalDisconnectedColumnsCount;
   final bool hasTorsionalSensitivity;
+  final bool hasStructuralEccentricity;
   final bool hasSoftStorey;
   final bool hasWallDeficit;
   final double maxEccentricityRatio;
@@ -325,6 +361,7 @@ class SeismicAnalysisReport {
     this.totalDisconnectedWallsCount = 0,
     this.totalDisconnectedColumnsCount = 0,
     required this.hasTorsionalSensitivity,
+    this.hasStructuralEccentricity = false,
     required this.hasSoftStorey,
     required this.hasWallDeficit,
     required this.maxEccentricityRatio,
@@ -340,6 +377,7 @@ class SeismicAnalysisReport {
     totalDisconnectedWallsCount: 0,
     totalDisconnectedColumnsCount: 0,
     hasTorsionalSensitivity: false,
+    hasStructuralEccentricity: false,
     hasSoftStorey: false,
     hasWallDeficit: false,
     maxEccentricityRatio: 0.0,

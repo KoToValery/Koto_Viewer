@@ -1796,10 +1796,14 @@ class Structural2dPainter extends CustomPainter {
 
     // Draw line of eccentricity between CM and CR
     if (distScene > 4.0 / zoomScale) {
+      final badgeColor = check.isTorsionallySensitive
+          ? const Color(0xFFFF1744)
+          : (check.hasSignificantEccentricity
+              ? const Color(0xFFFFB300)
+              : const Color(0xFFD500F9));
+
       final linePaint = Paint()
-        ..color = check.isTorsionallySensitive
-            ? const Color(0xFFFF1744)
-            : const Color(0xFFD500F9)
+        ..color = badgeColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.8 / zoomScale;
       _drawDashDotLine(canvas, cmScene, crScene, linePaint);
@@ -1828,7 +1832,7 @@ class Structural2dPainter extends CustomPainter {
         ..color = (check.isTorsionallySensitive ? const Color(0xDD000000) : const Color(0xCC1E1E1E))
         ..style = PaintingStyle.fill;
       final borderPaint = Paint()
-        ..color = check.isTorsionallySensitive ? const Color(0xFFFF1744) : const Color(0xFFD500F9)
+        ..color = badgeColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0;
       canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, const Radius.circular(4.0)), bgPaint);
