@@ -5200,6 +5200,171 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
+  List<Widget> _buildAppBarActions(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 540;
+
+    final layersButton = IconButton(
+      icon: const Icon(Icons.layers_outlined, color: Colors.white70, size: 20),
+      tooltip: context.l10n.layersTooltip,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      onPressed: _showLayersSheet,
+    );
+
+    final filterButton = IconButton(
+      icon: Icon(
+        _underlayFilterActive
+            ? Icons.filter_alt_rounded
+            : Icons.filter_alt_outlined,
+        color: _underlayFilterActive
+            ? const Color(0xFF00E5FF)
+            : Colors.white70,
+        size: 20,
+      ),
+      tooltip: _underlayFilterActive
+          ? context.l10n.structuralFilterActive
+          : context.l10n.structuralFilterInactive,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      onPressed: _toggleUnderlayFilter,
+    );
+
+    final snapButton = IconButton(
+      icon: Icon(
+        _snapEnabled ? Icons.grain_rounded : Icons.lens_blur_rounded,
+        color: _snapEnabled ? const Color(0xFF00E5FF) : Colors.white38,
+        size: 20,
+      ),
+      tooltip: _snapEnabled
+          ? context.l10n.snapEnabledTooltip
+          : context.l10n.snapDisabledTooltip,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      onPressed: () {
+        setState(() => _snapEnabled = !_snapEnabled);
+        HapticFeedback.selectionClick();
+      },
+    );
+
+    final undoButton = IconButton(
+      icon: Icon(Icons.undo_rounded,
+          color: _undoStack.isNotEmpty ? Colors.white : Colors.white24,
+          size: 20),
+      tooltip: context.l10n.undoAction,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      onPressed: _undoStack.isNotEmpty ? _undo : null,
+    );
+
+    final exportButton = IconButton(
+      icon: const Icon(Icons.share_outlined, color: Colors.white70, size: 20),
+      tooltip: context.l10n.exportBimModel,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      onPressed: _showExportDialog,
+    );
+
+    final viewport3dButton = IconButton(
+      icon: const Icon(Icons.view_in_ar_rounded, color: Color(0xFFFFB300), size: 20),
+      tooltip: context.l10n.structural3dView,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      onPressed: _open3dViewport,
+    );
+
+    if (!isCompact) {
+      return [
+        layersButton,
+        filterButton,
+        snapButton,
+        undoButton,
+        exportButton,
+        viewport3dButton,
+        const SizedBox(width: 4),
+      ];
+    }
+
+    // Compact mode for narrow/mobile screens to prevent RenderFlex horizontal overflows:
+    // Display 3 primary actions directly, with secondary actions in PopupMenu
+    return [
+      snapButton,
+      undoButton,
+      viewport3dButton,
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        color: const Color(0xFF242426),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        onSelected: (value) {
+          switch (value) {
+            case 'layers':
+              _showLayersSheet();
+              break;
+            case 'filter':
+              _toggleUnderlayFilter();
+              break;
+            case 'export':
+              _showExportDialog();
+              break;
+          }
+        },
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: 'layers',
+            child: Row(
+              children: [
+                const Icon(Icons.layers_outlined, size: 20, color: Colors.white70),
+                const SizedBox(width: 12),
+                Text(context.l10n.layersTooltip,
+                    style: const TextStyle(color: Colors.white, fontSize: 13)),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'filter',
+            child: Row(
+              children: [
+                Icon(
+                  _underlayFilterActive
+                      ? Icons.filter_alt_rounded
+                      : Icons.filter_alt_outlined,
+                  size: 20,
+                  color: _underlayFilterActive
+                      ? const Color(0xFF00E5FF)
+                      : Colors.white70,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _underlayFilterActive
+                        ? context.l10n.structuralFilterActive
+                        : context.l10n.structuralFilterInactive,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'export',
+            child: Row(
+              children: [
+                const Icon(Icons.share_outlined, size: 20, color: Colors.white70),
+                const SizedBox(width: 12),
+                Text(context.l10n.exportBimModel,
+                    style: const TextStyle(color: Colors.white, fontSize: 13)),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(width: 4),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -5207,93 +5372,43 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1C1C1E),
         elevation: 0,
+        titleSpacing: 0,
+        centerTitle: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: InkWell(
           onTap: _openStoreyManager,
           borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.layers_rounded,
-                    size: 18, color: Color(0xFF00E5FF)),
-                const SizedBox(width: 6),
+                    size: 16, color: Color(0xFF00E5FF)),
+                const SizedBox(width: 4),
                 Flexible(
                   child: Text(
                     _project.activeStorey.name,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
-                const Icon(Icons.arrow_drop_down, color: Colors.white70),
+                const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 20),
               ],
             ),
           ),
         ),
-        actions: [
-          // CAD Underlay Layers Launcher
-          IconButton(
-            icon: const Icon(Icons.layers_outlined, color: Colors.white70),
-            tooltip: context.l10n.layersTooltip,
-            onPressed: _showLayersSheet,
-          ),
-          // Underlay Filter Toggle (Walls & Axes focus)
-          IconButton(
-            icon: Icon(
-              _underlayFilterActive
-                  ? Icons.filter_alt_rounded
-                  : Icons.filter_alt_outlined,
-              color: _underlayFilterActive
-                  ? const Color(0xFF00E5FF)
-                  : Colors.white70,
-            ),
-            tooltip: _underlayFilterActive
-                ? context.l10n.structuralFilterActive
-                : context.l10n.structuralFilterInactive,
-            onPressed: _toggleUnderlayFilter,
-          ),
-          // Snap Toggle
-          IconButton(
-            icon: Icon(
-              _snapEnabled ? Icons.grain_rounded : Icons.lens_blur_rounded,
-              color: _snapEnabled ? const Color(0xFF00E5FF) : Colors.white38,
-            ),
-            tooltip: _snapEnabled
-                ? context.l10n.snapEnabledTooltip
-                : context.l10n.snapDisabledTooltip,
-            onPressed: () {
-              setState(() => _snapEnabled = !_snapEnabled);
-              HapticFeedback.selectionClick();
-            },
-          ),
-          // Undo Button
-          IconButton(
-            icon: Icon(Icons.undo_rounded,
-                color: _undoStack.isNotEmpty ? Colors.white : Colors.white24),
-            tooltip: context.l10n.undoAction,
-            onPressed: _undoStack.isNotEmpty ? _undo : null,
-          ),
-          // Export BiM Model (JSON / DXF)
-          IconButton(
-            icon: const Icon(Icons.share_outlined, color: Colors.white70),
-            tooltip: context.l10n.exportBimModel,
-            onPressed: _showExportDialog,
-          ),
-          // 3D Viewport Launcher
-          IconButton(
-            icon: const Icon(Icons.view_in_ar_rounded, color: Color(0xFFFFB300)),
-            tooltip: context.l10n.structural3dView,
-            onPressed: _open3dViewport,
-          ),
-        ],
+        actions: _buildAppBarActions(context),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {

@@ -1306,6 +1306,54 @@ void main() {
     expect(resAxis.snappedPoint.dy, closeTo(0.0, 1e-4));
     expect(resAxis.description, 'shearWallAxis');
   });
+
+  testWidgets('StructuralDesignerScreen AppBar renders without RenderFlex overflow on narrow 360px mobile screen', (tester) async {
+    final doc = DxfDocument(
+      entities: [
+        const DxfLine(
+          layer: '0',
+          p1: Offset(0, 0),
+          p2: Offset(100, 100),
+        ),
+      ],
+      layers: {
+        '0': DxfLayer(name: '0', isVisible: true),
+      },
+      blocks: const {},
+      headerVars: const {},
+      bounds: const Rect.fromLTWH(0, 0, 100, 100),
+      entityStats: const {'LINE': 1},
+    );
+
+    // Exact narrow mobile viewport: 360px logical width (typical 720p / 1080p budget Android)
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('bg'),
+        home: StructuralDesignerScreen(
+          document: doc,
+          initialCadBounds: const Rect.fromLTWH(0, 0, 100, 100),
+          title: 'Storey 1 (Elev. +0.00) Project Model',
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify AppBar renders with title, back button, actions and overflow menu
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.view_in_ar_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.undo_rounded), findsOneWidget);
+
+    // Verify no RenderFlex overflow error was triggered
+    expect(tester.takeException(), isNull);
+  });
 }
 
 
