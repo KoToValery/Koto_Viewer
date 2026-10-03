@@ -2077,6 +2077,18 @@ abstract class AppLocalizations {
   /// **'Drag midpoint to extrude cantilever'**
   String get slabEdgeExtrudeTooltip;
 
+  /// Magnetic parallel alignment indicator during slab edge dragging
+  ///
+  /// In en, this message translates to:
+  /// **'Aligned to line: {distance} m'**
+  String slabParallelAligned(String distance);
+
+  /// Guidance hint for point-by-point slab placement tool
+  ///
+  /// In en, this message translates to:
+  /// **'Tap or hold with snap to place slab points'**
+  String get slabPointByPointPrompt;
+
   /// Cancel rectangular slab drawing
   ///
   /// In en, this message translates to:

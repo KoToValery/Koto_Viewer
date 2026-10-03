@@ -833,7 +833,7 @@ class StructuralSlab {
       }
     }
 
-    // 3. Remove collinear points
+    // 3. Remove collinear points, acute needle fold-backs, and spikes
     changed = true;
     while (changed && validPts.length > 3) {
       changed = false;
@@ -847,7 +847,24 @@ class StructuralSlab {
         if (l1 > 1e-4 && l2 > 1e-4) {
           final cross = (v1.dx * v2.dy - v1.dy * v2.dx) / (l1 * l2);
           final dot = (v1.dx * v2.dx + v1.dy * v2.dy) / (l1 * l2);
-          if (cross.abs() < 0.015 && dot > 0.99) {
+
+          // A. Collinear redundant vertex (orphan point sitting on straight line)
+          if (cross.abs() < 0.02 && dot > 0.98) {
+            validPts.removeAt(i);
+            changed = true;
+            break;
+          }
+
+          // B. Acute needle fold-back / spike (израстък/остър вглъбнат участък)
+          if (cross.abs() < 0.06 && dot < -0.85) {
+            validPts.removeAt(i);
+            changed = true;
+            break;
+          }
+
+          // C. Degenerate narrow slit where chord between prev and next is almost closed
+          final chordDist = (validPts[next] - validPts[prev]).distance;
+          if (chordDist < minDistance * 1.5 && dot < -0.5) {
             validPts.removeAt(i);
             changed = true;
             break;
@@ -983,6 +1000,95 @@ class StructuralSlab {
       ));
     }
     return grips;
+  }
+
+  /// Moves the polygon edge at [edgeIndex] parallel to itself by [distance]
+  /// in the outward normal direction (positive = outward, negative = inward),
+  /// extending or trimming adjacent edges in ArchiCAD fashion, and cleaning
+  /// any redundant collinear points, spikes, acute notches, or overlapping segments.
+  StructuralSlab offsetEdge({
+    required int edgeIndex,
+    required double distance,
+    double minDistanceCad = 0.05,
+  }) {
+    if (polygon.length < 3 || edgeIndex < 0 || edgeIndex >= polygon.length) {
+      return this;
+    }
+    if (distance.abs() < 1e-4) {
+      return this;
+    }
+
+    final n = polygon.length;
+    final v1 = polygon[edgeIndex];
+    final v2 = polygon[(edgeIndex + 1) % n];
+    final edge = v2 - v1;
+    final len = edge.distance;
+    if (len < 1e-6) return this;
+
+    final u = edge / len;
+
+    // Outward normal via Shoelace orientation
+    double sum = 0.0;
+    for (int i = 0; i < n; i++) {
+      final pA = polygon[i];
+      final pB = polygon[(i + 1) % n];
+      sum += (pA.dx * pB.dy - pB.dx * pA.dy);
+    }
+    final isCCW = sum > 0;
+    final normal = isCCW ? Offset(u.dy, -u.dx) : Offset(-u.dy, u.dx);
+
+    final vPrev = polygon[(edgeIndex - 1 + n) % n];
+    final vNext = polygon[(edgeIndex + 2) % n];
+
+    final d1 = v1 - vPrev;
+    final d2 = vNext - v2;
+
+    final denom1 = d1.dx * normal.dx + d1.dy * normal.dy;
+    final denom2 = d2.dx * normal.dx + d2.dy * normal.dy;
+
+    final bool isD1Collinear = denom1.abs() <= 0.05;
+    final bool isD2Collinear = denom2.abs() <= 0.05;
+
+    Offset vNew1;
+    if (!isD1Collinear) {
+      final t1 = (distance / denom1).clamp(-4.0 * distance.abs(), 4.0 * distance.abs());
+      vNew1 = v1 + d1 * t1;
+    } else {
+      vNew1 = v1 + normal * distance;
+    }
+
+    Offset vNew2;
+    if (!isD2Collinear) {
+      final t2 = (distance / denom2).clamp(-4.0 * distance.abs(), 4.0 * distance.abs());
+      vNew2 = v2 + d2 * t2;
+    } else {
+      vNew2 = v2 + normal * distance;
+    }
+
+    final newPts = <Offset>[];
+    for (int i = 0; i < n; i++) {
+      if (i == edgeIndex) {
+        if (isD1Collinear) {
+          newPts.add(v1);
+        }
+        newPts.add(vNew1);
+        newPts.add(vNew2);
+        if (isD2Collinear) {
+          newPts.add(v2);
+        }
+      } else if (i == (edgeIndex + 1) % n) {
+        continue;
+      } else {
+        newPts.add(polygon[i]);
+      }
+    }
+
+    final cleanedPts = cleanPolygon(newPts, minDistance: minDistanceCad);
+    if (cleanedPts.length >= 3 && !hasSelfIntersections(cleanedPts)) {
+      return copyWith(polygon: cleanedPts);
+    }
+
+    return this;
   }
 
   /// Extrudes the polygon edge from vertex [edgeIndex] to [(edgeIndex + 1) % len]

@@ -12,6 +12,7 @@ import 'analysis/cantilever_detector.dart';
 import 'analysis/seismic_analysis_calculator.dart';
 import 'analysis/structural_underlay_filter.dart';
 import 'analysis/vertical_capacity_calculator.dart';
+import 'analysis/slab_parallel_alignment_helper.dart';
 import 'models/cantilever_analysis_models.dart';
 import 'models/seismic_analysis_models.dart';
 import 'models/structural_element.dart';
@@ -92,6 +93,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   String? _activeExtrudingSlabId;
   bool _isExtrudingEdge = false;
   double _extrusionDistanceCad = 0.0;
+  SlabParallelAlignmentResult? _activeParallelSnap;
+  List<Offset>? _previewSlabOffsetPolygon;
 
   // Pointer & Touch states (Offset pointer: dynamic height above finger)
   Offset? _touchScreenPos;
@@ -2558,13 +2561,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final polygon = _editingSlab!.polygon;
     final count = polygon.length;
     final idx = _draggingSlabVertexIndex!;
-    const double mergeSnapRadiusScreen = 28.0;
+    const double mergeSnapRadiusScreen = 32.0;
 
     int? candidate;
     for (int j = 0; j < count; j++) {
       if (j == idx) continue;
       final sPt = _cadToScreen(polygon[j]);
-      if ((screenPos - sPt).distance <= mergeSnapRadiusScreen) {
+      final cadDist = (effectiveCad - polygon[j]).distance;
+      if ((screenPos - sPt).distance <= mergeSnapRadiusScreen || cadDist <= 0.15 * _cadUnitsPerMeter) {
         candidate = j;
         effectiveCad = polygon[j];
         break;
@@ -2573,16 +2577,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     if (candidate != _mergeCandidateSlabVertexIndex) {
       HapticFeedback.selectionClick();
-    }
-
-    // Check for self-intersections (X-crossing)
-    if (candidate == null) {
-      final testPts = List<Offset>.from(polygon);
-      testPts[idx] = effectiveCad;
-      if (StructuralSlab.hasSelfIntersections(testPts)) {
-        // Prevent forming bowtie / X-crossing geometry
-        return;
-      }
     }
 
     setState(() {
@@ -2896,25 +2890,73 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _updateEdgeExtrusion(Offset screenPos) {
+    if (_activeGrip == null) return;
+    final grip = _activeGrip!;
     final rawCad = _screenToCad(screenPos);
-    DxfSnapResult? snap;
+    final disp = rawCad - grip.midpoint;
+    final rawD = disp.dx * grip.normal.dx + disp.dy * grip.normal.dy;
+
+    final double fitScale = _getCadFitScale();
+    final double currentScale = _transformController.value.getMaxScaleOnAxis();
+    final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+
+    SlabParallelAlignmentResult? parallelSnap;
     if (_snapEnabled) {
-      final double fitScale = _getCadFitScale();
-      final double currentScale = _transformController.value.getMaxScaleOnAxis();
-      final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
-      snap = DxfSnapHelper.findSnapPoint(
-        document: widget.document,
-        cadPoint: rawCad,
+      parallelSnap = SlabParallelAlignmentHelper.findParallelEdgeAlignment(
+        edgeV1: grip.v1,
+        edgeV2: grip.v2,
+        gripNormal: grip.normal,
+        rawDistance: rawD,
         toleranceCad: toleranceCad,
+        document: widget.document,
+        activeStorey: _project.activeStorey,
+        activeSlabId: _activeExtrudingSlabId,
+        ghostStorey: _project.ghostStorey,
+        cadUnitsPerMeter: _cadUnitsPerMeter,
       );
-      snap ??= _findStructuralSnap(rawCad, toleranceCad);
     }
-    final effectiveCad = snap?.point ?? rawCad;
-    final disp = effectiveCad - _activeGrip!.midpoint;
-    final d = disp.dx * _activeGrip!.normal.dx + disp.dy * _activeGrip!.normal.dy;
+
+    final double effectiveD;
+    if (parallelSnap != null) {
+      effectiveD = parallelSnap.distance;
+      if (_activeParallelSnap == null || (_activeParallelSnap!.distance - effectiveD).abs() > 1e-3) {
+        HapticFeedback.selectionClick();
+      }
+    } else {
+      DxfSnapResult? ptSnap;
+      if (_snapEnabled) {
+        ptSnap = DxfSnapHelper.findSnapPoint(
+          document: widget.document,
+          cadPoint: rawCad,
+          toleranceCad: toleranceCad,
+        );
+        ptSnap ??= _findStructuralSnap(rawCad, toleranceCad);
+      }
+      if (ptSnap != null) {
+        final ptDisp = ptSnap.point - grip.midpoint;
+        effectiveD = ptDisp.dx * grip.normal.dx + ptDisp.dy * grip.normal.dy;
+      } else {
+        effectiveD = rawD;
+      }
+    }
+
+    // Compute live preview polygon with offsetEdge
+    List<Offset>? previewPoly;
+    final active = _project.activeStorey;
+    final slabIdx = active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId);
+    if (slabIdx != -1 && effectiveD.abs() > 1e-4) {
+      final previewSlab = active.slabs[slabIdx].offsetEdge(
+        edgeIndex: grip.edgeIndex,
+        distance: effectiveD,
+        minDistanceCad: 0.05 * _cadUnitsPerMeter,
+      );
+      previewPoly = previewSlab.polygon;
+    }
 
     setState(() {
-      _extrusionDistanceCad = d;
+      _extrusionDistanceCad = effectiveD;
+      _activeParallelSnap = parallelSnap;
+      _previewSlabOffsetPolygon = previewPoly;
     });
   }
 
@@ -3363,6 +3405,38 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _snappedScreenPositions = [];
         }
         _liveDimensionText = null;
+      } else if (_activeTool == StructuralDrawTool.slab) {
+        if (_slabPointsCad.length >= 3 &&
+            (rawCad - _slabPointsCad.first).distance <= toleranceCad) {
+          snap = DxfSnapResult(
+            point: _slabPointsCad.first,
+            type: DxfSnapType.endpoint,
+            distance: (rawCad - _slabPointsCad.first).distance,
+          );
+        } else {
+          snap = _findStructuralSnap(rawCad, toleranceCad) ??
+              DxfSnapHelper.findSnapPoint(
+                document: widget.document,
+                cadPoint: rawCad,
+                toleranceCad: toleranceCad,
+                allowNearest: false,
+              );
+        }
+
+        if (snap != null) {
+          effectiveCad = snap.point;
+          snappedScreen = _cadToScreen(snap.point);
+          _snappedScreenPositions = [snappedScreen];
+        } else {
+          _snappedScreenPositions = [];
+        }
+
+        if (_slabPointsCad.isNotEmpty) {
+          final lenM = (effectiveCad - _slabPointsCad.last).distance / _cadUnitsPerMeter;
+          _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
+        } else {
+          _liveDimensionText = null;
+        }
       } else {
         // Single point snap for slabs & openings
         snap = _findStructuralSnap(rawCad, toleranceCad) ??
@@ -3430,6 +3504,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       } else if (_activeTool == StructuralDrawTool.measure && _measurementStartCad != null) {
         final distM = (rawCad - _measurementStartCad!).distance / _cadUnitsPerMeter;
         _liveDimensionText = distM >= 1.0 ? '${distM.toStringAsFixed(2)} m' : '${(distM * 100).toStringAsFixed(1)} cm';
+      } else if (_activeTool == StructuralDrawTool.slab && _slabPointsCad.isNotEmpty) {
+        final lenM = (rawCad - _slabPointsCad.last).distance / _cadUnitsPerMeter;
+        _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
       } else {
         _liveDimensionText = null;
       }
@@ -3644,6 +3721,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _editingSlab = cleaned;
           _updateActiveStoreySlab(cleaned);
           HapticFeedback.heavyImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.slabPointsMerged),
+              duration: const Duration(seconds: 2),
+            ),
+          );
         }
       } else if (_draggingSlabVertexCad != null) {
         final testPts = List<Offset>.from(_editingSlab!.polygon);
@@ -3678,9 +3761,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId);
           if (slabIdx != -1) {
             _pushUndo();
-            final updatedSlab = active.slabs[slabIdx].extrudeEdgeParallel(
+            final updatedSlab = active.slabs[slabIdx].offsetEdge(
               edgeIndex: _activeGrip!.edgeIndex,
               distance: d,
+              minDistanceCad: 0.05 * scale,
             );
             final updatedSlabs = List<StructuralSlab>.from(active.slabs);
             updatedSlabs[slabIdx] = updatedSlab;
@@ -3717,6 +3801,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _activeExtrudingSlabId = null;
         _midpointTouchDownPos = null;
         _extrusionDistanceCad = 0.0;
+        _activeParallelSnap = null;
+        _previewSlabOffsetPolygon = null;
       });
       return;
     }
@@ -4200,10 +4286,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     if (_activeTool == StructuralDrawTool.slab) {
+      if (_slabPointsCad.isNotEmpty) {
+        final cadPt = _screenToCad(details.localPosition);
+        _commitPlacement(cadPt);
+        return;
+      }
       final hitSlab = _hitTestSlab(details.localPosition);
       if (hitSlab != null) {
         _startSlabCorrection(hitSlab);
       } else {
+        final cadPt = _screenToCad(details.localPosition);
+        _commitPlacement(cadPt);
         setState(() {
           _selectedColumn = null;
           _selectedShearWall = null;
@@ -4412,46 +4505,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _updateActiveStorey(updatedStorey);
       HapticFeedback.mediumImpact();
     } else if (_activeTool == StructuralDrawTool.slab) {
-      if (_slabStartCornerCad == null) {
-        // Step 1: Set 1st corner of rectangular slab
-        setState(() => _slabStartCornerCad = cadCoord);
-        HapticFeedback.lightImpact();
-      } else {
-        // Step 2: Set opposite corner and commit closed rectangular slab
-        final c1 = _slabStartCornerCad!;
-        final c2 = cadCoord;
-        final minX = math.min(c1.dx, c2.dx);
-        final maxX = math.max(c1.dx, c2.dx);
-        final minY = math.min(c1.dy, c2.dy);
-        final maxY = math.max(c1.dy, c2.dy);
-
-        final w = maxX - minX;
-        final h = maxY - minY;
-
-        if (w >= 0.3 * scale && h >= 0.3 * scale) {
-          _pushUndo();
-          // Closed counter-clockwise rectangle in CAD coordinates (Y up)
-          final rectPolygon = [
-            Offset(minX, minY),
-            Offset(maxX, minY),
-            Offset(maxX, maxY),
-            Offset(minX, maxY),
-          ];
-          final newSlab = StructuralSlab(
-            id: 'slab_${DateTime.now().millisecondsSinceEpoch}',
-            polygon: rectPolygon,
-            thickness: _currentSlabThickness,
-            colorValue: Structural2dPainter.slabPalette[active.slabs.length % Structural2dPainter.slabPalette.length].toARGB32(),
-          );
-          final updatedSlabs = List<StructuralSlab>.from(active.slabs)..add(newSlab);
-          final updatedStorey = active.copyWith(slabs: updatedSlabs);
-          _updateActiveStorey(updatedStorey);
-          HapticFeedback.heavyImpact();
+      if (_slabPointsCad.length >= 3) {
+        final distToFirst = (cadCoord - _slabPointsCad.first).distance;
+        final double fitScale = _getCadFitScale();
+        final double currentScale = _transformController.value.getMaxScaleOnAxis();
+        final closeThresholdCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+        if (distToFirst <= closeThresholdCad) {
+          _closeSlabPolygon();
+          return;
         }
+      }
+      if (_slabPointsCad.isEmpty ||
+          (cadCoord - _slabPointsCad.last).distance >= 0.05 * scale) {
         setState(() {
-          _slabStartCornerCad = null;
-          _slabPointsCad.clear();
+          _slabPointsCad.add(cadCoord);
         });
+        HapticFeedback.lightImpact();
       }
     } else if (_activeTool == StructuralDrawTool.beam) {
       if (_beamStartCad == null) {
@@ -4580,15 +4649,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_slabPointsCad.length >= 3) {
       _pushUndo();
       final active = _project.activeStorey;
-      final newSlab = StructuralSlab(
-        id: 'slab_${DateTime.now().millisecondsSinceEpoch}',
-        polygon: List.from(_slabPointsCad),
-        thickness: _currentSlabThickness,
-        colorValue: Structural2dPainter.slabPalette[active.slabs.length % Structural2dPainter.slabPalette.length].toARGB32(),
+      final cleanedPts = StructuralSlab.cleanPolygon(
+        List.from(_slabPointsCad),
+        minDistance: 0.05 * _cadUnitsPerMeter,
       );
-      final updatedSlabs = List<StructuralSlab>.from(active.slabs)..add(newSlab);
-      final updatedStorey = active.copyWith(slabs: updatedSlabs);
-      _updateActiveStorey(updatedStorey);
+      if (cleanedPts.length >= 3) {
+        final newSlab = StructuralSlab(
+          id: 'slab_${DateTime.now().millisecondsSinceEpoch}',
+          polygon: cleanedPts,
+          thickness: _currentSlabThickness,
+          colorValue: Structural2dPainter.slabPalette[
+                  active.slabs.length % Structural2dPainter.slabPalette.length]
+              .toARGB32(),
+        );
+        final updatedSlabs = List<StructuralSlab>.from(active.slabs)..add(newSlab);
+        final updatedStorey = active.copyWith(slabs: updatedSlabs);
+        _updateActiveStorey(updatedStorey);
+      }
 
       setState(() => _slabPointsCad.clear());
       HapticFeedback.heavyImpact();
@@ -5177,6 +5254,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   slabPointsInProgress: _slabPointsCad,
                                   extrudingGrip: _activeGrip,
                                   extrusionDistance: _isExtrudingEdge ? _extrusionDistanceCad : null,
+                                  activeParallelSnap: _isExtrudingEdge ? _activeParallelSnap : null,
+                                  previewSlabOffsetPolygon: _isExtrudingEdge ? _previewSlabOffsetPolygon : null,
+                                  l10n: context.l10n,
                                   selectedColumnId: _selectedColumn?.id,
                                   selectedShearWallId: _selectedShearWall?.id,
                                   selectedBeamId: _selectedBeam?.id,
@@ -5464,8 +5544,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           });
                         },
                         isDrawingSlab: _activeTool == StructuralDrawTool.slab,
-                        hasSlabStartCorner: _slabStartCornerCad != null,
-                        slabPointCount: _slabStartCornerCad != null ? 1 : _slabPointsCad.length,
+                        hasSlabStartCorner: _slabPointsCad.isNotEmpty,
+                        slabPointCount: _slabPointsCad.length,
                         onCloseSlab: _closeSlabPolygon,
                         onUndoPoint: () {
                           setState(() {

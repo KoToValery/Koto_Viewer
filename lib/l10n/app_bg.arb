@@ -335,6 +335,8 @@
   "previewSlabCorner2Tag": "Плоча: посочете срещуположен ъгъл",
   "cantileverExtrudeDepth": "Еркер: {depth} m",
   "slabEdgeExtrudeTooltip": "Изтеглете средата на отсечката за еркер",
+  "slabParallelAligned": "Прилепено към линия: {distance} m",
+  "slabPointByPointPrompt": "Поставяйте точки със снап",
   "cancelSlab": "Откажи плоча",
   "slabRectDimensions": "Плоча: {width} x {height} m",
   "moveElement": "Премести",

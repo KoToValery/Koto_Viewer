@@ -656,7 +656,7 @@ class ElementPaletteBar extends StatelessWidget {
             ),
             const SizedBox(width: 4),
           ],
-          if (isDrawingSlab && (hasSlabStartCorner || slabPointCount > 0)) ...[
+          if (isDrawingSlab && slabPointCount > 0) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -665,9 +665,37 @@ class ElementPaletteBar extends StatelessWidget {
                 border: Border.all(color: const Color(0xFF00E5FF)),
               ),
               child: Text(
-                context.l10n.previewSlabCorner2Tag,
-                style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 11),
+                '$slabPointCount т.',
+                style: const TextStyle(
+                  color: Color(0xFF00E5FF),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+            ),
+            const SizedBox(width: 4),
+            if (slabPointCount >= 3) ...[
+              FilledButton.icon(
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                label: Text(
+                  context.l10n.closeSlab(slabPointCount),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF00C853),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: onCloseSlab,
+              ),
+              const SizedBox(width: 4),
+            ],
+            IconButton.filledTonal(
+              icon: const Icon(Icons.undo_rounded, size: 16),
+              tooltip: context.l10n.undoPoint,
+              onPressed: onUndoPoint,
+              visualDensity: VisualDensity.compact,
             ),
             const SizedBox(width: 4),
             IconButton.filledTonal(
@@ -675,6 +703,25 @@ class ElementPaletteBar extends StatelessWidget {
               tooltip: context.l10n.cancelSlab,
               onPressed: onClearSlab,
               visualDensity: VisualDensity.compact,
+            ),
+          ] else if (isDrawingSlab && slabPointCount == 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0x2200E5FF),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF00E5FF)),
+                  const SizedBox(width: 4),
+                  Text(
+                    context.l10n.slabPointByPointPrompt,
+                    style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 11),
+                  ),
+                ],
+              ),
             ),
           ],
         ],

@@ -1136,6 +1136,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get slabEdgeExtrudeTooltip => 'Drag midpoint to extrude cantilever';
 
   @override
+  String slabParallelAligned(String distance) {
+    return 'Aligned to line: $distance m';
+  }
+
+  @override
+  String get slabPointByPointPrompt =>
+      'Tap or hold with snap to place slab points';
+
+  @override
   String get cancelSlab => 'Cancel slab';
 
   @override

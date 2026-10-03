@@ -1144,6 +1144,14 @@ class AppLocalizationsBg extends AppLocalizations {
       'Изтеглете средата на отсечката за еркер';
 
   @override
+  String slabParallelAligned(String distance) {
+    return 'Прилепено към линия: $distance m';
+  }
+
+  @override
+  String get slabPointByPointPrompt => 'Поставяйте точки със снап';
+
+  @override
   String get cancelSlab => 'Откажи плоча';
 
   @override

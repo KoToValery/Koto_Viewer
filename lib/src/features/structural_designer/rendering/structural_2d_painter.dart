@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
+import '../analysis/slab_parallel_alignment_helper.dart';
 import '../models/cantilever_analysis_models.dart';
 import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
@@ -47,6 +49,9 @@ class Structural2dPainter extends CustomPainter {
   final int? mergeCandidateVertexIndex;
   final (Offset, Offset, String)? activeMeasurement;
   final Offset? measurementStartCad;
+  final SlabParallelAlignmentResult? activeParallelSnap;
+  final List<Offset>? previewSlabOffsetPolygon;
+  final AppLocalizations? l10n;
   final double cadUnitsPerMeter;
   final double zoomScale;
   final Offset Function(Offset) cadToScene;
@@ -80,6 +85,9 @@ class Structural2dPainter extends CustomPainter {
     this.slabPointsInProgress = const [],
     this.extrudingGrip,
     this.extrusionDistance,
+    this.activeParallelSnap,
+    this.previewSlabOffsetPolygon,
+    this.l10n,
     this.selectedColumnId,
     this.selectedShearWallId,
     this.selectedBeamId,
@@ -636,18 +644,85 @@ class Structural2dPainter extends CustomPainter {
     final sNew2 = cadToScene(vNew2);
     final sMidNew = cadToScene(midNew);
 
-    // Translucent fill for extruded region
-    final fillPath = Path()
-      ..moveTo(sV1.dx, sV1.dy)
-      ..lineTo(sNew1.dx, sNew1.dy)
-      ..lineTo(sNew2.dx, sNew2.dy)
-      ..lineTo(sV2.dx, sV2.dy)
-      ..close();
+    // 1. Draw Magnetic Parallel Alignment Guideline (ArchiCAD style)
+    if (activeParallelSnap != null) {
+      final sRefA = cadToScene(activeParallelSnap!.refStart);
+      final sRefB = cadToScene(activeParallelSnap!.refEnd);
+      final refVec = sRefB - sRefA;
+      final refLen = refVec.distance;
+      if (refLen > 1e-4) {
+        final uRef = refVec / refLen;
+        // Extend guideline past endpoints for clear alignment sighting across screen
+        final guideStart = sRefA - uRef * (150.0 / zoomScale);
+        final guideEnd = sRefB + uRef * (150.0 / zoomScale);
 
-    final fillPaint = Paint()
-      ..color = const Color(0x3800E5FF)
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(fillPath, fillPaint);
+        final guidePaint = Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 2.0 / zoomScale
+          ..style = PaintingStyle.stroke;
+        canvas.drawLine(guideStart, guideEnd, guidePaint);
+
+        // Magnetic diamond markers at reference segment ends
+        final markerPaint = Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..style = PaintingStyle.fill;
+        void drawDiamond(Offset pt) {
+          final s = 4.5 / zoomScale;
+          final p = Path()
+            ..moveTo(pt.dx, pt.dy - s)
+            ..lineTo(pt.dx + s, pt.dy)
+            ..lineTo(pt.dx, pt.dy + s)
+            ..lineTo(pt.dx - s, pt.dy)
+            ..close();
+          canvas.drawPath(p, markerPaint);
+        }
+        drawDiamond(sRefA);
+        drawDiamond(sRefB);
+      }
+    }
+
+    // 2. Draw preview polygon or extruded region
+    if (previewSlabOffsetPolygon != null && previewSlabOffsetPolygon!.length >= 3) {
+      final previewScenePts = previewSlabOffsetPolygon!.map(cadToScene).toList();
+      final previewPath = Path()..addPolygon(previewScenePts, true);
+      final previewFill = Paint()
+        ..color = const Color(0x3800E5FF)
+        ..style = PaintingStyle.fill;
+      final previewBorder = Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2 / zoomScale;
+      canvas.drawPath(previewPath, previewFill);
+      canvas.drawPath(previewPath, previewBorder);
+    } else {
+      // Translucent fill for extruded region
+      final fillPath = Path()
+        ..moveTo(sV1.dx, sV1.dy)
+        ..lineTo(sNew1.dx, sNew1.dy)
+        ..lineTo(sNew2.dx, sNew2.dy)
+        ..lineTo(sV2.dx, sV2.dy)
+        ..close();
+
+      final fillPaint = Paint()
+        ..color = const Color(0x3800E5FF)
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(fillPath, fillPaint);
+
+      // Perpendicular side connection lines
+      final sidePaint = Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0 / zoomScale;
+      canvas.drawLine(sV1, sNew1, sidePaint);
+      canvas.drawLine(sV2, sNew2, sidePaint);
+
+      // Parallel extruded front edge
+      final frontPaint = Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5 / zoomScale;
+      canvas.drawLine(sNew1, sNew2, frontPaint);
+    }
 
     // Original edge (dimmed line showing existing baseline)
     final ghostEdgePaint = Paint()
@@ -655,21 +730,6 @@ class Structural2dPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5 / zoomScale;
     canvas.drawLine(sV1, sV2, ghostEdgePaint);
-
-    // Perpendicular side connection lines
-    final sidePaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0 / zoomScale;
-    canvas.drawLine(sV1, sNew1, sidePaint);
-    canvas.drawLine(sV2, sNew2, sidePaint);
-
-    // Parallel extruded front edge
-    final frontPaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5 / zoomScale;
-    canvas.drawLine(sNew1, sNew2, frontPaint);
 
     // New corner vertex dots
     final vDotPaint = Paint()
@@ -704,7 +764,13 @@ class Structural2dPainter extends CustomPainter {
     canvas.translate(sMidNew.dx, sMidNew.dy);
     canvas.scale(1.0 / zoomScale);
 
-    final distText = '${d.abs().toStringAsFixed(2)} m';
+    final bool isAligned = activeParallelSnap != null;
+    final distText = isAligned
+        ? (l10n != null
+            ? l10n!.slabParallelAligned(d.abs().toStringAsFixed(2))
+            : '${d.abs().toStringAsFixed(2)} m (Прилепено)')
+        : '${d.abs().toStringAsFixed(2)} m';
+
     final textSpan = TextSpan(
       text: distText,
       style: const TextStyle(
@@ -732,6 +798,16 @@ class Structural2dPainter extends CustomPainter {
       RRect.fromRectAndRadius(bgRect, const Radius.circular(4.0)),
       badgeBgPaint,
     );
+    if (isAligned) {
+      final badgeBorderPaint = Paint()
+        ..color = const Color(0xFF00E5FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bgRect, const Radius.circular(4.0)),
+        badgeBorderPaint,
+      );
+    }
     textPainter.paint(canvas, badgeOffset);
     canvas.restore();
   }
@@ -1397,15 +1473,44 @@ class Structural2dPainter extends CustomPainter {
         for (int i = 0; i < pts.length - 1; i++) {
           canvas.drawLine(pts[i], pts[i + 1], slabPaint);
         }
+
+        bool isCloseSnap = false;
         if (currentCursorCad != null) {
-          canvas.drawLine(pts.last, cadToScene(currentCursorCad!), slabPaint);
+          final sCursor = cadToScene(currentCursorCad!);
+          if (slabPointsInProgress.length >= 3 &&
+              (currentCursorCad! - slabPointsInProgress.first).distance < (28.0 / (cadScale * zoomScale))) {
+            isCloseSnap = true;
+            final closeLinePaint = Paint()
+              ..color = const Color(0xFF00E676)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.5 / zoomScale;
+            canvas.drawLine(pts.last, pts.first, closeLinePaint);
+          } else {
+            canvas.drawLine(pts.last, sCursor, slabPaint);
+          }
         }
 
         final vDot = Paint()
           ..color = const Color(0xFFFF5252)
           ..style = PaintingStyle.fill;
-        for (final p in pts) {
+        for (int i = 0; i < pts.length; i++) {
+          final p = pts[i];
           canvas.drawCircle(p, 4.0 / zoomScale, vDot);
+        }
+
+        // Highlight first point when >= 3 points with closure snap indicator
+        if (slabPointsInProgress.length >= 3) {
+          final ringPaint = Paint()
+            ..color = isCloseSnap ? const Color(0xFF00E676) : const Color(0xFF00E5FF)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = (isCloseSnap ? 3.0 : 1.5) / zoomScale;
+          canvas.drawCircle(pts.first, (isCloseSnap ? 9.0 : 6.0) / zoomScale, ringPaint);
+          if (isCloseSnap) {
+            final innerDot = Paint()
+              ..color = const Color(0xFF00E676)
+              ..style = PaintingStyle.fill;
+            canvas.drawCircle(pts.first, 4.5 / zoomScale, innerDot);
+          }
         }
       }
     } else if (activeTool == StructuralDrawTool.slabOpening &&

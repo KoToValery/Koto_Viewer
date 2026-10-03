@@ -130,18 +130,55 @@ class StructuralPointerPainter extends CustomPainter {
       _drawSnapIndicator(canvas, effectiveTip, snapType!, themeColor);
     }
 
-    // 4. Live rectangular slab preview on pointer overlay (if drawing slab)
-    if (activeTool == StructuralDrawTool.slab && slabStartCornerPos != null) {
-      final rect = Rect.fromPoints(slabStartCornerPos!, effectiveTip);
-      final slabFill = Paint()
-        ..color = themeColor.withValues(alpha: 0.22)
-        ..style = PaintingStyle.fill;
-      final slabBorder = Paint()
-        ..color = themeColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8;
-      canvas.drawRect(rect, slabFill);
-      canvas.drawRect(rect, slabBorder);
+    // 4. Live slab preview on pointer overlay (point-by-point drawing)
+    if (activeTool == StructuralDrawTool.slab) {
+      if (slabPoints != null && slabPoints!.isNotEmpty) {
+        final slabBorder = Paint()
+          ..color = themeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+
+        for (int i = 0; i < slabPoints!.length - 1; i++) {
+          canvas.drawLine(slabPoints![i], slabPoints![i + 1], slabBorder);
+        }
+
+        final bool isClose = slabPoints!.length >= 3 &&
+            (effectiveTip - slabPoints!.first).distance <= 24.0;
+
+        if (isClose) {
+          final closeLine = Paint()
+            ..color = const Color(0xFF00E676)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5;
+          canvas.drawLine(slabPoints!.last, slabPoints!.first, closeLine);
+
+          final closeRing = Paint()
+            ..color = const Color(0xFF00E676)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5;
+          canvas.drawCircle(slabPoints!.first, 8.0, closeRing);
+        } else {
+          canvas.drawLine(slabPoints!.last, effectiveTip, slabBorder);
+        }
+
+        final vDot = Paint()
+          ..color = const Color(0xFFFF5252)
+          ..style = PaintingStyle.fill;
+        for (final p in slabPoints!) {
+          canvas.drawCircle(p, 4.0, vDot);
+        }
+      } else if (slabStartCornerPos != null) {
+        final rect = Rect.fromPoints(slabStartCornerPos!, effectiveTip);
+        final slabFill = Paint()
+          ..color = themeColor.withValues(alpha: 0.22)
+          ..style = PaintingStyle.fill;
+        final slabBorder = Paint()
+          ..color = themeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8;
+        canvas.drawRect(rect, slabFill);
+        canvas.drawRect(rect, slabBorder);
+      }
     }
 
     // 4b. Live rectangular opening preview on pointer overlay (if drawing slab opening)

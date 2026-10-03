@@ -974,6 +974,17 @@
   },
   "slabEdgeExtrudeTooltip": "Drag midpoint to extrude cantilever",
   "@slabEdgeExtrudeTooltip": { "description": "Tooltip for edge midpoint grip" },
+  "slabParallelAligned": "Aligned to line: {distance} m",
+  "@slabParallelAligned": {
+    "description": "Magnetic parallel alignment indicator during slab edge dragging",
+    "placeholders": {
+      "distance": { "type": "String" }
+    }
+  },
+  "slabPointByPointPrompt": "Tap or hold with snap to place slab points",
+  "@slabPointByPointPrompt": {
+    "description": "Guidance hint for point-by-point slab placement tool"
+  },
   "cancelSlab": "Cancel slab",
   "@cancelSlab": { "description": "Cancel rectangular slab drawing" },
   "slabRectDimensions": "Slab: {width} x {height} m",
