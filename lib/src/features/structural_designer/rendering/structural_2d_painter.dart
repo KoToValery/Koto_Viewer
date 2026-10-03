@@ -45,6 +45,8 @@ class Structural2dPainter extends CustomPainter {
   final int? draggingSlabVertexIndex;
   final Offset? draggingSlabVertexPos;
   final int? mergeCandidateVertexIndex;
+  final (Offset, Offset, String)? activeMeasurement;
+  final Offset? measurementStartCad;
   final double cadUnitsPerMeter;
   final double zoomScale;
   final Offset Function(Offset) cadToScene;
@@ -87,6 +89,8 @@ class Structural2dPainter extends CustomPainter {
     this.draggingSlabVertexIndex,
     this.draggingSlabVertexPos,
     this.mergeCandidateVertexIndex,
+    this.activeMeasurement,
+    this.measurementStartCad,
     this.cadUnitsPerMeter = 1.0,
     this.zoomScale = 1.0,
     required this.cadToScene,
@@ -152,6 +156,77 @@ class Structural2dPainter extends CustomPainter {
     if (seismicReport != null) {
       _drawSeismicCenters(canvas);
     }
+
+    // 8. Draw Distance Measurement Dimension Line & Badge
+    if (activeMeasurement != null) {
+      _drawMeasurementLine(canvas, activeMeasurement!.$1, activeMeasurement!.$2, activeMeasurement!.$3);
+    } else if (activeTool == StructuralDrawTool.measure && measurementStartCad != null && currentCursorCad != null) {
+      final p1 = measurementStartCad!;
+      final p2 = currentCursorCad!;
+      final lenM = (p2 - p1).distance / cadUnitsPerMeter;
+      final thickCm = (lenM * 100).round();
+      _drawMeasurementLine(canvas, p1, p2, '${lenM.toStringAsFixed(2)} m ($thickCm cm)');
+    }
+  }
+
+  void _drawMeasurementLine(Canvas canvas, Offset p1Cad, Offset p2Cad, String label) {
+    final p1 = cadToScene(p1Cad);
+    final p2 = cadToScene(p2Cad);
+    final linePaint = Paint()
+      ..color = const Color(0xFFFF5252)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 / zoomScale;
+    canvas.drawLine(p1, p2, linePaint);
+
+    final dx = p2.dx - p1.dx;
+    final dy = p2.dy - p1.dy;
+    final len = math.sqrt(dx * dx + dy * dy);
+    if (len > 1e-4) {
+      final ux = dx / len;
+      final uy = dy / len;
+      final nx = -uy;
+      final ny = ux;
+      final tickSize = 8.0 / zoomScale;
+
+      void drawTick(Offset p) {
+        final t1 = Offset(p.dx + (nx + ux) * tickSize * 0.7, p.dy + (ny + uy) * tickSize * 0.7);
+        final t2 = Offset(p.dx - (nx + ux) * tickSize * 0.7, p.dy - (ny + uy) * tickSize * 0.7);
+        canvas.drawLine(t1, t2, linePaint..strokeWidth = 2.5 / zoomScale);
+      }
+      drawTick(p1);
+      drawTick(p2);
+    }
+
+    // Centered label badge with offset
+    final mid = Offset((p1.dx + p2.dx) / 2.0, (p1.dy + p2.dy) / 2.0);
+    final offsetMid = len > 1e-4
+        ? Offset(mid.dx - (dy / len) * (18.0 / zoomScale), mid.dy + (dx / len) * (18.0 / zoomScale))
+        : mid;
+
+    canvas.save();
+    canvas.translate(offsetMid.dx, offsetMid.dy);
+    canvas.scale(1.0 / zoomScale);
+
+    final span = TextSpan(
+      text: label,
+      style: const TextStyle(
+        color: Color(0xFFFF5252),
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    final tp = TextPainter(text: span, textDirection: TextDirection.ltr)..layout();
+    final bgRect = Rect.fromCenter(center: Offset.zero, width: tp.width + 12.0, height: tp.height + 6.0);
+    final bgPaint = Paint()..color = const Color(0xEE1E1E24);
+    final borderPaint = Paint()
+      ..color = const Color(0xFFFF5252)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(5.0)), bgPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(5.0)), borderPaint);
+    tp.paint(canvas, Offset(-tp.width / 2.0, -tp.height / 2.0));
+
+    canvas.restore();
   }
 
   void _drawGhostStorey(Canvas canvas, StoreyLevel ghost) {
@@ -172,38 +247,25 @@ class Structural2dPainter extends CustomPainter {
     }
   }
 
+  static const List<Color> slabPalette = [
+    Color(0xFF00B0FF), // Sky Blue
+    Color(0xFF00E676), // Emerald Green
+    Color(0xFFFFB300), // Warm Amber
+    Color(0xFFAA00FF), // Vivid Purple
+    Color(0xFFFF5252), // Coral Red
+    Color(0xFF00E5FF), // Deep Cyan
+    Color(0xFFFF9100), // Orange
+    Color(0xFF3D5AFE), // Royal Indigo
+  ];
+
   Color _getSlabBaseColor(StructuralSlab slab, int slabIndex) {
-    // Distinct color palette for different slab fields / thicknesses:
-    final tCm = (slab.thickness * 100).round();
-    switch (tCm) {
-      case 15:
-        return const Color(0xFFFFB300); // Warm Amber
-      case 18:
-        return const Color(0xFF00E676); // Emerald Green
-      case 20:
-        return const Color(0xFF00B0FF); // Sky Blue (Standard)
-      case 22:
-        return const Color(0xFFAA00FF); // Vivid Purple
-      case 25:
-        return const Color(0xFFFF6D00); // Deep Orange
-      case 30:
-        return const Color(0xFF3D5AFE); // Royal Blue
-      default:
-        const palette = [
-          Color(0xFF00B0FF), // Sky Blue
-          Color(0xFF00E676), // Emerald
-          Color(0xFFFFB300), // Amber
-          Color(0xFFAA00FF), // Purple
-          Color(0xFFFF5252), // Coral
-          Color(0xFF00E5FF), // Cyan
-          Color(0xFF7C4DFF), // Deep Purple
-          Color(0xFFFF9100), // Orange
-        ];
-        return palette[slabIndex % palette.length];
+    if (slab.colorValue != null) {
+      return Color(slab.colorValue!);
     }
+    return slabPalette[slabIndex % slabPalette.length];
   }
 
-  void _drawSlabHatch(Canvas canvas, Path clipPath, Color color, {required bool isGhost}) {
+  void _drawSlabHatch(Canvas canvas, Path clipPath, Color color, {required int slabIndex, required bool isGhost}) {
     canvas.save();
     canvas.clipPath(clipPath);
 
@@ -215,15 +277,46 @@ class Structural2dPainter extends CustomPainter {
 
     // Spacing between diagonal hatch lines in scene pixels:
     final spacing = (28.0 / zoomScale).clamp(0.4, 200.0);
-    final minX = bounds.left - bounds.height;
-    final maxX = bounds.right + bounds.height;
+    final minX = bounds.left - bounds.height * 1.5;
+    final maxX = bounds.right + bounds.height * 1.5;
 
+    // Vary hatch angle based on slabIndex so different slab panels immediately stand out
+    final patternMode = slabIndex % 4;
     for (double x = minX; x <= maxX; x += spacing) {
-      canvas.drawLine(
-        Offset(x, bounds.top),
-        Offset(x + bounds.height, bounds.bottom),
-        hatchPaint,
-      );
+      if (patternMode == 0) {
+        // +45 degrees
+        canvas.drawLine(
+          Offset(x, bounds.top),
+          Offset(x + bounds.height, bounds.bottom),
+          hatchPaint,
+        );
+      } else if (patternMode == 1) {
+        // -45 degrees
+        canvas.drawLine(
+          Offset(x, bounds.bottom),
+          Offset(x + bounds.height, bounds.top),
+          hatchPaint,
+        );
+      } else if (patternMode == 2) {
+        // Steeper 60 degrees
+        canvas.drawLine(
+          Offset(x, bounds.top),
+          Offset(x + bounds.height * 0.58, bounds.bottom),
+          hatchPaint,
+        );
+      } else {
+        // Cross-hatch
+        canvas.drawLine(
+          Offset(x, bounds.top),
+          Offset(x + bounds.height, bounds.bottom),
+          hatchPaint,
+        );
+        canvas.drawLine(
+          Offset(x, bounds.bottom),
+          Offset(x + bounds.height, bounds.top),
+          hatchPaint,
+        );
+      }
     }
     canvas.restore();
   }
@@ -232,42 +325,32 @@ class Structural2dPainter extends CustomPainter {
     if (isGhost || slab.polygon.length < 3) return;
 
     final centroidScene = cadToScene(slab.centroid);
-    final structElev = currentStorey.structuralElevationFor(slab);
+    // Overhead slab bottom-up perspective:
+    // When drawing on level H, structural plans represent the slab overhead (+ storey height)
+    final overheadElev = currentStorey.elevation + currentStorey.height - (slab.floorFinish ?? currentStorey.floorFinishThickness);
     final int thickCm = (slab.thickness * 100).round();
 
-    final sign = structElev > 0 ? '+' : (structElev == 0 ? '±' : '');
-    final elevStr = '$sign${structElev.toStringAsFixed(2)}';
+    final sign = overheadElev > 0 ? '+' : (overheadElev == 0 ? '±' : '');
+    final elevStr = '$sign${overheadElev.toStringAsFixed(2)}';
 
     canvas.save();
     canvas.translate(centroidScene.dx, centroidScene.dy);
     canvas.scale(1.0 / zoomScale);
 
-    // Render central badge with downward structural level symbol:
-    // Line 1: ▼ К.К. -0.05
-    // Line 2: d = 20 cm
-    final titleSpan = TextSpan(
-      children: [
-        const TextSpan(
-          text: '▼ ',
-          style: TextStyle(
-            color: Color(0xFF00E5FF),
-            fontSize: 10.5,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        TextSpan(
-          text: 'К.К. $elevStr',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 10.5,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.3,
-          ),
-        ),
-      ],
+    // Section slab elevation marker:
+    // Downward structural level triangle \/ resting on horizontal shelf line
+    // Level elevation "+2.80" above the shelf, thickness "d = 20 cm" below
+    final elevSpan = TextSpan(
+      text: elevStr,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 11.0,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 0.3,
+      ),
     );
-    final titlePainter = TextPainter(
-      text: titleSpan,
+    final elevPainter = TextPainter(
+      text: elevSpan,
       textDirection: TextDirection.ltr,
     )..layout();
 
@@ -284,20 +367,34 @@ class Structural2dPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final badgeWidth = math.max(titlePainter.width, subPainter.width) + 16.0;
-    final badgeHeight = titlePainter.height + subPainter.height + 10.0;
+    final headerSpan = TextSpan(
+      text: '▲ ПЛОЧА НАД ${currentStorey.name.toUpperCase()}',
+      style: const TextStyle(
+        color: Color(0xFF00E5FF),
+        fontSize: 8.0,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 0.4,
+      ),
+    );
+    final headerPainter = TextPainter(
+      text: headerSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final contentWidth = math.max(headerPainter.width, math.max(elevPainter.width, subPainter.width) + 24.0);
+    final badgeWidth = contentWidth + 16.0;
+    final badgeHeight = headerPainter.height + elevPainter.height + subPainter.height + 16.0;
     final badgeRect = Rect.fromCenter(
       center: Offset.zero,
       width: badgeWidth,
       height: badgeHeight,
     );
 
-    // Translucent dark card pill with subtle border in slab color
     final bgPaint = Paint()
-      ..color = const Color(0xEE1A1A22)
+      ..color = const Color(0xF0181A22)
       ..style = PaintingStyle.fill;
     final borderPaint = Paint()
-      ..color = slabColor.withValues(alpha: 0.7)
+      ..color = slabColor.withValues(alpha: 0.75)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
@@ -305,13 +402,44 @@ class Structural2dPainter extends CustomPainter {
     canvas.drawRRect(rrect, bgPaint);
     canvas.drawRRect(rrect, borderPaint);
 
-    titlePainter.paint(
+    // 1. Header (overhead slab indicator)
+    headerPainter.paint(
       canvas,
-      Offset(-titlePainter.width / 2.0, -badgeHeight / 2.0 + 4.0),
+      Offset(-headerPainter.width / 2.0, -badgeHeight / 2.0 + 4.0),
     );
+
+    // 2. Section Triangle & Shelf Line
+    final shelfY = -badgeHeight / 2.0 + headerPainter.height + elevPainter.height + 6.0;
+    final shelfStartX = -badgeWidth / 2.0 + 10.0;
+    final shelfEndX = badgeWidth / 2.0 - 10.0;
+
+    final shelfPaint = Paint()
+      ..color = Colors.white70
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawLine(Offset(shelfStartX, shelfY), Offset(shelfEndX, shelfY), shelfPaint);
+
+    // Authentic structural level triangle: apex pointing down touching the shelf line
+    final triPath = Path()
+      ..moveTo(shelfStartX + 4.0, shelfY - 7.0)
+      ..lineTo(shelfStartX + 12.0, shelfY - 7.0)
+      ..lineTo(shelfStartX + 8.0, shelfY)
+      ..close();
+    final triPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(triPath, triPaint);
+
+    // 3. Elevation text above shelf
+    elevPainter.paint(
+      canvas,
+      Offset(shelfStartX + 16.0, shelfY - elevPainter.height - 1.0),
+    );
+
+    // 4. Thickness text below shelf
     subPainter.paint(
       canvas,
-      Offset(-subPainter.width / 2.0, -badgeHeight / 2.0 + titlePainter.height + 5.0),
+      Offset(shelfStartX + 16.0, shelfY + 2.0),
     );
 
     canvas.restore();
@@ -374,7 +502,7 @@ class Structural2dPainter extends CustomPainter {
     canvas.drawPath(path, fillPaint);
 
     // Light transparent diagonal hatch pattern (щриховка) for clear slab distinction
-    _drawSlabHatch(canvas, path, slabColor, isGhost: isGhost);
+    _drawSlabHatch(canvas, path, slabColor, slabIndex: slabIndex, isGhost: isGhost);
 
     canvas.drawPath(path, borderPaint);
 
@@ -826,6 +954,46 @@ class Structural2dPainter extends CustomPainter {
           handlePaint,
         );
       }
+    }
+
+    // Shear wall designation / number badge (e.g. "Ш1", "Ш2" or "W1", "W2")
+    if (!isGhost && wall.displayName.isNotEmpty) {
+      final midScene = Offset(
+        (pts[0].dx + pts[1].dx + pts[2].dx + pts[3].dx) / 4.0,
+        (pts[0].dy + pts[1].dy + pts[2].dy + pts[3].dy) / 4.0,
+      );
+
+      canvas.save();
+      canvas.translate(midScene.dx, midScene.dy);
+      canvas.scale(1.0 / zoomScale);
+
+      final textSpan = TextSpan(
+        text: wall.displayName,
+        style: TextStyle(
+          color: isSelected ? const Color(0xFFFFD54F) : Colors.white,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      );
+      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+      final bgRect = Rect.fromCenter(
+        center: Offset.zero,
+        width: tp.width + 6.0,
+        height: tp.height + 2.5,
+      );
+      final labelBgPaint = Paint()
+        ..color = const Color(0xCC1E1E24)
+        ..style = PaintingStyle.fill;
+      final labelBorderPaint = Paint()
+        ..color = isSelected ? const Color(0xFFFFB300) : const Color(0x66FFFFFF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8;
+      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), labelBgPaint);
+      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), labelBorderPaint);
+      tp.paint(canvas, Offset(-tp.width / 2.0, -tp.height / 2.0));
+
+      canvas.restore();
     }
   }
 
@@ -1368,10 +1536,11 @@ class Structural2dPainter extends CustomPainter {
   void _drawSeismicCenters(Canvas canvas) {
     if (seismicReport == null) return;
     final check = seismicReport!.getCheckForStorey(currentStorey.id);
-    if (check == null) return;
+    if (check == null || !check.hasSlabDiaphragm) return;
+    if (check.centerOfMassCad == null || check.centerOfRigidityCad == null) return;
 
-    final cmScene = cadToScene(check.centerOfMassCad);
-    final crScene = cadToScene(check.centerOfRigidityCad);
+    final cmScene = cadToScene(check.centerOfMassCad!);
+    final crScene = cadToScene(check.centerOfRigidityCad!);
 
     final double distScene = (cmScene - crScene).distance;
 

@@ -109,7 +109,9 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               children: [
                 _buildStatCard(
                   title: context.l10n.seismicStatMaxEccentricity,
-                  value: '${(report.maxEccentricityRatio * 100).round()}%',
+                  value: report.hasAnySlabDiaphragm
+                      ? '${(report.maxEccentricityRatio * 100).round()}%'
+                      : '—',
                   color: report.hasTorsionalSensitivity
                       ? const Color(0xFFFF1744)
                       : (report.maxEccentricityRatio > 0.08
@@ -264,6 +266,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
     );
   }
 
+
+
   Widget _buildTorsionalTab(BuildContext context, SeismicAnalysisReport report) {
     if (report.storeyChecks.isEmpty) {
       return Center(
@@ -278,8 +282,94 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, idx) {
         final check = report.storeyChecks[idx];
+
+        if (!check.hasSlabDiaphragm) {
+          const color = Color(0xFFFFB300);
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF262626),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color.withValues(alpha: 0.6), width: 1.2),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: color, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${check.storeyName} — ${context.l10n.seismicEccentricityTitle}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: color),
+                      ),
+                      child: Text(
+                        context.l10n.seismicNoSlabBadge,
+                        style: const TextStyle(
+                          color: color,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSubmetric(context.l10n.seismicEccentricityXLabel, context.l10n.seismicNoSlabEccentricity),
+                    _buildSubmetric(context.l10n.seismicEccentricityYLabel, context.l10n.seismicNoSlabEccentricity),
+                    _buildSubmetric(context.l10n.seismicLimitEc8Label, '≤ 15%'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: color.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline, size: 16, color: color),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          check.localizedRecommendation(context.l10n),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         final isSensitive = check.isTorsionallySensitive;
         final color = isSensitive ? const Color(0xFFFF1744) : (check.maxEccentricityRatio > 0.08 ? const Color(0xFFFFB300) : const Color(0xFF00E676));
+        final eccX = check.eccentricityM?.dx ?? 0.0;
+        final eccY = check.eccentricityM?.dy ?? 0.0;
 
         return Container(
           padding: const EdgeInsets.all(12),
@@ -330,8 +420,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSubmetric(context.l10n.seismicEccentricityXLabel, '${check.eccentricityM.dx.toStringAsFixed(2)} m (${(check.eccentricityRatioX * 100).round()}%)'),
-                  _buildSubmetric(context.l10n.seismicEccentricityYLabel, '${check.eccentricityM.dy.toStringAsFixed(2)} m (${(check.eccentricityRatioY * 100).round()}%)'),
+                  _buildSubmetric(context.l10n.seismicEccentricityXLabel, '${eccX.toStringAsFixed(2)} m (${(check.eccentricityRatioX * 100).round()}%)'),
+                  _buildSubmetric(context.l10n.seismicEccentricityYLabel, '${eccY.toStringAsFixed(2)} m (${(check.eccentricityRatioY * 100).round()}%)'),
                   _buildSubmetric(context.l10n.seismicLimitEc8Label, '≤ 15%'),
                 ],
               ),
@@ -388,6 +478,61 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, idx) {
         final check = report.storeyChecks[idx];
+
+        if (!check.hasSlabDiaphragm) {
+          const cardColor = Color(0xFFFFB300);
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF262626),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cardColor.withValues(alpha: 0.6), width: 1.2),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.line_weight_rounded, color: cardColor, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${check.storeyName} — ${context.l10n.seismicShearWallCoverageTitle}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: cardColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: cardColor),
+                      ),
+                      child: Text(
+                        context.l10n.seismicNoSlabBadge,
+                        style: const TextStyle(
+                          color: cardColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  context.l10n.seismicNoSlabWallCoverage,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ],
+            ),
+          );
+        }
+
         final bool okX = check.isWallCoverageSufficientX;
         final bool okY = check.isWallCoverageSufficientY;
         final Color cardColor = (!okX || !okY) ? const Color(0xFFFFB300) : const Color(0xFF00E676);
@@ -458,6 +603,30 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 context.l10n.seismicWallRecommendationText(check.floorAreaM2.toStringAsFixed(0)),
                 style: const TextStyle(color: Colors.white60, fontSize: 10),
               ),
+
+              if (check.disconnectedWallNames.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0x33FFB300),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFFB300)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 14, color: Color(0xFFFFB300)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          context.l10n.seismicWallsOutsideSlabWarning(check.disconnectedWallNames.length),
+                          style: const TextStyle(color: Color(0xFFFFB300), fontSize: 10, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         );

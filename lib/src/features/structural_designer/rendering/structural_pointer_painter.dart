@@ -12,7 +12,8 @@ enum StructuralDrawTool {
   shearWall(Icons.line_weight_rounded),
   beam(Icons.horizontal_rule_rounded),
   slab(Icons.crop_square_rounded),
-  slabOpening(Icons.tab_unselected_rounded);
+  slabOpening(Icons.tab_unselected_rounded),
+  measure(Icons.straighten_rounded);
 
   final IconData icon;
   const StructuralDrawTool(this.icon);
@@ -33,6 +34,8 @@ enum StructuralDrawTool {
         return l10n.toolSlab;
       case StructuralDrawTool.slabOpening:
         return l10n.toolOpening;
+      case StructuralDrawTool.measure:
+        return l10n.toolMeasure;
     }
   }
 }
@@ -54,6 +57,7 @@ class StructuralPointerPainter extends CustomPainter {
   final Size? previewOpeningSize;
   final List<Offset>? previewOpeningPolygon;
   final List<Offset>? slabPoints;
+  final Offset? measureStartPos;
   final String? liveDimensionText;
   final double scale;
   final AppLocalizations? l10n;
@@ -73,6 +77,7 @@ class StructuralPointerPainter extends CustomPainter {
     this.previewOpeningSize,
     this.previewOpeningPolygon,
     this.slabPoints,
+    this.measureStartPos,
     this.liveDimensionText,
     this.scale = 1.0,
     this.l10n,
@@ -186,9 +191,40 @@ class StructuralPointerPainter extends CustomPainter {
       }
     }
 
-    // 5. Dimension badge snapped to 10 cm (when drawing wall, beam, slab, or custom opening)
+    // 4c. Active measurement ruler line and architectural ticks
+    if (activeTool == StructuralDrawTool.measure && measureStartPos != null) {
+      final p1 = measureStartPos!;
+      final p2 = effectiveTip;
+      final measurePaint = Paint()
+        ..color = const Color(0xFFFF5252)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+      canvas.drawLine(p1, p2, measurePaint);
+
+      // Draw architectural 45-degree slash ticks at ends
+      const tickSize = 8.0;
+      final dx = p2.dx - p1.dx;
+      final dy = p2.dy - p1.dy;
+      final len = math.sqrt(dx * dx + dy * dy);
+      if (len > 1e-4) {
+        final ux = dx / len;
+        final uy = dy / len;
+        final nx = -uy;
+        final ny = ux;
+
+        void drawTick(Offset p) {
+          final t1 = Offset(p.dx + (nx + ux) * tickSize * 0.7, p.dy + (ny + uy) * tickSize * 0.7);
+          final t2 = Offset(p.dx - (nx + ux) * tickSize * 0.7, p.dy - (ny + uy) * tickSize * 0.7);
+          canvas.drawLine(t1, t2, measurePaint..strokeWidth = 2.5);
+        }
+        drawTick(p1);
+        drawTick(p2);
+      }
+    }
+
+    // 5. Dimension badge snapped to 10 cm (when drawing wall, beam, slab, custom opening, or measuring)
     if (liveDimensionText != null) {
-      final startPos = wallStartPos ?? beamStartPos ?? slabStartCornerPos ?? openingStartCornerPos;
+      final startPos = wallStartPos ?? beamStartPos ?? slabStartCornerPos ?? openingStartCornerPos ?? measureStartPos;
       if (startPos != null) {
         _drawDimensionBadge(canvas, startPos, effectiveTip, liveDimensionText!);
       }

@@ -36,14 +36,17 @@ class StoreySeismicCheck {
   final String storeyName;
   final int storeyIndex;
 
-  /// Center of Mass (CM) in CAD coordinates.
-  final Offset centerOfMassCad;
+  /// True if the storey has a reinforced concrete slab acting as a horizontal seismic diaphragm.
+  final bool hasSlabDiaphragm;
 
-  /// Center of Rigidity / Stiffness (CR) in CAD coordinates.
-  final Offset centerOfRigidityCad;
+  /// Center of Mass (CM) in CAD coordinates, or null if no slab diaphragm exists.
+  final Offset? centerOfMassCad;
 
-  /// Physical eccentricity vector (e_x, e_y) in meters.
-  final Offset eccentricityM;
+  /// Center of Rigidity / Stiffness (CR) in CAD coordinates, or null if no diaphragm exists.
+  final Offset? centerOfRigidityCad;
+
+  /// Physical eccentricity vector (e_x, e_y) in meters, or null if no diaphragm exists.
+  final Offset? eccentricityM;
 
   /// Total building plan dimensions in meters at this storey.
   final double dimensionXM;
@@ -82,6 +85,14 @@ class StoreySeismicCheck {
   /// IDs of shear walls discontinued on this storey.
   final List<String> discontinuousWallIds;
 
+  /// IDs of shear walls located outside the slab boundary (not connected to diaphragm).
+  final List<String> disconnectedWallIds;
+  final List<String> disconnectedWallNames;
+
+  /// IDs of columns located outside the slab boundary (not connected to diaphragm).
+  final List<String> disconnectedColumnIds;
+  final List<String> disconnectedColumnNames;
+
   /// Lateral stiffness index (sum EI / h³).
   final double lateralStiffnessIndex;
 
@@ -101,9 +112,10 @@ class StoreySeismicCheck {
     required this.storeyId,
     required this.storeyName,
     required this.storeyIndex,
-    required this.centerOfMassCad,
-    required this.centerOfRigidityCad,
-    required this.eccentricityM,
+    this.hasSlabDiaphragm = true,
+    this.centerOfMassCad,
+    this.centerOfRigidityCad,
+    this.eccentricityM,
     required this.dimensionXM,
     required this.dimensionYM,
     required this.eccentricityRatioX,
@@ -119,6 +131,10 @@ class StoreySeismicCheck {
     required this.floatingColumnIds,
     required this.floatingColumnNames,
     required this.discontinuousWallIds,
+    this.disconnectedWallIds = const [],
+    this.disconnectedWallNames = const [],
+    this.disconnectedColumnIds = const [],
+    this.disconnectedColumnNames = const [],
     required this.lateralStiffnessIndex,
     this.stiffnessRatioToAbove,
     required this.isSoftStorey,
@@ -126,34 +142,50 @@ class StoreySeismicCheck {
     required this.architectRecommendation,
   });
 
-  double get maxEccentricityM =>
-      (eccentricityM.dx.abs() > eccentricityM.dy.abs())
-          ? eccentricityM.dx.abs()
-          : eccentricityM.dy.abs();
+  double get maxEccentricityM {
+    if (eccentricityM == null) return 0.0;
+    return (eccentricityM!.dx.abs() > eccentricityM!.dy.abs())
+        ? eccentricityM!.dx.abs()
+        : eccentricityM!.dy.abs();
+  }
 
-  double get maxEccentricityRatio =>
-      (eccentricityRatioX > eccentricityRatioY)
-          ? eccentricityRatioX
-          : eccentricityRatioY;
+  double get maxEccentricityRatio {
+    if (!hasSlabDiaphragm) return 0.0;
+    return (eccentricityRatioX > eccentricityRatioY)
+        ? eccentricityRatioX
+        : eccentricityRatioY;
+  }
 
   String localizedRecommendation(AppLocalizations l10n) {
+    if (!hasSlabDiaphragm) {
+      return l10n.seismicRecNoSlabDiaphragm;
+    }
+
     final StringBuffer rec = StringBuffer();
+    if (disconnectedWallNames.isNotEmpty) {
+      rec.write(l10n.seismicRecDisconnectedWalls(disconnectedWallNames.join(', ')));
+      rec.write(' ');
+    }
+    if (disconnectedColumnNames.isNotEmpty) {
+      rec.write(l10n.seismicRecDisconnectedCols(disconnectedColumnNames.join(', ')));
+      rec.write(' ');
+    }
     if (floatingColumnNames.isNotEmpty) {
       rec.write(l10n.seismicRecFloatingCols(floatingColumnNames.join(', ')));
     }
-    if (isTorsionallySensitive) {
+    if (isTorsionallySensitive && centerOfMassCad != null && centerOfRigidityCad != null) {
       rec.write(l10n.seismicRecHighTorsion(
         maxEccentricityM.toStringAsFixed(2),
         (maxEccentricityRatio * 100).round(),
       ));
-      if (centerOfRigidityCad.dx < centerOfMassCad.dx) {
+      if (centerOfRigidityCad!.dx < centerOfMassCad!.dx) {
         rec.write(l10n.seismicRecAddWallEast);
-      } else if (centerOfRigidityCad.dx > centerOfMassCad.dx) {
+      } else if (centerOfRigidityCad!.dx > centerOfMassCad!.dx) {
         rec.write(l10n.seismicRecAddWallWest);
       }
-      if (centerOfRigidityCad.dy < centerOfMassCad.dy) {
+      if (centerOfRigidityCad!.dy < centerOfMassCad!.dy) {
         rec.write(l10n.seismicRecAddWallNorth);
-      } else if (centerOfRigidityCad.dy > centerOfMassCad.dy) {
+      } else if (centerOfRigidityCad!.dy > centerOfMassCad!.dy) {
         rec.write(l10n.seismicRecAddWallSouth);
       }
     } else if (!isWallCoverageSufficientX || !isWallCoverageSufficientY) {
@@ -276,6 +308,8 @@ class SeismicAnalysisReport {
   final List<OpeningProximityCheck> openingChecks;
   final int totalFloatingColumnsCount;
   final int totalDiscontinuousWallsCount;
+  final int totalDisconnectedWallsCount;
+  final int totalDisconnectedColumnsCount;
   final bool hasTorsionalSensitivity;
   final bool hasSoftStorey;
   final bool hasWallDeficit;
@@ -288,6 +322,8 @@ class SeismicAnalysisReport {
     required this.openingChecks,
     required this.totalFloatingColumnsCount,
     required this.totalDiscontinuousWallsCount,
+    this.totalDisconnectedWallsCount = 0,
+    this.totalDisconnectedColumnsCount = 0,
     required this.hasTorsionalSensitivity,
     required this.hasSoftStorey,
     required this.hasWallDeficit,
@@ -301,12 +337,20 @@ class SeismicAnalysisReport {
     openingChecks: [],
     totalFloatingColumnsCount: 0,
     totalDiscontinuousWallsCount: 0,
+    totalDisconnectedWallsCount: 0,
+    totalDisconnectedColumnsCount: 0,
     hasTorsionalSensitivity: false,
     hasSoftStorey: false,
     hasWallDeficit: false,
     maxEccentricityRatio: 0.0,
     overallRisk: SeismicRiskLevel.regular,
   );
+
+  bool get hasDisconnectedElements =>
+      totalDisconnectedWallsCount > 0 || totalDisconnectedColumnsCount > 0;
+
+  bool get hasAnySlabDiaphragm =>
+      storeyChecks.any((s) => s.hasSlabDiaphragm);
 
   bool isColumnFloating(String columnId) {
     for (final s in storeyChecks) {

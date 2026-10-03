@@ -1494,7 +1494,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get depthHCm => 'Височина h (cm)';
 
   @override
-  String get slabThicknessTitle => 'Дебелина на плоча';
+  String get slabThicknessTitle => 'Дебелина на плочата';
 
   @override
   String get slabThicknessHCm => 'Дебелина h (cm)';
@@ -1768,6 +1768,41 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String get seismicNoSlabBadge => 'Липсва плоча';
+
+  @override
+  String get seismicNoSlabEccentricity => 'Невъзможно без плоча';
+
+  @override
+  String get seismicRecNoSlabDiaphragm =>
+      'Липсва подова плоча на този етаж. Съгласно Еврокод 8 и строителната динамика, над колоните и шайбите е необходима плоча, която да формира хоризонтална сеизмична диафрагма и да позволи изчисляване на Центъра на масите (CM), Центъра на коравината (CR) и ексцентрицитета.';
+
+  @override
+  String seismicRecDisconnectedWalls(String names) {
+    return 'Шайби $names са разположени извън очертанията на плочата и не са свързани с подовата диафрагма. Те са изключени от пресмятането на коравината (CR) и сеизмичния център.';
+  }
+
+  @override
+  String seismicRecDisconnectedCols(String names) {
+    return 'Колони $names са разположени извън очертанията на плочата и не са свързани с подовата диафрагма.';
+  }
+
+  @override
+  String seismicWallsOutsideSlabWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count шайби извън плочата (изключени от диафрагмата)',
+      one: '1 шайба извън плочата (изключена от диафрагмата)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get seismicNoSlabWallCoverage =>
+      'Не може да се пресметне процентно покритие на шайбите без подова плоча.';
+
+  @override
   String get verticalBasePressure => 'Базисен натиск';
 
   @override
@@ -1915,5 +1950,90 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String verticalBasePressureHighText(String pressure) {
     return 'Базисният натиск ($pressure kPa) е висок. Препоръчва се цялостна фундаментна плоча (mat foundation) или пилотно фундиране след геоложки доклад.';
+  }
+
+  @override
+  String get toolMeasure => 'Мярка';
+
+  @override
+  String get distanceCentimeters => 'Разстояние (см)';
+
+  @override
+  String get loadStructuralModule => 'Зареди конструктивния модул';
+
+  @override
+  String get updatingLayers => 'Обновяване на слоевете...';
+
+  @override
+  String get isolateStructuralLayers => 'Изолирай конструктивни';
+
+  @override
+  String get showAllLayers => 'Всички слоеве';
+
+  @override
+  String get layersPreparationTitle => 'Подготовка на слоеве за BIM';
+
+  @override
+  String get layersPreparationSubtitle =>
+      'Скрийте излишните архитектурни слоеве (мебели, текстове, щриховки) за максимална прегледност и бързина.';
+
+  @override
+  String get exportBimModel => 'Експорт на BiM модел';
+
+  @override
+  String get exportBimJson => 'BiM проект (JSON)';
+
+  @override
+  String get exportStructuralDxf => 'Конструктивен AutoCAD (DXF)';
+
+  @override
+  String get exportSuccess => 'Моделът беше експортиран успешно';
+
+  @override
+  String exportFailed(String error) {
+    return 'Неуспешен експорт: $error';
+  }
+
+  @override
+  String slabOverStorey(String storey) {
+    return 'Плоча над $storey';
+  }
+
+  @override
+  String get shearWallSizePreset => '25×150 см';
+
+  @override
+  String get shearWallSizePresetAlt => '25×120 см';
+
+  @override
+  String get customWallDimensions => 'Произволна шайба...';
+
+  @override
+  String measuredDistance(String meters, String cm) {
+    return 'Разстояние: $meters m ($cm cm)';
+  }
+
+  @override
+  String measuredDelta(String dx, String dy) {
+    return 'ΔX = $dx m, ΔY = $dy m';
+  }
+
+  @override
+  String get clearMeasurement => 'Изчисти';
+
+  @override
+  String get columnNamePrefix => 'К';
+
+  @override
+  String get shearWallNamePrefix => 'Ш';
+
+  @override
+  String slabSectionElevationMarker(String elevation) {
+    return 'К.К. $elevation';
+  }
+
+  @override
+  String slabThicknessLabel(String thickness) {
+    return 'd = $thickness cm';
   }
 }

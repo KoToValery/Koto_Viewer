@@ -170,12 +170,45 @@ class StructuralColumn {
       isMirrored: isMirrored ?? this.isMirrored,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'center': {'dx': center.dx, 'dy': center.dy},
+    'shape': shape.name,
+    'width': width,
+    'height': height,
+    'rotationRad': rotationRad,
+    'thickness': thickness,
+    'isMirrored': isMirrored,
+  };
+
+  factory StructuralColumn.fromJson(Map<String, dynamic> json) {
+    return StructuralColumn(
+      id: json['id'] as String,
+      name: json['name'] as String?,
+      center: Offset(
+        (json['center']['dx'] as num).toDouble(),
+        (json['center']['dy'] as num).toDouble(),
+      ),
+      shape: ColumnShape.values.firstWhere(
+        (s) => s.name == json['shape'],
+        orElse: () => ColumnShape.rectangular,
+      ),
+      width: (json['width'] as num?)?.toDouble() ?? 0.25,
+      height: (json['height'] as num?)?.toDouble() ?? 0.25,
+      rotationRad: (json['rotationRad'] as num?)?.toDouble() ?? 0.0,
+      thickness: (json['thickness'] as num?)?.toDouble() ?? 0.25,
+      isMirrored: json['isMirrored'] as bool? ?? false,
+    );
+  }
 }
 
 /// Represents a structural reinforced concrete shear wall (шайба).
 /// The line from [start] to [end] is the LEADING REFERENCE LINE (default on the LEFT of the wall).
 class StructuralShearWall {
   final String id;
+  final String? name;
   final Offset start;
   final Offset end;
   final double thickness; // in meters (default 0.25)
@@ -183,11 +216,15 @@ class StructuralShearWall {
 
   const StructuralShearWall({
     required this.id,
+    this.name,
     required this.start,
     required this.end,
     this.thickness = 0.25,
     this.isFlipped = false,
   });
+
+  /// User-facing shear wall display name (e.g. "Ш1", "Ш2" or "W1", "W2"). Falls back to "Ш" if empty.
+  String get displayName => (name != null && name!.trim().isNotEmpty) ? name!.trim() : 'Ш';
 
   double get length {
     final dx = end.dx - start.dx;
@@ -224,6 +261,7 @@ class StructuralShearWall {
 
   StructuralShearWall copyWith({
     String? id,
+    String? name,
     Offset? start,
     Offset? end,
     double? thickness,
@@ -231,10 +269,37 @@ class StructuralShearWall {
   }) {
     return StructuralShearWall(
       id: id ?? this.id,
+      name: name ?? this.name,
       start: start ?? this.start,
       end: end ?? this.end,
       thickness: thickness ?? this.thickness,
       isFlipped: isFlipped ?? this.isFlipped,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'start': {'dx': start.dx, 'dy': start.dy},
+    'end': {'dx': end.dx, 'dy': end.dy},
+    'thickness': thickness,
+    'isFlipped': isFlipped,
+  };
+
+  factory StructuralShearWall.fromJson(Map<String, dynamic> json) {
+    return StructuralShearWall(
+      id: json['id'] as String,
+      name: json['name'] as String?,
+      start: Offset(
+        (json['start']['dx'] as num).toDouble(),
+        (json['start']['dy'] as num).toDouble(),
+      ),
+      end: Offset(
+        (json['end']['dx'] as num).toDouble(),
+        (json['end']['dy'] as num).toDouble(),
+      ),
+      thickness: (json['thickness'] as num?)?.toDouble() ?? 0.25,
+      isFlipped: json['isFlipped'] as bool? ?? false,
     );
   }
 }
@@ -314,6 +379,32 @@ class StructuralBeam {
       width: width ?? this.width,
       depth: depth ?? this.depth,
       isSecondary: isSecondary ?? this.isSecondary,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'start': {'dx': start.dx, 'dy': start.dy},
+    'end': {'dx': end.dx, 'dy': end.dy},
+    'width': width,
+    'depth': depth,
+    'isSecondary': isSecondary,
+  };
+
+  factory StructuralBeam.fromJson(Map<String, dynamic> json) {
+    return StructuralBeam(
+      id: json['id'] as String,
+      start: Offset(
+        (json['start']['dx'] as num).toDouble(),
+        (json['start']['dy'] as num).toDouble(),
+      ),
+      end: Offset(
+        (json['end']['dx'] as num).toDouble(),
+        (json['end']['dy'] as num).toDouble(),
+      ),
+      width: (json['width'] as num?)?.toDouble() ?? 0.25,
+      depth: (json['depth'] as num?)?.toDouble() ?? 0.50,
+      isSecondary: json['isSecondary'] as bool? ?? false,
     );
   }
 }
@@ -500,6 +591,32 @@ class StructuralGridAxis {
       bubbleAtEnd: bubbleAtEnd ?? this.bubbleAtEnd,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'start': {'dx': start.dx, 'dy': start.dy},
+    'end': {'dx': end.dx, 'dy': end.dy},
+    'bubbleAtStart': bubbleAtStart,
+    'bubbleAtEnd': bubbleAtEnd,
+  };
+
+  factory StructuralGridAxis.fromJson(Map<String, dynamic> json) {
+    return StructuralGridAxis(
+      id: json['id'] as String,
+      name: json['name'] as String? ?? '1',
+      start: Offset(
+        (json['start']['dx'] as num).toDouble(),
+        (json['start']['dy'] as num).toDouble(),
+      ),
+      end: Offset(
+        (json['end']['dx'] as num).toDouble(),
+        (json['end']['dy'] as num).toDouble(),
+      ),
+      bubbleAtStart: json['bubbleAtStart'] as bool? ?? true,
+      bubbleAtEnd: json['bubbleAtEnd'] as bool? ?? true,
+    );
+  }
 }
 
 /// Represents a reinforced concrete slab (плоча).
@@ -509,6 +626,7 @@ class StructuralSlab {
   final List<List<Offset>> openings; // Staircase, elevator, shaft cutouts
   final double thickness; // in meters (default 0.20)
   final double? floorFinish; // in meters (flooring/screed finish thickness, default 0.05)
+  final int? colorValue; // ARGB hex integer for distinct custom color
 
   const StructuralSlab({
     required this.id,
@@ -516,6 +634,7 @@ class StructuralSlab {
     this.openings = const [],
     this.thickness = 0.20,
     this.floorFinish,
+    this.colorValue,
   });
 
   /// Signed area of polygon using shoelace formula.
@@ -913,6 +1032,7 @@ class StructuralSlab {
     List<List<Offset>>? openings,
     double? thickness,
     double? floorFinish,
+    int? colorValue,
   }) {
     return StructuralSlab(
       id: id ?? this.id,
@@ -920,6 +1040,35 @@ class StructuralSlab {
       openings: openings ?? this.openings,
       thickness: thickness ?? this.thickness,
       floorFinish: floorFinish ?? this.floorFinish,
+      colorValue: colorValue ?? this.colorValue,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'polygon': polygon.map((p) => {'dx': p.dx, 'dy': p.dy}).toList(),
+    'openings': openings.map((op) => op.map((p) => {'dx': p.dx, 'dy': p.dy}).toList()).toList(),
+    'thickness': thickness,
+    'floorFinish': floorFinish,
+    'colorValue': colorValue,
+  };
+
+  factory StructuralSlab.fromJson(Map<String, dynamic> json) {
+    return StructuralSlab(
+      id: json['id'] as String,
+      polygon: (json['polygon'] as List<dynamic>?)
+              ?.map((p) => Offset((p['dx'] as num).toDouble(), (p['dy'] as num).toDouble()))
+              .toList() ??
+          [],
+      openings: (json['openings'] as List<dynamic>?)
+              ?.map((op) => (op as List<dynamic>)
+                  .map((p) => Offset((p['dx'] as num).toDouble(), (p['dy'] as num).toDouble()))
+                  .toList())
+              .toList() ??
+          [],
+      thickness: (json['thickness'] as num?)?.toDouble() ?? 0.20,
+      floorFinish: (json['floorFinish'] as num?)?.toDouble(),
+      colorValue: json['colorValue'] as int?,
     );
   }
 }
@@ -1031,6 +1180,49 @@ class StoreyLevel {
       gridAxes: gridAxes ?? this.gridAxes,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'elevation': elevation,
+    'floorFinishThickness': floorFinishThickness,
+    'height': height,
+    'columns': columns.map((c) => c.toJson()).toList(),
+    'shearWalls': shearWalls.map((w) => w.toJson()).toList(),
+    'beams': beams.map((b) => b.toJson()).toList(),
+    'slabs': slabs.map((s) => s.toJson()).toList(),
+    'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
+  };
+
+  factory StoreyLevel.fromJson(Map<String, dynamic> json) {
+    return StoreyLevel(
+      id: json['id'] as String,
+      name: json['name'] as String? ?? 'Storey',
+      elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
+      floorFinishThickness: (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
+      height: (json['height'] as num?)?.toDouble() ?? 2.80,
+      columns: (json['columns'] as List<dynamic>?)
+              ?.map((c) => StructuralColumn.fromJson(c as Map<String, dynamic>))
+              .toList() ??
+          [],
+      shearWalls: (json['shearWalls'] as List<dynamic>?)
+              ?.map((w) => StructuralShearWall.fromJson(w as Map<String, dynamic>))
+              .toList() ??
+          [],
+      beams: (json['beams'] as List<dynamic>?)
+              ?.map((b) => StructuralBeam.fromJson(b as Map<String, dynamic>))
+              .toList() ??
+          [],
+      slabs: (json['slabs'] as List<dynamic>?)
+              ?.map((s) => StructuralSlab.fromJson(s as Map<String, dynamic>))
+              .toList() ??
+          [],
+      gridAxes: (json['gridAxes'] as List<dynamic>?)
+              ?.map((a) => StructuralGridAxis.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
 }
 
 /// Master project holding all storeys and analysis settings.
@@ -1105,4 +1297,168 @@ class StructuralProject {
       facadeWallLoad: facadeWallLoad ?? this.facadeWallLoad,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'title': title,
+    'storeys': storeys.map((s) => s.toJson()).toList(),
+    'activeStoreyIndex': activeStoreyIndex,
+    'ghostMode': ghostMode.name,
+    'concreteGrade': concreteGrade,
+    'concreteE': concreteE,
+    'deadLoadSuperimposed': deadLoadSuperimposed,
+    'liveLoad': liveLoad,
+    'facadeWallLoad': facadeWallLoad,
+  };
+
+  factory StructuralProject.fromJson(Map<String, dynamic> json) {
+    return StructuralProject(
+      title: json['title'] as String? ?? 'Конструктивен Модел',
+      storeys: (json['storeys'] as List<dynamic>?)
+              ?.map((s) => StoreyLevel.fromJson(s as Map<String, dynamic>))
+              .toList() ??
+          const [
+            StoreyLevel(
+              id: 'storey_1',
+              name: 'Етаж 1 (Кота ±0.00)',
+              elevation: 0.0,
+              height: 2.80,
+            ),
+          ],
+      activeStoreyIndex: (json['activeStoreyIndex'] as num?)?.toInt() ?? 0,
+      ghostMode: GhostStoreyMode.values.firstWhere(
+        (g) => g.name == json['ghostMode'],
+        orElse: () => GhostStoreyMode.none,
+      ),
+      concreteGrade: json['concreteGrade'] as String? ?? 'C25/30',
+      concreteE: (json['concreteE'] as num?)?.toDouble() ?? 31000.0,
+      deadLoadSuperimposed: (json['deadLoadSuperimposed'] as num?)?.toDouble() ?? 1.5,
+      liveLoad: (json['liveLoad'] as num?)?.toDouble() ?? 2.0,
+      facadeWallLoad: (json['facadeWallLoad'] as num?)?.toDouble() ?? 3.5,
+    );
+  }
 }
+
+/// Helper to extract numeric suffix from a name (e.g. "К3" -> 3, "W12" -> 12).
+int? extractElementNumber(String name) {
+  final match = RegExp(r'\d+').firstMatch(name);
+  if (match == null) return null;
+  return int.tryParse(match.group(0)!);
+}
+
+/// Helper to extract element prefix letters (e.g. "К3" -> "К", "W12" -> "W").
+String? extractElementPrefix(String name) {
+  final match = RegExp(r'^[^\d]+').firstMatch(name.trim());
+  return match?.group(0);
+}
+
+/// Renumbers columns after a column has been deleted, ensuring no gaps in indices.
+List<StructuralColumn> renumberColumnsAfterDeletion(
+  List<StructuralColumn> remainingColumns,
+  StructuralColumn deletedColumn, {
+  String defaultPrefix = 'К',
+}) {
+  final deletedNum = extractElementNumber(deletedColumn.displayName);
+  if (deletedNum == null) return remainingColumns;
+
+  return remainingColumns.map((col) {
+    final curNum = extractElementNumber(col.displayName);
+    if (curNum != null && curNum > deletedNum) {
+      final pfx = extractElementPrefix(col.displayName) ?? defaultPrefix;
+      return col.copyWith(name: '$pfx${curNum - 1}');
+    }
+    return col;
+  }).toList();
+}
+
+/// Renumbers shear walls after a shear wall has been deleted, ensuring no gaps in indices.
+List<StructuralShearWall> renumberShearWallsAfterDeletion(
+  List<StructuralShearWall> remainingWalls,
+  StructuralShearWall deletedWall, {
+  String defaultPrefix = 'Ш',
+}) {
+  final deletedNum = extractElementNumber(deletedWall.displayName);
+  if (deletedNum == null) return remainingWalls;
+
+  return remainingWalls.map((wall) {
+    final curNum = extractElementNumber(wall.displayName);
+    if (curNum != null && curNum > deletedNum) {
+      final pfx = extractElementPrefix(wall.displayName) ?? defaultPrefix;
+      return wall.copyWith(name: '$pfx${curNum - 1}');
+    }
+    return wall;
+  }).toList();
+}
+
+/// Automatically re-sequences grid axes spatially:
+/// Sorts parallel axes along their normal direction and renames them.
+/// Axes closer to vertical -> Numbers (1, 2, 3...)
+/// Axes closer to horizontal -> Letters (А, Б, В... in BG, A, B, C... in EN).
+List<StructuralGridAxis> resequenceGridAxes(
+  List<StructuralGridAxis> axes, {
+  required bool isBulgarian,
+}) {
+  if (axes.isEmpty) return axes;
+
+  const bgLetters = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ'];
+  const enLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+  final letters = isBulgarian ? bgLetters : enLetters;
+
+  // Group axes into parallel sets
+  final groups = <List<StructuralGridAxis>>[];
+  for (final axis in axes) {
+    bool foundGroup = false;
+    for (final group in groups) {
+      if (group.first.isParallelTo(axis, toleranceRad: 0.15)) {
+        group.add(axis);
+        foundGroup = true;
+        break;
+      }
+    }
+    if (!foundGroup) {
+      groups.add([axis]);
+    }
+  }
+
+  final result = <StructuralGridAxis>[];
+
+  for (int gIdx = 0; gIdx < groups.length; gIdx++) {
+    final group = groups[gIdx];
+    final refAxis = group.first;
+    var normal = refAxis.normal;
+    // Standardize normal direction to point in positive direction (left-to-right / bottom-to-top)
+    if (normal.dx.abs() >= normal.dy.abs()) {
+      if (normal.dx < 0) normal = -normal;
+    } else {
+      if (normal.dy < 0) normal = -normal;
+    }
+
+    // Sort axes in this group by position along the normal
+    group.sort((a, b) {
+      final midA = (a.start + a.end) / 2.0;
+      final midB = (b.start + b.end) / 2.0;
+      final coordA = midA.dx * normal.dx + midA.dy * normal.dy;
+      final coordB = midB.dx * normal.dx + midB.dy * normal.dy;
+      return coordA.compareTo(coordB);
+    });
+
+    final refAngle = refAxis.angleRad;
+    final isVertical = (math.cos(refAngle).abs() <= math.sin(refAngle).abs());
+
+    final bool useNumbers;
+    if (groups.length == 1) {
+      useNumbers = int.tryParse(refAxis.name) != null || isVertical;
+    } else {
+      useNumbers = isVertical;
+    }
+
+    for (int i = 0; i < group.length; i++) {
+      final newName = useNumbers
+          ? '${i + 1}'
+          : (i < letters.length ? letters[i] : '${letters[i % letters.length]}${(i ~/ letters.length) + 1}');
+      result.add(group[i].copyWith(name: newName));
+    }
+  }
+
+  return result;
+}
+

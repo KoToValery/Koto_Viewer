@@ -1472,6 +1472,29 @@
       "support": { "type": "String" }
     }
   },
+  "seismicNoSlabBadge": "No Slab Diaphragm",
+  "@seismicNoSlabBadge": { "description": "Badge when a storey lacks a slab diaphragm" },
+  "seismicNoSlabEccentricity": "N/A (Slab required)",
+  "@seismicNoSlabEccentricity": { "description": "Text when eccentricity cannot be calculated without slab" },
+  "seismicRecNoSlabDiaphragm": "No floor slab defined on this storey. In accordance with Eurocode 8 and structural dynamics, a floor slab over vertical elements is required to form a horizontal seismic diaphragm and compute Center of Mass (CM), Center of Rigidity (CR), and eccentricity.",
+  "@seismicRecNoSlabDiaphragm": { "description": "Recommendation when storey lacks slab diaphragm" },
+  "seismicRecDisconnectedWalls": "Shear wall(s) {names} are located outside the slab boundary and do not connect to the horizontal diaphragm. They are excluded from CR and stiffness calculation.",
+  "@seismicRecDisconnectedWalls": {
+    "description": "Recommendation when walls are outside slab",
+    "placeholders": { "names": { "type": "String" } }
+  },
+  "seismicRecDisconnectedCols": "Column(s) {names} are located outside the slab boundary and do not connect to the horizontal diaphragm.",
+  "@seismicRecDisconnectedCols": {
+    "description": "Recommendation when columns are outside slab",
+    "placeholders": { "names": { "type": "String" } }
+  },
+  "seismicWallsOutsideSlabWarning": "{count, plural, =1{1 wall outside slab (excluded from diaphragm)} other{{count} walls outside slab (excluded from diaphragm)}}",
+  "@seismicWallsOutsideSlabWarning": {
+    "description": "Warning note when walls are outside slab",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "seismicNoSlabWallCoverage": "Shear wall ratio cannot be computed without a floor slab diaphragm.",
+  "@seismicNoSlabWallCoverage": { "description": "Text when wall ratio cannot be computed without slab" },
   "verticalBasePressure": "Base Pressure",
   "@verticalBasePressure": { "description": "Foundation base pressure stat card title" },
   "verticalNoColumns": "No columns defined in the project.",
@@ -1612,5 +1635,80 @@
   "@verticalBasePressureHighText": {
     "description": "Base pressure high text",
     "placeholders": { "pressure": { "type": "String" } }
+  },
+  "toolMeasure": "Measure",
+  "@toolMeasure": { "description": "Distance measurement tool label" },
+  "distanceCentimeters": "Distance (cm)",
+  "@distanceCentimeters": { "description": "Distance in centimeters label" },
+  "loadStructuralModule": "Load Structural Module",
+  "@loadStructuralModule": { "description": "Button to confirm layers and enter structural module" },
+  "updatingLayers": "Updating layers...",
+  "@updatingLayers": { "description": "Loading message while CAD layers are being updated" },
+  "isolateStructuralLayers": "Isolate Structural Layers",
+  "@isolateStructuralLayers": { "description": "Button to quickly isolate structural walls and axes" },
+  "showAllLayers": "Show All Layers",
+  "@showAllLayers": { "description": "Button to show all CAD layers" },
+  "layersPreparationTitle": "Prepare CAD Layers for BIM",
+  "@layersPreparationTitle": { "description": "Title of layer setup sheet before structural workspace" },
+  "layersPreparationSubtitle": "Hide architectural clutter, text, and furniture for better clarity and performance.",
+  "@layersPreparationSubtitle": { "description": "Subtitle explaining layer cleanup" },
+  "exportBimModel": "Export BiM Model",
+  "@exportBimModel": { "description": "Menu action to export structural model" },
+  "exportBimJson": "BiM Project (JSON)",
+  "@exportBimJson": { "description": "Option to export full BiM model in JSON format" },
+  "exportStructuralDxf": "Structural AutoCAD (DXF)",
+  "@exportStructuralDxf": { "description": "Option to export structural elements to DXF" },
+  "exportSuccess": "Model exported successfully",
+  "@exportSuccess": { "description": "Success message after export" },
+  "exportFailed": "Failed to export model: {error}",
+  "@exportFailed": {
+    "description": "Error message when export fails",
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "slabOverStorey": "Slab over {storey}",
+  "@slabOverStorey": {
+    "description": "Structural bottom-up elevation title for slab overhead",
+    "placeholders": { "storey": { "type": "String" } }
+  },
+  "shearWallSizePreset": "25×150 cm",
+  "@shearWallSizePreset": { "description": "Standard shear wall dimension preset" },
+  "shearWallSizePresetAlt": "25×120 cm",
+  "@shearWallSizePresetAlt": { "description": "Alternative standard shear wall preset" },
+  "customWallDimensions": "Custom Wall...",
+  "@customWallDimensions": { "description": "Button to configure custom shear wall dimensions" },
+  "slabThicknessTitle": "Slab Thickness",
+  "@slabThicknessTitle": { "description": "Title for slab thickness dialog and card" },
+  "measuredDistance": "Distance: {meters} m ({cm} cm)",
+  "@measuredDistance": {
+    "description": "Measured distance display",
+    "placeholders": {
+      "meters": { "type": "String" },
+      "cm": { "type": "String" }
+    }
+  },
+  "measuredDelta": "ΔX = {dx} m, ΔY = {dy} m",
+  "@measuredDelta": {
+    "description": "Delta coordinates display",
+    "placeholders": {
+      "dx": { "type": "String" },
+      "dy": { "type": "String" }
+    }
+  },
+  "clearMeasurement": "Clear",
+  "@clearMeasurement": { "description": "Button to clear measurement ruler" },
+  "columnNamePrefix": "C",
+  "@columnNamePrefix": { "description": "Prefix letter for column numbering" },
+  "shearWallNamePrefix": "W",
+  "@shearWallNamePrefix": { "description": "Prefix letter for shear wall numbering" },
+  "slabSectionElevationMarker": "T.O.C. {elevation}",
+  "@slabSectionElevationMarker": {
+    "description": "Top of concrete level marker text",
+    "placeholders": { "elevation": { "type": "String" } }
+  },
+  "slabThicknessLabel": "d = {thickness} cm",
+  "@slabThicknessLabel": {
+    "description": "Slab thickness label in elevation marker",
+    "placeholders": { "thickness": { "type": "String" } }
   }
 }
+

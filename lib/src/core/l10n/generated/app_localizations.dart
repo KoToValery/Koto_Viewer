@@ -2713,7 +2713,7 @@ abstract class AppLocalizations {
   /// **'Depth h (cm)'**
   String get depthHCm;
 
-  /// Title for slab thickness dialog
+  /// Title for slab thickness dialog and card
   ///
   /// In en, this message translates to:
   /// **'Slab Thickness'**
@@ -3168,6 +3168,48 @@ abstract class AppLocalizations {
   /// **'Opening is at a safe distance ({dist} m from {support}).'**
   String seismicRecOpeningSafe(String dist, String support);
 
+  /// Badge when a storey lacks a slab diaphragm
+  ///
+  /// In en, this message translates to:
+  /// **'No Slab Diaphragm'**
+  String get seismicNoSlabBadge;
+
+  /// Text when eccentricity cannot be calculated without slab
+  ///
+  /// In en, this message translates to:
+  /// **'N/A (Slab required)'**
+  String get seismicNoSlabEccentricity;
+
+  /// Recommendation when storey lacks slab diaphragm
+  ///
+  /// In en, this message translates to:
+  /// **'No floor slab defined on this storey. In accordance with Eurocode 8 and structural dynamics, a floor slab over vertical elements is required to form a horizontal seismic diaphragm and compute Center of Mass (CM), Center of Rigidity (CR), and eccentricity.'**
+  String get seismicRecNoSlabDiaphragm;
+
+  /// Recommendation when walls are outside slab
+  ///
+  /// In en, this message translates to:
+  /// **'Shear wall(s) {names} are located outside the slab boundary and do not connect to the horizontal diaphragm. They are excluded from CR and stiffness calculation.'**
+  String seismicRecDisconnectedWalls(String names);
+
+  /// Recommendation when columns are outside slab
+  ///
+  /// In en, this message translates to:
+  /// **'Column(s) {names} are located outside the slab boundary and do not connect to the horizontal diaphragm.'**
+  String seismicRecDisconnectedCols(String names);
+
+  /// Warning note when walls are outside slab
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 wall outside slab (excluded from diaphragm)} other{{count} walls outside slab (excluded from diaphragm)}}'**
+  String seismicWallsOutsideSlabWarning(int count);
+
+  /// Text when wall ratio cannot be computed without slab
+  ///
+  /// In en, this message translates to:
+  /// **'Shear wall ratio cannot be computed without a floor slab diaphragm.'**
+  String get seismicNoSlabWallCoverage;
+
   /// Foundation base pressure stat card title
   ///
   /// In en, this message translates to:
@@ -3378,6 +3420,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Base pressure ({pressure} kPa) is high. A full mat foundation or piling is recommended following a geotechnical report.'**
   String verticalBasePressureHighText(String pressure);
+
+  /// Distance measurement tool label
+  ///
+  /// In en, this message translates to:
+  /// **'Measure'**
+  String get toolMeasure;
+
+  /// Distance in centimeters label
+  ///
+  /// In en, this message translates to:
+  /// **'Distance (cm)'**
+  String get distanceCentimeters;
+
+  /// Button to confirm layers and enter structural module
+  ///
+  /// In en, this message translates to:
+  /// **'Load Structural Module'**
+  String get loadStructuralModule;
+
+  /// Loading message while CAD layers are being updated
+  ///
+  /// In en, this message translates to:
+  /// **'Updating layers...'**
+  String get updatingLayers;
+
+  /// Button to quickly isolate structural walls and axes
+  ///
+  /// In en, this message translates to:
+  /// **'Isolate Structural Layers'**
+  String get isolateStructuralLayers;
+
+  /// Button to show all CAD layers
+  ///
+  /// In en, this message translates to:
+  /// **'Show All Layers'**
+  String get showAllLayers;
+
+  /// Title of layer setup sheet before structural workspace
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare CAD Layers for BIM'**
+  String get layersPreparationTitle;
+
+  /// Subtitle explaining layer cleanup
+  ///
+  /// In en, this message translates to:
+  /// **'Hide architectural clutter, text, and furniture for better clarity and performance.'**
+  String get layersPreparationSubtitle;
+
+  /// Menu action to export structural model
+  ///
+  /// In en, this message translates to:
+  /// **'Export BiM Model'**
+  String get exportBimModel;
+
+  /// Option to export full BiM model in JSON format
+  ///
+  /// In en, this message translates to:
+  /// **'BiM Project (JSON)'**
+  String get exportBimJson;
+
+  /// Option to export structural elements to DXF
+  ///
+  /// In en, this message translates to:
+  /// **'Structural AutoCAD (DXF)'**
+  String get exportStructuralDxf;
+
+  /// Success message after export
+  ///
+  /// In en, this message translates to:
+  /// **'Model exported successfully'**
+  String get exportSuccess;
+
+  /// Error message when export fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export model: {error}'**
+  String exportFailed(String error);
+
+  /// Structural bottom-up elevation title for slab overhead
+  ///
+  /// In en, this message translates to:
+  /// **'Slab over {storey}'**
+  String slabOverStorey(String storey);
+
+  /// Standard shear wall dimension preset
+  ///
+  /// In en, this message translates to:
+  /// **'25×150 cm'**
+  String get shearWallSizePreset;
+
+  /// Alternative standard shear wall preset
+  ///
+  /// In en, this message translates to:
+  /// **'25×120 cm'**
+  String get shearWallSizePresetAlt;
+
+  /// Button to configure custom shear wall dimensions
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Wall...'**
+  String get customWallDimensions;
+
+  /// Measured distance display
+  ///
+  /// In en, this message translates to:
+  /// **'Distance: {meters} m ({cm} cm)'**
+  String measuredDistance(String meters, String cm);
+
+  /// Delta coordinates display
+  ///
+  /// In en, this message translates to:
+  /// **'ΔX = {dx} m, ΔY = {dy} m'**
+  String measuredDelta(String dx, String dy);
+
+  /// Button to clear measurement ruler
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearMeasurement;
+
+  /// Prefix letter for column numbering
+  ///
+  /// In en, this message translates to:
+  /// **'C'**
+  String get columnNamePrefix;
+
+  /// Prefix letter for shear wall numbering
+  ///
+  /// In en, this message translates to:
+  /// **'W'**
+  String get shearWallNamePrefix;
+
+  /// Top of concrete level marker text
+  ///
+  /// In en, this message translates to:
+  /// **'T.O.C. {elevation}'**
+  String slabSectionElevationMarker(String elevation);
+
+  /// Slab thickness label in elevation marker
+  ///
+  /// In en, this message translates to:
+  /// **'d = {thickness} cm'**
+  String slabThicknessLabel(String thickness);
 }
 
 class _AppLocalizationsDelegate

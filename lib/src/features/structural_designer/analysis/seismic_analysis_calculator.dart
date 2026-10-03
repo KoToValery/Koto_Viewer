@@ -34,6 +34,8 @@ class SeismicAnalysisCalculator {
 
     int totalFloatingColsCount = 0;
     int totalDiscontinuousWallsCount = 0;
+    int totalDisconnectedWallsCount = 0;
+    int totalDisconnectedColsCount = 0;
     bool anyTorsionalSensitivity = false;
     bool anySoftStorey = false;
     bool anyWallDeficit = false;
@@ -46,7 +48,7 @@ class SeismicAnalysisCalculator {
       final storey = project.storeys[sIdx];
       final double hM = math.max(2.4, storey.height);
 
-      // Floor area & bounding dimensions
+      // Floor slab area & bounding dimensions of the slab diaphragm
       double floorAreaM2 = 0.0;
       double minX = double.infinity, maxX = -double.infinity;
       double minY = double.infinity, maxY = -double.infinity;
@@ -61,56 +63,146 @@ class SeismicAnalysisCalculator {
         }
       }
 
-      // If no slabs or too small, derive footprint from columns and walls
-      if (floorAreaM2 <= 1.0) {
-        for (final col in storey.columns) {
-          final p = col.center;
-          if (p.dx < minX) minX = p.dx;
-          if (p.dx > maxX) maxX = p.dx;
-          if (p.dy < minY) minY = p.dy;
-          if (p.dy > maxY) maxY = p.dy;
-        }
-        for (final wall in storey.shearWalls) {
-          for (final p in [wall.start, wall.end]) {
-            if (p.dx < minX) minX = p.dx;
-            if (p.dx > maxX) maxX = p.dx;
-            if (p.dy < minY) minY = p.dy;
-            if (p.dy > maxY) maxY = p.dy;
+      // Check whether a physical slab diaphragm exists on this storey
+      final bool hasSlabDiaphragm = storey.slabs.isNotEmpty && floorAreaM2 >= 1.0;
+
+      // If no slab diaphragm exists at this level:
+      // In accordance with Eurocode 8 and structural dynamics, CM, CR, and eccentricity
+      // cannot be computed because horizontal seismic inertia forces and rigid-diaphragm
+      // kinematics are defined by the floor slab.
+      if (!hasSlabDiaphragm) {
+        final List<String> floatingIds = [];
+        final List<String> floatingNames = [];
+
+        if (sIdx > 0) {
+          final lowerStorey = project.storeys[sIdx - 1];
+          for (int cIdx = 0; cIdx < storey.columns.length; cIdx++) {
+            final col = storey.columns[cIdx];
+            final cPos = col.center;
+            bool hasSupportBelow = false;
+            for (final lowerCol in lowerStorey.columns) {
+              final dist = (lowerCol.center - cPos).distance / scale;
+              if (dist <= 0.25) {
+                hasSupportBelow = true;
+                break;
+              }
+            }
+            if (!hasSupportBelow) {
+              for (final lowerWall in lowerStorey.shearWalls) {
+                final dist = _distancePointToSegment(cPos, lowerWall.start, lowerWall.end) / scale;
+                if (dist <= 0.20) {
+                  hasSupportBelow = true;
+                  break;
+                }
+              }
+            }
+            if (!hasSupportBelow) {
+              floatingIds.add(col.id);
+              floatingNames.add('C${cIdx + 1}');
+              totalFloatingColsCount++;
+            }
           }
         }
-        if (minX.isFinite && maxX.isFinite && minY.isFinite && maxY.isFinite) {
-          final w = (maxX - minX) / scale;
-          final h = (maxY - minY) / scale;
-          floorAreaM2 = math.max(12.0, w * h);
-        } else {
-          minX = 0;
-          maxX = 10 * scale;
-          minY = 0;
-          maxY = 10 * scale;
-          floorAreaM2 = 100.0;
-        }
+
+        storeyStiffnessList.add(0.0);
+
+        final rec = StringBuffer();
+        rec.write('Липсва подова плоча на този етаж. За изчисляване на Центъра на масите (CM), Центъра на коравината (CR) и сеизмичния ексцентрицитет е необходима плоча над колоните и шайбите, която да действа като хоризонтална диафрагма.');
+
+        final risk = (floatingIds.isNotEmpty)
+            ? SeismicRiskLevel.critical
+            : SeismicRiskLevel.warning;
+
+        storeyChecks.add(StoreySeismicCheck(
+          storeyId: storey.id,
+          storeyName: storey.name,
+          storeyIndex: sIdx,
+          hasSlabDiaphragm: false,
+          centerOfMassCad: null,
+          centerOfRigidityCad: null,
+          eccentricityM: null,
+          dimensionXM: 0.0,
+          dimensionYM: 0.0,
+          eccentricityRatioX: 0.0,
+          eccentricityRatioY: 0.0,
+          isTorsionallySensitive: false,
+          wallAreaXM2: 0.0,
+          wallAreaYM2: 0.0,
+          floorAreaM2: 0.0,
+          wallRatioX: 0.0,
+          wallRatioY: 0.0,
+          isWallCoverageSufficientX: false,
+          isWallCoverageSufficientY: false,
+          floatingColumnIds: floatingIds,
+          floatingColumnNames: floatingNames,
+          discontinuousWallIds: const [],
+          disconnectedWallIds: const [],
+          disconnectedWallNames: const [],
+          disconnectedColumnIds: const [],
+          disconnectedColumnNames: const [],
+          lateralStiffnessIndex: 0.0,
+          isSoftStorey: false,
+          riskLevel: risk,
+          architectRecommendation: rec.toString().trim(),
+        ));
+        continue;
       }
 
       final double dimXM = math.max(3.0, (maxX - minX) / scale);
       final double dimYM = math.max(3.0, (maxY - minY) / scale);
 
+      // Filter connected vs disconnected columns (elements outside the slab diaphragm)
+      final List<StructuralColumn> connectedCols = [];
+      final List<String> disconnectedColIds = [];
+      final List<String> disconnectedColNames = [];
+
+      for (int cIdx = 0; cIdx < storey.columns.length; cIdx++) {
+        final col = storey.columns[cIdx];
+        if (isColumnConnectedToSlab(col, storey.slabs, scale)) {
+          connectedCols.add(col);
+        } else {
+          disconnectedColIds.add(col.id);
+          disconnectedColNames.add(col.displayName);
+          totalDisconnectedColsCount++;
+        }
+      }
+
+      // Filter connected vs disconnected shear walls (elements outside the slab diaphragm)
+      final List<_ConnectedWallData> connectedWalls = [];
+      final List<String> disconnectedWallIds = [];
+      final List<String> disconnectedWallNames = [];
+
+      for (int wIdx = 0; wIdx < storey.shearWalls.length; wIdx++) {
+        final wall = storey.shearWalls[wIdx];
+        final conn = getWallDiaphragmConnection(wall, storey.slabs, scale);
+        if (conn.isConnected && conn.effectiveLengthM > 0.05) {
+          connectedWalls.add(_ConnectedWallData(wall: wall, connection: conn));
+        } else {
+          disconnectedWallIds.add(wall.id);
+          disconnectedWallNames.add('Ш${wIdx + 1}');
+          totalDisconnectedWallsCount++;
+        }
+      }
+
       // A. Calculate Center of Mass (CM)
+      // The floor slab accounts for almost the entire diaphragm mass (~85-95%+).
+      // Only vertical elements connected to the slab contribute tributary mass to this level.
       double totalMass = 0.0;
       double sumMassX = 0.0;
       double sumMassY = 0.0;
 
-      // Slab mass
+      // Slab mass and centroid (accounting for openings)
       for (final slab in storey.slabs) {
         final aM2 = slab.netArea / (scale * scale);
-        final cCad = _computePolygonCentroid(slab.polygon);
+        final cCad = _computeSlabNetCentroid(slab);
         final slabMass = aM2 * (25.0 * slab.thickness + project.deadLoadSuperimposed + 0.3 * project.liveLoad);
         totalMass += slabMass;
         sumMassX += slabMass * cCad.dx;
         sumMassY += slabMass * cCad.dy;
       }
 
-      // Columns mass
-      for (final col in storey.columns) {
+      // Connected columns tributary mass
+      for (final col in connectedCols) {
         final colAreaM2 = (col.width / scale) * (col.height / scale);
         final colMass = colAreaM2 * hM * 25.0;
         totalMass += colMass;
@@ -118,14 +210,14 @@ class SeismicAnalysisCalculator {
         sumMassY += colMass * col.center.dy;
       }
 
-      // Shear walls mass
-      for (final wall in storey.shearWalls) {
-        final wallLenM = (wall.end - wall.start).distance / scale;
-        final wallMass = wallLenM * (wall.thickness / scale) * hM * 25.0;
-        final mid = (wall.start + wall.end) / 2.0;
+      // Connected shear walls tributary mass
+      for (final cw in connectedWalls) {
+        final wall = cw.wall;
+        final conn = cw.connection;
+        final wallMass = conn.effectiveLengthM * (wall.thickness / scale) * hM * 25.0;
         totalMass += wallMass;
-        sumMassX += wallMass * mid.dx;
-        sumMassY += wallMass * mid.dy;
+        sumMassX += wallMass * conn.effectiveCenterCad.dx;
+        sumMassY += wallMass * conn.effectiveCenterCad.dy;
       }
 
       final Offset cmCad;
@@ -136,6 +228,7 @@ class SeismicAnalysisCalculator {
       }
 
       // B. Calculate Center of Rigidity (CR) & Shear Wall Areas
+      // ONLY elements connected to the slab diaphragm participate in resisting lateral diaphragm forces!
       double sumKx = 0.0;
       double sumKy = 0.0;
       double sumKxY = 0.0;
@@ -144,11 +237,13 @@ class SeismicAnalysisCalculator {
       double totalWallAreaX = 0.0;
       double totalWallAreaY = 0.0;
 
-      // Shear walls rigidity contribution
-      for (final wall in storey.shearWalls) {
-        final lenM = math.max(0.40, (wall.end - wall.start).distance / scale);
+      // Connected shear walls rigidity contribution
+      for (final cw in connectedWalls) {
+        final wall = cw.wall;
+        final conn = cw.connection;
+        final lenM = math.max(0.40, conn.effectiveLengthM);
         final tM = math.max(0.15, wall.thickness / scale);
-        final mid = (wall.start + wall.end) / 2.0;
+        final center = conn.effectiveCenterCad;
 
         // Strong axis moment of inertia: t * L^3 / 12
         final iStrong = (tM * math.pow(lenM, 3)) / 12.0;
@@ -165,15 +260,15 @@ class SeismicAnalysisCalculator {
 
         sumKx += kX;
         sumKy += kY;
-        sumKxY += kX * mid.dy;
-        sumKyX += kY * mid.dx;
+        sumKxY += kX * center.dy;
+        sumKyX += kY * center.dx;
 
         totalWallAreaX += lenM * tM * cosA.abs();
         totalWallAreaY += lenM * tM * sinA.abs();
       }
 
-      // Columns rigidity contribution
-      for (final col in storey.columns) {
+      // Connected columns rigidity contribution
+      for (final col in connectedCols) {
         final wM = math.max(0.20, col.width / scale);
         final hColM = math.max(0.20, col.height / scale);
         final pos = col.center;
@@ -280,6 +375,12 @@ class SeismicAnalysisCalculator {
 
       // Architect-facing spatial balancing recommendation
       final StringBuffer rec = StringBuffer();
+      if (disconnectedWallNames.isNotEmpty) {
+        rec.write('Шайби ${disconnectedWallNames.join(", ")} са извън очертанията на плочата и не участват в пресмятането на коравината (CR) и сеизмичния център. ');
+      }
+      if (disconnectedColNames.isNotEmpty) {
+        rec.write('Колони ${disconnectedColNames.join(", ")} са извън очертанията на плочата и не участват в подовата диафрагма. ');
+      }
       if (floatingIds.isNotEmpty) {
         rec.write('Колони ${floatingNames.join(", ")} са НАСАДЕНИ върху плочата (без колона отдолу). Това е сериозна сеизмична уязвимост! ');
       }
@@ -311,7 +412,7 @@ class SeismicAnalysisCalculator {
       final SeismicRiskLevel risk;
       if (floatingIds.isNotEmpty || isTorsionallySensitive) {
         risk = SeismicRiskLevel.critical;
-      } else if (!wallOkX || !wallOkY || eRatioX > 0.08 || eRatioY > 0.08) {
+      } else if (!wallOkX || !wallOkY || eRatioX > 0.08 || eRatioY > 0.08 || disconnectedWallIds.isNotEmpty || disconnectedColIds.isNotEmpty) {
         risk = SeismicRiskLevel.warning;
       } else {
         risk = SeismicRiskLevel.regular;
@@ -321,6 +422,7 @@ class SeismicAnalysisCalculator {
         storeyId: storey.id,
         storeyName: storey.name,
         storeyIndex: sIdx,
+        hasSlabDiaphragm: true,
         centerOfMassCad: cmCad,
         centerOfRigidityCad: crCad,
         eccentricityM: Offset(exM, eyM),
@@ -339,6 +441,10 @@ class SeismicAnalysisCalculator {
         floatingColumnIds: floatingIds,
         floatingColumnNames: floatingNames,
         discontinuousWallIds: discWallIds,
+        disconnectedWallIds: disconnectedWallIds,
+        disconnectedWallNames: disconnectedWallNames,
+        disconnectedColumnIds: disconnectedColIds,
+        disconnectedColumnNames: disconnectedColNames,
         lateralStiffnessIndex: latStiffness,
         isSoftStorey: false,
         riskLevel: risk,
@@ -354,7 +460,7 @@ class SeismicAnalysisCalculator {
       bool isSoft = false;
       if (sIdx < numStoreys - 1) {
         final kAbove = storeyStiffnessList[sIdx + 1];
-        if (kAbove > 1e-4) {
+        if (cur.hasSlabDiaphragm && kAbove > 1e-4) {
           ratioToAbove = storeyStiffnessList[sIdx] / kAbove;
           if (ratioToAbove < 0.70) {
             isSoft = true;
@@ -377,6 +483,7 @@ class SeismicAnalysisCalculator {
         storeyId: cur.storeyId,
         storeyName: cur.storeyName,
         storeyIndex: cur.storeyIndex,
+        hasSlabDiaphragm: cur.hasSlabDiaphragm,
         centerOfMassCad: cur.centerOfMassCad,
         centerOfRigidityCad: cur.centerOfRigidityCad,
         eccentricityM: cur.eccentricityM,
@@ -395,6 +502,10 @@ class SeismicAnalysisCalculator {
         floatingColumnIds: cur.floatingColumnIds,
         floatingColumnNames: cur.floatingColumnNames,
         discontinuousWallIds: cur.discontinuousWallIds,
+        disconnectedWallIds: cur.disconnectedWallIds,
+        disconnectedWallNames: cur.disconnectedWallNames,
+        disconnectedColumnIds: cur.disconnectedColumnIds,
+        disconnectedColumnNames: cur.disconnectedColumnNames,
         lateralStiffnessIndex: cur.lateralStiffnessIndex,
         stiffnessRatioToAbove: ratioToAbove,
         isSoftStorey: isSoft,
@@ -483,7 +594,7 @@ class SeismicAnalysisCalculator {
     final SeismicRiskLevel overallRisk;
     if (totalFloatingColsCount > 0 || anyTorsionalSensitivity || anySoftStorey) {
       overallRisk = SeismicRiskLevel.critical;
-    } else if (anyWallDeficit || maxGlobalEccRatio > 0.08) {
+    } else if (anyWallDeficit || maxGlobalEccRatio > 0.08 || totalDisconnectedWallsCount > 0 || totalDisconnectedColsCount > 0) {
       overallRisk = SeismicRiskLevel.warning;
     } else {
       overallRisk = SeismicRiskLevel.regular;
@@ -495,11 +606,185 @@ class SeismicAnalysisCalculator {
       openingChecks: openingChecks,
       totalFloatingColumnsCount: totalFloatingColsCount,
       totalDiscontinuousWallsCount: totalDiscontinuousWallsCount,
+      totalDisconnectedWallsCount: totalDisconnectedWallsCount,
+      totalDisconnectedColumnsCount: totalDisconnectedColsCount,
       hasTorsionalSensitivity: anyTorsionalSensitivity,
       hasSoftStorey: anySoftStorey,
       hasWallDeficit: anyWallDeficit,
       maxEccentricityRatio: maxGlobalEccRatio,
       overallRisk: overallRisk,
+    );
+  }
+
+  /// Calculates the exact centroid of a slab polygon, taking into account any cutout openings.
+  static Offset _computeSlabNetCentroid(StructuralSlab slab) {
+    final grossArea = StructuralSlab.calculateArea(slab.polygon);
+    if (grossArea < 1e-6) return slab.centroid;
+    final grossCentroid = _computePolygonCentroid(slab.polygon);
+    if (slab.openings.isEmpty) return grossCentroid;
+
+    double netArea = grossArea;
+    double sumAx = grossArea * grossCentroid.dx;
+    double sumAy = grossArea * grossCentroid.dy;
+
+    for (final op in slab.openings) {
+      final opArea = StructuralSlab.calculateArea(op);
+      if (opArea > 1e-6) {
+        final opCentroid = _computePolygonCentroid(op);
+        netArea -= opArea;
+        sumAx -= opArea * opCentroid.dx;
+        sumAy -= opArea * opCentroid.dy;
+      }
+    }
+
+    if (netArea > 1e-6) {
+      return Offset(sumAx / netArea, sumAy / netArea);
+    }
+    return grossCentroid;
+  }
+
+  /// Checks if a point lies inside any of the given slabs (with optional CAD tolerance).
+  static bool isPointInsideSlabs(
+    Offset pt,
+    List<StructuralSlab> slabs, {
+    double toleranceCad = 0.0,
+  }) {
+    for (final slab in slabs) {
+      if (slab.polygon.length < 3) continue;
+      if (toleranceCad <= 1e-4) {
+        if (slab.containsPoint(pt)) return true;
+      } else {
+        final inflated = slab.bounds.inflate(toleranceCad);
+        if (!inflated.contains(pt)) continue;
+        if (slab.containsPoint(pt)) return true;
+        // Edge tolerance: within tolerance of the slab perimeter and not inside cutout
+        if (_distanceToPolygonPerimeter(pt, slab.polygon) <= toleranceCad) {
+          bool inOpening = false;
+          for (final op in slab.openings) {
+            if (StructuralSlab.calculateArea(op) > 1e-4 && _isPointInPoly(pt, op)) {
+              inOpening = true;
+              break;
+            }
+          }
+          if (!inOpening) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Ray-casting test for point-in-polygon.
+  static bool _isPointInPoly(Offset pt, List<Offset> poly) {
+    if (poly.length < 3) return false;
+    bool inside = false;
+    for (int i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      final xi = poly[i].dx, yi = poly[i].dy;
+      final xj = poly[j].dx, yj = poly[j].dy;
+      final intersect = ((yi > pt.dy) != (yj > pt.dy)) &&
+          (pt.dx < (xj - xi) * (pt.dy - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  /// Shortest distance from [pt] to any edge of the polygon.
+  static double _distanceToPolygonPerimeter(Offset pt, List<Offset> poly) {
+    if (poly.length < 2) return double.infinity;
+    double minDist = double.infinity;
+    final int n = poly.length;
+    for (int i = 0; i < n; i++) {
+      final d = _distancePointToSegment(pt, poly[i], poly[(i + 1) % n]);
+      if (d < minDist) minDist = d;
+    }
+    return minDist;
+  }
+
+  /// Determines if a column is covered by or connected to the floor slab diaphragm.
+  static bool isColumnConnectedToSlab(
+    StructuralColumn col,
+    List<StructuralSlab> slabs,
+    double scale,
+  ) {
+    if (slabs.isEmpty) return false;
+    // CAD tolerance: half column dimension + 0.10m margin
+    final double tolCad = math.max(col.width, col.height) * 0.55 + 0.10 * scale;
+    if (isPointInsideSlabs(col.center, slabs, toleranceCad: tolCad)) {
+      return true;
+    }
+    for (final v in col.polygonVertices) {
+      if (isPointInsideSlabs(v, slabs, toleranceCad: 0.05 * scale)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Computes the connection of a shear wall to the floor slab diaphragm.
+  /// If the shear wall is located outside the slab boundary, [isConnected] is false
+  /// and [effectiveLengthM] is 0.0, excluding it from diaphragm rigidity and mass.
+  static WallDiaphragmConnection getWallDiaphragmConnection(
+    StructuralShearWall wall,
+    List<StructuralSlab> slabs,
+    double scale,
+  ) {
+    if (slabs.isEmpty) {
+      return const WallDiaphragmConnection(
+        isConnected: false,
+        connectedFraction: 0.0,
+        effectiveLengthM: 0.0,
+        effectiveCenterCad: Offset.zero,
+      );
+    }
+
+    final double totalLenCad = wall.length;
+    final double tolCad = (wall.thickness * 0.55) + (0.12 * scale);
+
+    if (totalLenCad < 1e-4) {
+      final inside = isPointInsideSlabs(wall.start, slabs, toleranceCad: tolCad);
+      return WallDiaphragmConnection(
+        isConnected: inside,
+        connectedFraction: inside ? 1.0 : 0.0,
+        effectiveLengthM: inside ? (wall.thickness / scale) : 0.0,
+        effectiveCenterCad: wall.start,
+      );
+    }
+
+    const int samples = 11;
+    int connectedCount = 0;
+    double sumX = 0.0;
+    double sumY = 0.0;
+
+    for (int i = 0; i < samples; i++) {
+      final t = i / (samples - 1);
+      final pt = Offset(
+        wall.start.dx + (wall.end.dx - wall.start.dx) * t,
+        wall.start.dy + (wall.end.dy - wall.start.dy) * t,
+      );
+      if (isPointInsideSlabs(pt, slabs, toleranceCad: tolCad)) {
+        connectedCount++;
+        sumX += pt.dx;
+        sumY += pt.dy;
+      }
+    }
+
+    if (connectedCount == 0) {
+      return const WallDiaphragmConnection(
+        isConnected: false,
+        connectedFraction: 0.0,
+        effectiveLengthM: 0.0,
+        effectiveCenterCad: Offset.zero,
+      );
+    }
+
+    final fraction = connectedCount / samples;
+    final effLenM = (totalLenCad / scale) * fraction;
+    final effCenter = Offset(sumX / connectedCount, sumY / connectedCount);
+
+    return WallDiaphragmConnection(
+      isConnected: true,
+      connectedFraction: fraction,
+      effectiveLengthM: effLenM,
+      effectiveCenterCad: effCenter,
     );
   }
 
@@ -544,4 +829,27 @@ class SeismicAnalysisCalculator {
     final proj = Offset(a.dx + clampedT * ab.dx, a.dy + clampedT * ab.dy);
     return (p - proj).distance;
   }
+}
+
+/// Helper container for connected wall data in seismic analysis.
+class _ConnectedWallData {
+  final StructuralShearWall wall;
+  final WallDiaphragmConnection connection;
+
+  const _ConnectedWallData({required this.wall, required this.connection});
+}
+
+/// Result of evaluating whether and how much of a shear wall is connected to the slab diaphragm.
+class WallDiaphragmConnection {
+  final bool isConnected;
+  final double connectedFraction;
+  final double effectiveLengthM;
+  final Offset effectiveCenterCad;
+
+  const WallDiaphragmConnection({
+    required this.isConnected,
+    required this.connectedFraction,
+    required this.effectiveLengthM,
+    required this.effectiveCenterCad,
+  });
 }

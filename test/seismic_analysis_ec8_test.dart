@@ -58,9 +58,9 @@ void main() {
       final check = report.storeyChecks.first;
 
       // CM and CR should have practically identical X coordinate (~250 CAD)
-      expect(check.centerOfMassCad.dx, closeTo(250.0, 1.0));
-      expect(check.centerOfRigidityCad.dx, closeTo(250.0, 1.0));
-      expect(check.eccentricityM.dx, closeTo(0.0, 0.05));
+      expect(check.centerOfMassCad!.dx, closeTo(250.0, 1.0));
+      expect(check.centerOfRigidityCad!.dx, closeTo(250.0, 1.0));
+      expect(check.eccentricityM!.dx, closeTo(0.0, 0.05));
       expect(check.isTorsionallySensitive, isFalse);
     });
 
@@ -117,12 +117,12 @@ void main() {
       final check = report.storeyChecks.first;
 
       // CR should be pulled toward x=480 (East side)
-      expect(check.centerOfRigidityCad.dx, greaterThan(400.0));
+      expect(check.centerOfRigidityCad!.dx, greaterThan(400.0));
       // CM is near the center, slightly shifted towards wall due to wall weight (~288 CAD)
-      expect(check.centerOfMassCad.dx, closeTo(290.0, 40.0));
+      expect(check.centerOfMassCad!.dx, closeTo(290.0, 40.0));
 
       // Significant eccentricity e_x > 2.0 m
-      expect(check.eccentricityM.dx, greaterThan(2.0));
+      expect(check.eccentricityM!.dx, greaterThan(2.0));
       // Eccentricity ratio e / L > 15% -> torsionally sensitive!
       expect(check.eccentricityRatioX, greaterThan(0.15));
       expect(check.isTorsionallySensitive, isTrue);
@@ -457,6 +457,182 @@ void main() {
       final opCheck = report.openingChecks.first;
       expect(opCheck.isTooClose, isTrue);
       expect(opCheck.nearestSupportName, isNotNull);
+    });
+
+    test('8. Storey without slab: cannot compute CM, CR, or eccentricity without diaphragm', () {
+      const scale = 50.0;
+      // Storey with columns and shear walls, but NO SLAB
+      final wall = StructuralShearWall(
+        id: 'w1',
+        start: const Offset(100, 100),
+        end: const Offset(100, 400),
+        thickness: 0.25 * scale,
+      );
+      final col = StructuralColumn(
+        id: 'c1',
+        center: const Offset(400, 250),
+        width: 0.30 * scale,
+        height: 0.30 * scale,
+      );
+
+      final storeyWithoutSlab = StoreyLevel(
+        id: 's0_no_slab',
+        name: 'Ниво без плоча',
+        elevation: 0.0,
+        height: 3.0,
+        slabs: const [],
+        columns: [col],
+        shearWalls: [wall],
+      );
+
+      final project = StructuralProject(
+        title: 'No Slab Diaphragm Project',
+        storeys: [storeyWithoutSlab],
+      );
+
+      final report = SeismicAnalysisCalculator.analyzeProject(
+        project,
+        cadUnitsPerMeter: scale,
+      );
+
+      expect(report.storeyChecks.length, 1);
+      final check = report.storeyChecks.first;
+
+      // Diaphragm is absent
+      expect(check.hasSlabDiaphragm, isFalse);
+      expect(check.centerOfMassCad, isNull);
+      expect(check.centerOfRigidityCad, isNull);
+      expect(check.eccentricityM, isNull);
+      expect(check.maxEccentricityM, 0.0);
+      expect(check.maxEccentricityRatio, 0.0);
+      expect(check.floorAreaM2, 0.0);
+      expect(check.architectRecommendation, contains('Липсва подова плоча'));
+    });
+
+    test('9. Shear wall placed outside the slab boundary is EXCLUDED from CR, CM, and coverage', () {
+      const scale = 50.0;
+      // 10m x 10m slab from (0, 0) to (500, 500)
+      final slab = StructuralSlab(
+        id: 'slab1',
+        polygon: const [
+          Offset(0, 0),
+          Offset(500, 0),
+          Offset(500, 500),
+          Offset(0, 500),
+        ],
+        thickness: 0.20,
+      );
+
+      // Symmetric internal shear walls along X and Y inside the slab
+      final wallInsideLeft = StructuralShearWall(
+        id: 'w_in_left',
+        start: const Offset(150, 100),
+        end: const Offset(150, 400),
+        thickness: 0.25 * scale,
+      );
+      final wallInsideRight = StructuralShearWall(
+        id: 'w_in_right',
+        start: const Offset(350, 100),
+        end: const Offset(350, 400),
+        thickness: 0.25 * scale,
+      );
+
+      // External shear wall located outside the slab boundary at x = 750 (outside slab 0..500)
+      final wallOutside = StructuralShearWall(
+        id: 'w_outside',
+        start: const Offset(750, 100),
+        end: const Offset(750, 400),
+        thickness: 0.25 * scale,
+      );
+
+      final storey = StoreyLevel(
+        id: 's1',
+        name: 'Storey 1',
+        elevation: 0.0,
+        height: 3.0,
+        slabs: [slab],
+        shearWalls: [wallInsideLeft, wallInsideRight, wallOutside],
+        columns: const [],
+      );
+
+      final project = StructuralProject(
+        title: 'Wall Outside Slab Project',
+        storeys: [storey],
+      );
+
+      final report = SeismicAnalysisCalculator.analyzeProject(
+        project,
+        cadUnitsPerMeter: scale,
+      );
+
+      final check = report.storeyChecks.first;
+
+      // The outside wall must be detected as disconnected
+      expect(check.disconnectedWallIds, contains('w_outside'));
+      expect(report.totalDisconnectedWallsCount, 1);
+      expect(report.hasDisconnectedElements, isTrue);
+
+      // The outside wall at x=750 MUST NOT pull CR towards the right!
+      // Since the two inside walls are symmetric at x=150 and x=350, CR should stay at x=250!
+      expect(check.centerOfRigidityCad!.dx, closeTo(250.0, 1.0));
+      expect(check.centerOfMassCad!.dx, closeTo(250.0, 1.0));
+      expect(check.eccentricityM!.dx, closeTo(0.0, 0.05));
+
+      // Wall area inside: 2 walls * (300/50 = 6m) * 0.25m = 3.0 m² (wallOutside is NOT added)
+      expect(check.wallAreaYM2, closeTo(3.0, 0.05));
+
+      // Recommendation should warn about wall outside slab
+      expect(check.architectRecommendation, contains('извън очертанията на плочата'));
+    });
+
+    test('10. Large slab opening correctly shifts net slab centroid and CM', () {
+      const scale = 50.0;
+      // 10m x 10m slab from (0, 0) to (500, 500)
+      // Large opening on the East side (x = 300..450, y = 100..400)
+      const largeOpeningEast = [
+        Offset(300, 100),
+        Offset(450, 100),
+        Offset(450, 400),
+        Offset(300, 400),
+      ];
+
+      final slabWithOpening = StructuralSlab(
+        id: 'slab_op',
+        polygon: const [
+          Offset(0, 0),
+          Offset(500, 0),
+          Offset(500, 500),
+          Offset(0, 500),
+        ],
+        openings: const [largeOpeningEast],
+        thickness: 0.20,
+      );
+
+      final storey = StoreyLevel(
+        id: 's1',
+        name: 'Storey 1',
+        elevation: 0.0,
+        height: 3.0,
+        slabs: [slabWithOpening],
+        columns: const [],
+        shearWalls: const [],
+      );
+
+      final project = StructuralProject(
+        title: 'Opening Shift Project',
+        storeys: [storey],
+      );
+
+      final report = SeismicAnalysisCalculator.analyzeProject(
+        project,
+        cadUnitsPerMeter: scale,
+      );
+
+      final check = report.storeyChecks.first;
+
+      // Because the opening removed mass from the East side (x>300),
+      // the CM must shift to the West (x < 250)
+      expect(check.centerOfMassCad!.dx, lessThan(240.0));
     });
   });
 }

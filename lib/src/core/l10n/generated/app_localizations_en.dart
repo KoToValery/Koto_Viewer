@@ -1759,6 +1759,41 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get seismicNoSlabBadge => 'No Slab Diaphragm';
+
+  @override
+  String get seismicNoSlabEccentricity => 'N/A (Slab required)';
+
+  @override
+  String get seismicRecNoSlabDiaphragm =>
+      'No floor slab defined on this storey. In accordance with Eurocode 8 and structural dynamics, a floor slab over vertical elements is required to form a horizontal seismic diaphragm and compute Center of Mass (CM), Center of Rigidity (CR), and eccentricity.';
+
+  @override
+  String seismicRecDisconnectedWalls(String names) {
+    return 'Shear wall(s) $names are located outside the slab boundary and do not connect to the horizontal diaphragm. They are excluded from CR and stiffness calculation.';
+  }
+
+  @override
+  String seismicRecDisconnectedCols(String names) {
+    return 'Column(s) $names are located outside the slab boundary and do not connect to the horizontal diaphragm.';
+  }
+
+  @override
+  String seismicWallsOutsideSlabWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count walls outside slab (excluded from diaphragm)',
+      one: '1 wall outside slab (excluded from diaphragm)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get seismicNoSlabWallCoverage =>
+      'Shear wall ratio cannot be computed without a floor slab diaphragm.';
+
+  @override
   String get verticalBasePressure => 'Base Pressure';
 
   @override
@@ -1904,5 +1939,90 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String verticalBasePressureHighText(String pressure) {
     return 'Base pressure ($pressure kPa) is high. A full mat foundation or piling is recommended following a geotechnical report.';
+  }
+
+  @override
+  String get toolMeasure => 'Measure';
+
+  @override
+  String get distanceCentimeters => 'Distance (cm)';
+
+  @override
+  String get loadStructuralModule => 'Load Structural Module';
+
+  @override
+  String get updatingLayers => 'Updating layers...';
+
+  @override
+  String get isolateStructuralLayers => 'Isolate Structural Layers';
+
+  @override
+  String get showAllLayers => 'Show All Layers';
+
+  @override
+  String get layersPreparationTitle => 'Prepare CAD Layers for BIM';
+
+  @override
+  String get layersPreparationSubtitle =>
+      'Hide architectural clutter, text, and furniture for better clarity and performance.';
+
+  @override
+  String get exportBimModel => 'Export BiM Model';
+
+  @override
+  String get exportBimJson => 'BiM Project (JSON)';
+
+  @override
+  String get exportStructuralDxf => 'Structural AutoCAD (DXF)';
+
+  @override
+  String get exportSuccess => 'Model exported successfully';
+
+  @override
+  String exportFailed(String error) {
+    return 'Failed to export model: $error';
+  }
+
+  @override
+  String slabOverStorey(String storey) {
+    return 'Slab over $storey';
+  }
+
+  @override
+  String get shearWallSizePreset => '25×150 cm';
+
+  @override
+  String get shearWallSizePresetAlt => '25×120 cm';
+
+  @override
+  String get customWallDimensions => 'Custom Wall...';
+
+  @override
+  String measuredDistance(String meters, String cm) {
+    return 'Distance: $meters m ($cm cm)';
+  }
+
+  @override
+  String measuredDelta(String dx, String dy) {
+    return 'ΔX = $dx m, ΔY = $dy m';
+  }
+
+  @override
+  String get clearMeasurement => 'Clear';
+
+  @override
+  String get columnNamePrefix => 'C';
+
+  @override
+  String get shearWallNamePrefix => 'W';
+
+  @override
+  String slabSectionElevationMarker(String elevation) {
+    return 'T.O.C. $elevation';
+  }
+
+  @override
+  String slabThicknessLabel(String thickness) {
+    return 'd = $thickness cm';
   }
 }

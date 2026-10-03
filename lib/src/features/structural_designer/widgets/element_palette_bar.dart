@@ -44,6 +44,11 @@ class ElementPaletteBar extends StatelessWidget {
   final SeismicAnalysisReport? seismicReport;
   final bool hasWallStart;
   final bool hasBeamStart;
+  final double currentWallLength;
+  final void Function(double length, double thickness)? onUpdateWallDimensions;
+  final VoidCallback? onRotateWall;
+  final VoidCallback? onClearMeasurement;
+  final bool hasActiveMeasurement;
   final VoidCallback? onCustomColumnDimensions;
   final VoidCallback? onCustomWallThickness;
   final VoidCallback? onCustomBeamDimensions;
@@ -58,6 +63,11 @@ class ElementPaletteBar extends StatelessWidget {
     required this.onUpdateColumnPreset,
     required this.currentWallThickness,
     required this.onUpdateWallThickness,
+    this.currentWallLength = 1.50,
+    this.onUpdateWallDimensions,
+    this.onRotateWall,
+    this.onClearMeasurement,
+    this.hasActiveMeasurement = false,
     this.currentBeamWidth = 0.25,
     this.currentBeamDepth = 0.50,
     this.onUpdateBeamDimensions,
@@ -128,7 +138,9 @@ class ElementPaletteBar extends StatelessWidget {
             else if (activeTool == StructuralDrawTool.slab)
               _buildSlabOptionsBar(context)
             else if (activeTool == StructuralDrawTool.slabOpening)
-              _buildOpeningOptionsBar(context),
+              _buildOpeningOptionsBar(context)
+            else if (activeTool == StructuralDrawTool.measure)
+              _buildMeasureOptionsBar(context),
 
             const SizedBox(height: 6),
 
@@ -168,6 +180,11 @@ class ElementPaletteBar extends StatelessWidget {
                     tool: StructuralDrawTool.slabOpening,
                     icon: Icons.tab_unselected_rounded,
                     label: context.l10n.toolOpening,
+                  ),
+                  _buildToolButton(
+                    tool: StructuralDrawTool.measure,
+                    icon: Icons.straighten_rounded,
+                    label: context.l10n.toolMeasure,
                   ),
                   // Vertical divider between modeling elements and engineering checks
                   Container(
@@ -436,56 +453,42 @@ class ElementPaletteBar extends StatelessWidget {
   }
 
   Widget _buildColumnOptionsBar(BuildContext context) {
-    final columnPresets = [
-      (ColumnShape.rectangular, 0.25, 0.25, 0.25, '25×25'),
-      (ColumnShape.rectangular, 0.25, 0.50, 0.25, '25×50'),
-      (ColumnShape.rectangular, 0.30, 0.30, 0.30, '30×30'),
-      (ColumnShape.rectangular, 0.25, 0.60, 0.25, '25×60'),
-      (ColumnShape.rectangular, 0.30, 0.50, 0.30, '30×50'),
-      (ColumnShape.circular, 0.30, 0.30, 0.30, 'Ø 30'),
-      (ColumnShape.lShape, 0.50, 0.50, 0.25, context.l10n.columnShapeLShape),
-    ];
-
-    final bool matchesAnyPreset = columnPresets.any((p) =>
-        currentColumnPreset.shape == p.$1 &&
-        (currentColumnPreset.width - p.$2).abs() < 1e-3 &&
-        (currentColumnPreset.height - p.$3).abs() < 1e-3);
+    // Fixed standard preset 25x30 (or rotated 30x25)
+    final bool isFixedPreset = currentColumnPreset.shape == ColumnShape.rectangular &&
+        (((currentColumnPreset.width - 0.25).abs() < 1e-3 && (currentColumnPreset.height - 0.30).abs() < 1e-3) ||
+         ((currentColumnPreset.width - 0.30).abs() < 1e-3 && (currentColumnPreset.height - 0.25).abs() < 1e-3));
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          for (final (shape, w, h, t, label) in columnPresets) ...[
-            Padding(
-              padding: const EdgeInsets.only(right: 5),
-              child: ChoiceChip(
-                label: Text(label),
-                selected: currentColumnPreset.shape == shape &&
-                    (currentColumnPreset.width - w).abs() < 1e-3 &&
-                    (currentColumnPreset.height - h).abs() < 1e-3,
-                onSelected: (selected) {
-                  if (selected) {
-                    onUpdateColumnPreset(currentColumnPreset.copyWith(
-                      shape: shape,
-                      width: w,
-                      height: h,
-                      thickness: t,
-                    ));
-                  }
-                },
-                visualDensity: VisualDensity.compact,
-              ),
+          Padding(
+            padding: const EdgeInsets.only(right: 5),
+            child: ChoiceChip(
+              label: const Text('25×30 cm'),
+              selected: isFixedPreset,
+              onSelected: (selected) {
+                if (selected) {
+                  onUpdateColumnPreset(currentColumnPreset.copyWith(
+                    shape: ColumnShape.rectangular,
+                    width: 0.25,
+                    height: 0.30,
+                    thickness: 0.25,
+                  ));
+                }
+              },
+              visualDensity: VisualDensity.compact,
             ),
-          ],
-          if (!matchesAnyPreset)
+          ),
+          if (!isFixedPreset)
             Padding(
               padding: const EdgeInsets.only(right: 5),
               child: ChoiceChip(
                 label: Text(
                   currentColumnPreset.shape == ColumnShape.circular
                       ? 'Ø ${(currentColumnPreset.width * 100).round()} cm'
-                      : '${(currentColumnPreset.width * 100).round()}×${(currentColumnPreset.height * 100).round()}',
+                      : '${(currentColumnPreset.width * 100).round()}×${(currentColumnPreset.height * 100).round()} cm',
                 ),
                 selected: true,
                 onSelected: (_) {},
@@ -513,47 +516,98 @@ class ElementPaletteBar extends StatelessWidget {
   }
 
   Widget _buildWallOptionsBar(BuildContext context) {
-    final thicknesses = [0.15, 0.20, 0.25, 0.30, 0.35];
-    final bool matchesPreset =
-        thicknesses.any((t) => (currentWallThickness - t).abs() < 1e-3);
+    final bool isFixedPreset = (currentWallThickness - 0.25).abs() < 1e-3 && (currentWallLength - 1.50).abs() < 1e-3;
+    final bool isAltPreset = (currentWallThickness - 0.25).abs() < 1e-3 && (currentWallLength - 1.20).abs() < 1e-3;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          Text(
-            context.l10n.wallThicknessLabel,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          const SizedBox(width: 6),
-          for (final t in thicknesses)
-            Padding(
-              padding: const EdgeInsets.only(right: 5),
-              child: ChoiceChip(
-                label: Text('${(t * 100).toInt()} cm'),
-                selected: (currentWallThickness - t).abs() < 1e-3,
-                onSelected: (selected) {
-                  if (selected) onUpdateWallThickness(t);
-                },
-                visualDensity: VisualDensity.compact,
-              ),
+          Padding(
+            padding: const EdgeInsets.only(right: 5),
+            child: ChoiceChip(
+              label: Text(context.l10n.shearWallSizePreset),
+              selected: isFixedPreset,
+              onSelected: (selected) {
+                if (selected) {
+                  onUpdateWallThickness(0.25);
+                  onUpdateWallDimensions?.call(1.50, 0.25);
+                }
+              },
+              visualDensity: VisualDensity.compact,
             ),
-          if (!matchesPreset)
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 5),
+            child: ChoiceChip(
+              label: Text(context.l10n.shearWallSizePresetAlt),
+              selected: isAltPreset,
+              onSelected: (selected) {
+                if (selected) {
+                  onUpdateWallThickness(0.25);
+                  onUpdateWallDimensions?.call(1.20, 0.25);
+                }
+              },
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+          if (!isFixedPreset && !isAltPreset)
             Padding(
               padding: const EdgeInsets.only(right: 5),
               child: ChoiceChip(
-                label: Text('${(currentWallThickness * 100).round()} cm'),
+                label: Text('${(currentWallThickness * 100).round()}×${(currentWallLength * 100).round()} cm'),
                 selected: true,
                 onSelected: (_) {},
                 visualDensity: VisualDensity.compact,
               ),
             ),
-          if (onCustomWallThickness != null)
+          if (onRotateWall != null)
+            IconButton.filledTonal(
+              icon: const Icon(Icons.rotate_90_degrees_ccw, size: 18),
+              tooltip: context.l10n.rotate90,
+              onPressed: onRotateWall,
+              visualDensity: VisualDensity.compact,
+            ),
+          if (onCustomWallThickness != null) ...[
+            const SizedBox(width: 4),
             ActionChip(
               avatar: const Icon(Icons.tune_rounded, size: 14),
-              label: Text(context.l10n.otherEllipsis, style: const TextStyle(fontSize: 11)),
+              label: Text(context.l10n.customWallDimensions, style: const TextStyle(fontSize: 11)),
               onPressed: onCustomWallThickness,
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeasureOptionsBar(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF5252).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Icon(Icons.straighten_rounded, color: Color(0xFFFF5252), size: 16),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            context.l10n.toolMeasure,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+          ),
+          const SizedBox(width: 12),
+          if (hasActiveMeasurement && onClearMeasurement != null)
+            ActionChip(
+              avatar: const Icon(Icons.close_rounded, size: 14, color: Colors.white70),
+              label: Text(context.l10n.clearMeasurement, style: const TextStyle(fontSize: 11)),
+              onPressed: onClearMeasurement,
               visualDensity: VisualDensity.compact,
             ),
         ],

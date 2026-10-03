@@ -51,6 +51,37 @@ void main() {
       expect(recEn, contains('FLOATING'));
       expect(recEn, contains('SOFT STOREY'));
       expect(recEn, contains('High torsional sensitivity'));
+
+      const checkNoSlab = StoreySeismicCheck(
+        storeyId: 's_no_slab',
+        storeyName: 'Storey 0',
+        storeyIndex: 0,
+        hasSlabDiaphragm: false,
+        dimensionXM: 0,
+        dimensionYM: 0,
+        eccentricityRatioX: 0,
+        eccentricityRatioY: 0,
+        isTorsionallySensitive: false,
+        wallAreaXM2: 0,
+        wallAreaYM2: 0,
+        floorAreaM2: 0,
+        wallRatioX: 0,
+        wallRatioY: 0,
+        isWallCoverageSufficientX: false,
+        isWallCoverageSufficientY: false,
+        floatingColumnIds: [],
+        floatingColumnNames: [],
+        discontinuousWallIds: [],
+        lateralStiffnessIndex: 0,
+        isSoftStorey: false,
+        riskLevel: SeismicRiskLevel.warning,
+        architectRecommendation: '',
+      );
+
+      final noSlabBg = checkNoSlab.localizedRecommendation(l10nBg);
+      final noSlabEn = checkNoSlab.localizedRecommendation(l10nEn);
+      expect(noSlabBg, contains('Липсва подова плоча'));
+      expect(noSlabEn, contains('No floor slab'));
     });
 
     testWidgets('SeismicAnalysisSheet renders on narrow mobile screen without overflow',

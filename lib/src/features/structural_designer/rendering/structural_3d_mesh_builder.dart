@@ -116,8 +116,24 @@ class Structural3dMeshBuilder {
         storeyTriangles.addAll(beamTris);
       }
 
-      // 3. Extrude Slabs (plate with slab thickness)
-      for (final slab in storey.slabs) {
+      // 3. Extrude Slabs (plate with slab thickness in distinct vibrant colors)
+      const slab3dPalette = [
+        Color(0xFF00B0FF), // Sky Blue
+        Color(0xFF00E676), // Emerald Green
+        Color(0xFFFFB300), // Warm Amber
+        Color(0xFFAA00FF), // Vivid Purple
+        Color(0xFFFF5252), // Coral Red
+        Color(0xFF00E5FF), // Deep Cyan
+        Color(0xFFFF9100), // Orange
+        Color(0xFF3D5AFE), // Royal Indigo
+      ];
+
+      for (int slabIdx = 0; slabIdx < storey.slabs.length; slabIdx++) {
+        final slab = storey.slabs[slabIdx];
+        final Color baseColor = slab.colorValue != null
+            ? Color(slab.colorValue!)
+            : slab3dPalette[slabIdx % slab3dPalette.length];
+
         final double slabZTop = zBase;
         final double slabZBottom = zBase - slab.thickness * cadUnitsPerMeter;
 
@@ -126,11 +142,11 @@ class Structural3dMeshBuilder {
           slabZBottom,
           slabZTop,
           topColor: isCurrentStorey
-              ? const Color(0xFFB0BEC5)
-              : const Color(0x66B0BEC5),
+              ? baseColor
+              : baseColor.withValues(alpha: 0.4),
           sideColor: isCurrentStorey
-              ? const Color(0xFF90A4AE)
-              : const Color(0x6690A4AE),
+              ? baseColor.withValues(alpha: 0.8)
+              : baseColor.withValues(alpha: 0.25),
         );
         storeyTriangles.addAll(slabTris);
 
