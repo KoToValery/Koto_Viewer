@@ -635,5 +635,67 @@ void main() {
       expect(repWith.totalVerticalLoadBaseKn, greaterThan(repWithout.totalVerticalLoadBaseKn));
       expect(repWith.basePressureKpa, greaterThan(repWithout.basePressureKpa));
     });
+
+    test('Test 12: Real layout with 12.5cm off-axis snapping does not create false 12m slanted span across intermediate elements', () {
+      // Replicates the user's exact project layout:
+      // - 4 axes spaced 4m apart along X (X = 0, 4, 8, 12)
+      // - Column K1 on Axis 1 at (0.0, 0.0)
+      // - Column K2 on Axis 2 snapped 12.5 cm off-axis at (4.0, -0.125)
+      // - Shear wall W4 on Axis 3 at (8.0, 0.0)
+      // - Shear wall W8 on Axis 4 at (12.0, 1.50)
+      // - Additional interior elements (K6 at 4, 4)
+      final storeys = [
+        StoreyLevel(
+          id: 'storey_1',
+          name: 'Етаж 1',
+          elevation: 0.0,
+          height: 3.0,
+          gridAxes: [
+            const StructuralGridAxis(id: 'a1', name: '1', start: Offset(0, -2), end: Offset(0, 10)),
+            const StructuralGridAxis(id: 'a2', name: '2', start: Offset(4, -2), end: Offset(4, 10)),
+            const StructuralGridAxis(id: 'a3', name: '3', start: Offset(8, -2), end: Offset(8, 10)),
+            const StructuralGridAxis(id: 'a4', name: '4', start: Offset(12, -2), end: Offset(12, 10)),
+          ],
+          columns: const [
+            StructuralColumn(id: 'col_k1', center: Offset(0.0, 0.0), width: 0.25, height: 0.25),
+            StructuralColumn(id: 'col_k2', center: Offset(3.875, 0.0), width: 0.25, height: 0.40), // 12.5cm off-axis from Axis 2 (X=4.0)!
+            StructuralColumn(id: 'col_k6', center: Offset(4.0, 4.0), width: 0.25, height: 0.25),
+          ],
+          shearWalls: const [
+            StructuralShearWall(id: 'w4', start: Offset(7.0, 0.0), end: Offset(9.0, 0.0), thickness: 0.25),
+            StructuralShearWall(id: 'w8', start: Offset(11.0, 1.5), end: Offset(13.0, 1.5), thickness: 0.25),
+          ],
+          slabs: const [
+            StructuralSlab(
+              id: 'slab_1',
+              polygon: [
+                Offset(-0.5, -0.5),
+                Offset(13.0, -0.5),
+                Offset(13.0, 10.0),
+                Offset(-0.5, 10.0),
+              ],
+              thickness: 0.20, // 20 cm slab
+            ),
+          ],
+        ),
+      ];
+
+      final project = StructuralProject(
+        title: 'User 12.5cm Snap Real Layout',
+        storeys: storeys,
+      );
+
+      final report = VerticalCapacityCalculator.analyzeProject(project);
+
+      // Verify that the maximum clear span is approximately 4.0 m (between adjacent bays),
+      // and NOT a 11.95 m / 12.0 m diagonal jump across K2 and W4!
+      final slabCheck = report.slabChecks.first;
+      expect(slabCheck.maxSpanM, lessThan(5.0));
+      expect(slabCheck.maxSpanM, closeTo(4.0, 0.5));
+
+      // With a 4.0m span, the 20cm slab must be completely safe!
+      expect(slabCheck.isDeflectionSafe, true);
+      expect(report.slabIssuesCount, 0);
+    });
   });
 }

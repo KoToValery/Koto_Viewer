@@ -160,6 +160,197 @@ class VerticalCapacityCalculator {
 
   /// Calculates max clear span between adjacent supports in the storey (meters)
   /// and returns the coordinates of the critical span segment.
+  static bool _segmentsIntersect(Offset a1, Offset a2, Offset b1, Offset b2) {
+    double ccw(Offset a, Offset b, Offset c) {
+      return (c.dy - a.dy) * (b.dx - a.dx) - (b.dy - a.dy) * (c.dx - a.dx);
+    }
+
+    final d1 = ccw(a1, a2, b1);
+    final d2 = ccw(a1, a2, b2);
+    final d3 = ccw(b1, b2, a1);
+    final d4 = ccw(b1, b2, a2);
+    return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+        ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+  }
+
+  /// Checks whether there is any intervening support (column or shear wall) between p1 and p2.
+  /// Uses both Gabriel disc criterion and dynamic corridor checks so that spans cannot
+  /// jump across intermediate supports, even when supports are snapped 12.5cm off-center.
+  static bool _hasInterveningSupport({
+    required Offset p1,
+    required Offset p2,
+    required StoreyLevel storey,
+    required double scale,
+    String? skipColId1,
+    String? skipColId2,
+    String? skipWallId1,
+    String? skipWallId2,
+  }) {
+    final vec = p2 - p1;
+    final len = vec.distance;
+    if (len < 1e-3) return false;
+
+    final u = vec / len;
+    final mid = (p1 + p2) / 2.0;
+    final radius = len / 2.0;
+    final radiusLimit = math.max(0.0, radius - 0.25 * scale);
+    final radiusLimitSq = radiusLimit * radiusLimit;
+
+    // Corridor tolerance: for span distances, an obstacle within 1.2m of the line
+    // or within 22% of span length definitely intercepts the slab bay.
+    final corridorTol = math.max(0.70 * scale, math.min(1.80 * scale, 0.22 * len));
+
+    // 1. Check all other columns
+    for (final col in storey.columns) {
+      if (col.id == skipColId1 || col.id == skipColId2) continue;
+      final cPos = col.center;
+
+      // Gabriel disc check
+      final distToMidSq = (cPos - mid).distanceSquared;
+      if (distToMidSq < radiusLimitSq) {
+        return true;
+      }
+
+      // Corridor projection check
+      final t = (cPos - p1).dx * u.dx + (cPos - p1).dy * u.dy;
+      if (t > 0.35 * scale && t < len - 0.35 * scale) {
+        final perpDist = ((cPos - p1).dx * (-u.dy) + (cPos - p1).dy * u.dx).abs();
+        if (perpDist <= corridorTol) {
+          return true;
+        }
+      }
+    }
+
+    // 2. Check all shear walls
+    for (final wall in storey.shearWalls) {
+      if (wall.id == skipWallId1 || wall.id == skipWallId2) continue;
+      final wMid = (wall.start + wall.end) / 2.0;
+
+      // Gabriel disc check for wall midpoint and endpoints
+      if ((wMid - mid).distanceSquared < radiusLimitSq) {
+        return true;
+      }
+      if ((wall.start - mid).distanceSquared < radiusLimitSq) {
+        return true;
+      }
+      if ((wall.end - mid).distanceSquared < radiusLimitSq) {
+        return true;
+      }
+
+      // Line intersection test
+      if (_segmentsIntersect(p1, p2, wall.start, wall.end)) {
+        return true;
+      }
+
+      // Corridor projection check for wall midpoint
+      final t = (wMid - p1).dx * u.dx + (wMid - p1).dy * u.dy;
+      if (t > 0.35 * scale && t < len - 0.35 * scale) {
+        final perpDist = ((wMid - p1).dx * (-u.dy) + (wMid - p1).dy * u.dx).abs();
+        if (perpDist <= corridorTol) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /// Checks whether a candidate span p1-p2 is the diagonal hypotenuse of an orthogonal or near-orthogonal
+  /// structural bay (e.g. opposite corners of a rectangular panel), where two-way bending is actually
+  /// governed by the orthogonal spans rather than the diagonal distance.
+  static bool _isDiagonalOfBay({
+    required Offset p1,
+    required Offset p2,
+    required StoreyLevel storey,
+    required double scale,
+    String? skipColId1,
+    String? skipColId2,
+    String? skipWallId1,
+    String? skipWallId2,
+  }) {
+    final len = (p2 - p1).distance;
+    final lenM = len / scale;
+    if (lenM < 1.5) return false;
+
+    // Both delta X and delta Y must be significant (at least 0.8m)
+    final dxM = (p2.dx - p1.dx).abs() / scale;
+    final dyM = (p2.dy - p1.dy).abs() / scale;
+    if (dxM < 0.8 || dyM < 0.8) return false;
+
+    // Collect all candidate corner supports (excluding the elements being evaluated)
+    final candidateCorners = <Offset>[];
+    for (final col in storey.columns) {
+      if (col.id == skipColId1 || col.id == skipColId2) continue;
+      candidateCorners.add(col.center);
+    }
+    for (final wall in storey.shearWalls) {
+      if (wall.id == skipWallId1 || wall.id == skipWallId2) continue;
+      candidateCorners.add((wall.start + wall.end) / 2.0);
+      candidateCorners.add(wall.start);
+      candidateCorners.add(wall.end);
+    }
+
+    for (final s in candidateCorners) {
+      final v1 = s - p1;
+      final v2 = p2 - s;
+      final d1 = v1.distance;
+      final d2 = v2.distance;
+      if (d1 < 0.8 * scale || d2 < 0.8 * scale) continue;
+      if (d1 > len - 0.2 * scale || d2 > len - 0.2 * scale) continue;
+
+      final u1 = v1 / d1;
+      final u2 = v2 / d2;
+      final dot = (u1.dx * u2.dx + u1.dy * u2.dy).abs();
+      if (dot <= 0.45) {
+        final pythDist = math.sqrt(d1 * d1 + d2 * d2);
+        if ((pythDist - len).abs() <= 0.25 * len) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Returns the closest point on segment [a, b] to point [p].
+  static Offset _closestPointOnSegment(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final abLenSq = ab.dx * ab.dx + ab.dy * ab.dy;
+    if (abLenSq < 1e-6) return a;
+    final t = (((p.dx - a.dx) * ab.dx + (p.dy - a.dy) * ab.dy) / abLenSq).clamp(0.0, 1.0);
+    return Offset(a.dx + t * ab.dx, a.dy + t * ab.dy);
+  }
+
+  /// Returns the closest pair of points between two segments [a1, b1] and [a2, b2].
+  static (Offset, Offset) _closestPointsBetweenSegments(
+    Offset a1,
+    Offset b1,
+    Offset a2,
+    Offset b2,
+  ) {
+    final m1 = (a1 + b1) / 2.0;
+    final m2 = (a2 + b2) / 2.0;
+    final candidates = [
+      (a1, _closestPointOnSegment(a1, a2, b2)),
+      (b1, _closestPointOnSegment(b1, a2, b2)),
+      (_closestPointOnSegment(a2, a1, b1), a2),
+      (_closestPointOnSegment(b2, a1, b1), b2),
+      (m1, _closestPointOnSegment(m1, a2, b2)),
+      (_closestPointOnSegment(m2, a1, b1), m2),
+    ];
+    var best = candidates.first;
+    var minDSq = (best.$2 - best.$1).distanceSquared;
+    for (int k = 1; k < candidates.length; k++) {
+      final dSq = (candidates[k].$2 - candidates[k].$1).distanceSquared;
+      if (dSq < minDSq) {
+        minDSq = dSq;
+        best = candidates[k];
+      }
+    }
+    return best;
+  }
+
+  /// Calculates max clear span between adjacent supports in the storey (meters)
+  /// and returns the coordinates of the critical span segment.
   static ({double maxSpanM, (Offset, Offset)? criticalSpanSegment}) calculateClearSpan(
     StoreyLevel storey,
     double scale,
@@ -174,7 +365,7 @@ class VerticalCapacityCalculator {
       }
     }
 
-    // 2. Clear Spans along Grid Axes (if columns lie on grid axes)
+    // 2. Clear Spans along Grid Axes (supports lying within 0.45m of axis line)
     for (final axis in storey.gridAxes) {
       final aVec = axis.end - axis.start;
       final aLen = aVec.distance;
@@ -182,141 +373,148 @@ class VerticalCapacityCalculator {
       final uAxis = aVec / aLen;
       final nAxis = Offset(-uAxis.dy, uAxis.dx);
 
-      final colsOnAxis = <({StructuralColumn col, double t})>[];
+      final supportsOnAxis = <({Offset pos, double t})>[];
       for (final col in storey.columns) {
         final distPerp = ((col.center - axis.start).dx * nAxis.dx +
                 (col.center - axis.start).dy * nAxis.dy)
             .abs();
-        if (distPerp <= 0.35 * scale) {
+        if (distPerp <= 0.45 * scale) {
           final t = (col.center - axis.start).dx * uAxis.dx +
               (col.center - axis.start).dy * uAxis.dy;
-          colsOnAxis.add((col: col, t: t));
+          supportsOnAxis.add((pos: col.center, t: t));
+        }
+      }
+      for (final wall in storey.shearWalls) {
+        final mid = (wall.start + wall.end) / 2.0;
+        final distPerp = ((mid - axis.start).dx * nAxis.dx +
+                (mid - axis.start).dy * nAxis.dy)
+            .abs();
+        if (distPerp <= 0.45 * scale) {
+          final t = (mid - axis.start).dx * uAxis.dx +
+              (mid - axis.start).dy * uAxis.dy;
+          supportsOnAxis.add((pos: mid, t: t));
         }
       }
 
-      colsOnAxis.sort((a, b) => a.t.compareTo(b.t));
+      supportsOnAxis.sort((a, b) => a.t.compareTo(b.t));
 
-      for (int i = 0; i < colsOnAxis.length - 1; i++) {
-        final distM = (colsOnAxis[i + 1].t - colsOnAxis[i].t) / scale;
+      for (int i = 0; i < supportsOnAxis.length - 1; i++) {
+        final distM = (supportsOnAxis[i + 1].t - supportsOnAxis[i].t) / scale;
         if (distM >= 1.0) {
           candidateSpans.add((
             spanM: distM,
-            segment: (colsOnAxis[i].col.center, colsOnAxis[i + 1].col.center),
+            segment: (supportsOnAxis[i].pos, supportsOnAxis[i + 1].pos),
           ));
         }
       }
     }
 
-    // 3. Spans between adjacent Column pairs (checking for intermediate supports & diagonals)
+    // 3. Spans between adjacent Column pairs (Gabriel disc + corridor check)
     final cols = storey.columns;
     for (int i = 0; i < cols.length; i++) {
       for (int j = i + 1; j < cols.length; j++) {
         final c1 = cols[i].center;
         final c2 = cols[j].center;
-        final vec = c2 - c1;
-        final len = vec.distance;
-        final dM = len / scale;
-        if (dM < 1.0 || dM > 16.0) continue;
+        final dM = (c2 - c1).distance / scale;
+        if (dM < 1.0 || dM > 10.0) continue;
 
-        final u = vec / len;
-
-        // Check if another column lies between c1 and c2 (eliminates false 8m, 12m spans across multiple bays)
-        bool hasIntermediateSupport = false;
-        for (int k = 0; k < cols.length; k++) {
-          if (k == i || k == j) continue;
-          final ck = cols[k].center;
-          final t = (ck - c1).dx * u.dx + (ck - c1).dy * u.dy;
-          if (t > 0.35 * scale && t < len - 0.35 * scale) {
-            final perpDist = ((ck - c1).dx * (-u.dy) + (ck - c1).dy * u.dx).abs();
-            if (perpDist <= 0.40 * scale) {
-              hasIntermediateSupport = true;
-              break;
-            }
-          }
+        if (_hasInterveningSupport(
+          p1: c1,
+          p2: c2,
+          storey: storey,
+          scale: scale,
+          skipColId1: cols[i].id,
+          skipColId2: cols[j].id,
+        )) {
+          continue;
         }
-        if (hasIntermediateSupport) continue;
 
-        // Check if a shear wall intersects or lies along segment c1-c2
-        for (final wall in storey.shearWalls) {
-          final mid = (wall.start + wall.end) / 2.0;
-          final t = (mid - c1).dx * u.dx + (mid - c1).dy * u.dy;
-          if (t > 0.35 * scale && t < len - 0.35 * scale) {
-            final perpDist = ((mid - c1).dx * (-u.dy) + (mid - c1).dy * u.dx).abs();
-            if (perpDist <= 0.40 * scale) {
-              hasIntermediateSupport = true;
-              break;
-            }
-          }
+        if (_isDiagonalOfBay(
+          p1: c1,
+          p2: c2,
+          storey: storey,
+          scale: scale,
+          skipColId1: cols[i].id,
+          skipColId2: cols[j].id,
+        )) {
+          continue;
         }
-        if (hasIntermediateSupport) continue;
-
-        // Gabriel disc check: if any other column center is strictly inside the disc with diameter c1-c2,
-        // then c1-c2 is not an adjacent span (eliminates knight's moves and multi-bay jumps)
-        final midCol = (c1 + c2) / 2.0;
-        final radiusCol = len / 2.0;
-        final radiusLimit = math.max(0.0, radiusCol - 0.25 * scale);
-        final radiusLimitSq = radiusLimit * radiusLimit;
-        bool hasGabrielInterferer = false;
-        for (int k = 0; k < cols.length; k++) {
-          if (k == i || k == j) continue;
-          final distSq = (cols[k].center - midCol).distanceSquared;
-          if (distSq < radiusLimitSq) {
-            hasGabrielInterferer = true;
-            break;
-          }
-        }
-        if (hasGabrielInterferer) continue;
-
-        // Check if c1-c2 is a diagonal of an orthogonal 4-column bay
-        bool isDiagonal = false;
-        for (int k = 0; k < cols.length; k++) {
-          if (k == i || k == j) continue;
-          final ck = cols[k].center;
-          final v1 = ck - c1;
-          final v2 = c2 - ck;
-          final d1 = v1.distance;
-          final d2 = v2.distance;
-          if (d1 > 0.8 * scale && d2 > 0.8 * scale && d1 < len - 0.2 * scale && d2 < len - 0.2 * scale) {
-            final u1 = v1 / d1;
-            final u2 = v2 / d2;
-            final dot = (u1.dx * u2.dx + u1.dy * u2.dy).abs();
-            if (dot < 0.35 && (math.sqrt(d1 * d1 + d2 * d2) - len).abs() < 0.20 * len) {
-              isDiagonal = true;
-              break;
-            }
-          }
-        }
-        if (isDiagonal) continue;
 
         candidateSpans.add((spanM: dM, segment: (c1, c2)));
       }
     }
 
-    // 4. Also check distances from columns to adjacent shear walls
+    // 4. Spans between Columns and Shear Walls (measured to closest point on wall)
     for (final col in storey.columns) {
       for (final wall in storey.shearWalls) {
-        final mid = (wall.start + wall.end) / 2.0;
-        final dM = (col.center - mid).distance / scale;
-        if (dM >= 1.0 && dM <= 12.0) {
-          final vec = mid - col.center;
-          final len = vec.distance;
-          final u = vec / len;
-          bool hasInter = false;
-          for (final other in storey.columns) {
-            if (other.id == col.id) continue;
-            final t = (other.center - col.center).dx * u.dx + (other.center - col.center).dy * u.dy;
-            if (t > 0.35 * scale && t < len - 0.35 * scale) {
-              final perpDist = ((other.center - col.center).dx * (-u.dy) + (other.center - col.center).dy * u.dx).abs();
-              if (perpDist <= 0.40 * scale) {
-                hasInter = true;
-                break;
-              }
-            }
-          }
-          if (!hasInter) {
-            candidateSpans.add((spanM: dM, segment: (col.center, mid)));
-          }
+        final wallPt = _closestPointOnSegment(col.center, wall.start, wall.end);
+        final dM = (col.center - wallPt).distance / scale;
+        if (dM < 1.0 || dM > 10.0) continue;
+
+        if (_hasInterveningSupport(
+          p1: col.center,
+          p2: wallPt,
+          storey: storey,
+          scale: scale,
+          skipColId1: col.id,
+          skipWallId1: wall.id,
+        )) {
+          continue;
         }
+
+        if (_isDiagonalOfBay(
+          p1: col.center,
+          p2: wallPt,
+          storey: storey,
+          scale: scale,
+          skipColId1: col.id,
+          skipWallId1: wall.id,
+        )) {
+          continue;
+        }
+
+        candidateSpans.add((spanM: dM, segment: (col.center, wallPt)));
+      }
+    }
+
+    // 5. Spans between Shear Wall pairs (measured between closest points of walls)
+    final walls = storey.shearWalls;
+    for (int i = 0; i < walls.length; i++) {
+      for (int j = i + 1; j < walls.length; j++) {
+        final pair = _closestPointsBetweenSegments(
+          walls[i].start,
+          walls[i].end,
+          walls[j].start,
+          walls[j].end,
+        );
+        final p1 = pair.$1;
+        final p2 = pair.$2;
+        final dM = (p2 - p1).distance / scale;
+        if (dM < 1.0 || dM > 10.0) continue;
+
+        if (_hasInterveningSupport(
+          p1: p1,
+          p2: p2,
+          storey: storey,
+          scale: scale,
+          skipWallId1: walls[i].id,
+          skipWallId2: walls[j].id,
+        )) {
+          continue;
+        }
+
+        if (_isDiagonalOfBay(
+          p1: p1,
+          p2: p2,
+          storey: storey,
+          scale: scale,
+          skipWallId1: walls[i].id,
+          skipWallId2: walls[j].id,
+        )) {
+          continue;
+        }
+
+        candidateSpans.add((spanM: dM, segment: (p1, p2)));
       }
     }
 
