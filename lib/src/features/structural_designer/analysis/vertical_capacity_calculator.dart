@@ -225,30 +225,45 @@ class VerticalCapacityCalculator {
     for (final wall in storey.shearWalls) {
       if (wall.id == skipWallId1 || wall.id == skipWallId2) continue;
       final wMid = (wall.start + wall.end) / 2.0;
+      final wVec = wall.end - wall.start;
 
-      // Gabriel disc check for wall midpoint and endpoints
-      if ((wMid - mid).distanceSquared < radiusLimitSq) {
-        return true;
-      }
-      if ((wall.start - mid).distanceSquared < radiusLimitSq) {
-        return true;
-      }
-      if ((wall.end - mid).distanceSquared < radiusLimitSq) {
-        return true;
+      // Candidate points on the wall to check: endpoints, midpoint, and intersection with line p1-p2
+      final wallTestPoints = <Offset>[
+        wall.start,
+        wall.end,
+        wMid,
+      ];
+
+      // Intersection of wall segment with the infinite line p1-p2
+      final n = Offset(-u.dy, u.dx);
+      final denom = wVec.dx * n.dx + wVec.dy * n.dy;
+      if (denom.abs() > 1e-4) {
+        final sInt = ((p1 - wall.start).dx * n.dx + (p1 - wall.start).dy * n.dy) / denom;
+        if (sInt >= 0.0 && sInt <= 1.0) {
+          wallTestPoints.add(Offset(wall.start.dx + sInt * wVec.dx, wall.start.dy + sInt * wVec.dy));
+        }
       }
 
-      // Line intersection test
-      if (_segmentsIntersect(p1, p2, wall.start, wall.end)) {
-        return true;
-      }
-
-      // Corridor projection check for wall midpoint
-      final t = (wMid - p1).dx * u.dx + (wMid - p1).dy * u.dy;
-      if (t > 0.35 * scale && t < len - 0.35 * scale) {
-        final perpDist = ((wMid - p1).dx * (-u.dy) + (wMid - p1).dy * u.dx).abs();
-        if (perpDist <= corridorTol) {
+      // Check all candidate points on this wall
+      for (final pt in wallTestPoints) {
+        // Gabriel disc check
+        if ((pt - mid).distanceSquared < radiusLimitSq) {
           return true;
         }
+
+        // Corridor projection check
+        final t = (pt - p1).dx * u.dx + (pt - p1).dy * u.dy;
+        if (t > 0.35 * scale && t < len - 0.35 * scale) {
+          final perpDist = ((pt - p1).dx * (-u.dy) + (pt - p1).dy * u.dx).abs();
+          if (perpDist <= corridorTol) {
+            return true;
+          }
+        }
+      }
+
+      // Segment intersection test (crosses wall centerline)
+      if (_segmentsIntersect(p1, p2, wall.start, wall.end)) {
+        return true;
       }
     }
 
@@ -365,7 +380,7 @@ class VerticalCapacityCalculator {
       }
     }
 
-    // 2. Clear Spans along Grid Axes (supports lying within 0.45m of axis line)
+    // 2. Clear Spans along Grid Axes (supports lying within 0.45m of axis line, including intersecting shear walls)
     for (final axis in storey.gridAxes) {
       final aVec = axis.end - axis.start;
       final aLen = aVec.distance;
@@ -373,7 +388,7 @@ class VerticalCapacityCalculator {
       final uAxis = aVec / aLen;
       final nAxis = Offset(-uAxis.dy, uAxis.dx);
 
-      final supportsOnAxis = <({Offset pos, double t})>[];
+      final supportsOnAxis = <({Offset pos, double t, String supportId})>[];
       for (final col in storey.columns) {
         final distPerp = ((col.center - axis.start).dx * nAxis.dx +
                 (col.center - axis.start).dy * nAxis.dy)
@@ -381,29 +396,84 @@ class VerticalCapacityCalculator {
         if (distPerp <= 0.45 * scale) {
           final t = (col.center - axis.start).dx * uAxis.dx +
               (col.center - axis.start).dy * uAxis.dy;
-          supportsOnAxis.add((pos: col.center, t: t));
+          supportsOnAxis.add((pos: col.center, t: t, supportId: col.id));
         }
       }
       for (final wall in storey.shearWalls) {
+        final wVec = wall.end - wall.start;
+        // Check intersection of shear wall with axis line
+        final denom = wVec.dx * nAxis.dx + wVec.dy * nAxis.dy;
+        if (denom.abs() > 1e-4) {
+          final sInt = ((axis.start - wall.start).dx * nAxis.dx +
+                  (axis.start - wall.start).dy * nAxis.dy) /
+              denom;
+          if (sInt >= -0.15 && sInt <= 1.15) {
+            final pInt = wall.start + wVec * sInt.clamp(0.0, 1.0);
+            final distPerp = ((pInt - axis.start).dx * nAxis.dx +
+                    (pInt - axis.start).dy * nAxis.dy)
+                .abs();
+            if (distPerp <= 0.45 * scale) {
+              final t = (pInt - axis.start).dx * uAxis.dx +
+                  (pInt - axis.start).dy * uAxis.dy;
+              supportsOnAxis.add((pos: pInt, t: t, supportId: wall.id));
+            }
+          }
+        }
+
+        // Check endpoints and midpoint of shear wall
         final mid = (wall.start + wall.end) / 2.0;
-        final distPerp = ((mid - axis.start).dx * nAxis.dx +
-                (mid - axis.start).dy * nAxis.dy)
-            .abs();
-        if (distPerp <= 0.45 * scale) {
-          final t = (mid - axis.start).dx * uAxis.dx +
-              (mid - axis.start).dy * uAxis.dy;
-          supportsOnAxis.add((pos: mid, t: t));
+        for (final pt in [wall.start, wall.end, mid]) {
+          final distPerp = ((pt - axis.start).dx * nAxis.dx +
+                  (pt - axis.start).dy * nAxis.dy)
+              .abs();
+          if (distPerp <= 0.45 * scale) {
+            final t = (pt - axis.start).dx * uAxis.dx +
+                (pt - axis.start).dy * uAxis.dy;
+            supportsOnAxis.add((pos: pt, t: t, supportId: wall.id));
+          }
         }
       }
 
+      // Deduplicate supports from the same element that have very close t (< 0.30m)
       supportsOnAxis.sort((a, b) => a.t.compareTo(b.t));
+      final dedupedSupports = <({Offset pos, double t, String supportId})>[];
+      for (final s in supportsOnAxis) {
+        if (dedupedSupports.isEmpty) {
+          dedupedSupports.add(s);
+        } else {
+          final prev = dedupedSupports.last;
+          if (prev.supportId == s.supportId && (s.t - prev.t).abs() < 0.30 * scale) {
+            continue;
+          }
+          dedupedSupports.add(s);
+        }
+      }
 
-      for (int i = 0; i < supportsOnAxis.length - 1; i++) {
-        final distM = (supportsOnAxis[i + 1].t - supportsOnAxis[i].t) / scale;
+      for (int i = 0; i < dedupedSupports.length - 1; i++) {
+        // Do not form span between two points of the SAME wall!
+        if (dedupedSupports[i].supportId == dedupedSupports[i + 1].supportId) {
+          continue;
+        }
+
+        final distM = (dedupedSupports[i + 1].t - dedupedSupports[i].t) / scale;
         if (distM >= 1.0) {
+          // Verify that no other support intervenes between them
+          if (_hasInterveningSupport(
+            p1: dedupedSupports[i].pos,
+            p2: dedupedSupports[i + 1].pos,
+            storey: storey,
+            scale: scale,
+            skipColId1: dedupedSupports[i].supportId,
+            skipColId2: dedupedSupports[i + 1].supportId,
+            skipWallId1: dedupedSupports[i].supportId,
+            skipWallId2: dedupedSupports[i + 1].supportId,
+          )) {
+            continue;
+          }
+
           candidateSpans.add((
             spanM: distM,
-            segment: (supportsOnAxis[i].pos, supportsOnAxis[i + 1].pos),
+            segment: (dedupedSupports[i].pos, dedupedSupports[i + 1].pos),
           ));
         }
       }

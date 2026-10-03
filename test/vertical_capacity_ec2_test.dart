@@ -697,5 +697,64 @@ void main() {
       expect(slabCheck.isDeflectionSafe, true);
       expect(report.slabIssuesCount, 0);
     });
+
+    test('Test 13: Spans along grid axis do not cross intersecting perpendicular shear walls (no false 9.92m span)', () {
+      // Replicates the scenario from screenshot media_1791066782647.png:
+      // - Vertical axis along X = 0
+      // - Column K7 at (0.0, 0.0)
+      // - Horizontal shear wall W6 at Y = 4.37, starting on the axis at (0.0, 4.37)
+      // - Second horizontal shear wall W_lower at Y = 7.50
+      // - Support at (0.0, 9.92)
+      final storeys = [
+        StoreyLevel(
+          id: 'storey_1',
+          name: 'Етаж 1',
+          elevation: 0.0,
+          height: 3.0,
+          gridAxes: const [
+            StructuralGridAxis(id: 'axis_v', name: 'A', start: Offset(0, -1), end: Offset(0, 12)),
+          ],
+          columns: const [
+            StructuralColumn(id: 'col_k7', center: Offset(0.0, 0.0), width: 0.25, height: 0.40),
+            StructuralColumn(id: 'col_bottom', center: Offset(0.0, 9.92), width: 0.25, height: 0.40),
+          ],
+          shearWalls: const [
+            StructuralShearWall(id: 'w6', start: Offset(0.0, 4.37), end: Offset(3.0, 4.37), thickness: 0.25),
+            StructuralShearWall(id: 'w_lower', start: Offset(0.0, 7.50), end: Offset(3.0, 7.50), thickness: 0.25),
+          ],
+          slabs: const [
+            StructuralSlab(
+              id: 'slab_1',
+              polygon: [
+                Offset(-1.0, -1.0),
+                Offset(5.0, -1.0),
+                Offset(5.0, 12.0),
+                Offset(-1.0, 12.0),
+              ],
+              thickness: 0.20,
+            ),
+          ],
+        ),
+      ];
+
+      final project = StructuralProject(
+        title: 'Intersecting Shear Walls Test',
+        storeys: storeys,
+      );
+
+      final report = VerticalCapacityCalculator.analyzeProject(project);
+      final slabCheck = report.slabChecks.first;
+
+      // The span must NOT jump across W6 and W_lower (9.92 m).
+      // Instead, it must be bounded by W6 (approx 4.37 m).
+      expect(slabCheck.maxSpanM, lessThan(5.0));
+      expect(slabCheck.maxSpanM, closeTo(4.37, 0.1));
+      expect(slabCheck.criticalSpanSegment, isNotNull);
+
+      // The critical segment must start at K7 and end at W6 (not 9.92m to col_bottom)
+      final seg = slabCheck.criticalSpanSegment!;
+      final segLenM = (seg.$2 - seg.$1).distance;
+      expect(segLenM, closeTo(4.37, 0.1));
+    });
   });
 }
