@@ -427,16 +427,18 @@ class WallAxisDetector {
     return resequenceGridAxes(rawAxes, isBulgarian: isBulgarian);
   }
 
-  /// Injects detected walls and continuous grid axes into [document], isolating structural elements and hiding clutter layers.
+  /// Injects cleaned wall contours into [document] in layer [wallLayerName] (default 'WALLS_250'),
+  /// isolating structural masonry and hiding clutter layers.
   ///
-  /// Populates:
-  /// - [wallLayerName] (default 'WALLS_250') with closed wall contours and transverse jamb caps at openings.
-  /// - [axisLayerName] (default 'AXIS') with continuous full-building grid axes, bubble circles, and text labels (DASHDOT linetype).
+  /// Note: Grid axes are NOT injected as static CAD drawing lines into [document].
+  /// Instead, they are generated dynamically as native interactive [StructuralGridAxis] elements
+  /// inside the BIM module ([StructuralDesignerScreen]) via [convertToStructuralGridAxes]
+  /// and stored in [StructuralProjectStorey.gridAxes].
   static void applyToDocument(
     DxfDocument document,
     WallAxisDetectionResult result, {
     String wallLayerName = 'WALLS_250',
-    String axisLayerName = 'AXIS',
+    String? axisLayerName,
     bool isBulgarian = true,
   }) {
     if (!result.hasWallsFound) return;
@@ -457,27 +459,25 @@ class WallAxisDetector {
     );
     document.layers[wallLayerName] = wallLayer;
 
-    // 3. Create or update AXIS layer
-    final axisLayer = DxfLayer(
-      name: axisLayerName,
-      colorIndex: 1, // Red
-      isVisible: true,
-      lineType: 'DASHDOT',
-      customLineweight: 0.25,
-    );
-    document.layers[axisLayerName] = axisLayer;
-
-    // 4. Remove any previously injected entities for wallLayerName or axisLayerName
+    // 3. Remove any previously injected entities for wallLayerName or AXIS
     try {
       document.entities.removeWhere(
         (e) =>
             e.layer == wallLayerName ||
-            e.layer == axisLayerName ||
-            e.layer == 'AXIS',
+            e.layer == 'AXIS' ||
+            (axisLayerName != null && e.layer == axisLayerName),
       );
     } catch (_) {}
 
-    // 5. Add wall contour lines to document
+    // Ensure AXIS layer does not contain static CAD entities in underlay
+    if (document.layers.containsKey('AXIS')) {
+      document.layers['AXIS']?.isVisible = false;
+    }
+    if (axisLayerName != null && document.layers.containsKey(axisLayerName)) {
+      document.layers[axisLayerName]?.isVisible = false;
+    }
+
+    // 4. Add wall contour lines to document
     final newEntities = <DxfEntity>[];
 
     for (final seg in result.wallContourSegments) {
@@ -492,79 +492,7 @@ class WallAxisDetector {
       );
     }
 
-    // 6. Generate continuous structural grid axes across the full building envelope
-    final gridAxes = convertToStructuralGridAxes(
-      result.snappedCenterlines,
-      isBulgarian: isBulgarian,
-      scale: result.detectedScale,
-    );
-
-    final bubbleRadius = 250.0 * result.detectedScale; // 25 cm bubble radius (50 cm diameter)
-    final textHeight = 200.0 * result.detectedScale; // 20 cm text height
-
-    for (final axis in gridAxes) {
-      // Continuous axis line spanning the full envelope
-      newEntities.add(
-        DxfLine(
-          p1: axis.start,
-          p2: axis.end,
-          layer: axisLayerName,
-          colorIndex: 1,
-          lineType: 'DASHDOT',
-          lineTypeScale: 1.0,
-        ),
-      );
-
-      // Bubble and label at end
-      if (axis.bubbleAtEnd) {
-        newEntities.add(
-          DxfCircle(
-            center: axis.end,
-            radius: bubbleRadius,
-            layer: axisLayerName,
-            colorIndex: 1,
-          ),
-        );
-        newEntities.add(
-          DxfText(
-            text: axis.name,
-            insertPoint: axis.end,
-            alignPoint: axis.end,
-            hAlign: 1, // Center
-            vAlign: 2, // Middle
-            height: textHeight,
-            layer: axisLayerName,
-            colorIndex: 1,
-          ),
-        );
-      }
-
-      // Bubble and label at start
-      if (axis.bubbleAtStart) {
-        newEntities.add(
-          DxfCircle(
-            center: axis.start,
-            radius: bubbleRadius,
-            layer: axisLayerName,
-            colorIndex: 1,
-          ),
-        );
-        newEntities.add(
-          DxfText(
-            text: axis.name,
-            insertPoint: axis.start,
-            alignPoint: axis.start,
-            hAlign: 1, // Center
-            vAlign: 2, // Middle
-            height: textHeight,
-            layer: axisLayerName,
-            colorIndex: 1,
-          ),
-        );
-      }
-    }
-
-    // 7. Mutate document entity lists
+    // 5. Mutate document entity lists
     try {
       document.entities.addAll(newEntities);
     } catch (_) {
@@ -576,8 +504,8 @@ class WallAxisDetector {
         modelList.removeWhere(
           (e) =>
               e.layer == wallLayerName ||
-              e.layer == axisLayerName ||
-              e.layer == 'AXIS',
+              e.layer == 'AXIS' ||
+              (axisLayerName != null && e.layer == axisLayerName),
         );
         modelList.addAll(newEntities);
       } catch (_) {}

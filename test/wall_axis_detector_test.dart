@@ -242,29 +242,19 @@ void main() {
       final wallEntities = doc.entities.where((e) => e.layer == 'WALLS_250').toList();
       expect(wallEntities.isNotEmpty, isTrue);
 
-      // Verify AXIS layer exists, is visible, and contains continuous dash-dot grid axes with bubbles
-      expect(doc.layers.containsKey('AXIS'), isTrue);
-      expect(doc.layers['AXIS']?.isVisible, isTrue);
-      expect(doc.layers['AXIS']?.lineType, 'DASHDOT');
-
+      // Verify CAD underlay does NOT contain static axis entities (no fake CAD lines)
       final axisEntities = doc.entities.where((e) => e.layer == 'AXIS').toList();
-      expect(axisEntities.isNotEmpty, isTrue);
+      expect(axisEntities.isEmpty, isTrue);
 
-      final axisLines = axisEntities.whereType<DxfLine>().toList();
-      expect(axisLines.isNotEmpty, isTrue);
-      expect(axisLines.first.lineType, 'DASHDOT');
-
-      // Verify bubble circles and text labels are present in AXIS layer
-      final axisCircles = axisEntities.whereType<DxfCircle>().toList();
-      expect(axisCircles.isNotEmpty, isTrue);
-      final axisTexts = axisEntities.whereType<DxfText>().toList();
-      expect(axisTexts.isNotEmpty, isTrue);
-
-      // Verify axes can be extracted back as native interactive StructuralGridAxis elements
-      final importedAxes = WallAxisDetector.extractGridAxesFromDocument(doc, isBulgarian: true);
-      expect(importedAxes.isNotEmpty, isTrue);
-      expect(importedAxes.first.bubbleAtStart, isTrue);
-      expect(importedAxes.first.bubbleAtEnd, isTrue);
+      // Instead, dynamic interactive StructuralGridAxis elements are generated for the BIM module
+      final dynamicAxes = WallAxisDetector.convertToStructuralGridAxes(
+        result.snappedCenterlines,
+        isBulgarian: true,
+        scale: result.detectedScale,
+      );
+      expect(dynamicAxes.isNotEmpty, isTrue);
+      expect(dynamicAxes.first.bubbleAtStart, isTrue);
+      expect(dynamicAxes.first.bubbleAtEnd, isTrue);
     });
 
     test('8. Handles LWPOLYLINE and closed rectangular rooms', () {
@@ -663,6 +653,58 @@ void main() {
         return (e.p1.dx - 2000.0).abs() <= 20.0 && (e.p2.dx - 2000.0).abs() <= 20.0;
       });
       expect(hasCapInDoc, isTrue, reason: 'WALLS_250 layer in DXF document must contain the jamb cap line');
+    });
+
+    test('18. Dynamic BIM Grid Axis generation: CAD underlay has no static axes, axes are generated as live StructuralGridAxis elements', () {
+      final doc = _createTestDoc(
+        layers: {
+          'WALLS': DxfLayer(name: 'WALLS', colorIndex: 7, isVisible: true),
+        },
+        entities: const [
+          DxfLine(p1: Offset(0, 0), p2: Offset(6000, 0), layer: 'WALLS'),
+          DxfLine(p1: Offset(0, 250), p2: Offset(6000, 250), layer: 'WALLS'),
+          DxfLine(p1: Offset(0, 0), p2: Offset(0, 5000), layer: 'WALLS'),
+          DxfLine(p1: Offset(250, 0), p2: Offset(250, 5000), layer: 'WALLS'),
+        ],
+        bounds: const Rect.fromLTWH(0, 0, 6000, 5000),
+      );
+
+      final result = WallAxisDetector.detect(doc);
+      expect(result.hasWallsFound, isTrue);
+
+      // Clean walls in CAD underlay
+      WallAxisDetector.applyToDocument(doc, result);
+
+      // Verify CAD underlay does NOT have fake static CAD axis lines
+      final underlayAxisEnts = doc.entities.where((e) => e.layer == 'AXIS').toList();
+      expect(underlayAxisEnts.isEmpty, isTrue, reason: 'Underlay must not have static CAD axes');
+
+      // Generate dynamic BIM elements
+      final dynamicAxes = WallAxisDetector.convertToStructuralGridAxes(
+        result.snappedCenterlines,
+        isBulgarian: true,
+        scale: result.detectedScale,
+      );
+      expect(dynamicAxes.length, 2);
+
+      final hAxis = dynamicAxes.firstWhere((a) => (a.start.dy - a.end.dy).abs() < 1.0);
+      final vAxis = dynamicAxes.firstWhere((a) => (a.start.dx - a.end.dx).abs() < 1.0);
+
+      // Verify dynamic BIM element characteristics (interactive bubbles, geometric checks)
+      expect(hAxis.bubbleAtStart, isTrue);
+      expect(hAxis.bubbleAtEnd, isTrue);
+      expect(vAxis.bubbleAtStart, isTrue);
+      expect(vAxis.bubbleAtEnd, isTrue);
+
+      // Verify intersection calculation (live BIM element capability)
+      final intersection = hAxis.intersectionWith(vAxis);
+      expect(intersection, isNotNull);
+      expect(intersection!.dx, closeTo(125.0, 1.0));
+      expect(intersection.dy, closeTo(125.0, 1.0));
+
+      // Verify distance hit testing (for live user selection)
+      expect(hAxis.distanceToSegment(const Offset(3000, 125)), closeTo(0.0, 1.0));
+      expect(hAxis.distanceToSegment(const Offset(3000, 1000)), closeTo(875.0, 1.0));
     });
   });
 }

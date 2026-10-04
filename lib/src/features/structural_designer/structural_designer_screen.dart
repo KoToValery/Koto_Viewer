@@ -5039,14 +5039,25 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _checkAutoDetectWallsOnStartup() {
     if (!mounted) return;
-    // Don't auto-prompt if axes are already generated in active storey
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+
+    // If axes are already populated in active storey (e.g. from initState or saved project)
     if (_project.activeStorey.gridAxes.isNotEmpty) {
+      if (widget.initialDetectionResult != null || widget.document.layers.containsKey('WALLS_250')) {
+        _applyUnderlayFilter(true);
+        _runAnalysis();
+        setState(() {});
+      }
       return;
     }
 
-    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+    // If initialDetectionResult was provided from layer prep modal, apply it now
+    if (widget.initialDetectionResult != null && widget.initialDetectionResult!.hasWallsFound) {
+      _applyDetectedWallsAndAxes(widget.initialDetectionResult!);
+      return;
+    }
 
-    // Check if axes can be imported from layer AXIS
+    // Check if axes can be imported from an external DXF AXIS layer
     final importedAxes = WallAxisDetector.extractGridAxesFromDocument(
       widget.document,
       isBulgarian: isBg,
@@ -5056,11 +5067,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _updateActiveStorey(active.copyWith(gridAxes: importedAxes));
       _applyUnderlayFilter(true);
       _runAnalysis();
-      setState(() {});
+      setState(() {
+        _activeTool = StructuralDrawTool.select;
+      });
       return;
     }
 
-    // If WALLS_250 exists but gridAxes is empty, re-detect to populate gridAxes
+    // If WALLS_250 exists but gridAxes is empty, re-detect to populate dynamic gridAxes
     if (widget.document.layers.containsKey('WALLS_250')) {
       final result = WallAxisDetector.detect(widget.document);
       if (result.hasWallsFound) {
