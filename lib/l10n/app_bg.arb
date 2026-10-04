@@ -599,6 +599,10 @@
   "wallsAndAxesGeneratedSuccess": "Генерирани {axesCount} оси и изолирани {wallsCount} стенни контура ({unit})",
   "noWallsDetected": "Не са открити двойки стени (20-30 см) в чертежа",
   "wallCandidatesFound": "Открити {pairCount} двойки стени ({length} м)",
-  "autoDetectWallsSubtitle": "Открива стени 20-30 см, изолира контурите им в WALLS_250 и чертае осови линии."
+  "autoDetectWallsSubtitle": "Открива стени 20-30 см, изолира контурите им в WALLS_250 и чертае осови линии.",
+  "stripFootingFoundation": "Ивични основи (Кота ±0.00)",
+  "matFoundation": "Фундаментна плоча (Кота ±0.00)",
+  "foundationFootingLabel": "Основа • b = {width} см",
+  "overheadSlabLabel": "Плоча (+{elev} м)"
 }
 

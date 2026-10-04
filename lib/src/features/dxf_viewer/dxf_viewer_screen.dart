@@ -39,12 +39,10 @@ import 'widgets/dxf_measurement_overlay.dart';
 import '../../core/services/project_bundle_service.dart';
 import '../project_viewer/widgets/project_presentation_bar.dart';
 import '../structural_designer/models/structural_element.dart';
-import '../structural_designer/models/wall_axis_models.dart';
 import '../structural_designer/rendering/structural_2d_painter.dart';
 import '../structural_designer/rendering/structural_pointer_painter.dart';
 import '../structural_designer/services/structural_persistence_service.dart';
 import '../structural_designer/structural_designer_screen.dart';
-import '../structural_designer/widgets/structural_layer_prep_modal.dart';
 
 class DxfViewerScreen extends StatefulWidget {
   final String filePath;
@@ -1770,32 +1768,18 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
         tooltip: context.l10n.structuralDesignerBim,
         onPressed: _document != null
             ? () async {
-                WallAxisDetectionResult? detectedResult;
-                final confirmed = await StructuralLayerPrepModal.show(
-                  context: context,
-                  document: _document!,
-                  onLayersChanged: () {
-                    setState(() {});
-                  },
-                  onAxesDetected: (result) {
-                    detectedResult = result;
-                  },
-                );
-                if (confirmed == true && mounted) {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => StructuralDesignerScreen(
-                        document: _document!,
-                        initialCadBounds: _currentBounds,
-                        initialTransform: _transformController.value,
-                        title: _fileName,
-                        initialDetectionResult: detectedResult,
-                      ),
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => StructuralDesignerScreen(
+                      document: _document!,
+                      initialCadBounds: _currentBounds,
+                      initialTransform: _transformController.value,
+                      title: _fileName,
                     ),
-                  );
-                  if (mounted) {
-                    await _loadStructuralProject();
-                  }
+                  ),
+                );
+                if (mounted) {
+                  await _loadStructuralProject();
                 }
               }
             : null,

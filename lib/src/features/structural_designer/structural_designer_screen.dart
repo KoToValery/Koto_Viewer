@@ -27,8 +27,8 @@ import 'widgets/cantilever_analysis_sheet.dart';
 import 'widgets/element_palette_bar.dart';
 import 'widgets/seismic_analysis_sheet.dart';
 import 'widgets/storey_manager_sheet.dart';
+import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
 import 'widgets/structural_3d_viewport.dart';
-import 'widgets/structural_layer_prep_modal.dart';
 import 'widgets/vertical_capacity_sheet.dart';
 
 /// Main CAD/BIM Structural Designer workspace screen.
@@ -596,6 +596,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if ((screenPos - sPt).distance <= hitRadiusScreen) {
         return i;
       }
+    }
+    return null;
+  }
+
+  (StructuralSlab, int)? _hitTestAnySlabVertex(Offset screenPos) {
+    if (_editingSlab != null) {
+      final vIdx = _hitTestSlabVertex(screenPos, _editingSlab!);
+      if (vIdx != null) return (_editingSlab!, vIdx);
+    }
+    for (final slab in _project.activeStorey.slabs) {
+      final vIdx = _hitTestSlabVertex(screenPos, slab);
+      if (vIdx != null) return (slab, vIdx);
     }
     return null;
   }
@@ -1356,14 +1368,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return null;
   }
 
+  void _updateProjectGridAxes(List<StructuralGridAxis> newAxes) {
+    setState(() {
+      _project = _project.copyWithGridAxes(newAxes);
+    });
+    _saveProject();
+  }
+
   void _deleteSelectedGridAxis() {
     if (_selectedGridAxis == null) return;
     _pushUndo();
-    final active = _project.activeStorey;
-    final remaining = active.gridAxes.where((a) => a.id != _selectedGridAxis!.id).toList();
+    final remaining = _project.effectiveGridAxes.where((a) => a.id != _selectedGridAxis!.id).toList();
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
     final updated = resequenceGridAxes(remaining, isBulgarian: isBg);
-    _updateActiveStorey(active.copyWith(gridAxes: updated));
+    _updateProjectGridAxes(updated);
     setState(() => _selectedGridAxis = null);
     HapticFeedback.heavyImpact();
   }
@@ -1373,9 +1391,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final nextName = _getNextAxisName(_selectedGridAxis!.name);
     _pushUndo();
     final updated = _selectedGridAxis!.copyWith(name: nextName);
-    final active = _project.activeStorey;
-    final axes = active.gridAxes.map((a) => a.id == updated.id ? updated : a).toList();
-    _updateActiveStorey(active.copyWith(gridAxes: axes));
+    final axes = _project.effectiveGridAxes.map((a) => a.id == updated.id ? updated : a).toList();
+    _updateProjectGridAxes(axes);
     setState(() => _selectedGridAxis = updated);
     HapticFeedback.selectionClick();
   }
@@ -1534,10 +1551,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
 
     _pushUndo();
-    final active = _project.activeStorey;
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
-    final updatedAxes = resequenceGridAxes([...active.gridAxes, newAxis], isBulgarian: isBg);
-    _updateActiveStorey(active.copyWith(gridAxes: updatedAxes));
+    final updatedAxes = resequenceGridAxes([..._project.effectiveGridAxes, newAxis], isBulgarian: isBg);
+    _updateProjectGridAxes(updatedAxes);
 
     setState(() {
       _selectedGridAxis = newAxis;
@@ -1595,11 +1611,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _deleteSpecificGridAxis(String axisId) {
     _pushUndo();
-    final active = _project.activeStorey;
-    final remaining = active.gridAxes.where((a) => a.id != axisId).toList();
+    final remaining = _project.effectiveGridAxes.where((a) => a.id != axisId).toList();
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
     final updated = resequenceGridAxes(remaining, isBulgarian: isBg);
-    _updateActiveStorey(active.copyWith(gridAxes: updated));
+    _updateProjectGridAxes(updated);
     setState(() {
       if (_selectedGridAxis?.id == axisId) {
         _selectedGridAxis = null;
@@ -2996,13 +3011,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final updatedAxis = _draggingAxisStart
           ? _selectedGridAxis!.copyWith(start: proj)
           : _selectedGridAxis!.copyWith(end: proj);
-      final active = _project.activeStorey;
-      final axes = active.gridAxes.map((a) {
+      final axes = _project.effectiveGridAxes.map((a) {
         if (a.id == updatedAxis.id) return updatedAxis;
         if (a.isParallelTo(updatedAxis)) return a.alignWith(updatedAxis);
         return a;
       }).toList();
-      _updateActiveStorey(active.copyWith(gridAxes: axes));
+      _updateProjectGridAxes(axes);
       setState(() {
         _selectedGridAxis = updatedAxis;
       });
@@ -3130,15 +3144,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
 
-    // Compute live preview polygon with offsetEdge
+    // Compute live preview polygon with extrudeEdgeParallel (keeping original vertices in place)
     List<Offset>? previewPoly;
     final active = _project.activeStorey;
     final slabIdx = active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId);
     if (slabIdx != -1 && effectiveD.abs() > 1e-4) {
-      final previewSlab = active.slabs[slabIdx].offsetEdge(
+      final previewSlab = active.slabs[slabIdx].extrudeEdgeParallel(
         edgeIndex: grip.edgeIndex,
         distance: effectiveD,
-        minDistanceCad: 0.05 * _cadUnitsPerMeter,
       );
       previewPoly = previewSlab.polygon;
     }
@@ -3867,10 +3880,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId);
           if (slabIdx != -1) {
             _pushUndo();
-            final updatedSlab = active.slabs[slabIdx].offsetEdge(
+            final updatedSlab = active.slabs[slabIdx].extrudeEdgeParallel(
               edgeIndex: _activeGrip!.edgeIndex,
               distance: d,
-              minDistanceCad: 0.05 * scale,
             );
             final updatedSlabs = List<StructuralSlab>.from(active.slabs);
             updatedSlabs[slabIdx] = updatedSlab;
@@ -4163,7 +4175,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
 
-    // 1d. Check if holding on an existing slab -> start slab correction!
+    // 1d. Check if holding on ANY slab vertex -> enter vertex move mode!
+    final hitVertex = _hitTestAnySlabVertex(details.localPosition);
+    if (hitVertex != null) {
+      final (hitSlab, vIdx) = hitVertex;
+      _startSlabCorrection(hitSlab);
+      setState(() {
+        _draggingSlabVertexIndex = vIdx;
+        _draggingSlabVertexCad = hitSlab.polygon[vIdx];
+        _mergeCandidateSlabVertexIndex = null;
+      });
+      HapticFeedback.heavyImpact();
+      return;
+    }
+
+    // 1e. Check if holding on an existing slab -> start slab correction!
     if (_activeTool == StructuralDrawTool.slab || _activeTool == StructuralDrawTool.select) {
       final hitSlab = _hitTestSlab(details.localPosition);
       if (hitSlab != null) {
@@ -4172,7 +4198,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
 
-    // 1e. Check if holding on an existing slab opening -> move opening!
+    // 1f. Check if holding on an existing slab opening -> move opening!
     if (_activeTool == StructuralDrawTool.slabOpening || _activeTool == StructuralDrawTool.select) {
       final hitOpening = _hitTestOpening(details.localPosition);
       if (hitOpening != null) {
@@ -4220,15 +4246,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final updatedAxis = _draggingAxisStart
           ? _selectedGridAxis!.copyWith(start: proj)
           : _selectedGridAxis!.copyWith(end: proj);
-      final active = _project.activeStorey;
-      final axes = active.gridAxes.map((a) {
+      final axes = _project.effectiveGridAxes.map((a) {
         if (a.id == updatedAxis.id) return updatedAxis;
         if (a.isParallelTo(updatedAxis)) return a.alignWith(updatedAxis);
         return a;
       }).toList();
-      _updateActiveStorey(active.copyWith(gridAxes: axes));
+      _updateProjectGridAxes(axes);
       setState(() {
         _selectedGridAxis = updatedAxis;
+      });
+      return;
+    }
+    if (_draggingSlabVertexIndex != null && _editingSlab != null) {
+      final cadPt = _screenToCad(details.localPosition);
+      setState(() {
+        _draggingSlabVertexCad = cadPt;
       });
       return;
     }
@@ -4272,6 +4304,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handleLongPressEnd(LongPressEndDetails details) {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
+    if (_draggingSlabVertexIndex != null && _editingSlab != null) {
+      if (_draggingSlabVertexCad != null) {
+        _pushSlabCorrectionUndo();
+        final updated = _editingSlab!.moveVertex(_draggingSlabVertexIndex!, _draggingSlabVertexCad!);
+        _editingSlab = updated;
+        _updateActiveStoreySlab(updated);
+        _saveProject();
+        HapticFeedback.mediumImpact();
+      }
+      setState(() {
+        _draggingSlabVertexIndex = null;
+        _draggingSlabVertexCad = null;
+        _mergeCandidateSlabVertexIndex = null;
+      });
+      return;
+    }
     if (_isDraggingAxisHandle) {
       setState(() {
         _isDraggingAxisHandle = false;
@@ -4387,6 +4435,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _snappedScreenPos = null;
         _activeSnap = null;
         _activeMagneticGuides = null;
+      });
+    }
+    if (_draggingSlabVertexIndex != null) {
+      setState(() {
+        _draggingSlabVertexIndex = null;
+        _draggingSlabVertexCad = null;
+        _mergeCandidateSlabVertexIndex = null;
       });
     }
     if (_isMovingShearWall) {
@@ -4698,7 +4753,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             extensionLength: 1.5 * scale,
           );
           if (rawAxis != null) {
-            final existingParallel = active.gridAxes
+            final existingParallel = _project.effectiveGridAxes
                 .where((a) => a.isParallelTo(rawAxis))
                 .firstOrNull;
             final axis = existingParallel != null
@@ -4707,8 +4762,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
             _pushUndo();
             final isBg = Localizations.localeOf(context).languageCode == 'bg';
-            final updatedAxes = resequenceGridAxes([...active.gridAxes, axis], isBulgarian: isBg);
-            _updateActiveStorey(active.copyWith(gridAxes: updatedAxes));
+            final updatedAxes = resequenceGridAxes([..._project.effectiveGridAxes, axis], isBulgarian: isBg);
+            _updateProjectGridAxes(updatedAxes);
             setState(() {
               _firstWallEdgeStartCad = null;
               _firstWallEdgeEndCad = null;
@@ -4972,15 +5027,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _showLayersSheet() {
-    StructuralLayerPrepModal.show(
+    showModalBottomSheet<void>(
       context: context,
-      document: widget.document,
-      onLayersChanged: () {
-        setState(() {});
-      },
-      onAxesDetected: (result) {
-        _applyDetectedWallsAndAxes(result);
-      },
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DxfLayerSheet(
+        document: widget.document,
+        isDark: true,
+        onLayersChanged: () {
+          setState(() {});
+        },
+      ),
     );
   }
 
@@ -4993,8 +5050,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _applyUnderlayFilter(true);
 
     // Convert detected centerlines to native StructuralGridAxis elements
-    final active = _project.activeStorey;
-
     final newGridAxes = WallAxisDetector.convertToStructuralGridAxes(
       result.snappedCenterlines,
       isBulgarian: isBg,
@@ -5002,7 +5057,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
 
     // Merge with existing axes, avoiding duplicates along the same alignment
-    final combined = <StructuralGridAxis>[...active.gridAxes];
+    final combined = <StructuralGridAxis>[..._project.effectiveGridAxes];
     final dupToleranceCad = 100.0 * result.detectedScale;
     for (final newAxis in newGridAxes) {
       final isDup = combined.any((existing) =>
@@ -5018,7 +5073,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       combined,
       isBulgarian: isBg,
     );
-    _updateActiveStorey(active.copyWith(gridAxes: updatedAxes));
+    _updateProjectGridAxes(updatedAxes);
 
     _runAnalysis();
     setState(() {});
@@ -5042,7 +5097,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
 
     // If axes are already populated in active storey (e.g. from initState or saved project)
-    if (_project.activeStorey.gridAxes.isNotEmpty) {
+    if (_project.effectiveGridAxes.isNotEmpty) {
       if (widget.initialDetectionResult != null || widget.document.layers.containsKey('WALLS_250')) {
         _applyUnderlayFilter(true);
         _runAnalysis();
@@ -5063,8 +5118,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       isBulgarian: isBg,
     );
     if (importedAxes.isNotEmpty) {
-      final active = _project.activeStorey;
-      _updateActiveStorey(active.copyWith(gridAxes: importedAxes));
+      _updateProjectGridAxes(importedAxes);
       _applyUnderlayFilter(true);
       _runAnalysis();
       setState(() {
@@ -5353,6 +5407,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             name: context.l10n.storeyLevelName(nextIdx, newElev.toStringAsFixed(2)),
             elevation: newElev,
             height: lastStorey.height,
+            gridAxes: _project.effectiveGridAxes,
           );
           final updated = List<StoreyLevel>.from(_project.storeys)..add(newStorey);
           setState(() {
@@ -5833,6 +5888,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                 painter: Structural2dPainter(
                                   currentStorey: _project.activeStorey,
                                   ghostStorey: _project.ghostStorey,
+                                  overheadStorey: (_project.activeStoreyIndex < _project.storeys.length - 1)
+                                      ? _project.storeys[_project.activeStoreyIndex + 1]
+                                      : null,
+                                  hasBasement: _project.hasBasement,
+                                  foundationType: _project.foundationType,
+                                  stripFoundations: (_project.activeStorey.elevation.abs() < 1e-4 && !_project.hasBasement)
+                                      ? _project.computeDefaultStripFoundations(_project.activeStorey, cadUnitsPerMeter: _cadUnitsPerMeter)
+                                      : null,
+                                  matFoundation: (_project.activeStorey.elevation.abs() < 1e-4 && !_project.hasBasement)
+                                      ? _project.computeDefaultMatFoundation(_project.activeStorey, cadUnitsPerMeter: _cadUnitsPerMeter)
+                                      : null,
                                   cantileverZones: _analysisSummary.zones,
                                   verticalReport: _verticalCapacityReport,
                                   seismicReport: _seismicAnalysisReport,

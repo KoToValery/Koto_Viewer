@@ -66,10 +66,20 @@ class Structural2dPainter extends CustomPainter {
   final double zoomScale;
   final Offset Function(Offset) cadToScene;
   final double cadScale;
+  final StoreyLevel? overheadStorey;
+  final bool hasBasement;
+  final FoundationType foundationType;
+  final List<List<Offset>>? stripFoundations;
+  final StructuralSlab? matFoundation;
 
   const Structural2dPainter({
     required this.currentStorey,
     this.ghostStorey,
+    this.overheadStorey,
+    this.hasBasement = false,
+    this.foundationType = FoundationType.stripFooting,
+    this.stripFoundations,
+    this.matFoundation,
     this.cantileverZones = const [],
     this.verticalReport,
     this.seismicReport,
@@ -127,14 +137,27 @@ class Structural2dPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 0. Draw Ground Foundations (Strip footings or Mat Foundation) at elevation 0.00 if no basement
+    if (currentStorey.elevation.abs() < 1e-4 && !hasBasement) {
+      _drawGroundFoundations(canvas);
+    }
+
     // 1. Draw Ghost Storey (Trace Reference underlay) if enabled
     if (ghostStorey != null) {
       _drawGhostStorey(canvas, ghostStorey!);
     }
 
-    // 2. Draw Active Storey Slabs
-    for (int i = 0; i < currentStorey.slabs.length; i++) {
-      _drawSlab(canvas, currentStorey.slabs[i], slabIndex: i, isGhost: false);
+    // 2. Draw Active Storey Slabs or Overhead Slabs (from level +2.80)
+    if (currentStorey.slabs.isNotEmpty) {
+      for (int i = 0; i < currentStorey.slabs.length; i++) {
+        _drawSlab(canvas, currentStorey.slabs[i], slabIndex: i, isGhost: false);
+      }
+    } else if (currentStorey.elevation.abs() < 1e-4 &&
+        overheadStorey != null &&
+        overheadStorey!.slabs.isNotEmpty) {
+      for (int i = 0; i < overheadStorey!.slabs.length; i++) {
+        _drawSlab(canvas, overheadStorey!.slabs[i], slabIndex: i, isGhost: false, isOverheadFromAbove: true);
+      }
     }
 
     // 2b. Draw Active Storey Beams
@@ -340,69 +363,69 @@ class Structural2dPainter extends CustomPainter {
     return slabPalette[slabIndex % slabPalette.length];
   }
 
-  void _drawSlabHatch(Canvas canvas, Path clipPath, Color color, {required int slabIndex, required bool isGhost}) {
-    canvas.save();
-    canvas.clipPath(clipPath);
+  void _drawGroundFoundations(Canvas canvas) {
+    if (foundationType == FoundationType.stripFooting &&
+        stripFoundations != null &&
+        stripFoundations!.isNotEmpty) {
+      final fillPaint = Paint()
+        ..color = const Color(0x22546E7A)
+        ..style = PaintingStyle.fill;
+      final borderPaint = Paint()
+        ..color = const Color(0x8878909C)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2 / zoomScale;
 
-    final bounds = clipPath.getBounds();
-    final hatchPaint = Paint()
-      ..color = color.withValues(alpha: isGhost ? 0.05 : 0.16)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 / zoomScale;
-
-    // Spacing between diagonal hatch lines in scene pixels:
-    final spacing = (28.0 / zoomScale).clamp(0.4, 200.0);
-    final minX = bounds.left - bounds.height * 1.5;
-    final maxX = bounds.right + bounds.height * 1.5;
-
-    // Vary hatch angle based on slabIndex so different slab panels immediately stand out
-    final patternMode = slabIndex % 4;
-    for (double x = minX; x <= maxX; x += spacing) {
-      if (patternMode == 0) {
-        // +45 degrees
-        canvas.drawLine(
-          Offset(x, bounds.top),
-          Offset(x + bounds.height, bounds.bottom),
-          hatchPaint,
-        );
-      } else if (patternMode == 1) {
-        // -45 degrees
-        canvas.drawLine(
-          Offset(x, bounds.bottom),
-          Offset(x + bounds.height, bounds.top),
-          hatchPaint,
-        );
-      } else if (patternMode == 2) {
-        // Steeper 60 degrees
-        canvas.drawLine(
-          Offset(x, bounds.top),
-          Offset(x + bounds.height * 0.58, bounds.bottom),
-          hatchPaint,
-        );
-      } else {
-        // Cross-hatch
-        canvas.drawLine(
-          Offset(x, bounds.top),
-          Offset(x + bounds.height, bounds.bottom),
-          hatchPaint,
-        );
-        canvas.drawLine(
-          Offset(x, bounds.bottom),
-          Offset(x + bounds.height, bounds.top),
-          hatchPaint,
-        );
+      for (final poly in stripFoundations!) {
+        if (poly.length < 3) continue;
+        final pts = poly.map(cadToScene).toList();
+        final path = Path()..moveTo(pts.first.dx, pts.first.dy);
+        for (int i = 1; i < pts.length; i++) {
+          path.lineTo(pts[i].dx, pts[i].dy);
+        }
+        path.close();
+        canvas.drawPath(path, fillPaint);
+        canvas.drawPath(path, borderPaint);
+      }
+    } else if (foundationType == FoundationType.matFoundation && matFoundation != null) {
+      final pts = matFoundation!.polygon.map(cadToScene).toList();
+      if (pts.length >= 3) {
+        final path = Path()..moveTo(pts.first.dx, pts.first.dy);
+        for (int i = 1; i < pts.length; i++) {
+          path.lineTo(pts[i].dx, pts[i].dy);
+        }
+        path.close();
+        final fillPaint = Paint()
+          ..color = const Color(0x22546E7A)
+          ..style = PaintingStyle.fill;
+        final borderPaint = Paint()
+          ..color = const Color(0x9978909C)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5 / zoomScale;
+        canvas.drawPath(path, fillPaint);
+        canvas.drawPath(path, borderPaint);
       }
     }
-    canvas.restore();
   }
 
-  void _drawSlabLevelMarker(Canvas canvas, StructuralSlab slab, Color slabColor, {required bool isGhost}) {
+  void _drawSlabLevelMarker(
+    Canvas canvas,
+    StructuralSlab slab,
+    Color slabColor, {
+    required bool isGhost,
+    bool isOverheadFromAbove = false,
+  }) {
     if (isGhost || slab.polygon.length < 3) return;
 
     final centroidScene = cadToScene(slab.centroid);
-    // Overhead slab bottom-up perspective:
-    // When drawing on level H, structural plans represent the slab overhead (+ storey height)
-    final overheadElev = currentStorey.elevation + currentStorey.height - (slab.floorFinish ?? currentStorey.floorFinishThickness);
+    final double overheadElev;
+    if (isOverheadFromAbove && overheadStorey != null) {
+      overheadElev = overheadStorey!.elevation -
+          (slab.floorFinish ?? overheadStorey!.floorFinishThickness);
+    } else {
+      overheadElev = currentStorey.elevation +
+          currentStorey.height -
+          (slab.floorFinish ?? currentStorey.floorFinishThickness);
+    }
     final int thickCm = (slab.thickness * 100).round();
 
     final sign = overheadElev > 0 ? '+' : (overheadElev == 0 ? '±' : '');
@@ -412,14 +435,12 @@ class Structural2dPainter extends CustomPainter {
     canvas.translate(centroidScene.dx, centroidScene.dy);
     canvas.scale(1.0 / zoomScale);
 
-    // Section slab elevation marker:
-    // Downward structural level triangle \/ resting on horizontal shelf line
-    // Level elevation "+2.80" above the shelf, thickness "d = 20 cm" below
+    // Concise architectural section level marker (only elevation and thickness)
     final elevSpan = TextSpan(
       text: elevStr,
       style: const TextStyle(
         color: Colors.white,
-        fontSize: 11.0,
+        fontSize: 11.5,
         fontWeight: FontWeight.bold,
         letterSpacing: 0.3,
       ),
@@ -442,23 +463,9 @@ class Structural2dPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final headerSpan = TextSpan(
-      text: '▲ ПЛОЧА НАД ${currentStorey.name.toUpperCase()}',
-      style: const TextStyle(
-        color: Color(0xFF00E5FF),
-        fontSize: 8.0,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 0.4,
-      ),
-    );
-    final headerPainter = TextPainter(
-      text: headerSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final contentWidth = math.max(headerPainter.width, math.max(elevPainter.width, subPainter.width) + 24.0);
-    final badgeWidth = contentWidth + 16.0;
-    final badgeHeight = headerPainter.height + elevPainter.height + subPainter.height + 16.0;
+    final contentWidth = math.max(elevPainter.width, subPainter.width) + 24.0;
+    final badgeWidth = contentWidth + 14.0;
+    final badgeHeight = elevPainter.height + subPainter.height + 12.0;
     final badgeRect = Rect.fromCenter(
       center: Offset.zero,
       width: badgeWidth,
@@ -473,20 +480,14 @@ class Structural2dPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
-    final rrect = RRect.fromRectAndRadius(badgeRect, const Radius.circular(6.0));
+    final rrect = RRect.fromRectAndRadius(badgeRect, const Radius.circular(5.0));
     canvas.drawRRect(rrect, bgPaint);
     canvas.drawRRect(rrect, borderPaint);
 
-    // 1. Header (overhead slab indicator)
-    headerPainter.paint(
-      canvas,
-      Offset(-headerPainter.width / 2.0, -badgeHeight / 2.0 + 4.0),
-    );
-
-    // 2. Section Triangle & Shelf Line
-    final shelfY = -badgeHeight / 2.0 + headerPainter.height + elevPainter.height + 6.0;
-    final shelfStartX = -badgeWidth / 2.0 + 10.0;
-    final shelfEndX = badgeWidth / 2.0 - 10.0;
+    // Section Triangle & Shelf Line
+    final shelfY = -badgeHeight / 2.0 + elevPainter.height + 4.0;
+    final shelfStartX = -badgeWidth / 2.0 + 8.0;
+    final shelfEndX = badgeWidth / 2.0 - 8.0;
 
     final shelfPaint = Paint()
       ..color = Colors.white70
@@ -494,33 +495,39 @@ class Structural2dPainter extends CustomPainter {
       ..strokeWidth = 1.0;
     canvas.drawLine(Offset(shelfStartX, shelfY), Offset(shelfEndX, shelfY), shelfPaint);
 
-    // Authentic structural level triangle: apex pointing down touching the shelf line
+    // Downward structural level triangle \/ touching shelf line
     final triPath = Path()
-      ..moveTo(shelfStartX + 4.0, shelfY - 7.0)
-      ..lineTo(shelfStartX + 12.0, shelfY - 7.0)
-      ..lineTo(shelfStartX + 8.0, shelfY)
+      ..moveTo(shelfStartX + 2.0, shelfY - 7.0)
+      ..lineTo(shelfStartX + 10.0, shelfY - 7.0)
+      ..lineTo(shelfStartX + 6.0, shelfY)
       ..close();
     final triPaint = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.fill;
     canvas.drawPath(triPath, triPaint);
 
-    // 3. Elevation text above shelf
+    // Elevation text above shelf
     elevPainter.paint(
       canvas,
-      Offset(shelfStartX + 16.0, shelfY - elevPainter.height - 1.0),
+      Offset(shelfStartX + 14.0, shelfY - elevPainter.height - 1.0),
     );
 
-    // 4. Thickness text below shelf
+    // Thickness text below shelf
     subPainter.paint(
       canvas,
-      Offset(shelfStartX + 16.0, shelfY + 2.0),
+      Offset(shelfStartX + 14.0, shelfY + 2.0),
     );
 
     canvas.restore();
   }
 
-  void _drawSlab(Canvas canvas, StructuralSlab slab, {required int slabIndex, required bool isGhost}) {
+  void _drawSlab(
+    Canvas canvas,
+    StructuralSlab slab, {
+    required int slabIndex,
+    required bool isGhost,
+    bool isOverheadFromAbove = false,
+  }) {
     if (slab.polygon.length < 3) return;
 
     final isSelected = !isGhost && (slab.id == selectedSlabId);
@@ -576,9 +583,7 @@ class Structural2dPainter extends CustomPainter {
 
     canvas.drawPath(path, fillPaint);
 
-    // Light transparent diagonal hatch pattern (щриховка) for clear slab distinction
-    _drawSlabHatch(canvas, path, slabColor, slabIndex: slabIndex, isGhost: isGhost);
-
+    // Smooth clean outline without diagonal hatching (as requested)
     canvas.drawPath(path, borderPaint);
 
     // Draw openings outline & architectural X cross
@@ -617,11 +622,17 @@ class Structural2dPainter extends CustomPainter {
       }
     }
 
-    // Central structural elevation marker (конструктивен разрез с конструктивна кота)
-    _drawSlabLevelMarker(canvas, slab, slabColor, isGhost: isGhost);
+    // Central structural elevation marker (concise elevation marker)
+    _drawSlabLevelMarker(
+      canvas,
+      slab,
+      slabColor,
+      isGhost: isGhost,
+      isOverheadFromAbove: isOverheadFromAbove,
+    );
 
-    // If selected, draw corner vertex handles
-    if (isSelected) {
+    // If selected or slab tool is active, draw corner vertex handles
+    if (isSelected || activeTool == StructuralDrawTool.slab) {
       _drawSlabVertexHandles(canvas, polygon);
     }
 

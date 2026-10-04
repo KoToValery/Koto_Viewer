@@ -3699,6 +3699,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Find 20-30 cm walls, isolate contours into WALLS_250 and draw grid axes.'**
   String get autoDetectWallsSubtitle;
+
+  /// Title for strip footing foundations on ground level
+  ///
+  /// In en, this message translates to:
+  /// **'Strip Foundations (±0.00)'**
+  String get stripFootingFoundation;
+
+  /// Title for mat foundation raft
+  ///
+  /// In en, this message translates to:
+  /// **'Mat Foundation (±0.00)'**
+  String get matFoundation;
+
+  /// Label for foundation strip footing width
+  ///
+  /// In en, this message translates to:
+  /// **'Foundation • b = {width} cm'**
+  String foundationFootingLabel(int width);
+
+  /// Label for overhead slab elevation
+  ///
+  /// In en, this message translates to:
+  /// **'Overhead Slab (+{elev} m)'**
+  String overheadSlabLabel(String elev);
 }
 
 class _AppLocalizationsDelegate

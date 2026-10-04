@@ -2116,4 +2116,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get autoDetectWallsSubtitle =>
       'Find 20-30 cm walls, isolate contours into WALLS_250 and draw grid axes.';
+
+  @override
+  String get stripFootingFoundation => 'Strip Foundations (±0.00)';
+
+  @override
+  String get matFoundation => 'Mat Foundation (±0.00)';
+
+  @override
+  String foundationFootingLabel(int width) {
+    return 'Foundation • b = $width cm';
+  }
+
+  @override
+  String overheadSlabLabel(String elev) {
+    return 'Overhead Slab (+$elev m)';
+  }
 }

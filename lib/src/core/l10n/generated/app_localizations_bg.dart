@@ -2126,4 +2126,20 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get autoDetectWallsSubtitle =>
       'Открива стени 20-30 см, изолира контурите им в WALLS_250 и чертае осови линии.';
+
+  @override
+  String get stripFootingFoundation => 'Ивични основи (Кота ±0.00)';
+
+  @override
+  String get matFoundation => 'Фундаментна плоча (Кота ±0.00)';
+
+  @override
+  String foundationFootingLabel(int width) {
+    return 'Основа • b = $width см';
+  }
+
+  @override
+  String overheadSlabLabel(String elev) {
+    return 'Плоча (+$elev м)';
+  }
 }

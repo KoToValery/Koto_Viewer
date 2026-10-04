@@ -1275,9 +1275,7 @@ class StoreyLevel {
       slabs: slabs
           .map((s) => s.copyWith(id: '${s.id}_lvl_${newElevation.toInt()}'))
           .toList(),
-      gridAxes: gridAxes
-          .map((a) => a.copyWith(id: '${a.id}_lvl_${newElevation.toInt()}'))
-          .toList(),
+      gridAxes: List.from(gridAxes),
     );
   }
 
@@ -1351,12 +1349,58 @@ class StoreyLevel {
   }
 }
 
+/// Supported building foundation types.
+enum FoundationType {
+  stripFooting,
+  matFoundation,
+}
+
+/// Computes 2D Convex Hull of a set of 2D points using Andrew's Monotone Chain algorithm.
+List<Offset> compute2DConvexHull(List<Offset> points) {
+  if (points.length <= 3) return List.from(points);
+  final pts = List<Offset>.from(points)
+    ..sort((a, b) => a.dx != b.dx ? a.dx.compareTo(b.dx) : a.dy.compareTo(b.dy));
+  final unique = <Offset>[];
+  for (final p in pts) {
+    if (unique.isEmpty || (unique.last - p).distance > 1e-4) {
+      unique.add(p);
+    }
+  }
+  if (unique.length <= 3) return unique;
+
+  double cross(Offset o, Offset a, Offset b) =>
+      (a.dx - o.dx) * (b.dy - o.dy) - (a.dy - o.dy) * (b.dx - o.dx);
+
+  final lower = <Offset>[];
+  for (final p in unique) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower.last, p) <= 0) {
+      lower.removeLast();
+    }
+    lower.add(p);
+  }
+
+  final upper = <Offset>[];
+  for (int i = unique.length - 1; i >= 0; i--) {
+    final p = unique[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper.last, p) <= 0) {
+      upper.removeLast();
+    }
+    upper.add(p);
+  }
+
+  lower.removeLast();
+  upper.removeLast();
+  return [...lower, ...upper];
+}
+
 /// Master project holding all storeys and analysis settings.
 class StructuralProject {
   final String title;
   final List<StoreyLevel> storeys;
   final int activeStoreyIndex;
   final GhostStoreyMode ghostMode;
+  final List<StructuralGridAxis> gridAxes; // Master project-level grid axes instances
+  final FoundationType foundationType; // Default strip footings (ивични основи)
   final String concreteGrade; // e.g. 'C25/30'
   final double concreteE; // Elastic modulus in MPa (e.g. 31000)
   final double deadLoadSuperimposed; // kN/m² (finishes, screed, ceilings)
@@ -1375,6 +1419,8 @@ class StructuralProject {
     ],
     this.activeStoreyIndex = 0,
     this.ghostMode = GhostStoreyMode.none,
+    this.gridAxes = const [],
+    this.foundationType = FoundationType.stripFooting,
     this.concreteGrade = 'C25/30',
     this.concreteE = 31000.0,
     this.deadLoadSuperimposed = 1.5,
@@ -1386,6 +1432,143 @@ class StructuralProject {
       (activeStoreyIndex >= 0 && activeStoreyIndex < storeys.length)
           ? storeys[activeStoreyIndex]
           : storeys.first;
+
+  /// Effective grid axes instances shared across the entire project.
+  List<StructuralGridAxis> get effectiveGridAxes {
+    if (gridAxes.isNotEmpty) return gridAxes;
+    for (final s in storeys) {
+      if (s.gridAxes.isNotEmpty) return s.gridAxes;
+    }
+    return const [];
+  }
+
+  /// Whether the project contains any basement storey (elevation below 0.00).
+  bool get hasBasement => storeys.any((s) => s.elevation < -0.01);
+
+  /// Synchronizes project-level grid axes instances across all storeys.
+  StructuralProject copyWithGridAxes(List<StructuralGridAxis> newAxes) {
+    return copyWith(
+      gridAxes: newAxes,
+      storeys: storeys.map((s) => s.copyWith(gridAxes: newAxes)).toList(),
+    );
+  }
+
+  /// Computes default strip footing polygons (ивични основи) at ground level (±0.00).
+  /// Generates continuous strip footings under shear walls, column pads, and connecting strip beams.
+  List<List<Offset>> computeDefaultStripFoundations(
+    StoreyLevel storey, {
+    double stripWidthMeters = 0.60,
+    double cadUnitsPerMeter = 1.0,
+  }) {
+    if (storey.columns.isEmpty && storey.shearWalls.isEmpty) return const [];
+    final double wCad = stripWidthMeters * cadUnitsPerMeter;
+    final List<List<Offset>> strips = [];
+
+    // 1. Strip footings under all shear walls (ивични основи под шайби)
+    for (final wall in storey.shearWalls) {
+      final double l = wall.length;
+      if (l < 1e-4) continue;
+      final dir = (wall.end - wall.start) / l;
+      final normal = Offset(-dir.dy, dir.dx);
+      final double halfW = math.max(wall.thickness * cadUnitsPerMeter / 2.0 + 0.15 * cadUnitsPerMeter, wCad / 2.0);
+      final double endExt = 0.20 * cadUnitsPerMeter;
+      final p1 = wall.start - dir * endExt;
+      final p2 = wall.end + dir * endExt;
+      strips.add([
+        p1 - normal * halfW,
+        p2 - normal * halfW,
+        p2 + normal * halfW,
+        p1 + normal * halfW,
+      ]);
+    }
+
+    // 2. Footing pads under columns (единични фундаменти/стъпки под колони)
+    final double colPadExt = 0.25 * cadUnitsPerMeter;
+    for (final col in storey.columns) {
+      final halfW = (col.width * cadUnitsPerMeter) / 2.0 + colPadExt;
+      final halfH = (col.height * cadUnitsPerMeter) / 2.0 + colPadExt;
+      final c = col.center;
+      strips.add([
+        Offset(c.dx - halfW, c.dy - halfH),
+        Offset(c.dx + halfW, c.dy - halfH),
+        Offset(c.dx + halfW, c.dy + halfH),
+        Offset(c.dx - halfW, c.dy + halfH),
+      ]);
+    }
+
+    // 3. Connecting strip beams between adjacent columns along axes / bays (ивични фундаментни греди)
+    final cols = storey.columns;
+    final double maxBayCad = 8.0 * cadUnitsPerMeter;
+    for (int i = 0; i < cols.length; i++) {
+      for (int j = i + 1; j < cols.length; j++) {
+        final c1 = cols[i].center;
+        final c2 = cols[j].center;
+        final delta = c2 - c1;
+        final dist = delta.distance;
+        if (dist > 1e-4 && dist <= maxBayCad) {
+          // Check if orthogonal (aligned along X or Y within 15cm) or aligned with a grid axis
+          final bool isOrthogonal = delta.dx.abs() <= 0.20 * cadUnitsPerMeter || delta.dy.abs() <= 0.20 * cadUnitsPerMeter;
+          if (isOrthogonal) {
+            final dir = delta / dist;
+            final normal = Offset(-dir.dy, dir.dx);
+            final halfW = wCad / 2.0;
+            strips.add([
+              c1 - normal * halfW,
+              c2 - normal * halfW,
+              c2 + normal * halfW,
+              c1 + normal * halfW,
+            ]);
+          }
+        }
+      }
+    }
+
+    // 4. Strip footings along any structural beams on the ground level
+    for (final beam in storey.beams) {
+      final double l = beam.length;
+      if (l < 1e-4) continue;
+      final dir = (beam.end - beam.start) / l;
+      final normal = Offset(-dir.dy, dir.dx);
+      final double halfW = math.max(beam.width / 2.0, wCad / 2.0);
+      strips.add([
+        beam.start - normal * halfW,
+        beam.end - normal * halfW,
+        beam.end + normal * halfW,
+        beam.start + normal * halfW,
+      ]);
+    }
+
+    return strips;
+  }
+
+  /// Computes default mat foundation base (фундаментна плоча) enclosing all columns and shear walls.
+  StructuralSlab? computeDefaultMatFoundation(
+    StoreyLevel storey, {
+    double marginMeters = 0.50,
+    double cadUnitsPerMeter = 1.0,
+  }) {
+    final allPts = <Offset>[];
+    for (final col in storey.columns) {
+      allPts.addAll(col.polygonVertices);
+    }
+    for (final wall in storey.shearWalls) {
+      allPts.addAll(wall.polygonVertices);
+    }
+    if (allPts.length < 3) return null;
+
+    final hull = compute2DConvexHull(allPts);
+    if (hull.length < 3) return null;
+
+    final tempSlab = StructuralSlab(id: 'foundation_mat_base', polygon: hull);
+    final offsetPoly = tempSlab.offsetContour(marginMeters * cadUnitsPerMeter).polygon;
+
+    return StructuralSlab(
+      id: 'foundation_mat_base',
+      polygon: offsetPoly,
+      thickness: 0.50,
+      colorValue: const Color(0xFF546E7A).toARGB32(),
+    );
+  }
 
   StoreyLevel? get ghostStorey {
     switch (ghostMode) {
@@ -1405,6 +1588,8 @@ class StructuralProject {
     List<StoreyLevel>? storeys,
     int? activeStoreyIndex,
     GhostStoreyMode? ghostMode,
+    List<StructuralGridAxis>? gridAxes,
+    FoundationType? foundationType,
     String? concreteGrade,
     double? concreteE,
     double? deadLoadSuperimposed,
@@ -1416,6 +1601,8 @@ class StructuralProject {
       storeys: storeys ?? this.storeys,
       activeStoreyIndex: activeStoreyIndex ?? this.activeStoreyIndex,
       ghostMode: ghostMode ?? this.ghostMode,
+      gridAxes: gridAxes ?? this.gridAxes,
+      foundationType: foundationType ?? this.foundationType,
       concreteGrade: concreteGrade ?? this.concreteGrade,
       concreteE: concreteE ?? this.concreteE,
       deadLoadSuperimposed: deadLoadSuperimposed ?? this.deadLoadSuperimposed,
@@ -1429,6 +1616,8 @@ class StructuralProject {
     'storeys': storeys.map((s) => s.toJson()).toList(),
     'activeStoreyIndex': activeStoreyIndex,
     'ghostMode': ghostMode.name,
+    'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
+    'foundationType': foundationType.name,
     'concreteGrade': concreteGrade,
     'concreteE': concreteE,
     'deadLoadSuperimposed': deadLoadSuperimposed,
@@ -1454,6 +1643,14 @@ class StructuralProject {
       ghostMode: GhostStoreyMode.values.firstWhere(
         (g) => g.name == json['ghostMode'],
         orElse: () => GhostStoreyMode.none,
+      ),
+      gridAxes: (json['gridAxes'] as List<dynamic>?)
+              ?.map((a) => StructuralGridAxis.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      foundationType: FoundationType.values.firstWhere(
+        (f) => f.name == json['foundationType'],
+        orElse: () => FoundationType.stripFooting,
       ),
       concreteGrade: json['concreteGrade'] as String? ?? 'C25/30',
       concreteE: (json['concreteE'] as num?)?.toDouble() ?? 31000.0,

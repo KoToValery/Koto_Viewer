@@ -31,6 +31,45 @@ class Structural3dMeshBuilder {
       final double zTop = (storey.elevation + storey.height) * cadUnitsPerMeter;
       final List<Triangle3D> storeyTriangles = [];
 
+      // 0. Extrude Ground Foundations (Strip footings or Mat) at elevation 0.00 if no basement
+      if (storey.elevation.abs() < 1e-4 && !project.hasBasement) {
+        if (project.foundationType == FoundationType.stripFooting) {
+          final strips = project.computeDefaultStripFoundations(
+            storey,
+            cadUnitsPerMeter: cadUnitsPerMeter,
+          );
+          final double zFoundTop = zBase;
+          final double zFoundBottom = zBase - 0.60 * cadUnitsPerMeter;
+          for (final strip in strips) {
+            final fTris = _extrudePolygon(
+              strip,
+              zFoundBottom,
+              zFoundTop,
+              topColor: isCurrentStorey ? const Color(0xFF607D8B) : const Color(0x66607D8B),
+              sideColor: isCurrentStorey ? const Color(0xFF455A64) : const Color(0x66455A64),
+            );
+            storeyTriangles.addAll(fTris);
+          }
+        } else {
+          final mat = project.computeDefaultMatFoundation(
+            storey,
+            cadUnitsPerMeter: cadUnitsPerMeter,
+          );
+          if (mat != null) {
+            final double zFoundTop = zBase;
+            final double zFoundBottom = zBase - mat.thickness * cadUnitsPerMeter;
+            final fTris = _extrudePolygon(
+              mat.polygon,
+              zFoundBottom,
+              zFoundTop,
+              topColor: isCurrentStorey ? const Color(0xFF607D8B) : const Color(0x66607D8B),
+              sideColor: isCurrentStorey ? const Color(0xFF455A64) : const Color(0x66455A64),
+            );
+            storeyTriangles.addAll(fTris);
+          }
+        }
+      }
+
       // 1. Extrude Columns (with EC2 vertical capacity & EC8 floating column color tinting)
       for (final col in storey.columns) {
         final vCheck = verticalReport?.getCheckForColumn(col.id);

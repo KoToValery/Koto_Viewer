@@ -627,25 +627,38 @@ class VerticalCapacityCalculator {
 
     final int numStoreys = project.storeys.length;
 
-    // Calculate total footprint area from ground slab
+    // Calculate total footprint area from ground slab or default foundations
     final groundStorey = project.storeys.first;
     double totalFootprintAreaM2 = 0.0;
     for (final s in groundStorey.slabs) {
       totalFootprintAreaM2 += s.netArea / (scale * scale);
     }
-    if (totalFootprintAreaM2 <= 1.0 && groundStorey.columns.isNotEmpty) {
-      // Estimate footprint from column envelope
-      final pts = groundStorey.columns.map((c) => c.center).toList();
-      double minX = pts.first.dx, maxX = pts.first.dx;
-      double minY = pts.first.dy, maxY = pts.first.dy;
-      for (final p in pts) {
-        if (p.dx < minX) minX = p.dx;
-        if (p.dx > maxX) maxX = p.dx;
-        if (p.dy < minY) minY = p.dy;
-        if (p.dy > maxY) maxY = p.dy;
+    if (totalFootprintAreaM2 <= 1.0 && (groundStorey.columns.isNotEmpty || groundStorey.shearWalls.isNotEmpty)) {
+      if (!project.hasBasement && project.foundationType == FoundationType.stripFooting) {
+        final strips = project.computeDefaultStripFoundations(groundStorey, cadUnitsPerMeter: scale);
+        for (final strip in strips) {
+          totalFootprintAreaM2 += StructuralSlab.calculateArea(strip) / (scale * scale);
+        }
+      } else if (!project.hasBasement && project.foundationType == FoundationType.matFoundation) {
+        final mat = project.computeDefaultMatFoundation(groundStorey, cadUnitsPerMeter: scale);
+        if (mat != null) {
+          totalFootprintAreaM2 += mat.netArea / (scale * scale);
+        }
       }
-      totalFootprintAreaM2 = ((maxX - minX + 2.0 * scale) / scale) *
-          ((maxY - minY + 2.0 * scale) / scale);
+      if (totalFootprintAreaM2 <= 1.0 && groundStorey.columns.isNotEmpty) {
+        // Fallback estimate footprint from column envelope
+        final pts = groundStorey.columns.map((c) => c.center).toList();
+        double minX = pts.first.dx, maxX = pts.first.dx;
+        double minY = pts.first.dy, maxY = pts.first.dy;
+        for (final p in pts) {
+          if (p.dx < minX) minX = p.dx;
+          if (p.dx > maxX) maxX = p.dx;
+          if (p.dy < minY) minY = p.dy;
+          if (p.dy > maxY) maxY = p.dy;
+        }
+        totalFootprintAreaM2 = ((maxX - minX + 2.0 * scale) / scale) *
+            ((maxY - minY + 2.0 * scale) / scale);
+      }
     }
     totalFootprintAreaM2 = math.max(10.0, totalFootprintAreaM2);
 

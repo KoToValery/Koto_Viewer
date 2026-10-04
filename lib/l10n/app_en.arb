@@ -1805,6 +1805,24 @@
     }
   },
   "autoDetectWallsSubtitle": "Find 20-30 cm walls, isolate contours into WALLS_250 and draw grid axes.",
-  "@autoDetectWallsSubtitle": { "description": "Subtitle describing wall and axis extraction in layer prep modal" }
+  "@autoDetectWallsSubtitle": { "description": "Subtitle describing wall and axis extraction in layer prep modal" },
+  "stripFootingFoundation": "Strip Foundations (±0.00)",
+  "@stripFootingFoundation": { "description": "Title for strip footing foundations on ground level" },
+  "matFoundation": "Mat Foundation (±0.00)",
+  "@matFoundation": { "description": "Title for mat foundation raft" },
+  "foundationFootingLabel": "Foundation • b = {width} cm",
+  "@foundationFootingLabel": {
+    "description": "Label for foundation strip footing width",
+    "placeholders": {
+      "width": { "type": "int" }
+    }
+  },
+  "overheadSlabLabel": "Overhead Slab (+{elev} m)",
+  "@overheadSlabLabel": {
+    "description": "Label for overhead slab elevation",
+    "placeholders": {
+      "elev": { "type": "String" }
+    }
+  }
 }
 
