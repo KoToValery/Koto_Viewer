@@ -4,6 +4,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../../dxf_viewer/models/dxf_color_table.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../analysis/structural_underlay_filter.dart';
+import '../analysis/wall_axis_detector.dart';
 
 /// Modal bottom sheet presented upon entering the BIM Structural Designer module,
 /// allowing the engineer to prepare and isolate structural layers (walls, columns, axes)
@@ -107,6 +108,46 @@ class _StructuralLayerPrepModalState extends State<StructuralLayerPrepModal> {
       layer.isVisible = !layer.isVisible;
       if (layer.isVisible && layer.isFrozen) {
         layer.isFrozen = false;
+      }
+    });
+  }
+
+  void _autoDetectAndGenerateAxes() {
+    _applyLayerChange(() {
+      final result = WallAxisDetector.detect(widget.document);
+      if (!result.hasWallsFound) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.noWallsDetected),
+              backgroundColor: const Color(0xFF33333D),
+            ),
+          );
+        }
+        return;
+      }
+      WallAxisDetector.applyToDocument(widget.document, result);
+      _layerCounts.clear();
+      for (final layerName in widget.document.layers.keys) {
+        _layerCounts[layerName] = 0;
+      }
+      for (final entity in widget.document.entities) {
+        final name = entity.layer.trim();
+        _layerCounts[name] = (_layerCounts[name] ?? 0) + 1;
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.l10n.wallsAndAxesGeneratedSuccess(
+                result.snappedCenterlines.length,
+                result.wallContourSegments.length,
+                result.detectedUnitName,
+              ),
+            ),
+            backgroundColor: const Color(0xFF1E88E5),
+          ),
+        );
       }
     });
   }
@@ -250,6 +291,33 @@ class _StructuralLayerPrepModalState extends State<StructuralLayerPrepModal> {
                       ),
                     ),
                   ],
+                ),
+              ),
+
+              // Auto-detect walls & axes action button
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.auto_awesome, size: 16, color: Color(0xFFFF5252)),
+                    label: Text(
+                      context.l10n.autoDetectWallsAndAxes,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFFF5252),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFFF5252), width: 1.2),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _isUpdating ? null : _autoDetectAndGenerateAxes,
+                  ),
                 ),
               ),
 

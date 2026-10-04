@@ -1767,6 +1767,40 @@
   "@slabThicknessLabel": {
     "description": "Slab thickness label in elevation marker",
     "placeholders": { "thickness": { "type": "String" } }
-  }
+  },
+  "autoDetectWallsAndAxes": "Auto-Detect Walls & Axes",
+  "@autoDetectWallsAndAxes": { "description": "Title/action for wall and axis detection" },
+  "autoDetectWallsPrompt": "Detected walls ({thickness} {unit}) in \"{layer}\". Isolate walls and generate centerline axes?",
+  "@autoDetectWallsPrompt": {
+    "description": "Prompt when walls are automatically detected upon opening drawing",
+    "placeholders": {
+      "thickness": { "type": "String" },
+      "unit": { "type": "String" },
+      "layer": { "type": "String" }
+    }
+  },
+  "isolateWallsAndGenerateAxes": "Isolate Walls & Generate Axes",
+  "@isolateWallsAndGenerateAxes": { "description": "Button to isolate walls and create axis layer" },
+  "wallsAndAxesGeneratedSuccess": "Generated {axesCount} axes and isolated {wallsCount} wall contours ({unit})",
+  "@wallsAndAxesGeneratedSuccess": {
+    "description": "Feedback message when walls and axes are successfully generated",
+    "placeholders": {
+      "axesCount": { "type": "int" },
+      "wallsCount": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "noWallsDetected": "No 25 cm wall pairs detected in drawing",
+  "@noWallsDetected": { "description": "Message when no wall pairs are detected" },
+  "wallCandidatesFound": "Found {pairCount} wall pairs ({length} m)",
+  "@wallCandidatesFound": {
+    "description": "Candidate summary for layer ranking",
+    "placeholders": {
+      "pairCount": { "type": "int" },
+      "length": { "type": "String" }
+    }
+  },
+  "autoDetectWallsSubtitle": "Find 25 cm masonry walls, isolate contours into WALLS_250 and draw dashed AXIS centerlines.",
+  "@autoDetectWallsSubtitle": { "description": "Subtitle describing wall and axis extraction in layer prep modal" }
 }
 

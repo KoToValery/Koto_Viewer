@@ -3641,6 +3641,52 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'d = {thickness} cm'**
   String slabThicknessLabel(String thickness);
+
+  /// Title/action for wall and axis detection
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-Detect Walls & Axes'**
+  String get autoDetectWallsAndAxes;
+
+  /// Prompt when walls are automatically detected upon opening drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Detected walls ({thickness} {unit}) in \"{layer}\". Isolate walls and generate centerline axes?'**
+  String autoDetectWallsPrompt(String thickness, String unit, String layer);
+
+  /// Button to isolate walls and create axis layer
+  ///
+  /// In en, this message translates to:
+  /// **'Isolate Walls & Generate Axes'**
+  String get isolateWallsAndGenerateAxes;
+
+  /// Feedback message when walls and axes are successfully generated
+  ///
+  /// In en, this message translates to:
+  /// **'Generated {axesCount} axes and isolated {wallsCount} wall contours ({unit})'**
+  String wallsAndAxesGeneratedSuccess(
+    int axesCount,
+    int wallsCount,
+    String unit,
+  );
+
+  /// Message when no wall pairs are detected
+  ///
+  /// In en, this message translates to:
+  /// **'No 25 cm wall pairs detected in drawing'**
+  String get noWallsDetected;
+
+  /// Candidate summary for layer ranking
+  ///
+  /// In en, this message translates to:
+  /// **'Found {pairCount} wall pairs ({length} m)'**
+  String wallCandidatesFound(int pairCount, String length);
+
+  /// Subtitle describing wall and axis extraction in layer prep modal
+  ///
+  /// In en, this message translates to:
+  /// **'Find 25 cm masonry walls, isolate contours into WALLS_250 and draw dashed AXIS centerlines.'**
+  String get autoDetectWallsSubtitle;
 }
 
 class _AppLocalizationsDelegate

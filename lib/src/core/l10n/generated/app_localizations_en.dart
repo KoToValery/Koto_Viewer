@@ -2077,4 +2077,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String slabThicknessLabel(String thickness) {
     return 'd = $thickness cm';
   }
+
+  @override
+  String get autoDetectWallsAndAxes => 'Auto-Detect Walls & Axes';
+
+  @override
+  String autoDetectWallsPrompt(String thickness, String unit, String layer) {
+    return 'Detected walls ($thickness $unit) in \"$layer\". Isolate walls and generate centerline axes?';
+  }
+
+  @override
+  String get isolateWallsAndGenerateAxes => 'Isolate Walls & Generate Axes';
+
+  @override
+  String wallsAndAxesGeneratedSuccess(
+    int axesCount,
+    int wallsCount,
+    String unit,
+  ) {
+    return 'Generated $axesCount axes and isolated $wallsCount wall contours ($unit)';
+  }
+
+  @override
+  String get noWallsDetected => 'No 25 cm wall pairs detected in drawing';
+
+  @override
+  String wallCandidatesFound(int pairCount, String length) {
+    return 'Found $pairCount wall pairs ($length m)';
+  }
+
+  @override
+  String get autoDetectWallsSubtitle =>
+      'Find 25 cm masonry walls, isolate contours into WALLS_250 and draw dashed AXIS centerlines.';
 }

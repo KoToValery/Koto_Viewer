@@ -14,6 +14,7 @@ import 'analysis/structural_underlay_filter.dart';
 import 'analysis/vertical_capacity_calculator.dart';
 import 'analysis/slab_parallel_alignment_helper.dart';
 import 'analysis/structural_magnetic_alignment_helper.dart';
+import 'analysis/wall_axis_detector.dart';
 import 'models/cantilever_analysis_models.dart';
 import 'models/seismic_analysis_models.dart';
 import 'models/structural_element.dart';
@@ -220,6 +221,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           }
         });
       }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAutoDetectWallsOnStartup();
     });
   }
 
@@ -4950,6 +4955,160 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
+  void _checkAutoDetectWallsOnStartup() {
+    if (!mounted) return;
+    // Don't auto-prompt if AXIS or WALLS_250 layer already exists in document
+    if (widget.document.layers.containsKey('AXIS') ||
+        widget.document.layers.containsKey('WALLS_250')) {
+      return;
+    }
+
+    final result = WallAxisDetector.detect(widget.document);
+    if (!result.hasWallsFound || !mounted) return;
+
+    final best = result.bestGroup!;
+    showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E24),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(color: Colors.black54, blurRadius: 20, offset: Offset(0, -4)),
+          ],
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF5252).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.auto_awesome, color: Color(0xFFFF5252), size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n.autoDetectWallsAndAxes,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          context.l10n.wallCandidatesFound(
+                            best.pairCount,
+                            best.totalOverlapLength.toStringAsFixed(1),
+                          ),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF00E5FF)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                context.l10n.autoDetectWallsPrompt(
+                  '25',
+                  result.detectedUnitName,
+                  best.layerName,
+                ),
+                style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: Text(
+                      context.l10n.cancel,
+                      style: const TextStyle(color: Colors.white60),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: Text(context.l10n.isolateWallsAndGenerateAxes),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00E5FF),
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).then((confirmed) {
+      if (confirmed == true && mounted) {
+        setState(() {
+          WallAxisDetector.applyToDocument(widget.document, result);
+          _underlayFilterActive = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.l10n.wallsAndAxesGeneratedSuccess(
+                result.snappedCenterlines.length,
+                result.wallContourSegments.length,
+                result.detectedUnitName,
+              ),
+            ),
+            backgroundColor: const Color(0xFF1E88E5),
+          ),
+        );
+      }
+    });
+  }
+
+  void _runManualAutoDetectWalls() {
+    final result = WallAxisDetector.detect(widget.document);
+    if (!result.hasWallsFound) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.noWallsDetected),
+          backgroundColor: const Color(0xFF33333D),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      WallAxisDetector.applyToDocument(widget.document, result);
+      _underlayFilterActive = true;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.l10n.wallsAndAxesGeneratedSuccess(
+            result.snappedCenterlines.length,
+            result.wallContourSegments.length,
+            result.detectedUnitName,
+          ),
+        ),
+        backgroundColor: const Color(0xFF1E88E5),
+      ),
+    );
+  }
+
   Future<void> _showExportDialog() async {
     final baseName = widget.title ?? 'structural_model';
     showModalBottomSheet<void>(
@@ -5305,6 +5464,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             case 'filter':
               _toggleUnderlayFilter();
               break;
+            case 'auto_walls':
+              _runManualAutoDetectWalls();
+              break;
             case 'export':
               _showExportDialog();
               break;
@@ -5345,6 +5507,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'auto_walls',
+            child: Row(
+              children: [
+                const Icon(Icons.auto_awesome, size: 20, color: Color(0xFFFF5252)),
+                const SizedBox(width: 12),
+                Text(context.l10n.autoDetectWallsAndAxes,
+                    style: const TextStyle(color: Colors.white, fontSize: 13)),
               ],
             ),
           ),

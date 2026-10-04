@@ -590,6 +590,13 @@
   "columnNamePrefix": "К",
   "shearWallNamePrefix": "Ш",
   "slabSectionElevationMarker": "К.К. {elevation}",
-  "slabThicknessLabel": "d = {thickness} cm"
+  "slabThicknessLabel": "d = {thickness} cm",
+  "autoDetectWallsAndAxes": "Автоматично откриване на стени и оси",
+  "autoDetectWallsPrompt": "Открити са зидове ({thickness} {unit}) в \"{layer}\". Желаете ли да изолирате стените в чист слой и да генерирате осови линии?",
+  "isolateWallsAndGenerateAxes": "Изолирай стените и генерирай оси",
+  "wallsAndAxesGeneratedSuccess": "Генерирани {axesCount} оси и изолирани {wallsCount} стенни контура ({unit})",
+  "noWallsDetected": "Не са открити двойки стени от 25 см в чертежа",
+  "wallCandidatesFound": "Открити {pairCount} двойки стени ({length} м)",
+  "autoDetectWallsSubtitle": "Открива зидове 25 см, изолира контурите им в WALLS_250 и чертае пунктирани оси в AXIS."
 }
 

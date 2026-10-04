@@ -2087,4 +2087,36 @@ class AppLocalizationsBg extends AppLocalizations {
   String slabThicknessLabel(String thickness) {
     return 'd = $thickness cm';
   }
+
+  @override
+  String get autoDetectWallsAndAxes => 'Автоматично откриване на стени и оси';
+
+  @override
+  String autoDetectWallsPrompt(String thickness, String unit, String layer) {
+    return 'Открити са зидове ($thickness $unit) в \"$layer\". Желаете ли да изолирате стените в чист слой и да генерирате осови линии?';
+  }
+
+  @override
+  String get isolateWallsAndGenerateAxes => 'Изолирай стените и генерирай оси';
+
+  @override
+  String wallsAndAxesGeneratedSuccess(
+    int axesCount,
+    int wallsCount,
+    String unit,
+  ) {
+    return 'Генерирани $axesCount оси и изолирани $wallsCount стенни контура ($unit)';
+  }
+
+  @override
+  String get noWallsDetected => 'Не са открити двойки стени от 25 см в чертежа';
+
+  @override
+  String wallCandidatesFound(int pairCount, String length) {
+    return 'Открити $pairCount двойки стени ($length м)';
+  }
+
+  @override
+  String get autoDetectWallsSubtitle =>
+      'Открива зидове 25 см, изолира контурите им в WALLS_250 и чертае пунктирани оси в AXIS.';
 }
