@@ -1236,6 +1236,14 @@ class StoreyLevel {
     this.gridAxes = const [],
   });
 
+  /// Whether any structural BIM elements exist on this storey.
+  bool get hasAnyElements =>
+      columns.isNotEmpty ||
+      shearWalls.isNotEmpty ||
+      beams.isNotEmpty ||
+      slabs.isNotEmpty ||
+      gridAxes.isNotEmpty;
+
   /// Computes the structural elevation (Конструктивна кота) for [slab].
   /// Calculated as architectural elevation minus flooring finish thickness.
   double structuralElevationFor(StructuralSlab slab) {

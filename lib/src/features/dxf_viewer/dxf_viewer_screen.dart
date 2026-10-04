@@ -38,7 +38,11 @@ import 'widgets/dxf_measurement_canvas_painter.dart';
 import 'widgets/dxf_measurement_overlay.dart';
 import '../../core/services/project_bundle_service.dart';
 import '../project_viewer/widgets/project_presentation_bar.dart';
+import '../structural_designer/models/structural_element.dart';
 import '../structural_designer/models/wall_axis_models.dart';
+import '../structural_designer/rendering/structural_2d_painter.dart';
+import '../structural_designer/rendering/structural_pointer_painter.dart';
+import '../structural_designer/services/structural_persistence_service.dart';
 import '../structural_designer/structural_designer_screen.dart';
 import '../structural_designer/widgets/structural_layer_prep_modal.dart';
 
@@ -118,6 +122,36 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
 
   // Layout & viewport
   Size _viewportSize = Size.zero;
+
+  // Structural BIM Model Overlay
+  StructuralProject? _structuralProject;
+  bool _showStructuralBimOverlay = true;
+
+  double get _cadUnitsPerMeter {
+    final unit = _effectiveUnit;
+    if (unit != DxfUnit.unitless && unit.toMeters > 0) {
+      return 1.0 / unit.toMeters;
+    }
+    final b = _currentBounds;
+    final maxDim = math.max(b.width, b.height);
+    if (maxDim > 500.0) {
+      return 1000.0;
+    } else if (maxDim > 60.0) {
+      return 100.0;
+    }
+    return 1.0;
+  }
+
+  Future<void> _loadStructuralProject() async {
+    try {
+      final p = await StructuralPersistenceService.loadProject(documentKey: _fileName);
+      if (mounted) {
+        setState(() {
+          _structuralProject = p;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
@@ -276,6 +310,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       }
 
       _saveToRecentFiles();
+      _loadStructuralProject();
 
       // Fit to screen after frame builds
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1747,7 +1782,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                   },
                 );
                 if (confirmed == true && mounted) {
-                  Navigator.of(context).push(
+                  await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => StructuralDesignerScreen(
                         document: _document!,
@@ -1758,6 +1793,9 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                       ),
                     ),
                   );
+                  if (mounted) {
+                    await _loadStructuralProject();
+                  }
                 }
               }
             : null,
@@ -1866,12 +1904,32 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
             case 'export_kcad':
               _exportKcad();
               break;
+            case 'bim_overlay':
+              setState(() {
+                _showStructuralBimOverlay = !_showStructuralBimOverlay;
+              });
+              break;
             case 'print':
               _printDxf();
               break;
           }
         },
         itemBuilder: (context) => [
+          if (_structuralProject != null && _structuralProject!.activeStorey.hasAnyElements)
+            PopupMenuItem(
+              value: 'bim_overlay',
+              child: Row(
+                children: [
+                  Icon(
+                    _showStructuralBimOverlay ? Icons.apartment_rounded : Icons.domain_disabled_rounded,
+                    size: 20,
+                    color: _showStructuralBimOverlay ? const Color(0xFF00E5FF) : Colors.white70,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(_showStructuralBimOverlay ? context.l10n.hideBimOverlay : context.l10n.showBimOverlay),
+                ],
+              ),
+            ),
           const PopupMenuItem(
             value: 'export_kcad',
             child: Row(
@@ -2132,25 +2190,51 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
                               }
                             }
                           },
-                          child: RepaintBoundary(
-                            child: CustomPaint(
-                              size: _viewportSize,
-                              isComplex: true,
-                              willChange: false,
-                              painter: DxfPainter(
-                                document: _document!,
-                                theme: _canvasTheme,
-                                activeLayout: _activeLayout,
-                                currentScale: _renderScale,
-                                measurement: null, // Rendered crisply on screen-space overlay above InteractiveViewer
-                                annotations: const [], // Rendered crisply on screen-space overlay above InteractiveViewer
-                                visibleCadRect: _getVisibleCadRect(),
-                                highlightedEntity: _selectedEntity,
-                                snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
-                                showGrid: _showGrid,
-                                settings: _displaySettings,
+                          child: Stack(
+                            fit: StackFit.passthrough,
+                            children: [
+                              RepaintBoundary(
+                                child: CustomPaint(
+                                  size: _viewportSize,
+                                  isComplex: true,
+                                  willChange: false,
+                                  painter: DxfPainter(
+                                    document: _document!,
+                                    theme: _canvasTheme,
+                                    activeLayout: _activeLayout,
+                                    currentScale: _renderScale,
+                                    measurement: null, // Rendered crisply on screen-space overlay above InteractiveViewer
+                                    annotations: const [], // Rendered crisply on screen-space overlay above InteractiveViewer
+                                    visibleCadRect: _getVisibleCadRect(),
+                                    highlightedEntity: _selectedEntity,
+                                    snapResult: _isMeasureMode && _snapEnabled ? (_hoveredSnap ?? _activeMeasureSnap) : null,
+                                    showGrid: _showGrid,
+                                    settings: _displaySettings,
+                                  ),
+                                ),
                               ),
-                            ),
+                              if (_showStructuralBimOverlay &&
+                                  _structuralProject != null &&
+                                  _structuralProject!.activeStorey.hasAnyElements)
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    child: CustomPaint(
+                                      size: _viewportSize,
+                                      painter: Structural2dPainter(
+                                        currentStorey: _structuralProject!.activeStorey,
+                                        ghostStorey: _structuralProject!.ghostStorey,
+                                        cantileverZones: const [],
+                                        activeTool: StructuralDrawTool.select,
+                                        l10n: context.l10n,
+                                        cadUnitsPerMeter: _cadUnitsPerMeter,
+                                        zoomScale: _transformController.value.getMaxScaleOnAxis(),
+                                        cadToScene: _cadToScene,
+                                        cadScale: _getCadFitScale(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),

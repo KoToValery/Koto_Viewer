@@ -879,6 +879,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String get structuralDesignerBim => 'Конструктивен Модел (BIM)';
 
   @override
+  String get showBimOverlay => 'Покажи BIM елементи';
+
+  @override
+  String get hideBimOverlay => 'Скрий BIM елементи';
+
+  @override
   String get structuralDesigner => 'Конструктивен Модел';
 
   @override

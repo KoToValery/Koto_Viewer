@@ -143,6 +143,7 @@ class DxfPainter extends CustomPainter {
   final bool showGrid;
   final DxfDisplaySettings settings;
   final Rect? visibleCadRect;
+  final bool Function(DxfEntity entity)? entityFilter;
 
   DxfPainter({
     required this.document,
@@ -156,6 +157,7 @@ class DxfPainter extends CustomPainter {
     this.showGrid = true,
     this.settings = const DxfDisplaySettings(),
     this.visibleCadRect,
+    this.entityFilter,
   });
 
   @override
@@ -363,6 +365,9 @@ class DxfPainter extends CustomPainter {
 
     for (final entity in entitiesToDraw) {
       try {
+        if (entityFilter != null && !entityFilter!(entity)) {
+          continue;
+        }
         final layer = document.layers[entity.layer];
         if (layer != null && (!layer.isVisible || layer.isFrozen)) {
           // If entity is an Insert on a hidden layer (e.g. layer 0),
@@ -2235,6 +2240,7 @@ class DxfPainter extends CustomPainter {
           }
 
           for (final child in compiled.otherEntities) {
+            if (entityFilter != null && !entityFilter!(child)) continue;
             final childLayer = layers[child.layer];
             if (childLayer != null && (!childLayer.isVisible || childLayer.isFrozen)) continue;
 

@@ -5805,6 +5805,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                     theme: DxfCanvasTheme.darkCad,
                                     activeLayout: 'Model',
                                     currentScale: _renderScale,
+                                    entityFilter: _underlayFilterActive
+                                        ? (entity) {
+                                            // 1. Suppress all hatches (fill patterns) in structural underlay
+                                            if (entity is DxfHatch) return false;
+                                            // 2. If entity is on a white structural layer, suppress non-white entities (e.g. insulation lines with color 30)
+                                            final layer = widget.document.layers[entity.layer];
+                                            if (layer != null && StructuralUnderlayFilter.isWhiteLayer(layer)) {
+                                              if (entity.colorIndex != null &&
+                                                  entity.colorIndex != 256 &&
+                                                  entity.colorIndex != 0 &&
+                                                  entity.colorIndex != 7 &&
+                                                  entity.colorIndex != 255) {
+                                                return false;
+                                              }
+                                            }
+                                            return true;
+                                          }
+                                        : null,
                                   ),
                                 ),
                               ),

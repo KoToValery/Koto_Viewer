@@ -706,5 +706,38 @@ void main() {
       expect(hAxis.distanceToSegment(const Offset(3000, 125)), closeTo(0.0, 1.0));
       expect(hAxis.distanceToSegment(const Offset(3000, 1000)), closeTo(875.0, 1.0));
     });
+
+    test('19. Closure lines are recorded into the original wall layer so walls are closed in the architectural underlay', () {
+      final doc = _createTestDoc(
+        layers: {
+          'стени': DxfLayer(name: 'стени', colorIndex: 7, isVisible: true),
+        },
+        entities: const [
+          DxfLine(p1: Offset(0, 0), p2: Offset(4000, 0), layer: 'стени'),
+          DxfLine(p1: Offset(0, 250), p2: Offset(4000, 250), layer: 'стени'),
+        ],
+        bounds: const Rect.fromLTWH(0, 0, 4000, 250),
+      );
+
+      final result = WallAxisDetector.detect(doc);
+      expect(result.hasWallsFound, isTrue);
+      expect(result.closureSegments.isNotEmpty, isTrue);
+
+      WallAxisDetector.applyToDocument(doc, result);
+
+      // Verify transverse closing caps were injected directly into layer 'стени'
+      final steniClosingLines = doc.entities
+          .where((e) => e.layer == 'стени' && e is DxfLine)
+          .cast<DxfLine>()
+          .where((l) => (l.p1.dx - l.p2.dx).abs() < 1.0 && (l.p1.dy - l.p2.dy).abs() >= 200.0)
+          .toList();
+
+      expect(
+        steniClosingLines.isNotEmpty,
+        isTrue,
+        reason: 'Original wall layer "стени" must receive transverse end cap lines',
+      );
+      expect(steniClosingLines.first.colorIndex, 7);
+    });
   });
 }

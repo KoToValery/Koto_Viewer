@@ -35,6 +35,7 @@ class StructuralUnderlayFilter {
     if (idx == 7 || idx == 255 || idx == 0) {
       // If entities exist, check whether they override the layer color away from white
       if (layerEntities != null && layerEntities.isNotEmpty) {
+        if (layerEntities.every((e) => e is DxfHatch)) return false;
         int nonWhiteEntities = 0;
         int whiteEntities = 0;
         for (final e in layerEntities) {
@@ -107,7 +108,10 @@ class StructuralUnderlayFilter {
     final name = layerName.toLowerCase();
     const thinKeywords = [
       'defpoints',
-      'hatch', 'штрих',
+      'hatch', 'штрих', 'щрих',
+      'fill', 'запълване', 'плътно',
+      'pattern',
+      'insul', 'изолац', 'изолация',
       'furn', 'мебел',
       'dim', 'размер',
       'text', 'текст',
@@ -250,6 +254,11 @@ class StructuralUnderlayFilter {
         return thickestWhite.map((l) => l.name).toSet();
       } else {
         // "Ако нямат линиите дебелина- остават всички бели"
+        final hasWhiteKeywords = whiteLayers.any((l) => matchesStructuralKeyword(l.name));
+        if (hasWhiteKeywords) {
+          final structuralWhite = whiteLayers.where((l) => matchesStructuralKeyword(l.name)).toList();
+          return structuralWhite.map((l) => l.name).toSet();
+        }
         return whiteLayers.map((l) => l.name).toSet();
       }
     }

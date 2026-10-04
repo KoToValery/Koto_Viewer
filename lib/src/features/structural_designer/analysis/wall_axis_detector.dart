@@ -188,6 +188,7 @@ class WallAxisDetector {
     // Step 4: Collect raw centerlines and closed wall contour segments with opening jamb caps
     final rawCenterlines = <(Offset, Offset)>[];
     final wallContourSegments = <(Offset, Offset)>[];
+    final closureSegments = <(Offset, Offset)>[];
 
     final allPairs = <WallPairCandidate>[];
     for (final group in activeGroups) {
@@ -201,6 +202,7 @@ class WallAxisDetector {
           pair,
           allPairs,
           wallContourSegments,
+          closureSegments,
         );
       }
     }
@@ -228,6 +230,7 @@ class WallAxisDetector {
       bridgedCenterlines: bridgedCenterlines,
       snappedCenterlines: snappedCenterlines,
       wallContourSegments: wallContourSegments,
+      closureSegments: closureSegments,
     );
   }
 
@@ -480,6 +483,7 @@ class WallAxisDetector {
     // 4. Add wall contour lines to document
     final newEntities = <DxfEntity>[];
 
+    // 4a. Add wall contour lines to wallLayerName (e.g. WALLS_250)
     for (final seg in result.wallContourSegments) {
       newEntities.add(
         DxfLine(
@@ -490,6 +494,37 @@ class WallAxisDetector {
           trueColor: result.bestGroup?.trueColor,
         ),
       );
+    }
+
+    // 4b. Inject transverse closing caps directly into the ORIGINAL wall layer
+    // (e.g. 'стени'), so walls are closed when viewing the architectural underlay!
+    final origWallLayer = result.bestGroup?.layerName;
+    if (origWallLayer != null && origWallLayer != wallLayerName && document.layers.containsKey(origWallLayer)) {
+      final caps = result.closureSegments.isNotEmpty ? result.closureSegments : result.wallContourSegments;
+      for (final cap in caps) {
+        bool exists = false;
+        for (final e in document.entities) {
+          if (e.layer == origWallLayer && e is DxfLine) {
+            final d1 = (e.p1 - cap.$1).distance + (e.p2 - cap.$2).distance;
+            final d2 = (e.p1 - cap.$2).distance + (e.p2 - cap.$1).distance;
+            if (d1 < 1.0 || d2 < 1.0) {
+              exists = true;
+              break;
+            }
+          }
+        }
+        if (!exists) {
+          newEntities.add(
+            DxfLine(
+              p1: cap.$1,
+              p2: cap.$2,
+              layer: origWallLayer,
+              colorIndex: wallColor,
+              trueColor: result.bestGroup?.trueColor,
+            ),
+          );
+        }
+      }
     }
 
     // 5. Mutate document entity lists
@@ -1537,8 +1572,9 @@ class WallAxisDetector {
   static void _collectWallContourWithEndCaps(
     WallPairCandidate pair,
     List<WallPairCandidate> allPairs,
-    List<(Offset, Offset)> wallContourSegments,
-  ) {
+    List<(Offset, Offset)> wallContourSegments, [
+    List<(Offset, Offset)>? closureSegments,
+  ]) {
     final sA = pair.segmentA;
     final sB = pair.segmentB;
     final refAngle = sA.angleRad;
@@ -1595,6 +1631,9 @@ class WallAxisDetector {
     if (!isStartCorner) {
       // Open end (door/window opening or free wall end): close with transverse cap
       _addSegmentUnique(wallContourSegments, pAStart, pBStart);
+      if (closureSegments != null) {
+        _addSegmentUnique(closureSegments, pAStart, pBStart);
+      }
       faceAStart = pAStart;
       faceBStart = pBStart;
     } else {
@@ -1611,6 +1650,9 @@ class WallAxisDetector {
     if (!isEndCorner) {
       // Open end (door/window opening or free wall end): close with transverse cap
       _addSegmentUnique(wallContourSegments, pAEnd, pBEnd);
+      if (closureSegments != null) {
+        _addSegmentUnique(closureSegments, pAEnd, pBEnd);
+      }
       faceAEnd = pAEnd;
       faceBEnd = pBEnd;
     } else {

@@ -94,6 +94,7 @@ class WallAxisDetectionResult {
   final List<(Offset, Offset)> bridgedCenterlines;
   final List<(Offset, Offset)> snappedCenterlines;
   final List<(Offset, Offset)> wallContourSegments;
+  final List<(Offset, Offset)> closureSegments;
 
   const WallAxisDetectionResult({
     required this.evaluatedGroups,
@@ -105,6 +106,7 @@ class WallAxisDetectionResult {
     required this.bridgedCenterlines,
     required this.snappedCenterlines,
     required this.wallContourSegments,
+    this.closureSegments = const [],
   });
 
   bool get hasWallsFound => bestGroup != null && bestGroup!.pairCount > 0;
@@ -119,5 +121,6 @@ class WallAxisDetectionResult {
     bridgedCenterlines: [],
     snappedCenterlines: [],
     wallContourSegments: [],
+    closureSegments: [],
   );
 }

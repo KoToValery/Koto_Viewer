@@ -259,6 +259,8 @@
   "dwgMemoryLimitError": "Чертежът съдържа твърде много вътрешни обекти и изисква повече оперативна памет от наличната на това устройство. Препоръчваме да го конвертирате в DXF на компютър или да го изчистите с командата PURGE в CAD софтуер.",
   "dwgConversionFailed": "Грешка при конвертиране на DWG файл: {error}",
   "structuralDesignerBim": "Конструктивен Модел (BIM)",
+  "showBimOverlay": "Покажи BIM елементи",
+  "hideBimOverlay": "Скрий BIM елементи",
   "structuralDesigner": "Конструктивен Модел",
   "structural3dView": "3D Конструкция",
   "snapEnabledTooltip": "Прилепване (Snap): Включено",

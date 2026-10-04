@@ -1616,6 +1616,18 @@ abstract class AppLocalizations {
   /// **'Structural Model (BIM)'**
   String get structuralDesignerBim;
 
+  /// Option to show structural BIM elements over architectural drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Show Structural BIM Elements'**
+  String get showBimOverlay;
+
+  /// Option to hide structural BIM elements over architectural drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Structural BIM Elements'**
+  String get hideBimOverlay;
+
   /// Title of Structural Designer screen
   ///
   /// In en, this message translates to:

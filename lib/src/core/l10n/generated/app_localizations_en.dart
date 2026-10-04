@@ -874,6 +874,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get structuralDesignerBim => 'Structural Model (BIM)';
 
   @override
+  String get showBimOverlay => 'Show Structural BIM Elements';
+
+  @override
+  String get hideBimOverlay => 'Hide Structural BIM Elements';
+
+  @override
   String get structuralDesigner => 'Structural Model';
 
   @override
