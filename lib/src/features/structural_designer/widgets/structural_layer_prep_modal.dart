@@ -141,12 +141,18 @@ class _StructuralLayerPrepModalState extends State<StructuralLayerPrepModal> {
         final name = entity.layer.trim();
         _layerCounts[name] = (_layerCounts[name] ?? 0) + 1;
       }
-      if (mounted) {
+      if (mounted && widget.onAxesDetected == null) {
+        final isBg = Localizations.localeOf(context).languageCode == 'bg';
+        final axes = WallAxisDetector.convertToStructuralGridAxes(
+          result.snappedCenterlines,
+          isBulgarian: isBg,
+          scale: result.detectedScale,
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               context.l10n.wallsAndAxesGeneratedSuccess(
-                result.snappedCenterlines.length,
+                axes.length,
                 result.wallContourSegments.length,
                 result.detectedUnitName,
               ),

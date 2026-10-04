@@ -185,15 +185,23 @@ class WallAxisDetector {
       }
     }
 
-    // Step 4: Collect raw centerlines and wall contour segments
+    // Step 4: Collect raw centerlines and closed wall contour segments with opening jamb caps
     final rawCenterlines = <(Offset, Offset)>[];
     final wallContourSegments = <(Offset, Offset)>[];
+
+    final allPairs = <WallPairCandidate>[];
+    for (final group in activeGroups) {
+      allPairs.addAll(group.wallPairs);
+    }
 
     for (final group in activeGroups) {
       for (final pair in group.wallPairs) {
         rawCenterlines.add((pair.centerlineStart, pair.centerlineEnd));
-        wallContourSegments.add((pair.segmentA.start, pair.segmentA.end));
-        wallContourSegments.add((pair.segmentB.start, pair.segmentB.end));
+        _collectWallContourWithEndCaps(
+          pair,
+          allPairs,
+          wallContourSegments,
+        );
       }
     }
 
@@ -226,27 +234,53 @@ class WallAxisDetector {
   /// Converts detected snapped centerline segments into unified, continuous [StructuralGridAxis] elements.
   ///
   /// Merges collinear wall centerlines along the same structural alignment into single continuous axes,
-  /// extends them past the building perimeter (by default 1.20 m) so end bubbles sit neatly outside walls,
+  /// extends them past the entire building perimeter (by default 1.20 m) so end bubbles sit neatly aligned outside walls,
   /// and sequences them with standard engineering naming (1, 2, 3... for vertical, А, Б, В... for horizontal).
   static List<StructuralGridAxis> convertToStructuralGridAxes(
     List<(Offset, Offset)> centerlines, {
     required bool isBulgarian,
     required double scale,
     double extensionM = 1.20,
-    double collinearToleranceMm = 200.0,
+    double collinearToleranceMm = 50.0,
+    double minTotalWallLengthM = 0.30,
   }) {
     if (centerlines.isEmpty) return const [];
 
     final extensionCad = (extensionM * 1000.0) * scale;
     final collinearTolCad = collinearToleranceMm * scale;
+    final minTotalWallLengthCad = (minTotalWallLengthM * 1000.0) * scale;
 
-    // Angle bucketing (within +-1.5 degrees)
+    // 1. Calculate the overall bounding envelope of all detected centerlines
+    double bMinX = double.infinity;
+    double bMaxX = -double.infinity;
+    double bMinY = double.infinity;
+    double bMaxY = -double.infinity;
+
+    for (final line in centerlines) {
+      final p1 = line.$1;
+      final p2 = line.$2;
+      bMinX = math.min(bMinX, math.min(p1.dx, p2.dx));
+      bMaxX = math.max(bMaxX, math.max(p1.dx, p2.dx));
+      bMinY = math.min(bMinY, math.min(p1.dy, p2.dy));
+      bMaxY = math.max(bMaxY, math.max(p1.dy, p2.dy));
+    }
+
+    final envelopeCorners = [
+      Offset(bMinX, bMinY),
+      Offset(bMaxX, bMinY),
+      Offset(bMaxX, bMaxY),
+      Offset(bMinX, bMaxY),
+    ];
+
+    // 2. Angle bucketing (within +-1.5 degrees)
     const angleTolerance = 1.5 * math.pi / 180.0;
     final buckets = <List<(Offset, Offset)>>[];
 
     for (final line in centerlines) {
       final p1 = line.$1;
       final p2 = line.$2;
+      if ((p2 - p1).distance < 1e-4) continue;
+
       var angle = math.atan2(p2.dy - p1.dy, p2.dx - p1.dx);
       if (angle < 0) angle += math.pi;
       if (angle >= math.pi - 1e-4) angle = 0.0;
@@ -277,46 +311,95 @@ class WallAxisDetector {
       var refAngle = math.atan2(b0.$2.dy - b0.$1.dy, b0.$2.dx - b0.$1.dx);
       if (refAngle < 0) refAngle += math.pi;
       if (refAngle >= math.pi - 1e-4) refAngle = 0.0;
+
+      // Snap near horizontal / vertical to exact 0.0 and pi/2
+      if (refAngle < 2.0 * math.pi / 180.0 || (refAngle - math.pi).abs() < 2.0 * math.pi / 180.0) {
+        refAngle = 0.0;
+      } else if ((refAngle - math.pi / 2.0).abs() < 2.0 * math.pi / 180.0) {
+        refAngle = math.pi / 2.0;
+      }
+
       final cosA = math.cos(refAngle);
       final sinA = math.sin(refAngle);
 
-      // Sort by perpendicular offset d
+      // Project the whole building envelope onto the axis direction vector u = (cosA, sinA)
+      double envMinT = double.infinity;
+      double envMaxT = -double.infinity;
+      for (final corner in envelopeCorners) {
+        final t = corner.dx * cosA + corner.dy * sinA;
+        envMinT = math.min(envMinT, t);
+        envMaxT = math.max(envMaxT, t);
+      }
+
+      // Compute perpendicular offset d and directional range [tMin, tMax]
       final withD = bucket.map((line) {
         final mid = (line.$1 + line.$2) / 2.0;
         final d = -mid.dx * sinA + mid.dy * cosA;
         final t1 = line.$1.dx * cosA + line.$1.dy * sinA;
         final t2 = line.$2.dx * cosA + line.$2.dy * sinA;
-        return (line: line, d: d, tMin: math.min(t1, t2), tMax: math.max(t1, t2));
+        final len = (line.$2 - line.$1).distance;
+        return (line: line, d: d, length: len, tMin: math.min(t1, t2), tMax: math.max(t1, t2));
       }).toList()
         ..sort((a, b) => a.d.compareTo(b.d));
 
-      // Cluster collinear lines
-      final clusters = <List<({(Offset, Offset) line, double d, double tMin, double tMax})>>[];
+      // Cluster collinear lines along the same alignment
+      final initialClusters = <List<({(Offset, Offset) line, double d, double length, double tMin, double tMax})>>[];
       var curCluster = [withD.first];
+      double clusterBaseD = withD.first.d;
       for (int i = 1; i < withD.length; i++) {
-        if ((withD[i].d - curCluster.last.d).abs() <= collinearTolCad) {
+        if ((withD[i].d - clusterBaseD).abs() <= collinearTolCad) {
           curCluster.add(withD[i]);
         } else {
-          clusters.add(curCluster);
+          initialClusters.add(curCluster);
           curCluster = [withD[i]];
+          clusterBaseD = withD[i].d;
         }
       }
-      clusters.add(curCluster);
+      initialClusters.add(curCluster);
+
+      // Merge clusters whose weighted average offsets are within collinearTolCad
+      final clusters = <List<({(Offset, Offset) line, double d, double length, double tMin, double tMax})>>[];
+      for (final c in initialClusters) {
+        if (clusters.isEmpty) {
+          clusters.add(c);
+        } else {
+          final prev = clusters.last;
+          final prevAvgD = prev.fold<double>(0.0, (sum, it) => sum + it.d * it.length) /
+              prev.fold<double>(0.0, (sum, it) => sum + it.length);
+          final curAvgD = c.fold<double>(0.0, (sum, it) => sum + it.d * it.length) /
+              c.fold<double>(0.0, (sum, it) => sum + it.length);
+          if ((curAvgD - prevAvgD).abs() <= collinearTolCad) {
+            prev.addAll(c);
+          } else {
+            clusters.add(c);
+          }
+        }
+      }
 
       for (final cluster in clusters) {
-        double minT = cluster.first.tMin;
-        double maxT = cluster.first.tMax;
-        double avgD = 0;
-        for (final item in cluster) {
-          minT = math.min(minT, item.tMin);
-          maxT = math.max(maxT, item.tMax);
-          avgD += item.d;
-        }
-        avgD /= cluster.length;
+        double totalLen = 0.0;
+        double weightedD = 0.0;
+        double clusterMinT = double.infinity;
+        double clusterMaxT = -double.infinity;
 
-        // Extend past outer wall ends so axis bubbles sit outside the building envelope
-        final tStart = minT - extensionCad;
-        final tEnd = maxT + extensionCad;
+        for (final item in cluster) {
+          totalLen += item.length;
+          weightedD += item.d * item.length;
+          clusterMinT = math.min(clusterMinT, item.tMin);
+          clusterMaxT = math.max(clusterMaxT, item.tMax);
+        }
+
+        // Filter out tiny artifacts below minimum wall length
+        if (totalLen < minTotalWallLengthCad && minTotalWallLengthCad > 0) {
+          continue;
+        }
+
+        final avgD = totalLen > 0 ? weightedD / totalLen : cluster.first.d;
+
+        // In structural BIM drawings, grid axes span across the entire building envelope,
+        // with end bubbles sitting aligned outside the building perimeter.
+        final tStart = math.min(envMinT, clusterMinT) - extensionCad;
+        final tEnd = math.max(envMaxT, clusterMaxT) + extensionCad;
 
         final startPt = Offset(
           tStart * cosA - avgD * sinA,
@@ -330,7 +413,7 @@ class WallAxisDetector {
         axisCounter++;
         rawAxes.add(
           StructuralGridAxis(
-            id: 'axis_auto_$axisCounter',
+            id: 'axis_auto_${axisCounter}_${DateTime.now().millisecondsSinceEpoch}',
             name: '$axisCounter',
             start: startPt,
             end: endPt,
@@ -344,12 +427,16 @@ class WallAxisDetector {
     return resequenceGridAxes(rawAxes, isBulgarian: isBulgarian);
   }
 
-  /// Injects detected walls and axes into [document], isolating walls and hiding other layers.
+  /// Injects detected walls into [document], isolating walls and hiding other layers.
+  ///
+  /// Note: Grid axes are NOT injected as static CAD dashed lines into [document].
+  /// Instead, they are generated as native interactive [StructuralGridAxis] elements
+  /// via [convertToStructuralGridAxes] and stored in [StructuralProjectStorey.gridAxes].
   static void applyToDocument(
     DxfDocument document,
     WallAxisDetectionResult result, {
     String wallLayerName = 'WALLS_250',
-    String axisLayerName = 'AXIS',
+    String? axisLayerName,
   }) {
     if (!result.hasWallsFound) return;
 
@@ -369,17 +456,25 @@ class WallAxisDetector {
     );
     document.layers[wallLayerName] = wallLayer;
 
-    // 3. Create or update AXIS layer (Red ACI 1, DASHED)
-    final axisLayer = DxfLayer(
-      name: axisLayerName,
-      colorIndex: 1, // Red
-      isVisible: true,
-      lineType: 'DASHED',
-      customLineweight: 0.25,
-    );
-    document.layers[axisLayerName] = axisLayer;
+    // 3. Remove any previously injected entities for wallLayerName or AXIS
+    try {
+      document.entities.removeWhere(
+        (e) =>
+            e.layer == wallLayerName ||
+            e.layer == 'AXIS' ||
+            (axisLayerName != null && e.layer == axisLayerName),
+      );
+    } catch (_) {}
 
-    // 4. Add wall contour lines to document
+    // 4. Ensure AXIS layer is not shown as a CAD layer
+    if (document.layers.containsKey('AXIS')) {
+      document.layers['AXIS']?.isVisible = false;
+    }
+    if (axisLayerName != null && document.layers.containsKey(axisLayerName)) {
+      document.layers[axisLayerName]?.isVisible = false;
+    }
+
+    // 5. Add wall contour lines to document
     final newEntities = <DxfEntity>[];
 
     for (final seg in result.wallContourSegments) {
@@ -394,20 +489,6 @@ class WallAxisDetector {
       );
     }
 
-    // 5. Add centerline axis lines with DASHED linetype to document
-    for (final axis in result.snappedCenterlines) {
-      newEntities.add(
-        DxfLine(
-          p1: axis.$1,
-          p2: axis.$2,
-          layer: axisLayerName,
-          colorIndex: 1,
-          lineType: 'DASHED',
-          lineTypeScale: 1.0,
-        ),
-      );
-    }
-
     // 6. Mutate document entity lists
     try {
       document.entities.addAll(newEntities);
@@ -417,6 +498,12 @@ class WallAxisDetector {
     final modelList = document.layoutEntities['Model'];
     if (modelList != null) {
       try {
+        modelList.removeWhere(
+          (e) =>
+              e.layer == wallLayerName ||
+              e.layer == 'AXIS' ||
+              (axisLayerName != null && e.layer == axisLayerName),
+        );
         modelList.addAll(newEntities);
       } catch (_) {}
     }
@@ -1388,5 +1475,161 @@ class WallAxisDetector {
 
     final double t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
     return Offset(x1 + t * (x2 - x1), y1 + t * (y2 - y1));
+  }
+
+  /// Closes open wall ends at doors and windows by adding transverse closure caps (jamb lines),
+  /// while preserving corner and T-junction continuity.
+  static void _collectWallContourWithEndCaps(
+    WallPairCandidate pair,
+    List<WallPairCandidate> allPairs,
+    List<(Offset, Offset)> wallContourSegments,
+  ) {
+    final sA = pair.segmentA;
+    final sB = pair.segmentB;
+    final refAngle = sA.angleRad;
+    final double cosA = math.cos(refAngle);
+    final double sinA = math.sin(refAngle);
+    final u = Offset(cosA, sinA);
+
+    // Perpendicular offsets of both faces from origin
+    final midA = (sA.start + sA.end) / 2.0;
+    final midB = (sB.start + sB.end) / 2.0;
+    final dA = -midA.dx * sinA + midA.dy * cosA;
+    final dB = -midB.dx * sinA + midB.dy * cosA;
+
+    // Projections along u for segment A
+    final t1A = sA.start.dx * cosA + sA.start.dy * sinA;
+    final t2A = sA.end.dx * cosA + sA.end.dy * sinA;
+    final tMinA = math.min(t1A, t2A);
+    final tMaxA = math.max(t1A, t2A);
+
+    // Projections along u for segment B
+    final t1B = sB.start.dx * cosA + sB.start.dy * sinA;
+    final t2B = sB.end.dx * cosA + sB.end.dy * sinA;
+    final tMinB = math.min(t1B, t2B);
+    final tMaxB = math.max(t1B, t2B);
+
+    // Common overlap along wall length
+    final tStart = math.max(tMinA, tMinB);
+    final tEnd = math.min(tMaxA, tMaxB);
+
+    if (tEnd <= tStart) {
+      // Degenerate/no overlap, preserve original segments
+      _addSegmentUnique(wallContourSegments, sA.start, sA.end);
+      _addSegmentUnique(wallContourSegments, sB.start, sB.end);
+      return;
+    }
+
+    // Perpendicular face points at the start of the mutual overlap
+    final pAStart = Offset(tStart * cosA - dA * sinA, tStart * sinA + dA * cosA);
+    final pBStart = Offset(tStart * cosA - dB * sinA, tStart * sinA + dB * cosA);
+    final midStart = (pAStart + pBStart) / 2.0;
+
+    // Perpendicular face points at the end of the mutual overlap
+    final pAEnd = Offset(tEnd * cosA - dA * sinA, tEnd * sinA + dA * cosA);
+    final pBEnd = Offset(tEnd * cosA - dB * sinA, tEnd * sinA + dB * cosA);
+    final midEnd = (pAEnd + pBEnd) / 2.0;
+
+    final wallThickness = pair.perpendicularDistance;
+
+    // Check if start is an open jamb/opening or a corner/junction
+    final bool isStartCorner = _isCornerOrJunction(midStart, u, wallThickness, allPairs, pair);
+    final Offset faceAStart;
+    final Offset faceBStart;
+
+    if (!isStartCorner) {
+      // Open end (door/window opening or free wall end): close with transverse cap
+      _addSegmentUnique(wallContourSegments, pAStart, pBStart);
+      faceAStart = pAStart;
+      faceBStart = pBStart;
+    } else {
+      // Corner or junction: keep original outer endpoints to meet intersecting wall
+      faceAStart = (t1A == tMinA) ? sA.start : sA.end;
+      faceBStart = (t1B == tMinB) ? sB.start : sB.end;
+    }
+
+    // Check if end is an open jamb/opening or a corner/junction
+    final bool isEndCorner = _isCornerOrJunction(midEnd, u, wallThickness, allPairs, pair);
+    final Offset faceAEnd;
+    final Offset faceBEnd;
+
+    if (!isEndCorner) {
+      // Open end (door/window opening or free wall end): close with transverse cap
+      _addSegmentUnique(wallContourSegments, pAEnd, pBEnd);
+      faceAEnd = pAEnd;
+      faceBEnd = pBEnd;
+    } else {
+      // Corner or junction: keep original outer endpoints to meet intersecting wall
+      faceAEnd = (t2A == tMaxA) ? sA.end : sA.start;
+      faceBEnd = (t2B == tMaxB) ? sB.end : sB.start;
+    }
+
+    // Add longitudinal wall face segments
+    _addSegmentUnique(wallContourSegments, faceAStart, faceAEnd);
+    _addSegmentUnique(wallContourSegments, faceBStart, faceBEnd);
+  }
+
+  /// Determines whether [midPt] of a wall pair connects to an intersecting or continuing wall
+  /// (e.g. L-corner, T-junction, or collinear continuation), rather than being an open jamb / opening.
+  static bool _isCornerOrJunction(
+    Offset midPt,
+    Offset wallDir,
+    double wallThickness,
+    List<WallPairCandidate> allPairs,
+    WallPairCandidate currentPair,
+  ) {
+    final searchRadius = wallThickness * 1.25;
+
+    for (final other in allPairs) {
+      if (identical(other, currentPair)) continue;
+
+      final otherDir = other.segmentA.direction;
+      final dot = (wallDir.dx * otherDir.dx + wallDir.dy * otherDir.dy).abs();
+
+      if (dot < 0.85) {
+        // Non-parallel wall (L-corner or T-junction):
+        final p1 = other.centerlineStart;
+        final p2 = other.centerlineEnd;
+        final closest = _closestPointOnSegment(midPt, p1, p2);
+        if ((midPt - closest).distance <= searchRadius) {
+          return true;
+        }
+      } else {
+        // Parallel wall: check if it touches midPt directly (collinear continuation with no opening)
+        if ((other.centerlineStart - midPt).distance <= wallThickness * 0.45 ||
+            (other.centerlineEnd - midPt).distance <= wallThickness * 0.45) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /// Calculates the closest point on the line segment [a]-[b] to point [p].
+  static Offset _closestPointOnSegment(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final lenSq = ab.dx * ab.dx + ab.dy * ab.dy;
+    if (lenSq < 1e-8) return a;
+    final t = ((p.dx - a.dx) * ab.dx + (p.dy - a.dy) * ab.dy) / lenSq;
+    final clampedT = t.clamp(0.0, 1.0);
+    return a + ab * clampedT;
+  }
+
+  /// Adds a segment to [list] if it is not degenerate and does not already exist within [tol].
+  static void _addSegmentUnique(
+    List<(Offset, Offset)> list,
+    Offset p1,
+    Offset p2, {
+    double tol = 5.0,
+  }) {
+    if ((p2 - p1).distance < 1.0) return;
+    for (final existing in list) {
+      if (((existing.$1 - p1).distance <= tol && (existing.$2 - p2).distance <= tol) ||
+          ((existing.$1 - p2).distance <= tol && (existing.$2 - p1).distance <= tol)) {
+        return;
+      }
+    }
+    list.add((p1, p2));
   }
 }

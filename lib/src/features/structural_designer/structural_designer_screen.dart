@@ -4976,9 +4976,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       scale: result.detectedScale,
     );
 
+    // Merge with existing axes, avoiding duplicates along the same alignment
+    final combined = <StructuralGridAxis>[...active.gridAxes];
+    final dupToleranceCad = 100.0 * result.detectedScale;
+    for (final newAxis in newGridAxes) {
+      final isDup = combined.any((existing) =>
+          existing.isParallelTo(newAxis, toleranceRad: 0.05) &&
+          existing.distanceToSegment((newAxis.start + newAxis.end) / 2.0) <= dupToleranceCad);
+      if (!isDup) {
+        combined.add(newAxis);
+      }
+    }
+
     // Sequence all axes neatly (numbers for vertical, letters for horizontal)
     final updatedAxes = resequenceGridAxes(
-      [...active.gridAxes, ...newGridAxes],
+      combined,
       isBulgarian: isBg,
     );
     _updateActiveStorey(active.copyWith(gridAxes: updatedAxes));
@@ -4990,7 +5002,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       SnackBar(
         content: Text(
           context.l10n.wallsAndAxesGeneratedSuccess(
-            result.snappedCenterlines.length,
+            newGridAxes.length,
             result.wallContourSegments.length,
             result.detectedUnitName,
           ),
@@ -5002,9 +5014,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _checkAutoDetectWallsOnStartup() {
     if (!mounted) return;
-    // Don't auto-prompt if AXIS or WALLS_250 layer already exists in document
-    if (widget.document.layers.containsKey('AXIS') ||
-        widget.document.layers.containsKey('WALLS_250')) {
+    // Don't auto-prompt if WALLS_250 layer already exists in document or axes are already generated
+    if (widget.document.layers.containsKey('WALLS_250') ||
+        _project.activeStorey.gridAxes.isNotEmpty) {
       return;
     }
 

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
@@ -209,7 +210,7 @@ void main() {
       expect((result.snappedCenterlines.first.$2.dx - result.snappedCenterlines.first.$1.dx).abs(), closeTo(500.0, 1.0));
     });
 
-    test('7. applyToDocument injects WALLS_250 and AXIS layers and hides original layers', () {
+    test('7. applyToDocument isolates WALLS_250 layer and keeps CAD underlay clean for interactive StructuralGridAxis', () {
       final doc = _createTestDoc(
         layers: {
           '0': DxfLayer(name: '0', colorIndex: 7, isVisible: true),
@@ -228,24 +229,32 @@ void main() {
 
       WallAxisDetector.applyToDocument(doc, result);
 
-      // Verify original layers are hidden
+      // Verify original clutter layers are hidden
       expect(doc.layers['0']?.isVisible, isFalse);
       expect(doc.layers['FURNITURE']?.isVisible, isFalse);
 
-      // Verify WALLS_250 and AXIS layers exist and are visible
+      // Verify WALLS_250 exists and is visible with heavy lineweight
       expect(doc.layers.containsKey('WALLS_250'), isTrue);
       expect(doc.layers['WALLS_250']?.isVisible, isTrue);
-      expect(doc.layers.containsKey('AXIS'), isTrue);
-      expect(doc.layers['AXIS']?.isVisible, isTrue);
-      expect(doc.layers['AXIS']?.colorIndex, 1); // Red
-      expect(doc.layers['AXIS']?.lineType, 'DASHED');
+      expect(doc.layers['WALLS_250']?.customLineweight, 0.70);
 
-      // Verify entities in AXIS and WALLS_250 were added
-      final axisEntities = doc.entities.where((e) => e.layer == 'AXIS').toList();
+      // Verify wall entities were added to WALLS_250
       final wallEntities = doc.entities.where((e) => e.layer == 'WALLS_250').toList();
-      expect(axisEntities.isNotEmpty, isTrue);
       expect(wallEntities.isNotEmpty, isTrue);
-      expect(axisEntities.first.lineType, 'DASHED');
+
+      // Verify CAD underlay does NOT have static cut-up lines in AXIS layer
+      final axisEntities = doc.entities.where((e) => e.layer == 'AXIS').toList();
+      expect(axisEntities.isEmpty, isTrue);
+
+      // Instead, axes are converted to native interactive StructuralGridAxis elements
+      final structuralAxes = WallAxisDetector.convertToStructuralGridAxes(
+        result.snappedCenterlines,
+        isBulgarian: true,
+        scale: result.detectedScale,
+      );
+      expect(structuralAxes.isNotEmpty, isTrue);
+      expect(structuralAxes.first.bubbleAtStart, isTrue);
+      expect(structuralAxes.first.bubbleAtEnd, isTrue);
     });
 
     test('8. Handles LWPOLYLINE and closed rectangular rooms', () {
@@ -508,6 +517,142 @@ void main() {
       for (final seg in result.wallContourSegments) {
         expect(seg.$1.dy != 1000 && seg.$1.dy != 1250, isTrue);
       }
+    });
+
+    test('15. convertToStructuralGridAxes ensures interior short walls extend across the full building envelope with aligned external bubbles', () {
+      final centerlines = <(Offset, Offset)>[
+        // Outer horizontal walls: from X = 0 to 10000, along Y = 0 and Y = 8000
+        (const Offset(0, 0), const Offset(10000, 0)),
+        (const Offset(0, 8000), const Offset(10000, 8000)),
+        // Outer vertical walls: from Y = 0 to 8000, along X = 0 and X = 10000
+        (const Offset(0, 0), const Offset(0, 8000)),
+        (const Offset(10000, 0), const Offset(10000, 8000)),
+        // Short interior wall: along Y = 3500, only 3m long from X = 3000 to X = 6000
+        (const Offset(3000, 3500), const Offset(6000, 3500)),
+      ];
+
+      final axes = WallAxisDetector.convertToStructuralGridAxes(
+        centerlines,
+        isBulgarian: true,
+        scale: 1.0, // mm
+        extensionM: 1.50, // 1.5m = 1500mm
+      );
+
+      // Total 3 horizontal axes (Y=0, Y=3500, Y=8000) and 2 vertical axes (X=0, X=10000)
+      expect(axes.length, 5);
+
+      final horizontalAxes = axes.where((a) => a.direction.dx.abs() > a.direction.dy.abs()).toList();
+      expect(horizontalAxes.length, 3);
+
+      // The interior axis along Y=3500 must span the FULL building width (0 - 1500 to 10000 + 1500 = -1500 to 11500),
+      // exactly matching the outer horizontal axes, instead of terminating inside rooms at 1500 and 7500.
+      final interiorAxis = horizontalAxes.firstWhere((a) => (a.start.dy - 3500).abs() < 50);
+      expect(interiorAxis.start.dx, closeTo(-1500.0, 1.0));
+      expect(interiorAxis.end.dx, closeTo(11500.0, 1.0));
+
+      for (final hAxis in horizontalAxes) {
+        expect(hAxis.start.dx, closeTo(-1500.0, 1.0), reason: 'All horizontal start bubbles must be aligned outside the building on the left');
+        expect(hAxis.end.dx, closeTo(11500.0, 1.0), reason: 'All horizontal end bubbles must be aligned outside the building on the right');
+        expect(hAxis.bubbleAtStart, isTrue);
+        expect(hAxis.bubbleAtEnd, isTrue);
+      }
+
+      final verticalAxes = axes.where((a) => a.direction.dy.abs() > a.direction.dx.abs()).toList();
+      expect(verticalAxes.length, 2);
+
+      for (final vAxis in verticalAxes) {
+        expect(vAxis.start.dy, closeTo(-1500.0, 1.0), reason: 'All vertical bottom bubbles must be aligned outside the building at the bottom');
+        expect(vAxis.end.dy, closeTo(9500.0, 1.0), reason: 'All vertical top bubbles must be aligned outside the building at the top');
+        expect(vAxis.bubbleAtStart, isTrue);
+        expect(vAxis.bubbleAtEnd, isTrue);
+      }
+    });
+
+    test('16. Generated StructuralGridAxis elements are fully interactive and can calculate geometric intersections', () {
+      final centerlines = <(Offset, Offset)>[
+        (const Offset(0, 0), const Offset(6000, 0)),
+        (const Offset(2000, 0), const Offset(2000, 4000)),
+      ];
+
+      final axes = WallAxisDetector.convertToStructuralGridAxes(
+        centerlines,
+        isBulgarian: true,
+        scale: 1.0,
+        extensionM: 1.0,
+      );
+
+      expect(axes.length, 2);
+      final axisH = axes.firstWhere((a) => a.direction.dx.abs() > a.direction.dy.abs());
+      final axisV = axes.firstWhere((a) => a.direction.dy.abs() > a.direction.dx.abs());
+
+      // Should find intersection at (2000, 0) for column/shear wall placement
+      final intersection = axisH.intersectionWith(axisV);
+      expect(intersection, isNotNull);
+      expect(intersection!.dx, closeTo(2000.0, 1.0));
+      expect(intersection.dy, closeTo(0.0, 1.0));
+    });
+
+    test('17. WallAxisDetector automatically caps open wall ends at door and window openings with transverse closure segments', () {
+      final wallLayer = DxfLayer(name: 'WALLS', colorIndex: 7);
+      final doc = _createTestDoc(
+        layers: {'WALLS': wallLayer},
+        entities: const [
+          // Horizontal pier 1: from X = 0 to X = 2000 (meets vertical wall at corner X = 0)
+          DxfLine(p1: Offset(0, 0), p2: Offset(2000, 0), layer: 'WALLS'),
+          DxfLine(p1: Offset(250, 250), p2: Offset(2000, 250), layer: 'WALLS'),
+
+          // Horizontal pier 2: from X = 3200 to X = 5000 (window opening between 2000 and 3200)
+          DxfLine(p1: Offset(3200, 0), p2: Offset(5000, 0), layer: 'WALLS'),
+          DxfLine(p1: Offset(3200, 250), p2: Offset(5000, 250), layer: 'WALLS'),
+
+          // Vertical wall meeting horizontal pier 1 at L-corner at X = 0, Y = 0
+          DxfLine(p1: Offset(0, 0), p2: Offset(0, 3000), layer: 'WALLS'),
+          DxfLine(p1: Offset(250, 250), p2: Offset(250, 3000), layer: 'WALLS'),
+        ],
+        bounds: const Rect.fromLTWH(0, 0, 5000, 3000),
+      );
+
+      final result = WallAxisDetector.detect(doc);
+      expect(result.hasWallsFound, isTrue);
+
+      final contours = result.wallContourSegments;
+      expect(contours.isNotEmpty, isTrue);
+
+      // Helper to check if a transverse vertical cap segment exists near a given X coordinate
+      bool hasVerticalCapNear(double targetX) {
+        return contours.any((seg) {
+          final x1 = seg.$1.dx;
+          final x2 = seg.$2.dx;
+          final y1 = seg.$1.dy;
+          final y2 = seg.$2.dy;
+          // Must be roughly vertical (x1 ~= x2) at targetX and span roughly y = [0, 250]
+          return (x1 - targetX).abs() <= 20.0 &&
+              (x2 - targetX).abs() <= 20.0 &&
+              (math.min(y1, y2) - 0.0).abs() <= 20.0 &&
+              (math.max(y1, y2) - 250.0).abs() <= 20.0;
+        });
+      }
+
+      // 1. Window jamb at X = 2000 MUST be closed with a cap
+      expect(hasVerticalCapNear(2000.0), isTrue, reason: 'Window opening start at X=2000 must be closed with an end cap');
+
+      // 2. Window jamb at X = 3200 MUST be closed with a cap
+      expect(hasVerticalCapNear(3200.0), isTrue, reason: 'Window opening end at X=3200 must be closed with an end cap');
+
+      // 3. Free wall end at X = 5000 MUST be closed with a cap
+      expect(hasVerticalCapNear(5000.0), isTrue, reason: 'Free wall end at X=5000 must be closed with an end cap');
+
+      // 4. L-corner at X = 0 must NOT have a transverse cap cutting across the corner
+      expect(hasVerticalCapNear(0.0), isFalse, reason: 'L-corner must remain open to connect cleanly with intersecting wall');
+
+      // 5. In WALLS_250 layer, applyToDocument creates these closure segments
+      WallAxisDetector.applyToDocument(doc, result);
+      final wall250Entities = doc.entities.where((e) => e.layer == 'WALLS_250').toList();
+      final hasCapInDoc = wall250Entities.any((e) {
+        if (e is! DxfLine) return false;
+        return (e.p1.dx - 2000.0).abs() <= 20.0 && (e.p2.dx - 2000.0).abs() <= 20.0;
+      });
+      expect(hasCapInDoc, isTrue, reason: 'WALLS_250 layer in DXF document must contain the jamb cap line');
     });
   });
 }

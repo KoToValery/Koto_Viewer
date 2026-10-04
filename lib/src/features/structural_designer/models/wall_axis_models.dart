@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 
@@ -24,6 +25,9 @@ class WallSegment {
     this.sourceTrueColor,
     this.sourceEntity,
   });
+
+  /// Unit direction vector along this segment.
+  Offset get direction => Offset(math.cos(angleRad), math.sin(angleRad));
 
   /// Unique key for (Layer, Color) grouping.
   String get groupKey {
