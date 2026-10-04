@@ -41,6 +41,7 @@ class StructuralDesignerScreen extends StatefulWidget {
   final Rect? initialCadBounds;
   final Matrix4? initialTransform;
   final String? title;
+  final WallAxisDetectionResult? initialDetectionResult;
 
   const StructuralDesignerScreen({
     super.key,
@@ -49,6 +50,7 @@ class StructuralDesignerScreen extends StatefulWidget {
     this.initialCadBounds,
     this.initialTransform,
     this.title,
+    this.initialDetectionResult,
   });
 
   @override
@@ -201,6 +203,29 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // The user can manually toggle structural underlay filtering via the AppBar funnel icon.
 
     _project = widget.initialProject ?? const StructuralProject();
+    if (_project.activeStorey.gridAxes.isEmpty) {
+      if (widget.initialDetectionResult != null && widget.initialDetectionResult!.hasWallsFound) {
+        final axes = WallAxisDetector.convertToStructuralGridAxes(
+          widget.initialDetectionResult!.snappedCenterlines,
+          isBulgarian: true,
+          scale: widget.initialDetectionResult!.detectedScale,
+        );
+        if (axes.isNotEmpty) {
+          final storeys = List<StoreyLevel>.from(_project.storeys);
+          final activeIndex = _project.activeStoreyIndex.clamp(0, storeys.length - 1);
+          storeys[activeIndex] = storeys[activeIndex].copyWith(gridAxes: axes);
+          _project = _project.copyWith(storeys: storeys);
+        }
+      } else {
+        final imported = WallAxisDetector.extractGridAxesFromDocument(widget.document);
+        if (imported.isNotEmpty) {
+          final storeys = List<StoreyLevel>.from(_project.storeys);
+          final activeIndex = _project.activeStoreyIndex.clamp(0, storeys.length - 1);
+          storeys[activeIndex] = storeys[activeIndex].copyWith(gridAxes: imported);
+          _project = _project.copyWith(storeys: storeys);
+        }
+      }
+    }
     if (_project.activeStorey.gridAxes.isEmpty) {
       _activeTool = StructuralDrawTool.gridAxis;
     } else {
@@ -4963,12 +4988,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (!result.hasWallsFound) return;
 
     _pushUndo();
-    WallAxisDetector.applyToDocument(widget.document, result);
-    _underlayFilterActive = true;
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+    WallAxisDetector.applyToDocument(widget.document, result, isBulgarian: isBg);
+    _applyUnderlayFilter(true);
 
     // Convert detected centerlines to native StructuralGridAxis elements
     final active = _project.activeStorey;
-    final isBg = Localizations.localeOf(context).languageCode == 'bg';
 
     final newGridAxes = WallAxisDetector.convertToStructuralGridAxes(
       result.snappedCenterlines,
@@ -5014,9 +5039,33 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _checkAutoDetectWallsOnStartup() {
     if (!mounted) return;
-    // Don't auto-prompt if WALLS_250 layer already exists in document or axes are already generated
-    if (widget.document.layers.containsKey('WALLS_250') ||
-        _project.activeStorey.gridAxes.isNotEmpty) {
+    // Don't auto-prompt if axes are already generated in active storey
+    if (_project.activeStorey.gridAxes.isNotEmpty) {
+      return;
+    }
+
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+
+    // Check if axes can be imported from layer AXIS
+    final importedAxes = WallAxisDetector.extractGridAxesFromDocument(
+      widget.document,
+      isBulgarian: isBg,
+    );
+    if (importedAxes.isNotEmpty) {
+      final active = _project.activeStorey;
+      _updateActiveStorey(active.copyWith(gridAxes: importedAxes));
+      _applyUnderlayFilter(true);
+      _runAnalysis();
+      setState(() {});
+      return;
+    }
+
+    // If WALLS_250 exists but gridAxes is empty, re-detect to populate gridAxes
+    if (widget.document.layers.containsKey('WALLS_250')) {
+      final result = WallAxisDetector.detect(widget.document);
+      if (result.hasWallsFound) {
+        _applyDetectedWallsAndAxes(result);
+      }
       return;
     }
 

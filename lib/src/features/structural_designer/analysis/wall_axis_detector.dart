@@ -427,16 +427,17 @@ class WallAxisDetector {
     return resequenceGridAxes(rawAxes, isBulgarian: isBulgarian);
   }
 
-  /// Injects detected walls into [document], isolating walls and hiding other layers.
+  /// Injects detected walls and continuous grid axes into [document], isolating structural elements and hiding clutter layers.
   ///
-  /// Note: Grid axes are NOT injected as static CAD dashed lines into [document].
-  /// Instead, they are generated as native interactive [StructuralGridAxis] elements
-  /// via [convertToStructuralGridAxes] and stored in [StructuralProjectStorey.gridAxes].
+  /// Populates:
+  /// - [wallLayerName] (default 'WALLS_250') with closed wall contours and transverse jamb caps at openings.
+  /// - [axisLayerName] (default 'AXIS') with continuous full-building grid axes, bubble circles, and text labels (DASHDOT linetype).
   static void applyToDocument(
     DxfDocument document,
     WallAxisDetectionResult result, {
     String wallLayerName = 'WALLS_250',
-    String? axisLayerName,
+    String axisLayerName = 'AXIS',
+    bool isBulgarian = true,
   }) {
     if (!result.hasWallsFound) return;
 
@@ -456,23 +457,25 @@ class WallAxisDetector {
     );
     document.layers[wallLayerName] = wallLayer;
 
-    // 3. Remove any previously injected entities for wallLayerName or AXIS
+    // 3. Create or update AXIS layer
+    final axisLayer = DxfLayer(
+      name: axisLayerName,
+      colorIndex: 1, // Red
+      isVisible: true,
+      lineType: 'DASHDOT',
+      customLineweight: 0.25,
+    );
+    document.layers[axisLayerName] = axisLayer;
+
+    // 4. Remove any previously injected entities for wallLayerName or axisLayerName
     try {
       document.entities.removeWhere(
         (e) =>
             e.layer == wallLayerName ||
-            e.layer == 'AXIS' ||
-            (axisLayerName != null && e.layer == axisLayerName),
+            e.layer == axisLayerName ||
+            e.layer == 'AXIS',
       );
     } catch (_) {}
-
-    // 4. Ensure AXIS layer is not shown as a CAD layer
-    if (document.layers.containsKey('AXIS')) {
-      document.layers['AXIS']?.isVisible = false;
-    }
-    if (axisLayerName != null && document.layers.containsKey(axisLayerName)) {
-      document.layers[axisLayerName]?.isVisible = false;
-    }
 
     // 5. Add wall contour lines to document
     final newEntities = <DxfEntity>[];
@@ -489,7 +492,79 @@ class WallAxisDetector {
       );
     }
 
-    // 6. Mutate document entity lists
+    // 6. Generate continuous structural grid axes across the full building envelope
+    final gridAxes = convertToStructuralGridAxes(
+      result.snappedCenterlines,
+      isBulgarian: isBulgarian,
+      scale: result.detectedScale,
+    );
+
+    final bubbleRadius = 250.0 * result.detectedScale; // 25 cm bubble radius (50 cm diameter)
+    final textHeight = 200.0 * result.detectedScale; // 20 cm text height
+
+    for (final axis in gridAxes) {
+      // Continuous axis line spanning the full envelope
+      newEntities.add(
+        DxfLine(
+          p1: axis.start,
+          p2: axis.end,
+          layer: axisLayerName,
+          colorIndex: 1,
+          lineType: 'DASHDOT',
+          lineTypeScale: 1.0,
+        ),
+      );
+
+      // Bubble and label at end
+      if (axis.bubbleAtEnd) {
+        newEntities.add(
+          DxfCircle(
+            center: axis.end,
+            radius: bubbleRadius,
+            layer: axisLayerName,
+            colorIndex: 1,
+          ),
+        );
+        newEntities.add(
+          DxfText(
+            text: axis.name,
+            insertPoint: axis.end,
+            alignPoint: axis.end,
+            hAlign: 1, // Center
+            vAlign: 2, // Middle
+            height: textHeight,
+            layer: axisLayerName,
+            colorIndex: 1,
+          ),
+        );
+      }
+
+      // Bubble and label at start
+      if (axis.bubbleAtStart) {
+        newEntities.add(
+          DxfCircle(
+            center: axis.start,
+            radius: bubbleRadius,
+            layer: axisLayerName,
+            colorIndex: 1,
+          ),
+        );
+        newEntities.add(
+          DxfText(
+            text: axis.name,
+            insertPoint: axis.start,
+            alignPoint: axis.start,
+            hAlign: 1, // Center
+            vAlign: 2, // Middle
+            height: textHeight,
+            layer: axisLayerName,
+            colorIndex: 1,
+          ),
+        );
+      }
+    }
+
+    // 7. Mutate document entity lists
     try {
       document.entities.addAll(newEntities);
     } catch (_) {
@@ -501,8 +576,8 @@ class WallAxisDetector {
         modelList.removeWhere(
           (e) =>
               e.layer == wallLayerName ||
-              e.layer == 'AXIS' ||
-              (axisLayerName != null && e.layer == axisLayerName),
+              e.layer == axisLayerName ||
+              e.layer == 'AXIS',
         );
         modelList.addAll(newEntities);
       } catch (_) {}
@@ -510,6 +585,58 @@ class WallAxisDetector {
 
     // Invalidate spatial index so new entities are picked up
     document.spatialIndex = null;
+  }
+
+  /// Extracts or reconstructs [StructuralGridAxis] elements from document's grid axis layer ([axisLayerName]),
+  /// matching lines with adjacent bubble text labels.
+  static List<StructuralGridAxis> extractGridAxesFromDocument(
+    DxfDocument document, {
+    String axisLayerName = 'AXIS',
+    bool isBulgarian = true,
+  }) {
+    final entities = document.layoutEntities['Model'] ?? document.entities;
+    final axisLines = entities
+        .whereType<DxfLine>()
+        .where((l) => l.layer == axisLayerName || l.layer == 'AXIS')
+        .toList();
+
+    if (axisLines.isEmpty) return const [];
+
+    final axisTexts = entities
+        .whereType<DxfText>()
+        .where((t) => t.layer == axisLayerName || t.layer == 'AXIS')
+        .toList();
+
+    final result = <StructuralGridAxis>[];
+    int idx = 0;
+
+    for (final line in axisLines) {
+      idx++;
+      String name = '$idx';
+      double bestDist = double.infinity;
+      for (final txt in axisTexts) {
+        final d1 = (txt.insertPoint - line.p1).distance;
+        final d2 = (txt.insertPoint - line.p2).distance;
+        final d = math.min(d1, d2);
+        if (d < bestDist && d < 2000.0) {
+          bestDist = d;
+          name = txt.text;
+        }
+      }
+
+      result.add(
+        StructuralGridAxis(
+          id: 'axis_imported_${idx}_${DateTime.now().millisecondsSinceEpoch}',
+          name: name,
+          start: line.p1,
+          end: line.p2,
+          bubbleAtStart: true,
+          bubbleAtEnd: true,
+        ),
+      );
+    }
+
+    return resequenceGridAxes(result, isBulgarian: isBulgarian);
   }
 
   // --- Internal Geometric & Grouping Methods ---

@@ -131,7 +131,8 @@ class _StructuralLayerPrepModalState extends State<StructuralLayerPrepModal> {
         }
         return;
       }
-      WallAxisDetector.applyToDocument(widget.document, result);
+      final isBg = Localizations.localeOf(context).languageCode == 'bg';
+      WallAxisDetector.applyToDocument(widget.document, result, isBulgarian: isBg);
       widget.onAxesDetected?.call(result);
       _layerCounts.clear();
       for (final layerName in widget.document.layers.keys) {

@@ -242,19 +242,29 @@ void main() {
       final wallEntities = doc.entities.where((e) => e.layer == 'WALLS_250').toList();
       expect(wallEntities.isNotEmpty, isTrue);
 
-      // Verify CAD underlay does NOT have static cut-up lines in AXIS layer
-      final axisEntities = doc.entities.where((e) => e.layer == 'AXIS').toList();
-      expect(axisEntities.isEmpty, isTrue);
+      // Verify AXIS layer exists, is visible, and contains continuous dash-dot grid axes with bubbles
+      expect(doc.layers.containsKey('AXIS'), isTrue);
+      expect(doc.layers['AXIS']?.isVisible, isTrue);
+      expect(doc.layers['AXIS']?.lineType, 'DASHDOT');
 
-      // Instead, axes are converted to native interactive StructuralGridAxis elements
-      final structuralAxes = WallAxisDetector.convertToStructuralGridAxes(
-        result.snappedCenterlines,
-        isBulgarian: true,
-        scale: result.detectedScale,
-      );
-      expect(structuralAxes.isNotEmpty, isTrue);
-      expect(structuralAxes.first.bubbleAtStart, isTrue);
-      expect(structuralAxes.first.bubbleAtEnd, isTrue);
+      final axisEntities = doc.entities.where((e) => e.layer == 'AXIS').toList();
+      expect(axisEntities.isNotEmpty, isTrue);
+
+      final axisLines = axisEntities.whereType<DxfLine>().toList();
+      expect(axisLines.isNotEmpty, isTrue);
+      expect(axisLines.first.lineType, 'DASHDOT');
+
+      // Verify bubble circles and text labels are present in AXIS layer
+      final axisCircles = axisEntities.whereType<DxfCircle>().toList();
+      expect(axisCircles.isNotEmpty, isTrue);
+      final axisTexts = axisEntities.whereType<DxfText>().toList();
+      expect(axisTexts.isNotEmpty, isTrue);
+
+      // Verify axes can be extracted back as native interactive StructuralGridAxis elements
+      final importedAxes = WallAxisDetector.extractGridAxesFromDocument(doc, isBulgarian: true);
+      expect(importedAxes.isNotEmpty, isTrue);
+      expect(importedAxes.first.bubbleAtStart, isTrue);
+      expect(importedAxes.first.bubbleAtEnd, isTrue);
     });
 
     test('8. Handles LWPOLYLINE and closed rectangular rooms', () {
