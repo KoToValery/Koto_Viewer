@@ -440,5 +440,74 @@ void main() {
       final totalPairs = result.evaluatedGroups.fold<int>(0, (sum, g) => sum + g.pairCount);
       expect(totalPairs, 2);
     });
+
+    test('14. Multi-line window clusters (dense parallel lines: frame, sash, glass, sill) are rejected by intermediate line filtering and do not outrank real walls', () {
+      final wallLayer = DxfLayer(name: 'стени', colorIndex: 7);
+
+      // Real 250mm solid wall: two faces at y=0 and y=250, length 5000mm, color 7
+      final wallA = const DxfLine(
+        p1: Offset(0, 0),
+        p2: Offset(5000, 0),
+        layer: 'стени',
+        colorIndex: 7,
+      );
+      final wallB = const DxfLine(
+        p1: Offset(0, 250),
+        p2: Offset(5000, 250),
+        layer: 'стени',
+        colorIndex: 7,
+      );
+
+      // Perpendicular wall corner to provide building layout
+      final wallVertA = const DxfLine(
+        p1: Offset(0, 0),
+        p2: Offset(0, 4000),
+        layer: 'стени',
+        colorIndex: 7,
+      );
+      final wallVertB = const DxfLine(
+        p1: Offset(250, 250),
+        p2: Offset(250, 4000),
+        layer: 'стени',
+        colorIndex: 7,
+      );
+
+      // Window opening cluster in color 30: 6 parallel lines close to each other
+      // y = 1000, 1050, 1100, 1150, 1200, 1250 (outer sill to inner frame = 250mm apart, but has 4 intermediate lines!)
+      final windowLines = <DxfLine>[];
+      for (double y = 1000; y <= 1250; y += 50) {
+        windowLines.add(
+          DxfLine(
+            p1: Offset(1000, y),
+            p2: Offset(3000, y),
+            layer: 'стени',
+            colorIndex: 30,
+          ),
+        );
+      }
+
+      final doc = _createTestDoc(
+        layers: {'стени': wallLayer},
+        entities: [wallA, wallB, wallVertA, wallVertB, ...windowLines],
+        bounds: const Rect.fromLTWH(0, 0, 5000, 4000),
+      );
+
+      final result = WallAxisDetector.detect(doc);
+
+      expect(result.hasWallsFound, isTrue);
+      // Real walls (color 7) must win over window lines (color 30)
+      expect(result.bestGroup?.colorIndex, 7);
+      expect(result.bestGroup?.layerName, 'стени');
+
+      // The window cluster in color 30 should have 0 pairs because all pairs spanning 200-250mm
+      // contain intermediate parallel lines between them.
+      final windowGroup = result.evaluatedGroups.where((g) => g.colorIndex == 30).firstOrNull;
+      expect(windowGroup, isNull);
+
+      // Verified: 0 window contour lines in detected wall contours
+      for (final seg in result.wallContourSegments) {
+        expect(seg.$1.dy != 1000 && seg.$1.dy != 1250, isTrue);
+      }
+    });
   });
 }

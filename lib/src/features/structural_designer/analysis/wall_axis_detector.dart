@@ -80,6 +80,7 @@ class WallAxisDetector {
         targetDistCad,
         toleranceCad,
         minOverlapCad,
+        documentBounds: document.bounds,
       );
 
       if (pairs.isNotEmpty) {
@@ -103,6 +104,28 @@ class WallAxisDetector {
           layoutBonus = 2.5; // Strong boost for real room layouts
         }
 
+        // Network connectivity bonus: real building walls intersect or meet perpendicular walls at corners/T-junctions
+        int cornerConnections = 0;
+        for (final p1 in pairs) {
+          final a1 = p1.segmentA.angleRad * 180.0 / math.pi;
+          for (final p2 in pairs) {
+            if (p1 == p2) continue;
+            final a2 = p2.segmentA.angleRad * 180.0 / math.pi;
+            if (((a1 - a2).abs() - 90.0).abs() <= 15.0) {
+              final d1 = (p1.centerlineStart - p2.centerlineStart).distance;
+              final d2 = (p1.centerlineStart - p2.centerlineEnd).distance;
+              final d3 = (p1.centerlineEnd - p2.centerlineStart).distance;
+              final d4 = (p1.centerlineEnd - p2.centerlineEnd).distance;
+              if (d1 <= snapRadiusCad || d2 <= snapRadiusCad || d3 <= snapRadiusCad || d4 <= snapRadiusCad) {
+                cornerConnections++;
+                break;
+              }
+            }
+          }
+        }
+        final connRatio = pairs.isNotEmpty ? (cornerConnections / pairs.length) : 0.0;
+        final networkBonus = 1.0 + (connRatio * 1.5);
+
         // Check soft keywords (title block, sheet border, furniture, hatch -> penalty)
         double keywordMultiplier = 1.0;
         final lowerName = layerName.toLowerCase();
@@ -112,9 +135,9 @@ class WallAxisDetector {
           keywordMultiplier = 1.5; // Soft boost for wall layers
         }
 
-        // Score: combines total length, pair count diversity, and layout quality
+        // Score: combines total length, pair count diversity, layout quality, and topological connectivity
         final pairFactor = 1.0 + math.sqrt(pairs.length);
-        final score = totalOverlap * pairFactor * layoutBonus * keywordMultiplier;
+        final score = totalOverlap * pairFactor * layoutBonus * networkBonus * keywordMultiplier;
 
         final firstSeg = segments.first;
         evaluatedGroups.add(
@@ -155,7 +178,9 @@ class WallAxisDetector {
     for (int i = 1; i < evaluatedGroups.length; i++) {
       final g = evaluatedGroups[i];
       // Include other high-scoring wall layers (e.g. interior + exterior walls)
-      if (g.score >= bestGroup.score * 0.3 && g.pairCount >= 2) {
+      final bool isExplicitWall = _isStructuralLayer(g.layerName.toLowerCase());
+      final double scoreThreshold = isExplicitWall ? 0.25 : 0.50;
+      if (g.score >= bestGroup.score * scoreThreshold && g.pairCount >= 2) {
         activeGroups.add(g);
       }
     }
@@ -431,6 +456,10 @@ class WallAxisDetector {
     if ((scale - 0.001).abs() < 1e-5) return 'm';
     return 'units';
   }
+
+  @visibleForTesting
+  static Map<String, List<WallSegment>> extractSegmentsForTesting(DxfDocument document) =>
+      _extractSegments(document);
 
   /// Extracts straight segments from document, grouped primarily by Layer.
   /// Unpacks block references (INSERT) to ensure block geometry is fully captured.
@@ -727,6 +756,7 @@ class WallAxisDetector {
           targetDist,
           tolerance,
           minOverlap,
+          documentBounds: document.bounds,
         );
         for (final p in pairs) {
           candidateTotalOverlap += p.overlapLength / s;
@@ -741,6 +771,39 @@ class WallAxisDetector {
 
     return bestCandidate;
   }
+
+  @visibleForTesting
+  static List<WallSegment> mergeCollinearSegmentsForTesting(
+    List<WallSegment> segments,
+    double toleranceCad,
+  ) =>
+      _mergeCollinearSegments(segments, toleranceCad);
+
+  @visibleForTesting
+  static List<WallPairCandidate> findParallelPairsForTesting(
+    List<WallSegment> segments,
+    double targetDistanceCad,
+    double toleranceCad,
+    double minOverlapCad, {
+    Rect? documentBounds,
+    bool checkIntermediate = true,
+  }) =>
+      _findParallelPairs(
+        segments,
+        targetDistanceCad,
+        toleranceCad,
+        minOverlapCad,
+        documentBounds: documentBounds,
+        checkIntermediate: checkIntermediate,
+      );
+
+  @visibleForTesting
+  static List<(Offset, Offset)> bridgeOpeningsForTesting(
+    List<(Offset, Offset)> rawAxes,
+    double maxBridgeGapCad,
+    double toleranceCad,
+  ) =>
+      _bridgeOpenings(rawAxes, maxBridgeGapCad, toleranceCad);
 
   /// Merges touching or overlapping collinear segments in the same layer.
   static List<WallSegment> _mergeCollinearSegments(
@@ -910,8 +973,10 @@ class WallAxisDetector {
     List<WallSegment> segments,
     double targetDistanceCad,
     double toleranceCad,
-    double minOverlapCad,
-  ) {
+    double minOverlapCad, {
+    Rect? documentBounds,
+    bool checkIntermediate = true,
+  }) {
     final pairs = <WallPairCandidate>[];
     final angleBuckets = _bucketByAngle(segments);
 
@@ -970,6 +1035,42 @@ class WallAxisDetector {
           final overlap = tEnd - tStart;
 
           if (overlap >= minOverlapCad) {
+            // Sheet border / margin frame rejection:
+            // Border lines span a large fraction of the sheet and sit right at the boundary.
+            if (documentBounds != null &&
+                documentBounds.width > 0 &&
+                documentBounds.height > 0) {
+              if (_isSheetBorder(s1.seg, documentBounds, targetDistanceCad) ||
+                  _isSheetBorder(s2.seg, documentBounds, targetDistanceCad)) {
+                continue; // Reject sheet border lines
+              }
+            }
+
+            if (checkIntermediate && j > i + 1) {
+              // Check if any intermediate segment between s1 (index i) and s2 (index j)
+              // runs parallel in the cavity between s1 and s2.
+              // In solid masonry or concrete walls, the space between the outer faces is empty.
+              // In windows, doors, and multi-layer assemblies, intermediate parallel lines
+              // (window frames, glass panes, sills, insulation interfaces) lie between the outer lines.
+              final margin = math.max(toleranceCad * 0.15, dist * 0.10);
+              bool hasIntermediate = false;
+
+              for (int k = i + 1; k < j; k++) {
+                final sk = projected[k];
+                if (sk.d > s1.d + margin && sk.d < s2.d - margin) {
+                  final kOverlap = math.min(tEnd, sk.tMax) - math.max(tStart, sk.tMin);
+                  if (kOverlap >= math.min(minOverlapCad * 0.35, dist * 0.20)) {
+                    hasIntermediate = true;
+                    break;
+                  }
+                }
+              }
+
+              if (hasIntermediate) {
+                continue; // Reject false window / multi-line pair
+              }
+            }
+
             final double midOffset = (s1.d + s2.d) / 2.0;
             final centerStart = Offset(
               tStart * cosA - midOffset * sinA,
@@ -995,7 +1096,56 @@ class WallAxisDetector {
       }
     }
 
+    // Filter repetitive ladder rungs (e.g. stair treads, title block rows, gratings)
+    // In solid walls, each face belongs to only one wall cavity.
+    // If a segment participates in pairs on BOTH sides at target wall thickness,
+    // it is a shared internal rung of an equidistant ladder/stair/grid.
+    if (pairs.length > 2) {
+      final partnersMap = <WallSegment, List<double>>{};
+      for (final p in pairs) {
+        partnersMap.putIfAbsent(p.segmentA, () => []).add(p.perpendicularDistance);
+        partnersMap.putIfAbsent(p.segmentB, () => []).add(-p.perpendicularDistance);
+      }
+      pairs.removeWhere((p) {
+        final aPartners = partnersMap[p.segmentA] ?? [];
+        final bPartners = partnersMap[p.segmentB] ?? [];
+        final aHasBoth = aPartners.any((d) => d > 0) && aPartners.any((d) => d < 0);
+        final bHasBoth = bPartners.any((d) => d > 0) && bPartners.any((d) => d < 0);
+        return aHasBoth && bHasBoth;
+      });
+    }
+
     return pairs;
+  }
+
+  static bool _isSheetBorder(
+    WallSegment s,
+    Rect docBounds,
+    double targetDistCad,
+  ) {
+    // Structural wall layers are never sheet borders
+    if (_isStructuralLayer(s.sourceLayer.toLowerCase())) return false;
+
+    final double docWidth = docBounds.width.abs();
+    final double docHeight = docBounds.height.abs();
+    // A drawing must be significantly larger than a single wall to have sheet margins
+    if (docWidth < targetDistCad * 8 || docHeight < targetDistCad * 8) return false;
+
+    final double deg = s.angleRad * 180.0 / math.pi;
+    if (deg < 15.0 || deg > 165.0) {
+      if (s.length >= docWidth * 0.60) {
+        final double midY = (s.start.dy + s.end.dy) / 2.0;
+        final double dEdge = math.min((midY - docBounds.top).abs(), (midY - docBounds.bottom).abs());
+        if (dEdge <= docHeight * 0.06) return true;
+      }
+    } else if (deg > 75.0 && deg < 105.0) {
+      if (s.length >= docHeight * 0.60) {
+        final double midX = (s.start.dx + s.end.dx) / 2.0;
+        final double dEdge = math.min((midX - docBounds.left).abs(), (midX - docBounds.right).abs());
+        if (dEdge <= docWidth * 0.06) return true;
+      }
+    }
+    return false;
   }
 
   /// Bridges collinear gaps (up to [maxBridgeGapCad] = 2.50 m) across door/window openings.
