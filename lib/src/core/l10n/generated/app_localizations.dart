@@ -2785,6 +2785,24 @@ abstract class AppLocalizations {
   /// **'Slab Opening'**
   String get slabOpeningTitle;
 
+  /// Title for MEP shaft opening
+  ///
+  /// In en, this message translates to:
+  /// **'Shaft'**
+  String get openingShaftTitle;
+
+  /// Title for staircase opening
+  ///
+  /// In en, this message translates to:
+  /// **'Staircase Opening'**
+  String get openingStaircaseTitle;
+
+  /// Title for elevator shaft opening
+  ///
+  /// In en, this message translates to:
+  /// **'Elevator Shaft'**
+  String get openingElevatorTitle;
+
   /// Title for grid axis
   ///
   /// In en, this message translates to:

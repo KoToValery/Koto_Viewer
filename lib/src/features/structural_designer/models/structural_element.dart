@@ -631,11 +631,70 @@ class StructuralGridAxis {
   }
 }
 
+/// Represents the engineering / architectural type of a slab opening cutout.
+enum SlabOpeningType {
+  /// MEP Installation shaft (Инсталационен щранг - ВиК, ОВК, Електро).
+  shaft,
+
+  /// Staircase void / flight cut (Стълбищен отвор / стълбищна клетка).
+  staircase,
+
+  /// Elevator shaft core void (Асансьорна шахта).
+  elevator,
+
+  /// General / custom architectural slab opening (Свободен / общ отвор).
+  custom,
+}
+
+/// Represents a typed opening in a structural slab.
+class SlabOpening {
+  final String id;
+  final int index;
+  final SlabOpeningType type;
+  final List<Offset> polygon;
+  final String? name;
+
+  const SlabOpening({
+    required this.id,
+    required this.index,
+    this.type = SlabOpeningType.shaft,
+    required this.polygon,
+    this.name,
+  });
+
+  /// Short display code (e.g. "Щ", "СТ", "АС", "ОТ").
+  String get defaultCode {
+    switch (type) {
+      case SlabOpeningType.shaft:
+        return 'Щ';
+      case SlabOpeningType.staircase:
+        return 'СТ';
+      case SlabOpeningType.elevator:
+        return 'АС';
+      case SlabOpeningType.custom:
+        return 'ОТ';
+    }
+  }
+
+  double get area => StructuralSlab.calculateArea(polygon);
+
+  Offset get centroid {
+    if (polygon.isEmpty) return Offset.zero;
+    double cx = 0, cy = 0;
+    for (final p in polygon) {
+      cx += p.dx;
+      cy += p.dy;
+    }
+    return Offset(cx / polygon.length, cy / polygon.length);
+  }
+}
+
 /// Represents a reinforced concrete slab (плоча).
 class StructuralSlab {
   final String id;
   final List<Offset> polygon; // Outer perimeter boundary
   final List<List<Offset>> openings; // Staircase, elevator, shaft cutouts
+  final List<SlabOpeningType>? openingTypes; // Typed categorization of openings
   final double thickness; // in meters (default 0.20)
   final double? floorFinish; // in meters (flooring/screed finish thickness, default 0.05)
   final int? colorValue; // ARGB hex integer for distinct custom color
@@ -644,10 +703,33 @@ class StructuralSlab {
     required this.id,
     required this.polygon,
     this.openings = const [],
+    this.openingTypes,
     this.thickness = 0.20,
     this.floorFinish,
     this.colorValue,
   });
+
+  /// Retrieves the engineering opening type for opening at [index].
+  SlabOpeningType getOpeningType(int index) {
+    if (openingTypes != null && index >= 0 && index < openingTypes!.length) {
+      return openingTypes![index];
+    }
+    return SlabOpeningType.shaft;
+  }
+
+  /// Returns typed opening objects for all openings in this slab.
+  List<SlabOpening> get typedOpenings {
+    final list = <SlabOpening>[];
+    for (int i = 0; i < openings.length; i++) {
+      list.add(SlabOpening(
+        id: '${id}_op_$i',
+        index: i,
+        type: getOpeningType(i),
+        polygon: openings[i],
+      ));
+    }
+    return list;
+  }
 
   /// Signed area of polygon using shoelace formula.
   static double calculateArea(List<Offset> pts) {
@@ -730,25 +812,52 @@ class StructuralSlab {
   }
 
   /// Adds an opening polygon (cutout) to the slab.
-  StructuralSlab addOpening(List<Offset> opening) {
+  StructuralSlab addOpening(List<Offset> opening, {SlabOpeningType type = SlabOpeningType.shaft}) {
     if (opening.length < 3) return this;
-    final updated = List<List<Offset>>.from(openings)..add(opening);
-    return copyWith(openings: updated);
+    final updatedOpenings = List<List<Offset>>.from(openings)..add(opening);
+    final updatedTypes = List<SlabOpeningType>.generate(
+      updatedOpenings.length,
+      (i) => i < (openingTypes?.length ?? 0)
+          ? openingTypes![i]
+          : (i == updatedOpenings.length - 1 ? type : SlabOpeningType.shaft),
+    );
+    return copyWith(openings: updatedOpenings, openingTypes: updatedTypes);
   }
 
   /// Removes opening at [index].
   StructuralSlab removeOpening(int index) {
     if (index < 0 || index >= openings.length) return this;
-    final updated = List<List<Offset>>.from(openings)..removeAt(index);
-    return copyWith(openings: updated);
+    final updatedOpenings = List<List<Offset>>.from(openings)..removeAt(index);
+    List<SlabOpeningType>? updatedTypes;
+    if (openingTypes != null && index < openingTypes!.length) {
+      updatedTypes = List<SlabOpeningType>.from(openingTypes!)..removeAt(index);
+    }
+    return copyWith(openings: updatedOpenings, openingTypes: updatedTypes);
   }
 
   /// Updates opening at [index].
-  StructuralSlab updateOpening(int index, List<Offset> newOpening) {
+  StructuralSlab updateOpening(int index, List<Offset> newOpening, {SlabOpeningType? type}) {
     if (index < 0 || index >= openings.length || newOpening.length < 3) return this;
-    final updated = List<List<Offset>>.from(openings);
-    updated[index] = newOpening;
-    return copyWith(openings: updated);
+    final updatedOpenings = List<List<Offset>>.from(openings);
+    updatedOpenings[index] = newOpening;
+    List<SlabOpeningType>? updatedTypes;
+    if (openingTypes != null || type != null) {
+      updatedTypes = List<SlabOpeningType>.generate(
+        openings.length,
+        (i) => (i == index && type != null) ? type : getOpeningType(i),
+      );
+    }
+    return copyWith(openings: updatedOpenings, openingTypes: updatedTypes);
+  }
+
+  /// Updates the type of opening at [index].
+  StructuralSlab updateOpeningType(int index, SlabOpeningType type) {
+    if (index < 0 || index >= openings.length) return this;
+    final updatedTypes = List<SlabOpeningType>.generate(
+      openings.length,
+      (i) => i == index ? type : getOpeningType(i),
+    );
+    return copyWith(openingTypes: updatedTypes);
   }
 
   /// Checks whether two 2D line segments strictly cross/intersect.
@@ -1148,6 +1257,7 @@ class StructuralSlab {
     String? id,
     List<Offset>? polygon,
     List<List<Offset>>? openings,
+    List<SlabOpeningType>? openingTypes,
     double? thickness,
     double? floorFinish,
     int? colorValue,
@@ -1156,6 +1266,7 @@ class StructuralSlab {
       id: id ?? this.id,
       polygon: polygon ?? this.polygon,
       openings: openings ?? this.openings,
+      openingTypes: openingTypes ?? this.openingTypes,
       thickness: thickness ?? this.thickness,
       floorFinish: floorFinish ?? this.floorFinish,
       colorValue: colorValue ?? this.colorValue,
@@ -1166,6 +1277,7 @@ class StructuralSlab {
     'id': id,
     'polygon': polygon.map((p) => {'dx': p.dx, 'dy': p.dy}).toList(),
     'openings': openings.map((op) => op.map((p) => {'dx': p.dx, 'dy': p.dy}).toList()).toList(),
+    if (openingTypes != null) 'openingTypes': openingTypes!.map((t) => t.name).toList(),
     'thickness': thickness,
     'floorFinish': floorFinish,
     'colorValue': colorValue,
@@ -1184,6 +1296,12 @@ class StructuralSlab {
                   .toList())
               .toList() ??
           [],
+      openingTypes: (json['openingTypes'] as List<dynamic>?)
+          ?.map((t) => SlabOpeningType.values.firstWhere(
+                (v) => v.name == t,
+                orElse: () => SlabOpeningType.shaft,
+              ))
+          .toList(),
       thickness: (json['thickness'] as num?)?.toDouble() ?? 0.20,
       floorFinish: (json['floorFinish'] as num?)?.toDouble(),
       colorValue: json['colorValue'] as int?,

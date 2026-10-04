@@ -91,6 +91,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   String _selectedOpeningPreset = 'shaft';
   double _shaftWidthM = 0.40;
   double _shaftHeightM = 0.60;
+  double _stairsWidthM = 2.40;
+  double _stairsHeightM = 4.50;
+  double _elevatorWidthM = 1.80;
+  double _elevatorHeightM = 2.00;
   final List<Offset> _slabPointsCad = [];
 
   // Midpoint edge extrusion states (Cantilever / еркер drag)
@@ -1314,9 +1318,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (targetSlabIdx == -1 || targetSlabIdx == oldSlabIdx) {
       final slab = updatedSlabs[oldSlabIdx];
       if (oldOpIdx < slab.openings.length) {
-        final newOps = List<List<Offset>>.from(slab.openings);
-        newOps[oldOpIdx] = newPoly;
-        final updatedSlab = slab.copyWith(openings: newOps);
+        final oldType = slab.getOpeningType(oldOpIdx);
+        final updatedSlab = slab.updateOpening(oldOpIdx, newPoly, type: oldType);
         updatedSlabs[oldSlabIdx] = updatedSlab;
         _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
         setState(() {
@@ -1325,33 +1328,100 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     } else {
       final oldSlab = updatedSlabs[oldSlabIdx];
-      final newOldOps = List<List<Offset>>.from(oldSlab.openings);
-      if (oldOpIdx < newOldOps.length) {
-        newOldOps.removeAt(oldOpIdx);
-      }
-      updatedSlabs[oldSlabIdx] = oldSlab.copyWith(openings: newOldOps);
+      final oldType = oldSlab.getOpeningType(oldOpIdx);
+      final updatedOldSlab = oldSlab.removeOpening(oldOpIdx);
+      updatedSlabs[oldSlabIdx] = updatedOldSlab;
 
       final targetSlab = updatedSlabs[targetSlabIdx];
-      final newTargetOps = List<List<Offset>>.from(targetSlab.openings)..add(newPoly);
-      final updatedTargetSlab = targetSlab.copyWith(openings: newTargetOps);
+      final updatedTargetSlab = targetSlab.addOpening(newPoly, type: oldType);
       updatedSlabs[targetSlabIdx] = updatedTargetSlab;
 
       _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
       setState(() {
-        _selectedOpening = (updatedTargetSlab.id, newTargetOps.length - 1);
+        _selectedOpening = (updatedTargetSlab.id, updatedTargetSlab.openings.length - 1);
       });
+    }
+  }
+
+  (double, double) _getOpeningPresetDimensions(String preset) {
+    if (preset == 'staircase') {
+      return (_stairsWidthM, _stairsHeightM);
+    }
+    if (preset == 'elevator') {
+      return (_elevatorWidthM, _elevatorHeightM);
+    }
+    return (_shaftWidthM, _shaftHeightM);
+  }
+
+  void _rotateActiveOpeningPreset() {
+    setState(() {
+      if (_selectedOpeningPreset == 'staircase') {
+        final temp = _stairsWidthM;
+        _stairsWidthM = _stairsHeightM;
+        _stairsHeightM = temp;
+      } else if (_selectedOpeningPreset == 'elevator') {
+        final temp = _elevatorWidthM;
+        _elevatorWidthM = _elevatorHeightM;
+        _elevatorHeightM = temp;
+      } else {
+        final temp = _shaftWidthM;
+        _shaftWidthM = _shaftHeightM;
+        _shaftHeightM = temp;
+      }
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  SlabOpeningType _cycleOpeningType(SlabOpeningType current) {
+    switch (current) {
+      case SlabOpeningType.shaft:
+        return SlabOpeningType.staircase;
+      case SlabOpeningType.staircase:
+        return SlabOpeningType.elevator;
+      case SlabOpeningType.elevator:
+        return SlabOpeningType.custom;
+      case SlabOpeningType.custom:
+        return SlabOpeningType.shaft;
+    }
+  }
+
+  void _updateOpeningTypeInStorey((String, int) key, SlabOpeningType newType) {
+    _pushUndo();
+    final (slabId, opIdx) = key;
+    final active = _project.activeStorey;
+    final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+    if (slabIdx != -1) {
+      final updatedSlab = active.slabs[slabIdx].updateOpeningType(opIdx, newType);
+      final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+      updatedSlabs[slabIdx] = updatedSlab;
+      _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  String _getOpeningTypeName(SlabOpeningType type, AppLocalizations l10n) {
+    switch (type) {
+      case SlabOpeningType.shaft:
+        return l10n.openingShaftTitle;
+      case SlabOpeningType.staircase:
+        return l10n.openingStaircaseTitle;
+      case SlabOpeningType.elevator:
+        return l10n.openingElevatorTitle;
+      case SlabOpeningType.custom:
+        return l10n.slabOpeningTitle;
     }
   }
 
   Size? _getPreviewOpeningSize() {
     if (_activeTool == StructuralDrawTool.slabOpening &&
-        _selectedOpeningPreset == 'shaft' &&
+        _selectedOpeningPreset != 'custom' &&
         _openingStartCad == null &&
         !_isMovingOpening) {
       final double fitScale = _getCadFitScale();
       final double currentScale = _transformController.value.getMaxScaleOnAxis();
       final double screenScale = fitScale * currentScale.clamp(0.001, 10000.0) * _cadUnitsPerMeter;
-      return Size(_shaftWidthM * screenScale, _shaftHeightM * screenScale);
+      final (dimW, dimH) = _getOpeningPresetDimensions(_selectedOpeningPreset);
+      return Size(dimW * screenScale, dimH * screenScale);
     }
     return null;
   }
@@ -3190,12 +3260,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           : _currentWallLength * _cadUnitsPerMeter;
       final double maxDimScreen = wallL * cadScale;
       offsetAboveFinger = math.max(80.0, maxDimScreen / 2.0 + 36.0);
-    } else if (!isMouse && (_isMovingOpening || (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset == 'shaft'))) {
+    } else if (!isMouse && (_isMovingOpening || (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset != 'custom'))) {
       final double fitScale = _getCadFitScale();
       final double currentScale = _transformController.value.getMaxScaleOnAxis();
       final double cadScale = fitScale * currentScale.clamp(0.001, 10000.0);
-      final double opW = _shaftWidthM * _cadUnitsPerMeter;
-      final double opH = _shaftHeightM * _cadUnitsPerMeter;
+      final (dimW, dimH) = _getOpeningPresetDimensions(_selectedOpeningPreset);
+      final double opW = dimW * _cadUnitsPerMeter;
+      final double opH = dimH * _cadUnitsPerMeter;
       final double maxDimScreen = math.max(opW, opH) * cadScale;
       offsetAboveFinger = math.max(80.0, maxDimScreen + 36.0);
     } else if (!isMouse) {
@@ -3252,14 +3323,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
         _snappedScreenPositions = [];
       } else if (_isMovingOpening ||
-                 (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset == 'shaft')) {
-        // Multi-corner weighted snapping for openings (standard shaft 40x60 cm or moving opening)
+                 (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset != 'custom')) {
+        // Multi-corner weighted snapping for openings (preset opening or moving opening)
         final List<Offset> cornerOffsets;
         if (_isMovingOpening && _movingOpeningRelativeOffsets != null) {
           cornerOffsets = _movingOpeningRelativeOffsets!;
         } else {
-          final halfW = (_shaftWidthM * _cadUnitsPerMeter) / 2.0;
-          final halfH = (_shaftHeightM * _cadUnitsPerMeter) / 2.0;
+          final (dimW, dimH) = _getOpeningPresetDimensions(_selectedOpeningPreset);
+          final halfW = (dimW * _cadUnitsPerMeter) / 2.0;
+          final halfH = (dimH * _cadUnitsPerMeter) / 2.0;
           cornerOffsets = [
             Offset(-halfW, -halfH),
             Offset(halfW, -halfH),
@@ -3586,7 +3658,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
         effectiveCad = rawCad;
         _liveDimensionText = null;
-      } else if (_isMovingOpening || (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset == 'shaft')) {
+      } else if (_isMovingOpening || (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset != 'custom')) {
         effectiveCad = rawCad;
         _liveDimensionText = null;
       } else if (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset == 'custom' && _openingStartCad != null) {
@@ -4862,7 +4934,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               Offset(maxX, maxY),
               Offset(minX, maxY),
             ];
-            _addOpeningToSlab(opPoly);
+            _addOpeningToSlab(opPoly, type: SlabOpeningType.custom);
           }
           setState(() {
             _openingStartCad = null;
@@ -4870,16 +4942,25 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           });
         }
       } else {
-        // Standard shaft opening (40x60 cm per norm, with 90° rotation)
-        final halfW = (_shaftWidthM * scale) / 2.0;
-        final halfH = (_shaftHeightM * scale) / 2.0;
+        // Preset opening (shaft, staircase, elevator)
+        final (dimW, dimH) = _getOpeningPresetDimensions(_selectedOpeningPreset);
+        final halfW = (dimW * scale) / 2.0;
+        final halfH = (dimH * scale) / 2.0;
         final opPoly = [
           Offset(cadCoord.dx - halfW, cadCoord.dy - halfH),
           Offset(cadCoord.dx + halfW, cadCoord.dy - halfH),
           Offset(cadCoord.dx + halfW, cadCoord.dy + halfH),
           Offset(cadCoord.dx - halfW, cadCoord.dy + halfH),
         ];
-        _addOpeningToSlab(opPoly);
+        final SlabOpeningType opType;
+        if (_selectedOpeningPreset == 'staircase') {
+          opType = SlabOpeningType.staircase;
+        } else if (_selectedOpeningPreset == 'elevator') {
+          opType = SlabOpeningType.elevator;
+        } else {
+          opType = SlabOpeningType.shaft;
+        }
+        _addOpeningToSlab(opPoly, type: opType);
       }
     } else if (_activeTool == StructuralDrawTool.measure) {
       if (_measurementStartCad == null) {
@@ -4905,7 +4986,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
-  void _addOpeningToSlab(List<Offset> opPoly) {
+  void _addOpeningToSlab(List<Offset> opPoly, {SlabOpeningType type = SlabOpeningType.shaft}) {
     final active = _project.activeStorey;
     final center = Offset(
       opPoly.map((p) => p.dx).reduce((a, b) => a + b) / opPoly.length,
@@ -4926,7 +5007,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (targetSlabIdx != -1) {
       _pushUndo();
       final slab = active.slabs[targetSlabIdx];
-      final updatedSlab = slab.addOpening(opPoly);
+      final updatedSlab = slab.addOpening(opPoly, type: type);
       final updatedSlabs = List<StructuralSlab>.from(active.slabs);
       updatedSlabs[targetSlabIdx] = updatedSlab;
       _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
@@ -6213,14 +6294,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         onUpdateOpeningPreset: (preset) {
                           setState(() => _selectedOpeningPreset = preset);
                         },
-                        onRotateOpening: () {
-                          setState(() {
-                            final temp = _shaftWidthM;
-                            _shaftWidthM = _shaftHeightM;
-                            _shaftHeightM = temp;
-                          });
-                          HapticFeedback.selectionClick();
-                        },
+                        onRotateOpening: _rotateActiveOpeningPreset,
                         hasOpeningStartCorner: _openingStartCad != null,
                         onClearOpening: () {
                           setState(() {
@@ -6496,17 +6570,43 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
       final double wM = (maxX - minX) / _cadUnitsPerMeter;
       final double hM = (maxY - minY) / _cadUnitsPerMeter;
-      primaryColor = const Color(0xFFFF9800);
-      title = context.l10n.slabOpeningTitle;
+      final opType = slab.getOpeningType(opIdx);
+      switch (opType) {
+        case SlabOpeningType.staircase:
+          primaryColor = const Color(0xFF00B0FF);
+          title = context.l10n.openingStaircaseTitle;
+          break;
+        case SlabOpeningType.elevator:
+          primaryColor = const Color(0xFF7C4DFF);
+          title = context.l10n.openingElevatorTitle;
+          break;
+        case SlabOpeningType.shaft:
+          primaryColor = const Color(0xFFFF9800);
+          title = context.l10n.openingShaftTitle;
+          break;
+        case SlabOpeningType.custom:
+          primaryColor = const Color(0xFFFF9800);
+          title = context.l10n.slabOpeningTitle;
+          break;
+      }
       subtitle = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
       onDeselect = () => setState(() => _selectedOpening = null);
       onRename = null;
 
       actionButtons.addAll([
         _buildDockActionButton(
+          icon: Icons.category_outlined,
+          label: _getOpeningTypeName(opType, context.l10n),
+          color: primaryColor,
+          onTap: () {
+            final nextType = _cycleOpeningType(opType);
+            _updateOpeningTypeInStorey(_selectedOpening!, nextType);
+          },
+        ),
+        _buildDockActionButton(
           icon: Icons.rotate_90_degrees_ccw_rounded,
           label: context.l10n.rotateElement,
-          color: const Color(0xFFFF9800),
+          color: primaryColor,
           onTap: _rotateSelectedOpening,
         ),
         _buildDockActionButton(

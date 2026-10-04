@@ -1526,6 +1526,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get slabOpeningTitle => 'Slab Opening';
 
   @override
+  String get openingShaftTitle => 'Shaft';
+
+  @override
+  String get openingStaircaseTitle => 'Staircase Opening';
+
+  @override
+  String get openingElevatorTitle => 'Elevator Shaft';
+
+  @override
   String gridAxisTitle(String name) {
     return 'Axis \"$name\"';
   }

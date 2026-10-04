@@ -1532,6 +1532,15 @@ class AppLocalizationsBg extends AppLocalizations {
   String get slabOpeningTitle => 'Отвор в плоча';
 
   @override
+  String get openingShaftTitle => 'Щранг';
+
+  @override
+  String get openingStaircaseTitle => 'Стълбищен отвор';
+
+  @override
+  String get openingElevatorTitle => 'Асансьорна шахта';
+
+  @override
   String gridAxisTitle(String name) {
     return 'Ос \"$name\"';
   }

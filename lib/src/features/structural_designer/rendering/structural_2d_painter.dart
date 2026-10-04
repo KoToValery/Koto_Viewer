@@ -586,7 +586,7 @@ class Structural2dPainter extends CustomPainter {
     // Smooth clean outline without diagonal hatching (as requested)
     canvas.drawPath(path, borderPaint);
 
-    // Draw openings outline & architectural X cross
+    // Draw openings outline & architectural representation per type
     for (int oIdx = 0; oIdx < slab.openings.length; oIdx++) {
       final op = slab.openings[oIdx];
       if (op.length >= 3) {
@@ -602,22 +602,53 @@ class Structural2dPainter extends CustomPainter {
             selectedOpening!.$1 == slab.id &&
             selectedOpening!.$2 == oIdx;
         final bool isMovingThis = isOpSelected && movingOpeningPolygon != null;
+        final opType = slab.getOpeningType(oIdx);
+
+        final Color baseColor;
+        switch (opType) {
+          case SlabOpeningType.staircase:
+            baseColor = const Color(0xFF00B0FF);
+            break;
+          case SlabOpeningType.elevator:
+            baseColor = const Color(0xFF7C4DFF);
+            break;
+          case SlabOpeningType.shaft:
+          case SlabOpeningType.custom:
+            baseColor = const Color(0xFFFF9800);
+            break;
+        }
+
+        final opFillPaint = Paint()
+          ..color = isGhost
+              ? baseColor.withValues(alpha: 0.05)
+              : (isOpSelected ? baseColor.withValues(alpha: 0.25) : baseColor.withValues(alpha: 0.12))
+          ..style = PaintingStyle.fill;
+        canvas.drawPath(opPath, opFillPaint);
 
         final opBorderPaint = Paint()
           ..color = isGhost
-              ? const Color(0x66FFB74D)
+              ? baseColor.withValues(alpha: 0.4)
               : (isMovingThis
                   ? const Color(0x55FFFFFF)
-                  : (isOpSelected ? const Color(0xFFFF5252) : const Color(0xFFFF9800)))
+                  : (isOpSelected ? const Color(0xFFFF5252) : baseColor))
           ..style = PaintingStyle.stroke
           ..strokeWidth = isOpSelected ? (2.5 / zoomScale) : (1.5 / zoomScale);
 
         canvas.drawPath(opPath, opBorderPaint);
 
-        // Draw architectural X cross
+        // Internal architectural drafting details
         if (opPts.length >= 4) {
-          canvas.drawLine(opPts[0], opPts[2], opBorderPaint);
-          canvas.drawLine(opPts[1], opPts[3], opBorderPaint);
+          if (opType == SlabOpeningType.staircase) {
+            _drawStaircaseTreads(canvas, opPts, opBorderPaint);
+          } else if (opType == SlabOpeningType.elevator) {
+            canvas.drawLine(opPts[0], opPts[2], opBorderPaint);
+            canvas.drawLine(opPts[1], opPts[3], opBorderPaint);
+            _drawElevatorCabin(canvas, opPts, opBorderPaint);
+          } else {
+            // Standard MEP shaft / custom cutout: architectural X cross
+            canvas.drawLine(opPts[0], opPts[2], opBorderPaint);
+            canvas.drawLine(opPts[1], opPts[3], opBorderPaint);
+          }
         }
       }
     }
@@ -888,6 +919,100 @@ class Structural2dPainter extends CustomPainter {
     }
     textPainter.paint(canvas, badgeOffset);
     canvas.restore();
+  }
+
+  void _drawStaircaseTreads(Canvas canvas, List<Offset> opPts, Paint borderPaint) {
+    if (opPts.length < 4) return;
+    final treadPaint = Paint()
+      ..color = borderPaint.color.withValues(alpha: 0.65)
+      ..strokeWidth = 1.0 / zoomScale
+      ..style = PaintingStyle.stroke;
+
+    final d1 = (opPts[1] - opPts[0]).distance;
+    final d2 = (opPts[3] - opPts[0]).distance;
+
+    final Offset pA0, pA1, pB0, pB1;
+    if (d2 >= d1) {
+      pA0 = opPts[0];
+      pA1 = opPts[3];
+      pB0 = opPts[1];
+      pB1 = opPts[2];
+    } else {
+      pA0 = opPts[0];
+      pA1 = opPts[1];
+      pB0 = opPts[3];
+      pB1 = opPts[2];
+    }
+
+    const int numTreads = 9;
+    for (int i = 1; i < numTreads; i++) {
+      final t = i / numTreads;
+      final ptA = Offset.lerp(pA0, pA1, t)!;
+      final ptB = Offset.lerp(pB0, pB1, t)!;
+      canvas.drawLine(ptA, ptB, treadPaint);
+    }
+
+    final startMid = Offset.lerp(pA0, pB0, 0.5)!;
+    final endMid = Offset.lerp(pA1, pB1, 0.5)!;
+    final arrowStart = Offset.lerp(startMid, endMid, 0.2)!;
+    final arrowEnd = Offset.lerp(startMid, endMid, 0.8)!;
+    final arrowDir = arrowEnd - arrowStart;
+    final arrowLen = arrowDir.distance;
+    if (arrowLen > 10.0 / zoomScale) {
+      final u = arrowDir / arrowLen;
+      final normal = Offset(-u.dy, u.dx);
+      final arrowPaint = Paint()
+        ..color = borderPaint.color
+        ..strokeWidth = 1.5 / zoomScale
+        ..style = PaintingStyle.stroke;
+      canvas.drawCircle(arrowStart, 2.5 / zoomScale, Paint()..color = borderPaint.color);
+      canvas.drawLine(arrowStart, arrowEnd, arrowPaint);
+      final headLen = 6.0 / zoomScale;
+      final headWidth = 3.5 / zoomScale;
+      final headLeft = arrowEnd - u * headLen + normal * headWidth;
+      final headRight = arrowEnd - u * headLen - normal * headWidth;
+      canvas.drawLine(arrowEnd, headLeft, arrowPaint);
+      canvas.drawLine(arrowEnd, headRight, arrowPaint);
+    }
+  }
+
+  void _drawElevatorCabin(Canvas canvas, List<Offset> opPts, Paint borderPaint) {
+    if (opPts.length < 4) return;
+    final center = Offset(
+      (opPts[0].dx + opPts[1].dx + opPts[2].dx + opPts[3].dx) / 4.0,
+      (opPts[0].dy + opPts[1].dy + opPts[2].dy + opPts[3].dy) / 4.0,
+    );
+
+    final cabinPts = opPts.map((p) => Offset.lerp(p, center, 0.3)!).toList();
+    final cabinPath = Path()..moveTo(cabinPts[0].dx, cabinPts[0].dy);
+    for (int i = 1; i < cabinPts.length; i++) {
+      cabinPath.lineTo(cabinPts[i].dx, cabinPts[i].dy);
+    }
+    cabinPath.close();
+
+    final cabinFill = Paint()
+      ..color = borderPaint.color.withValues(alpha: 0.15)
+      ..style = PaintingStyle.fill;
+    final cabinStroke = Paint()
+      ..color = borderPaint.color
+      ..strokeWidth = 1.4 / zoomScale
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawPath(cabinPath, cabinFill);
+    canvas.drawPath(cabinPath, cabinStroke);
+
+    final tp = TextPainter(
+      text: TextSpan(
+        text: 'A',
+        style: TextStyle(
+          color: borderPaint.color,
+          fontSize: (12.0 / zoomScale).clamp(8.0, 24.0),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, center - Offset(tp.width / 2.0, tp.height / 2.0));
   }
 
   void _drawBeam(Canvas canvas, StructuralBeam beam, {required bool isGhost}) {

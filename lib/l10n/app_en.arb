@@ -1281,6 +1281,12 @@
   "@beamTitle": { "description": "Title for beam" },
   "slabOpeningTitle": "Slab Opening",
   "@slabOpeningTitle": { "description": "Title for slab opening" },
+  "openingShaftTitle": "Shaft",
+  "@openingShaftTitle": { "description": "Title for MEP shaft opening" },
+  "openingStaircaseTitle": "Staircase Opening",
+  "@openingStaircaseTitle": { "description": "Title for staircase opening" },
+  "openingElevatorTitle": "Elevator Shaft",
+  "@openingElevatorTitle": { "description": "Title for elevator shaft opening" },
   "gridAxisTitle": "Axis \"{name}\"",
   "@gridAxisTitle": {
     "description": "Title for grid axis",

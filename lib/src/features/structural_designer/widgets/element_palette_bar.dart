@@ -791,6 +791,8 @@ class ElementPaletteBar extends StatelessWidget {
     final l10n = context.l10n;
     final presets = [
       ('shaft', l10n.shaftOpeningLabel),
+      ('staircase', l10n.stairsOpeningLabel),
+      ('elevator', l10n.elevatorOpeningLabel),
       ('custom', l10n.openingPresetCustom),
     ];
 
@@ -813,7 +815,7 @@ class ElementPaletteBar extends StatelessWidget {
                 visualDensity: VisualDensity.compact,
               ),
             ),
-          if (currentOpeningPreset == 'shaft' && onRotateOpening != null) ...[
+          if (currentOpeningPreset != 'custom' && onRotateOpening != null) ...[
             IconButton(
               icon: const Icon(Icons.rotate_90_degrees_ccw, size: 18),
               tooltip: l10n.rotate90,

@@ -33,7 +33,7 @@ void main() {
 
     test('3. When lines have NO thickness (null or 0), all White layers remain and non-white hide', () {
       final layers = [
-        DxfLayer(name: '0', colorIndex: 7), // White, no lineweight
+        DxfLayer(name: 'COLUMNS', colorIndex: 7), // White, no lineweight
         DxfLayer(name: 'WALLS', colorIndex: 7), // White, no lineweight
         DxfLayer(name: 'DOORS', colorIndex: 1), // Red, no lineweight
         DxfLayer(name: 'FURNITURE', colorIndex: 2), // Yellow, no lineweight
@@ -42,7 +42,7 @@ void main() {
 
       final visible = StructuralUnderlayFilter.filterLayers(layers: layers);
 
-      expect(visible, equals({'0', 'WALLS'}));
+      expect(visible, equals({'COLUMNS', 'WALLS'}));
     });
 
     test('4. When lines have NO thickness, excludes obvious negative clutter layers', () {
