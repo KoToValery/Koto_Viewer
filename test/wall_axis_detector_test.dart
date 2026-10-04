@@ -281,5 +281,164 @@ void main() {
       expect(result.bestGroup?.pairCount, greaterThanOrEqualTo(4));
       expect(result.snappedCenterlines.length, greaterThanOrEqualTo(4));
     });
+
+    test('9. Correctly prioritizes real walls over border/title block (антетка) lines', () {
+      // Border layer has lines separated by 250mm
+      final border1 = const DxfLine(p1: Offset(0, 0), p2: Offset(10000, 0), layer: 'АНТЕТКА');
+      final border2 = const DxfLine(p1: Offset(0, 250), p2: Offset(10000, 250), layer: 'АНТЕТКА');
+
+      // Wall layer has rooms with both horizontal and vertical walls (250mm)
+      final wallH1 = const DxfLine(p1: Offset(1000, 1000), p2: Offset(8000, 1000), layer: 'СТЕНО');
+      final wallH2 = const DxfLine(p1: Offset(1000, 1250), p2: Offset(8000, 1250), layer: 'СТЕНО');
+      final wallV1 = const DxfLine(p1: Offset(1000, 1000), p2: Offset(1000, 6000), layer: 'СТЕНО');
+      final wallV2 = const DxfLine(p1: Offset(1250, 1000), p2: Offset(1250, 6000), layer: 'СТЕНО');
+      final wallV3 = const DxfLine(p1: Offset(8000, 1000), p2: Offset(8000, 6000), layer: 'СТЕНО');
+      final wallV4 = const DxfLine(p1: Offset(7750, 1000), p2: Offset(7750, 6000), layer: 'СТЕНО');
+
+      final doc = _createTestDoc(
+        layers: {
+          'АНТЕТКА': DxfLayer(name: 'АНТЕТКА', colorIndex: 7),
+          'СТЕНО': DxfLayer(name: 'СТЕНО', colorIndex: 1),
+        },
+        entities: [border1, border2, wallH1, wallH2, wallV1, wallV2, wallV3, wallV4],
+        bounds: const Rect.fromLTWH(0, 0, 10000, 6000),
+      );
+
+      final result = WallAxisDetector.detect(doc);
+      expect(result.hasWallsFound, isTrue);
+      // The winning group must be the real wall layer 'СТЕНО', not the title block 'АНТЕТКА'
+      expect(result.bestGroup?.layerName, 'СТЕНО');
+    });
+
+    test('10. Extracts and detects walls defined inside block instances (DxfInsert)', () {
+      final block = DxfBlock(
+        name: 'WALLS_PLAN',
+        entities: const [
+          DxfLine(p1: Offset(0, 0), p2: Offset(6000, 0), layer: 'WALLS'),
+          DxfLine(p1: Offset(0, 250), p2: Offset(6000, 250), layer: 'WALLS'),
+        ],
+      );
+
+      final insert = const DxfInsert(
+        blockName: 'WALLS_PLAN',
+        insertPoint: Offset(500, 500),
+        layer: 'A-ARCH',
+      );
+
+      final doc = DxfDocument(
+        layers: {'WALLS': DxfLayer(name: 'WALLS', colorIndex: 7)},
+        blocks: {'WALLS_PLAN': block},
+        entities: [insert],
+        headerVars: const {},
+        bounds: const Rect.fromLTWH(0, 0, 8000, 4000),
+        entityStats: const {},
+      );
+
+      final result = WallAxisDetector.detect(doc);
+      expect(result.hasWallsFound, isTrue);
+      expect(result.bestGroup?.layerName, 'WALLS');
+      expect(result.snappedCenterlines.length, 1);
+      // Centerline should be at y = 500 + 125 = 625
+      expect(result.snappedCenterlines.first.$1.dy, closeTo(625.0, 1.0));
+    });
+
+    test('11. convertToStructuralGridAxes merges collinear centerlines into continuous StructuralGridAxis and extends ends', () {
+      final centerlines = <(Offset, Offset)>[
+        // Collinear horizontal segments along y = 1000 with a 3m gap between them
+        (const Offset(0, 1000), const Offset(2000, 1000)),
+        (const Offset(5000, 1000), const Offset(7000, 1000)),
+        // A second parallel horizontal alignment along y = 4000
+        (const Offset(0, 4000), const Offset(7000, 4000)),
+        // A vertical alignment along x = 0
+        (const Offset(0, 1000), const Offset(0, 4000)),
+      ];
+
+      final axes = WallAxisDetector.convertToStructuralGridAxes(
+        centerlines,
+        isBulgarian: true,
+        scale: 1.0, // mm scale
+        extensionM: 1.20, // 1.2m = 1200mm
+      );
+
+      // Should merge the two collinear segments along y = 1000 into 1 axis,
+      // resulting in total 2 horizontal axes and 1 vertical axis = 3 axes
+      expect(axes.length, 3);
+
+      final horizontal = axes.where((a) => a.direction.dx.abs() > a.direction.dy.abs()).toList();
+      final vertical = axes.where((a) => a.direction.dy.abs() > a.direction.dx.abs()).toList();
+
+      expect(horizontal.length, 2);
+      expect(vertical.length, 1);
+
+      // Names should be sequenced (vertical numbers "1", horizontal letters "А", "Б")
+      expect(vertical.first.name, '1');
+      expect(horizontal.first.name, 'А');
+      expect(horizontal.last.name, 'Б');
+
+      // The merged axis along y=1000 should extend from 0 - 1200 = -1200 to 7000 + 1200 = 8200
+      final mergedAxis = horizontal.firstWhere((a) => (a.start.dy - 1000).abs() < 50);
+      expect(mergedAxis.start.dx, closeTo(-1200.0, 1.0));
+      expect(mergedAxis.end.dx, closeTo(8200.0, 1.0));
+      expect(mergedAxis.bubbleAtStart, isTrue);
+      expect(mergedAxis.bubbleAtEnd, isTrue);
+    });
+
+    test('12. DxfDocument infers layer defaultEntityLineweight from entity lineweights when layer lineweight is null', () {
+      final layerWalls = DxfLayer(name: 'WALLS', colorIndex: 7);
+      final layerDims = DxfLayer(name: 'DIMS', colorIndex: 7);
+
+      final entities = <DxfEntity>[
+        // Entities on WALLS with explicit lineweight 0.30 mm
+        DxfLine(p1: Offset.zero, p2: const Offset(100, 0), layer: 'WALLS', lineWeight: 0.30),
+        DxfLine(p1: const Offset(100, 0), p2: const Offset(200, 0), layer: 'WALLS', lineWeight: 0.30),
+        // Entities on DIMS with explicit lineweight 0.13 mm
+        DxfLine(p1: Offset.zero, p2: const Offset(0, 100), layer: 'DIMS', lineWeight: 0.13),
+      ];
+
+      final doc = DxfDocument(
+        layers: {'WALLS': layerWalls, 'DIMS': layerDims},
+        blocks: const {},
+        entities: entities,
+        headerVars: const {},
+        bounds: const Rect.fromLTWH(0, 0, 200, 100),
+        entityStats: const {},
+      );
+
+      expect(doc.layers['WALLS']?.effectiveLineweight, closeTo(0.30, 1e-4));
+      expect(doc.layers['DIMS']?.effectiveLineweight, closeTo(0.13, 1e-4));
+    });
+
+    test('13. WallAxisDetector detects 20 cm concrete and 30 cm plastered walls with wide tolerance', () {
+      // 200 mm concrete shear wall
+      final lineConcreteA = const DxfLine(p1: Offset(0, 0), p2: Offset(4000, 0), layer: 'WALL_CONCRETE', colorIndex: 3);
+      final lineConcreteB = const DxfLine(p1: Offset(0, 200), p2: Offset(4000, 200), layer: 'WALL_CONCRETE', colorIndex: 3);
+
+      // 300 mm plastered wall
+      final linePlasterA = const DxfLine(p1: Offset(0, 2000), p2: Offset(4000, 2000), layer: 'WALL_PLASTER', colorIndex: 5);
+      final linePlasterB = const DxfLine(p1: Offset(0, 2300), p2: Offset(4000, 2300), layer: 'WALL_PLASTER', colorIndex: 5);
+
+      final doc = DxfDocument(
+        layers: {
+          'WALL_CONCRETE': DxfLayer(name: 'WALL_CONCRETE', colorIndex: 3),
+          'WALL_PLASTER': DxfLayer(name: 'WALL_PLASTER', colorIndex: 5),
+        },
+        blocks: const {},
+        entities: [lineConcreteA, lineConcreteB, linePlasterA, linePlasterB],
+        headerVars: const {},
+        bounds: const Rect.fromLTWH(0, 0, 4000, 2500),
+        entityStats: const {},
+      );
+
+      final result = WallAxisDetector.detect(
+        doc,
+        targetThicknessMm: 250.0,
+        thicknessToleranceMm: 55.0, // 195 to 305 mm
+      );
+
+      expect(result.hasWallsFound, isTrue);
+      // Both the 200mm and 300mm pairs should be detected
+      final totalPairs = result.evaluatedGroups.fold<int>(0, (sum, g) => sum + g.pairCount);
+      expect(totalPairs, 2);
+    });
   });
 }

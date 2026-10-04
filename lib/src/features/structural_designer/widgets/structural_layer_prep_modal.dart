@@ -5,6 +5,7 @@ import '../../dxf_viewer/models/dxf_color_table.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../analysis/structural_underlay_filter.dart';
 import '../analysis/wall_axis_detector.dart';
+import '../models/wall_axis_models.dart';
 
 /// Modal bottom sheet presented upon entering the BIM Structural Designer module,
 /// allowing the engineer to prepare and isolate structural layers (walls, columns, axes)
@@ -13,11 +14,13 @@ import '../analysis/wall_axis_detector.dart';
 class StructuralLayerPrepModal extends StatefulWidget {
   final DxfDocument document;
   final VoidCallback onLayersChanged;
+  final ValueChanged<WallAxisDetectionResult>? onAxesDetected;
 
   const StructuralLayerPrepModal({
     super.key,
     required this.document,
     required this.onLayersChanged,
+    this.onAxesDetected,
   });
 
   /// Displays the layer preparation bottom sheet. Returns true if user confirmed.
@@ -25,6 +28,7 @@ class StructuralLayerPrepModal extends StatefulWidget {
     required BuildContext context,
     required DxfDocument document,
     required VoidCallback onLayersChanged,
+    ValueChanged<WallAxisDetectionResult>? onAxesDetected,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -33,6 +37,7 @@ class StructuralLayerPrepModal extends StatefulWidget {
       builder: (ctx) => StructuralLayerPrepModal(
         document: document,
         onLayersChanged: onLayersChanged,
+        onAxesDetected: onAxesDetected,
       ),
     );
   }
@@ -127,6 +132,7 @@ class _StructuralLayerPrepModalState extends State<StructuralLayerPrepModal> {
         return;
       }
       WallAxisDetector.applyToDocument(widget.document, result);
+      widget.onAxesDetected?.call(result);
       _layerCounts.clear();
       for (final layerName in widget.document.layers.keys) {
         _layerCounts[layerName] = 0;

@@ -3673,7 +3673,7 @@ abstract class AppLocalizations {
   /// Message when no wall pairs are detected
   ///
   /// In en, this message translates to:
-  /// **'No 25 cm wall pairs detected in drawing'**
+  /// **'No standard wall pairs (20-30 cm) detected in drawing'**
   String get noWallsDetected;
 
   /// Candidate summary for layer ranking
@@ -3685,7 +3685,7 @@ abstract class AppLocalizations {
   /// Subtitle describing wall and axis extraction in layer prep modal
   ///
   /// In en, this message translates to:
-  /// **'Find 25 cm masonry walls, isolate contours into WALLS_250 and draw dashed AXIS centerlines.'**
+  /// **'Find 20-30 cm walls, isolate contours into WALLS_250 and draw grid axes.'**
   String get autoDetectWallsSubtitle;
 }
 

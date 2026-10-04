@@ -19,6 +19,7 @@ import 'models/cantilever_analysis_models.dart';
 import 'models/seismic_analysis_models.dart';
 import 'models/structural_element.dart';
 import 'models/vertical_capacity_models.dart';
+import 'models/wall_axis_models.dart';
 import 'rendering/structural_2d_painter.dart';
 import 'rendering/structural_pointer_painter.dart';
 import 'services/structural_persistence_service.dart';
@@ -4952,6 +4953,50 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       onLayersChanged: () {
         setState(() {});
       },
+      onAxesDetected: (result) {
+        _applyDetectedWallsAndAxes(result);
+      },
+    );
+  }
+
+  void _applyDetectedWallsAndAxes(WallAxisDetectionResult result) {
+    if (!result.hasWallsFound) return;
+
+    _pushUndo();
+    WallAxisDetector.applyToDocument(widget.document, result);
+    _underlayFilterActive = true;
+
+    // Convert detected centerlines to native StructuralGridAxis elements
+    final active = _project.activeStorey;
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+
+    final newGridAxes = WallAxisDetector.convertToStructuralGridAxes(
+      result.snappedCenterlines,
+      isBulgarian: isBg,
+      scale: result.detectedScale,
+    );
+
+    // Sequence all axes neatly (numbers for vertical, letters for horizontal)
+    final updatedAxes = resequenceGridAxes(
+      [...active.gridAxes, ...newGridAxes],
+      isBulgarian: isBg,
+    );
+    _updateActiveStorey(active.copyWith(gridAxes: updatedAxes));
+
+    _runAnalysis();
+    setState(() {});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.l10n.wallsAndAxesGeneratedSuccess(
+            result.snappedCenterlines.length,
+            result.wallContourSegments.length,
+            result.detectedUnitName,
+          ),
+        ),
+        backgroundColor: const Color(0xFF1E88E5),
+      ),
     );
   }
 
@@ -5060,22 +5105,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ),
     ).then((confirmed) {
       if (confirmed == true && mounted) {
-        setState(() {
-          WallAxisDetector.applyToDocument(widget.document, result);
-          _underlayFilterActive = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              context.l10n.wallsAndAxesGeneratedSuccess(
-                result.snappedCenterlines.length,
-                result.wallContourSegments.length,
-                result.detectedUnitName,
-              ),
-            ),
-            backgroundColor: const Color(0xFF1E88E5),
-          ),
-        );
+        _applyDetectedWallsAndAxes(result);
       }
     });
   }
@@ -5091,22 +5121,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       );
       return;
     }
-    setState(() {
-      WallAxisDetector.applyToDocument(widget.document, result);
-      _underlayFilterActive = true;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          context.l10n.wallsAndAxesGeneratedSuccess(
-            result.snappedCenterlines.length,
-            result.wallContourSegments.length,
-            result.detectedUnitName,
-          ),
-        ),
-        backgroundColor: const Color(0xFF1E88E5),
-      ),
-    );
+    _applyDetectedWallsAndAxes(result);
   }
 
   Future<void> _showExportDialog() async {

@@ -256,97 +256,100 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                 );
                 final count = _layerCounts[layer.name] ?? 0;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Layer Color Indicator
-                      Container(
-                        width: 26,
-                        height: 26,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: theme.colorScheme.outline.withValues(alpha: 0.4),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: color.withValues(alpha: 0.35),
-                              blurRadius: 5,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-
-                      // Layer Details & Dropdown Lineweight Selector
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              layer.name.isEmpty ? 'Unnamed Layer' : layer.name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                decoration: layer.isVisible ? null : TextDecoration.lineThrough,
-                                color: layer.isVisible ? null : theme.disabledColor,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '$count ${count == 1 ? "object" : "objects"} ${layer.isFrozen ? "• Frozen" : ""}${layer.lineweight != null && layer.lineweight! > 0 ? " • DXF: ${layer.lineweight!.toStringAsFixed(2)} mm" : ""}',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: theme.textTheme.bodySmall?.color,
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-
-                            // Lineweight Dropdown Menu
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Lineweight: ',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: theme.textTheme.bodySmall?.color,
-                                  ),
-                                ),
-                                Container(
-                                  height: 27,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: theme.dividerColor.withValues(alpha: 0.3),
-                                      width: 0.8,
+                            final effLw = layer.effectiveLineweight;
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Layer Color Indicator
+                                  Container(
+                                    width: 26,
+                                    height: 26,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                                        width: 1.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: color.withValues(alpha: 0.35),
+                                          blurRadius: 5,
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<double?>(
-                                      value: layer.customLineweight,
-                                      isDense: true,
-                                      icon: Icon(Icons.arrow_drop_down, size: 17, color: theme.colorScheme.primary),
-                                      dropdownColor: theme.colorScheme.surface,
-                                      borderRadius: BorderRadius.circular(8),
-                                      items: [
-                                        DropdownMenuItem<double?>(
-                                          value: null,
-                                          child: _buildDropdownItemRow(
-                                            label: 'Original',
-                                            thickness: (layer.lineweight != null && layer.lineweight! > 0)
-                                                ? (layer.lineweight! * 4.5).clamp(0.9, 3.5)
-                                                : 1.0,
-                                            theme: theme,
+                                  const SizedBox(width: 12),
+
+                                  // Layer Details & Dropdown Lineweight Selector
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          layer.name.isEmpty ? 'Unnamed Layer' : layer.name,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                            decoration: layer.isVisible ? null : TextDecoration.lineThrough,
+                                            color: layer.isVisible ? null : theme.disabledColor,
                                           ),
                                         ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '$count ${count == 1 ? "object" : "objects"} ${layer.isFrozen ? "• Frozen" : ""}${effLw != null && effLw > 0 ? " • DXF: ${effLw.toStringAsFixed(2)} mm" : ""}',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            color: theme.textTheme.bodySmall?.color,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 5),
+
+                                        // Lineweight Dropdown Menu
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              'Lineweight: ',
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                color: theme.textTheme.bodySmall?.color,
+                                              ),
+                                            ),
+                                            Container(
+                                              height: 27,
+                                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                                              decoration: BoxDecoration(
+                                                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: theme.dividerColor.withValues(alpha: 0.3),
+                                                  width: 0.8,
+                                                ),
+                                              ),
+                                              child: DropdownButtonHideUnderline(
+                                                child: DropdownButton<double?>(
+                                                  value: layer.customLineweight,
+                                                  isDense: true,
+                                                  icon: Icon(Icons.arrow_drop_down, size: 17, color: theme.colorScheme.primary),
+                                                  dropdownColor: theme.colorScheme.surface,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  items: [
+                                                    DropdownMenuItem<double?>(
+                                                      value: null,
+                                                      child: _buildDropdownItemRow(
+                                                        label: (effLw != null && effLw > 0)
+                                                            ? 'Original (${effLw.toStringAsFixed(2)} mm)'
+                                                            : 'Original',
+                                                        thickness: (effLw != null && effLw > 0)
+                                                            ? (effLw * 9.5).clamp(0.8, 4.0)
+                                                            : 1.0,
+                                                        theme: theme,
+                                                      ),
+                                                    ),
                                         DropdownMenuItem<double?>(
                                           value: 0.12,
                                           child: _buildDropdownItemRow(label: '0.12 mm', thickness: 0.9, theme: theme),

@@ -2109,7 +2109,8 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
-  String get noWallsDetected => 'Не са открити двойки стени от 25 см в чертежа';
+  String get noWallsDetected =>
+      'Не са открити двойки стени (20-30 см) в чертежа';
 
   @override
   String wallCandidatesFound(int pairCount, String length) {
@@ -2118,5 +2119,5 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get autoDetectWallsSubtitle =>
-      'Открива зидове 25 см, изолира контурите им в WALLS_250 и чертае пунктирани оси в AXIS.';
+      'Открива стени 20-30 см, изолира контурите им в WALLS_250 и чертае осови линии.';
 }

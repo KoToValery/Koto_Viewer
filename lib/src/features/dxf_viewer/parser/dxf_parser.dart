@@ -648,7 +648,10 @@ class DxfParser {
               }
               break;
             case 370:
-              lineweight = p.doubleValue / 100.0; // In mm
+              final lwVal = p.intValue;
+              if (lwVal >= 0) {
+                lineweight = lwVal / 100.0; // In mm
+              }
               break;
           }
           idx++;
@@ -899,7 +902,10 @@ class DxfParser {
           lineTypeScale = p.doubleValue > 0 ? p.doubleValue : null;
           break;
         case 370:
-          lineWeight = p.doubleValue / 100.0;
+          final lwVal = p.intValue;
+          if (lwVal >= 0) {
+            lineWeight = lwVal / 100.0;
+          }
           break;
         case 67:
           isPaperSpace = p.intValue == 1;

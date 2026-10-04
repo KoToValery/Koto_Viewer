@@ -680,7 +680,11 @@ class DxfPainter extends CustomPainter {
     // 1. User custom layer override (0.12, 0.25, 0.35, 0.70 mm)
     // 2. Entity own lineweight from DXF
     // 3. Layer original lineweight from DXF
-    double? mm = layer?.customLineweight ?? lineWeight ?? layer?.lineweight;
+    // 4. Inferred dominant entity lineweight on layer
+    double? mm = layer?.customLineweight ??
+        (lineWeight != null && lineWeight > 0 ? lineWeight : null) ??
+        layer?.lineweight ??
+        layer?.defaultEntityLineweight;
 
     if (mm == null && (isThick || (layer?.isThick ?? false))) {
       mm = 0.70;
@@ -688,16 +692,20 @@ class DxfPainter extends CustomPainter {
 
     if (mm != null && mm > 0) {
       // AutoCAD standard lineweight mapping (in mm) to screen canvas pixels:
-      // 0.12 mm -> ~0.95 px
-      // 0.25 mm -> ~1.50 px
-      // 0.35 mm -> ~2.20 px
-      // 0.70 mm -> ~3.80 px
-      final basePx = (mm * 5.0).clamp(0.8, 14.0);
+      // 0.05 mm -> ~0.75 px
+      // 0.13 mm -> ~1.25 px
+      // 0.15 mm -> ~1.45 px
+      // 0.20 mm -> ~1.90 px
+      // 0.25 mm -> ~2.40 px
+      // 0.30 mm -> ~2.85 px
+      // 0.50 mm -> ~4.75 px
+      // 0.70 mm -> ~6.65 px
+      final basePx = (mm * 9.5).clamp(0.75, 14.0);
       return (basePx * settings.lineThicknessScale) / scale;
     }
 
-    // Default crisp standard thin line (~1.1 px)
-    return (1.1 * settings.lineThicknessScale) / scale;
+    // Default crisp standard line (AutoCAD default LWDEFAULT 0.25mm -> ~2.0 px)
+    return (2.0 * settings.lineThicknessScale) / scale;
   }
 
   void _drawGrid(Canvas canvas, Size size) {

@@ -2099,7 +2099,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get noWallsDetected => 'No 25 cm wall pairs detected in drawing';
+  String get noWallsDetected =>
+      'No standard wall pairs (20-30 cm) detected in drawing';
 
   @override
   String wallCandidatesFound(int pairCount, String length) {
@@ -2108,5 +2109,5 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get autoDetectWallsSubtitle =>
-      'Find 25 cm masonry walls, isolate contours into WALLS_250 and draw dashed AXIS centerlines.';
+      'Find 20-30 cm walls, isolate contours into WALLS_250 and draw grid axes.';
 }

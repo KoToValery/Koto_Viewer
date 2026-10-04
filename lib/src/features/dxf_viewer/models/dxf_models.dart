@@ -91,11 +91,17 @@ class DxfLayer {
   bool isFrozen;
   final double? lineweight;
   double? customLineweight; // null = Original (from DXF), or 0.12, 0.25, 0.35, 0.70 mm override
+  double? defaultEntityLineweight; // Inferred dominant lineweight from entities on this layer
   final String? lineType;
+
+  /// Effective lineweight factoring custom user override, layer header lineweight,
+  /// or inferred entity lineweight.
+  double? get effectiveLineweight =>
+      customLineweight ?? lineweight ?? defaultEntityLineweight;
 
   bool get isThick =>
       (customLineweight != null && customLineweight! >= 0.35) ||
-      (customLineweight == null && (lineweight != null && lineweight! >= 0.35));
+      (customLineweight == null && (effectiveLineweight != null && effectiveLineweight! >= 0.35));
 
   set isThick(bool val) {
     customLineweight = val ? 0.70 : 0.12;
@@ -109,6 +115,7 @@ class DxfLayer {
     this.isFrozen = false,
     this.lineweight,
     this.customLineweight,
+    this.defaultEntityLineweight,
     this.lineType,
     bool isThick = false,
   }) {
@@ -125,6 +132,7 @@ class DxfLayer {
     bool? isFrozen,
     double? lineweight,
     double? customLineweight,
+    double? defaultEntityLineweight,
     String? lineType,
     bool? isThick,
   }) {
@@ -136,6 +144,7 @@ class DxfLayer {
       isFrozen: isFrozen ?? this.isFrozen,
       lineweight: lineweight ?? this.lineweight,
       customLineweight: customLineweight ?? this.customLineweight,
+      defaultEntityLineweight: defaultEntityLineweight ?? this.defaultEntityLineweight,
       lineType: lineType ?? this.lineType,
     );
     if (isThick != null && customLineweight == null) {
@@ -1557,7 +1566,38 @@ class DxfDocument {
     Map<String, Rect>? layoutBounds,
   })  : layouts = layouts ?? _computeLayouts(entities),
         layoutEntities = layoutEntities ?? _computeLayoutEntities(entities),
-        layoutBounds = layoutBounds ?? _computeLayoutBounds(entities, bounds);
+        layoutBounds = layoutBounds ?? _computeLayoutBounds(entities, bounds) {
+    _inferLayerEntityLineweights(layers, entities);
+  }
+
+  static void _inferLayerEntityLineweights(
+    Map<String, DxfLayer> layers,
+    List<DxfEntity> entities,
+  ) {
+    final layerLwCounts = <String, Map<double, int>>{};
+    for (final entity in entities) {
+      final lw = entity.lineWeight;
+      if (lw != null && lw > 0) {
+        final counts = layerLwCounts.putIfAbsent(entity.layer.trim(), () => {});
+        counts[lw] = (counts[lw] ?? 0) + 1;
+      }
+    }
+
+    for (final entry in layerLwCounts.entries) {
+      final layer = layers[entry.key];
+      if (layer != null && (layer.lineweight == null || layer.lineweight! <= 0)) {
+        double? dominantLw;
+        int maxCount = 0;
+        for (final lwEntry in entry.value.entries) {
+          if (lwEntry.value > maxCount) {
+            maxCount = lwEntry.value;
+            dominantLw = lwEntry.key;
+          }
+        }
+        layer.defaultEntityLineweight = dominantLw;
+      }
+    }
+  }
 
   static List<String> _computeLayouts(List<DxfEntity> entities) {
     final list = <String>['Model'];

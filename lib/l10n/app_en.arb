@@ -1790,7 +1790,7 @@
       "unit": { "type": "String" }
     }
   },
-  "noWallsDetected": "No 25 cm wall pairs detected in drawing",
+  "noWallsDetected": "No standard wall pairs (20-30 cm) detected in drawing",
   "@noWallsDetected": { "description": "Message when no wall pairs are detected" },
   "wallCandidatesFound": "Found {pairCount} wall pairs ({length} m)",
   "@wallCandidatesFound": {
@@ -1800,7 +1800,7 @@
       "length": { "type": "String" }
     }
   },
-  "autoDetectWallsSubtitle": "Find 25 cm masonry walls, isolate contours into WALLS_250 and draw dashed AXIS centerlines.",
+  "autoDetectWallsSubtitle": "Find 20-30 cm walls, isolate contours into WALLS_250 and draw grid axes.",
   "@autoDetectWallsSubtitle": { "description": "Subtitle describing wall and axis extraction in layer prep modal" }
 }
 
