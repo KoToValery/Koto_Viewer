@@ -2179,6 +2179,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bimProjectNoUnderlay => 'No underlay attached';
 
   @override
+  String get bimProjectUnderlayFormatError =>
+      'Please select a valid .dxf or .dwg CAD drawing file.';
+
+  @override
   String get bimProjectElevation => 'Elevation (m)';
 
   @override

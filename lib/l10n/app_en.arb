@@ -1854,6 +1854,8 @@
   "@bimProjectReplaceUnderlay": { "description": "Action to replace an existing underlay drawing" },
   "bimProjectNoUnderlay": "No underlay attached",
   "@bimProjectNoUnderlay": { "description": "Status text when no underlay is selected for a storey" },
+  "bimProjectUnderlayFormatError": "Please select a valid .dxf or .dwg CAD drawing file.",
+  "@bimProjectUnderlayFormatError": { "description": "Error message when non-CAD file is selected as storey underlay" },
   "bimProjectElevation": "Elevation (m)",
   "@bimProjectElevation": { "description": "Storey elevation field label in meters" },
   "bimProjectHeight": "Height (m)",

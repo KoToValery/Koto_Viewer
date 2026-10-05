@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/bim_work_project.dart';
 import '../services/bim_project_library_service.dart';
+import '../services/bim_underlay_picker_helper.dart';
 
 class _StoreyDraft {
   String storeyId;
@@ -133,18 +133,11 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
   }
 
   Future<void> _pickUnderlayForStorey(_StoreyDraft draft) async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['dxf', 'dwg'],
-      );
-      if (result != null && result.files.single.path != null) {
-        setState(() {
-          draft.pickedFile = File(result.files.single.path!);
-        });
-      }
-    } catch (e) {
-      debugPrint('Error picking underlay file: $e');
+    final file = await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
+    if (file != null) {
+      setState(() {
+        draft.pickedFile = file;
+      });
     }
   }
 
@@ -196,7 +189,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
       debugPrint('Error creating project: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('${context.l10n.error}: $e')),
         );
       }
     } finally {

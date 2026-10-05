@@ -9,6 +9,7 @@ import '../../dxf_viewer/rendering/dxf_painter.dart';
 import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../models/bim_work_project.dart';
 import '../services/bim_project_library_service.dart';
+import '../services/bim_underlay_picker_helper.dart';
 import 'bim_workspace_screen.dart';
 
 /// Screen allowing users to inspect each storey underlay drawing and place a common
@@ -72,6 +73,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
   Future<void> _loadAllUnderlays() async {
     setState(() => _isLoading = true);
     final lib = BimProjectLibraryService.instance;
+    _loadedDocs.clear();
 
     for (final storey in _project.storeys) {
       if (storey.hasUnderlay) {
@@ -89,6 +91,50 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
 
     if (mounted) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickAndAttachUnderlayForCurrentStorey() async {
+    final file = await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
+    if (file == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await BimProjectLibraryService.instance.attachUnderlayFile(
+        _project.id,
+        _currentStorey.storeyId,
+        file,
+      );
+
+      final latestProject = await BimProjectLibraryService.instance.loadProject(_project.id) ?? _project;
+      if (mounted) {
+        setState(() {
+          _project = latestProject;
+          _touchCadCoord = null;
+          _activeSnapCad = null;
+          _isDraggingPoint = false;
+        });
+        await _loadAllUnderlays();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.bimProjectUnderlayAttached),
+              backgroundColor: const Color(0xFF00E676),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error attaching underlay in alignment screen: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.couldNotOpenFilePicker(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -226,6 +272,13 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       appBar: AppBar(
         title: Text(l10n.bimAlignmentTitle),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.upload_file_rounded),
+            tooltip: _currentStorey.hasUnderlay
+                ? l10n.bimProjectReplaceUnderlay
+                : l10n.bimProjectAddUnderlay,
+            onPressed: _pickAndAttachUnderlayForCurrentStorey,
+          ),
           IconButton(
             icon: Icon(
               _showOnionSkin ? Icons.layers_rounded : Icons.layers_outlined,
@@ -384,9 +437,35 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                           },
                         )
                       : Center(
-                          child: Text(
-                            l10n.bimProjectNoUnderlay,
-                            style: TextStyle(color: theme.hintColor),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.layers_clear_outlined,
+                                  size: 64,
+                                  color: theme.hintColor.withValues(alpha: 0.5),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  l10n.bimProjectNoUnderlay,
+                                  style: TextStyle(color: theme.hintColor, fontSize: 16),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.upload_file_rounded),
+                                  label: Text(l10n.bimProjectAddUnderlay),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: theme.colorScheme.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onPressed: _pickAndAttachUnderlayForCurrentStorey,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                 ),

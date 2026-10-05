@@ -2190,6 +2190,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get bimProjectNoUnderlay => 'Няма заредена подложка';
 
   @override
+  String get bimProjectUnderlayFormatError =>
+      'Моля, изберете валиден CAD чертеж във формат .dxf или .dwg.';
+
+  @override
   String get bimProjectElevation => 'Кота (м)';
 
   @override

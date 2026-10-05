@@ -278,5 +278,34 @@ void main() {
       final afterDelete = await libraryService.listProjects();
       expect(afterDelete.isEmpty, isTrue);
     });
+
+    test('attachUnderlayFile copies DXF and updates project storeys correctly', () async {
+      final tempDir = await Directory.systemTemp.createTemp('bim_test_underlay_');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+
+      final libraryService = BimProjectLibraryService(customRootDir: tempDir);
+      final project = await libraryService.createProject(
+        name: 'Underlay Test Project',
+        storeys: const [
+          BimStoreyUnderlay(storeyId: 's1', name: 'Storey 1', elevation: 0.0),
+        ],
+      );
+
+      final dummyDxf = File('${tempDir.path}/sample.dxf');
+      await dummyDxf.writeAsString('0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nEOF\n');
+
+      final updatedStorey = await libraryService.attachUnderlayFile(
+        project.id,
+        's1',
+        dummyDxf,
+      );
+
+      expect(updatedStorey.hasUnderlay, isTrue);
+      expect(updatedStorey.underlayFileName, equals('underlays/s1.dxf'));
+
+      final underlayFile = await libraryService.getUnderlayFile(project.id, updatedStorey.underlayFileName!);
+      expect(underlayFile, isNotNull);
+      expect(await underlayFile!.exists(), isTrue);
+    });
   });
 }

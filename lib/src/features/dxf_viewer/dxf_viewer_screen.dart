@@ -1426,7 +1426,7 @@ class _DxfViewerScreenState extends State<DxfViewerScreen> {
       if (!lower.endsWith('.dxf') && !lower.endsWith('.dwg')) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select a valid .dxf or .dwg file to import.')),
+            SnackBar(content: Text(context.l10n.bimProjectUnderlayFormatError)),
           );
         }
         return;

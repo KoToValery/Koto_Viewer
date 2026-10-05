@@ -3814,6 +3814,12 @@ abstract class AppLocalizations {
   /// **'No underlay attached'**
   String get bimProjectNoUnderlay;
 
+  /// Error message when non-CAD file is selected as storey underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a valid .dxf or .dwg CAD drawing file.'**
+  String get bimProjectUnderlayFormatError;
+
   /// Storey elevation field label in meters
   ///
   /// In en, this message translates to:
