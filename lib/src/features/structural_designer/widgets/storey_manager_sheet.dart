@@ -9,9 +9,10 @@ class StoreyManagerSheet extends StatelessWidget {
   final ValueChanged<int> onSelectStorey;
   final ValueChanged<GhostStoreyMode> onGhostModeChanged;
   final void Function(int index, double newHeight) onUpdateHeight;
-  final VoidCallback onAddStorey;
-  final VoidCallback onDuplicateCurrentStorey;
+  final VoidCallback? onAddStorey;
+  final VoidCallback? onDuplicateCurrentStorey;
   final void Function(int index) onDeleteStorey;
+  final VoidCallback? onManageStoreys;
 
   const StoreyManagerSheet({
     super.key,
@@ -19,9 +20,10 @@ class StoreyManagerSheet extends StatelessWidget {
     required this.onSelectStorey,
     required this.onGhostModeChanged,
     required this.onUpdateHeight,
-    required this.onAddStorey,
-    required this.onDuplicateCurrentStorey,
+    this.onAddStorey,
+    this.onDuplicateCurrentStorey,
     required this.onDeleteStorey,
+    this.onManageStoreys,
   });
 
   @override
@@ -225,41 +227,57 @@ class StoreyManagerSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Action Buttons: Add storey & Duplicate typical storey
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      onAddStorey();
-                      Navigator.of(context).pop();
-                    },
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(context.l10n.newStorey),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF333333),
-                      foregroundColor: Colors.white,
+            if (onManageStoreys != null)
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  onManageStoreys!();
+                },
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: Text(context.l10n.bimProjectManageStoreys),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00E5FF),
+                  foregroundColor: Colors.black,
+                  textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              )
+            else if (onAddStorey != null && onDuplicateCurrentStorey != null)
+              // Action Buttons: Add storey & Duplicate typical storey
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        onAddStorey!();
+                        Navigator.of(context).pop();
+                      },
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(context.l10n.newStorey),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF333333),
+                        foregroundColor: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      onDuplicateCurrentStorey();
-                      Navigator.of(context).pop();
-                    },
-                    icon: const Icon(Icons.copy_all_rounded, size: 18),
-                    label: Text(context.l10n.duplicateTypical),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00E5FF),
-                      foregroundColor: Colors.black,
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        onDuplicateCurrentStorey!();
+                        Navigator.of(context).pop();
+                      },
+                      icon: const Icon(Icons.copy_all_rounded, size: 18),
+                      label: Text(context.l10n.duplicateTypical),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00E5FF),
+                        foregroundColor: Colors.black,
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
           ],
         ),
       ),

@@ -28,6 +28,7 @@ import 'widgets/element_palette_bar.dart';
 import 'widgets/seismic_analysis_sheet.dart';
 import 'widgets/storey_manager_sheet.dart';
 import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
+import 'models/structural_bim_context.dart';
 import 'widgets/structural_3d_viewport.dart';
 import 'widgets/vertical_capacity_sheet.dart';
 
@@ -42,6 +43,7 @@ class StructuralDesignerScreen extends StatefulWidget {
   final Matrix4? initialTransform;
   final String? title;
   final WallAxisDetectionResult? initialDetectionResult;
+  final StructuralBimContext? bimContext;
 
   const StructuralDesignerScreen({
     super.key,
@@ -51,6 +53,7 @@ class StructuralDesignerScreen extends StatefulWidget {
     this.initialTransform,
     this.title,
     this.initialDetectionResult,
+    this.bimContext,
   });
 
   @override
@@ -60,6 +63,15 @@ class StructuralDesignerScreen extends StatefulWidget {
 
 class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   late final TransformationController _transformController;
+
+  DxfDocument get _document {
+    if (widget.bimContext != null) {
+      final activeId = _project.activeStorey.id;
+      final underlay = widget.bimContext!.underlaysByStorey[activeId];
+      if (underlay != null) return underlay;
+    }
+    return widget.document;
+  }
 
   late StructuralProject _project;
   StructuralDrawTool _activeTool = StructuralDrawTool.column;
@@ -199,7 +211,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _renderScale = initialScale.clamp(0.001, 10000.0);
     _transformController.addListener(_onTransformChanged);
 
-    for (final entry in widget.document.layers.entries) {
+    for (final entry in _document.layers.entries) {
       _originalLayerVisibility[entry.key] = entry.value.isVisible;
     }
 
@@ -221,7 +233,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _project = _project.copyWith(storeys: storeys);
         }
       } else {
-        final imported = WallAxisDetector.extractGridAxesFromDocument(widget.document);
+        final imported = WallAxisDetector.extractGridAxesFromDocument(_document);
         if (imported.isNotEmpty) {
           final storeys = List<StoreyLevel>.from(_project.storeys);
           final activeIndex = _project.activeStoreyIndex.clamp(0, storeys.length - 1);
@@ -237,21 +249,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
     _runAnalysis();
 
-    // Auto-load persisted BiM model if previously saved for this drawing
-    final docKey = widget.title ?? 'structural_model';
-    StructuralPersistenceService.loadProject(documentKey: docKey).then((saved) {
-      if (saved != null && mounted) {
-        setState(() {
-          _project = saved;
-          _runAnalysis();
-          if (_project.activeStorey.gridAxes.isEmpty) {
-            _activeTool = StructuralDrawTool.gridAxis;
-          } else {
-            _activeTool = StructuralDrawTool.column;
-          }
-        });
-      }
-    });
+    // Auto-load persisted BiM model if previously saved for this drawing (demo mode only)
+    if (widget.bimContext == null) {
+      final docKey = widget.title ?? 'structural_model';
+      StructuralPersistenceService.loadProject(documentKey: docKey).then((saved) {
+        if (saved != null && mounted) {
+          setState(() {
+            _project = saved;
+            _runAnalysis();
+            if (_project.activeStorey.gridAxes.isEmpty) {
+              _activeTool = StructuralDrawTool.gridAxis;
+            } else {
+              _activeTool = StructuralDrawTool.column;
+            }
+          });
+        }
+      });
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAutoDetectWallsOnStartup();
@@ -277,7 +291,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _scaleSettleTimer?.cancel();
     _transformController.removeListener(_onTransformChanged);
     for (final entry in _originalLayerVisibility.entries) {
-      widget.document.layers[entry.key]?.isVisible = entry.value;
+      _document.layers[entry.key]?.isVisible = entry.value;
     }
     _transformController.dispose();
     super.dispose();
@@ -321,7 +335,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   double get _cadUnitsPerMeter {
-    final unit = widget.document.unit;
+    if (widget.bimContext != null) {
+      return widget.bimContext!.cadUnitsPerMeter;
+    }
+    final unit = _document.unit;
     if (unit != DxfUnit.unitless && unit.toMeters > 0) {
       return 1.0 / unit.toMeters;
     }
@@ -353,12 +370,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   // --- Coordinate Transformations ---
 
   Rect get _cadBounds {
+    if (widget.bimContext != null) {
+      return widget.bimContext!.projectBounds;
+    }
     if (widget.initialCadBounds != null &&
         !widget.initialCadBounds!.isEmpty &&
         widget.initialCadBounds!.isFinite) {
       return widget.initialCadBounds!;
     }
-    return widget.document.bounds;
+    return _document.bounds;
   }
 
   double _getCadFitScale() {
@@ -2540,9 +2560,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
 
-    final entities = widget.document.layoutEntities['Model'] ?? widget.document.entities;
+    final entities = _document.layoutEntities['Model'] ?? _document.entities;
     for (final entity in entities) {
-      final layer = widget.document.layers[entity.layer];
+      final layer = _document.layers[entity.layer];
       if (layer != null && !layer.isVisible) continue;
       if (entity is DxfLine) {
         checkSegment(entity.p1, entity.p2);
@@ -2561,7 +2581,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           }
         }
       } else if (entity is DxfInsert) {
-        final block = widget.document.blocks[entity.blockName];
+        final block = _document.blocks[entity.blockName];
         if (block != null && block.entities.isNotEmpty) {
           final rad = entity.rotationDeg * math.pi / 180.0;
           final cosA = math.cos(rad);
@@ -2578,7 +2598,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           }
 
           for (final child in block.entities) {
-            final childLayer = widget.document.layers[child.layer];
+            final childLayer = _document.layers[child.layer];
             if (childLayer != null && !childLayer.isVisible) continue;
             if (child is DxfLine) {
               checkSegment(transformPt(child.p1), transformPt(child.p2));
@@ -2763,7 +2783,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final double toleranceCad =
           24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
       snap = DxfSnapHelper.findSnapPoint(
-        document: widget.document,
+        document: _document,
         cadPoint: rawCad,
         toleranceCad: toleranceCad,
       );
@@ -3182,7 +3202,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         gripNormal: grip.normal,
         rawDistance: rawD,
         toleranceCad: toleranceCad,
-        document: widget.document,
+        document: _document,
         activeStorey: _project.activeStorey,
         activeSlabId: _activeExtrudingSlabId,
         ghostStorey: _project.ghostStorey,
@@ -3200,7 +3220,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       DxfSnapResult? ptSnap;
       if (_snapEnabled) {
         ptSnap = DxfSnapHelper.findSnapPoint(
-          document: widget.document,
+          document: _document,
           cadPoint: rawCad,
           toleranceCad: toleranceCad,
         );
@@ -3307,7 +3327,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           toleranceCad: toleranceCad,
           activeStorey: _project.activeStorey,
           movingColumnId: _isMovingColumn ? _selectedColumn?.id : null,
-          dxfDocument: widget.document,
+          dxfDocument: _document,
           cadUnitsPerMeter: _cadUnitsPerMeter,
         );
         if (mag != null) {
@@ -3346,7 +3366,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           final p = rawCad + cornerOffset;
           final s = _findStructuralSnap(p, toleranceCad, cornersOnly: true) ??
               DxfSnapHelper.findSnapPoint(
-                document: widget.document,
+                document: _document,
                 cadPoint: p,
                 toleranceCad: toleranceCad,
                 allowNearest: false,
@@ -3387,7 +3407,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             final pt = candCenter + cornerOffset;
             final match = _findStructuralSnap(pt, toleranceCad * 0.8, cornersOnly: true) ??
                 DxfSnapHelper.findSnapPoint(
-                  document: widget.document,
+                  document: _document,
                   cadPoint: pt,
                   toleranceCad: toleranceCad * 0.8,
                   allowNearest: false,
@@ -3455,7 +3475,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         if (_openingStartCad == null) {
           snap = _findStructuralSnap(rawCad, toleranceCad) ??
               DxfSnapHelper.findSnapPoint(
-                document: widget.document,
+                document: _document,
                 cadPoint: rawCad,
                 toleranceCad: toleranceCad,
                 allowNearest: false,
@@ -3471,7 +3491,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         } else {
           snap = _findStructuralSnap(rawCad, toleranceCad) ??
               DxfSnapHelper.findSnapPoint(
-                document: widget.document,
+                document: _document,
                 cadPoint: rawCad,
                 toleranceCad: toleranceCad,
                 allowNearest: false,
@@ -3487,12 +3507,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             final dxM = dxCad / _cadUnitsPerMeter;
             final dyM = dyCad / _cadUnitsPerMeter;
             final snappedDxM = math.max(0.10, (dxM / 0.10).round() * 0.10);
-            final snappedDyM = math.max(0.10, (dyM / 0.10).round() * 0.10);
+            final snappedDxM2 = math.max(0.10, (dyM / 0.10).round() * 0.10);
             final signX = rawCad.dx >= c1.dx ? 1.0 : -1.0;
             final signY = rawCad.dy >= c1.dy ? 1.0 : -1.0;
             effectiveCad = Offset(
               c1.dx + signX * snappedDxM * _cadUnitsPerMeter,
-              c1.dy + signY * snappedDyM * _cadUnitsPerMeter,
+              c1.dy + signY * snappedDxM2 * _cadUnitsPerMeter,
             );
             snappedScreen = _cadToScreen(effectiveCad);
             _snappedScreenPositions = [];
@@ -3520,7 +3540,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           toleranceCad: toleranceCad,
           activeStorey: _project.activeStorey,
           movingWallId: _isMovingShearWall ? _selectedShearWall?.id : null,
-          dxfDocument: widget.document,
+          dxfDocument: _document,
           cadUnitsPerMeter: _cadUnitsPerMeter,
         );
         if (mag != null) {
@@ -3583,7 +3603,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       } else if (_activeTool == StructuralDrawTool.gridAxis) {
         snap = _findStructuralSnap(rawCad, toleranceCad) ??
             DxfSnapHelper.findSnapPoint(
-              document: widget.document,
+              document: _document,
               cadPoint: rawCad,
               toleranceCad: toleranceCad,
               allowNearest: false,
@@ -3607,7 +3627,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         } else {
           snap = _findStructuralSnap(rawCad, toleranceCad) ??
               DxfSnapHelper.findSnapPoint(
-                document: widget.document,
+                document: _document,
                 cadPoint: rawCad,
                 toleranceCad: toleranceCad,
                 allowNearest: false,
@@ -3632,7 +3652,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         // Single point snap for slabs & openings
         snap = _findStructuralSnap(rawCad, toleranceCad) ??
             DxfSnapHelper.findSnapPoint(
-              document: widget.document,
+              document: _document,
               cadPoint: rawCad,
               toleranceCad: toleranceCad,
               allowNearest: false,
@@ -5046,6 +5066,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _saveProject() {
+    if (widget.bimContext != null) {
+      widget.bimContext!.onProjectChanged(_project);
+      return;
+    }
     final docKey = widget.title ?? 'structural_model';
     StructuralPersistenceService.saveProject(documentKey: docKey, project: _project);
   }
@@ -5066,17 +5090,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _underlayFilterActive = activate;
     if (activate) {
       final visibleLayerNames = StructuralUnderlayFilter.filterLayers(
-        layers: widget.document.layers.values,
-        entities: widget.document.entities,
-        blocks: widget.document.blocks,
+        layers: _document.layers.values,
+        entities: _document.entities,
+        blocks: _document.blocks,
       );
 
       // Verify how many entities in Model space will actually be visible
-      final modelEntities = widget.document.layoutEntities['Model'] ?? widget.document.entities;
+      final modelEntities = _document.layoutEntities['Model'] ?? _document.entities;
       int visibleCount = 0;
       for (final e in modelEntities) {
         if (e is DxfInsert) {
-          final block = widget.document.blocks[e.blockName];
+          final block = _document.blocks[e.blockName];
           if (block != null) {
             final hasChild = block.entities.any((child) => visibleLayerNames.contains(child.layer));
             if (hasChild || visibleLayerNames.contains(e.layer)) visibleCount++;
@@ -5092,18 +5116,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (visibleLayerNames.isEmpty || visibleCount == 0) {
         _underlayFilterActive = false;
         for (final entry in _originalLayerVisibility.entries) {
-          widget.document.layers[entry.key]?.isVisible = entry.value;
+          _document.layers[entry.key]?.isVisible = entry.value;
         }
         return;
       }
 
-      for (final layer in widget.document.layers.values) {
+      for (final layer in _document.layers.values) {
         layer.isVisible = visibleLayerNames.contains(layer.name);
       }
     } else {
       for (final entry in _originalLayerVisibility.entries) {
-        widget.document.layers[entry.key]?.isVisible = entry.value;
+        _document.layers[entry.key]?.isVisible = entry.value;
       }
+    }
+
+    if (widget.bimContext != null) {
+      final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
+      widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
     }
   }
 
@@ -5113,9 +5142,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DxfLayerSheet(
-        document: widget.document,
+        document: _document,
         isDark: true,
         onLayersChanged: () {
+          if (widget.bimContext != null) {
+            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
+            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+          }
           setState(() {});
         },
       ),
@@ -5127,8 +5160,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     _pushUndo();
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
-    WallAxisDetector.applyToDocument(widget.document, result, isBulgarian: isBg);
+    WallAxisDetector.applyToDocument(_document, result, isBulgarian: isBg);
     _applyUnderlayFilter(true);
+    if (widget.bimContext != null) {
+      widget.bimContext!.onWallsDetected(_project.activeStorey.id);
+    }
 
     // Convert detected centerlines to native StructuralGridAxis elements
     final newGridAxes = WallAxisDetector.convertToStructuralGridAxes(
@@ -5179,7 +5215,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // If axes are already populated in active storey (e.g. from initState or saved project)
     if (_project.effectiveGridAxes.isNotEmpty) {
-      if (widget.initialDetectionResult != null || widget.document.layers.containsKey('WALLS_250')) {
+      if (widget.initialDetectionResult != null || _document.layers.containsKey('WALLS_250')) {
         _applyUnderlayFilter(true);
         _runAnalysis();
         setState(() {});
@@ -5195,7 +5231,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // Check if axes can be imported from an external DXF AXIS layer
     final importedAxes = WallAxisDetector.extractGridAxesFromDocument(
-      widget.document,
+      _document,
       isBulgarian: isBg,
     );
     if (importedAxes.isNotEmpty) {
@@ -5209,15 +5245,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     // If WALLS_250 exists but gridAxes is empty, re-detect to populate dynamic gridAxes
-    if (widget.document.layers.containsKey('WALLS_250')) {
-      final result = WallAxisDetector.detect(widget.document);
+    if (_document.layers.containsKey('WALLS_250')) {
+      final result = WallAxisDetector.detect(_document);
       if (result.hasWallsFound) {
         _applyDetectedWallsAndAxes(result);
       }
       return;
     }
 
-    final result = WallAxisDetector.detect(widget.document);
+    final result = WallAxisDetector.detect(_document);
     if (!result.hasWallsFound || !mounted) return;
 
     final best = result.bestGroup!;
@@ -5320,7 +5356,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _runManualAutoDetectWalls() {
-    final result = WallAxisDetector.detect(widget.document);
+    final result = WallAxisDetector.detect(_document);
     if (!result.hasWallsFound) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -5334,6 +5370,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   Future<void> _showExportDialog() async {
+    if (widget.bimContext != null) {
+      await widget.bimContext!.onExport(context, _project, _project.activeStorey.id);
+      return;
+    }
     final baseName = widget.title ?? 'structural_model';
     showModalBottomSheet<void>(
       context: context,
@@ -5456,11 +5496,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       isScrollControlled: true,
       builder: (ctx) => StoreyManagerSheet(
         project: _project,
+        onManageStoreys: widget.bimContext?.onManageStoreys,
         onSelectStorey: (idx) {
           setState(() {
             _project = _project.copyWith(activeStoreyIndex: idx);
             _slabPointsCad.clear();
             _wallStartCad = null;
+            _originalLayerVisibility.clear();
+            for (final entry in _document.layers.entries) {
+              _originalLayerVisibility[entry.key] = entry.value.isVisible;
+            }
             _runAnalysis();
           });
           _saveProject();
@@ -5937,7 +5982,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               child: RepaintBoundary(
                                 child: CustomPaint(
                                   painter: DxfPainter(
-                                    document: widget.document,
+                                    document: _document,
                                     theme: DxfCanvasTheme.darkCad,
                                     activeLayout: 'Model',
                                     currentScale: _renderScale,
@@ -5946,7 +5991,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                             // 1. Suppress all hatches (fill patterns) in structural underlay
                                             if (entity is DxfHatch) return false;
                                             // 2. If entity is on a white structural layer, suppress non-white entities (e.g. insulation lines with color 30)
-                                            final layer = widget.document.layers[entity.layer];
+                                            final layer = _document.layers[entity.layer];
                                             if (layer != null && StructuralUnderlayFilter.isWhiteLayer(layer)) {
                                               if (entity.colorIndex != null &&
                                                   entity.colorIndex != 256 &&

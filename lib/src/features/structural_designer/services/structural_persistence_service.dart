@@ -111,71 +111,136 @@ class StructuralPersistenceService {
     sb.writeln('0\nSECTION\n2\nENTITIES');
 
     for (final storey in project.storeys) {
-      // Columns
-      for (final col in storey.columns) {
-        final pts = col.polygonVertices;
-        if (pts.length >= 3) {
-          _writeClosedPolyline(sb, pts, 'S-COL', 2);
-          _writeText(sb, col.displayName, col.center.dx, col.center.dy, 0.25 * cadUnitsPerMeter, 'S-COL');
-        }
-      }
-
-      // Shear Walls
-      for (final wall in storey.shearWalls) {
-        final pts = wall.polygonVertices;
-        if (pts.length >= 4) {
-          _writeClosedPolyline(sb, pts, 'S-WALL', 1);
-          final mid = (wall.start + wall.end) / 2.0;
-          _writeText(sb, wall.displayName, mid.dx, mid.dy, 0.25 * cadUnitsPerMeter, 'S-WALL');
-        }
-      }
-
-      // Beams
-      for (final beam in storey.beams) {
-        final pts = beam.polygonVertices;
-        if (pts.length >= 4) {
-          _writeClosedPolyline(sb, pts, 'S-BEAM', 4);
-        }
-      }
-
-      // Slabs
-      for (final slab in storey.slabs) {
-        if (slab.polygon.length >= 3) {
-          _writeClosedPolyline(sb, slab.polygon, 'S-SLAB', 3);
-          for (final op in slab.openings) {
-            if (op.length >= 3) {
-              _writeClosedPolyline(sb, op, 'S-SLAB', 3);
-            }
-          }
-          final c = slab.centroid;
-          final elev = storey.structuralElevationFor(slab);
-          final thickCm = (slab.thickness * 100).round();
-          _writeText(sb, 'T.O.C. ${elev >= 0 ? "+" : ""}${elev.toStringAsFixed(2)} (d=${thickCm}cm)', c.dx, c.dy, 0.25 * cadUnitsPerMeter, 'S-SLAB');
-        }
-      }
-
-      // Grid Axes
-      for (final axis in storey.gridAxes) {
-        sb.writeln('0\nLINE\n8\nS-AXIS\n62\n6');
-        sb.writeln('10\n${axis.start.dx}\n20\n${axis.start.dy}\n30\n0.0');
-        sb.writeln('11\n${axis.end.dx}\n21\n${axis.end.dy}\n31\n0.0');
-
-        final bubbleRadius = 0.40 * cadUnitsPerMeter;
-        if (axis.bubbleAtStart) {
-          _writeCircle(sb, axis.start.dx, axis.start.dy, bubbleRadius, 'S-AXIS');
-          _writeText(sb, axis.name, axis.start.dx, axis.start.dy, 0.30 * cadUnitsPerMeter, 'S-AXIS');
-        }
-        if (axis.bubbleAtEnd) {
-          _writeCircle(sb, axis.end.dx, axis.end.dy, bubbleRadius, 'S-AXIS');
-          _writeText(sb, axis.name, axis.end.dx, axis.end.dy, 0.30 * cadUnitsPerMeter, 'S-AXIS');
-        }
-      }
+      _writeStoreyEntities(sb, storey, cadUnitsPerMeter, (p) => p);
     }
 
     sb.writeln('0\nENDSEC\n0\nEOF');
 
     await file.writeAsString(sb.toString());
     return file;
+  }
+
+  /// Exports a single storey level's structural model to DXF, optionally transforming
+  /// coordinates back into the storey's original local underlay CAD coordinates.
+  static Future<File> exportStoreyToDxfFile({
+    required StoreyLevel storey,
+    required String baseName,
+    Offset? cpRef,
+    Offset? cpLocal,
+    double unitScale = 1.0,
+    double cadUnitsPerMeter = 1.0,
+    Directory? outputDirectory,
+  }) async {
+    final dir = outputDirectory ?? await getTemporaryDirectory();
+    final cleanName = baseName.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
+    final file = File('${dir.path}/${cleanName}_structural_storey.dxf');
+
+    final sb = StringBuffer();
+
+    // 1. DXF Header
+    sb.writeln('0\nSECTION\n2\nHEADER\n9\n\$ACADVER\n1\nAC1015'); // AutoCAD 2000
+    sb.writeln('0\nENDSEC');
+
+    // 2. DXF Tables (Layers)
+    sb.writeln('0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n5');
+    void writeLayer(String name, int color) {
+      sb.writeln('0\nLAYER\n2\n$name\n70\n0\n62\n$color\n6\nCONTINUOUS');
+    }
+    writeLayer('S-COL', 2); // Yellow
+    writeLayer('S-WALL', 1); // Red
+    writeLayer('S-BEAM', 4); // Cyan
+    writeLayer('S-SLAB', 3); // Green
+    writeLayer('S-AXIS', 6); // Magenta
+    sb.writeln('0\nENDTAB\n0\nENDSEC');
+
+    // 3. DXF Entities
+    sb.writeln('0\nSECTION\n2\nENTITIES');
+
+    Offset toLocal(Offset p) {
+      if (cpRef != null && cpLocal != null && unitScale > 0) {
+        return (p - cpRef) / unitScale + cpLocal;
+      }
+      return p;
+    }
+
+    _writeStoreyEntities(sb, storey, cadUnitsPerMeter, toLocal);
+
+    sb.writeln('0\nENDSEC\n0\nEOF');
+
+    await file.writeAsString(sb.toString());
+    return file;
+  }
+
+  static void _writeStoreyEntities(
+    StringBuffer sb,
+    StoreyLevel storey,
+    double cadUnitsPerMeter,
+    Offset Function(Offset) tr,
+  ) {
+    // Columns
+    for (final col in storey.columns) {
+      final pts = col.polygonVertices.map(tr).toList();
+      if (pts.length >= 3) {
+        _writeClosedPolyline(sb, pts, 'S-COL', 2);
+        final c = tr(col.center);
+        _writeText(sb, col.displayName, c.dx, c.dy, 0.25 * cadUnitsPerMeter, 'S-COL');
+      }
+    }
+
+    // Shear Walls
+    for (final wall in storey.shearWalls) {
+      final pts = wall.polygonVertices.map(tr).toList();
+      if (pts.length >= 4) {
+        _writeClosedPolyline(sb, pts, 'S-WALL', 1);
+        final mid = tr((wall.start + wall.end) / 2.0);
+        _writeText(sb, wall.displayName, mid.dx, mid.dy, 0.25 * cadUnitsPerMeter, 'S-WALL');
+      }
+    }
+
+    // Beams
+    for (final beam in storey.beams) {
+      final pts = beam.polygonVertices.map(tr).toList();
+      if (pts.length >= 4) {
+        _writeClosedPolyline(sb, pts, 'S-BEAM', 4);
+      }
+    }
+
+    // Slabs
+    for (final slab in storey.slabs) {
+      final poly = slab.polygon.map(tr).toList();
+      if (poly.length >= 3) {
+        _writeClosedPolyline(sb, poly, 'S-SLAB', 3);
+        for (final op in slab.openings) {
+          final opPts = op.map(tr).toList();
+          if (opPts.length >= 3) {
+            _writeClosedPolyline(sb, opPts, 'S-SLAB', 3);
+          }
+        }
+        final c = tr(slab.centroid);
+        final elev = storey.structuralElevationFor(slab);
+        final thickCm = (slab.thickness * 100).round();
+        _writeText(sb, 'T.O.C. ${elev >= 0 ? "+" : ""}${elev.toStringAsFixed(2)} (d=${thickCm}cm)', c.dx, c.dy, 0.25 * cadUnitsPerMeter, 'S-SLAB');
+      }
+    }
+
+    // Grid Axes
+    for (final axis in storey.gridAxes) {
+      final s = tr(axis.start);
+      final e = tr(axis.end);
+      sb.writeln('0\nLINE\n8\nS-AXIS\n62\n6');
+      sb.writeln('10\n${s.dx}\n20\n${s.dy}\n30\n0.0');
+      sb.writeln('11\n${e.dx}\n21\n${e.dy}\n31\n0.0');
+
+      final bubbleRadius = 0.40 * cadUnitsPerMeter;
+      if (axis.bubbleAtStart) {
+        _writeCircle(sb, s.dx, s.dy, bubbleRadius, 'S-AXIS');
+        _writeText(sb, axis.name, s.dx, s.dy, 0.30 * cadUnitsPerMeter, 'S-AXIS');
+      }
+      if (axis.bubbleAtEnd) {
+        _writeCircle(sb, e.dx, e.dy, bubbleRadius, 'S-AXIS');
+        _writeText(sb, axis.name, e.dx, e.dy, 0.30 * cadUnitsPerMeter, 'S-AXIS');
+      }
+    }
   }
 
   /// Prompts system share dialog for exported file.

@@ -3741,6 +3741,324 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Overhead Slab (+{elev} m)'**
   String overheadSlabLabel(String elev);
+
+  /// Standalone BiM projects title on Home screen and navigation
+  ///
+  /// In en, this message translates to:
+  /// **'BiM Projects'**
+  String get bimProjects;
+
+  /// Subtitle for BiM Projects hero card
+  ///
+  /// In en, this message translates to:
+  /// **'Structural models & multi-storey drawings'**
+  String get bimProjectsSubtitle;
+
+  /// Title of the project library screen
+  ///
+  /// In en, this message translates to:
+  /// **'BiM Projects Library'**
+  String get bimProjectLibraryTitle;
+
+  /// Action and title to create a new BiM project
+  ///
+  /// In en, this message translates to:
+  /// **'New BiM Project'**
+  String get bimProjectNew;
+
+  /// Label for project name field
+  ///
+  /// In en, this message translates to:
+  /// **'Project Name'**
+  String get bimProjectName;
+
+  /// Hint text for project name field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Residential Building Flora'**
+  String get bimProjectNameHint;
+
+  /// Label for project location or city
+  ///
+  /// In en, this message translates to:
+  /// **'Location / City'**
+  String get bimProjectLocation;
+
+  /// Hint text for project location field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Sofia, Bulgaria'**
+  String get bimProjectLocationHint;
+
+  /// Header for storeys and underlays section
+  ///
+  /// In en, this message translates to:
+  /// **'Storeys & Underlays'**
+  String get bimProjectStoreysSection;
+
+  /// Action to pick and attach an architectural underlay
+  ///
+  /// In en, this message translates to:
+  /// **'Add Underlay'**
+  String get bimProjectAddUnderlay;
+
+  /// Action to replace an existing underlay drawing
+  ///
+  /// In en, this message translates to:
+  /// **'Replace Underlay'**
+  String get bimProjectReplaceUnderlay;
+
+  /// Status text when no underlay is selected for a storey
+  ///
+  /// In en, this message translates to:
+  /// **'No underlay attached'**
+  String get bimProjectNoUnderlay;
+
+  /// Storey elevation field label in meters
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation (m)'**
+  String get bimProjectElevation;
+
+  /// Storey clear height field label in meters
+  ///
+  /// In en, this message translates to:
+  /// **'Height (m)'**
+  String get bimProjectHeight;
+
+  /// Label for storey name
+  ///
+  /// In en, this message translates to:
+  /// **'Storey Name'**
+  String get bimProjectStoreyName;
+
+  /// Quick wizard section to generate storey levels
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Storey Setup'**
+  String get bimProjectQuickSetup;
+
+  /// Count of underground basement levels
+  ///
+  /// In en, this message translates to:
+  /// **'Basements'**
+  String get bimProjectBasementCount;
+
+  /// Count of above ground levels
+  ///
+  /// In en, this message translates to:
+  /// **'Above ground'**
+  String get bimProjectAboveGroundCount;
+
+  /// Default floor-to-floor height in meters
+  ///
+  /// In en, this message translates to:
+  /// **'Storey height (m)'**
+  String get bimProjectFloorHeight;
+
+  /// Button to generate initial storey list
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Storeys'**
+  String get bimProjectGenerateStoreys;
+
+  /// Button to add a single storey
+  ///
+  /// In en, this message translates to:
+  /// **'Add Storey'**
+  String get bimProjectAddStorey;
+
+  /// Tooltip or action to delete a storey
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Storey'**
+  String get bimProjectDeleteStorey;
+
+  /// Submit button to create the BiM project
+  ///
+  /// In en, this message translates to:
+  /// **'Create Project'**
+  String get bimProjectCreateButton;
+
+  /// Status badge when control points are not all confirmed
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting Alignment'**
+  String get bimProjectStatusAlignment;
+
+  /// Status badge when drawings are aligned and ready
+  ///
+  /// In en, this message translates to:
+  /// **'Aligned • BiM Ready'**
+  String get bimProjectStatusReady;
+
+  /// Storey count badge
+  ///
+  /// In en, this message translates to:
+  /// **'{count} storeys'**
+  String bimProjectStoreysCount(int count);
+
+  /// Action to open the structural BiM model
+  ///
+  /// In en, this message translates to:
+  /// **'Open Model'**
+  String get bimProjectOpen;
+
+  /// Action to open the control-point alignment screen
+  ///
+  /// In en, this message translates to:
+  /// **'Align Drawings'**
+  String get bimProjectAlignStoreys;
+
+  /// Title for delete project confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Project?'**
+  String get bimProjectDeleteConfirmTitle;
+
+  /// Message for delete project confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete \"{name}\"? All structural elements and drawings will be deleted.'**
+  String bimProjectDeleteConfirmMessage(String name);
+
+  /// Action to rename a BiM project
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get bimProjectRename;
+
+  /// Title for the storey alignment screen
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing Alignment'**
+  String get bimAlignmentTitle;
+
+  /// Instructions explaining how to align underlays
+  ///
+  /// In en, this message translates to:
+  /// **'Tap and hold to place a common control point (e.g. intersection of axes 1 and A) on each storey underlay.'**
+  String get bimAlignmentInstructions;
+
+  /// Status indicator for control point coordinates
+  ///
+  /// In en, this message translates to:
+  /// **'Control point set at ({x}, {y})'**
+  String bimAlignmentControlPointSet(String x, String y);
+
+  /// Notice when control point has not been set yet
+  ///
+  /// In en, this message translates to:
+  /// **'Control point required'**
+  String get bimAlignmentControlPointMissing;
+
+  /// Toggle to show lower storey semi-transparently
+  ///
+  /// In en, this message translates to:
+  /// **'Ghost lower storey'**
+  String get bimAlignmentOnionSkin;
+
+  /// Confirmation button to lock alignment and launch BiM designer
+  ///
+  /// In en, this message translates to:
+  /// **'Ready • Start BiM'**
+  String get bimAlignmentReadyButton;
+
+  /// Confirmation modal title before automation
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Alignment & Start BiM'**
+  String get bimAlignmentConfirmTitle;
+
+  /// Confirmation modal explanation before wall detection
+  ///
+  /// In en, this message translates to:
+  /// **'All control points are placed. The BiM module will now align the storeys, detect walls and generate grid axes. Proceed?'**
+  String get bimAlignmentConfirmMessage;
+
+  /// Export current storey DXF with original coordinates
+  ///
+  /// In en, this message translates to:
+  /// **'Export Storey Drawing (DXF)'**
+  String get bimProjectExportStoreyDxf;
+
+  /// Subtitle describing storey DXF export
+  ///
+  /// In en, this message translates to:
+  /// **'Original coordinates with visible & structural layers'**
+  String get bimProjectExportStoreyDxfSubtitle;
+
+  /// Export full project package as ZIP
+  ///
+  /// In en, this message translates to:
+  /// **'Export Project Package (ZIP)'**
+  String get bimProjectExportAllZip;
+
+  /// Subtitle describing ZIP export
+  ///
+  /// In en, this message translates to:
+  /// **'All storey drawings + structural BiM model'**
+  String get bimProjectExportAllZipSubtitle;
+
+  /// Snackbar notification on successful export
+  ///
+  /// In en, this message translates to:
+  /// **'Exported successfully: {filename}'**
+  String bimProjectExportSuccess(String filename);
+
+  /// Empty state description in BiM project library
+  ///
+  /// In en, this message translates to:
+  /// **'No BiM projects yet. Tap \'+\' to create your first structural project.'**
+  String get bimProjectNoProjects;
+
+  /// Action from storey manager sheet to edit project storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Storeys & Underlays'**
+  String get bimProjectManageStoreys;
+
+  /// Default name for basement storey
+  ///
+  /// In en, this message translates to:
+  /// **'Basement {num}'**
+  String bimProjectBasement(int num);
+
+  /// Default name for ground floor
+  ///
+  /// In en, this message translates to:
+  /// **'Ground Floor'**
+  String get bimProjectGroundFloor;
+
+  /// Default name for above-ground floor
+  ///
+  /// In en, this message translates to:
+  /// **'Floor {num}'**
+  String bimProjectFloor(int num);
+
+  /// Status text while saving BiM model
+  ///
+  /// In en, this message translates to:
+  /// **'Saving BiM project...'**
+  String get bimProjectSaving;
+
+  /// Success message when underlay is loaded
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay attached'**
+  String get bimProjectUnderlayAttached;
+
+  /// Notice when attempting to open unaligned project
+  ///
+  /// In en, this message translates to:
+  /// **'Please align all storeys before entering the BiM designer.'**
+  String get bimProjectAlignFirstPrompt;
+
+  /// Loading indicator while opening BiM project workspace
+  ///
+  /// In en, this message translates to:
+  /// **'Loading BiM project and underlays...'**
+  String get bimProjectLoading;
 }
 
 class _AppLocalizationsDelegate

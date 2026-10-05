@@ -1829,6 +1829,143 @@
     "placeholders": {
       "elev": { "type": "String" }
     }
-  }
+  },
+  "bimProjects": "BiM Projects",
+  "@bimProjects": { "description": "Standalone BiM projects title on Home screen and navigation" },
+  "bimProjectsSubtitle": "Structural models & multi-storey drawings",
+  "@bimProjectsSubtitle": { "description": "Subtitle for BiM Projects hero card" },
+  "bimProjectLibraryTitle": "BiM Projects Library",
+  "@bimProjectLibraryTitle": { "description": "Title of the project library screen" },
+  "bimProjectNew": "New BiM Project",
+  "@bimProjectNew": { "description": "Action and title to create a new BiM project" },
+  "bimProjectName": "Project Name",
+  "@bimProjectName": { "description": "Label for project name field" },
+  "bimProjectNameHint": "e.g. Residential Building Flora",
+  "@bimProjectNameHint": { "description": "Hint text for project name field" },
+  "bimProjectLocation": "Location / City",
+  "@bimProjectLocation": { "description": "Label for project location or city" },
+  "bimProjectLocationHint": "e.g. Sofia, Bulgaria",
+  "@bimProjectLocationHint": { "description": "Hint text for project location field" },
+  "bimProjectStoreysSection": "Storeys & Underlays",
+  "@bimProjectStoreysSection": { "description": "Header for storeys and underlays section" },
+  "bimProjectAddUnderlay": "Add Underlay",
+  "@bimProjectAddUnderlay": { "description": "Action to pick and attach an architectural underlay" },
+  "bimProjectReplaceUnderlay": "Replace Underlay",
+  "@bimProjectReplaceUnderlay": { "description": "Action to replace an existing underlay drawing" },
+  "bimProjectNoUnderlay": "No underlay attached",
+  "@bimProjectNoUnderlay": { "description": "Status text when no underlay is selected for a storey" },
+  "bimProjectElevation": "Elevation (m)",
+  "@bimProjectElevation": { "description": "Storey elevation field label in meters" },
+  "bimProjectHeight": "Height (m)",
+  "@bimProjectHeight": { "description": "Storey clear height field label in meters" },
+  "bimProjectStoreyName": "Storey Name",
+  "@bimProjectStoreyName": { "description": "Label for storey name" },
+  "bimProjectQuickSetup": "Quick Storey Setup",
+  "@bimProjectQuickSetup": { "description": "Quick wizard section to generate storey levels" },
+  "bimProjectBasementCount": "Basements",
+  "@bimProjectBasementCount": { "description": "Count of underground basement levels" },
+  "bimProjectAboveGroundCount": "Above ground",
+  "@bimProjectAboveGroundCount": { "description": "Count of above ground levels" },
+  "bimProjectFloorHeight": "Storey height (m)",
+  "@bimProjectFloorHeight": { "description": "Default floor-to-floor height in meters" },
+  "bimProjectGenerateStoreys": "Generate Storeys",
+  "@bimProjectGenerateStoreys": { "description": "Button to generate initial storey list" },
+  "bimProjectAddStorey": "Add Storey",
+  "@bimProjectAddStorey": { "description": "Button to add a single storey" },
+  "bimProjectDeleteStorey": "Delete Storey",
+  "@bimProjectDeleteStorey": { "description": "Tooltip or action to delete a storey" },
+  "bimProjectCreateButton": "Create Project",
+  "@bimProjectCreateButton": { "description": "Submit button to create the BiM project" },
+  "bimProjectStatusAlignment": "Awaiting Alignment",
+  "@bimProjectStatusAlignment": { "description": "Status badge when control points are not all confirmed" },
+  "bimProjectStatusReady": "Aligned • BiM Ready",
+  "@bimProjectStatusReady": { "description": "Status badge when drawings are aligned and ready" },
+  "bimProjectStoreysCount": "{count} storeys",
+  "@bimProjectStoreysCount": {
+    "description": "Storey count badge",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bimProjectOpen": "Open Model",
+  "@bimProjectOpen": { "description": "Action to open the structural BiM model" },
+  "bimProjectAlignStoreys": "Align Drawings",
+  "@bimProjectAlignStoreys": { "description": "Action to open the control-point alignment screen" },
+  "bimProjectDeleteConfirmTitle": "Delete Project?",
+  "@bimProjectDeleteConfirmTitle": { "description": "Title for delete project confirmation dialog" },
+  "bimProjectDeleteConfirmMessage": "Are you sure you want to delete \"{name}\"? All structural elements and drawings will be deleted.",
+  "@bimProjectDeleteConfirmMessage": {
+    "description": "Message for delete project confirmation dialog",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "bimProjectRename": "Rename",
+  "@bimProjectRename": { "description": "Action to rename a BiM project" },
+  "bimAlignmentTitle": "Drawing Alignment",
+  "@bimAlignmentTitle": { "description": "Title for the storey alignment screen" },
+  "bimAlignmentInstructions": "Tap and hold to place a common control point (e.g. intersection of axes 1 and A) on each storey underlay.",
+  "@bimAlignmentInstructions": { "description": "Instructions explaining how to align underlays" },
+  "bimAlignmentControlPointSet": "Control point set at ({x}, {y})",
+  "@bimAlignmentControlPointSet": {
+    "description": "Status indicator for control point coordinates",
+    "placeholders": {
+      "x": { "type": "String" },
+      "y": { "type": "String" }
+    }
+  },
+  "bimAlignmentControlPointMissing": "Control point required",
+  "@bimAlignmentControlPointMissing": { "description": "Notice when control point has not been set yet" },
+  "bimAlignmentOnionSkin": "Ghost lower storey",
+  "@bimAlignmentOnionSkin": { "description": "Toggle to show lower storey semi-transparently" },
+  "bimAlignmentReadyButton": "Ready • Start BiM",
+  "@bimAlignmentReadyButton": { "description": "Confirmation button to lock alignment and launch BiM designer" },
+  "bimAlignmentConfirmTitle": "Confirm Alignment & Start BiM",
+  "@bimAlignmentConfirmTitle": { "description": "Confirmation modal title before automation" },
+  "bimAlignmentConfirmMessage": "All control points are placed. The BiM module will now align the storeys, detect walls and generate grid axes. Proceed?",
+  "@bimAlignmentConfirmMessage": { "description": "Confirmation modal explanation before wall detection" },
+  "bimProjectExportStoreyDxf": "Export Storey Drawing (DXF)",
+  "@bimProjectExportStoreyDxf": { "description": "Export current storey DXF with original coordinates" },
+  "bimProjectExportStoreyDxfSubtitle": "Original coordinates with visible & structural layers",
+  "@bimProjectExportStoreyDxfSubtitle": { "description": "Subtitle describing storey DXF export" },
+  "bimProjectExportAllZip": "Export Project Package (ZIP)",
+  "@bimProjectExportAllZip": { "description": "Export full project package as ZIP" },
+  "bimProjectExportAllZipSubtitle": "All storey drawings + structural BiM model",
+  "@bimProjectExportAllZipSubtitle": { "description": "Subtitle describing ZIP export" },
+  "bimProjectExportSuccess": "Exported successfully: {filename}",
+  "@bimProjectExportSuccess": {
+    "description": "Snackbar notification on successful export",
+    "placeholders": {
+      "filename": { "type": "String" }
+    }
+  },
+  "bimProjectNoProjects": "No BiM projects yet. Tap '+' to create your first structural project.",
+  "@bimProjectNoProjects": { "description": "Empty state description in BiM project library" },
+  "bimProjectManageStoreys": "Manage Storeys & Underlays",
+  "@bimProjectManageStoreys": { "description": "Action from storey manager sheet to edit project storeys" },
+  "bimProjectBasement": "Basement {num}",
+  "@bimProjectBasement": {
+    "description": "Default name for basement storey",
+    "placeholders": {
+      "num": { "type": "int" }
+    }
+  },
+  "bimProjectGroundFloor": "Ground Floor",
+  "@bimProjectGroundFloor": { "description": "Default name for ground floor" },
+  "bimProjectFloor": "Floor {num}",
+  "@bimProjectFloor": {
+    "description": "Default name for above-ground floor",
+    "placeholders": {
+      "num": { "type": "int" }
+    }
+  },
+  "bimProjectSaving": "Saving BiM project...",
+  "@bimProjectSaving": { "description": "Status text while saving BiM model" },
+  "bimProjectUnderlayAttached": "Underlay attached",
+  "@bimProjectUnderlayAttached": { "description": "Success message when underlay is loaded" },
+  "bimProjectAlignFirstPrompt": "Please align all storeys before entering the BiM designer.",
+  "@bimProjectAlignFirstPrompt": { "description": "Notice when attempting to open unaligned project" },
+  "bimProjectLoading": "Loading BiM project and underlays...",
+  "@bimProjectLoading": { "description": "Loading indicator while opening BiM project workspace" }
 }
 

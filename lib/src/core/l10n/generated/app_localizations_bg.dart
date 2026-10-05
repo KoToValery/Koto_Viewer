@@ -2151,4 +2151,182 @@ class AppLocalizationsBg extends AppLocalizations {
   String overheadSlabLabel(String elev) {
     return 'Плоча (+$elev м)';
   }
+
+  @override
+  String get bimProjects => 'BiM Проекти';
+
+  @override
+  String get bimProjectsSubtitle =>
+      'Конструктивни модели и многоетажни чертежи';
+
+  @override
+  String get bimProjectLibraryTitle => 'Библиотека с BiM Проекти';
+
+  @override
+  String get bimProjectNew => 'Нов BiM Проект';
+
+  @override
+  String get bimProjectName => 'Име на проекта';
+
+  @override
+  String get bimProjectNameHint => 'напр. Жилищна сграда Флора';
+
+  @override
+  String get bimProjectLocation => 'Местоположение / Град';
+
+  @override
+  String get bimProjectLocationHint => 'напр. София, България';
+
+  @override
+  String get bimProjectStoreysSection => 'Етажи и подложки';
+
+  @override
+  String get bimProjectAddUnderlay => 'Зареди подложка';
+
+  @override
+  String get bimProjectReplaceUnderlay => 'Смени подложка';
+
+  @override
+  String get bimProjectNoUnderlay => 'Няма заредена подложка';
+
+  @override
+  String get bimProjectElevation => 'Кота (м)';
+
+  @override
+  String get bimProjectHeight => 'Височина (м)';
+
+  @override
+  String get bimProjectStoreyName => 'Име на етаж';
+
+  @override
+  String get bimProjectQuickSetup => 'Бърза настройка на етажи';
+
+  @override
+  String get bimProjectBasementCount => 'Подземни етажи';
+
+  @override
+  String get bimProjectAboveGroundCount => 'Надземни етажи';
+
+  @override
+  String get bimProjectFloorHeight => 'Етажна височина (м)';
+
+  @override
+  String get bimProjectGenerateStoreys => 'Генерирай етажи';
+
+  @override
+  String get bimProjectAddStorey => 'Добави етаж';
+
+  @override
+  String get bimProjectDeleteStorey => 'Изтрий етаж';
+
+  @override
+  String get bimProjectCreateButton => 'Създай проект';
+
+  @override
+  String get bimProjectStatusAlignment => 'Чака подравняване';
+
+  @override
+  String get bimProjectStatusReady => 'Подравнен • Готов за BiM';
+
+  @override
+  String bimProjectStoreysCount(int count) {
+    return '$count етажа';
+  }
+
+  @override
+  String get bimProjectOpen => 'Отвори модела';
+
+  @override
+  String get bimProjectAlignStoreys => 'Подравни чертежи';
+
+  @override
+  String get bimProjectDeleteConfirmTitle => 'Изтриване на проект?';
+
+  @override
+  String bimProjectDeleteConfirmMessage(String name) {
+    return 'Сигурни ли сте, че искате да изтриете \"$name\"? Всички конструктивни елементи и чертежи ще бъдат изтрити.';
+  }
+
+  @override
+  String get bimProjectRename => 'Преименувай';
+
+  @override
+  String get bimAlignmentTitle => 'Подравняване на чертежи';
+
+  @override
+  String get bimAlignmentInstructions =>
+      'Задръжте с пръст, за да поставите водеща контролна точка (напр. пресечката на оси 1 и А) на всяка подложка.';
+
+  @override
+  String bimAlignmentControlPointSet(String x, String y) {
+    return 'Контролната точка е поставена на ($x, $y)';
+  }
+
+  @override
+  String get bimAlignmentControlPointMissing => 'Изисква се контролна точка';
+
+  @override
+  String get bimAlignmentOnionSkin => 'Сравнение с долен етаж';
+
+  @override
+  String get bimAlignmentReadyButton => 'Готов съм • Стартирай BiM';
+
+  @override
+  String get bimAlignmentConfirmTitle => 'Потвърждение на подравняването';
+
+  @override
+  String get bimAlignmentConfirmMessage =>
+      'Всички контролни точки са поставени. BiM модулът ще подравни етажите, ще открие стените и ще генерира оси. Продължаване?';
+
+  @override
+  String get bimProjectExportStoreyDxf => 'Експорт на етажния чертеж (DXF)';
+
+  @override
+  String get bimProjectExportStoreyDxfSubtitle =>
+      'Оригинални координати с показаните и конструктивни слоеве';
+
+  @override
+  String get bimProjectExportAllZip => 'Експорт на целия проект (ZIP)';
+
+  @override
+  String get bimProjectExportAllZipSubtitle =>
+      'Всички етажни чертежи + конструктивен BiM модел';
+
+  @override
+  String bimProjectExportSuccess(String filename) {
+    return 'Успешен експорт: $filename';
+  }
+
+  @override
+  String get bimProjectNoProjects =>
+      'Все още няма BiM проекти. Натиснете \'+\', за да създадете първия си проект.';
+
+  @override
+  String get bimProjectManageStoreys => 'Управление на етажи и подложки';
+
+  @override
+  String bimProjectBasement(int num) {
+    return 'Сутерен $num';
+  }
+
+  @override
+  String get bimProjectGroundFloor => 'Партер';
+
+  @override
+  String bimProjectFloor(int num) {
+    return 'Етаж $num';
+  }
+
+  @override
+  String get bimProjectSaving => 'Запазване на BiM проект...';
+
+  @override
+  String get bimProjectUnderlayAttached => 'Подложката е прикачена';
+
+  @override
+  String get bimProjectAlignFirstPrompt =>
+      'Моля, подравнете всички етажи преди отваряне на BiM дизайнера.';
+
+  @override
+  String get bimProjectLoading => 'Зареждане на BiM проект и подложки...';
 }

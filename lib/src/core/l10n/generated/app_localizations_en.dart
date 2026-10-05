@@ -2141,4 +2141,181 @@ class AppLocalizationsEn extends AppLocalizations {
   String overheadSlabLabel(String elev) {
     return 'Overhead Slab (+$elev m)';
   }
+
+  @override
+  String get bimProjects => 'BiM Projects';
+
+  @override
+  String get bimProjectsSubtitle => 'Structural models & multi-storey drawings';
+
+  @override
+  String get bimProjectLibraryTitle => 'BiM Projects Library';
+
+  @override
+  String get bimProjectNew => 'New BiM Project';
+
+  @override
+  String get bimProjectName => 'Project Name';
+
+  @override
+  String get bimProjectNameHint => 'e.g. Residential Building Flora';
+
+  @override
+  String get bimProjectLocation => 'Location / City';
+
+  @override
+  String get bimProjectLocationHint => 'e.g. Sofia, Bulgaria';
+
+  @override
+  String get bimProjectStoreysSection => 'Storeys & Underlays';
+
+  @override
+  String get bimProjectAddUnderlay => 'Add Underlay';
+
+  @override
+  String get bimProjectReplaceUnderlay => 'Replace Underlay';
+
+  @override
+  String get bimProjectNoUnderlay => 'No underlay attached';
+
+  @override
+  String get bimProjectElevation => 'Elevation (m)';
+
+  @override
+  String get bimProjectHeight => 'Height (m)';
+
+  @override
+  String get bimProjectStoreyName => 'Storey Name';
+
+  @override
+  String get bimProjectQuickSetup => 'Quick Storey Setup';
+
+  @override
+  String get bimProjectBasementCount => 'Basements';
+
+  @override
+  String get bimProjectAboveGroundCount => 'Above ground';
+
+  @override
+  String get bimProjectFloorHeight => 'Storey height (m)';
+
+  @override
+  String get bimProjectGenerateStoreys => 'Generate Storeys';
+
+  @override
+  String get bimProjectAddStorey => 'Add Storey';
+
+  @override
+  String get bimProjectDeleteStorey => 'Delete Storey';
+
+  @override
+  String get bimProjectCreateButton => 'Create Project';
+
+  @override
+  String get bimProjectStatusAlignment => 'Awaiting Alignment';
+
+  @override
+  String get bimProjectStatusReady => 'Aligned • BiM Ready';
+
+  @override
+  String bimProjectStoreysCount(int count) {
+    return '$count storeys';
+  }
+
+  @override
+  String get bimProjectOpen => 'Open Model';
+
+  @override
+  String get bimProjectAlignStoreys => 'Align Drawings';
+
+  @override
+  String get bimProjectDeleteConfirmTitle => 'Delete Project?';
+
+  @override
+  String bimProjectDeleteConfirmMessage(String name) {
+    return 'Are you sure you want to delete \"$name\"? All structural elements and drawings will be deleted.';
+  }
+
+  @override
+  String get bimProjectRename => 'Rename';
+
+  @override
+  String get bimAlignmentTitle => 'Drawing Alignment';
+
+  @override
+  String get bimAlignmentInstructions =>
+      'Tap and hold to place a common control point (e.g. intersection of axes 1 and A) on each storey underlay.';
+
+  @override
+  String bimAlignmentControlPointSet(String x, String y) {
+    return 'Control point set at ($x, $y)';
+  }
+
+  @override
+  String get bimAlignmentControlPointMissing => 'Control point required';
+
+  @override
+  String get bimAlignmentOnionSkin => 'Ghost lower storey';
+
+  @override
+  String get bimAlignmentReadyButton => 'Ready • Start BiM';
+
+  @override
+  String get bimAlignmentConfirmTitle => 'Confirm Alignment & Start BiM';
+
+  @override
+  String get bimAlignmentConfirmMessage =>
+      'All control points are placed. The BiM module will now align the storeys, detect walls and generate grid axes. Proceed?';
+
+  @override
+  String get bimProjectExportStoreyDxf => 'Export Storey Drawing (DXF)';
+
+  @override
+  String get bimProjectExportStoreyDxfSubtitle =>
+      'Original coordinates with visible & structural layers';
+
+  @override
+  String get bimProjectExportAllZip => 'Export Project Package (ZIP)';
+
+  @override
+  String get bimProjectExportAllZipSubtitle =>
+      'All storey drawings + structural BiM model';
+
+  @override
+  String bimProjectExportSuccess(String filename) {
+    return 'Exported successfully: $filename';
+  }
+
+  @override
+  String get bimProjectNoProjects =>
+      'No BiM projects yet. Tap \'+\' to create your first structural project.';
+
+  @override
+  String get bimProjectManageStoreys => 'Manage Storeys & Underlays';
+
+  @override
+  String bimProjectBasement(int num) {
+    return 'Basement $num';
+  }
+
+  @override
+  String get bimProjectGroundFloor => 'Ground Floor';
+
+  @override
+  String bimProjectFloor(int num) {
+    return 'Floor $num';
+  }
+
+  @override
+  String get bimProjectSaving => 'Saving BiM project...';
+
+  @override
+  String get bimProjectUnderlayAttached => 'Underlay attached';
+
+  @override
+  String get bimProjectAlignFirstPrompt =>
+      'Please align all storeys before entering the BiM designer.';
+
+  @override
+  String get bimProjectLoading => 'Loading BiM project and underlays...';
 }

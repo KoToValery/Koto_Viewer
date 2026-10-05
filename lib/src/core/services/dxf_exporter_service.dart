@@ -28,16 +28,19 @@ class DxfExporterService {
         defaultTextHeight: defaultTextHeight,
       );
 
-  /// Exports a complete DXF file merging [baseFile] with all [importedFiles]
-  /// and any user-added [annotations].
+  /// Exports a complete DXF file merging [baseFile] with all [importedFiles],
+  /// any user-added [annotations], and optional [layerVisibility] states.
   static Future<File> exportMergedDxf({
     required File baseFile,
     List<File> importedFiles = const [],
     List<DxfAnnotation> annotations = const [],
+    Map<String, bool>? layerVisibility,
     required File outputFile,
     double defaultTextHeight = 2.5,
   }) async {
-    if (importedFiles.isEmpty && annotations.isEmpty) {
+    if (importedFiles.isEmpty &&
+        annotations.isEmpty &&
+        (layerVisibility == null || layerVisibility.isEmpty)) {
       return baseFile.copy(outputFile.path);
     }
 
@@ -298,6 +301,7 @@ class DxfExporterService {
     final outPairs = <_DxfPair>[];
     String? curSection;
     String? curTableInOutput;
+    String? currentBaseLayerName;
     bool insertedBlocks = false;
     bool insertedEntities = false;
 
@@ -365,6 +369,23 @@ class DxfExporterService {
             newLtypePairs.clear();
           }
           curTableInOutput = null;
+          currentBaseLayerName = null;
+        } else if (curTableInOutput == 'LAYER') {
+          if (p.code == 0 && p.value.trim().toUpperCase() == 'LAYER') {
+            currentBaseLayerName = null;
+          } else if (p.code == 2 && currentBaseLayerName == null) {
+            currentBaseLayerName = p.value.trim();
+          } else if (p.code == 62 &&
+              currentBaseLayerName != null &&
+              layerVisibility != null &&
+              layerVisibility.containsKey(currentBaseLayerName)) {
+            final isVis = layerVisibility[currentBaseLayerName]!;
+            final col = int.tryParse(p.value.trim()) ?? 7;
+            final effectiveCol = isVis ? col.abs() : -col.abs();
+            outPairs.add(_DxfPair(62, '$effectiveCol'));
+            idx++;
+            continue;
+          }
         }
       }
 

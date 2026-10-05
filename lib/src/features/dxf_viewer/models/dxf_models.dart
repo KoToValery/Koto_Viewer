@@ -1550,6 +1550,15 @@ class DxfDocument {
   /// Bounding rectangles for each layout.
   final Map<String, Rect> layoutBounds;
 
+  factory DxfDocument.empty() => DxfDocument(
+        layers: const {},
+        blocks: const {},
+        entities: const [],
+        headerVars: const {},
+        bounds: Rect.zero,
+        entityStats: const {},
+      );
+
   DxfDocument({
     required this.layers,
     required this.blocks,
