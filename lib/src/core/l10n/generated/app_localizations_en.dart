@@ -2393,4 +2393,75 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openingPointsMerged => 'Opening points merged';
+
+  @override
+  String get finePositionTitle => 'Position & Nudge';
+
+  @override
+  String nudgeStepLabel(String step) {
+    return 'Step: $step';
+  }
+
+  @override
+  String get step1cm => '1 cm';
+
+  @override
+  String get step5cm => '5 cm';
+
+  @override
+  String get step10cm => '10 cm';
+
+  @override
+  String get step25cm => '25 cm';
+
+  @override
+  String get coordinateXLabel => 'X (m)';
+
+  @override
+  String get coordinateYLabel => 'Y (m)';
+
+  @override
+  String clearDistanceDimension(String distance) {
+    return 'Clear: $distance m';
+  }
+
+  @override
+  String axialDistanceDimension(String distance) {
+    return 'Axis: $distance m';
+  }
+
+  @override
+  String get flushFaceAligned => 'Flush Face';
+
+  @override
+  String get refLineCenter => 'Ref: Center';
+
+  @override
+  String get refLineLeft => 'Ref: Left Face';
+
+  @override
+  String get refLineRight => 'Ref: Right Face';
+
+  @override
+  String get refLineTitle => 'Reference Line';
+
+  @override
+  String get snapToNearest => 'Snap to nearest';
+
+  @override
+  String get alignLeftFace => 'Flush Left';
+
+  @override
+  String get alignRightFace => 'Flush Right';
+
+  @override
+  String get alignTopFace => 'Flush Top';
+
+  @override
+  String get alignBottomFace => 'Flush Bottom';
+
+  @override
+  String shearWallRefLineChanged(String line) {
+    return 'Reference line: $line';
+  }
 }

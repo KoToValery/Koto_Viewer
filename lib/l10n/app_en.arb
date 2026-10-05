@@ -2032,6 +2032,60 @@
   "deleteOpeningPoint": "Delete Point",
   "@deleteOpeningPoint": { "description": "Button label to delete the selected vertex of an opening polygon" },
   "openingPointsMerged": "Opening points merged",
-  "@openingPointsMerged": { "description": "Notification when two opening vertices are merged" }
+  "@openingPointsMerged": { "description": "Notification when two opening vertices are merged" },
+  "finePositionTitle": "Position & Nudge",
+  "@finePositionTitle": { "description": "Title and button for fine position and nudge bottom sheet" },
+  "nudgeStepLabel": "Step: {step}",
+  "@nudgeStepLabel": {
+    "description": "Step size label",
+    "placeholders": { "step": { "type": "String" } }
+  },
+  "step1cm": "1 cm",
+  "@step1cm": { "description": "1 cm step label" },
+  "step5cm": "5 cm",
+  "@step5cm": { "description": "5 cm step label" },
+  "step10cm": "10 cm",
+  "@step10cm": { "description": "10 cm step label" },
+  "step25cm": "25 cm",
+  "@step25cm": { "description": "25 cm step label" },
+  "coordinateXLabel": "X (m)",
+  "@coordinateXLabel": { "description": "Label for X coordinate input" },
+  "coordinateYLabel": "Y (m)",
+  "@coordinateYLabel": { "description": "Label for Y coordinate input" },
+  "clearDistanceDimension": "Clear: {distance} m",
+  "@clearDistanceDimension": {
+    "description": "Dynamic clear dimension text",
+    "placeholders": { "distance": { "type": "String" } }
+  },
+  "axialDistanceDimension": "Axis: {distance} m",
+  "@axialDistanceDimension": {
+    "description": "Dynamic axial dimension text",
+    "placeholders": { "distance": { "type": "String" } }
+  },
+  "flushFaceAligned": "Flush Face",
+  "@flushFaceAligned": { "description": "Flush face alignment badge" },
+  "refLineCenter": "Ref: Center",
+  "@refLineCenter": { "description": "Shear wall center reference line label" },
+  "refLineLeft": "Ref: Left Face",
+  "@refLineLeft": { "description": "Shear wall left face reference line label" },
+  "refLineRight": "Ref: Right Face",
+  "@refLineRight": { "description": "Shear wall right face reference line label" },
+  "refLineTitle": "Reference Line",
+  "@refLineTitle": { "description": "Title for shear wall reference line" },
+  "snapToNearest": "Snap to nearest",
+  "@snapToNearest": { "description": "Button to snap element to nearest axis or face" },
+  "alignLeftFace": "Flush Left",
+  "@alignLeftFace": { "description": "Align left face button" },
+  "alignRightFace": "Flush Right",
+  "@alignRightFace": { "description": "Align right face button" },
+  "alignTopFace": "Flush Top",
+  "@alignTopFace": { "description": "Align top face button" },
+  "alignBottomFace": "Flush Bottom",
+  "@alignBottomFace": { "description": "Align bottom face button" },
+  "shearWallRefLineChanged": "Reference line: {line}",
+  "@shearWallRefLineChanged": {
+    "description": "Notification when shear wall reference line changes",
+    "placeholders": { "line": { "type": "String" } }
+  }
 }
 

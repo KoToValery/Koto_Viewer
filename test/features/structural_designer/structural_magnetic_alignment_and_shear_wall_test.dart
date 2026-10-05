@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/structural_magnetic_alignment_helper.dart';
@@ -161,6 +160,82 @@ void main() {
       expect(result, isNotNull);
       expect(result!.snappedCenter.dx, closeTo(8.0, 1e-3));
       expect(result.snappedCenter.dy, closeTo(6.0, 1e-3));
+    });
+
+    test('alignColumn snaps 2-DOF simultaneously: X to grid axis and Y to perpendicular column', () {
+      // axis1 is at x = 0. col1 is at (5.0, 5.0).
+      // Placing near x = 0.05, y = 5.04.
+      // Under 2-DOF solver, X snaps to axis1 (0.0) and Y snaps to col1 (5.0).
+      final result = StructuralMagneticAlignmentHelper.alignColumn(
+        rawCenter: const Offset(0.05, 5.04),
+        toleranceCad: 0.20,
+        activeStorey: storey,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.snappedCenter.dx, closeTo(0.0, 1e-3));
+      expect(result.snappedCenter.dy, closeTo(5.0, 1e-3));
+      expect(result.description, 'gridAxisAndColumn');
+      expect(result.guideLines.length, 2);
+    });
+
+    test('alignColumn aligns flush left face with another column', () {
+      // col1 is at (5.0, 5.0), width=0.30 -> left face is at x = 4.85
+      // Placing new column with width=0.50 near left face (x_center ~ 4.85 + 0.25 = 5.10, y = 15.0)
+      final result = StructuralMagneticAlignmentHelper.alignColumn(
+        rawCenter: const Offset(5.12, 15.0),
+        columnWidth: 0.50,
+        columnHeight: 0.50,
+        toleranceCad: 0.20,
+        activeStorey: storey,
+      );
+
+      expect(result, isNotNull);
+      // Left face of new column (result.dx - 0.25) should equal 4.85
+      expect(result!.snappedCenter.dx - 0.25, closeTo(4.85, 1e-3));
+    });
+
+    test('alignShearWall snaps end to perpendicular cross axis (T-junction)', () {
+      // axis1 is at x = 0, axisA is at y = 0.
+      // Placing vertical wall (length=2.0) parallel to axis1 (x ~ 0.05) with bottom end near axisA (center y ~ 1.05)
+      // When snapped, bottom end touches y = 0, so center snaps to y = 1.0!
+      final result = StructuralMagneticAlignmentHelper.alignShearWall(
+        rawCenter: const Offset(0.05, 1.06),
+        wallLength: 2.0,
+        wallThickness: 0.25,
+        wallRotationRad: math.pi / 2,
+        toleranceCad: 0.20,
+        activeStorey: storey,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.snappedCenter.dx, closeTo(0.0, 1e-3));
+      expect(result.snappedCenter.dy, closeTo(1.0, 1e-3));
+      expect(result.description, 'gridAxisAndCrossAxis');
+    });
+
+    test('StructuralShearWall referenceLine leftFace and rightFace calculate vertices properly', () {
+      const wallCenter = StructuralShearWall(
+        id: 'w_c',
+        start: Offset(0, 0),
+        end: Offset(4, 0),
+        thickness: 0.25,
+        referenceLine: ShearWallReferenceLine.center,
+      );
+      const wallLeft = StructuralShearWall(
+        id: 'w_l',
+        start: Offset(0, 0),
+        end: Offset(4, 0),
+        thickness: 0.25,
+        referenceLine: ShearWallReferenceLine.leftFace,
+      );
+
+      expect(wallCenter.polygonVertices[0].dy, closeTo(0.125, 1e-4));
+      expect(wallCenter.polygonVertices[2].dy, closeTo(-0.125, 1e-4));
+
+      // Left face: baseline (y=0) is one edge, other edge is at y = -0.25 (normal pointing -Y)
+      expect(wallLeft.polygonVertices[0].dy, closeTo(0.0, 1e-4));
+      expect(wallLeft.polygonVertices[2].dy, closeTo(-0.25, 1e-4));
     });
   });
 

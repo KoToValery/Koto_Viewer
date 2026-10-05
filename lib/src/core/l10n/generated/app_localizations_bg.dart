@@ -2402,4 +2402,75 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get openingPointsMerged => 'Точките на отвора са обединени';
+
+  @override
+  String get finePositionTitle => 'Позиция и стъпка';
+
+  @override
+  String nudgeStepLabel(String step) {
+    return 'Стъпка: $step';
+  }
+
+  @override
+  String get step1cm => '1 cm';
+
+  @override
+  String get step5cm => '5 cm';
+
+  @override
+  String get step10cm => '10 cm';
+
+  @override
+  String get step25cm => '25 cm';
+
+  @override
+  String get coordinateXLabel => 'X (m)';
+
+  @override
+  String get coordinateYLabel => 'Y (m)';
+
+  @override
+  String clearDistanceDimension(String distance) {
+    return 'Светло: $distance m';
+  }
+
+  @override
+  String axialDistanceDimension(String distance) {
+    return 'Ос: $distance m';
+  }
+
+  @override
+  String get flushFaceAligned => 'Подравнено лице';
+
+  @override
+  String get refLineCenter => 'Реф: Център';
+
+  @override
+  String get refLineLeft => 'Реф: Ляво лице';
+
+  @override
+  String get refLineRight => 'Реф: Дясно лице';
+
+  @override
+  String get refLineTitle => 'Референтна линия';
+
+  @override
+  String get snapToNearest => 'Прилепи към най-близък';
+
+  @override
+  String get alignLeftFace => 'Ляво лице';
+
+  @override
+  String get alignRightFace => 'Дясно лице';
+
+  @override
+  String get alignTopFace => 'Горно лице';
+
+  @override
+  String get alignBottomFace => 'Долно лице';
+
+  @override
+  String shearWallRefLineChanged(String line) {
+    return 'Референтна линия: $line';
+  }
 }

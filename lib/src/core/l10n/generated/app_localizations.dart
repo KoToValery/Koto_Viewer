@@ -4185,6 +4185,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opening points merged'**
   String get openingPointsMerged;
+
+  /// Title and button for fine position and nudge bottom sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Position & Nudge'**
+  String get finePositionTitle;
+
+  /// Step size label
+  ///
+  /// In en, this message translates to:
+  /// **'Step: {step}'**
+  String nudgeStepLabel(String step);
+
+  /// 1 cm step label
+  ///
+  /// In en, this message translates to:
+  /// **'1 cm'**
+  String get step1cm;
+
+  /// 5 cm step label
+  ///
+  /// In en, this message translates to:
+  /// **'5 cm'**
+  String get step5cm;
+
+  /// 10 cm step label
+  ///
+  /// In en, this message translates to:
+  /// **'10 cm'**
+  String get step10cm;
+
+  /// 25 cm step label
+  ///
+  /// In en, this message translates to:
+  /// **'25 cm'**
+  String get step25cm;
+
+  /// Label for X coordinate input
+  ///
+  /// In en, this message translates to:
+  /// **'X (m)'**
+  String get coordinateXLabel;
+
+  /// Label for Y coordinate input
+  ///
+  /// In en, this message translates to:
+  /// **'Y (m)'**
+  String get coordinateYLabel;
+
+  /// Dynamic clear dimension text
+  ///
+  /// In en, this message translates to:
+  /// **'Clear: {distance} m'**
+  String clearDistanceDimension(String distance);
+
+  /// Dynamic axial dimension text
+  ///
+  /// In en, this message translates to:
+  /// **'Axis: {distance} m'**
+  String axialDistanceDimension(String distance);
+
+  /// Flush face alignment badge
+  ///
+  /// In en, this message translates to:
+  /// **'Flush Face'**
+  String get flushFaceAligned;
+
+  /// Shear wall center reference line label
+  ///
+  /// In en, this message translates to:
+  /// **'Ref: Center'**
+  String get refLineCenter;
+
+  /// Shear wall left face reference line label
+  ///
+  /// In en, this message translates to:
+  /// **'Ref: Left Face'**
+  String get refLineLeft;
+
+  /// Shear wall right face reference line label
+  ///
+  /// In en, this message translates to:
+  /// **'Ref: Right Face'**
+  String get refLineRight;
+
+  /// Title for shear wall reference line
+  ///
+  /// In en, this message translates to:
+  /// **'Reference Line'**
+  String get refLineTitle;
+
+  /// Button to snap element to nearest axis or face
+  ///
+  /// In en, this message translates to:
+  /// **'Snap to nearest'**
+  String get snapToNearest;
+
+  /// Align left face button
+  ///
+  /// In en, this message translates to:
+  /// **'Flush Left'**
+  String get alignLeftFace;
+
+  /// Align right face button
+  ///
+  /// In en, this message translates to:
+  /// **'Flush Right'**
+  String get alignRightFace;
+
+  /// Align top face button
+  ///
+  /// In en, this message translates to:
+  /// **'Flush Top'**
+  String get alignTopFace;
+
+  /// Align bottom face button
+  ///
+  /// In en, this message translates to:
+  /// **'Flush Bottom'**
+  String get alignBottomFace;
+
+  /// Notification when shear wall reference line changes
+  ///
+  /// In en, this message translates to:
+  /// **'Reference line: {line}'**
+  String shearWallRefLineChanged(String line);
 }
 
 class _AppLocalizationsDelegate

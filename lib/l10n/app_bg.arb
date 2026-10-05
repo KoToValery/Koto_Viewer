@@ -682,6 +682,27 @@
   "noSlabLayerDetectedOrEmpty": "Няма открит слой за плоча или слоят е празен",
   "slabLayerAddedToFilter": "Слоят за плоча \"{layer}\" е добавен към конструктивния филтър",
   "deleteOpeningPoint": "Изтрий точка",
-  "openingPointsMerged": "Точките на отвора са обединени"
+  "openingPointsMerged": "Точките на отвора са обединени",
+  "finePositionTitle": "Позиция и стъпка",
+  "nudgeStepLabel": "Стъпка: {step}",
+  "step1cm": "1 cm",
+  "step5cm": "5 cm",
+  "step10cm": "10 cm",
+  "step25cm": "25 cm",
+  "coordinateXLabel": "X (m)",
+  "coordinateYLabel": "Y (m)",
+  "clearDistanceDimension": "Светло: {distance} m",
+  "axialDistanceDimension": "Ос: {distance} m",
+  "flushFaceAligned": "Подравнено лице",
+  "refLineCenter": "Реф: Център",
+  "refLineLeft": "Реф: Ляво лице",
+  "refLineRight": "Реф: Дясно лице",
+  "refLineTitle": "Референтна линия",
+  "snapToNearest": "Прилепи към най-близък",
+  "alignLeftFace": "Ляво лице",
+  "alignRightFace": "Дясно лице",
+  "alignTopFace": "Горно лице",
+  "alignBottomFace": "Долно лице",
+  "shearWallRefLineChanged": "Референтна линия: {line}"
 }
 

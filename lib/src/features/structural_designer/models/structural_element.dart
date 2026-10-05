@@ -204,15 +204,23 @@ class StructuralColumn {
   }
 }
 
+/// Reference baseline position for shear walls.
+enum ShearWallReferenceLine {
+  center,
+  leftFace,
+  rightFace,
+}
+
 /// Represents a structural reinforced concrete shear wall (шайба).
-/// The line from [start] to [end] is the LEADING REFERENCE LINE (default on the LEFT of the wall).
+/// The line from [start] to [end] is the LEADING REFERENCE LINE.
 class StructuralShearWall {
   final String id;
   final String? name;
   final Offset start;
   final Offset end;
   final double thickness; // in meters (default 0.25)
-  final bool isFlipped; // whether the wall body is flipped to the left side of the line
+  final bool isFlipped; // whether the wall body is flipped to the opposite side of the line
+  final ShearWallReferenceLine referenceLine;
 
   const StructuralShearWall({
     required this.id,
@@ -221,6 +229,7 @@ class StructuralShearWall {
     required this.end,
     this.thickness = 0.25,
     this.isFlipped = false,
+    this.referenceLine = ShearWallReferenceLine.center,
   });
 
   /// User-facing shear wall display name (e.g. "Ш1", "Ш2" or "W1", "W2"). Falls back to "Ш" if empty.
@@ -237,11 +246,21 @@ class StructuralShearWall {
   /// Rotation angle in radians (synonym for [angleRad]).
   double get rotationRad => angleRad;
 
-  /// Geometric center of the shear wall baseline.
-  Offset get center => Offset((start.dx + end.dx) / 2.0, (start.dy + end.dy) / 2.0);
+  /// Geometric center of the shear wall body.
+  Offset get center {
+    final baseCenter = Offset((start.dx + end.dx) / 2.0, (start.dy + end.dy) / 2.0);
+    if (referenceLine == ShearWallReferenceLine.center) return baseCenter;
+    final double l = length;
+    if (l < 1e-6) return baseCenter;
+    final normal = Offset((end.dy - start.dy) / l, -(end.dx - start.dx) / l);
+    final halfT = thickness / 2.0;
+    final double shift = referenceLine == ShearWallReferenceLine.leftFace
+        ? (isFlipped ? -halfT : halfT)
+        : (isFlipped ? halfT : -halfT);
+    return baseCenter + normal * shift;
+  }
 
   /// 4 corner vertices forming the thick wall box in CAD coordinates.
-  /// Symmetrically centered along the axial baseline from [start] to [end].
   List<Offset> get polygonVertices {
     final double l = length;
     if (l < 1e-6) {
@@ -251,14 +270,29 @@ class StructuralShearWall {
     final double dy = end.dy - start.dy;
     final normal = Offset(dy / l, -dx / l);
     final halfT = thickness / 2.0;
-    final ox = normal.dx * halfT;
-    final oy = normal.dy * halfT;
+
+    final double o1;
+    final double o2;
+    switch (referenceLine) {
+      case ShearWallReferenceLine.center:
+        o1 = -halfT;
+        o2 = halfT;
+        break;
+      case ShearWallReferenceLine.leftFace:
+        o1 = isFlipped ? -thickness : 0.0;
+        o2 = isFlipped ? 0.0 : thickness;
+        break;
+      case ShearWallReferenceLine.rightFace:
+        o1 = isFlipped ? 0.0 : -thickness;
+        o2 = isFlipped ? thickness : 0.0;
+        break;
+    }
 
     return [
-      Offset(start.dx - ox, start.dy - oy),
-      Offset(end.dx - ox, end.dy - oy),
-      Offset(end.dx + ox, end.dy + oy),
-      Offset(start.dx + ox, start.dy + oy),
+      Offset(start.dx + normal.dx * o1, start.dy + normal.dy * o1),
+      Offset(end.dx + normal.dx * o1, end.dy + normal.dy * o1),
+      Offset(end.dx + normal.dx * o2, end.dy + normal.dy * o2),
+      Offset(start.dx + normal.dx * o2, start.dy + normal.dy * o2),
     ];
   }
 
@@ -269,6 +303,7 @@ class StructuralShearWall {
     Offset? end,
     double? thickness,
     bool? isFlipped,
+    ShearWallReferenceLine? referenceLine,
   }) {
     return StructuralShearWall(
       id: id ?? this.id,
@@ -277,6 +312,7 @@ class StructuralShearWall {
       end: end ?? this.end,
       thickness: thickness ?? this.thickness,
       isFlipped: isFlipped ?? this.isFlipped,
+      referenceLine: referenceLine ?? this.referenceLine,
     );
   }
 
@@ -287,6 +323,7 @@ class StructuralShearWall {
     'end': {'dx': end.dx, 'dy': end.dy},
     'thickness': thickness,
     'isFlipped': isFlipped,
+    'referenceLine': referenceLine.name,
   };
 
   factory StructuralShearWall.fromJson(Map<String, dynamic> json) {
@@ -303,6 +340,10 @@ class StructuralShearWall {
       ),
       thickness: (json['thickness'] as num?)?.toDouble() ?? 0.25,
       isFlipped: json['isFlipped'] as bool? ?? false,
+      referenceLine: ShearWallReferenceLine.values.firstWhere(
+        (s) => s.name == json['referenceLine'],
+        orElse: () => ShearWallReferenceLine.center,
+      ),
     );
   }
 }
