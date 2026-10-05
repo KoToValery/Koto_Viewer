@@ -68,9 +68,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   DxfDocument get _document {
     if (widget.bimContext != null) {
-      final activeId = _project.activeStorey.id;
-      final underlay = widget.bimContext!.underlaysByStorey[activeId];
-      if (underlay != null) return underlay;
+      try {
+        final activeId = _project.activeStorey.id;
+        final underlay = widget.bimContext!.underlaysByStorey[activeId];
+        if (underlay != null) return underlay;
+      } catch (_) {}
     }
     return widget.document;
   }
@@ -208,6 +210,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   @override
   void initState() {
     super.initState();
+    _project = widget.initialProject ?? const StructuralProject();
     _initDisplaySettings();
     DxfDisplaySettingsService.settingsNotifier.addListener(_onDisplaySettingsChanged);
     _transformController = TransformationController(
@@ -225,8 +228,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // Underlay filter starts off (all layers visible as in commit e781d51).
     // The user can manually toggle structural underlay filtering via the AppBar funnel icon.
-
-    _project = widget.initialProject ?? const StructuralProject();
     if (_project.activeStorey.gridAxes.isEmpty) {
       if (widget.initialDetectionResult != null && widget.initialDetectionResult!.hasWallsFound) {
         final axes = WallAxisDetector.convertToStructuralGridAxes(

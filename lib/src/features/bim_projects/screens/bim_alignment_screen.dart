@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -48,6 +49,11 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
   Offset? _touchCadCoord;
   Offset? _activeSnapCad;
   bool _isDraggingPoint = false;
+  PointerDeviceKind _activePointerKind = PointerDeviceKind.touch;
+  Offset? _touchScreenPos;
+  Offset? _targetScreenPos;
+  Offset? _snappedScreenPos;
+  DxfSnapType? _activeSnapType;
 
   @override
   void initState() {
@@ -113,6 +119,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     setState(() {
       _touchCadCoord = null;
       _activeSnapCad = null;
+      _touchScreenPos = null;
+      _targetScreenPos = null;
+      _snappedScreenPos = null;
+      _activeSnapType = null;
       _isDraggingPoint = false;
       _renderScale = 1.0;
       _transformController.value = Matrix4.identity();
@@ -161,6 +171,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
           _project = latestProject;
           _touchCadCoord = null;
           _activeSnapCad = null;
+          _touchScreenPos = null;
+          _targetScreenPos = null;
+          _snappedScreenPos = null;
+          _activeSnapType = null;
           _isDraggingPoint = false;
         });
         await _loadAllUnderlays();
@@ -283,9 +297,12 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     }
   }
 
-  void _updateSnapPoint(Offset localPosition, Rect bounds, Size viewportSize) {
+  void _updateSnapPoint(Offset localPosition, Rect bounds, Size viewportSize, {bool isMouse = false}) {
     if (_currentDoc == null) return;
-    final scenePos = _transformController.toScene(localPosition);
+    final touchPos = localPosition;
+    // On touch/mobile: position target tip 56 pixels directly above finger so finger doesn't obscure view (same as CAD dimensioning)
+    final targetPos = isMouse ? localPosition : (localPosition - const Offset(0, 56.0));
+    final scenePos = _transformController.toScene(targetPos);
     final cadPt = _sceneToCad(scenePos, bounds, viewportSize);
     final fitScale = _getCadFitScale(bounds, viewportSize);
     final currentScale = _transformController.value.getMaxScaleOnAxis().clamp(0.0001, 10000.0);
@@ -297,9 +314,22 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       toleranceCad: toleranceCad,
     );
 
+    if (snap != null) {
+      if (_activeSnapCad == null || _activeSnapCad != snap.point) {
+        HapticFeedback.selectionClick();
+      }
+    }
+
+    final effectiveCad = snap?.point ?? cadPt;
+    final snappedScreen = snap != null ? _cadToScreen(snap.point, bounds, viewportSize) : null;
+
     setState(() {
-      _touchCadCoord = cadPt;
+      _touchScreenPos = touchPos;
+      _targetScreenPos = targetPos;
+      _snappedScreenPos = snappedScreen;
+      _activeSnapType = snap?.type;
       _activeSnapCad = snap?.point;
+      _touchCadCoord = effectiveCad;
     });
   }
 
@@ -346,6 +376,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       _project = updatedProject;
       _touchCadCoord = null;
       _activeSnapCad = null;
+      _touchScreenPos = null;
+      _targetScreenPos = null;
+      _snappedScreenPos = null;
+      _activeSnapType = null;
       _isDraggingPoint = false;
     });
 
@@ -370,6 +404,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       _project = updatedProject;
       _touchCadCoord = null;
       _activeSnapCad = null;
+      _touchScreenPos = null;
+      _targetScreenPos = null;
+      _snappedScreenPos = null;
+      _activeSnapType = null;
       _isDraggingPoint = false;
     });
 
@@ -573,30 +611,64 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                               return Stack(
                                 fit: StackFit.passthrough,
                                 children: [
-                                  GestureDetector(
-                                    onLongPressStart: (details) {
-                                      _isDraggingPoint = true;
-                                      _updateSnapPoint(details.localPosition, bounds, viewportSize);
-                                      HapticFeedback.selectionClick();
+                                  RawGestureDetector(
+                                    gestures: <Type, GestureRecognizerFactory>{
+                                      LongPressGestureRecognizer:
+                                          GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+                                        () => LongPressGestureRecognizer(
+                                          duration: const Duration(milliseconds: 250),
+                                          debugOwner: this,
+                                        ),
+                                        (LongPressGestureRecognizer instance) {
+                                          instance
+                                            ..onLongPressStart = (details) {
+                                              _isDraggingPoint = true;
+                                              _updateSnapPoint(
+                                                details.localPosition,
+                                                bounds,
+                                                viewportSize,
+                                                isMouse: _activePointerKind == PointerDeviceKind.mouse,
+                                              );
+                                              HapticFeedback.selectionClick();
+                                            }
+                                            ..onLongPressMoveUpdate = (details) {
+                                              _updateSnapPoint(
+                                                details.localPosition,
+                                                bounds,
+                                                viewportSize,
+                                                isMouse: _activePointerKind == PointerDeviceKind.mouse,
+                                              );
+                                            }
+                                            ..onLongPressEnd = (details) {
+                                              final target = _activeSnapCad ?? _touchCadCoord;
+                                              setState(() {
+                                                _isDraggingPoint = false;
+                                                _touchScreenPos = null;
+                                                _targetScreenPos = null;
+                                                _snappedScreenPos = null;
+                                                _activeSnapType = null;
+                                              });
+                                              if (target != null) {
+                                                _onSetControlPoint(target);
+                                              }
+                                            }
+                                            ..onLongPressCancel = () {
+                                              setState(() {
+                                                _isDraggingPoint = false;
+                                                _touchScreenPos = null;
+                                                _targetScreenPos = null;
+                                                _snappedScreenPos = null;
+                                                _activeSnapType = null;
+                                              });
+                                            };
+                                        },
+                                      ),
                                     },
-                                    onLongPressMoveUpdate: (details) {
-                                      _updateSnapPoint(details.localPosition, bounds, viewportSize);
-                                    },
-                                    onLongPressEnd: (details) {
-                                      setState(() {
-                                        _isDraggingPoint = false;
-                                      });
-                                      final target = _activeSnapCad ?? _touchCadCoord;
-                                      if (target != null) {
-                                        _onSetControlPoint(target);
-                                      }
-                                    },
-                                    onLongPressCancel: () {
-                                      setState(() {
-                                        _isDraggingPoint = false;
-                                      });
-                                    },
-                                    child: InteractiveViewer(
+                                    child: Listener(
+                                      onPointerDown: (e) {
+                                        _activePointerKind = e.kind;
+                                      },
+                                      child: InteractiveViewer(
                                       transformationController: _transformController,
                                       scaleFactor: 350.0,
                                       trackpadScrollCausesScale: true,
@@ -687,6 +759,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                                       ),
                                     ),
                                   ),
+                                  ),
 
                                   // Screen-Space Control Point Bullseye Marker (Crisp, vector-sharp at ANY zoom scale)
                                   Positioned.fill(
@@ -698,6 +771,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                                           draggingPoint: _isDraggingPoint
                                               ? (_activeSnapCad ?? _touchCadCoord)
                                               : null,
+                                          touchPos: _isDraggingPoint ? _touchScreenPos : null,
+                                          targetPos: _isDraggingPoint ? _targetScreenPos : null,
+                                          snappedPos: _isDraggingPoint ? _snappedScreenPos : null,
+                                          snapType: _isDraggingPoint ? _activeSnapType : null,
                                           cadToScreen: (pt) => _cadToScreen(pt, bounds, viewportSize),
                                         ),
                                       ),
@@ -825,17 +902,25 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
 class _ControlPointOverlayPainter extends CustomPainter {
   final Offset? placedPoint;
   final Offset? draggingPoint;
+  final Offset? touchPos;
+  final Offset? targetPos;
+  final Offset? snappedPos;
+  final DxfSnapType? snapType;
   final Offset Function(Offset) cadToScreen;
 
   _ControlPointOverlayPainter({
     required this.placedPoint,
     required this.draggingPoint,
+    this.touchPos,
+    this.targetPos,
+    this.snappedPos,
+    this.snapType,
     required this.cadToScreen,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (placedPoint != null) {
+    if (placedPoint != null && draggingPoint == null) {
       final p = cadToScreen(placedPoint!);
       _drawBullseye(
         canvas,
@@ -847,13 +932,60 @@ class _ControlPointOverlayPainter extends CustomPainter {
     }
 
     if (draggingPoint != null) {
-      final p = cadToScreen(draggingPoint!);
+      final effectiveTip = snappedPos ?? targetPos ?? cadToScreen(draggingPoint!);
+      final bool isSnapped = snappedPos != null;
+      final baseColor = isSnapped ? const Color(0xFF00E5FF) : const Color(0xFFFF9100);
+      final glowColor = baseColor.withValues(alpha: 0.35);
+
+      // 1. Draw Touch Anchor under user's finger (if finger touch position is available)
+      if (touchPos != null) {
+        final touchAnchorPaint = Paint()
+          ..color = baseColor.withValues(alpha: 0.15)
+          ..style = PaintingStyle.fill;
+        final touchBorderPaint = Paint()
+          ..color = baseColor.withValues(alpha: 0.6)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5;
+        final touchCenterPaint = Paint()
+          ..color = baseColor
+          ..style = PaintingStyle.fill;
+
+        canvas.drawCircle(touchPos!, 18, touchAnchorPaint);
+        canvas.drawCircle(touchPos!, 18, touchBorderPaint);
+        canvas.drawCircle(touchPos!, 3.5, touchCenterPaint);
+
+        // 2. Sleek Guideline Stem connecting touch anchor to the offset target apex
+        final stemPaint = Paint()
+          ..color = baseColor.withValues(alpha: 0.85)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8;
+        final glowStemPaint = Paint()
+          ..color = glowColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5.0;
+
+        final stemPath = Path()
+          ..moveTo(touchPos!.dx, touchPos!.dy - 18)
+          ..lineTo(effectiveTip.dx, effectiveTip.dy + 24);
+
+        canvas.drawPath(stemPath, glowStemPaint);
+        canvas.drawPath(stemPath, stemPaint);
+      }
+
+      // 3. Offset Target Bullseye (56px above finger, fully visible)
+      final snapLabel = isSnapped
+          ? (snapType != null ? snapType!.name.toUpperCase() : 'SNAP')
+          : 'CP';
+      final coordText =
+          '${draggingPoint!.dx.toStringAsFixed(2)}, ${draggingPoint!.dy.toStringAsFixed(2)}';
+
       _drawBullseye(
         canvas,
-        p,
-        color: const Color(0xFFFF9100),
+        effectiveTip,
+        color: baseColor,
         isPlaced: false,
-        label: 'Snap: (${draggingPoint!.dx.toStringAsFixed(2)}, ${draggingPoint!.dy.toStringAsFixed(2)})',
+        label: '$snapLabel: ($coordText)',
+        snapType: snapType,
       );
     }
   }
@@ -864,6 +996,7 @@ class _ControlPointOverlayPainter extends CustomPainter {
     required Color color,
     required bool isPlaced,
     required String label,
+    DxfSnapType? snapType,
   }) {
     // Subtle circular glow around target
     final glowPaint = Paint()
@@ -888,29 +1021,79 @@ class _ControlPointOverlayPainter extends CustomPainter {
     canvas.drawLine(Offset(p.dx - 28, p.dy), Offset(p.dx + 28, p.dy), crossPaint);
     canvas.drawLine(Offset(p.dx, p.dy - 28), Offset(p.dx, p.dy + 28), crossPaint);
 
+    // Snap marker glyph if snapped
+    if (snapType != null) {
+      final snapPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8;
+      switch (snapType) {
+        case DxfSnapType.endpoint:
+          canvas.drawRect(Rect.fromCenter(center: p, width: 14, height: 14), snapPaint);
+          break;
+        case DxfSnapType.midpoint:
+          final path = Path()
+            ..moveTo(p.dx, p.dy - 8)
+            ..lineTo(p.dx + 8, p.dy + 7)
+            ..lineTo(p.dx - 8, p.dy + 7)
+            ..close();
+          canvas.drawPath(path, snapPaint);
+          break;
+        case DxfSnapType.center:
+          canvas.drawCircle(p, 8, snapPaint);
+          break;
+        case DxfSnapType.perpendicular:
+          canvas.drawLine(Offset(p.dx - 6, p.dy + 6), Offset(p.dx + 6, p.dy + 6), snapPaint);
+          canvas.drawLine(Offset(p.dx, p.dy + 6), Offset(p.dx, p.dy - 6), snapPaint);
+          break;
+        default:
+          canvas.drawRect(Rect.fromCenter(center: p, width: 12, height: 12), snapPaint);
+          break;
+      }
+    }
+
     // Center dot
     canvas.drawCircle(p, 3.5, Paint()..color = color..style = PaintingStyle.fill);
 
-    // Coordinate badge
+    // Coordinate badge with rounded dark backdrop
     final textSpan = TextSpan(
       text: label,
       style: TextStyle(
         color: color,
         fontSize: 10,
         fontWeight: FontWeight.bold,
-        backgroundColor: Colors.black.withValues(alpha: 0.70),
       ),
     );
     final textPainter = TextPainter(
       text: textSpan,
       textDirection: TextDirection.ltr,
     )..layout();
-    textPainter.paint(canvas, Offset(p.dx + 16, p.dy - 24));
+
+    final badgeRect = Rect.fromLTWH(
+      p.dx + 16,
+      p.dy - 26,
+      textPainter.width + 10,
+      textPainter.height + 6,
+    );
+    final badgeRRect = RRect.fromRectAndRadius(badgeRect, const Radius.circular(5));
+    canvas.drawRRect(badgeRRect, Paint()..color = Colors.black.withValues(alpha: 0.75));
+    canvas.drawRRect(
+      badgeRRect,
+      Paint()
+        ..color = color.withValues(alpha: 0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+    textPainter.paint(canvas, Offset(p.dx + 21, p.dy - 23));
   }
 
   @override
   bool shouldRepaint(covariant _ControlPointOverlayPainter oldDelegate) {
     return oldDelegate.placedPoint != placedPoint ||
-        oldDelegate.draggingPoint != draggingPoint;
+        oldDelegate.draggingPoint != draggingPoint ||
+        oldDelegate.touchPos != touchPos ||
+        oldDelegate.targetPos != targetPos ||
+        oldDelegate.snappedPos != snappedPos ||
+        oldDelegate.snapType != snapType;
   }
 }
