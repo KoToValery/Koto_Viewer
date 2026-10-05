@@ -1968,6 +1968,10 @@
   "bimProjectAlignFirstPrompt": "Please align all storeys before entering the BiM designer.",
   "@bimProjectAlignFirstPrompt": { "description": "Notice when attempting to open unaligned project" },
   "bimProjectLoading": "Loading BiM project and underlays...",
-  "@bimProjectLoading": { "description": "Loading indicator while opening BiM project workspace" }
+  "@bimProjectLoading": { "description": "Loading indicator while opening BiM project workspace" },
+  "cadThemeDarkCad": "CAD Dark",
+  "@cadThemeDarkCad": { "description": "Dark CAD theme for drawings canvas" },
+  "cadThemePaperWhite": "Paper White",
+  "@cadThemePaperWhite": { "description": "Paper white theme for drawings canvas" }
 }
 

@@ -2322,4 +2322,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bimProjectLoading => 'Loading BiM project and underlays...';
+
+  @override
+  String get cadThemeDarkCad => 'CAD Dark';
+
+  @override
+  String get cadThemePaperWhite => 'Paper White';
 }

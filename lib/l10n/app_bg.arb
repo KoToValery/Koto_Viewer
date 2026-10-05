@@ -660,6 +660,8 @@
   "bimProjectSaving": "Запазване на BiM проект...",
   "bimProjectUnderlayAttached": "Подложката е прикачена",
   "bimProjectAlignFirstPrompt": "Моля, подравнете всички етажи преди отваряне на BiM дизайнера.",
-  "bimProjectLoading": "Зареждане на BiM проект и подложки..."
+  "bimProjectLoading": "Зареждане на BiM проект и подложки...",
+  "cadThemeDarkCad": "Тъмен CAD фон",
+  "cadThemePaperWhite": "Бяла хартия"
 }
 

@@ -4065,6 +4065,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading BiM project and underlays...'**
   String get bimProjectLoading;
+
+  /// Dark CAD theme for drawings canvas
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Dark'**
+  String get cadThemeDarkCad;
+
+  /// Paper white theme for drawings canvas
+  ///
+  /// In en, this message translates to:
+  /// **'Paper White'**
+  String get cadThemePaperWhite;
 }
 
 class _AppLocalizationsDelegate

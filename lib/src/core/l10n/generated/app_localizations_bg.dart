@@ -2333,4 +2333,10 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get bimProjectLoading => 'Зареждане на BiM проект и подложки...';
+
+  @override
+  String get cadThemeDarkCad => 'Тъмен CAD фон';
+
+  @override
+  String get cadThemePaperWhite => 'Бяла хартия';
 }

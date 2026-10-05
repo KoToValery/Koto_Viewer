@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/l10n/l10n_extensions.dart';
+import '../dxf_viewer/models/dxf_display_settings.dart';
 import '../dxf_viewer/models/dxf_models.dart';
 import '../dxf_viewer/rendering/dxf_painter.dart';
 import '../dxf_viewer/rendering/dxf_snap_helper.dart';
+import '../dxf_viewer/widgets/dxf_display_settings_sheet.dart';
 import 'analysis/cantilever_detector.dart';
 import 'analysis/seismic_analysis_calculator.dart';
 import 'analysis/structural_underlay_filter.dart';
@@ -190,6 +192,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   double _renderScale = 1.0;
   Timer? _scaleSettleTimer;
 
+  // CAD Display Settings & Theme
+  DxfDisplaySettings _displaySettings = const DxfDisplaySettings();
+  DxfCanvasTheme _canvasTheme = DxfCanvasTheme.darkCad;
+
   // Layer filter for structural underlay (isolate thick walls & grid axes)
   bool _underlayFilterActive = false;
   final Map<String, bool> _originalLayerVisibility = {};
@@ -202,6 +208,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   @override
   void initState() {
     super.initState();
+    _initDisplaySettings();
+    DxfDisplaySettingsService.settingsNotifier.addListener(_onDisplaySettingsChanged);
     _transformController = TransformationController(
       widget.initialTransform != null
           ? Matrix4.copy(widget.initialTransform!)
@@ -289,12 +297,42 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   @override
   void dispose() {
     _scaleSettleTimer?.cancel();
+    DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged);
     _transformController.removeListener(_onTransformChanged);
     for (final entry in _originalLayerVisibility.entries) {
       _document.layers[entry.key]?.isVisible = entry.value;
     }
     _transformController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initDisplaySettings() async {
+    final loaded = await DxfDisplaySettingsService.getSettings();
+    if (mounted) {
+      setState(() {
+        _displaySettings = loaded;
+      });
+    }
+  }
+
+  void _onDisplaySettingsChanged() {
+    if (mounted) {
+      setState(() {
+        _displaySettings = DxfDisplaySettingsService.settingsNotifier.value;
+      });
+    }
+  }
+
+  void _showDisplaySettingsSheet() {
+    DxfDisplaySettingsSheet.show(
+      context: context,
+      initialSettings: _displaySettings,
+      onSettingsChanged: (newSettings) {
+        setState(() {
+          _displaySettings = newSettings;
+        });
+      },
+    );
   }
 
   void _onTransformChanged() {
@@ -436,6 +474,40 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Offset _cadToScreen(Offset cadPoint) {
     final scenePos = _cadToScene(cadPoint);
     return MatrixUtils.transformPoint(_transformController.value, scenePos);
+  }
+
+  Rect? _getVisibleCadRect() {
+    if (_viewportSize.isEmpty) return null;
+    try {
+      final pTopLeft = _transformController.toScene(Offset.zero);
+      final pBottomRight = _transformController.toScene(
+        Offset(_viewportSize.width, _viewportSize.height),
+      );
+
+      final cadTopLeft = _sceneToCad(pTopLeft);
+      final cadBottomRight = _sceneToCad(pBottomRight);
+
+      final left = math.min(cadTopLeft.dx, cadBottomRight.dx);
+      final right = math.max(cadTopLeft.dx, cadBottomRight.dx);
+      final bottom = math.min(cadTopLeft.dy, cadBottomRight.dy);
+      final top = math.max(cadTopLeft.dy, cadBottomRight.dy);
+
+      final marginX = (right - left) * 0.1;
+      final marginY = (top - bottom) * 0.1;
+
+      final rect = Rect.fromLTRB(
+        left - marginX,
+        bottom - marginY,
+        right + marginX,
+        top + marginY,
+      );
+
+      final bounds = _cadBounds;
+      final maxDocExtent = bounds.inflate(bounds.longestSide * 0.05 + 10.0);
+      return rect.intersect(maxDocExtent);
+    } catch (_) {
+      return null;
+    }
   }
 
   // --- Pointer & Touch Handling with Offset Ruler (56px) & Magnetic Snap ---
@@ -5702,47 +5774,40 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       onPressed: _open3dViewport,
     );
 
-    if (!isCompact) {
-      return [
-        layersButton,
-        filterButton,
-        snapButton,
-        undoButton,
-        exportButton,
-        viewport3dButton,
-        const SizedBox(width: 4),
-      ];
-    }
-
-    // Compact mode for narrow/mobile screens to prevent RenderFlex horizontal overflows:
-    // Display 3 primary actions directly, with secondary actions in PopupMenu
-    return [
-      snapButton,
-      undoButton,
-      viewport3dButton,
-      PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 20),
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-        color: const Color(0xFF242426),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        onSelected: (value) {
-          switch (value) {
-            case 'layers':
-              _showLayersSheet();
-              break;
-            case 'filter':
-              _toggleUnderlayFilter();
-              break;
-            case 'auto_walls':
-              _runManualAutoDetectWalls();
-              break;
-            case 'export':
-              _showExportDialog();
-              break;
-          }
-        },
-        itemBuilder: (context) => [
+    final moreMenu = PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 20),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      color: const Color(0xFF242426),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      onSelected: (value) {
+        switch (value) {
+          case 'layers':
+            _showLayersSheet();
+            break;
+          case 'filter':
+            _toggleUnderlayFilter();
+            break;
+          case 'display_settings':
+            _showDisplaySettingsSheet();
+            break;
+          case 'theme_toggle':
+            setState(() {
+              _canvasTheme = _canvasTheme.isDark
+                  ? DxfCanvasTheme.paperWhite
+                  : DxfCanvasTheme.darkCad;
+            });
+            break;
+          case 'auto_walls':
+            _runManualAutoDetectWalls();
+            break;
+          case 'export':
+            _showExportDialog();
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (isCompact)
           PopupMenuItem(
             value: 'layers',
             child: Row(
@@ -5754,6 +5819,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               ],
             ),
           ),
+        if (isCompact)
           PopupMenuItem(
             value: 'filter',
             child: Row(
@@ -5780,17 +5846,50 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               ],
             ),
           ),
-          PopupMenuItem(
-            value: 'auto_walls',
-            child: Row(
-              children: [
-                const Icon(Icons.auto_awesome, size: 20, color: Color(0xFFFF5252)),
-                const SizedBox(width: 12),
-                Text(context.l10n.autoDetectWallsAndAxes,
-                    style: const TextStyle(color: Colors.white, fontSize: 13)),
-              ],
-            ),
+        PopupMenuItem(
+          value: 'display_settings',
+          child: Row(
+            children: [
+              const Icon(Icons.tune_rounded, size: 20, color: Colors.white70),
+              const SizedBox(width: 12),
+              Text(context.l10n.displaySettings,
+                  style: const TextStyle(color: Colors.white, fontSize: 13)),
+            ],
           ),
+        ),
+        PopupMenuItem(
+          value: 'theme_toggle',
+          child: Row(
+            children: [
+              Icon(
+                _canvasTheme.isDark
+                    ? Icons.light_mode_outlined
+                    : Icons.dark_mode_outlined,
+                size: 20,
+                color: Colors.white70,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                _canvasTheme.isDark
+                    ? context.l10n.cadThemePaperWhite
+                    : context.l10n.cadThemeDarkCad,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'auto_walls',
+          child: Row(
+            children: [
+              const Icon(Icons.auto_awesome, size: 20, color: Color(0xFFFF5252)),
+              const SizedBox(width: 12),
+              Text(context.l10n.autoDetectWallsAndAxes,
+                  style: const TextStyle(color: Colors.white, fontSize: 13)),
+            ],
+          ),
+        ),
+        if (isCompact)
           PopupMenuItem(
             value: 'export',
             child: Row(
@@ -5802,8 +5901,29 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               ],
             ),
           ),
-        ],
-      ),
+      ],
+    );
+
+    if (!isCompact) {
+      return [
+        layersButton,
+        filterButton,
+        snapButton,
+        undoButton,
+        exportButton,
+        viewport3dButton,
+        moreMenu,
+        const SizedBox(width: 4),
+      ];
+    }
+
+    // Compact mode for narrow/mobile screens to prevent RenderFlex horizontal overflows:
+    // Display 3 primary actions directly, with secondary actions in PopupMenu
+    return [
+      snapButton,
+      undoButton,
+      viewport3dButton,
+      moreMenu,
       const SizedBox(width: 4),
     ];
   }
@@ -5972,7 +6092,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         _activePointersCount = 0;
                         _isMultiTouchGesture = false;
                       },
-                      child: SizedBox(
+                      child: Container(
+                        color: _canvasTheme.bgColor,
                         width: _viewportSize.width,
                         height: _viewportSize.height,
                         child: Stack(
@@ -5981,11 +6102,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             Positioned.fill(
                               child: RepaintBoundary(
                                 child: CustomPaint(
+                                  size: _viewportSize,
+                                  isComplex: true,
+                                  willChange: false,
                                   painter: DxfPainter(
                                     document: _document,
-                                    theme: DxfCanvasTheme.darkCad,
+                                    theme: _canvasTheme,
                                     activeLayout: 'Model',
                                     currentScale: _renderScale,
+                                    visibleCadRect: _getVisibleCadRect(),
+                                    settings: _displaySettings,
                                     entityFilter: _underlayFilterActive
                                         ? (entity) {
                                             // 1. Suppress all hatches (fill patterns) in structural underlay
