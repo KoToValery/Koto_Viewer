@@ -20,20 +20,18 @@ class BimUnderlayPickerHelper {
       // On Android, CAD MIME types are not registered in Android's MimeTypeMap,
       // which causes FileType.custom with 'dxf'/'dwg' to fail with PlatformException.
       if (Platform.isAndroid) {
-        result = await FilePicker.platform.pickFiles(
-          type: FileType.any,
-        );
+        result = await FilePicker.platform.pickFiles(type: FileType.any);
       } else {
         try {
           result = await FilePicker.platform.pickFiles(
             type: FileType.custom,
-            allowedExtensions: const ['dxf', 'dwg'],
+            allowedExtensions: const ['dxf', 'dwg', 'kcad'],
           );
         } on PlatformException catch (e) {
-          debugPrint('FileType.custom failed on this platform ($e), falling back to FileType.any');
-          result = await FilePicker.platform.pickFiles(
-            type: FileType.any,
+          debugPrint(
+            'FileType.custom failed on this platform ($e), falling back to FileType.any',
           );
+          result = await FilePicker.platform.pickFiles(type: FileType.any);
         }
       }
 
@@ -55,7 +53,10 @@ class BimUnderlayPickerHelper {
       }
 
       final lowerPath = filePath.toLowerCase();
-      final isCad = lowerPath.endsWith('.dxf') || lowerPath.endsWith('.dwg');
+      final isCad =
+          lowerPath.endsWith('.dxf') ||
+          lowerPath.endsWith('.dwg') ||
+          lowerPath.endsWith('.kcad');
 
       if (!isCad) {
         if (context.mounted) {
@@ -75,7 +76,9 @@ class BimUnderlayPickerHelper {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.l10n.couldNotOpenFilePicker(e.message ?? e.toString())),
+            content: Text(
+              context.l10n.couldNotOpenFilePicker(e.message ?? e.toString()),
+            ),
           ),
         );
       }

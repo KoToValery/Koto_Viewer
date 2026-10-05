@@ -17,10 +17,7 @@ import 'bim_alignment_screen.dart';
 class BimWorkspaceScreen extends StatefulWidget {
   final BimWorkProject project;
 
-  const BimWorkspaceScreen({
-    super.key,
-    required this.project,
-  });
+  const BimWorkspaceScreen({super.key, required this.project});
 
   @override
   State<BimWorkspaceScreen> createState() => _BimWorkspaceScreenState();
@@ -47,15 +44,23 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
     });
 
     try {
-      final latestProject =
-          await BimProjectLibraryService.instance.getProject(_project.id) ?? _project;
+      var latestProject =
+          await BimProjectLibraryService.instance.getProject(_project.id) ??
+          _project;
 
       // Load and align all underlays into unified coordinate space
-      final loadedUnderlays = await BimUnderlayLoader.loadAndAlign(project: latestProject);
+      final loadedUnderlays = await BimUnderlayLoader.loadAndAlign(
+        project: latestProject,
+      );
 
+      latestProject =
+          await BimProjectLibraryService.instance.loadProject(
+            latestProject.id,
+          ) ??
+          latestProject;
       // Load or initialize structural model
-      StructuralProject? structural =
-          await BimProjectLibraryService.instance.loadStructuralProject(latestProject.id);
+      StructuralProject? structural = await BimProjectLibraryService.instance
+          .loadStructuralProject(latestProject.id);
 
       if (structural == null || structural.storeys.isEmpty) {
         // Initialize structural storeys matching the project storeys
@@ -79,12 +84,30 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
           title: latestProject.name,
           storeys: storeys.isNotEmpty
               ? storeys
-              : const [StoreyLevel(id: 'default_ground', name: '±0.00', elevation: 0.0, height: 3.0)],
-          activeStoreyIndex: activeIdx.clamp(0, (storeys.length - 1).clamp(0, 999)),
+              : const [
+                  StoreyLevel(
+                    id: 'default_ground',
+                    name: '±0.00',
+                    elevation: 0.0,
+                    height: 3.0,
+                  ),
+                ],
+          activeStoreyIndex: activeIdx.clamp(
+            0,
+            (storeys.length - 1).clamp(0, 999),
+          ),
         );
 
-        await BimProjectLibraryService.instance.saveStructuralProject(latestProject.id, structural);
+        await BimProjectLibraryService.instance.saveStructuralProject(
+          latestProject.id,
+          structural,
+        );
       }
+
+      final initialized = await BimProjectLibraryService.instance.initializeAxes(
+        latestProject, structural, loadedUnderlays.underlaysByStorey);
+      latestProject = initialized.$1;
+      structural = initialized.$2;
 
       if (mounted) {
         setState(() {
@@ -107,13 +130,21 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
 
   void _onProjectChanged(StructuralProject updated) {
     _structuralProject = updated;
-    BimProjectLibraryService.instance.saveStructuralProject(_project.id, updated);
+    BimProjectLibraryService.instance.saveStructuralProject(
+      _project.id,
+      updated,
+    );
   }
 
-  void _onLayerVisibilityChanged(String storeyId, Map<String, bool> layerVisibility) {
+  void _onLayerVisibilityChanged(
+    String storeyId,
+    Map<String, bool> layerVisibility,
+  ) {
     final updatedStoreys = _project.storeys.map((s) {
       if (s.storeyId == storeyId) {
-        return s.copyWith(layerVisibility: Map<String, bool>.from(layerVisibility));
+        return s.copyWith(
+          layerVisibility: Map<String, bool>.from(layerVisibility),
+        );
       }
       return s;
     }).toList();
@@ -126,7 +157,11 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
     // Wall detection completed on a storey
   }
 
-  Future<void> _handleExport(BuildContext context, StructuralProject project, String activeStoreyId) async {
+  Future<void> _handleExport(
+    BuildContext context,
+    StructuralProject project,
+    String activeStoreyId,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF1E1E24),
@@ -142,7 +177,11 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.share_rounded, color: Color(0xFF00E5FF), size: 22),
+                  const Icon(
+                    Icons.share_rounded,
+                    color: Color(0xFF00E5FF),
+                    size: 22,
+                  ),
                   const SizedBox(width: 10),
                   Text(
                     context.l10n.exportBimModel,
@@ -163,11 +202,17 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     color: const Color(0xFFFFB300).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.architecture_rounded, color: Color(0xFFFFB300)),
+                  child: const Icon(
+                    Icons.architecture_rounded,
+                    color: Color(0xFFFFB300),
+                  ),
                 ),
                 title: Text(
                   context.l10n.bimProjectExportStoreyDxf,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 subtitle: Text(
                   context.l10n.bimProjectExportStoreyDxfSubtitle,
@@ -185,7 +230,11 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(context.l10n.bimProjectExportSuccess(file.uri.pathSegments.last)),
+                          content: Text(
+                            context.l10n.bimProjectExportSuccess(
+                              file.uri.pathSegments.last,
+                            ),
+                          ),
                           backgroundColor: const Color(0xFF1E88E5),
                         ),
                       );
@@ -194,7 +243,11 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(context.l10n.exportFailed(e.toString()))),
+                        SnackBar(
+                          content: Text(
+                            context.l10n.exportFailed(e.toString()),
+                          ),
+                        ),
                       );
                     }
                   }
@@ -209,11 +262,17 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.folder_zip_rounded, color: Color(0xFF00E5FF)),
+                  child: const Icon(
+                    Icons.folder_zip_rounded,
+                    color: Color(0xFF00E5FF),
+                  ),
                 ),
                 title: Text(
                   context.l10n.bimProjectExportAllZip,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 subtitle: Text(
                   context.l10n.bimProjectExportAllZipSubtitle,
@@ -230,7 +289,11 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(context.l10n.bimProjectExportSuccess(file.uri.pathSegments.last)),
+                          content: Text(
+                            context.l10n.bimProjectExportSuccess(
+                              file.uri.pathSegments.last,
+                            ),
+                          ),
                           backgroundColor: const Color(0xFF1E88E5),
                         ),
                       );
@@ -239,7 +302,11 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(context.l10n.exportFailed(e.toString()))),
+                        SnackBar(
+                          content: Text(
+                            context.l10n.exportFailed(e.toString()),
+                          ),
+                        ),
                       );
                     }
                   }
@@ -254,11 +321,17 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                     color: const Color(0xFFAB47BC).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.data_object_rounded, color: Color(0xFFAB47BC)),
+                  child: const Icon(
+                    Icons.data_object_rounded,
+                    color: Color(0xFFAB47BC),
+                  ),
                 ),
                 title: Text(
                   context.l10n.exportBimJson,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 subtitle: const Text(
                   'JSON (.bim.json)',
@@ -267,15 +340,20 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                 onTap: () async {
                   Navigator.of(ctx).pop();
                   try {
-                    final file = await StructuralPersistenceService.exportToJsonFile(
-                      project: project,
-                      baseName: _project.name,
-                    );
+                    final file =
+                        await StructuralPersistenceService.exportToJsonFile(
+                          project: project,
+                          baseName: _project.name,
+                        );
                     await StructuralPersistenceService.shareFile(file);
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(context.l10n.exportFailed(e.toString()))),
+                        SnackBar(
+                          content: Text(
+                            context.l10n.exportFailed(e.toString()),
+                          ),
+                        ),
                       );
                     }
                   }
@@ -290,11 +368,7 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
 
   Future<void> _openStoreyManager() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => BimAlignmentScreen(
-          project: _project,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => BimAlignmentScreen(project: _project)),
     );
     if (mounted) {
       _loadWorkspace();
@@ -335,7 +409,11 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.redAccent,
+                  size: 48,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   _errorMessage ?? 'Failed to load project',
@@ -361,8 +439,11 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
 
     // Active underlay document fallback
     final activeStoreyId = _structuralProject!.activeStorey.id;
-    final primaryDoc = underlaysMap[activeStoreyId] ??
-        (underlaysMap.isNotEmpty ? underlaysMap.values.first : DxfDocument.empty());
+    final primaryDoc =
+        underlaysMap[activeStoreyId] ??
+        (underlaysMap.isNotEmpty
+            ? underlaysMap.values.first
+            : DxfDocument.empty());
 
     final bimContext = StructuralBimContext(
       underlaysByStorey: underlaysMap,

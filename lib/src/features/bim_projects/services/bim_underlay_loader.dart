@@ -1,10 +1,9 @@
 import 'dart:math' as math;
 import 'dart:ui';
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
 import '../../dxf_viewer/models/dxf_models.dart';
-import '../../dxf_viewer/parser/dxf_parser.dart';
+import 'bim_underlay_conversion_service.dart';
 import '../../structural_designer/analysis/structural_underlay_filter.dart';
-import '../../structural_designer/analysis/wall_axis_detector.dart';
 import '../models/bim_work_project.dart';
 import 'bim_project_library_service.dart';
 import 'dxf_document_transformer.dart';
@@ -51,20 +50,7 @@ class BimUnderlayLoader {
     final lib = libraryService ?? BimProjectLibraryService.instance;
     final rawDocs = <String, DxfDocument>{};
 
-    // 1. Load raw DXF files from disk
-    for (final storey in project.storeys) {
-      if (storey.hasUnderlay) {
-        final file = await lib.getUnderlayFile(project.id, storey.underlayFileName!);
-        if (file != null && await file.exists()) {
-          try {
-            final doc = await DxfParser.parseFromFile(file);
-            rawDocs[storey.storeyId] = doc;
-          } catch (e) {
-            debugPrint('Error parsing underlay for storey ${storey.storeyId}: $e');
-          }
-        }
-      }
-    }
+    project = await lib.prepareUnderlays(project, loadedDocuments: rawDocs);
 
     if (rawDocs.isEmpty) {
       const defaultBounds = Rect.fromLTWH(0, 0, 100, 100);
@@ -78,7 +64,8 @@ class BimUnderlayLoader {
 
     // 2. Identify reference storey & reference control point
     final refStorey = project.referenceStorey;
-    final refDoc = (refStorey != null && rawDocs.containsKey(refStorey.storeyId))
+    final refDoc =
+        (refStorey != null && rawDocs.containsKey(refStorey.storeyId))
         ? rawDocs[refStorey.storeyId]!
         : rawDocs.values.first;
 
@@ -123,7 +110,7 @@ class BimUnderlayLoader {
             transformed.layers[entry.key]!.isVisible = entry.value;
           }
         }
-      } else {
+      } else if (BimUnderlayMetadata.read(transformed) == null) {
         // Initial start: apply automatic filtering to all floor layouts
         final visibleLayerNames = StructuralUnderlayFilter.filterLayers(
           layers: transformed.layers.values,
@@ -137,12 +124,19 @@ class BimUnderlayLoader {
         }
       }
 
-      // Re-apply WALLS_250 detection if previously detected
-      if (storey.wallsDetected) {
-        final det = WallAxisDetector.detect(transformed);
-        if (det.hasWallsFound) {
-          WallAxisDetector.applyToDocument(transformed, det, isBulgarian: isBulgarian);
-        }
+      final metadata = BimUnderlayMetadata.read(doc);
+      if (metadata != null) {
+        metadata['axes'] = BimUnderlayMetadata.axes(doc)
+            .map(
+              (a) => a
+                  .copyWith(
+                    start: a.start * scale + translation,
+                    end: a.end * scale + translation,
+                  )
+                  .toJson(),
+            )
+            .toList();
+        transformed.headerVars[BimUnderlayMetadata.key] = jsonEncode(metadata);
       }
 
       transformedDocs[storey.storeyId] = transformed;

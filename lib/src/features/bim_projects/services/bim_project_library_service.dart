@@ -3,7 +3,10 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import '../../../core/services/dwg_converter_service.dart';
+import '../../dxf_viewer/models/dxf_models.dart';
+import '../../dxf_viewer/binary/kcad_service.dart';
+import '../../dxf_viewer/parser/dxf_parser.dart';
+import 'bim_underlay_conversion_service.dart';
 import '../../structural_designer/models/structural_element.dart';
 import '../models/bim_work_project.dart';
 
@@ -13,7 +16,7 @@ class BimProjectLibraryService {
   final Directory? _customRootDir;
 
   BimProjectLibraryService({Directory? customRootDir})
-      : _customRootDir = customRootDir;
+    : _customRootDir = customRootDir;
 
   /// Default singleton instance
   static final BimProjectLibraryService instance = BimProjectLibraryService();
@@ -80,7 +83,10 @@ class BimProjectLibraryService {
     required List<BimStoreyUnderlay> storeys,
   }) async {
     final now = DateTime.now();
-    final randSuffix = math.Random().nextInt(0xffffff).toRadixString(16).padLeft(6, '0');
+    final randSuffix = math.Random()
+        .nextInt(0xffffff)
+        .toRadixString(16)
+        .padLeft(6, '0');
     final id = 'bim_${now.millisecondsSinceEpoch}_$randSuffix';
 
     final project = BimWorkProject(
@@ -94,7 +100,7 @@ class BimProjectLibraryService {
     );
 
     await getProjectDirectory(id);
-    await saveProjectManifest(project);
+    if (!await saveProjectManifest(project)) throw FileSystemException('Cannot create project');
 
     // Initialize corresponding structural project
     final initialStructuralStoreys = storeys.map((s) {
@@ -121,7 +127,7 @@ class BimProjectLibraryService {
       activeStoreyIndex: 0,
     );
 
-    await saveStructuralProject(id, initialStructural);
+    if (!await saveStructuralProject(id, initialStructural)) throw FileSystemException('Cannot initialize structural model');
     return project;
   }
 
@@ -142,20 +148,22 @@ class BimProjectLibraryService {
   }
 
   /// Alias for [loadProject].
-  Future<BimWorkProject?> getProject(String projectId) => loadProject(projectId);
+  Future<BimWorkProject?> getProject(String projectId) =>
+      loadProject(projectId);
 
   /// Atomically saves the project manifest.
   Future<bool> saveProjectManifest(BimWorkProject project) async {
     try {
       final projDir = await getProjectDirectory(project.id);
       final manifestFile = File('${projDir.path}/project.json');
-      final tmpFile = File('${projDir.path}/project.json.tmp');
+      final tmpFile = File(
+        '${projDir.path}/project.json.tmp_${DateTime.now().microsecondsSinceEpoch}',
+      );
 
-      final content = const JsonEncoder.withIndent('  ').convert(project.toJson());
+      final content = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(project.toJson());
       await tmpFile.writeAsString(content, flush: true);
-      if (await manifestFile.exists()) {
-        await manifestFile.delete();
-      }
       await tmpFile.rename(manifestFile.path);
       return true;
     } catch (e) {
@@ -173,7 +181,37 @@ class BimProjectLibraryService {
 
       final content = await structFile.readAsString();
       final jsonMap = jsonDecode(content) as Map<String, dynamic>;
-      return StructuralProject.fromJson(jsonMap);
+      final structural = StructuralProject.fromJson(jsonMap);
+      final manifest = await loadProject(projectId);
+      if (manifest == null || manifest.storeys.isEmpty) return structural;
+      // Manifest is authoritative for elevations/order, so an interrupted edit
+      // cannot leave two different sets of storeys. Geometry stays keyed by ID.
+      final existing = {for (final s in structural.storeys) s.id: s};
+      final activeId = structural.storeys.isEmpty
+          ? null
+          : structural.activeStorey.id;
+      final synced = manifest.storeys
+          .map(
+            (s) =>
+                (existing[s.storeyId] ??
+                        StoreyLevel(
+                          id: s.storeyId,
+                          name: s.elevationLabel,
+                          elevation: s.elevation,
+                          height: s.height,
+                        ))
+                    .copyWith(
+                      name: s.elevationLabel,
+                      elevation: s.elevation,
+                      height: s.height,
+                    ),
+          )
+          .toList();
+      final active = synced.indexWhere((s) => s.id == activeId);
+      return structural.copyWith(
+        storeys: synced,
+        activeStoreyIndex: active < 0 ? 0 : active,
+      );
     } catch (e) {
       debugPrint('Error loading structural project for $projectId: $e');
       return null;
@@ -188,13 +226,14 @@ class BimProjectLibraryService {
     try {
       final projDir = await getProjectDirectory(projectId);
       final structFile = File('${projDir.path}/structural.json');
-      final tmpFile = File('${projDir.path}/structural.json.tmp');
+      final tmpFile = File(
+        '${projDir.path}/structural.json.tmp_${DateTime.now().microsecondsSinceEpoch}',
+      );
 
-      final content = const JsonEncoder.withIndent('  ').convert(structural.toJson());
+      final content = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(structural.toJson());
       await tmpFile.writeAsString(content, flush: true);
-      if (await structFile.exists()) {
-        await structFile.delete();
-      }
       await tmpFile.rename(structFile.path);
 
       // Update project updatedAt timestamp
@@ -209,65 +248,212 @@ class BimProjectLibraryService {
     }
   }
 
-  /// Attaches or replaces an underlay file for a specific storey.
-  /// Converts DWG to DXF if necessary and copies the resulting DXF file into
-  /// `<projectDir>/underlays/<storeyId>.dxf`.
+  /// Publishes a validated, immutable revision. The old revision remains valid
+  /// until the manifest rename commits the new paths.
   Future<BimStoreyUnderlay> attachUnderlayFile(
     String projectId,
     String storeyId,
-    File sourceFile,
-  ) async {
-    final projDir = await getProjectDirectory(projectId);
-    final underlaysDir = Directory('${projDir.path}/underlays');
-    if (!await underlaysDir.exists()) {
-      await underlaysDir.create(recursive: true);
-    }
-
-    String effectiveDxfPath;
-    final lowerPath = sourceFile.path.toLowerCase();
-    if (lowerPath.endsWith('.dwg')) {
-      effectiveDxfPath = await DwgConverterService.convertDwgToDxf(sourceFile.path);
-    } else {
-      effectiveDxfPath = sourceFile.path;
-    }
-
-    final targetUnderlayFile = File('${underlaysDir.path}/$storeyId.dxf');
-    await File(effectiveDxfPath).copy(targetUnderlayFile.path);
-
-    final manifest = await loadProject(projectId);
-    if (manifest != null) {
-      final updatedStoreys = manifest.storeys.map((s) {
-        if (s.storeyId == storeyId) {
-          return s.copyWith(
-            sourceFileName: sourceFile.path.split(Platform.pathSeparator).last,
-            underlayFileName: 'underlays/$storeyId.dxf',
-            clearControlPoint: true, // Reset control point on new drawing
-            wallsDetected: false,
-          );
+    File sourceFile, {
+    BimConversionResult? prepared,
+    bool preserveAlignment = false,
+  }) async {
+    final result =
+        prepared ?? await BimUnderlayConversionService.convert(sourceFile);
+    try {
+      final manifest = await loadProject(projectId);
+      if (manifest == null ||
+          !manifest.storeys.any((s) => s.storeyId == storeyId)) {
+        throw StateError('Unknown project/storey');
+      }
+      final projDir = await getProjectDirectory(projectId);
+      final parent = Directory('${projDir.path}/underlays');
+      await parent.create(recursive: true);
+      final revision = await parent.createTemp('revision_');
+      final relative =
+          'underlays/${revision.uri.pathSegments.where((s) => s.isNotEmpty).last}';
+      for (final entity in await result.directory.list().toList()) {
+        if (entity is File) {
+          await entity.copy('${revision.path}/${entity.uri.pathSegments.last}');
         }
-        return s;
+      }
+      final checked = await KcadService.loadKcadFile(
+        File('${revision.path}/working.kcad'),
+      );
+      final metadata = BimUnderlayMetadata.read(checked);
+      if (metadata == null) throw StateError('Invalid processed KCAD');
+      // Reload after I/O to retain other edits made while the conversion ran.
+      final latest = await loadProject(projectId) ?? manifest;
+      final updatedStoreys = latest.storeys.map((s) {
+        if (s.storeyId != storeyId) return s;
+        return s.copyWith(
+          sourceFileName: preserveAlignment
+              ? s.sourceFileName
+              : sourceFile.uri.pathSegments.last,
+          underlayFileName: '$relative/working.kcad',
+          clearControlPoint: !preserveAlignment,
+          layerVisibility: preserveAlignment ? s.layerVisibility : {},
+          wallsDetected: metadata['wallsFound'] == true,
+          processing: {
+            'version': BimUnderlayMetadata.version,
+            'status': metadata['hasResults'] == true
+                ? 'completedWithResults'
+                : 'completedEmpty',
+            'source': '$relative/${result.sourceFile.uri.pathSegments.last}',
+            'pure': '$relative/pure.kcad',
+            if (result.dxfFile != null) 'dxf': '$relative/source.dxf',
+            'fingerprint': result.sourceFingerprint,
+          },
+        );
       }).toList();
-
-      final updatedProject = manifest.copyWith(
+      final updated = latest.copyWith(
         storeys: updatedStoreys,
-        alignmentConfirmed: false,
+        alignmentConfirmed: preserveAlignment
+            ? latest.alignmentConfirmed
+            : false,
         updatedAt: DateTime.now(),
       );
-      await saveProjectManifest(updatedProject);
+      if (!await saveProjectManifest(updated)) {
+        throw FileSystemException('Cannot save project manifest');
+      }
       return updatedStoreys.firstWhere((s) => s.storeyId == storeyId);
+    } finally {
+      if (prepared == null) await result.dispose();
     }
+  }
 
-    return BimStoreyUnderlay(
-      storeyId: storeyId,
-      name: storeyId,
-      elevation: 0.0,
-      sourceFileName: sourceFile.path.split(Platform.pathSeparator).last,
-      underlayFileName: 'underlays/$storeyId.dxf',
+  /// Migrates legacy underlays once; a legacy wallsDetected flag is not a cache.
+  Future<BimWorkProject> prepareUnderlays(BimWorkProject project, {
+    Map<String, DxfDocument>? loadedDocuments,
+  }) async {
+    var current = await loadProject(project.id) ?? project;
+    for (final storey in current.storeys) {
+      if (!storey.hasUnderlay) continue;
+      var valid = false;
+      if (storey.isKcad &&
+          storey.processing['version'] == BimUnderlayMetadata.version) {
+        final file = await getUnderlayFile(
+          current.id,
+          storey.underlayFileName!,
+        );
+        if (file != null) {
+          try {
+            final doc = await KcadService.loadKcadFile(file);
+            valid = BimUnderlayMetadata.read(doc) != null;
+            if (valid) loadedDocuments?[storey.storeyId] = doc;
+          } catch (_) {
+            /* Recover from the preserved source below. */
+          }
+        }
+      }
+      if (valid) continue;
+      final sourcePath =
+          storey.processing['source'] as String? ?? storey.underlayFileName!;
+      final source = await getUnderlayFile(current.id, sourcePath);
+      if (source == null) {
+        throw FileSystemException('Missing underlay source', sourcePath);
+      }
+      await attachUnderlayFile(
+        current.id,
+        storey.storeyId,
+        source,
+        preserveAlignment: true,
+      );
+      current = await loadProject(current.id) ?? current;
+      if (loadedDocuments != null) {
+        loadedDocuments[storey.storeyId] = await loadUnderlay(current.id,
+          current.storeys.firstWhere((s) => s.storeyId == storey.storeyId));
+      }
+    }
+    return current;
+  }
+
+  Future<void> reprocessUnderlay(String projectId, String storeyId) async {
+    final project = await loadProject(projectId);
+    if (project == null) throw StateError('Missing project');
+    final storey = project.storeys.firstWhere((s) => s.storeyId == storeyId);
+    final source = await getUnderlayFile(
+      projectId,
+      storey.processing['source'] as String? ?? storey.underlayFileName!,
+    );
+    if (source == null) throw StateError('Missing source');
+    await attachUnderlayFile(
+      projectId,
+      storeyId,
+      source,
+      preserveAlignment: true,
     );
   }
 
+  Future<DxfDocument> loadUnderlay(
+    String projectId,
+    BimStoreyUnderlay storey,
+  ) async {
+    final file = await getUnderlayFile(projectId, storey.underlayFileName!);
+    if (file == null) {
+      throw FileSystemException('Missing underlay', storey.underlayFileName);
+    }
+    return storey.isKcad
+        ? KcadService.loadKcadFile(file)
+        : DxfParser.parseFromFile(file);
+  }
+
+  Future<BimWorkProject> updateStoreys(
+    String projectId,
+    List<BimStoreyUnderlay> storeys,
+  ) async {
+    if (storeys.isEmpty ||
+        storeys.any((s) => !s.elevation.isFinite) ||
+        storeys.map((s) => s.storeyId).toSet().length != storeys.length ||
+        storeys.map((s) => s.elevationLabel).toSet().length != storeys.length) {
+      throw ArgumentError('Storeys must have unique IDs and elevations');
+    }
+    final project = await loadProject(projectId);
+    if (project == null) throw StateError('Missing project');
+    final old = {for (final s in project.storeys) s.storeyId: s};
+    // Only elevation/name/height are edited here, never replace current file paths.
+    final updated = project.copyWith(
+      storeys: storeys
+          .map(
+            (s) => (old[s.storeyId] ?? s).copyWith(
+              elevation: s.elevation,
+              name: s.elevationLabel,
+              height: s.height,
+            ),
+          )
+          .toList(),
+      referenceStoreyId: project.referenceStorey?.storeyId,
+      updatedAt: DateTime.now(),
+    );
+    if (!await saveProjectManifest(updated)) {
+      throw FileSystemException('Cannot save storeys');
+    }
+    return updated;
+  }
+
+  /// Consume local analysis seeds exactly once, after alignment. An empty
+  /// saved axis list thereafter represents the user's choice, not missing data.
+  Future<(BimWorkProject, StructuralProject)> initializeAxes(
+    BimWorkProject project, StructuralProject structural,
+    Map<String, DxfDocument> alignedDocuments,
+  ) async {
+    if (project.axisSeedsConsumed || alignedDocuments.isEmpty) return (project, structural);
+    if (structural.effectiveGridAxes.isEmpty) {
+      final doc = alignedDocuments[project.referenceStorey?.storeyId];
+      if (doc != null) structural = structural.copyWithGridAxes(BimUnderlayMetadata.axes(doc));
+    }
+    if (!await saveStructuralProject(project.id, structural)) {
+      throw StateError('Cannot save initial axes');
+    }
+    project = project.copyWith(axisSeedsConsumed: true);
+    if (!await saveProjectManifest(project)) throw StateError('Cannot save axis initialization');
+    return (project, structural);
+  }
+
   /// Returns the absolute [File] for a relative underlay path within [projectId].
-  Future<File?> getUnderlayFile(String projectId, String underlayRelativePath) async {
+  Future<File?> getUnderlayFile(
+    String projectId,
+    String underlayRelativePath,
+  ) async {
     final projDir = await getProjectDirectory(projectId);
     final file = File('${projDir.path}/$underlayRelativePath');
     if (await file.exists()) {

@@ -4419,6 +4419,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get cancelMove;
+
+  /// No description provided for @bimProjectEditElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit elevation'**
+  String get bimProjectEditElevation;
+
+  /// No description provided for @bimProjectSortStoreys.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by elevation'**
+  String get bimProjectSortStoreys;
+
+  /// No description provided for @bimProjectElevationHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. +2.85, 0.00, -3.20'**
+  String get bimProjectElevationHelper;
+
+  /// No description provided for @bimProjectInvalidElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid elevation in metres.'**
+  String get bimProjectInvalidElevation;
+
+  /// No description provided for @bimProjectDuplicateElevation.
+  ///
+  /// In en, this message translates to:
+  /// **'A storey already has this elevation.'**
+  String get bimProjectDuplicateElevation;
+
+  /// No description provided for @bimProjectConvertingUnderlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Converting underlay…'**
+  String get bimProjectConvertingUnderlay;
+
+  /// No description provided for @bimProjectDetectingWallsAndSlabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Detecting walls and slabs…'**
+  String get bimProjectDetectingWallsAndSlabs;
+
+  /// No description provided for @bimProjectKcadReady.
+  ///
+  /// In en, this message translates to:
+  /// **'KCAD ready'**
+  String get bimProjectKcadReady;
+
+  /// No description provided for @bimProjectConversionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay conversion failed'**
+  String get bimProjectConversionFailed;
+
+  /// No description provided for @bimProjectReprocessUnderlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Reprocess underlay'**
+  String get bimProjectReprocessUnderlay;
 }
 
 class _AppLocalizationsDelegate

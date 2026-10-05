@@ -2137,7 +2137,15 @@
   "confirmMove": "Confirm",
   "@confirmMove": { "description": "Confirm move button" },
   "cancelMove": "Cancel",
-  "@cancelMove": { "description": "Cancel move button" }
+  "@cancelMove": { "description": "Cancel move button" },
+  "bimProjectEditElevation": "Edit elevation",
+  "bimProjectSortStoreys": "Sort by elevation",
+  "bimProjectElevationHelper": "e.g. +2.85, 0.00, -3.20",
+  "bimProjectInvalidElevation": "Enter a valid elevation in metres.",
+  "bimProjectDuplicateElevation": "A storey already has this elevation.",
+  "bimProjectConvertingUnderlay": "Converting underlay…",
+  "bimProjectDetectingWallsAndSlabs": "Detecting walls and slabs…",
+  "bimProjectKcadReady": "KCAD ready",
+  "bimProjectConversionFailed": "Underlay conversion failed",
+  "bimProjectReprocessUnderlay": "Reprocess underlay"
 }
-
-

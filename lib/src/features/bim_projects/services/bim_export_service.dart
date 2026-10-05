@@ -7,6 +7,8 @@ import '../../structural_designer/models/structural_element.dart';
 import '../../structural_designer/services/structural_persistence_service.dart';
 import '../models/bim_work_project.dart';
 import 'bim_project_library_service.dart';
+import 'bim_underlay_loader.dart';
+import 'bim_underlay_conversion_service.dart';
 
 /// Service responsible for exporting individual storey DXF drawings (with original
 /// CAD coordinates, preserved layer states, and structural BiM layers) and full-project ZIP packages.
@@ -20,7 +22,9 @@ class BimExportService {
     required String storeyId,
     double cadUnitsPerMeter = 1.0,
     Directory? outputDirectory,
+    BimProjectLibraryService? libraryService,
   }) async {
+    final lib = libraryService ?? BimProjectLibraryService.instance;
     final tempDir = outputDirectory ?? await getTemporaryDirectory();
     final cleanProjName = project.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
 
@@ -34,38 +38,71 @@ class BimExportService {
       orElse: () => structural.activeStorey,
     );
 
-    final cleanStoreyName = bimStorey.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    final outBaseName = '${cleanProjName}_$cleanStoreyName';
+    final cleanStoreyName = bimStorey.elevationLabel.replaceAll(
+      RegExp(r'[\\/:*?"<>|]'),
+      '_',
+    );
+    final safeId = bimStorey.storeyId.replaceAll(
+      RegExp(r'[^a-zA-Z0-9_-]'),
+      '_',
+    );
+    final outBaseName = '${cleanProjName}_${cleanStoreyName}_$safeId';
 
     final refStorey = project.referenceStorey;
     final cpRef = refStorey?.controlPoint;
     final cpLocal = bimStorey.controlPoint;
-    final unitScale = bimStorey.unitScale;
+    var unitScale = bimStorey.unitScale;
+    if (bimStorey.hasUnderlay && refStorey != null && refStorey.hasUnderlay) {
+      final local = await lib.loadUnderlay(project.id, bimStorey);
+      final reference = await lib.loadUnderlay(project.id, refStorey);
+      unitScale =
+          BimUnderlayLoader.computeUnitsPerMeter(reference, reference.bounds) /
+          BimUnderlayLoader.computeUnitsPerMeter(local, local.bounds);
+    }
 
     // 1. Generate structural DXF in local coordinates of the storey
-    final structDxfFile = await StructuralPersistenceService.exportStoreyToDxfFile(
-      storey: structStorey,
-      baseName: outBaseName,
-      cpRef: cpRef,
-      cpLocal: cpLocal,
-      unitScale: unitScale,
-      cadUnitsPerMeter: cadUnitsPerMeter,
-      outputDirectory: tempDir,
-    );
+    final structDxfFile =
+        await StructuralPersistenceService.exportStoreyToDxfFile(
+          storey: structStorey.copyWith(gridAxes: structural.effectiveGridAxes),
+          baseName: outBaseName,
+          cpRef: cpRef,
+          cpLocal: cpLocal,
+          unitScale: unitScale,
+          cadUnitsPerMeter: cadUnitsPerMeter,
+          outputDirectory: tempDir,
+          axisLayerName: 'BIM_Axis',
+        );
 
     // 2. If underlay drawing exists, merge with it and apply layerVisibility
     if (bimStorey.hasUnderlay) {
-      final underlayFile = await BimProjectLibraryService.instance.getUnderlayFile(
-        project.id,
-        bimStorey.underlayFileName!,
-      );
+      final path = bimStorey.isKcad
+          ? bimStorey.processing['dxf'] as String?
+          : bimStorey.underlayFileName;
+      if (path == null) {
+        throw UnsupportedError(
+          'DXF export of a KCAD-only underlay requires its original DXF. The KCAD underlay is preserved.',
+        );
+      }
+      final underlayFile = await lib.getUnderlayFile(project.id, path);
+      if (underlayFile == null) {
+        throw FileSystemException('Missing export source', path);
+      }
+      var visibility = bimStorey.layerVisibility;
+      if (bimStorey.isKcad) {
+        final doc = await lib.loadUnderlay(project.id, bimStorey);
+        final metadata = BimUnderlayMetadata.read(doc);
+        // Export original architecture; generated contours are a working filter.
+        if (metadata != null) {
+          visibility = Map<String, bool>.from(metadata['visibility'] as Map);
+        }
+      }
 
-      if (underlayFile != null && await underlayFile.exists()) {
+      if (await underlayFile.exists()) {
         final finalDxfFile = File('${tempDir.path}/$outBaseName.dxf');
         return DxfExporterService.exportMergedDxf(
           baseFile: underlayFile,
           importedFiles: [structDxfFile],
-          layerVisibility: bimStorey.layerVisibility,
+          layerVisibility: visibility,
           outputFile: finalDxfFile,
         );
       }
@@ -80,7 +117,9 @@ class BimExportService {
     required StructuralProject structural,
     double cadUnitsPerMeter = 1.0,
     Directory? outputDirectory,
+    BimProjectLibraryService? libraryService,
   }) async {
+    final lib = libraryService ?? BimProjectLibraryService.instance;
     final tempDir = outputDirectory ?? await getTemporaryDirectory();
     final cleanProjName = project.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
     final archive = Archive();
@@ -94,24 +133,61 @@ class BimExportService {
           storeyId: storey.storeyId,
           cadUnitsPerMeter: cadUnitsPerMeter,
           outputDirectory: tempDir,
+          libraryService: lib,
         );
         final bytes = await storeyFile.readAsBytes();
-        final entryName = '${storey.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')}.dxf';
+        final safeId = storey.storeyId.replaceAll(
+          RegExp(r'[^a-zA-Z0-9_-]'),
+          '_',
+        );
+        final entryName = '${storey.elevationLabel}_$safeId.dxf';
         archive.addFile(ArchiveFile(entryName, bytes.length, bytes));
       } catch (e) {
-        // Continue adding other storeys if one fails
+        throw StateError('Export failed at ${storey.elevationLabel}: $e');
       }
     }
 
+    // Include all files referenced by the manifest so the package is recoverable.
+    final paths = <String>{};
+    for (final storey in project.storeys) {
+      if (storey.underlayFileName != null) paths.add(storey.underlayFileName!);
+      for (final key in ['source', 'pure', 'dxf']) {
+        final path = storey.processing[key];
+        if (path is String) paths.add(path);
+      }
+    }
+    for (final path in paths) {
+      final file = await lib.getUnderlayFile(project.id, path);
+      if (file == null) throw FileSystemException('Missing package file', path);
+      final bytes = await file.readAsBytes();
+      archive.addFile(ArchiveFile(path, bytes.length, bytes));
+    }
+    final structuralBytes = utf8.encode(jsonEncode(structural.toJson()));
+    archive.addFile(
+      ArchiveFile('structural.json', structuralBytes.length, structuralBytes),
+    );
+
     // 2. Add structural BIM JSON
-    final jsonString = const JsonEncoder.withIndent('  ').convert(structural.toJson());
+    final jsonString = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(structural.toJson());
     final jsonBytes = utf8.encode(jsonString);
-    archive.addFile(ArchiveFile('${cleanProjName}_model.bim.json', jsonBytes.length, jsonBytes));
+    archive.addFile(
+      ArchiveFile(
+        '${cleanProjName}_model.bim.json',
+        jsonBytes.length,
+        jsonBytes,
+      ),
+    );
 
     // 3. Add Project Manifest
-    final manifestString = const JsonEncoder.withIndent('  ').convert(project.toJson());
+    final manifestString = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(project.toJson());
     final manifestBytes = utf8.encode(manifestString);
-    archive.addFile(ArchiveFile('project.json', manifestBytes.length, manifestBytes));
+    archive.addFile(
+      ArchiveFile('project.json', manifestBytes.length, manifestBytes),
+    );
 
     // 4. Encode ZIP
     final zipBytes = ZipEncoder().encode(archive)!;

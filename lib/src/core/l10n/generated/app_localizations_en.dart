@@ -2528,4 +2528,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cancelMove => 'Cancel';
+
+  @override
+  String get bimProjectEditElevation => 'Edit elevation';
+
+  @override
+  String get bimProjectSortStoreys => 'Sort by elevation';
+
+  @override
+  String get bimProjectElevationHelper => 'e.g. +2.85, 0.00, -3.20';
+
+  @override
+  String get bimProjectInvalidElevation => 'Enter a valid elevation in metres.';
+
+  @override
+  String get bimProjectDuplicateElevation =>
+      'A storey already has this elevation.';
+
+  @override
+  String get bimProjectConvertingUnderlay => 'Converting underlay…';
+
+  @override
+  String get bimProjectDetectingWallsAndSlabs => 'Detecting walls and slabs…';
+
+  @override
+  String get bimProjectKcadReady => 'KCAD ready';
+
+  @override
+  String get bimProjectConversionFailed => 'Underlay conversion failed';
+
+  @override
+  String get bimProjectReprocessUnderlay => 'Reprocess underlay';
 }

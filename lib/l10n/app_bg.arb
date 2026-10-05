@@ -721,6 +721,15 @@
   "noNeighborsFound": "Няма съседни елементи по осите",
   "precisionMoveActive": "Преместване",
   "confirmMove": "Потвърди",
-  "cancelMove": "Отказ"
+  "cancelMove": "Отказ",
+  "bimProjectEditElevation": "Редактиране на кота",
+  "bimProjectSortStoreys": "Сортирай по кота",
+  "bimProjectElevationHelper": "напр. +2,85, 0,00, -3,20",
+  "bimProjectInvalidElevation": "Въведете валидна кота в метри.",
+  "bimProjectDuplicateElevation": "Вече има етаж с тази кота.",
+  "bimProjectConvertingUnderlay": "Конвертиране на подложка…",
+  "bimProjectDetectingWallsAndSlabs": "Разпознаване на стени и плочи…",
+  "bimProjectKcadReady": "KCAD готов",
+  "bimProjectConversionFailed": "Неуспешна конверсия на подложката",
+  "bimProjectReprocessUnderlay": "Повторен анализ на подложката"
 }
-

@@ -285,8 +285,8 @@ void main() {
       final archive = ZipDecoder().decodeBytes(zipBytes);
 
       final entryNames = archive.files.map((f) => f.name).toList();
-      expect(entryNames, contains('Ground Floor.dxf'));
-      expect(entryNames, contains('Floor 1.dxf'));
+      expect(entryNames, contains('±0.00_st_0.dxf'));
+      expect(entryNames, contains('+3.00_st_1.dxf'));
       expect(entryNames, contains('Varna Sea Residence_model.bim.json'));
       expect(entryNames, contains('project.json'));
 
@@ -309,7 +309,7 @@ void main() {
       expect(afterDelete.isEmpty, isTrue);
     });
 
-    test('attachUnderlayFile copies DXF and updates project storeys correctly', () async {
+    test('attachUnderlayFile converts DXF and updates project storeys correctly', () async {
       final tempDir = await Directory.systemTemp.createTemp('bim_test_underlay_');
       addTearDown(() => tempDir.deleteSync(recursive: true));
 
@@ -331,7 +331,7 @@ void main() {
       );
 
       expect(updatedStorey.hasUnderlay, isTrue);
-      expect(updatedStorey.underlayFileName, equals('underlays/s1.dxf'));
+      expect(updatedStorey.underlayFileName, endsWith('/working.kcad'));
 
       final underlayFile = await libraryService.getUnderlayFile(project.id, updatedStorey.underlayFileName!);
       expect(underlayFile, isNotNull);

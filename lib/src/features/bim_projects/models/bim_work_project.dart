@@ -13,6 +13,7 @@ class BimStoreyUnderlay {
   final double unitScale;
   final Map<String, bool> layerVisibility;
   final bool wallsDetected;
+  final Map<String, dynamic> processing;
 
   const BimStoreyUnderlay({
     required this.storeyId,
@@ -25,18 +26,35 @@ class BimStoreyUnderlay {
     this.unitScale = 1.0,
     this.layerVisibility = const {},
     this.wallsDetected = false,
+    this.processing = const {},
   });
 
   bool get hasUnderlay =>
       underlayFileName != null && underlayFileName!.trim().isNotEmpty;
 
   bool get isControlPointSet => controlPoint != null;
+  bool get isKcad => underlayFileName?.toLowerCase().endsWith('.kcad') == true;
 
   /// Formatted elevation string (e.g. ±0.00, +2.80, -2.80) to save space without long floor text labels.
-  String get elevationLabel {
-    if (elevation.abs() < 1e-4) return '±0.00';
+  String get elevationLabel => formatElevation(elevation);
+
+  static String formatElevation(double elevation) {
+    if (elevation.abs() < 0.005) return '±0.00';
     final sign = elevation > 0 ? '+' : '';
     return '$sign${elevation.toStringAsFixed(2)}';
+  }
+
+  /// User-entered elevations use centimetre precision and either decimal mark.
+  static double? parseElevation(String text) {
+    final normalized = text.trim().replaceAll(',', '.');
+    if (!RegExp(r'^[+-]?\d+(?:\.\d+)?$').hasMatch(normalized) &&
+        !RegExp(r'^±0(?:\.0+)?$').hasMatch(normalized)) {
+      return null;
+    }
+    final value = double.tryParse(normalized.replaceFirst('±', ''));
+    if (value == null || !value.isFinite) return null;
+    final rounded = double.tryParse(value.toStringAsFixed(2));
+    return rounded == 0 ? 0.0 : rounded;
   }
 
   BimStoreyUnderlay copyWith({
@@ -51,6 +69,7 @@ class BimStoreyUnderlay {
     double? unitScale,
     Map<String, bool>? layerVisibility,
     bool? wallsDetected,
+    Map<String, dynamic>? processing,
   }) {
     return BimStoreyUnderlay(
       storeyId: storeyId ?? this.storeyId,
@@ -59,10 +78,14 @@ class BimStoreyUnderlay {
       height: height ?? this.height,
       sourceFileName: sourceFileName ?? this.sourceFileName,
       underlayFileName: underlayFileName ?? this.underlayFileName,
-      controlPoint: clearControlPoint ? null : (controlPoint ?? this.controlPoint),
+      controlPoint: clearControlPoint
+          ? null
+          : (controlPoint ?? this.controlPoint),
       unitScale: unitScale ?? this.unitScale,
-      layerVisibility: layerVisibility ?? Map<String, bool>.from(this.layerVisibility),
+      layerVisibility:
+          layerVisibility ?? Map<String, bool>.from(this.layerVisibility),
       wallsDetected: wallsDetected ?? this.wallsDetected,
+      processing: processing ?? this.processing,
     );
   }
 
@@ -78,6 +101,7 @@ class BimStoreyUnderlay {
     'unitScale': unitScale,
     'layerVisibility': layerVisibility,
     'wallsDetected': wallsDetected,
+    'processing': processing,
   };
 
   factory BimStoreyUnderlay.fromJson(Map<String, dynamic> json) {
@@ -108,6 +132,7 @@ class BimStoreyUnderlay {
       unitScale: (json['unitScale'] as num?)?.toDouble() ?? 1.0,
       layerVisibility: lv,
       wallsDetected: json['wallsDetected'] as bool? ?? false,
+      processing: Map<String, dynamic>.from(json['processing'] as Map? ?? {}),
     );
   }
 }
@@ -123,6 +148,7 @@ class BimWorkProject {
   final List<BimStoreyUnderlay> storeys;
   final bool alignmentConfirmed;
   final String? referenceStoreyId;
+  final bool axisSeedsConsumed;
 
   const BimWorkProject({
     required this.id,
@@ -133,6 +159,7 @@ class BimWorkProject {
     this.storeys = const [],
     this.alignmentConfirmed = false,
     this.referenceStoreyId,
+    this.axisSeedsConsumed = false,
   });
 
   /// True when all storeys that have an underlay attached also have their control point set.
@@ -149,6 +176,12 @@ class BimWorkProject {
 
   int get underlaysCount => storeys.where((s) => s.hasUnderlay).length;
 
+  List<BimStoreyUnderlay> get sortedStoreysByElevation =>
+      List<BimStoreyUnderlay>.of(storeys)..sort((a, b) {
+        final order = a.elevation.compareTo(b.elevation);
+        return order != 0 ? order : a.storeyId.compareTo(b.storeyId);
+      });
+
   int get basementCount => storeys.where((s) => s.elevation < -0.01).length;
 
   int get aboveGroundCount => storeys.where((s) => s.elevation >= -0.01).length;
@@ -163,11 +196,15 @@ class BimWorkProject {
     }
     // Prefer elevation near 0.00 with underlay
     for (final s in storeys) {
-      if (s.elevation.abs() < 0.01 && s.hasUnderlay && s.isControlPointSet) return s;
+      if (s.elevation.abs() < 0.01 && s.hasUnderlay && s.isControlPointSet) {
+        return s;
+      }
     }
     // Next prefer any non-basement with underlay & control point
     for (final s in storeys) {
-      if (s.elevation >= -0.01 && s.hasUnderlay && s.isControlPointSet) return s;
+      if (s.elevation >= -0.01 && s.hasUnderlay && s.isControlPointSet) {
+        return s;
+      }
     }
     // Any with underlay & control point
     for (final s in storeys) {
@@ -189,6 +226,7 @@ class BimWorkProject {
     List<BimStoreyUnderlay>? storeys,
     bool? alignmentConfirmed,
     String? referenceStoreyId,
+    bool? axisSeedsConsumed,
   }) {
     return BimWorkProject(
       id: id ?? this.id,
@@ -199,6 +237,7 @@ class BimWorkProject {
       storeys: storeys ?? List<BimStoreyUnderlay>.from(this.storeys),
       alignmentConfirmed: alignmentConfirmed ?? this.alignmentConfirmed,
       referenceStoreyId: referenceStoreyId ?? this.referenceStoreyId,
+      axisSeedsConsumed: axisSeedsConsumed ?? this.axisSeedsConsumed,
     );
   }
 
@@ -211,6 +250,7 @@ class BimWorkProject {
     'storeys': storeys.map((s) => s.toJson()).toList(),
     'alignmentConfirmed': alignmentConfirmed,
     if (referenceStoreyId != null) 'referenceStoreyId': referenceStoreyId,
+    'axisSeedsConsumed': axisSeedsConsumed,
   };
 
   factory BimWorkProject.fromJson(Map<String, dynamic> json) {
@@ -220,14 +260,21 @@ class BimWorkProject {
         .toList();
 
     return BimWorkProject(
-      id: json['id'] as String? ?? 'proj_${DateTime.now().millisecondsSinceEpoch}',
+      id:
+          json['id'] as String? ??
+          'proj_${DateTime.now().millisecondsSinceEpoch}',
       name: json['name'] as String? ?? 'BiM Project',
       location: json['location'] as String? ?? '',
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+          DateTime.now(),
       storeys: storeysList,
       alignmentConfirmed: json['alignmentConfirmed'] as bool? ?? false,
       referenceStoreyId: json['referenceStoreyId'] as String?,
+      axisSeedsConsumed: json['axisSeedsConsumed'] as bool? ?? false,
     );
   }
 }

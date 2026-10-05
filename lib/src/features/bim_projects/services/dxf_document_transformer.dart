@@ -42,10 +42,8 @@ class DxfDocumentTransformer {
     double scale = 1.0,
     Rect? overrideBounds,
   }) {
-    Offset tr(Offset p) => Offset(
-          p.dx * scale + translation.dx,
-          p.dy * scale + translation.dy,
-        );
+    Offset tr(Offset p) =>
+        Offset(p.dx * scale + translation.dx, p.dy * scale + translation.dy);
 
     double sc(double val) => val * scale;
 
@@ -56,7 +54,8 @@ class DxfDocumentTransformer {
     }
 
     // Compute bounding box if not overridden
-    Rect bounds = overrideBounds ?? _computeBounds(transformedEntities, source.blocks);
+    Rect bounds =
+        overrideBounds ?? _computeBounds(transformedEntities, source.blocks);
 
     // Rebuild spatial index with transformed entities and bounds
     final spatialIndex = DxfQuadTree.build(
@@ -101,17 +100,21 @@ class DxfDocumentTransformer {
     );
   }
 
+  static DxfEntity copyToLayer(DxfEntity entity, String layer) =>
+      _transformEntity(entity, (p) => p, (v) => v, 1, layer: layer);
+
   static DxfEntity _transformEntity(
     DxfEntity entity,
     Offset Function(Offset) tr,
     double Function(double) sc,
-    double scale,
-  ) {
+    double scale, {
+    String? layer,
+  }) {
     if (entity is DxfLine) {
       return DxfLine(
         p1: tr(entity.p1),
         p2: tr(entity.p2),
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -123,7 +126,7 @@ class DxfDocumentTransformer {
     } else if (entity is DxfPoint) {
       return DxfPoint(
         point: tr(entity.point),
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -136,7 +139,7 @@ class DxfDocumentTransformer {
       return DxfCircle(
         center: tr(entity.center),
         radius: sc(entity.radius),
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -151,7 +154,7 @@ class DxfDocumentTransformer {
         radius: sc(entity.radius),
         startAngleDeg: entity.startAngleDeg,
         endAngleDeg: entity.endAngleDeg,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -167,7 +170,7 @@ class DxfDocumentTransformer {
         minorRatio: entity.minorRatio,
         startParam: entity.startParam,
         endParam: entity.endParam,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -191,7 +194,7 @@ class DxfDocumentTransformer {
         }).toList(),
         isClosed: entity.isClosed,
         elevation: entity.elevation,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -216,7 +219,7 @@ class DxfDocumentTransformer {
         isClosed: entity.isClosed,
         is3D: entity.is3D,
         flags: entity.flags,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -234,7 +237,7 @@ class DxfDocumentTransformer {
         weights: entity.weights,
         isClosed: entity.isClosed,
         isRational: entity.isRational,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -255,7 +258,7 @@ class DxfDocumentTransformer {
         vAlign: entity.vAlign,
         style: entity.style,
         isInvisible: entity.isInvisible,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -277,7 +280,7 @@ class DxfDocumentTransformer {
         style: entity.style,
         widthFactor: entity.widthFactor,
         lineSpacingFactor: entity.lineSpacingFactor,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -292,7 +295,7 @@ class DxfDocumentTransformer {
         p1: tr(entity.p1),
         p2: tr(entity.p2),
         p3: tr(entity.p3),
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -312,7 +315,7 @@ class DxfDocumentTransformer {
         patternScale: sc(entity.patternScale),
         transparency: entity.transparency,
         patternLines: entity.patternLines,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -334,7 +337,7 @@ class DxfDocumentTransformer {
         vAlign: entity.vAlign,
         style: entity.style,
         flags: entity.flags,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -373,7 +376,7 @@ class DxfDocumentTransformer {
         rowSpacing: sc(entity.rowSpacing),
         colSpacing: sc(entity.colSpacing),
         attributes: transformedAttrs,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -393,7 +396,7 @@ class DxfDocumentTransformer {
         textOverride: entity.textOverride,
         blockName: entity.blockName,
         styleName: entity.styleName,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -406,7 +409,7 @@ class DxfDocumentTransformer {
       return DxfLeader(
         vertices: entity.vertices.map(tr).toList(),
         hasArrowhead: entity.hasArrowhead,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -434,7 +437,7 @@ class DxfDocumentTransformer {
         textWidth: entity.textWidth != null ? sc(entity.textWidth!) : null,
         hasArrowhead: entity.hasArrowhead,
         arrowheadSize: sc(entity.arrowheadSize),
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,
@@ -453,7 +456,7 @@ class DxfDocumentTransformer {
         status: entity.status,
         viewportId: entity.viewportId,
         twistAngleDeg: entity.twistAngleDeg,
-        layer: entity.layer,
+        layer: layer ?? entity.layer,
         colorIndex: entity.colorIndex,
         trueColor: entity.trueColor,
         lineType: entity.lineType,

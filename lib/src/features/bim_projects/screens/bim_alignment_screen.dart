@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../dxf_viewer/models/dxf_display_settings.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
-import '../../dxf_viewer/parser/dxf_parser.dart';
+import '../services/bim_underlay_conversion_service.dart';
+import '../widgets/bim_elevation_dialog.dart';
 import '../../dxf_viewer/rendering/dxf_painter.dart';
 import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../../dxf_viewer/widgets/dxf_display_settings_sheet.dart';
@@ -22,21 +23,19 @@ import 'bim_workspace_screen.dart';
 class BimAlignmentScreen extends StatefulWidget {
   final BimWorkProject project;
 
-  const BimAlignmentScreen({
-    super.key,
-    required this.project,
-  });
+  const BimAlignmentScreen({super.key, required this.project});
 
   @override
   State<BimAlignmentScreen> createState() => _BimAlignmentScreenState();
 }
 
 class _BimAlignmentScreenState extends State<BimAlignmentScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late BimWorkProject _project;
   late TabController _tabController;
   final Map<String, DxfDocument> _loadedDocs = {};
   bool _isLoading = true;
+  String? _loadError;
   bool _showOnionSkin = false;
   bool _underlayFilterActive = false;
 
@@ -68,7 +67,9 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     _tabController.addListener(_onTabChanged);
     _transformController.addListener(_onTransformChanged);
     _initDisplaySettings();
-    DxfDisplaySettingsService.settingsNotifier.addListener(_onDisplaySettingsChanged);
+    DxfDisplaySettingsService.settingsNotifier.addListener(
+      _onDisplaySettingsChanged,
+    );
     _loadAllUnderlays();
   }
 
@@ -78,7 +79,9 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     _tabController.dispose();
     _transformController.removeListener(_onTransformChanged);
     _transformController.dispose();
-    DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged);
+    DxfDisplaySettingsService.settingsNotifier.removeListener(
+      _onDisplaySettingsChanged,
+    );
     _transformSettleTimer?.cancel();
     super.dispose();
   }
@@ -103,12 +106,18 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
   void _onTransformChanged() {
     if (_isGestureActive) return;
     _transformSettleTimer?.cancel();
-    _transformSettleTimer = Timer(const Duration(milliseconds: 60), _syncCanvasAfterTransform);
+    _transformSettleTimer = Timer(
+      const Duration(milliseconds: 60),
+      _syncCanvasAfterTransform,
+    );
   }
 
   void _syncCanvasAfterTransform() {
     if (!mounted || _isGestureActive) return;
-    final currentScale = _transformController.value.getMaxScaleOnAxis().clamp(0.001, 10000.0);
+    final currentScale = _transformController.value.getMaxScaleOnAxis().clamp(
+      0.001,
+      10000.0,
+    );
     if ((currentScale - _renderScale).abs() / _renderScale > 0.03) {
       setState(() {
         _renderScale = currentScale;
@@ -136,18 +145,20 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     final lib = BimProjectLibraryService.instance;
     _loadedDocs.clear();
 
-    for (final storey in _project.storeys) {
-      if (storey.hasUnderlay) {
-        final file = await lib.getUnderlayFile(_project.id, storey.underlayFileName!);
-        if (file != null && await file.exists()) {
-          try {
-            final doc = await DxfParser.parseFromFile(file);
-            _loadedDocs[storey.storeyId] = doc;
-          } catch (e) {
-            debugPrint('Error loading underlay for ${storey.storeyId}: $e');
-          }
+    try {
+      _loadError = null;
+      _project = await lib.prepareUnderlays(_project, loadedDocuments: _loadedDocs);
+      for (final storey in _project.storeys) {
+        if (!storey.hasUnderlay) continue;
+        final doc = _loadedDocs[storey.storeyId]!;
+        for (final entry in storey.layerVisibility.entries) {
+          doc.layers[entry.key]?.isVisible = entry.value;
         }
+        _loadedDocs[storey.storeyId] = doc;
       }
+      _underlayFilterActive = true;
+    } catch (error) {
+      _loadError = error.toString();
     }
 
     if (mounted) {
@@ -167,7 +178,9 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
         file,
       );
 
-      final latestProject = await BimProjectLibraryService.instance.loadProject(_project.id) ?? _project;
+      final latestProject =
+          await BimProjectLibraryService.instance.loadProject(_project.id) ??
+          _project;
       if (mounted) {
         setState(() {
           _project = latestProject;
@@ -299,15 +312,25 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     }
   }
 
-  void _updateSnapPoint(Offset localPosition, Rect bounds, Size viewportSize, {bool isMouse = false}) {
+  void _updateSnapPoint(
+    Offset localPosition,
+    Rect bounds,
+    Size viewportSize, {
+    bool isMouse = false,
+  }) {
     if (_currentDoc == null) return;
     final touchPos = localPosition;
     // On touch/mobile: position target tip 56 pixels directly above finger so finger doesn't obscure view (same as CAD dimensioning)
-    final targetPos = isMouse ? localPosition : (localPosition - const Offset(0, 56.0));
+    final targetPos = isMouse
+        ? localPosition
+        : (localPosition - const Offset(0, 56.0));
     final scenePos = _transformController.toScene(targetPos);
     final cadPt = _sceneToCad(scenePos, bounds, viewportSize);
     final fitScale = _getCadFitScale(bounds, viewportSize);
-    final currentScale = _transformController.value.getMaxScaleOnAxis().clamp(0.0001, 10000.0);
+    final currentScale = _transformController.value.getMaxScaleOnAxis().clamp(
+      0.0001,
+      10000.0,
+    );
     final toleranceCad = 26.0 / (fitScale * currentScale);
 
     final snap = DxfSnapHelper.findSnapPoint(
@@ -323,7 +346,9 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     }
 
     final effectiveCad = snap?.point ?? cadPt;
-    final snappedScreen = snap != null ? _cadToScreen(snap.point, bounds, viewportSize) : null;
+    final snappedScreen = snap != null
+        ? _cadToScreen(snap.point, bounds, viewportSize)
+        : null;
 
     setState(() {
       _touchScreenPos = touchPos;
@@ -463,6 +488,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     setState(() {
       _underlayFilterActive = !_underlayFilterActive;
       for (final doc in _loadedDocs.values) {
+        if (BimUnderlayMetadata.read(doc) != null) {
+          BimUnderlayMetadata.setFiltered(doc, _underlayFilterActive);
+          continue;
+        }
         if (_underlayFilterActive) {
           final visible = StructuralUnderlayFilter.filterLayers(
             layers: doc.layers.values,
@@ -484,6 +513,82 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     HapticFeedback.selectionClick();
   }
 
+  Future<void> _manageElevation({bool add = false, bool sort = false}) async {
+    if (_isLoading) return;
+    final activeId = _currentStorey.storeyId;
+    final storeys = List<BimStoreyUnderlay>.of(_project.storeys);
+    if (sort) {
+      storeys.sort((a, b) => a.elevation.compareTo(b.elevation));
+    } else {
+      final elevation = await showBimElevationDialog(
+        context: context,
+        initialElevation: add
+            ? storeys.map((s) => s.elevation).reduce(math.max) + 2.8
+            : _currentStorey.elevation,
+        occupiedElevations: storeys
+            .where((s) => add || s.storeyId != activeId)
+            .map((s) => s.elevation),
+      );
+      if (!mounted || elevation == null) return;
+      if (add) {
+        storeys.add(
+          BimStoreyUnderlay(
+            storeyId: 'storey_${DateTime.now().microsecondsSinceEpoch}',
+            name: BimStoreyUnderlay.formatElevation(elevation),
+            elevation: elevation,
+          ),
+        );
+      } else {
+        final index = storeys.indexWhere((s) => s.storeyId == activeId);
+        storeys[index] = storeys[index].copyWith(elevation: elevation);
+      }
+    }
+    setState(() => _isLoading = true);
+    try {
+      final updated = await BimProjectLibraryService.instance.updateStoreys(
+        _project.id,
+        storeys,
+      );
+      if (!mounted) return;
+      _tabController.removeListener(_onTabChanged);
+      _tabController.dispose();
+      _project = updated;
+      _tabController = TabController(
+        length: updated.storeys.length,
+        vsync: this,
+        initialIndex: updated.storeys.indexWhere((s) => s.storeyId == activeId),
+      );
+      _tabController.addListener(_onTabChanged);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _reprocess() async {
+    if (_isLoading || !_currentStorey.hasUnderlay) return;
+    setState(() => _isLoading = true);
+    try {
+      await BimProjectLibraryService.instance.reprocessUnderlay(
+        _project.id,
+        _currentStorey.storeyId,
+      );
+      if (mounted) await _loadAllUnderlays();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _loadError = '$error';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -499,11 +604,15 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
             tooltip: _currentStorey.hasUnderlay
                 ? l10n.bimProjectReplaceUnderlay
                 : l10n.bimProjectAddUnderlay,
-            onPressed: _pickAndAttachUnderlayForCurrentStorey,
+            onPressed: _isLoading
+                ? null
+                : _pickAndAttachUnderlayForCurrentStorey,
           ),
           IconButton(
             icon: Icon(
-              _underlayFilterActive ? Icons.filter_alt_rounded : Icons.filter_alt_outlined,
+              _underlayFilterActive
+                  ? Icons.filter_alt_rounded
+                  : Icons.filter_alt_outlined,
               color: _underlayFilterActive ? const Color(0xFF00E5FF) : null,
             ),
             tooltip: _underlayFilterActive
@@ -530,6 +639,18 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (value) {
               switch (value) {
+                case 'edit_elevation':
+                  _manageElevation();
+                  break;
+                case 'add_elevation':
+                  _manageElevation(add: true);
+                  break;
+                case 'sort_elevations':
+                  _manageElevation(sort: true);
+                  break;
+                case 'reprocess':
+                  _reprocess();
+                  break;
                 case 'settings':
                   _showDisplaySettingsSheet();
                   break;
@@ -546,6 +667,26 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
               }
             },
             itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'edit_elevation',
+                enabled: !_isLoading,
+                child: Text(l10n.bimProjectEditElevation),
+              ),
+              PopupMenuItem(
+                value: 'add_elevation',
+                enabled: !_isLoading,
+                child: Text(l10n.bimProjectAddStorey),
+              ),
+              PopupMenuItem(
+                value: 'sort_elevations',
+                enabled: !_isLoading,
+                child: Text(l10n.bimProjectSortStoreys),
+              ),
+              PopupMenuItem(
+                value: 'reprocess',
+                enabled: !_isLoading && _currentStorey.hasUnderlay,
+                child: Text(l10n.bimProjectReprocessUnderlay),
+              ),
               PopupMenuItem(
                 value: 'settings',
                 child: Row(
@@ -567,7 +708,11 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                       size: 20,
                     ),
                     const SizedBox(width: 10),
-                    Text(_canvasTheme.isDark ? l10n.cadThemePaperWhite : l10n.cadThemeDarkCad),
+                    Text(
+                      _canvasTheme.isDark
+                          ? l10n.cadThemePaperWhite
+                          : l10n.cadThemeDarkCad,
+                    ),
                   ],
                 ),
               ),
@@ -576,9 +721,16 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                   value: 'clear_cp',
                   child: Row(
                     children: [
-                      const Icon(Icons.clear_rounded, size: 20, color: Colors.orangeAccent),
+                      const Icon(
+                        Icons.clear_rounded,
+                        size: 20,
+                        color: Colors.orangeAccent,
+                      ),
                       const SizedBox(width: 10),
-                      Text(l10n.clear, style: const TextStyle(color: Colors.orangeAccent)),
+                      Text(
+                        l10n.clear,
+                        style: const TextStyle(color: Colors.orangeAccent),
+                      ),
                     ],
                   ),
                 ),
@@ -599,9 +751,13 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            hasCp ? Icons.check_circle_rounded : Icons.circle_outlined,
+                            hasCp
+                                ? Icons.check_circle_rounded
+                                : Icons.circle_outlined,
                             size: 14,
-                            color: hasCp ? const Color(0xFF00E676) : Colors.orangeAccent,
+                            color: hasCp
+                                ? const Color(0xFF00E676)
+                                : Colors.orangeAccent,
                           ),
                           const SizedBox(width: 6),
                           Text(s.elevationLabel),
@@ -615,15 +771,37 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_loadError!),
+                  TextButton(
+                    onPressed: _loadAllUnderlays,
+                    child: Text(l10n.retry),
+                  ),
+                ],
+              ),
+            )
           : Column(
               children: [
                 // Instruction banner
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.5,
+                  ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, size: 18, color: Color(0xFF00E5FF)),
+                      const Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: Color(0xFF00E5FF),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -642,7 +820,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                           color: _canvasTheme.bgColor,
                           child: LayoutBuilder(
                             builder: (context, constraints) {
-                              final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+                              final viewportSize = Size(
+                                constraints.maxWidth,
+                                constraints.maxHeight,
+                              );
                               final bounds = _currentDoc!.bounds;
 
                               return Stack(
@@ -651,151 +832,198 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                                   RawGestureDetector(
                                     gestures: <Type, GestureRecognizerFactory>{
                                       LongPressGestureRecognizer:
-                                          GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
-                                        () => LongPressGestureRecognizer(
-                                          duration: const Duration(milliseconds: 250),
-                                          debugOwner: this,
-                                        ),
-                                        (LongPressGestureRecognizer instance) {
-                                          instance
-                                            ..onLongPressStart = (details) {
-                                              _isDraggingPoint = true;
-                                              _updateSnapPoint(
-                                                details.localPosition,
-                                                bounds,
-                                                viewportSize,
-                                                isMouse: _activePointerKind == PointerDeviceKind.mouse,
-                                              );
-                                              HapticFeedback.selectionClick();
-                                            }
-                                            ..onLongPressMoveUpdate = (details) {
-                                              _updateSnapPoint(
-                                                details.localPosition,
-                                                bounds,
-                                                viewportSize,
-                                                isMouse: _activePointerKind == PointerDeviceKind.mouse,
-                                              );
-                                            }
-                                            ..onLongPressEnd = (details) {
-                                              final target = _activeSnapCad ?? _touchCadCoord;
-                                              setState(() {
-                                                _isDraggingPoint = false;
-                                                _touchScreenPos = null;
-                                                _targetScreenPos = null;
-                                                _snappedScreenPos = null;
-                                                _activeSnapType = null;
-                                              });
-                                              if (target != null) {
-                                                _onSetControlPoint(target);
-                                              }
-                                            }
-                                            ..onLongPressCancel = () {
-                                              setState(() {
-                                                _isDraggingPoint = false;
-                                                _touchScreenPos = null;
-                                                _targetScreenPos = null;
-                                                _snappedScreenPos = null;
-                                                _activeSnapType = null;
-                                              });
-                                            };
-                                        },
-                                      ),
+                                          GestureRecognizerFactoryWithHandlers<
+                                            LongPressGestureRecognizer
+                                          >(
+                                            () => LongPressGestureRecognizer(
+                                              duration: const Duration(
+                                                milliseconds: 250,
+                                              ),
+                                              debugOwner: this,
+                                            ),
+                                            (
+                                              LongPressGestureRecognizer
+                                              instance,
+                                            ) {
+                                              instance
+                                                ..onLongPressStart = (details) {
+                                                  _isDraggingPoint = true;
+                                                  _updateSnapPoint(
+                                                    details.localPosition,
+                                                    bounds,
+                                                    viewportSize,
+                                                    isMouse:
+                                                        _activePointerKind ==
+                                                        PointerDeviceKind.mouse,
+                                                  );
+                                                  HapticFeedback.selectionClick();
+                                                }
+                                                ..onLongPressMoveUpdate =
+                                                    (details) {
+                                                      _updateSnapPoint(
+                                                        details.localPosition,
+                                                        bounds,
+                                                        viewportSize,
+                                                        isMouse:
+                                                            _activePointerKind ==
+                                                            PointerDeviceKind
+                                                                .mouse,
+                                                      );
+                                                    }
+                                                ..onLongPressEnd = (details) {
+                                                  final target =
+                                                      _activeSnapCad ??
+                                                      _touchCadCoord;
+                                                  setState(() {
+                                                    _isDraggingPoint = false;
+                                                    _touchScreenPos = null;
+                                                    _targetScreenPos = null;
+                                                    _snappedScreenPos = null;
+                                                    _activeSnapType = null;
+                                                  });
+                                                  if (target != null) {
+                                                    _onSetControlPoint(target);
+                                                  }
+                                                }
+                                                ..onLongPressCancel = () {
+                                                  setState(() {
+                                                    _isDraggingPoint = false;
+                                                    _touchScreenPos = null;
+                                                    _targetScreenPos = null;
+                                                    _snappedScreenPos = null;
+                                                    _activeSnapType = null;
+                                                  });
+                                                };
+                                            },
+                                          ),
                                     },
                                     child: Listener(
                                       onPointerDown: (e) {
                                         _activePointerKind = e.kind;
                                       },
                                       child: InteractiveViewer(
-                                      transformationController: _transformController,
-                                      scaleFactor: 350.0,
-                                      trackpadScrollCausesScale: true,
-                                      minScale: 0.001,
-                                      maxScale: 1000.0,
-                                      boundaryMargin: const EdgeInsets.all(double.infinity),
-                                      onInteractionStart: (details) {
-                                        _isGestureActive = true;
-                                        _transformSettleTimer?.cancel();
-                                      },
-                                      onInteractionEnd: (details) {
-                                        _isGestureActive = false;
-                                        _transformSettleTimer?.cancel();
-                                        _transformSettleTimer = Timer(
-                                          const Duration(milliseconds: 60),
-                                          _syncCanvasAfterTransform,
-                                        );
-                                      },
-                                      child: SizedBox(
-                                        width: viewportSize.width,
-                                        height: viewportSize.height,
-                                        child: Stack(
-                                          children: [
-                                            // Optional onion skin from lower storey
-                                            if (_showOnionSkin && _lowerDoc != null) ...[
-                                              Builder(
-                                                builder: (context) {
-                                                  Offset offset = Offset.zero;
-                                                  if (_lowerStorey?.controlPoint != null &&
-                                                      _currentStorey.controlPoint != null) {
-                                                    final curCp = _cadToScene(
-                                                        _currentStorey.controlPoint!, bounds, viewportSize);
-                                                    final lowCp = _cadToScene(
-                                                        _lowerStorey!.controlPoint!, _lowerDoc!.bounds, viewportSize);
-                                                    offset = curCp - lowCp;
-                                                  }
+                                        transformationController:
+                                            _transformController,
+                                        scaleFactor: 350.0,
+                                        trackpadScrollCausesScale: true,
+                                        minScale: 0.001,
+                                        maxScale: 1000.0,
+                                        boundaryMargin: const EdgeInsets.all(
+                                          double.infinity,
+                                        ),
+                                        onInteractionStart: (details) {
+                                          _isGestureActive = true;
+                                          _transformSettleTimer?.cancel();
+                                        },
+                                        onInteractionEnd: (details) {
+                                          _isGestureActive = false;
+                                          _transformSettleTimer?.cancel();
+                                          _transformSettleTimer = Timer(
+                                            const Duration(milliseconds: 60),
+                                            _syncCanvasAfterTransform,
+                                          );
+                                        },
+                                        child: SizedBox(
+                                          width: viewportSize.width,
+                                          height: viewportSize.height,
+                                          child: Stack(
+                                            children: [
+                                              // Optional onion skin from lower storey
+                                              if (_showOnionSkin &&
+                                                  _lowerDoc != null) ...[
+                                                Builder(
+                                                  builder: (context) {
+                                                    Offset offset = Offset.zero;
+                                                    if (_lowerStorey
+                                                                ?.controlPoint !=
+                                                            null &&
+                                                        _currentStorey
+                                                                .controlPoint !=
+                                                            null) {
+                                                      final curCp = _cadToScene(
+                                                        _currentStorey
+                                                            .controlPoint!,
+                                                        bounds,
+                                                        viewportSize,
+                                                      );
+                                                      final lowCp = _cadToScene(
+                                                        _lowerStorey!
+                                                            .controlPoint!,
+                                                        _lowerDoc!.bounds,
+                                                        viewportSize,
+                                                      );
+                                                      offset = curCp - lowCp;
+                                                    }
 
-                                                  return Positioned.fill(
-                                                    child: Transform.translate(
-                                                      offset: offset,
-                                                      child: Opacity(
-                                                        opacity: 0.38,
-                                                        child: RepaintBoundary(
-                                                          child: CustomPaint(
-                                                            size: viewportSize,
-                                                            isComplex: true,
-                                                            willChange: false,
-                                                            painter: DxfPainter(
-                                                              document: _lowerDoc!,
-                                                              theme: _canvasTheme,
-                                                              activeLayout: 'Model',
-                                                              currentScale: _renderScale,
-                                                              visibleCadRect: _getVisibleCadRect(
-                                                                  _lowerDoc!.bounds, viewportSize),
-                                                              showGrid: false,
-                                                              settings: _displaySettings,
+                                                    return Positioned.fill(
+                                                      child: Transform.translate(
+                                                        offset: offset,
+                                                        child: Opacity(
+                                                          opacity: 0.38,
+                                                          child: RepaintBoundary(
+                                                            child: CustomPaint(
+                                                              size:
+                                                                  viewportSize,
+                                                              isComplex: true,
+                                                              willChange: false,
+                                                              painter: DxfPainter(
+                                                                document:
+                                                                    _lowerDoc!,
+                                                                theme:
+                                                                    _canvasTheme,
+                                                                activeLayout:
+                                                                    'Model',
+                                                                currentScale:
+                                                                    _renderScale,
+                                                                visibleCadRect:
+                                                                    _getVisibleCadRect(
+                                                                      _lowerDoc!
+                                                                          .bounds,
+                                                                      viewportSize,
+                                                                    ),
+                                                                showGrid: false,
+                                                                settings:
+                                                                    _displaySettings,
+                                                              ),
                                                             ),
                                                           ),
                                                         ),
                                                       ),
-                                                    ),
-                                                  );
-                                                },
-                                              ),
-                                            ],
+                                                    );
+                                                  },
+                                                ),
+                                              ],
 
-                                            // Main active storey drawing
-                                            Positioned.fill(
-                                              child: RepaintBoundary(
-                                                child: CustomPaint(
-                                                  size: viewportSize,
-                                                  isComplex: true,
-                                                  willChange: false,
-                                                  painter: DxfPainter(
-                                                    document: _currentDoc!,
-                                                    theme: _canvasTheme,
-                                                    activeLayout: 'Model',
-                                                    currentScale: _renderScale,
-                                                    visibleCadRect: _getVisibleCadRect(bounds, viewportSize),
-                                                    showGrid: true,
-                                                    settings: _displaySettings,
+                                              // Main active storey drawing
+                                              Positioned.fill(
+                                                child: RepaintBoundary(
+                                                  child: CustomPaint(
+                                                    size: viewportSize,
+                                                    isComplex: true,
+                                                    willChange: false,
+                                                    painter: DxfPainter(
+                                                      document: _currentDoc!,
+                                                      theme: _canvasTheme,
+                                                      activeLayout: 'Model',
+                                                      currentScale:
+                                                          _renderScale,
+                                                      visibleCadRect:
+                                                          _getVisibleCadRect(
+                                                            bounds,
+                                                            viewportSize,
+                                                          ),
+                                                      showGrid: true,
+                                                      settings:
+                                                          _displaySettings,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
                                   ),
 
                                   // Screen-Space Control Point Bullseye Marker (Crisp, vector-sharp at ANY zoom scale)
@@ -804,15 +1032,29 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                                       child: CustomPaint(
                                         size: viewportSize,
                                         painter: _ControlPointOverlayPainter(
-                                          placedPoint: _currentStorey.controlPoint,
+                                          placedPoint:
+                                              _currentStorey.controlPoint,
                                           draggingPoint: _isDraggingPoint
-                                              ? (_activeSnapCad ?? _touchCadCoord)
+                                              ? (_activeSnapCad ??
+                                                    _touchCadCoord)
                                               : null,
-                                          touchPos: _isDraggingPoint ? _touchScreenPos : null,
-                                          targetPos: _isDraggingPoint ? _targetScreenPos : null,
-                                          snappedPos: _isDraggingPoint ? _snappedScreenPos : null,
-                                          snapType: _isDraggingPoint ? _activeSnapType : null,
-                                          cadToScreen: (pt) => _cadToScreen(pt, bounds, viewportSize),
+                                          touchPos: _isDraggingPoint
+                                              ? _touchScreenPos
+                                              : null,
+                                          targetPos: _isDraggingPoint
+                                              ? _targetScreenPos
+                                              : null,
+                                          snappedPos: _isDraggingPoint
+                                              ? _snappedScreenPos
+                                              : null,
+                                          snapType: _isDraggingPoint
+                                              ? _activeSnapType
+                                              : null,
+                                          cadToScreen: (pt) => _cadToScreen(
+                                            pt,
+                                            bounds,
+                                            viewportSize,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -836,7 +1078,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                                 const SizedBox(height: 12),
                                 Text(
                                   l10n.bimProjectNoUnderlay,
-                                  style: TextStyle(color: theme.hintColor, fontSize: 16),
+                                  style: TextStyle(
+                                    color: theme.hintColor,
+                                    fontSize: 16,
+                                  ),
                                 ),
                                 const SizedBox(height: 16),
                                 ElevatedButton.icon(
@@ -845,10 +1090,17 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: theme.colorScheme.primary,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   ),
-                                  onPressed: _pickAndAttachUnderlayForCurrentStorey,
+                                  onPressed: _isLoading
+                                      ? null
+                                      : _pickAndAttachUnderlayForCurrentStorey,
                                 ),
                               ],
                             ),
@@ -861,7 +1113,11 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
-                    border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2))),
+                    border: Border(
+                      top: BorderSide(
+                        color: theme.dividerColor.withValues(alpha: 0.2),
+                      ),
+                    ),
                   ),
                   child: SafeArea(
                     top: false,
@@ -892,11 +1148,16 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                                       child: Text(
                                         _currentStorey.isControlPointSet
                                             ? l10n.bimAlignmentControlPointSet(
-                                                _currentStorey.controlPoint!.dx.toStringAsFixed(2),
-                                                _currentStorey.controlPoint!.dy.toStringAsFixed(2),
+                                                _currentStorey.controlPoint!.dx
+                                                    .toStringAsFixed(2),
+                                                _currentStorey.controlPoint!.dy
+                                                    .toStringAsFixed(2),
                                               )
                                             : l10n.bimAlignmentControlPointMissing,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -905,7 +1166,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                               const SizedBox(height: 2),
                               Text(
                                 '${_project.storeys.where((s) => s.isControlPointSet).length}/${_project.underlaysCount} aligned',
-                                style: TextStyle(fontSize: 11, color: theme.hintColor),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.hintColor,
+                                ),
                               ),
                             ],
                           ),
@@ -914,13 +1178,21 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
 
                         // Ready / Start BiM Button
                         ElevatedButton.icon(
-                          icon: const Icon(Icons.rocket_launch_rounded, size: 18),
+                          icon: const Icon(
+                            Icons.rocket_launch_rounded,
+                            size: 18,
+                          ),
                           label: Text(l10n.bimAlignmentReadyButton),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF00E5FF),
                             foregroundColor: Colors.black,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                           ),
                           onPressed: _project.allControlPointsPlaced
                               ? _onConfirmAlignment
@@ -964,14 +1236,18 @@ class _ControlPointOverlayPainter extends CustomPainter {
         p,
         color: const Color(0xFF00E5FF),
         isPlaced: true,
-        label: 'CP: (${placedPoint!.dx.toStringAsFixed(2)}, ${placedPoint!.dy.toStringAsFixed(2)})',
+        label:
+            'CP: (${placedPoint!.dx.toStringAsFixed(2)}, ${placedPoint!.dy.toStringAsFixed(2)})',
       );
     }
 
     if (draggingPoint != null) {
-      final effectiveTip = snappedPos ?? targetPos ?? cadToScreen(draggingPoint!);
+      final effectiveTip =
+          snappedPos ?? targetPos ?? cadToScreen(draggingPoint!);
       final bool isSnapped = snappedPos != null;
-      final baseColor = isSnapped ? const Color(0xFF00E5FF) : const Color(0xFFFF9100);
+      final baseColor = isSnapped
+          ? const Color(0xFF00E5FF)
+          : const Color(0xFFFF9100);
       final glowColor = baseColor.withValues(alpha: 0.35);
 
       // 1. Draw Touch Anchor under user's finger (if finger touch position is available)
@@ -1055,8 +1331,16 @@ class _ControlPointOverlayPainter extends CustomPainter {
     canvas.drawCircle(p, 20, ringPaint..strokeWidth = 1.0);
 
     // Crosshairs
-    canvas.drawLine(Offset(p.dx - 28, p.dy), Offset(p.dx + 28, p.dy), crossPaint);
-    canvas.drawLine(Offset(p.dx, p.dy - 28), Offset(p.dx, p.dy + 28), crossPaint);
+    canvas.drawLine(
+      Offset(p.dx - 28, p.dy),
+      Offset(p.dx + 28, p.dy),
+      crossPaint,
+    );
+    canvas.drawLine(
+      Offset(p.dx, p.dy - 28),
+      Offset(p.dx, p.dy + 28),
+      crossPaint,
+    );
 
     // Snap marker glyph if snapped
     if (snapType != null) {
@@ -1066,7 +1350,10 @@ class _ControlPointOverlayPainter extends CustomPainter {
         ..strokeWidth = 1.8;
       switch (snapType) {
         case DxfSnapType.endpoint:
-          canvas.drawRect(Rect.fromCenter(center: p, width: 14, height: 14), snapPaint);
+          canvas.drawRect(
+            Rect.fromCenter(center: p, width: 14, height: 14),
+            snapPaint,
+          );
           break;
         case DxfSnapType.midpoint:
           final path = Path()
@@ -1080,26 +1367,39 @@ class _ControlPointOverlayPainter extends CustomPainter {
           canvas.drawCircle(p, 8, snapPaint);
           break;
         case DxfSnapType.perpendicular:
-          canvas.drawLine(Offset(p.dx - 6, p.dy + 6), Offset(p.dx + 6, p.dy + 6), snapPaint);
-          canvas.drawLine(Offset(p.dx, p.dy + 6), Offset(p.dx, p.dy - 6), snapPaint);
+          canvas.drawLine(
+            Offset(p.dx - 6, p.dy + 6),
+            Offset(p.dx + 6, p.dy + 6),
+            snapPaint,
+          );
+          canvas.drawLine(
+            Offset(p.dx, p.dy + 6),
+            Offset(p.dx, p.dy - 6),
+            snapPaint,
+          );
           break;
         default:
-          canvas.drawRect(Rect.fromCenter(center: p, width: 12, height: 12), snapPaint);
+          canvas.drawRect(
+            Rect.fromCenter(center: p, width: 12, height: 12),
+            snapPaint,
+          );
           break;
       }
     }
 
     // Center dot
-    canvas.drawCircle(p, 3.5, Paint()..color = color..style = PaintingStyle.fill);
+    canvas.drawCircle(
+      p,
+      3.5,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.fill,
+    );
 
     // Coordinate badge with rounded dark backdrop
     final textSpan = TextSpan(
       text: label,
-      style: TextStyle(
-        color: color,
-        fontSize: 10,
-        fontWeight: FontWeight.bold,
-      ),
+      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
     );
     final textPainter = TextPainter(
       text: textSpan,
@@ -1112,8 +1412,14 @@ class _ControlPointOverlayPainter extends CustomPainter {
       textPainter.width + 10,
       textPainter.height + 6,
     );
-    final badgeRRect = RRect.fromRectAndRadius(badgeRect, const Radius.circular(5));
-    canvas.drawRRect(badgeRRect, Paint()..color = Colors.black.withValues(alpha: 0.75));
+    final badgeRRect = RRect.fromRectAndRadius(
+      badgeRect,
+      const Radius.circular(5),
+    );
+    canvas.drawRRect(
+      badgeRRect,
+      Paint()..color = Colors.black.withValues(alpha: 0.75),
+    );
     canvas.drawRRect(
       badgeRRect,
       Paint()

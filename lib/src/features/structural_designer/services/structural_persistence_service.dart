@@ -67,7 +67,9 @@ class StructuralPersistenceService {
     final dir = outputDirectory ?? await getTemporaryDirectory();
     final cleanName = baseName.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
     final file = File('${dir.path}/${cleanName}_structural_model.bim.json');
-    final jsonString = const JsonEncoder.withIndent('  ').convert(project.toJson());
+    final jsonString = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(project.toJson());
     await file.writeAsString(jsonString);
     return file;
   }
@@ -92,7 +94,9 @@ class StructuralPersistenceService {
     final sb = StringBuffer();
 
     // 1. DXF Header
-    sb.writeln('0\nSECTION\n2\nHEADER\n9\n\$ACADVER\n1\nAC1015'); // AutoCAD 2000
+    sb.writeln(
+      '0\nSECTION\n2\nHEADER\n9\n\$ACADVER\n1\nAC1015',
+    ); // AutoCAD 2000
     sb.writeln('0\nENDSEC');
 
     // 2. DXF Tables (Layers)
@@ -100,6 +104,7 @@ class StructuralPersistenceService {
     void writeLayer(String name, int color) {
       sb.writeln('0\nLAYER\n2\n$name\n70\n0\n62\n$color\n6\nCONTINUOUS');
     }
+
     writeLayer('S-COL', 2); // Yellow
     writeLayer('S-WALL', 1); // Red
     writeLayer('S-BEAM', 4); // Cyan
@@ -130,6 +135,7 @@ class StructuralPersistenceService {
     double unitScale = 1.0,
     double cadUnitsPerMeter = 1.0,
     Directory? outputDirectory,
+    String axisLayerName = 'S-AXIS',
   }) async {
     final dir = outputDirectory ?? await getTemporaryDirectory();
     final cleanName = baseName.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
@@ -138,19 +144,36 @@ class StructuralPersistenceService {
     final sb = StringBuffer();
 
     // 1. DXF Header
-    sb.writeln('0\nSECTION\n2\nHEADER\n9\n\$ACADVER\n1\nAC1015'); // AutoCAD 2000
+    sb.writeln(
+      '0\nSECTION\n2\nHEADER\n9\n\$ACADVER\n1\nAC1015',
+    ); // AutoCAD 2000
     sb.writeln('0\nENDSEC');
 
-    // 2. DXF Tables (Layers)
-    sb.writeln('0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n5');
+    // Define the axis pattern explicitly so CAD applications render it reliably.
+    sb.writeln('0\nSECTION\n2\nTABLES');
+    final localUnitsPerMeter = cpRef != null && cpLocal != null && unitScale > 0
+        ? cadUnitsPerMeter / unitScale
+        : cadUnitsPerMeter;
+    sb.writeln('0\nTABLE\n2\nLTYPE\n70\n2');
+    sb.writeln(
+      '0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0.0',
+    );
+    sb.writeln(
+      '0\nLTYPE\n2\nBIM_AXIS_DASHED\n70\n0\n3\nBIM axis\n72\n65\n73\n2',
+    );
+    sb.writeln(
+      '40\n${0.75 * localUnitsPerMeter}\n49\n${0.5 * localUnitsPerMeter}\n74\n0\n49\n${-0.25 * localUnitsPerMeter}\n74\n0',
+    );
+    sb.writeln('0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n5');
     void writeLayer(String name, int color) {
       sb.writeln('0\nLAYER\n2\n$name\n70\n0\n62\n$color\n6\nCONTINUOUS');
     }
+
     writeLayer('S-COL', 2); // Yellow
     writeLayer('S-WALL', 1); // Red
     writeLayer('S-BEAM', 4); // Cyan
     writeLayer('S-SLAB', 3); // Green
-    writeLayer('S-AXIS', 6); // Magenta
+    writeLayer(axisLayerName, 6); // Magenta
     sb.writeln('0\nENDTAB\n0\nENDSEC');
 
     // 3. DXF Entities
@@ -163,7 +186,14 @@ class StructuralPersistenceService {
       return p;
     }
 
-    _writeStoreyEntities(sb, storey, cadUnitsPerMeter, toLocal);
+    _writeStoreyEntities(
+      sb,
+      storey,
+      localUnitsPerMeter,
+      toLocal,
+      axisLayerName: axisLayerName,
+      axisLineType: 'BIM_AXIS_DASHED',
+    );
 
     sb.writeln('0\nENDSEC\n0\nEOF');
 
@@ -175,15 +205,24 @@ class StructuralPersistenceService {
     StringBuffer sb,
     StoreyLevel storey,
     double cadUnitsPerMeter,
-    Offset Function(Offset) tr,
-  ) {
+    Offset Function(Offset) tr, {
+    String axisLayerName = 'S-AXIS',
+    String? axisLineType,
+  }) {
     // Columns
     for (final col in storey.columns) {
       final pts = col.polygonVertices.map(tr).toList();
       if (pts.length >= 3) {
         _writeClosedPolyline(sb, pts, 'S-COL', 2);
         final c = tr(col.center);
-        _writeText(sb, col.displayName, c.dx, c.dy, 0.25 * cadUnitsPerMeter, 'S-COL');
+        _writeText(
+          sb,
+          col.displayName,
+          c.dx,
+          c.dy,
+          0.25 * cadUnitsPerMeter,
+          'S-COL',
+        );
       }
     }
 
@@ -193,7 +232,14 @@ class StructuralPersistenceService {
       if (pts.length >= 4) {
         _writeClosedPolyline(sb, pts, 'S-WALL', 1);
         final mid = tr((wall.start + wall.end) / 2.0);
-        _writeText(sb, wall.displayName, mid.dx, mid.dy, 0.25 * cadUnitsPerMeter, 'S-WALL');
+        _writeText(
+          sb,
+          wall.displayName,
+          mid.dx,
+          mid.dy,
+          0.25 * cadUnitsPerMeter,
+          'S-WALL',
+        );
       }
     }
 
@@ -219,7 +265,14 @@ class StructuralPersistenceService {
         final c = tr(slab.centroid);
         final elev = storey.structuralElevationFor(slab);
         final thickCm = (slab.thickness * 100).round();
-        _writeText(sb, 'T.O.C. ${elev >= 0 ? "+" : ""}${elev.toStringAsFixed(2)} (d=${thickCm}cm)', c.dx, c.dy, 0.25 * cadUnitsPerMeter, 'S-SLAB');
+        _writeText(
+          sb,
+          'T.O.C. ${elev >= 0 ? "+" : ""}${elev.toStringAsFixed(2)} (d=${thickCm}cm)',
+          c.dx,
+          c.dy,
+          0.25 * cadUnitsPerMeter,
+          'S-SLAB',
+        );
       }
     }
 
@@ -227,31 +280,48 @@ class StructuralPersistenceService {
     for (final axis in storey.gridAxes) {
       final s = tr(axis.start);
       final e = tr(axis.end);
-      sb.writeln('0\nLINE\n8\nS-AXIS\n62\n6');
+      sb.writeln('0\nLINE\n8\n$axisLayerName\n62\n6');
+      if (axisLineType != null) sb.writeln('6\n$axisLineType');
       sb.writeln('10\n${s.dx}\n20\n${s.dy}\n30\n0.0');
       sb.writeln('11\n${e.dx}\n21\n${e.dy}\n31\n0.0');
 
       final bubbleRadius = 0.40 * cadUnitsPerMeter;
       if (axis.bubbleAtStart) {
-        _writeCircle(sb, s.dx, s.dy, bubbleRadius, 'S-AXIS');
-        _writeText(sb, axis.name, s.dx, s.dy, 0.30 * cadUnitsPerMeter, 'S-AXIS');
+        _writeCircle(sb, s.dx, s.dy, bubbleRadius, axisLayerName);
+        _writeText(
+          sb,
+          axis.name,
+          s.dx,
+          s.dy,
+          0.30 * cadUnitsPerMeter,
+          axisLayerName,
+        );
       }
       if (axis.bubbleAtEnd) {
-        _writeCircle(sb, e.dx, e.dy, bubbleRadius, 'S-AXIS');
-        _writeText(sb, axis.name, e.dx, e.dy, 0.30 * cadUnitsPerMeter, 'S-AXIS');
+        _writeCircle(sb, e.dx, e.dy, bubbleRadius, axisLayerName);
+        _writeText(
+          sb,
+          axis.name,
+          e.dx,
+          e.dy,
+          0.30 * cadUnitsPerMeter,
+          axisLayerName,
+        );
       }
     }
   }
 
   /// Prompts system share dialog for exported file.
   static Future<void> shareFile(File file, {String? subject}) async {
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      subject: subject,
-    );
+    await Share.shareXFiles([XFile(file.path)], subject: subject);
   }
 
-  static void _writeClosedPolyline(StringBuffer sb, List<Offset> pts, String layer, int color) {
+  static void _writeClosedPolyline(
+    StringBuffer sb,
+    List<Offset> pts,
+    String layer,
+    int color,
+  ) {
     sb.writeln('0\nLWPOLYLINE\n8\n$layer\n62\n$color');
     sb.writeln('90\n${pts.length}\n70\n1'); // 70=1 is closed
     for (final p in pts) {
@@ -259,14 +329,27 @@ class StructuralPersistenceService {
     }
   }
 
-  static void _writeText(StringBuffer sb, String text, double x, double y, double height, String layer) {
+  static void _writeText(
+    StringBuffer sb,
+    String text,
+    double x,
+    double y,
+    double height,
+    String layer,
+  ) {
     sb.writeln('0\nTEXT\n8\n$layer\n62\n7');
     sb.writeln('10\n$x\n20\n$y\n30\n0.0');
     sb.writeln('40\n$height\n1\n$text\n72\n1\n73\n2'); // Centered
     sb.writeln('11\n$x\n21\n$y\n31\n0.0');
   }
 
-  static void _writeCircle(StringBuffer sb, double cx, double cy, double radius, String layer) {
+  static void _writeCircle(
+    StringBuffer sb,
+    double cx,
+    double cy,
+    double radius,
+    String layer,
+  ) {
     sb.writeln('0\nCIRCLE\n8\n$layer\n62\n6');
     sb.writeln('10\n$cx\n20\n$cy\n30\n0.0\n40\n$radius');
   }

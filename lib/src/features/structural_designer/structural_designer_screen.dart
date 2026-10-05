@@ -1,3 +1,4 @@
+import '../bim_projects/services/bim_underlay_conversion_service.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
@@ -241,9 +242,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _originalLayerVisibility[entry.key] = entry.value.isVisible;
     }
 
-    // Underlay filter starts off (all layers visible as in commit e781d51).
+    if (BimUnderlayMetadata.read(_document) != null) {
+      _underlayFilterActive = BimUnderlayMetadata.generatedLayers(_document)
+        .any((name) => _document.layers[name]?.isVisible == true);
+    }
+    // Standalone drawings retain their existing filter controls.
     // The user can manually toggle structural underlay filtering via the AppBar funnel icon.
-    if (_project.activeStorey.gridAxes.isEmpty) {
+    if (widget.bimContext == null && _project.activeStorey.gridAxes.isEmpty) {
       if (widget.initialDetectionResult != null && widget.initialDetectionResult!.hasWallsFound) {
         final axes = WallAxisDetector.convertToStructuralGridAxes(
           widget.initialDetectionResult!.snappedCenterlines,
@@ -6239,6 +6244,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   // --- Structural Underlay Layer Filtering (White Thick Walls & Slabs focus) ---
 
   void _applyUnderlayFilter(bool activate) {
+    if (BimUnderlayMetadata.read(_document) != null) {
+      _underlayFilterActive = activate;
+      final docs = widget.bimContext?.underlaysByStorey ?? {'': _document};
+      for (final entry in docs.entries) {
+        BimUnderlayMetadata.setFiltered(entry.value, activate);
+        widget.bimContext?.onLayerVisibilityChanged(entry.key,
+          {for (final l in entry.value.layers.values) l.name: l.isVisible});
+      }
+      _underlayRevision++;
+      return;
+    }
     _underlayFilterActive = activate;
     if (activate) {
       final Set<String> visibleLayerNames = _customUnderlayFilterLayers ??
@@ -6554,6 +6570,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _checkAutoDetectWallsOnStartup() {
+    // BIM underlays are analysed once at import; empty/deleted axes stay empty.
+    if (widget.bimContext != null) return;
     if (!mounted) return;
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
 
@@ -6700,6 +6718,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _runManualAutoDetectWalls() {
+    if (widget.bimContext != null) {
+      // Reprocess the preserved source via the project's underlay management.
+      widget.bimContext!.onManageStoreys();
+      return;
+    }
     final result = WallAxisDetector.detect(_document);
     if (!result.hasWallsFound) {
       final slabResult = StructuralUnderlayFilter.detectSlabLayers(_document);

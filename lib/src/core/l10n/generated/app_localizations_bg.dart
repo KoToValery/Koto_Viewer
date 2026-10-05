@@ -2537,4 +2537,35 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get cancelMove => 'Отказ';
+
+  @override
+  String get bimProjectEditElevation => 'Редактиране на кота';
+
+  @override
+  String get bimProjectSortStoreys => 'Сортирай по кота';
+
+  @override
+  String get bimProjectElevationHelper => 'напр. +2,85, 0,00, -3,20';
+
+  @override
+  String get bimProjectInvalidElevation => 'Въведете валидна кота в метри.';
+
+  @override
+  String get bimProjectDuplicateElevation => 'Вече има етаж с тази кота.';
+
+  @override
+  String get bimProjectConvertingUnderlay => 'Конвертиране на подложка…';
+
+  @override
+  String get bimProjectDetectingWallsAndSlabs =>
+      'Разпознаване на стени и плочи…';
+
+  @override
+  String get bimProjectKcadReady => 'KCAD готов';
+
+  @override
+  String get bimProjectConversionFailed => 'Неуспешна конверсия на подложката';
+
+  @override
+  String get bimProjectReprocessUnderlay => 'Повторен анализ на подложката';
 }
