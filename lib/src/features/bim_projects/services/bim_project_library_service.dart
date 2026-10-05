@@ -100,7 +100,7 @@ class BimProjectLibraryService {
     final initialStructuralStoreys = storeys.map((s) {
       return StoreyLevel(
         id: s.storeyId,
-        name: s.name,
+        name: s.elevationLabel,
         elevation: s.elevation,
         height: s.height,
       );
@@ -113,7 +113,7 @@ class BimProjectLibraryService {
           : const [
               StoreyLevel(
                 id: 'storey_1',
-                name: 'Етаж 1 (Кота ±0.00)',
+                name: '±0.00',
                 elevation: 0.0,
                 height: 2.80,
               ),

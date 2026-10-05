@@ -179,7 +179,7 @@ class StoreyManagerSheet extends StatelessWidget {
                         ),
                       ),
                       title: Text(
-                        storey.name,
+                        storey.elevationLabel,
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight:

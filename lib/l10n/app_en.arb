@@ -2019,6 +2019,19 @@
   "cadThemeDarkCad": "CAD Dark",
   "@cadThemeDarkCad": { "description": "Dark CAD theme for drawings canvas" },
   "cadThemePaperWhite": "Paper White",
-  "@cadThemePaperWhite": { "description": "Paper white theme for drawings canvas" }
+  "@cadThemePaperWhite": { "description": "Paper white theme for drawings canvas" },
+  "noSlabLayerDetectedOrEmpty": "No slab layer found or layer is empty",
+  "@noSlabLayerDetectedOrEmpty": { "description": "Notice when no slab layer is found or when the slab layer contains no entities" },
+  "slabLayerAddedToFilter": "Slab layer \"{layer}\" added to structural filter",
+  "@slabLayerAddedToFilter": {
+    "description": "Notice when a slab layer is detected and added to the structural underlay filter",
+    "placeholders": {
+      "layer": { "type": "String" }
+    }
+  },
+  "deleteOpeningPoint": "Delete Point",
+  "@deleteOpeningPoint": { "description": "Button label to delete the selected vertex of an opening polygon" },
+  "openingPointsMerged": "Opening points merged",
+  "@openingPointsMerged": { "description": "Notification when two opening vertices are merged" }
 }
 

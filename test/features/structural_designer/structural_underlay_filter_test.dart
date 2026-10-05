@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/structural_underlay_filter.dart';
@@ -181,6 +182,120 @@ void main() {
       );
 
       expect(visible, equals({'A-WALL'}));
+    });
+
+    test('12. Preserves 12 cm walls with same white color as 25 cm walls in a separate layer', () {
+      final layers = [
+        DxfLayer(name: 'WALLS_25', colorIndex: 7, lineweight: 0.50), // White, 25cm exterior/bearing
+        DxfLayer(name: 'WALLS_12', colorIndex: 7, lineweight: 0.25), // White, 12cm interior partition
+        DxfLayer(name: 'FURNITURE', colorIndex: 7, lineweight: 0.13), // White, clutter
+        DxfLayer(name: 'DOORS', colorIndex: 1, lineweight: 0.50), // Red
+      ];
+
+      final visible = StructuralUnderlayFilter.filterLayers(layers: layers);
+
+      // Both 25cm and 12cm walls stay visible, thin clutter and doors hidden
+      expect(visible, equals({'WALLS_25', 'WALLS_12'}));
+    });
+
+    test('13. Preserves Bulgarian partition walls (Преградни, Зид 12) alongside 25cm walls', () {
+      final layers = [
+        DxfLayer(name: 'Стени_25см', colorIndex: 7, lineweight: 0.50), // White 25cm
+        DxfLayer(name: 'Преградни_стени_12', colorIndex: 7, lineweight: 0.25), // White 12cm
+        DxfLayer(name: 'Зидария_12', colorIndex: 2, lineweight: 0.25), // Different layer color
+        DxfLayer(name: 'Щрих_штрих', colorIndex: 7, lineweight: 0.13), // Hatch
+      ];
+
+      final visible = StructuralUnderlayFilter.filterLayers(layers: layers);
+
+      expect(visible.contains('Стени_25см'), isTrue);
+      expect(visible.contains('Преградни_стени_12'), isTrue);
+      expect(visible.contains('Зидария_12'), isTrue);
+      expect(visible.contains('Щрих_штрих'), isFalse);
+    });
+
+    test('14. Preserves thickest white layers and 12cm walls without requiring wall keywords (no rigid keyword filtering)', () {
+      // Layers named arbitrarily by CAD drafter (e.g. A-GEN-01, AR_MASONRY) without the word "wall" or "стена"
+      final layers = [
+        DxfLayer(name: 'LAYER_HEAVY', colorIndex: 7, lineweight: 0.50), // White, thickest (25cm)
+        DxfLayer(name: 'LAYER_MEDIUM', colorIndex: 7, lineweight: 0.25), // White, medium (12cm)
+        DxfLayer(name: 'LAYER_THIN', colorIndex: 7, lineweight: 0.09), // White, thin
+        DxfLayer(name: 'LAYER_RED', colorIndex: 1, lineweight: 0.50), // Non-white
+      ];
+
+      final visible = StructuralUnderlayFilter.filterLayers(layers: layers);
+
+      // Heavy and medium white layers are preserved unconditionally
+      expect(visible.contains('LAYER_HEAVY'), isTrue);
+      expect(visible.contains('LAYER_MEDIUM'), isTrue);
+      expect(visible.contains('LAYER_THIN'), isFalse);
+      expect(visible.contains('LAYER_RED'), isFalse);
+    });
+
+    test('15. matchesSlabKeyword correctly matches English, Cyrillic, and Latinized Bulgarian slab keywords', () {
+      expect(StructuralUnderlayFilter.matchesSlabKeyword('SLAB'), isTrue);
+      expect(StructuralUnderlayFilter.matchesSlabKeyword('Slabs_Level1'), isTrue);
+      expect(StructuralUnderlayFilter.matchesSlabKeyword('КОТА_ПЛОЧА'), isTrue);
+      expect(StructuralUnderlayFilter.matchesSlabKeyword('Плочи_кота_0'), isTrue);
+      expect(StructuralUnderlayFilter.matchesSlabKeyword('AR_PLOCHA'), isTrue);
+      expect(StructuralUnderlayFilter.matchesSlabKeyword('ploca_etaj1'), isTrue);
+      expect(StructuralUnderlayFilter.matchesSlabKeyword('furniture_slab'), isFalse); // clutter keyword
+      expect(StructuralUnderlayFilter.matchesSlabKeyword('random_layer'), isFalse);
+    });
+
+    test('16. detectSlabLayers separates non-empty slab layers from empty slab layers', () {
+      final doc = DxfDocument(
+        layers: {
+          'SLAB_MAIN': DxfLayer(name: 'SLAB_MAIN', colorIndex: 3),
+          'ПЛОЧА_EMPTY': DxfLayer(name: 'ПЛОЧА_EMPTY', colorIndex: 3),
+          'WALLS': DxfLayer(name: 'WALLS', colorIndex: 7),
+        },
+        blocks: const {},
+        entities: [
+          DxfLine(p1: const Offset(0, 0), p2: const Offset(10, 0), layer: 'SLAB_MAIN'),
+          DxfLine(p1: const Offset(0, 0), p2: const Offset(10, 0), layer: 'WALLS'),
+        ],
+        headerVars: const {},
+        bounds: const Rect.fromLTWH(0, 0, 100, 100),
+        entityStats: const {},
+      );
+
+      final result = StructuralUnderlayFilter.detectSlabLayers(doc);
+
+      expect(result.foundAny, isTrue);
+      expect(result.hasValidLayers, isTrue);
+      expect(result.detectedLayers, equals(['SLAB_MAIN']));
+      expect(result.emptyLayers, equals(['ПЛОЧА_EMPTY']));
+
+      // Empty document test
+      final emptyDoc = DxfDocument(
+        layers: {
+          'WALLS': DxfLayer(name: 'WALLS', colorIndex: 7),
+        },
+        blocks: const {},
+        entities: const [],
+        headerVars: const {},
+        bounds: const Rect.fromLTWH(0, 0, 100, 100),
+        entityStats: const {},
+      );
+      final emptyResult = StructuralUnderlayFilter.detectSlabLayers(emptyDoc);
+      expect(emptyResult.foundAny, isFalse);
+      expect(emptyResult.hasValidLayers, isFalse);
+      expect(emptyResult.detectedLayers, isEmpty);
+      expect(emptyResult.emptyLayers, isEmpty);
+    });
+
+    test('17. Slab layers are included in filterLayers alongside white wall layers', () {
+      final layers = [
+        DxfLayer(name: 'WALLS_250', colorIndex: 7, lineweight: 0.50),
+        DxfLayer(name: 'SLAB_OUTLINE', colorIndex: 4, lineweight: 0.25), // Cyan slab layer
+        DxfLayer(name: 'DOORS', colorIndex: 1, lineweight: 0.25),
+      ];
+
+      final visible = StructuralUnderlayFilter.filterLayers(layers: layers);
+      expect(visible.contains('WALLS_250'), isTrue);
+      expect(visible.contains('SLAB_OUTLINE'), isTrue);
+      expect(visible.contains('DOORS'), isFalse);
     });
   });
 }

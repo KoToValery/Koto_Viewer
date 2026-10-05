@@ -2387,4 +2387,19 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get cadThemePaperWhite => 'Бяла хартия';
+
+  @override
+  String get noSlabLayerDetectedOrEmpty =>
+      'Няма открит слой за плоча или слоят е празен';
+
+  @override
+  String slabLayerAddedToFilter(String layer) {
+    return 'Слоят за плоча \"$layer\" е добавен към конструктивния филтър';
+  }
+
+  @override
+  String get deleteOpeningPoint => 'Изтрий точка';
+
+  @override
+  String get openingPointsMerged => 'Точките на отвора са обединени';
 }

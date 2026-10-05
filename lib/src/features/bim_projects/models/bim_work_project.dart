@@ -32,6 +32,13 @@ class BimStoreyUnderlay {
 
   bool get isControlPointSet => controlPoint != null;
 
+  /// Formatted elevation string (e.g. ±0.00, +2.80, -2.80) to save space without long floor text labels.
+  String get elevationLabel {
+    if (elevation.abs() < 1e-4) return '±0.00';
+    final sign = elevation > 0 ? '+' : '';
+    return '$sign${elevation.toStringAsFixed(2)}';
+  }
+
   BimStoreyUnderlay copyWith({
     String? storeyId,
     String? name,

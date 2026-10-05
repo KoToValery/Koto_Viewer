@@ -11,6 +11,7 @@ import '../../dxf_viewer/rendering/dxf_painter.dart';
 import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../../dxf_viewer/widgets/dxf_display_settings_sheet.dart';
 import '../../dxf_viewer/widgets/dxf_layer_sheet.dart';
+import '../../structural_designer/analysis/structural_underlay_filter.dart';
 import '../models/bim_work_project.dart';
 import '../services/bim_project_library_service.dart';
 import '../services/bim_underlay_picker_helper.dart';
@@ -37,6 +38,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
   final Map<String, DxfDocument> _loadedDocs = {};
   bool _isLoading = true;
   bool _showOnionSkin = false;
+  bool _underlayFilterActive = false;
 
   DxfCanvasTheme _canvasTheme = DxfCanvasTheme.darkCad;
   DxfDisplaySettings _displaySettings = const DxfDisplaySettings();
@@ -457,6 +459,31 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     }
   }
 
+  void _toggleUnderlayFilter() {
+    setState(() {
+      _underlayFilterActive = !_underlayFilterActive;
+      for (final doc in _loadedDocs.values) {
+        if (_underlayFilterActive) {
+          final visible = StructuralUnderlayFilter.filterLayers(
+            layers: doc.layers.values,
+            entities: doc.entities,
+            blocks: doc.blocks,
+          );
+          if (visible.isNotEmpty) {
+            for (final l in doc.layers.values) {
+              l.isVisible = visible.contains(l.name);
+            }
+          }
+        } else {
+          for (final l in doc.layers.values) {
+            l.isVisible = true;
+          }
+        }
+      }
+    });
+    HapticFeedback.selectionClick();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -473,6 +500,16 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                 ? l10n.bimProjectReplaceUnderlay
                 : l10n.bimProjectAddUnderlay,
             onPressed: _pickAndAttachUnderlayForCurrentStorey,
+          ),
+          IconButton(
+            icon: Icon(
+              _underlayFilterActive ? Icons.filter_alt_rounded : Icons.filter_alt_outlined,
+              color: _underlayFilterActive ? const Color(0xFF00E5FF) : null,
+            ),
+            tooltip: _underlayFilterActive
+                ? l10n.structuralFilterActive
+                : l10n.structuralFilterInactive,
+            onPressed: _toggleUnderlayFilter,
           ),
           IconButton(
             icon: const Icon(Icons.layers_rounded),
@@ -567,7 +604,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                             color: hasCp ? const Color(0xFF00E676) : Colors.orangeAccent,
                           ),
                           const SizedBox(width: 6),
-                          Text(s.name),
+                          Text(s.elevationLabel),
                         ],
                       ),
                     );

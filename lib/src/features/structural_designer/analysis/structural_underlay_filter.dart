@@ -137,6 +137,8 @@ class StructuralUnderlayFilter {
     const structuralKeywords = [
       // English
       'wall', 'walls',
+      'wall12', 'walls12', 'wall_12', 'walls_12', 'w12',
+      'partition', 'partitions', 'part_wall', 'interior_wall', 'int_wall', 'int-wall', 'intwall',
       'slab', 'slabs',
       'col', 'column', 'columns',
       'beam', 'beams',
@@ -148,6 +150,10 @@ class StructuralUnderlayFilter {
 
       // Bulgarian (Cyrillic)
       'стена', 'стени', 'стен',
+      '12', '12см', '12cm',
+      'прегр', 'преградна', 'преградни', 'прегради',
+      'зид 12', 'зидария 12', 'стена 12', 'стени 12', 'ст12', 'ст-12', 'ст 12',
+      'вътр', 'вътрешна', 'вътрешни',
       'плоча', 'плочи', 'плоч',
       'колона', 'колони',
       'греда', 'греди',
@@ -161,6 +167,8 @@ class StructuralUnderlayFilter {
 
       // Bulgarian (Latinized / Transliterated)
       'stena', 'steni',
+      'pregr', 'pregrad',
+      'zid 12', 'stena 12', 'steni 12', 'st12', 'st-12',
       'plocha', 'ploca', 'plochi', 'ploci',
       'kolona', 'koloni',
       'greda', 'gredi',
@@ -176,13 +184,94 @@ class StructuralUnderlayFilter {
     return false;
   }
 
+  /// Checks if a layer name specifically matches slab keywords
+  /// (e.g. slab, slabs, плоча, плочи, плоч, plocha, ploca, plochi).
+  static bool matchesSlabKeyword(String layerName) {
+    final name = layerName.toLowerCase();
+    if (isNegativeKeyword(name)) return false;
+
+    const keywords = [
+      'slab', 'slabs',
+      'плоча', 'плочи', 'плоч',
+      'plocha', 'ploca', 'plochi', 'ploci',
+    ];
+    for (final kw in keywords) {
+      if (name.contains(kw)) return true;
+    }
+    return false;
+  }
+
+  /// Checks if a layer name specifically matches 12cm walls or partition walls
+  /// (e.g. 12, 12cm, 12см, прегр, partition, interior).
+  static bool matchesPartitionOr12cmKeyword(String layerName) {
+    final name = layerName.toLowerCase();
+    if (isNegativeKeyword(name)) return false;
+
+    const keywords = [
+      '12', '12cm', '12см',
+      'прегр', 'pregr',
+      'partit',
+      'вътр', 'interior',
+    ];
+    for (final kw in keywords) {
+      if (name.contains(kw)) return true;
+    }
+    return false;
+  }
+
+  /// Detects slab layers in [document] matching slab keywords and categorizes them
+  /// by whether they contain entities.
+  static SlabLayerDetectionResult detectSlabLayers(
+    DxfDocument document, {
+    Iterable<DxfEntity>? entities,
+    Map<String, DxfBlock>? blocks,
+  }) {
+    final entityCounts = <String, int>{};
+    final allEntities = entities ?? document.entities;
+    for (final e in allEntities) {
+      final name = e.layer.trim();
+      entityCounts[name] = (entityCounts[name] ?? 0) + 1;
+    }
+    final allBlocks = blocks ?? document.blocks;
+    for (final b in allBlocks.values) {
+      for (final e in b.entities) {
+        final name = e.layer.trim();
+        entityCounts[name] = (entityCounts[name] ?? 0) + 1;
+      }
+    }
+
+    final detected = <String>[];
+    final empty = <String>[];
+    bool matchedAny = false;
+
+    for (final layer in document.layers.values) {
+      if (matchesSlabKeyword(layer.name)) {
+        matchedAny = true;
+        final count = entityCounts[layer.name] ?? 0;
+        if (count > 0) {
+          detected.add(layer.name);
+        } else {
+          empty.add(layer.name);
+        }
+      }
+    }
+
+    return SlabLayerDetectionResult(
+      detectedLayers: detected,
+      emptyLayers: empty,
+      foundAny: matchedAny,
+    );
+  }
+
   /// Determines the set of layer names that should remain visible for the structural underlay.
   ///
   /// Filtering logic:
   /// 1. Finds all White layers that actually contain entities.
   /// 2. If White layers exist:
-  ///    - If any have thickness > 0: isolates the thickest White layers (max lineweight).
-  ///    - If none have thickness: keeps all White layers.
+  ///    - Isolates thickest White layer(s) (25cm main walls).
+  ///    - Preserves 12cm partition walls (same white color or distinct layer with 12cm/partition keywords or secondary wall lineweight).
+  ///    - Preserves layers matching slab keywords (slab, плоча, etc.).
+  ///    - If none have thickness: keeps all White layers plus partition and slab layers without rigid keyword filtering.
   /// 3. If NO White layers exist in the drawing (or only empty/non-model layers):
   ///    - Falls back to structural keywords (wall, slab, плоча, стена, stena, etc.).
   static Set<String> filterLayers({
@@ -227,7 +316,7 @@ class StructuralUnderlayFilter {
 
     // Check if any layers explicitly match structural keywords
     final keywordLayers = candidateList
-        .where((l) => matchesStructuralKeyword(l.name))
+        .where((l) => matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name))
         .toList();
 
     if (whiteLayers.isNotEmpty) {
@@ -239,31 +328,75 @@ class StructuralUnderlayFilter {
       }
 
       if (maxWhiteLw > 0.0) {
-        // "Най-дебелия Бял цвят да остава, всички други се скриват."
-        final hasWhiteKeywords = whiteLayers.any((l) => matchesStructuralKeyword(l.name));
-        final thickestWhite = whiteLayers.where((l) {
+        // "Най-дебелия Бял цвят да остава, плюс 12 см стени"
+        final preservedWhite = whiteLayers.where((l) {
           final lw = getLayerThickness(l, entitiesByLayer[l.name]);
-          if (hasWhiteKeywords) {
-            // When structural keyword layers are present, keep all white structural layers
-            if (matchesStructuralKeyword(l.name)) return true;
-            return false;
+
+          // 1. Thickest White layer(s) (25cm main walls)
+          if (lw >= maxWhiteLw - 0.005) return true;
+
+          // 2. Explicit 12cm / partition wall keywords
+          if (matchesPartitionOr12cmKeyword(l.name)) return true;
+
+          // 3. Structural wall or slab keywords
+          if (matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name)) return true;
+
+          // 4. Secondary wall thickness: 12cm partition walls drawn with medium pen
+          // (e.g. 0.20mm - 0.35mm when main walls are 0.50mm - 0.70mm)
+          // No rigid keyword check: preserves all medium white walls!
+          if (maxWhiteLw >= 0.35 && lw >= 0.20 && !isNegativeKeyword(l.name)) {
+            return true;
           }
-          return lw >= maxWhiteLw - 0.005;
+
+          return false;
         }).toList();
 
-        return thickestWhite.map((l) => l.name).toSet();
+        // Also check if any non-white layers explicitly match 12cm / partition walls or slab
+        final extra12cmAndSlabLayers = candidateList.where((l) =>
+            !whiteLayers.contains(l) &&
+            (matchesPartitionOr12cmKeyword(l.name) || matchesSlabKeyword(l.name))).map((l) => l.name);
+
+        final result = preservedWhite.map((l) => l.name).toSet();
+        result.addAll(extra12cmAndSlabLayers);
+        return result;
       } else {
         // "Ако нямат линиите дебелина- остават всички бели"
-        final hasWhiteKeywords = whiteLayers.any((l) => matchesStructuralKeyword(l.name));
-        if (hasWhiteKeywords) {
-          final structuralWhite = whiteLayers.where((l) => matchesStructuralKeyword(l.name)).toList();
-          return structuralWhite.map((l) => l.name).toSet();
-        }
-        return whiteLayers.map((l) => l.name).toSet();
+        // Without rigid keyword gating: all white layers stay!
+        final extra12cmAndSlab = candidateList
+            .where((l) => matchesPartitionOr12cmKeyword(l.name) || matchesSlabKeyword(l.name))
+            .map((l) => l.name);
+
+        final result = whiteLayers.map((l) => l.name).toSet();
+        result.addAll(extra12cmAndSlab);
+        return result;
       }
     }
 
     // Step 2: "ако няма бели тогава ще филтрираме по думи wall, slab, плоча,стена,stena и т.н."
     return keywordLayers.map((l) => l.name).toSet();
   }
+}
+
+/// Result of detecting slab layers by keywords in a CAD underlay drawing.
+class SlabLayerDetectionResult {
+  /// Layer names matching slab keywords that contain at least 1 entity.
+  final List<String> detectedLayers;
+
+  /// Layer names matching slab keywords that contain 0 entities.
+  final List<String> emptyLayers;
+
+  /// Whether any layer matched slab keywords (regardless of entity count).
+  final bool foundAny;
+
+  const SlabLayerDetectionResult({
+    required this.detectedLayers,
+    required this.emptyLayers,
+    required this.foundAny,
+  });
+
+  /// Whether at least one valid, non-empty slab layer was detected.
+  bool get hasValidLayers => detectedLayers.isNotEmpty;
+
+  /// Whether slab layers were matched by name but all were completely empty.
+  bool get isEmptyMatch => foundAny && detectedLayers.isEmpty;
 }

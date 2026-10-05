@@ -31,6 +31,35 @@ void main() {
       expect(underlay.hasUnderlay, isTrue);
       expect(underlay.isControlPointSet, isTrue);
       expect(underlay.elevation, equals(0.0));
+      expect(underlay.elevationLabel, equals('±0.00'));
+
+      const underlayUpper = BimStoreyUnderlay(
+        storeyId: 'storey_2',
+        name: 'Floor 2',
+        elevation: 3.20,
+      );
+      expect(underlayUpper.elevationLabel, equals('+3.20'));
+
+      const underlayBasement = BimStoreyUnderlay(
+        storeyId: 'storey_b',
+        name: 'Basement',
+        elevation: -2.80,
+      );
+      expect(underlayBasement.elevationLabel, equals('-2.80'));
+
+      const structLevel = StoreyLevel(
+        id: 'lvl_1',
+        name: '±0.00',
+        elevation: 0.0,
+      );
+      expect(structLevel.elevationLabel, equals('±0.00'));
+
+      const structLevel2 = StoreyLevel(
+        id: 'lvl_2',
+        name: '+3.00',
+        elevation: 3.0,
+      );
+      expect(structLevel2.elevationLabel, equals('+3.00'));
 
       final jsonMap = underlay.toJson();
       final restored = BimStoreyUnderlay.fromJson(jsonMap);
@@ -38,6 +67,7 @@ void main() {
       expect(restored.storeyId, equals('storey_1'));
       expect(restored.name, equals('Floor 1'));
       expect(restored.elevation, equals(0.0));
+      expect(restored.elevationLabel, equals('±0.00'));
       expect(restored.controlPoint, equals(const Offset(100.0, 200.0)));
       expect(restored.layerVisibility['WALLS'], isTrue);
       expect(restored.layerVisibility['FURNITURE'], isFalse);

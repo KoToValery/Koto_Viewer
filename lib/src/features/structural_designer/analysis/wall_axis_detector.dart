@@ -23,6 +23,10 @@ class WallAxisDetector {
   /// Generous tolerance (+-55 mm) to comfortably handle 20 cm concrete walls (шайби),
   /// 24-25 cm masonry (четворка/Porotherm), and 30 cm walls with plaster.
   static const double defaultThicknessToleranceMm = 55.0;
+  /// Partition wall thickness in millimeters (standard European interior wall: 12 cm).
+  static const double partitionWallThicknessMm = 120.0;
+  /// Tolerance for partition walls (+-35 mm: 85 mm to 155 mm).
+  static const double partitionThicknessToleranceMm = 35.0;
   static const double defaultMinOverlapMm = 50.0; // 5 cm min overlap
   static const double defaultMaxOpeningBridgeGapMm = 2500.0; // 2.50 meters
   static const double defaultCornerSnapRadiusMm = 350.0; // 35 cm
@@ -74,14 +78,36 @@ class WallAxisDetector {
       // Collinear pre-merging to clean broken drafts & duplicates
       final mergedSegments = _mergeCollinearSegments(segments, toleranceCad);
 
-      // Detect parallel pairs at target distance
-      final pairs = _findParallelPairs(
+      // Detect parallel pairs at target distance (250mm)
+      final pairs25 = _findParallelPairs(
         mergedSegments,
         targetDistCad,
         toleranceCad,
         minOverlapCad,
         documentBounds: document.bounds,
       );
+
+      // Detect partition wall pairs at 120mm (12cm)
+      final pairs12 = _findParallelPairs(
+        mergedSegments,
+        partitionWallThicknessMm * scale,
+        partitionThicknessToleranceMm * scale,
+        minOverlapCad,
+        documentBounds: document.bounds,
+      );
+
+      // Avoid duplicate pairs if tolerances overlap
+      final pairs = <WallPairCandidate>[...pairs25];
+      for (final p12 in pairs12) {
+        final isDup = pairs.any((p) =>
+            ((p.centerlineStart - p12.centerlineStart).distance < toleranceCad &&
+             (p.centerlineEnd - p12.centerlineEnd).distance < toleranceCad) ||
+            ((p.centerlineStart - p12.centerlineEnd).distance < toleranceCad &&
+             (p.centerlineEnd - p12.centerlineStart).distance < toleranceCad));
+        if (!isDup) {
+          pairs.add(p12);
+        }
+      }
 
       if (pairs.isNotEmpty) {
         double totalOverlap = 0.0;
@@ -177,9 +203,9 @@ class WallAxisDetector {
 
     for (int i = 1; i < evaluatedGroups.length; i++) {
       final g = evaluatedGroups[i];
-      // Include other high-scoring wall layers (e.g. interior + exterior walls)
-      final bool isExplicitWall = _isStructuralLayer(g.layerName.toLowerCase());
-      final double scoreThreshold = isExplicitWall ? 0.25 : 0.50;
+      // Include other high-scoring wall layers (e.g. interior + exterior walls, 12cm partition walls)
+      // Geometry-driven without rigid keyword gating: any wall candidate group with >= 25% score is included
+      const double scoreThreshold = 0.25;
       if (g.score >= bestGroup.score * scoreThreshold && g.pairCount >= 2) {
         activeGroups.add(g);
       }
@@ -619,7 +645,8 @@ class WallAxisDetector {
 
   static bool _isStructuralLayer(String lowerName) {
     const structural = [
-      'wall', 'стена', 'стен', 'stena', 'zid', 'masonry', 'mason', 'структура', 'констр'
+      'wall', 'стена', 'стен', 'stena', 'zid', 'masonry', 'mason', 'структура', 'констр',
+      '12', 'прегр', 'pregr', 'part', 'partition', 'вътр', 'interior'
     ];
     for (final kw in structural) {
       if (lowerName.contains(kw)) return true;

@@ -460,4 +460,97 @@ void main() {
       expect(check.isWidthSufficient, isTrue); // 25 cm >= 25 cm
     });
   });
+
+  group('Structural BiM Designer - Opening Polygon Editing Tests', () {
+    const baseOpening = [
+      Offset(1, 1),
+      Offset(3, 1),
+      Offset(3, 3),
+      Offset(1, 3),
+    ];
+    final testSlab = StructuralSlab(
+      id: 'slab_1',
+      polygon: const [
+        Offset(0, 0),
+        Offset(10, 0),
+        Offset(10, 10),
+        Offset(0, 10),
+      ],
+      openings: [baseOpening],
+    );
+
+    test('moveOpeningVertex moves specified vertex without affecting other vertices', () {
+      final updated = testSlab.moveOpeningVertex(0, 1, const Offset(4, 1));
+      expect(updated, isNotNull);
+      final op = updated!.openings.first;
+      expect(op[0], equals(const Offset(1, 1)));
+      expect(op[1], equals(const Offset(4, 1)));
+      expect(op[2], equals(const Offset(3, 3)));
+      expect(op[3], equals(const Offset(1, 3)));
+    });
+
+    test('insertOpeningMidpointVertex splits edge and inserts midpoint', () {
+      final updated = testSlab.insertOpeningMidpointVertex(0, 0);
+      expect(updated, isNotNull);
+      final op = updated!.openings.first;
+      expect(op.length, equals(5));
+      expect(op[0], equals(const Offset(1, 1)));
+      expect(op[1], equals(const Offset(2, 1))); // Midpoint of (1,1) and (3,1)
+      expect(op[2], equals(const Offset(3, 1)));
+    });
+
+    test('removeOpeningVertex removes vertex when polygon has more than 3 vertices', () {
+      // Create a 5-vertex opening
+      final withFive = testSlab.insertOpeningMidpointVertex(0, 0)!;
+      expect(withFive.openings.first.length, equals(5));
+
+      final withFour = withFive.removeOpeningVertex(0, 1);
+      expect(withFour, isNotNull);
+      expect(withFour!.openings.first.length, equals(4));
+    });
+
+    test('removeOpeningVertex prevents removing vertex if opening has 3 or fewer vertices', () {
+      final triangleSlab = testSlab.copyWith(
+        openings: [
+          [const Offset(1, 1), const Offset(3, 1), const Offset(2, 3)],
+        ],
+      );
+      final result = triangleSlab.removeOpeningVertex(0, 0);
+      expect(result, isNull);
+    });
+
+    test('getOpeningEdgeGrips returns midpoint grips with outward normals for all edges', () {
+      final grips = testSlab.getOpeningEdgeGrips(0);
+      expect(grips.length, equals(4));
+
+      // Edge 0: (1,1) -> (3,1), midpoint is (2,1)
+      expect(grips[0].midpoint, equals(const Offset(2, 1)));
+      expect(grips[0].edgeIndex, equals(0));
+      expect(grips[0].v1, equals(const Offset(1, 1)));
+      expect(grips[0].v2, equals(const Offset(3, 1)));
+
+      // Edge 1: (3,1) -> (3,3), midpoint is (3,2)
+      expect(grips[1].midpoint, equals(const Offset(3, 2)));
+    });
+
+    test('extrudeOpeningEdgeParallel extrudes edge outward while maintaining edge parallelism', () {
+      // Extrude right edge (index 1: from (3,1) to (3,3)) by 1.0 unit outward
+      final extruded = testSlab.extrudeOpeningEdgeParallel(
+        openingIndex: 0,
+        edgeIndex: 1,
+        distance: 1.0,
+      );
+      expect(extruded, isNotNull);
+      final op = extruded!.openings.first;
+      // Inserts 2 new vertices for the extruded parallel edge, similar to slab edge extrusion
+      expect(op.length, equals(6));
+      // Extruded edge points move rightward to x=4
+      expect(op[2].dx, closeTo(4.0, 1e-4));
+      expect(op[3].dx, closeTo(4.0, 1e-4));
+      // Original base corners remain
+      expect(op[0].dx, closeTo(1.0, 1e-4));
+      expect(op[1].dx, closeTo(3.0, 1e-4));
+    });
+  });
 }
+

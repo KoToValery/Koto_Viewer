@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/parser/dxf_parser.dart';
+import '../../structural_designer/analysis/structural_underlay_filter.dart';
 import '../../structural_designer/analysis/wall_axis_detector.dart';
 import '../models/bim_work_project.dart';
 import 'bim_project_library_service.dart';
@@ -114,11 +115,24 @@ class BimUnderlayLoader {
         scale: scale,
       );
 
-      // Restore layer visibility if saved
+      // Restore layer visibility if saved; if not saved yet (initial startup),
+      // apply automatic underlay filter to all storeys so every layout starts filtered!
       if (storey.layerVisibility.isNotEmpty) {
         for (final entry in storey.layerVisibility.entries) {
           if (transformed.layers.containsKey(entry.key)) {
             transformed.layers[entry.key]!.isVisible = entry.value;
+          }
+        }
+      } else {
+        // Initial start: apply automatic filtering to all floor layouts
+        final visibleLayerNames = StructuralUnderlayFilter.filterLayers(
+          layers: transformed.layers.values,
+          entities: transformed.entities,
+          blocks: transformed.blocks,
+        );
+        if (visibleLayerNames.isNotEmpty) {
+          for (final layer in transformed.layers.values) {
+            layer.isVisible = visibleLayerNames.contains(layer.name);
           }
         }
       }

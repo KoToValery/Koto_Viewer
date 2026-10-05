@@ -860,6 +860,113 @@ class StructuralSlab {
     return copyWith(openingTypes: updatedTypes);
   }
 
+  /// Moves opening vertex at [vertexIndex] of opening [openingIndex] to [newPos].
+  StructuralSlab moveOpeningVertex(int openingIndex, int vertexIndex, Offset newPos) {
+    if (openingIndex < 0 || openingIndex >= openings.length) return this;
+    final op = openings[openingIndex];
+    if (vertexIndex < 0 || vertexIndex >= op.length) return this;
+    final updatedOp = List<Offset>.from(op);
+    updatedOp[vertexIndex] = newPos;
+    return updateOpening(openingIndex, updatedOp);
+  }
+
+  /// Inserts a new vertex at the midpoint of edge [edgeIndex] of opening [openingIndex].
+  StructuralSlab insertOpeningMidpointVertex(int openingIndex, int edgeIndex) {
+    if (openingIndex < 0 || openingIndex >= openings.length) return this;
+    final op = openings[openingIndex];
+    if (edgeIndex < 0 || edgeIndex >= op.length) return this;
+    final p1 = op[edgeIndex];
+    final p2 = op[(edgeIndex + 1) % op.length];
+    final mid = Offset((p1.dx + p2.dx) / 2.0, (p1.dy + p2.dy) / 2.0);
+    final updatedOp = List<Offset>.from(op);
+    updatedOp.insert(edgeIndex + 1, mid);
+    return updateOpening(openingIndex, updatedOp);
+  }
+
+  /// Removes opening vertex at [vertexIndex] of opening [openingIndex] if at least 4 vertices remain.
+  StructuralSlab? removeOpeningVertex(int openingIndex, int vertexIndex) {
+    if (openingIndex < 0 || openingIndex >= openings.length) return null;
+    final op = openings[openingIndex];
+    if (op.length <= 3 || vertexIndex < 0 || vertexIndex >= op.length) return null;
+    final updatedOp = List<Offset>.from(op)..removeAt(vertexIndex);
+    return updateOpening(openingIndex, updatedOp);
+  }
+
+  /// Calculates the midpoints and outward normal vectors for all edges of opening [openingIndex].
+  List<SlabEdgeGripInfo> getOpeningEdgeGrips(int openingIndex) {
+    if (openingIndex < 0 || openingIndex >= openings.length) return const [];
+    final op = openings[openingIndex];
+    if (op.length < 3) return const [];
+
+    double sum = 0.0;
+    for (int i = 0; i < op.length; i++) {
+      final pA = op[i];
+      final pB = op[(i + 1) % op.length];
+      sum += (pA.dx * pB.dy - pB.dx * pA.dy);
+    }
+    final isCCW = sum > 0;
+
+    final List<SlabEdgeGripInfo> grips = [];
+    for (int i = 0; i < op.length; i++) {
+      final v1 = op[i];
+      final v2 = op[(i + 1) % op.length];
+      final edge = v2 - v1;
+      final len = edge.distance;
+      if (len < 1e-6) continue;
+      final u = edge / len;
+      final normal = isCCW ? Offset(u.dy, -u.dx) : Offset(-u.dy, u.dx);
+      final mid = Offset((v1.dx + v2.dx) / 2.0, (v1.dy + v2.dy) / 2.0);
+
+      grips.add(SlabEdgeGripInfo(
+        edgeIndex: i,
+        midpoint: mid,
+        normal: normal,
+        v1: v1,
+        v2: v2,
+        length: len,
+      ));
+    }
+    return grips;
+  }
+
+  /// Extrudes the opening polygon edge from vertex [edgeIndex] to [(edgeIndex + 1) % len]
+  /// parallel to itself by [distance] in the outward normal direction,
+  /// inserting two new vertices to create the stepped extrusion (identical to slab extrudeEdgeParallel).
+  StructuralSlab extrudeOpeningEdgeParallel({
+    required int openingIndex,
+    required int edgeIndex,
+    required double distance,
+  }) {
+    if (openingIndex < 0 || openingIndex >= openings.length) return this;
+    final op = openings[openingIndex];
+    if (op.length < 3 || edgeIndex < 0 || edgeIndex >= op.length) return this;
+    if (distance.abs() < 1e-4) return this;
+
+    final v1 = op[edgeIndex];
+    final v2 = op[(edgeIndex + 1) % op.length];
+    final edge = v2 - v1;
+    final len = edge.distance;
+    if (len < 1e-6) return this;
+
+    final u = edge / len;
+    double sum = 0.0;
+    for (int i = 0; i < op.length; i++) {
+      final pA = op[i];
+      final pB = op[(i + 1) % op.length];
+      sum += (pA.dx * pB.dy - pB.dx * pA.dy);
+    }
+    final isCCW = sum > 0;
+    final normal = isCCW ? Offset(u.dy, -u.dx) : Offset(-u.dy, u.dx);
+
+    final vNew1 = v1 + normal * distance;
+    final vNew2 = v2 + normal * distance;
+
+    final newOp = List<Offset>.from(op);
+    newOp.insertAll(edgeIndex + 1, [vNew1, vNew2]);
+
+    return updateOpening(openingIndex, newOp);
+  }
+
   /// Checks whether two 2D line segments strictly cross/intersect.
   static bool doSegmentsIntersect(Offset p1, Offset p2, Offset p3, Offset p4) {
     double ccw(Offset a, Offset b, Offset c) {
@@ -1353,6 +1460,13 @@ class StoreyLevel {
     this.slabs = const [],
     this.gridAxes = const [],
   });
+
+  /// Formatted elevation string (e.g. ±0.00, +2.80, -2.80) to save space without long floor text labels.
+  String get elevationLabel {
+    if (elevation.abs() < 1e-4) return '±0.00';
+    final sign = elevation > 0 ? '+' : '';
+    return '$sign${elevation.toStringAsFixed(2)}';
+  }
 
   /// Whether any structural BIM elements exist on this storey.
   bool get hasAnyElements =>

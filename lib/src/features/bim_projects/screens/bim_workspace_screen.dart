@@ -62,7 +62,7 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
         final storeys = latestProject.storeys.map((s) {
           return StoreyLevel(
             id: s.storeyId,
-            name: s.name,
+            name: s.elevationLabel,
             elevation: s.elevation,
             height: s.height,
           );
@@ -79,7 +79,7 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
           title: latestProject.name,
           storeys: storeys.isNotEmpty
               ? storeys
-              : const [StoreyLevel(id: 'default_ground', name: 'Ground Floor', elevation: 0.0, height: 3.0)],
+              : const [StoreyLevel(id: 'default_ground', name: '±0.00', elevation: 0.0, height: 3.0)],
           activeStoreyIndex: activeIdx.clamp(0, (storeys.length - 1).clamp(0, 999)),
         );
 

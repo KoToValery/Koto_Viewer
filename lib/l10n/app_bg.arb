@@ -678,6 +678,10 @@
   "bimProjectAlignFirstPrompt": "Моля, подравнете всички етажи преди отваряне на BiM дизайнера.",
   "bimProjectLoading": "Зареждане на BiM проект и подложки...",
   "cadThemeDarkCad": "Тъмен CAD фон",
-  "cadThemePaperWhite": "Бяла хартия"
+  "cadThemePaperWhite": "Бяла хартия",
+  "noSlabLayerDetectedOrEmpty": "Няма открит слой за плоча или слоят е празен",
+  "slabLayerAddedToFilter": "Слоят за плоча \"{layer}\" е добавен към конструктивния филтър",
+  "deleteOpeningPoint": "Изтрий точка",
+  "openingPointsMerged": "Точките на отвора са обединени"
 }
 

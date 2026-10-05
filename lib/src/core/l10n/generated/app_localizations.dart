@@ -4161,6 +4161,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Paper White'**
   String get cadThemePaperWhite;
+
+  /// Notice when no slab layer is found or when the slab layer contains no entities
+  ///
+  /// In en, this message translates to:
+  /// **'No slab layer found or layer is empty'**
+  String get noSlabLayerDetectedOrEmpty;
+
+  /// Notice when a slab layer is detected and added to the structural underlay filter
+  ///
+  /// In en, this message translates to:
+  /// **'Slab layer \"{layer}\" added to structural filter'**
+  String slabLayerAddedToFilter(String layer);
+
+  /// Button label to delete the selected vertex of an opening polygon
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Point'**
+  String get deleteOpeningPoint;
+
+  /// Notification when two opening vertices are merged
+  ///
+  /// In en, this message translates to:
+  /// **'Opening points merged'**
+  String get openingPointsMerged;
 }
 
 class _AppLocalizationsDelegate

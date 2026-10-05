@@ -42,6 +42,13 @@ class Structural2dPainter extends CustomPainter {
   final Offset? openingStartCornerCad;
   final (String, int)? selectedOpening;
   final List<Offset>? movingOpeningPolygon;
+  final int? selectedOpeningVertexIndex;
+  final int? draggingOpeningVertexIndex;
+  final Offset? draggingOpeningVertexPos;
+  final int? mergeCandidateOpeningVertexIndex;
+  final SlabEdgeGripInfo? extrudingOpeningGrip;
+  final double? extrudingOpeningDistance;
+  final List<Offset>? previewOpeningOffsetPolygon;
   final StructuralColumn? movingColumn;
   final Offset? movingColumnPos;
   final String? selectedSlabId;
@@ -94,6 +101,13 @@ class Structural2dPainter extends CustomPainter {
     this.openingStartCornerCad,
     this.selectedOpening,
     this.movingOpeningPolygon,
+    this.selectedOpeningVertexIndex,
+    this.draggingOpeningVertexIndex,
+    this.draggingOpeningVertexPos,
+    this.mergeCandidateOpeningVertexIndex,
+    this.extrudingOpeningGrip,
+    this.extrudingOpeningDistance,
+    this.previewOpeningOffsetPolygon,
     this.axisOffsetPreview,
     this.columnOffsetPreview,
     this.selectedGridAxisId,
@@ -590,19 +604,31 @@ class Structural2dPainter extends CustomPainter {
     for (int oIdx = 0; oIdx < slab.openings.length; oIdx++) {
       final op = slab.openings[oIdx];
       if (op.length >= 3) {
-        final opPts = op.map(cadToScene).toList();
-        final opPath = Path()..moveTo(opPts.first.dx, opPts.first.dy);
-        for (int i = 1; i < opPts.length; i++) {
-          opPath.lineTo(opPts[i].dx, opPts[i].dy);
-        }
-        opPath.close();
-
         final isOpSelected = !isGhost &&
             selectedOpening != null &&
             selectedOpening!.$1 == slab.id &&
             selectedOpening!.$2 == oIdx;
         final bool isMovingThis = isOpSelected && movingOpeningPolygon != null;
         final opType = slab.getOpeningType(oIdx);
+
+        List<Offset> effectiveOp = op;
+        if (isOpSelected) {
+          if (draggingOpeningVertexIndex != null &&
+              draggingOpeningVertexPos != null &&
+              draggingOpeningVertexIndex! < op.length) {
+            effectiveOp = List<Offset>.from(op);
+            effectiveOp[draggingOpeningVertexIndex!] = draggingOpeningVertexPos!;
+          } else if (previewOpeningOffsetPolygon != null && previewOpeningOffsetPolygon!.isNotEmpty) {
+            effectiveOp = previewOpeningOffsetPolygon!;
+          }
+        }
+
+        final opPts = effectiveOp.map(cadToScene).toList();
+        final opPath = Path()..moveTo(opPts.first.dx, opPts.first.dy);
+        for (int i = 1; i < opPts.length; i++) {
+          opPath.lineTo(opPts[i].dx, opPts[i].dy);
+        }
+        opPath.close();
 
         final Color baseColor;
         switch (opType) {
@@ -622,7 +648,7 @@ class Structural2dPainter extends CustomPainter {
           ..color = isGhost
               ? baseColor.withValues(alpha: 0.05)
               : (isOpSelected ? baseColor.withValues(alpha: 0.25) : baseColor.withValues(alpha: 0.12))
-          ..style = PaintingStyle.fill;
+            ..style = PaintingStyle.fill;
         canvas.drawPath(opPath, opFillPaint);
 
         final opBorderPaint = Paint()
@@ -648,6 +674,15 @@ class Structural2dPainter extends CustomPainter {
             // Standard MEP shaft / custom cutout: architectural X cross
             canvas.drawLine(opPts[0], opPts[2], opBorderPaint);
             canvas.drawLine(opPts[1], opPts[3], opBorderPaint);
+          }
+        }
+
+        // Draw interactive polygon vertex handles and edge grips when opening is selected
+        if (isOpSelected) {
+          _drawOpeningVertexHandles(canvas, effectiveOp);
+          _drawOpeningEdgeGrips(canvas, slab, oIdx);
+          if (extrudingOpeningGrip != null && extrudingOpeningDistance != null) {
+            _drawOpeningExtrusionPreview(canvas, extrudingOpeningGrip!, extrudingOpeningDistance!);
           }
         }
       }
@@ -917,6 +952,153 @@ class Structural2dPainter extends CustomPainter {
         badgeBorderPaint,
       );
     }
+    textPainter.paint(canvas, badgeOffset);
+    canvas.restore();
+  }
+
+  void _drawOpeningVertexHandles(Canvas canvas, List<Offset> polygon) {
+    final double radius = 6.0 / zoomScale;
+    final handleFill = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final handleStroke = Paint()
+      ..color = const Color(0xFFFF5252)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 / zoomScale;
+
+    final candidateFill = Paint()
+      ..color = const Color(0x55F44336)
+      ..style = PaintingStyle.fill;
+    final candidateStroke = Paint()
+      ..color = const Color(0xFFE53935)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5 / zoomScale;
+
+    for (int i = 0; i < polygon.length; i++) {
+      final scenePt = cadToScene(polygon[i]);
+      if (mergeCandidateOpeningVertexIndex == i) {
+        canvas.drawCircle(scenePt, radius * 1.8, candidateFill);
+        canvas.drawCircle(scenePt, radius * 1.8, candidateStroke);
+      }
+
+      if (draggingOpeningVertexIndex == i) {
+        final activeFill = Paint()
+          ..color = const Color(0xFFFFD600)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(scenePt, radius * 1.3, activeFill);
+        canvas.drawCircle(scenePt, radius * 1.3, handleStroke);
+      } else if (selectedOpeningVertexIndex == i) {
+        final selFill = Paint()
+          ..color = const Color(0xFFFFB300)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(scenePt, radius * 1.2, selFill);
+        canvas.drawCircle(scenePt, radius * 1.2, handleStroke);
+      } else {
+        canvas.drawCircle(scenePt, radius, handleFill);
+        canvas.drawCircle(scenePt, radius, handleStroke);
+      }
+    }
+  }
+
+  void _drawOpeningEdgeGrips(Canvas canvas, StructuralSlab slab, int opIdx) {
+    final grips = slab.getOpeningEdgeGrips(opIdx);
+    if (grips.isEmpty) return;
+
+    final double radius = 4.5 / zoomScale;
+    final gripFill = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.fill;
+    final gripBorder = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2 / zoomScale;
+
+    for (final grip in grips) {
+      if (extrudingOpeningGrip != null &&
+          extrudingOpeningGrip!.edgeIndex == grip.edgeIndex &&
+          (extrudingOpeningGrip!.midpoint - grip.midpoint).distance < 1e-4) {
+        continue;
+      }
+      final sceneMid = cadToScene(grip.midpoint);
+      canvas.drawCircle(sceneMid, radius, gripFill);
+      canvas.drawCircle(sceneMid, radius, gripBorder);
+    }
+  }
+
+  void _drawOpeningExtrusionPreview(Canvas canvas, SlabEdgeGripInfo grip, double d) {
+    final v1 = grip.v1;
+    final v2 = grip.v2;
+    final normal = grip.normal;
+    final vNew1 = v1 + normal * d;
+    final vNew2 = v2 + normal * d;
+    final midNew = grip.midpoint + normal * d;
+
+    final sV1 = cadToScene(v1);
+    final sV2 = cadToScene(v2);
+    final sNew1 = cadToScene(vNew1);
+    final sNew2 = cadToScene(vNew2);
+    final sMidNew = cadToScene(midNew);
+
+    final extrudePaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 / zoomScale;
+
+    // Draw stepped extruded edge lines
+    canvas.drawLine(sV1, sNew1, extrudePaint);
+    canvas.drawLine(sNew1, sNew2, extrudePaint);
+    canvas.drawLine(sNew2, sV2, extrudePaint);
+
+    // Draw displacement vector arrow
+    final arrowPaint = Paint()
+      ..color = const Color(0xFFFFD600)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5 / zoomScale;
+    canvas.drawLine(cadToScene(grip.midpoint), sMidNew, arrowPaint);
+
+    final midHandleFill = Paint()
+      ..color = const Color(0xFFFFD600)
+      ..style = PaintingStyle.fill;
+    final midHandleBorder = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5 / zoomScale;
+    canvas.drawCircle(sMidNew, 5.0 / zoomScale, midHandleFill);
+    canvas.drawCircle(sMidNew, 5.0 / zoomScale, midHandleBorder);
+
+    // Distance badge text
+    canvas.save();
+    canvas.translate(sMidNew.dx, sMidNew.dy);
+    canvas.scale(1.0 / zoomScale);
+
+    final distText = '${d.abs().toStringAsFixed(2)} m';
+    final textSpan = TextSpan(
+      text: distText,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 10.0,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    const badgeOffset = Offset(12.0, -12.0);
+    final bgRect = Rect.fromLTWH(
+      badgeOffset.dx - 4.0,
+      badgeOffset.dy - 2.0,
+      textPainter.width + 8.0,
+      textPainter.height + 4.0,
+    );
+    final badgeBgPaint = Paint()
+      ..color = const Color(0xCC000000)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(bgRect, const Radius.circular(4.0)),
+      badgeBgPaint,
+    );
     textPainter.paint(canvas, badgeOffset);
     canvas.restore();
   }

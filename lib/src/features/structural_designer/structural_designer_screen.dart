@@ -156,6 +156,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   bool _hasMovedSelectedOpening = false;
   List<Offset>? _movingOpeningRelativeOffsets;
   Offset? _movingOpeningOriginalCenter;
+  int? _selectedOpeningVertexIndex;
+  int? _draggingOpeningVertexIndex;
+  Offset? _draggingOpeningVertexCad;
+  int? _mergeCandidateOpeningVertexIndex;
+  SlabEdgeGripInfo? _activeOpeningGrip;
+  List<Offset>? _previewOpeningOffsetPolygon;
   StructuralColumn? _columnMirrorBase;
   int _columnMirrorCycle = 0;
   bool _isOffsettingAxisWithDrag = false;
@@ -293,9 +299,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (!_initializedStoreyName && _project.storeys.isNotEmpty) {
       _initializedStoreyName = true;
       final storeys = List<StoreyLevel>.from(_project.storeys);
-      final first = storeys[0];
-      if (first.name.startsWith('Етаж 1') || first.name.startsWith('Storey 1')) {
-        storeys[0] = first.copyWith(name: context.l10n.storeyLevelName(1, '0.00'));
+      bool changed = false;
+      for (int i = 0; i < storeys.length; i++) {
+        final s = storeys[i];
+        if (s.name.startsWith('Етаж') ||
+            s.name.startsWith('Storey') ||
+            s.name.contains('Ground') ||
+            s.name.contains('Floor') ||
+            s.name.contains('Basement')) {
+          storeys[i] = s.copyWith(name: s.elevationLabel);
+          changed = true;
+        }
+      }
+      if (changed) {
         _project = _project.copyWith(storeys: storeys);
       }
     }
@@ -619,6 +635,54 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
     return null;
+  }
+
+  int? _hitTestOpeningVertex(Offset screenPos, List<Offset> opening) {
+    const double hitMarginScreen = 24.0;
+    for (int i = 0; i < opening.length; i++) {
+      final sPt = _cadToScreen(opening[i]);
+      if ((screenPos - sPt).distance <= hitMarginScreen) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  SlabEdgeGripInfo? _hitTestOpeningMidpoint(Offset screenPos, StructuralSlab slab, int opIdx) {
+    const double hitMarginScreen = 24.0;
+    final grips = slab.getOpeningEdgeGrips(opIdx);
+    for (final grip in grips) {
+      final sMid = _cadToScreen(grip.midpoint);
+      if ((screenPos - sMid).distance <= hitMarginScreen) {
+        return grip;
+      }
+    }
+    return null;
+  }
+
+  void _deleteSelectedOpeningVertex() {
+    if (_selectedOpening == null || _selectedOpeningVertexIndex == null) return;
+    final (slabId, opIdx) = _selectedOpening!;
+    final active = _project.activeStorey;
+    final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+    if (slabIdx == -1) return;
+    final slab = active.slabs[slabIdx];
+    if (opIdx >= slab.openings.length) return;
+    final op = slab.openings[opIdx];
+    if (op.length <= 3) return;
+
+    _pushUndo();
+    final updatedSlab = slab.removeOpeningVertex(opIdx, _selectedOpeningVertexIndex!);
+    if (updatedSlab != null) {
+      final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+      updatedSlabs[slabIdx] = updatedSlab;
+      _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+      setState(() {
+        _selectedOpeningVertexIndex = null;
+      });
+      _saveProject();
+      HapticFeedback.mediumImpact();
+    }
   }
 
   StructuralGridAxis? _hitTestGridAxis(Offset screenPos) {
@@ -1332,6 +1396,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
       setState(() {
         _selectedOpening = null;
+        _selectedOpeningVertexIndex = null;
       });
       HapticFeedback.heavyImpact();
     }
@@ -2898,6 +2963,55 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     });
   }
 
+  void _updateOpeningVertexDrag(Offset screenPos) {
+    if (_selectedOpening == null || _draggingOpeningVertexIndex == null) return;
+    final (slabId, opIdx) = _selectedOpening!;
+    final active = _project.activeStorey;
+    final slab = active.slabs.firstWhere((s) => s.id == slabId, orElse: () => active.slabs.first);
+    if (opIdx >= slab.openings.length) return;
+    final op = slab.openings[opIdx];
+    final idx = _draggingOpeningVertexIndex!;
+
+    final rawCad = _screenToCad(screenPos);
+    DxfSnapResult? snap;
+    if (_snapEnabled) {
+      final double fitScale = _getCadFitScale();
+      final double currentScale = _transformController.value.getMaxScaleOnAxis();
+      final double toleranceCad =
+          24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+      snap = DxfSnapHelper.findSnapPoint(
+        document: _document,
+        cadPoint: rawCad,
+        toleranceCad: toleranceCad,
+      );
+      snap ??= _findStructuralSnap(rawCad, toleranceCad);
+    }
+    Offset effectiveCad = snap?.point ?? rawCad;
+
+    // Check snap-to-merge with ANY other vertex in the opening polygon
+    const double mergeSnapRadiusScreen = 32.0;
+    int? candidate;
+    for (int j = 0; j < op.length; j++) {
+      if (j == idx) continue;
+      final sPt = _cadToScreen(op[j]);
+      final cadDist = (effectiveCad - op[j]).distance;
+      if ((screenPos - sPt).distance <= mergeSnapRadiusScreen || cadDist <= 0.15 * _cadUnitsPerMeter) {
+        candidate = j;
+        effectiveCad = op[j];
+        break;
+      }
+    }
+
+    if (candidate != _mergeCandidateOpeningVertexIndex) {
+      HapticFeedback.selectionClick();
+    }
+
+    setState(() {
+      _draggingOpeningVertexCad = effectiveCad;
+      _mergeCandidateOpeningVertexIndex = candidate;
+    });
+  }
+
   void _handlePointerDown(PointerDownEvent event) {
     _activePointersCount++;
     _activePointerKind = event.kind;
@@ -2947,6 +3061,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _mergeCandidateSlabVertexIndex = null;
         });
       }
+      if (_activeOpeningGrip != null) {
+        setState(() {
+          _activeOpeningGrip = null;
+          _isExtrudingEdge = false;
+          _extrusionDistanceCad = 0.0;
+          _previewOpeningOffsetPolygon = null;
+        });
+      }
+      if (_draggingOpeningVertexIndex != null) {
+        setState(() {
+          _draggingOpeningVertexIndex = null;
+          _draggingOpeningVertexCad = null;
+          _mergeCandidateOpeningVertexIndex = null;
+        });
+      }
       return;
     }
     _isMultiTouchGesture = false;
@@ -2984,6 +3113,46 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (hitAnotherSlab != null && hitAnotherSlab.id != _editingSlab!.id) {
         _startSlabCorrection(hitAnotherSlab);
         return;
+      }
+    }
+
+    // 1b. If an opening is selected: check if tapped on its vertex handle or midpoint grip
+    if (_selectedOpening != null) {
+      final (slabId, opIdx) = _selectedOpening!;
+      final active = _project.activeStorey;
+      final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+      if (slabIdx != -1) {
+        final slab = active.slabs[slabIdx];
+        if (opIdx < slab.openings.length) {
+          final op = slab.openings[opIdx];
+
+          // Check if tapped on a vertex handle of the selected opening
+          final vIdx = _hitTestOpeningVertex(event.localPosition, op);
+          if (vIdx != null) {
+            setState(() {
+              _selectedOpeningVertexIndex = vIdx;
+              _draggingOpeningVertexIndex = vIdx;
+              _draggingOpeningVertexCad = op[vIdx];
+              _mergeCandidateOpeningVertexIndex = null;
+            });
+            HapticFeedback.selectionClick();
+            return;
+          }
+
+          // Check if touched on a midpoint grip of the selected opening
+          final opGrip = _hitTestOpeningMidpoint(event.localPosition, slab, opIdx);
+          if (opGrip != null) {
+            setState(() {
+              _activeOpeningGrip = opGrip;
+              _midpointTouchDownPos = event.localPosition;
+              _isExtrudingEdge = false;
+              _extrusionDistanceCad = 0.0;
+              _previewOpeningOffsetPolygon = null;
+            });
+            HapticFeedback.selectionClick();
+            return;
+          }
+        }
       }
     }
 
@@ -3099,6 +3268,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (hit == null) {
         setState(() {
           _selectedOpening = null;
+          _selectedOpeningVertexIndex = null;
         });
       }
     }
@@ -3198,6 +3368,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
+    // A2. Dragging opening vertex
+    if (_draggingOpeningVertexIndex != null && _selectedOpening != null) {
+      _updateOpeningVertexDrag(event.localPosition);
+      return;
+    }
+
     // B. Midpoint grip dragging (parallel extrusion)
     if (_activeGrip != null) {
       if (!_isExtrudingEdge && _midpointTouchDownPos != null) {
@@ -3207,6 +3383,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
       if (_isExtrudingEdge) {
         _updateEdgeExtrusion(event.localPosition);
+      }
+      return;
+    }
+
+    // B2. Opening midpoint grip dragging (parallel extrusion)
+    if (_activeOpeningGrip != null && _selectedOpening != null) {
+      if (!_isExtrudingEdge && _midpointTouchDownPos != null) {
+        if ((event.localPosition - _midpointTouchDownPos!).distance > 8.0) {
+          _isExtrudingEdge = true;
+        }
+      }
+      if (_isExtrudingEdge) {
+        _updateOpeningEdgeExtrusion(event.localPosition);
       }
       return;
     }
@@ -3329,6 +3518,52 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _extrusionDistanceCad = effectiveD;
       _activeParallelSnap = parallelSnap;
       _previewSlabOffsetPolygon = previewPoly;
+    });
+  }
+
+  void _updateOpeningEdgeExtrusion(Offset screenPos) {
+    if (_activeOpeningGrip == null || _selectedOpening == null) return;
+    final (slabId, opIdx) = _selectedOpening!;
+    final grip = _activeOpeningGrip!;
+    final rawCad = _screenToCad(screenPos);
+    final disp = rawCad - grip.midpoint;
+    final rawD = disp.dx * grip.normal.dx + disp.dy * grip.normal.dy;
+
+    final double fitScale = _getCadFitScale();
+    final double currentScale = _transformController.value.getMaxScaleOnAxis();
+    final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+
+    double effectiveD = rawD;
+    if (_snapEnabled) {
+      final ptSnap = DxfSnapHelper.findSnapPoint(
+        document: _document,
+        cadPoint: rawCad,
+        toleranceCad: toleranceCad,
+      ) ?? _findStructuralSnap(rawCad, toleranceCad);
+      if (ptSnap != null) {
+        final ptDisp = ptSnap.point - grip.midpoint;
+        effectiveD = ptDisp.dx * grip.normal.dx + ptDisp.dy * grip.normal.dy;
+      }
+    }
+
+    List<Offset>? previewPoly;
+    final active = _project.activeStorey;
+    final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+    if (slabIdx != -1 && effectiveD.abs() > 1e-4) {
+      final slab = active.slabs[slabIdx];
+      if (opIdx < slab.openings.length) {
+        final previewSlab = slab.extrudeOpeningEdgeParallel(
+          openingIndex: opIdx,
+          edgeIndex: grip.edgeIndex,
+          distance: effectiveD,
+        );
+        previewPoly = previewSlab.openings[opIdx];
+      }
+    }
+
+    setState(() {
+      _extrusionDistanceCad = effectiveD;
+      _previewOpeningOffsetPolygon = previewPoly;
     });
   }
 
@@ -4040,6 +4275,56 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
+    // 1b. Opening vertex dragging commit or merge on release
+    if (_draggingOpeningVertexIndex != null && _selectedOpening != null) {
+      final (slabId, opIdx) = _selectedOpening!;
+      final active = _project.activeStorey;
+      final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+      if (slabIdx != -1) {
+        final slab = active.slabs[slabIdx];
+        if (opIdx < slab.openings.length) {
+          final op = slab.openings[opIdx];
+          final idx = _draggingOpeningVertexIndex!;
+          final candidate = _mergeCandidateOpeningVertexIndex;
+          if (candidate != null && op.length > 3) {
+            _pushUndo();
+            final updatedSlab = slab.removeOpeningVertex(opIdx, idx);
+            if (updatedSlab != null) {
+              final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+              updatedSlabs[slabIdx] = updatedSlab;
+              _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+              HapticFeedback.heavyImpact();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(context.l10n.openingPointsMerged),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          } else if (_draggingOpeningVertexCad != null) {
+            final testPts = List<Offset>.from(op);
+            testPts[idx] = _draggingOpeningVertexCad!;
+            if (!StructuralSlab.hasSelfIntersections(testPts)) {
+              _pushUndo();
+              final updatedSlab = slab.moveOpeningVertex(opIdx, idx, _draggingOpeningVertexCad!);
+              final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+              updatedSlabs[slabIdx] = updatedSlab;
+              _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+              HapticFeedback.mediumImpact();
+            } else {
+              HapticFeedback.vibrate();
+            }
+          }
+        }
+      }
+      setState(() {
+        _draggingOpeningVertexIndex = null;
+        _draggingOpeningVertexCad = null;
+        _mergeCandidateOpeningVertexIndex = null;
+      });
+      return;
+    }
+
     // 2. Edge extrusion or midpoint tap on release
     if (_activeGrip != null) {
       if (_isExtrudingEdge) {
@@ -4092,6 +4377,50 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _extrusionDistanceCad = 0.0;
         _activeParallelSnap = null;
         _previewSlabOffsetPolygon = null;
+      });
+      return;
+    }
+
+    // 2b. Opening edge extrusion or midpoint tap on release
+    if (_activeOpeningGrip != null && _selectedOpening != null) {
+      final (slabId, opIdx) = _selectedOpening!;
+      final active = _project.activeStorey;
+      final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+      if (slabIdx != -1) {
+        final slab = active.slabs[slabIdx];
+        if (opIdx < slab.openings.length) {
+          if (_isExtrudingEdge) {
+            final d = _extrusionDistanceCad;
+            final scale = _cadUnitsPerMeter;
+            if (d.abs() >= 0.05 * scale) {
+              _pushUndo();
+              final updatedSlab = slab.extrudeOpeningEdgeParallel(
+                openingIndex: opIdx,
+                edgeIndex: _activeOpeningGrip!.edgeIndex,
+                distance: d,
+              );
+              final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+              updatedSlabs[slabIdx] = updatedSlab;
+              _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+              HapticFeedback.heavyImpact();
+            }
+          } else {
+            // Tapped on midpoint grip without dragging -> insert midpoint vertex!
+            _pushUndo();
+            final updatedSlab = slab.insertOpeningMidpointVertex(opIdx, _activeOpeningGrip!.edgeIndex);
+            final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+            updatedSlabs[slabIdx] = updatedSlab;
+            _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+            HapticFeedback.lightImpact();
+          }
+        }
+      }
+      setState(() {
+        _isExtrudingEdge = false;
+        _activeOpeningGrip = null;
+        _midpointTouchDownPos = null;
+        _extrusionDistanceCad = 0.0;
+        _previewOpeningOffsetPolygon = null;
       });
       return;
     }
@@ -4326,6 +4655,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _selectedColumn = null;
           _selectedBeam = null;
           _selectedOpening = null;
+          _selectedOpeningVertexIndex = null;
           _selectedGridAxis = null;
           _isMovingColumn = false;
         });
@@ -4344,6 +4674,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _selectedColumn = null;
           _selectedShearWall = null;
           _selectedOpening = null;
+          _selectedOpeningVertexIndex = null;
           _selectedGridAxis = null;
           _isMovingColumn = false;
           _isMovingShearWall = false;
@@ -4375,7 +4706,28 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
 
-    // 1f. Check if holding on an existing slab opening -> move opening!
+    // 1f. Check if holding on a vertex of the selected opening
+    if (_selectedOpening != null) {
+      final (slabId, opIdx) = _selectedOpening!;
+      final active = _project.activeStorey;
+      final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+      if (slabIdx != -1 && opIdx < active.slabs[slabIdx].openings.length) {
+        final op = active.slabs[slabIdx].openings[opIdx];
+        final vIdx = _hitTestOpeningVertex(details.localPosition, op);
+        if (vIdx != null) {
+          HapticFeedback.heavyImpact();
+          setState(() {
+            _selectedOpeningVertexIndex = vIdx;
+            _draggingOpeningVertexIndex = vIdx;
+            _draggingOpeningVertexCad = op[vIdx];
+            _mergeCandidateOpeningVertexIndex = null;
+          });
+          return;
+        }
+      }
+    }
+
+    // 1g. Check if holding on an existing slab opening -> move opening!
     if (_activeTool == StructuralDrawTool.slabOpening || _activeTool == StructuralDrawTool.select) {
       final hitOpening = _hitTestOpening(details.localPosition);
       if (hitOpening != null) {
@@ -4393,6 +4745,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _selectedShearWall = null;
           _selectedBeam = null;
           _selectedOpening = null;
+          _selectedOpeningVertexIndex = null;
           _selectedGridAxis = null;
           _isMovingColumn = false;
           _isMovingShearWall = false;
@@ -4407,6 +4760,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _selectedShearWall = null;
       _selectedBeam = null;
       _selectedOpening = null;
+      _selectedOpeningVertexIndex = null;
       _selectedGridAxis = null;
       _isMovingColumn = false;
       _isMovingShearWall = false;
@@ -4438,6 +4792,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final cadPt = _screenToCad(details.localPosition);
       setState(() {
         _draggingSlabVertexCad = cadPt;
+      });
+      return;
+    }
+    if (_draggingOpeningVertexIndex != null && _selectedOpening != null) {
+      final cadPt = _screenToCad(details.localPosition);
+      setState(() {
+        _draggingOpeningVertexCad = cadPt;
       });
       return;
     }
@@ -4494,6 +4855,28 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingSlabVertexIndex = null;
         _draggingSlabVertexCad = null;
         _mergeCandidateSlabVertexIndex = null;
+      });
+      return;
+    }
+    if (_draggingOpeningVertexIndex != null && _selectedOpening != null) {
+      if (_draggingOpeningVertexCad != null) {
+        final (slabId, opIdx) = _selectedOpening!;
+        final active = _project.activeStorey;
+        final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+        if (slabIdx != -1 && opIdx < active.slabs[slabIdx].openings.length) {
+          _pushUndo();
+          final updatedSlab = active.slabs[slabIdx].moveOpeningVertex(opIdx, _draggingOpeningVertexIndex!, _draggingOpeningVertexCad!);
+          final updatedSlabs = List<StructuralSlab>.from(active.slabs);
+          updatedSlabs[slabIdx] = updatedSlab;
+          _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+          _saveProject();
+          HapticFeedback.mediumImpact();
+        }
+      }
+      setState(() {
+        _draggingOpeningVertexIndex = null;
+        _draggingOpeningVertexCad = null;
+        _mergeCandidateOpeningVertexIndex = null;
       });
       return;
     }
@@ -4621,6 +5004,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _mergeCandidateSlabVertexIndex = null;
       });
     }
+    if (_draggingOpeningVertexIndex != null) {
+      setState(() {
+        _draggingOpeningVertexIndex = null;
+        _draggingOpeningVertexCad = null;
+        _mergeCandidateOpeningVertexIndex = null;
+      });
+    }
     if (_isMovingShearWall) {
       setState(() {
         _isMovingShearWall = false;
@@ -4669,6 +5059,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
+    if (_selectedOpening != null) {
+      final (slabId, opIdx) = _selectedOpening!;
+      final active = _project.activeStorey;
+      final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
+      if (slabIdx != -1 && opIdx < active.slabs[slabIdx].openings.length) {
+        final hitVIdx = _hitTestOpeningVertex(details.localPosition, active.slabs[slabIdx].openings[opIdx]);
+        if (hitVIdx != null) {
+          setState(() {
+            _selectedOpeningVertexIndex = hitVIdx;
+          });
+          HapticFeedback.selectionClick();
+          return;
+        }
+      }
+    }
+
     if (_activeTool == StructuralDrawTool.gridAxis) {
       final hitAxis = _hitTestGridAxis(details.localPosition);
       if (hitAxis != null) {
@@ -4678,6 +5084,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _selectedShearWall = null;
           _selectedBeam = null;
           _selectedOpening = null;
+          _selectedOpeningVertexIndex = null;
           _isMovingColumn = false;
           _isMovingShearWall = false;
         });
@@ -4696,6 +5103,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedShearWall = null;
         _selectedBeam = null;
         _selectedOpening = null;
+        _selectedOpeningVertexIndex = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
         _isMovingShearWall = false;
@@ -4713,6 +5121,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedColumn = null;
         _selectedBeam = null;
         _selectedOpening = null;
+        _selectedOpeningVertexIndex = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
         _isMovingShearWall = false;
@@ -4736,6 +5145,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _selectedColumn = null;
           _selectedShearWall = null;
           _selectedOpening = null;
+          _selectedOpeningVertexIndex = null;
           _selectedGridAxis = null;
           _isMovingColumn = false;
           _isMovingShearWall = false;
@@ -4765,6 +5175,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _selectedShearWall = null;
           _selectedBeam = null;
           _selectedOpening = null;
+          _selectedOpeningVertexIndex = null;
           _selectedGridAxis = null;
         });
       }
@@ -4775,6 +5186,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final hitOpening = _hitTestOpening(details.localPosition);
       setState(() {
         _selectedOpening = hitOpening;
+        _selectedOpeningVertexIndex = null;
         _selectedColumn = null;
         _selectedShearWall = null;
         _selectedBeam = null;
@@ -4813,6 +5225,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       setState(() {
         _selectedBeam = hitBeam;
         _selectedOpening = null;
+        _selectedOpeningVertexIndex = null;
         _selectedColumn = null;
         _selectedShearWall = null;
         _selectedGridAxis = null;
@@ -4830,6 +5243,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedShearWall = null;
         _selectedBeam = null;
         _selectedOpening = null;
+        _selectedOpeningVertexIndex = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
         _isMovingShearWall = false;
@@ -4845,6 +5259,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedColumn = null;
         _selectedBeam = null;
         _selectedOpening = null;
+        _selectedOpeningVertexIndex = null;
         _selectedGridAxis = null;
         _isMovingColumn = false;
         _isMovingShearWall = false;
@@ -4861,6 +5276,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedShearWall = null;
         _selectedBeam = null;
         _selectedOpening = null;
+        _selectedOpeningVertexIndex = null;
         _isMovingColumn = false;
         _isMovingShearWall = false;
       });
@@ -4880,6 +5296,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _selectedShearWall = null;
         _selectedBeam = null;
         _selectedOpening = null;
+        _selectedOpeningVertexIndex = null;
         _selectedGridAxis = null;
       });
     }
@@ -5225,9 +5642,45 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       for (final layer in _document.layers.values) {
         layer.isVisible = visibleLayerNames.contains(layer.name);
       }
+
+      // Propagate filter to all subsequent storey layouts in the BIM project
+      if (widget.bimContext != null) {
+        for (final entry in widget.bimContext!.underlaysByStorey.entries) {
+          final storeyId = entry.key;
+          final doc = entry.value;
+          if (storeyId == _project.activeStorey.id) continue;
+          final sVisible = _customUnderlayFilterLayers ??
+              StructuralUnderlayFilter.filterLayers(
+                layers: doc.layers.values,
+                entities: doc.entities,
+                blocks: doc.blocks,
+              );
+          if (sVisible.isNotEmpty) {
+            for (final l in doc.layers.values) {
+              l.isVisible = sVisible.contains(l.name);
+            }
+          }
+          final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible};
+          widget.bimContext!.onLayerVisibilityChanged(storeyId, sVisMap);
+        }
+      }
     } else {
       for (final entry in _originalLayerVisibility.entries) {
         _document.layers[entry.key]?.isVisible = entry.value;
+      }
+
+      // Restore all layers across all storeys
+      if (widget.bimContext != null) {
+        for (final entry in widget.bimContext!.underlaysByStorey.entries) {
+          final storeyId = entry.key;
+          final doc = entry.value;
+          if (storeyId == _project.activeStorey.id) continue;
+          for (final l in doc.layers.values) {
+            l.isVisible = true;
+          }
+          final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible};
+          widget.bimContext!.onLayerVisibilityChanged(storeyId, sVisMap);
+        }
       }
     }
 
@@ -5395,6 +5848,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _pushUndo();
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
     WallAxisDetector.applyToDocument(_document, result, isBulgarian: isBg);
+
+    // Auto-detect slab layers by keyword and integrate into underlay filter
+    final slabResult = StructuralUnderlayFilter.detectSlabLayers(_document);
+    if (slabResult.hasValidLayers) {
+      _customUnderlayFilterLayers ??= StructuralUnderlayFilter.filterLayers(
+        layers: _document.layers.values,
+        entities: _document.entities,
+        blocks: _document.blocks,
+      );
+      _customUnderlayFilterLayers!.addAll(slabResult.detectedLayers);
+      for (final slabLayer in slabResult.detectedLayers) {
+        if (_document.layers.containsKey(slabLayer)) {
+          _document.layers[slabLayer]!.isVisible = true;
+        }
+      }
+    }
+
     _applyUnderlayFilter(true);
     if (widget.bimContext != null) {
       widget.bimContext!.onWallsDetected(_project.activeStorey.id);
@@ -5429,15 +5899,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _runAnalysis();
     setState(() {});
 
+    final String wallMsg = context.l10n.wallsAndAxesGeneratedSuccess(
+      newGridAxes.length,
+      result.wallContourSegments.length,
+      result.detectedUnitName,
+    );
+    final String slabMsg = slabResult.hasValidLayers
+        ? context.l10n.slabLayerAddedToFilter(slabResult.detectedLayers.join(', '))
+        : context.l10n.noSlabLayerDetectedOrEmpty;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          context.l10n.wallsAndAxesGeneratedSuccess(
-            newGridAxes.length,
-            result.wallContourSegments.length,
-            result.detectedUnitName,
-          ),
-        ),
+        content: Text('$wallMsg\n$slabMsg'),
         backgroundColor: const Color(0xFF1E88E5),
       ),
     );
@@ -5592,12 +6065,39 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _runManualAutoDetectWalls() {
     final result = WallAxisDetector.detect(_document);
     if (!result.hasWallsFound) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.noWallsDetected),
-          backgroundColor: const Color(0xFF33333D),
-        ),
-      );
+      final slabResult = StructuralUnderlayFilter.detectSlabLayers(_document);
+      if (slabResult.hasValidLayers) {
+        _customUnderlayFilterLayers ??= StructuralUnderlayFilter.filterLayers(
+          layers: _document.layers.values,
+          entities: _document.entities,
+          blocks: _document.blocks,
+        );
+        _customUnderlayFilterLayers!.addAll(slabResult.detectedLayers);
+        for (final slabLayer in slabResult.detectedLayers) {
+          if (_document.layers.containsKey(slabLayer)) {
+            _document.layers[slabLayer]!.isVisible = true;
+          }
+        }
+        _applyUnderlayFilter(true);
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${context.l10n.noWallsDetected}\n${context.l10n.slabLayerAddedToFilter(slabResult.detectedLayers.join(', '))}',
+            ),
+            backgroundColor: const Color(0xFF1E88E5),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${context.l10n.noWallsDetected}\n${context.l10n.noSlabLayerDetectedOrEmpty}',
+            ),
+            backgroundColor: const Color(0xFF33333D),
+          ),
+        );
+      }
       return;
     }
     _applyDetectedWallsAndAxes(result);
@@ -5762,6 +6262,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             for (final entry in _document.layers.entries) {
               _originalLayerVisibility[entry.key] = entry.value.isVisible;
             }
+            if (_underlayFilterActive) {
+              _applyUnderlayFilter(true);
+            }
             _runAnalysis();
           });
           _saveProject();
@@ -5913,6 +6416,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         child: Container(
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           alignment: Alignment.center,
+          decoration: _underlayFilterActive
+              ? BoxDecoration(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                )
+              : null,
           child: Icon(
             _underlayFilterActive
                 ? Icons.filter_alt_rounded
@@ -6020,33 +6529,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               ],
             ),
           ),
-        if (isCompact)
-          PopupMenuItem(
-            value: 'filter',
-            child: Row(
-              children: [
-                Icon(
-                  _underlayFilterActive
-                      ? Icons.filter_alt_rounded
-                      : Icons.filter_alt_outlined,
-                  size: 20,
-                  color: _underlayFilterActive
-                      ? const Color(0xFF00E5FF)
-                      : Colors.white70,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _underlayFilterActive
-                        ? context.l10n.structuralFilterActive
-                        : context.l10n.structuralFilterInactive,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
         PopupMenuItem(
           value: 'filter_config',
           child: Row(
@@ -6142,8 +6624,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     // Compact mode for narrow/mobile screens to prevent RenderFlex horizontal overflows:
-    // Display 3 primary actions directly, with secondary actions in PopupMenu
+    // Display primary actions directly with Underlay filter quick button
     return [
+      filterButton,
       snapButton,
       undoButton,
       viewport3dButton,
@@ -6180,7 +6663,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
-                    _project.activeStorey.name,
+                    _project.activeStorey.elevationLabel,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
@@ -6277,13 +6760,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           !_isMovingColumn &&
                           !_isMovingShearWall &&
                           !_isMovingOpening &&
-                          _draggingSlabVertexIndex == null,
+                          _draggingSlabVertexIndex == null &&
+                          _draggingOpeningVertexIndex == null,
                       scaleEnabled: !_isPlacingWithHold &&
                           !_isExtrudingEdge &&
                           !_isMovingColumn &&
                           !_isMovingShearWall &&
                           !_isMovingOpening &&
-                          _draggingSlabVertexIndex == null,
+                          _draggingSlabVertexIndex == null &&
+                          _draggingOpeningVertexIndex == null,
                       scaleFactor: 350.0,
                       trackpadScrollCausesScale: true,
                       minScale: 0.001,
@@ -6305,6 +6790,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             _draggingSlabVertexIndex = null;
                             _draggingSlabVertexCad = null;
                             _mergeCandidateSlabVertexIndex = null;
+                            _draggingOpeningVertexIndex = null;
+                            _draggingOpeningVertexCad = null;
+                            _mergeCandidateOpeningVertexIndex = null;
+                            _activeOpeningGrip = null;
+                            _previewOpeningOffsetPolygon = null;
                             _touchScreenPos = null;
                             _targetScreenPos = null;
                             _snappedScreenPos = null;
@@ -6401,6 +6891,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   beamPreviewWidth: _currentBeamWidth * _cadUnitsPerMeter,
                                   openingStartCornerCad: _openingStartCad,
                                   selectedOpening: _selectedOpening,
+                                  selectedOpeningVertexIndex: _selectedOpeningVertexIndex,
+                                  draggingOpeningVertexIndex: _draggingOpeningVertexIndex,
+                                  draggingOpeningVertexPos: _draggingOpeningVertexCad,
+                                  mergeCandidateOpeningVertexIndex: _mergeCandidateOpeningVertexIndex,
+                                  extrudingOpeningGrip: _activeOpeningGrip,
+                                  extrudingOpeningDistance: _isExtrudingEdge ? _extrusionDistanceCad : null,
+                                  previewOpeningOffsetPolygon: _isExtrudingEdge ? _previewOpeningOffsetPolygon : null,
                                   movingOpeningPolygon: _isMovingOpening && _movingOpeningRelativeOffsets != null
                                       ? _movingOpeningRelativeOffsets!
                                           .map((r) => (_activeSnap?.point ?? _currentCadCoord ?? _movingOpeningOriginalCenter ?? Offset.zero) + r)
@@ -6665,6 +7162,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             _activeMeasurement = null;
                             _selectedBeam = null;
                             _selectedOpening = null;
+                            _selectedOpeningVertexIndex = null;
                             _selectedGridAxis = null;
                             _isMovingOpening = false;
                             _isMovingShearWall = false;
@@ -7032,10 +7530,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           break;
       }
       subtitle = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
-      onDeselect = () => setState(() => _selectedOpening = null);
+      onDeselect = () => setState(() {
+        _selectedOpening = null;
+        _selectedOpeningVertexIndex = null;
+      });
       onRename = null;
 
       actionButtons.addAll([
+        if (_selectedOpeningVertexIndex != null && op.length > 3)
+          _buildDockActionButton(
+            icon: Icons.delete_sweep_rounded,
+            label: context.l10n.deleteOpeningPoint,
+            color: const Color(0xFFFFB300),
+            onTap: _deleteSelectedOpeningVertex,
+          ),
         _buildDockActionButton(
           icon: Icons.category_outlined,
           label: _getOpeningTypeName(opType, context.l10n),

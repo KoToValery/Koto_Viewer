@@ -2378,4 +2378,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cadThemePaperWhite => 'Paper White';
+
+  @override
+  String get noSlabLayerDetectedOrEmpty =>
+      'No slab layer found or layer is empty';
+
+  @override
+  String slabLayerAddedToFilter(String layer) {
+    return 'Slab layer \"$layer\" added to structural filter';
+  }
+
+  @override
+  String get deleteOpeningPoint => 'Delete Point';
+
+  @override
+  String get openingPointsMerged => 'Opening points merged';
 }

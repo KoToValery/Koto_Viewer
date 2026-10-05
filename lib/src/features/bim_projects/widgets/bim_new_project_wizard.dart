@@ -18,6 +18,12 @@ class _StoreyDraft {
     required this.elevation,
     this.height = 2.80,
   });
+
+  String get elevationLabel {
+    if (elevation.abs() < 1e-4) return '±0.00';
+    final sign = elevation > 0 ? '+' : '';
+    return '$sign${elevation.toStringAsFixed(2)}';
+  }
 }
 
 /// Modal / screen wizard for configuring and creating a new standalone BiM Project.
@@ -86,7 +92,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
       _storeys.add(
         _StoreyDraft(
           storeyId: 'storey_$idx',
-          name: 'Basement $b', // will be localized in UI
+          name: elev.toStringAsFixed(2),
           elevation: elev,
           height: _floorHeight,
         ),
@@ -98,7 +104,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
     _storeys.add(
       _StoreyDraft(
         storeyId: 'storey_$idx',
-        name: 'Ground Floor',
+        name: '±0.00',
         elevation: 0.0,
         height: _floorHeight,
       ),
@@ -111,7 +117,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
       _storeys.add(
         _StoreyDraft(
           storeyId: 'storey_$idx',
-          name: 'Floor $f',
+          name: '+${elev.toStringAsFixed(2)}',
           elevation: elev,
           height: _floorHeight,
         ),
@@ -121,15 +127,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
   }
 
   String _getStoreyDisplayName(_StoreyDraft draft, int index) {
-    if (draft.elevation < -0.01) {
-      final bNum = (-draft.elevation / draft.height).round();
-      return '${context.l10n.bimProjectBasement(bNum)} (${draft.elevation.toStringAsFixed(2)} m)';
-    } else if (draft.elevation.abs() <= 0.01) {
-      return '${context.l10n.bimProjectGroundFloor} (±0.00 m)';
-    } else {
-      final fNum = (draft.elevation / draft.height).round();
-      return '${context.l10n.bimProjectFloor(fNum)} (+${draft.elevation.toStringAsFixed(2)} m)';
-    }
+    return draft.elevationLabel;
   }
 
   Future<void> _pickUnderlayForStorey(_StoreyDraft draft) async {
@@ -359,7 +357,11 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                               _storeys.add(
                                 _StoreyDraft(
                                   storeyId: 'storey_$nextIdx',
-                                  name: 'Floor $nextIdx',
+                                  name: newElev.abs() < 1e-4
+                                      ? '±0.00'
+                                      : (newElev > 0
+                                          ? '+${newElev.toStringAsFixed(2)}'
+                                          : newElev.toStringAsFixed(2)),
                                   elevation: newElev,
                                   height: _floorHeight,
                                 ),
