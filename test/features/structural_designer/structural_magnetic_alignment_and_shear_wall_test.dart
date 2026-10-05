@@ -237,6 +237,135 @@ void main() {
       expect(wallLeft.polygonVertices[0].dy, closeTo(0.0, 1e-4));
       expect(wallLeft.polygonVertices[2].dy, closeTo(-0.25, 1e-4));
     });
+
+    test('alignColumn with lockX locks X to anchorCenter and only moves/snaps along Y', () {
+      const anchor = Offset(5.0, 5.0);
+      const rawCenter = Offset(8.5, 9.95);
+      final result = StructuralMagneticAlignmentHelper.alignColumn(
+        rawCenter: rawCenter,
+        anchorCenter: anchor,
+        axisLockMode: StructuralAxisLockMode.lockX,
+        toleranceCad: 0.20,
+        activeStorey: storey,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.snappedCenter.dx, closeTo(5.0, 1e-4));
+      expect(result.snappedCenter.dy, closeTo(9.95, 1e-2));
+    });
+
+    test('alignColumn with lockY locks Y to anchorCenter and only moves/snaps along X', () {
+      const anchor = Offset(5.0, 5.0);
+      const rawCenter = Offset(0.04, 8.5);
+      final result = StructuralMagneticAlignmentHelper.alignColumn(
+        rawCenter: rawCenter,
+        anchorCenter: anchor,
+        axisLockMode: StructuralAxisLockMode.lockY,
+        toleranceCad: 0.20,
+        activeStorey: storey,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.snappedCenter.dy, closeTo(5.0, 1e-4));
+      expect(result.snappedCenter.dx, closeTo(0.0, 1e-3));
+    });
+
+    test('alignColumn snaps to Equal Spacing between two existing columns', () {
+      final multiColStorey = StoreyLevel(
+        id: 's2',
+        name: 'Floor 1',
+        elevation: 0.0,
+        height: 3.0,
+        columns: const [
+          StructuralColumn(id: 'c1', name: 'К1', center: Offset(0.0, 2.0), width: 0.40, height: 0.40),
+          StructuralColumn(id: 'c2', name: 'К2', center: Offset(6.0, 2.0), width: 0.40, height: 0.40),
+        ],
+        shearWalls: const [],
+        beams: const [],
+        slabs: const [],
+      );
+
+      final result = StructuralMagneticAlignmentHelper.alignColumn(
+        rawCenter: const Offset(3.05, 2.0),
+        toleranceCad: 0.25,
+        activeStorey: multiColStorey,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.description, 'equalSpacing');
+      expect(result.snappedCenter.dx, closeTo(3.0, 1e-3));
+      expect(result.snappedCenter.dy, closeTo(2.0, 1e-3));
+      expect(result.liveDimensionText, isNotNull);
+      expect(result.liveDimensionText, contains('='));
+    });
+  });
+
+  group('NeighborClearDistance & Face-to-Face Calculations', () {
+    final corridorStorey = StoreyLevel(
+      id: 's_corr',
+      name: 'Corridor',
+      elevation: 0.0,
+      height: 3.0,
+      columns: const [
+        StructuralColumn(id: 'c_left', name: 'К1', center: Offset(0.0, 0.0), width: 0.40, height: 0.40),
+        StructuralColumn(id: 'c_mid', name: 'К2', center: Offset(4.0, 0.0), width: 0.40, height: 0.40),
+        StructuralColumn(id: 'c_right', name: 'К3', center: Offset(10.0, 0.0), width: 0.40, height: 0.40),
+      ],
+      shearWalls: const [],
+      beams: const [],
+      slabs: const [],
+    );
+
+    test('findNeighborClearDistances finds adjacent left and right columns with correct clear distance', () {
+      final neighbors = StructuralMagneticAlignmentHelper.findNeighborClearDistances(
+        center: const Offset(4.0, 0.0),
+        width: 0.40,
+        height: 0.40,
+        activeStorey: corridorStorey,
+        currentElementId: 'c_mid',
+        cadUnitsPerMeter: 1.0,
+      );
+
+      expect(neighbors.length, 2);
+      final left = neighbors.firstWhere((n) => n.direction == 'left');
+      final right = neighbors.firstWhere((n) => n.direction == 'right');
+
+      expect(left.currentClearDistanceM, closeTo(3.60, 1e-3));
+      expect(left.neighborName, 'К1');
+
+      expect(right.currentClearDistanceM, closeTo(5.60, 1e-3));
+      expect(right.neighborName, 'К3');
+    });
+
+    test('computeDeltaCad adjusts element position accurately', () {
+      const left = NeighborClearDistance(
+        direction: 'left',
+        neighborName: 'К1',
+        currentClearDistanceM: 3.60,
+        neighborFacePoint: Offset(0.20, 0.0),
+        ourFacePoint: Offset(3.80, 0.0),
+        isHorizontal: true,
+        sign: 1.0,
+      );
+
+      final deltaLeft = left.computeDeltaCad(targetClearDistanceM: 4.00, cadUnitsPerMeter: 1.0);
+      expect(deltaLeft.dx, closeTo(0.40, 1e-4));
+      expect(deltaLeft.dy, closeTo(0.0, 1e-4));
+
+      const right = NeighborClearDistance(
+        direction: 'right',
+        neighborName: 'К3',
+        currentClearDistanceM: 5.60,
+        neighborFacePoint: Offset(9.80, 0.0),
+        ourFacePoint: Offset(4.20, 0.0),
+        isHorizontal: true,
+        sign: -1.0,
+      );
+
+      final deltaRight = right.computeDeltaCad(targetClearDistanceM: 5.00, cadUnitsPerMeter: 1.0);
+      expect(deltaRight.dx, closeTo(0.60, 1e-4));
+      expect(deltaRight.dy, closeTo(0.0, 1e-4));
+    });
   });
 
   group('Structural 3D Mesh Builder - Ceiling Level Positioning', () {

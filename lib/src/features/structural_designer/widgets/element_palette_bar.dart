@@ -4,6 +4,7 @@ import '../models/cantilever_analysis_models.dart';
 import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
+import '../analysis/structural_magnetic_alignment_helper.dart';
 import '../rendering/structural_pointer_painter.dart';
 
 /// Bottom dock palette bar for choosing structural elements (columns, walls, slabs, beams, axes),
@@ -58,6 +59,8 @@ class ElementPaletteBar extends StatelessWidget {
   final VoidCallback? onOpenUnderlayFilterConfig;
   final VoidCallback? onShowAllLayers;
   final VoidCallback? onIsolateWhiteLayers;
+  final StructuralAxisLockMode axisLockMode;
+  final ValueChanged<StructuralAxisLockMode>? onUpdateAxisLockMode;
 
   const ElementPaletteBar({
     super.key,
@@ -110,6 +113,8 @@ class ElementPaletteBar extends StatelessWidget {
     this.onOpenUnderlayFilterConfig,
     this.onShowAllLayers,
     this.onIsolateWhiteLayers,
+    this.axisLockMode = StructuralAxisLockMode.autoMode,
+    this.onUpdateAxisLockMode,
   });
 
   @override
@@ -526,9 +531,45 @@ class ElementPaletteBar extends StatelessWidget {
               visualDensity: VisualDensity.compact,
             ),
           ],
+          ..._buildAxisLockChips(context),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildAxisLockChips(BuildContext context) {
+    if (onUpdateAxisLockMode == null) return const [];
+    return [
+      const SizedBox(width: 6),
+      Container(width: 1, height: 20, color: Colors.white24),
+      const SizedBox(width: 6),
+      ChoiceChip(
+        label: Text(context.l10n.axisLockAuto),
+        selected: axisLockMode == StructuralAxisLockMode.autoMode,
+        onSelected: (sel) {
+          if (sel) onUpdateAxisLockMode!(StructuralAxisLockMode.autoMode);
+        },
+        visualDensity: VisualDensity.compact,
+      ),
+      const SizedBox(width: 4),
+      ChoiceChip(
+        label: Text(context.l10n.axisLockX),
+        selected: axisLockMode == StructuralAxisLockMode.lockX,
+        onSelected: (sel) {
+          if (sel) onUpdateAxisLockMode!(StructuralAxisLockMode.lockX);
+        },
+        visualDensity: VisualDensity.compact,
+      ),
+      const SizedBox(width: 4),
+      ChoiceChip(
+        label: Text(context.l10n.axisLockY),
+        selected: axisLockMode == StructuralAxisLockMode.lockY,
+        onSelected: (sel) {
+          if (sel) onUpdateAxisLockMode!(StructuralAxisLockMode.lockY);
+        },
+        visualDensity: VisualDensity.compact,
+      ),
+    ];
   }
 
   Widget _buildWallOptionsBar(BuildContext context) {
@@ -594,6 +635,7 @@ class ElementPaletteBar extends StatelessWidget {
               visualDensity: VisualDensity.compact,
             ),
           ],
+          ..._buildAxisLockChips(context),
         ],
       ),
     );

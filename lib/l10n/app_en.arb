@@ -2086,6 +2086,58 @@
   "@shearWallRefLineChanged": {
     "description": "Notification when shear wall reference line changes",
     "placeholders": { "line": { "type": "String" } }
-  }
+  },
+  "axisLockAuto": "Auto",
+  "@axisLockAuto": { "description": "Auto axis constraint mode" },
+  "axisLockX": "↔ Lock X",
+  "@axisLockX": { "description": "Lock X coordinate axis constraint" },
+  "axisLockY": "↕ Lock Y",
+  "@axisLockY": { "description": "Lock Y coordinate axis constraint" },
+  "axisLockTitle": "Axis Constraint",
+  "@axisLockTitle": { "description": "Axis constraint setting title" },
+  "equalSpacing": "Equal Spacing",
+  "@equalSpacing": { "description": "Equal spacing alignment label" },
+  "equalSpacingDimension": "{distance} = {distance} m",
+  "@equalSpacingDimension": {
+    "description": "Equal spacing dimension text",
+    "placeholders": { "distance": { "type": "String" } }
+  },
+  "clearDistanceToNeighbors": "Clear Distance to Neighbors",
+  "@clearDistanceToNeighbors": { "description": "Title for clear distance section" },
+  "clearDistanceLeft": "To {name} (Left): {dist} m",
+  "@clearDistanceLeft": {
+    "description": "Clear distance to left neighbor",
+    "placeholders": { "name": { "type": "String" }, "dist": { "type": "String" } }
+  },
+  "clearDistanceRight": "To {name} (Right): {dist} m",
+  "@clearDistanceRight": {
+    "description": "Clear distance to right neighbor",
+    "placeholders": { "name": { "type": "String" }, "dist": { "type": "String" } }
+  },
+  "clearDistanceTop": "To {name} (Top): {dist} m",
+  "@clearDistanceTop": {
+    "description": "Clear distance to top neighbor",
+    "placeholders": { "name": { "type": "String" }, "dist": { "type": "String" } }
+  },
+  "clearDistanceBottom": "To {name} (Bottom): {dist} m",
+  "@clearDistanceBottom": {
+    "description": "Clear distance to bottom neighbor",
+    "placeholders": { "name": { "type": "String" }, "dist": { "type": "String" } }
+  },
+  "setClearDistanceAction": "Clear Distance",
+  "@setClearDistanceAction": { "description": "Button to adjust clear distance" },
+  "targetClearDistanceLabel": "Desired clear distance (m)",
+  "@targetClearDistanceLabel": { "description": "Input label for target clear distance" },
+  "applyClearDistance": "Apply",
+  "@applyClearDistance": { "description": "Apply clear distance button" },
+  "noNeighborsFound": "No adjacent elements along axes",
+  "@noNeighborsFound": { "description": "Notice when no adjacent columns or walls are detected" },
+  "precisionMoveActive": "Positioning active",
+  "@precisionMoveActive": { "description": "Status text while precision move is active" },
+  "confirmMove": "Confirm",
+  "@confirmMove": { "description": "Confirm move button" },
+  "cancelMove": "Cancel",
+  "@cancelMove": { "description": "Cancel move button" }
 }
+
 

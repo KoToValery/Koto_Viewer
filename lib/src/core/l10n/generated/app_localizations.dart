@@ -4311,6 +4311,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reference line: {line}'**
   String shearWallRefLineChanged(String line);
+
+  /// Auto axis constraint mode
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get axisLockAuto;
+
+  /// Lock X coordinate axis constraint
+  ///
+  /// In en, this message translates to:
+  /// **'↔ Lock X'**
+  String get axisLockX;
+
+  /// Lock Y coordinate axis constraint
+  ///
+  /// In en, this message translates to:
+  /// **'↕ Lock Y'**
+  String get axisLockY;
+
+  /// Axis constraint setting title
+  ///
+  /// In en, this message translates to:
+  /// **'Axis Constraint'**
+  String get axisLockTitle;
+
+  /// Equal spacing alignment label
+  ///
+  /// In en, this message translates to:
+  /// **'Equal Spacing'**
+  String get equalSpacing;
+
+  /// Equal spacing dimension text
+  ///
+  /// In en, this message translates to:
+  /// **'{distance} = {distance} m'**
+  String equalSpacingDimension(String distance);
+
+  /// Title for clear distance section
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Distance to Neighbors'**
+  String get clearDistanceToNeighbors;
+
+  /// Clear distance to left neighbor
+  ///
+  /// In en, this message translates to:
+  /// **'To {name} (Left): {dist} m'**
+  String clearDistanceLeft(String name, String dist);
+
+  /// Clear distance to right neighbor
+  ///
+  /// In en, this message translates to:
+  /// **'To {name} (Right): {dist} m'**
+  String clearDistanceRight(String name, String dist);
+
+  /// Clear distance to top neighbor
+  ///
+  /// In en, this message translates to:
+  /// **'To {name} (Top): {dist} m'**
+  String clearDistanceTop(String name, String dist);
+
+  /// Clear distance to bottom neighbor
+  ///
+  /// In en, this message translates to:
+  /// **'To {name} (Bottom): {dist} m'**
+  String clearDistanceBottom(String name, String dist);
+
+  /// Button to adjust clear distance
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Distance'**
+  String get setClearDistanceAction;
+
+  /// Input label for target clear distance
+  ///
+  /// In en, this message translates to:
+  /// **'Desired clear distance (m)'**
+  String get targetClearDistanceLabel;
+
+  /// Apply clear distance button
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get applyClearDistance;
+
+  /// Notice when no adjacent columns or walls are detected
+  ///
+  /// In en, this message translates to:
+  /// **'No adjacent elements along axes'**
+  String get noNeighborsFound;
+
+  /// Status text while precision move is active
+  ///
+  /// In en, this message translates to:
+  /// **'Positioning active'**
+  String get precisionMoveActive;
+
+  /// Confirm move button
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirmMove;
+
+  /// Cancel move button
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancelMove;
 }
 
 class _AppLocalizationsDelegate

@@ -58,6 +58,54 @@ class BeamMagneticAlignmentResult {
   });
 }
 
+/// Direction constraint mode for element movement / placement.
+enum StructuralAxisLockMode {
+  /// Free 2-DOF magnetic snapping (both X and Y are active).
+  autoMode,
+
+  /// Movement is constrained vertically; X coordinate remains fixed.
+  lockX,
+
+  /// Movement is constrained horizontally; Y coordinate remains fixed.
+  lockY,
+}
+
+/// Face-to-face clear distance to an adjacent structural element.
+class NeighborClearDistance {
+  final String direction; // 'left', 'right', 'top', 'bottom'
+  final String neighborName;
+  final double currentClearDistanceM;
+  final Offset neighborFacePoint;
+  final Offset ourFacePoint;
+  final bool isHorizontal;
+  final double sign; // +1.0 or -1.0
+
+  const NeighborClearDistance({
+    required this.direction,
+    required this.neighborName,
+    required this.currentClearDistanceM,
+    required this.neighborFacePoint,
+    required this.ourFacePoint,
+    required this.isHorizontal,
+    required this.sign,
+  });
+
+  /// Computes the delta offset (in CAD units) that must be added to current element center
+  /// so that the face-to-face clear distance becomes [targetClearDistanceM].
+  Offset computeDeltaCad({
+    required double targetClearDistanceM,
+    required double cadUnitsPerMeter,
+  }) {
+    final double diffM = targetClearDistanceM - currentClearDistanceM;
+    final double diffCad = diffM * cadUnitsPerMeter;
+    if (isHorizontal) {
+      return Offset(sign * diffCad, 0.0);
+    } else {
+      return Offset(0.0, sign * diffCad);
+    }
+  }
+}
+
 /// Helper for magnetic parallel and axial alignment (магнитно прилепване)
 /// for columns, shear walls, and beams, replacing point-snapping with ArchiCAD-style guidelines.
 class StructuralMagneticAlignmentHelper {
@@ -127,6 +175,165 @@ class StructuralMagneticAlignmentHelper {
     return anchors;
   }
 
+  /// Discovers adjacent columns and shear walls along the horizontal and vertical corridors
+  /// and calculates exact face-to-face clear distances (светли размери).
+  static List<NeighborClearDistance> findNeighborClearDistances({
+    required Offset center,
+    required double width,
+    required double height,
+    required StoreyLevel activeStorey,
+    String? currentElementId,
+    double cadUnitsPerMeter = 1.0,
+  }) {
+    final results = <NeighborClearDistance>[];
+
+    // Collect candidate neighbor elements
+    final candidates = <({String name, Offset center, double w, double h})>[];
+    for (final col in activeStorey.columns) {
+      if (currentElementId != null && col.id == currentElementId) continue;
+      candidates.add((
+        name: col.displayName.isNotEmpty ? col.displayName : 'К',
+        center: col.center,
+        w: col.width,
+        h: col.height,
+      ));
+    }
+    for (final wall in activeStorey.shearWalls) {
+      if (currentElementId != null && wall.id == currentElementId) continue;
+      final dx = (wall.end.dx - wall.start.dx).abs();
+      final dy = (wall.end.dy - wall.start.dy).abs();
+      final sinA = math.sin(wall.angleRad).abs();
+      final cosA = math.cos(wall.angleRad).abs();
+      final bboxW = dx + wall.thickness * sinA;
+      final bboxH = dy + wall.thickness * cosA;
+      candidates.add((
+        name: wall.displayName.isNotEmpty ? wall.displayName : 'Ш',
+        center: wall.center,
+        w: bboxW,
+        h: bboxH,
+      ));
+    }
+
+    final corridorXMargin = math.max(height, 0.4 * cadUnitsPerMeter) * 1.5;
+    final corridorYMargin = math.max(width, 0.4 * cadUnitsPerMeter) * 1.5;
+
+    // 1. Horizontal Corridor (Left & Right)
+    ({String name, Offset center, double w, double h})? nearestLeft;
+    double maxLeftX = -double.infinity;
+    ({String name, Offset center, double w, double h})? nearestRight;
+    double minRightX = double.infinity;
+
+    for (final cand in candidates) {
+      final dY = (cand.center.dy - center.dy).abs();
+      if (dY <= corridorXMargin) {
+        if (cand.center.dx < center.dx) {
+          if (cand.center.dx > maxLeftX) {
+            maxLeftX = cand.center.dx;
+            nearestLeft = cand;
+          }
+        } else if (cand.center.dx > center.dx) {
+          if (cand.center.dx < minRightX) {
+            minRightX = cand.center.dx;
+            nearestRight = cand;
+          }
+        }
+      }
+    }
+
+    if (nearestLeft != null) {
+      final faceOurLeft = center.dx - width / 2.0;
+      final faceNeighborRight = nearestLeft.center.dx + nearestLeft.w / 2.0;
+      final clearDistCad = faceOurLeft - faceNeighborRight;
+      if (clearDistCad > 0.01 * cadUnitsPerMeter) {
+        results.add(NeighborClearDistance(
+          direction: 'left',
+          neighborName: nearestLeft.name,
+          currentClearDistanceM: clearDistCad / cadUnitsPerMeter,
+          neighborFacePoint: Offset(faceNeighborRight, center.dy),
+          ourFacePoint: Offset(faceOurLeft, center.dy),
+          isHorizontal: true,
+          sign: 1.0,
+        ));
+      }
+    }
+
+    if (nearestRight != null) {
+      final faceOurRight = center.dx + width / 2.0;
+      final faceNeighborLeft = nearestRight.center.dx - nearestRight.w / 2.0;
+      final clearDistCad = faceNeighborLeft - faceOurRight;
+      if (clearDistCad > 0.01 * cadUnitsPerMeter) {
+        results.add(NeighborClearDistance(
+          direction: 'right',
+          neighborName: nearestRight.name,
+          currentClearDistanceM: clearDistCad / cadUnitsPerMeter,
+          neighborFacePoint: Offset(faceNeighborLeft, center.dy),
+          ourFacePoint: Offset(faceOurRight, center.dy),
+          isHorizontal: true,
+          sign: -1.0,
+        ));
+      }
+    }
+
+    // 2. Vertical Corridor (Bottom & Top)
+    ({String name, Offset center, double w, double h})? nearestBottom;
+    double maxBottomY = -double.infinity;
+    ({String name, Offset center, double w, double h})? nearestTop;
+    double minTopY = double.infinity;
+
+    for (final cand in candidates) {
+      final dX = (cand.center.dx - center.dx).abs();
+      if (dX <= corridorYMargin) {
+        if (cand.center.dy < center.dy) {
+          if (cand.center.dy > maxBottomY) {
+            maxBottomY = cand.center.dy;
+            nearestBottom = cand;
+          }
+        } else if (cand.center.dy > center.dy) {
+          if (cand.center.dy < minTopY) {
+            minTopY = cand.center.dy;
+            nearestTop = cand;
+          }
+        }
+      }
+    }
+
+    if (nearestBottom != null) {
+      final faceOurBottom = center.dy - height / 2.0;
+      final faceNeighborTop = nearestBottom.center.dy + nearestBottom.h / 2.0;
+      final clearDistCad = faceOurBottom - faceNeighborTop;
+      if (clearDistCad > 0.01 * cadUnitsPerMeter) {
+        results.add(NeighborClearDistance(
+          direction: 'bottom',
+          neighborName: nearestBottom.name,
+          currentClearDistanceM: clearDistCad / cadUnitsPerMeter,
+          neighborFacePoint: Offset(center.dx, faceNeighborTop),
+          ourFacePoint: Offset(center.dx, faceOurBottom),
+          isHorizontal: false,
+          sign: 1.0,
+        ));
+      }
+    }
+
+    if (nearestTop != null) {
+      final faceOurTop = center.dy + height / 2.0;
+      final faceNeighborBottom = nearestTop.center.dy - nearestTop.h / 2.0;
+      final clearDistCad = faceNeighborBottom - faceOurTop;
+      if (clearDistCad > 0.01 * cadUnitsPerMeter) {
+        results.add(NeighborClearDistance(
+          direction: 'top',
+          neighborName: nearestTop.name,
+          currentClearDistanceM: clearDistCad / cadUnitsPerMeter,
+          neighborFacePoint: Offset(center.dx, faceNeighborBottom),
+          ourFacePoint: Offset(center.dx, faceOurTop),
+          isHorizontal: false,
+          sign: -1.0,
+        ));
+      }
+    }
+
+    return results;
+  }
+
   /// Aligns a column center to structural grid axes, other column coordinates (X/Y),
   /// shear walls, beams, or DXF underlay lines.
   static ColumnMagneticAlignmentResult? alignColumn({
@@ -139,7 +346,48 @@ class StructuralMagneticAlignmentHelper {
     String? movingColumnId,
     DxfDocument? dxfDocument,
     double cadUnitsPerMeter = 1.0,
+    StructuralAxisLockMode axisLockMode = StructuralAxisLockMode.autoMode,
+    Offset? anchorCenter,
+    Offset? previousSnappedCenter,
   }) {
+    // 0. Handle Axis Constraint Mode
+    Offset effectiveRawCenter = rawCenter;
+    if (axisLockMode == StructuralAxisLockMode.lockX && anchorCenter != null) {
+      effectiveRawCenter = Offset(anchorCenter.dx, effectiveRawCenter.dy);
+    } else if (axisLockMode == StructuralAxisLockMode.lockY && anchorCenter != null) {
+      effectiveRawCenter = Offset(effectiveRawCenter.dx, anchorCenter.dy);
+    }
+
+    // 0b. Hysteresis tolerance window (sticky snap)
+    double effectiveTol = toleranceCad;
+    if (previousSnappedCenter != null &&
+        (effectiveRawCenter - previousSnappedCenter).distance <= toleranceCad * 1.35) {
+      effectiveTol = toleranceCad * 1.35;
+    }
+
+    ColumnMagneticAlignmentResult wrapResult(ColumnMagneticAlignmentResult res) {
+      if (axisLockMode == StructuralAxisLockMode.lockX && anchorCenter != null) {
+        return ColumnMagneticAlignmentResult(
+          snappedCenter: Offset(anchorCenter.dx, res.snappedCenter.dy),
+          guideLines: res.guideLines,
+          description: res.description,
+          markerPoint: res.markerPoint != null ? Offset(anchorCenter.dx, res.markerPoint!.dy) : null,
+          liveDimensionText: res.liveDimensionText,
+          dimensionLine: res.dimensionLine,
+        );
+      } else if (axisLockMode == StructuralAxisLockMode.lockY && anchorCenter != null) {
+        return ColumnMagneticAlignmentResult(
+          snappedCenter: Offset(res.snappedCenter.dx, anchorCenter.dy),
+          guideLines: res.guideLines,
+          description: res.description,
+          markerPoint: res.markerPoint != null ? Offset(res.markerPoint!.dx, anchorCenter.dy) : null,
+          liveDimensionText: res.liveDimensionText,
+          dimensionLine: res.dimensionLine,
+        );
+      }
+      return res;
+    }
+
     final axes = activeStorey.gridAxes;
     final anchors = _getColumnAnchors(
       width: columnWidth,
@@ -163,9 +411,9 @@ class StructuralMagneticAlignmentHelper {
         for (final anchor in anchors) {
           final isPrimary = anchor.name == 'center' || anchor.name.startsWith('wallModule');
           if (!isPrimary) continue;
-          final anchorWorld = rawCenter + anchor.offset;
+          final anchorWorld = effectiveRawCenter + anchor.offset;
           final d = (anchorWorld - inter).distance;
-          if (d <= toleranceCad * 1.5 && d < bestInterDist) {
+          if (d <= effectiveTol * 1.5 && d < bestInterDist) {
             bestInterDist = d;
             bestSnappedCenter = inter - anchor.offset;
             bestInterPoint = inter;
@@ -178,9 +426,9 @@ class StructuralMagneticAlignmentHelper {
           for (final anchor in anchors) {
             final isPrimary = anchor.name == 'center' || anchor.name.startsWith('wallModule');
             if (isPrimary) continue;
-            final anchorWorld = rawCenter + anchor.offset;
+            final anchorWorld = effectiveRawCenter + anchor.offset;
             final d = (anchorWorld - inter).distance;
-            if (d <= toleranceCad * 0.7 && d < bestInterDist) {
+            if (d <= effectiveTol * 0.7 && d < bestInterDist) {
               bestInterDist = d;
               bestSnappedCenter = inter - anchor.offset;
               bestInterPoint = inter;
@@ -192,7 +440,7 @@ class StructuralMagneticAlignmentHelper {
     }
 
     if (bestSnappedCenter != null && bestAxes != null) {
-      return ColumnMagneticAlignmentResult(
+      return wrapResult(ColumnMagneticAlignmentResult(
         snappedCenter: bestSnappedCenter,
         guideLines: [
           (bestAxes.$1.start, bestAxes.$1.end),
@@ -200,7 +448,7 @@ class StructuralMagneticAlignmentHelper {
         ],
         description: 'gridIntersection',
         markerPoint: bestInterPoint,
-      );
+      ));
     }
 
     // 2. Single Grid Axis line alignment (column anchor locks to axis line + 2-DOF cross-alignment)
@@ -215,17 +463,17 @@ class StructuralMagneticAlignmentHelper {
       ({Offset offset, String name})? bestAnchor;
 
       for (final anchor in anchors) {
-        final anchorWorld = rawCenter + anchor.offset;
+        final anchorWorld = effectiveRawCenter + anchor.offset;
         final distPerp = (anchorWorld - axis.start).dx * nAxis.dx +
             (anchorWorld - axis.start).dy * nAxis.dy;
-        if (distPerp.abs() <= toleranceCad && distPerp.abs() < bestPerpDist.abs()) {
+        if (distPerp.abs() <= effectiveTol && distPerp.abs() < bestPerpDist.abs()) {
           bestPerpDist = distPerp;
           bestAnchor = anchor;
         }
       }
 
       if (bestAnchor != null) {
-        final baseCenterOnAxis = rawCenter - nAxis * bestPerpDist;
+        final baseCenterOnAxis = effectiveRawCenter - nAxis * bestPerpDist;
 
         // --- 2-DOF Cross-Axis & Element Alignment along the axis ---
         // 2a. Check if any other Column aligns perpendicularly across the axis
@@ -238,7 +486,7 @@ class StructuralMagneticAlignmentHelper {
           final dPerpCol = (otherCol.center - proj).distance;
           if (dPerpCol > 0.15 * cadUnitsPerMeter) {
             final dAlong = (baseCenterOnAxis - proj).distance;
-            if (dAlong <= toleranceCad && dAlong < minCrossColDist) {
+            if (dAlong <= effectiveTol && dAlong < minCrossColDist) {
               minCrossColDist = dAlong;
               crossColAlignPt = proj;
               crossColSourcePt = otherCol.center;
@@ -255,7 +503,7 @@ class StructuralMagneticAlignmentHelper {
           final dPerpWall = (wall.center - proj).distance;
           if (dPerpWall > 0.15 * cadUnitsPerMeter) {
             final dAlong = (baseCenterOnAxis - proj).distance;
-            if (dAlong <= toleranceCad && dAlong < minCrossWallDist) {
+            if (dAlong <= effectiveTol && dAlong < minCrossWallDist) {
               minCrossWallDist = dAlong;
               crossWallAlignPt = proj;
               crossWallSourcePt = wall.center;
@@ -265,7 +513,7 @@ class StructuralMagneticAlignmentHelper {
 
         if (crossColAlignPt != null && crossColSourcePt != null) {
           final finalCenter = crossColAlignPt - bestAnchor.offset;
-          return ColumnMagneticAlignmentResult(
+          return wrapResult(ColumnMagneticAlignmentResult(
             snappedCenter: finalCenter,
             guideLines: [
               (axis.start, axis.end),
@@ -273,12 +521,12 @@ class StructuralMagneticAlignmentHelper {
             ],
             description: 'gridAxisAndColumn',
             markerPoint: crossColAlignPt,
-          );
+          ));
         }
 
         if (crossWallAlignPt != null && crossWallSourcePt != null) {
           final finalCenter = crossWallAlignPt - bestAnchor.offset;
-          return ColumnMagneticAlignmentResult(
+          return wrapResult(ColumnMagneticAlignmentResult(
             snappedCenter: finalCenter,
             guideLines: [
               (axis.start, axis.end),
@@ -286,7 +534,7 @@ class StructuralMagneticAlignmentHelper {
             ],
             description: 'gridAxisAndWall',
             markerPoint: crossWallAlignPt,
-          );
+          ));
         }
 
         // Obstacles along axis direction to compute distance and 5 cm snap
@@ -357,58 +605,60 @@ class StructuralMagneticAlignmentHelper {
           }
         }
 
-        return ColumnMagneticAlignmentResult(
+        return wrapResult(ColumnMagneticAlignmentResult(
           snappedCenter: finalCenter,
           guideLines: [(axis.start, axis.end)],
           description: 'gridAxis',
           markerPoint: finalCenter + bestAnchor.offset,
           liveDimensionText: dimText,
           dimensionLine: dimLine,
-        );
+        ));
       }
     }
 
     // 3. Multi-DOF Column and Shear Wall Orthogonal Alignment (X and Y solved independently)
-    Offset candidateCenter = rawCenter;
+    Offset candidateCenter = effectiveRawCenter;
     final List<(Offset, Offset)> colGuides = [];
     double? candX;
     double? candY;
     StructuralColumn? xRefCol;
     StructuralColumn? yRefCol;
+    String? equalSpacingDimText;
+    (Offset, Offset)? equalSpacingDimLine;
 
     for (final col in activeStorey.columns) {
       if (movingColumnId != null && col.id == movingColumnId) continue;
 
       // X alignment: compare Center, Flush Left, Flush Right with axial priority
       if (candX == null) {
-        final dCenter = (rawCenter.dx - col.center.dx).abs();
-        final rawLeft = rawCenter.dx - columnWidth / 2.0;
+        final dCenter = (effectiveRawCenter.dx - col.center.dx).abs();
+        final rawLeft = effectiveRawCenter.dx - columnWidth / 2.0;
         final colLeft = col.center.dx - col.width / 2.0;
         final dLeft = (rawLeft - colLeft).abs();
-        final rawRight = rawCenter.dx + columnWidth / 2.0;
+        final rawRight = effectiveRawCenter.dx + columnWidth / 2.0;
         final colRight = col.center.dx + col.width / 2.0;
         final dRight = (rawRight - colRight).abs();
 
-        final minY = math.min(rawCenter.dy, col.center.dy) - 3.0 * cadUnitsPerMeter;
-        final maxY = math.max(rawCenter.dy, col.center.dy) + 3.0 * cadUnitsPerMeter;
+        final minY = math.min(effectiveRawCenter.dy, col.center.dy) - 3.0 * cadUnitsPerMeter;
+        final maxY = math.max(effectiveRawCenter.dy, col.center.dy) + 3.0 * cadUnitsPerMeter;
 
-        if (dLeft <= toleranceCad * 0.6 && dLeft < dCenter - 0.05) {
+        if (dLeft <= effectiveTol * 0.6 && dLeft < dCenter - 0.05) {
           xRefCol = col;
           candX = colLeft + columnWidth / 2.0;
           colGuides.add((Offset(colLeft, minY), Offset(colLeft, maxY)));
-        } else if (dRight <= toleranceCad * 0.6 && dRight < dCenter - 0.05) {
+        } else if (dRight <= effectiveTol * 0.6 && dRight < dCenter - 0.05) {
           xRefCol = col;
           candX = colRight - columnWidth / 2.0;
           colGuides.add((Offset(colRight, minY), Offset(colRight, maxY)));
-        } else if (dCenter <= toleranceCad) {
+        } else if (dCenter <= effectiveTol) {
           xRefCol = col;
           candX = col.center.dx;
           colGuides.add((Offset(col.center.dx, minY), Offset(col.center.dx, maxY)));
-        } else if (dLeft <= toleranceCad) {
+        } else if (dLeft <= effectiveTol) {
           xRefCol = col;
           candX = colLeft + columnWidth / 2.0;
           colGuides.add((Offset(colLeft, minY), Offset(colLeft, maxY)));
-        } else if (dRight <= toleranceCad) {
+        } else if (dRight <= effectiveTol) {
           xRefCol = col;
           candX = colRight - columnWidth / 2.0;
           colGuides.add((Offset(colRight, minY), Offset(colRight, maxY)));
@@ -417,34 +667,34 @@ class StructuralMagneticAlignmentHelper {
 
       // Y alignment: compare Center, Flush Bottom, Flush Top with axial priority
       if (candY == null) {
-        final dCenter = (rawCenter.dy - col.center.dy).abs();
-        final rawBot = rawCenter.dy - columnHeight / 2.0;
+        final dCenter = (effectiveRawCenter.dy - col.center.dy).abs();
+        final rawBot = effectiveRawCenter.dy - columnHeight / 2.0;
         final colBot = col.center.dy - col.height / 2.0;
         final dBot = (rawBot - colBot).abs();
-        final rawTop = rawCenter.dy + columnHeight / 2.0;
+        final rawTop = effectiveRawCenter.dy + columnHeight / 2.0;
         final colTop = col.center.dy + col.height / 2.0;
         final dTop = (rawTop - colTop).abs();
 
-        final minX = math.min(rawCenter.dx, col.center.dx) - 3.0 * cadUnitsPerMeter;
-        final maxX = math.max(rawCenter.dx, col.center.dx) + 3.0 * cadUnitsPerMeter;
+        final minX = math.min(effectiveRawCenter.dx, col.center.dx) - 3.0 * cadUnitsPerMeter;
+        final maxX = math.max(effectiveRawCenter.dx, col.center.dx) + 3.0 * cadUnitsPerMeter;
 
-        if (dBot <= toleranceCad * 0.6 && dBot < dCenter - 0.05) {
+        if (dBot <= effectiveTol * 0.6 && dBot < dCenter - 0.05) {
           yRefCol = col;
           candY = colBot + columnHeight / 2.0;
           colGuides.add((Offset(minX, colBot), Offset(maxX, colBot)));
-        } else if (dTop <= toleranceCad * 0.6 && dTop < dCenter - 0.05) {
+        } else if (dTop <= effectiveTol * 0.6 && dTop < dCenter - 0.05) {
           yRefCol = col;
           candY = colTop - columnHeight / 2.0;
           colGuides.add((Offset(minX, colTop), Offset(maxX, colTop)));
-        } else if (dCenter <= toleranceCad) {
+        } else if (dCenter <= effectiveTol) {
           yRefCol = col;
           candY = col.center.dy;
           colGuides.add((Offset(minX, col.center.dy), Offset(maxX, col.center.dy)));
-        } else if (dBot <= toleranceCad) {
+        } else if (dBot <= effectiveTol) {
           yRefCol = col;
           candY = colBot + columnHeight / 2.0;
           colGuides.add((Offset(minX, colBot), Offset(maxX, colBot)));
-        } else if (dTop <= toleranceCad) {
+        } else if (dTop <= effectiveTol) {
           yRefCol = col;
           candY = colTop - columnHeight / 2.0;
           colGuides.add((Offset(minX, colTop), Offset(maxX, colTop)));
@@ -454,49 +704,109 @@ class StructuralMagneticAlignmentHelper {
       if (candX != null && candY != null) break;
     }
 
+    // 3b. Equal Spacing Snapping (Равни разстояния между две съседни колони)
+    if (candX == null && activeStorey.columns.length >= 2) {
+      for (int i = 0; i < activeStorey.columns.length; i++) {
+        final c1 = activeStorey.columns[i];
+        if (movingColumnId != null && c1.id == movingColumnId) continue;
+        for (int j = i + 1; j < activeStorey.columns.length; j++) {
+          final c2 = activeStorey.columns[j];
+          if (movingColumnId != null && c2.id == movingColumnId) continue;
+          if ((c1.center.dy - c2.center.dy).abs() > 0.6 * cadUnitsPerMeter) continue;
+          if ((effectiveRawCenter.dy - c1.center.dy).abs() > 0.9 * cadUnitsPerMeter) continue;
+          final leftC = c1.center.dx < c2.center.dx ? c1 : c2;
+          final rightC = c1.center.dx < c2.center.dx ? c2 : c1;
+          final leftFace = leftC.center.dx + leftC.width / 2.0;
+          final rightFace = rightC.center.dx - rightC.width / 2.0;
+          if (rightFace - leftFace > columnWidth) {
+            final equalX = (leftFace + rightFace) / 2.0;
+            if ((effectiveRawCenter.dx - equalX).abs() <= effectiveTol) {
+              candX = equalX;
+              final clearM = ((equalX - columnWidth / 2.0) - leftFace) / cadUnitsPerMeter;
+              colGuides.add((Offset(leftFace, leftC.center.dy), Offset(rightFace, rightC.center.dy)));
+              equalSpacingDimText = '${clearM.toStringAsFixed(2)} = ${clearM.toStringAsFixed(2)} m';
+              equalSpacingDimLine = (Offset(leftFace, leftC.center.dy), Offset(rightFace, rightC.center.dy));
+              break;
+            }
+          }
+        }
+        if (candX != null) break;
+      }
+    }
+    if (candY == null && activeStorey.columns.length >= 2) {
+      for (int i = 0; i < activeStorey.columns.length; i++) {
+        final c1 = activeStorey.columns[i];
+        if (movingColumnId != null && c1.id == movingColumnId) continue;
+        for (int j = i + 1; j < activeStorey.columns.length; j++) {
+          final c2 = activeStorey.columns[j];
+          if (movingColumnId != null && c2.id == movingColumnId) continue;
+          if ((c1.center.dx - c2.center.dx).abs() > 0.6 * cadUnitsPerMeter) continue;
+          if ((effectiveRawCenter.dx - c1.center.dx).abs() > 0.9 * cadUnitsPerMeter) continue;
+          final botC = c1.center.dy < c2.center.dy ? c1 : c2;
+          final topC = c1.center.dy < c2.center.dy ? c2 : c1;
+          final botFace = botC.center.dy + botC.height / 2.0;
+          final topFace = topC.center.dy - topC.height / 2.0;
+          if (topFace - botFace > columnHeight) {
+            final equalY = (botFace + topFace) / 2.0;
+            if ((effectiveRawCenter.dy - equalY).abs() <= effectiveTol) {
+              candY = equalY;
+              final clearM = ((equalY - columnHeight / 2.0) - botFace) / cadUnitsPerMeter;
+              colGuides.add((Offset(botC.center.dx, botFace), Offset(topC.center.dx, topFace)));
+              equalSpacingDimText = '${clearM.toStringAsFixed(2)} = ${clearM.toStringAsFixed(2)} m';
+              equalSpacingDimLine = (Offset(botC.center.dx, botFace), Offset(topC.center.dx, topFace));
+              break;
+            }
+          }
+        }
+        if (candY != null) break;
+      }
+    }
+
     if (candX != null || candY != null) {
-      candidateCenter = Offset(candX ?? rawCenter.dx, candY ?? rawCenter.dy);
+      candidateCenter = Offset(candX ?? effectiveRawCenter.dx, candY ?? effectiveRawCenter.dy);
 
       // Measure clear distance (светъл размер) to the reference column along the line
-      String? dimText;
-      (Offset, Offset)? dimLine;
+      String? dimText = equalSpacingDimText;
+      (Offset, Offset)? dimLine = equalSpacingDimLine;
 
-      if (candX != null && xRefCol != null && candY == null) {
-        // Aligned vertically with xRefCol -> compute clear distance along Y
-        final double signY = candidateCenter.dy >= xRefCol.center.dy ? 1.0 : -1.0;
-        final double faceOurY = candidateCenter.dy - signY * columnHeight / 2.0;
-        final double faceRefY = xRefCol.center.dy + signY * xRefCol.height / 2.0;
-        final double clearDistCad = (faceOurY - faceRefY).abs();
-        if (clearDistCad > 0.05 * cadUnitsPerMeter && clearDistCad <= 12.0 * cadUnitsPerMeter) {
-          final clearDistM = clearDistCad / cadUnitsPerMeter;
-          dimText = '${clearDistM.toStringAsFixed(2)} m';
-          final p1 = Offset(candidateCenter.dx, faceRefY);
-          final p2 = Offset(candidateCenter.dx, faceOurY);
-          dimLine = (p1, p2);
-        }
-      } else if (candY != null && yRefCol != null && candX == null) {
-        // Aligned horizontally with yRefCol -> compute clear distance along X
-        final double signX = candidateCenter.dx >= yRefCol.center.dx ? 1.0 : -1.0;
-        final double faceOurX = candidateCenter.dx - signX * columnWidth / 2.0;
-        final double faceRefX = yRefCol.center.dx + signX * yRefCol.width / 2.0;
-        final double clearDistCad = (faceOurX - faceRefX).abs();
-        if (clearDistCad > 0.05 * cadUnitsPerMeter && clearDistCad <= 12.0 * cadUnitsPerMeter) {
-          final clearDistM = clearDistCad / cadUnitsPerMeter;
-          dimText = '${clearDistM.toStringAsFixed(2)} m';
-          final p1 = Offset(faceRefX, candidateCenter.dy);
-          final p2 = Offset(faceOurX, candidateCenter.dy);
-          dimLine = (p1, p2);
+      if (dimText == null) {
+        if (candX != null && xRefCol != null && candY == null) {
+          final double signY = candidateCenter.dy >= xRefCol.center.dy ? 1.0 : -1.0;
+          final double faceOurY = candidateCenter.dy - signY * columnHeight / 2.0;
+          final double faceRefY = xRefCol.center.dy + signY * xRefCol.height / 2.0;
+          final double clearDistCad = (faceOurY - faceRefY).abs();
+          if (clearDistCad > 0.05 * cadUnitsPerMeter && clearDistCad <= 12.0 * cadUnitsPerMeter) {
+            final clearDistM = clearDistCad / cadUnitsPerMeter;
+            dimText = '${clearDistM.toStringAsFixed(2)} m';
+            final p1 = Offset(candidateCenter.dx, faceRefY);
+            final p2 = Offset(candidateCenter.dx, faceOurY);
+            dimLine = (p1, p2);
+          }
+        } else if (candY != null && yRefCol != null && candX == null) {
+          final double signX = candidateCenter.dx >= yRefCol.center.dx ? 1.0 : -1.0;
+          final double faceOurX = candidateCenter.dx - signX * columnWidth / 2.0;
+          final double faceRefX = yRefCol.center.dx + signX * yRefCol.width / 2.0;
+          final double clearDistCad = (faceOurX - faceRefX).abs();
+          if (clearDistCad > 0.05 * cadUnitsPerMeter && clearDistCad <= 12.0 * cadUnitsPerMeter) {
+            final clearDistM = clearDistCad / cadUnitsPerMeter;
+            dimText = '${clearDistM.toStringAsFixed(2)} m';
+            final p1 = Offset(faceRefX, candidateCenter.dy);
+            final p2 = Offset(faceOurX, candidateCenter.dy);
+            dimLine = (p1, p2);
+          }
         }
       }
 
-      return ColumnMagneticAlignmentResult(
+      return wrapResult(ColumnMagneticAlignmentResult(
         snappedCenter: candidateCenter,
         guideLines: colGuides,
-        description: (candX != null && candY != null) ? 'columnAlign2D' : 'columnAlign',
+        description: equalSpacingDimText != null
+            ? 'equalSpacing'
+            : ((candX != null && candY != null) ? 'columnAlign2D' : 'columnAlign'),
         markerPoint: candidateCenter,
         liveDimensionText: dimText,
         dimensionLine: dimLine,
-      );
+      ));
     }
 
     // 4. Centerline of Shear Walls
@@ -506,15 +816,15 @@ class StructuralMagneticAlignmentHelper {
       if (segLen < 1e-4) continue;
       final u = segVec / segLen;
       final n = Offset(-u.dy, u.dx);
-      final distPerp = (rawCenter - wall.start).dx * n.dx + (rawCenter - wall.start).dy * n.dy;
-      if (distPerp.abs() <= toleranceCad) {
-        final proj = rawCenter - n * distPerp;
-        return ColumnMagneticAlignmentResult(
+      final distPerp = (effectiveRawCenter - wall.start).dx * n.dx + (effectiveRawCenter - wall.start).dy * n.dy;
+      if (distPerp.abs() <= effectiveTol) {
+        final proj = effectiveRawCenter - n * distPerp;
+        return wrapResult(ColumnMagneticAlignmentResult(
           snappedCenter: proj,
           guideLines: [(wall.start - u * 2.0, wall.end + u * 2.0)],
           description: 'shearWall',
           markerPoint: proj,
-        );
+        ));
       }
     }
 
@@ -525,15 +835,15 @@ class StructuralMagneticAlignmentHelper {
       if (segLen < 1e-4) continue;
       final u = segVec / segLen;
       final n = Offset(-u.dy, u.dx);
-      final distPerp = (rawCenter - beam.start).dx * n.dx + (rawCenter - beam.start).dy * n.dy;
-      if (distPerp.abs() <= toleranceCad) {
-        final proj = rawCenter - n * distPerp;
-        return ColumnMagneticAlignmentResult(
+      final distPerp = (effectiveRawCenter - beam.start).dx * n.dx + (effectiveRawCenter - beam.start).dy * n.dy;
+      if (distPerp.abs() <= effectiveTol) {
+        final proj = effectiveRawCenter - n * distPerp;
+        return wrapResult(ColumnMagneticAlignmentResult(
           snappedCenter: proj,
           guideLines: [(beam.start - u * 2.0, beam.end + u * 2.0)],
           description: 'beam',
           markerPoint: proj,
-        );
+        ));
       }
     }
 
@@ -548,17 +858,17 @@ class StructuralMagneticAlignmentHelper {
           if (segLen < 0.2 * cadUnitsPerMeter) continue;
           final u = segVec / segLen;
           final n = Offset(-u.dy, u.dx);
-          final distPerp = (rawCenter - p1).dx * n.dx + (rawCenter - p1).dy * n.dy;
-          if (distPerp.abs() <= toleranceCad) {
-            final proj = rawCenter - n * distPerp;
+          final distPerp = (effectiveRawCenter - p1).dx * n.dx + (effectiveRawCenter - p1).dy * n.dy;
+          if (distPerp.abs() <= effectiveTol) {
+            final proj = effectiveRawCenter - n * distPerp;
             final t = ((proj - p1).dx * u.dx + (proj - p1).dy * u.dy) / segLen;
             if (t >= -0.2 && t <= 1.2) {
-              return ColumnMagneticAlignmentResult(
+              return wrapResult(ColumnMagneticAlignmentResult(
                 snappedCenter: proj,
                 guideLines: [(p1 - u * 1.5, p2 + u * 1.5)],
                 description: 'dxfLine',
                 markerPoint: proj,
-              );
+              ));
             }
           }
         }
@@ -580,7 +890,50 @@ class StructuralMagneticAlignmentHelper {
     String? movingWallId,
     DxfDocument? dxfDocument,
     double cadUnitsPerMeter = 1.0,
+    StructuralAxisLockMode axisLockMode = StructuralAxisLockMode.autoMode,
+    Offset? anchorCenter,
+    Offset? previousSnappedCenter,
   }) {
+    // 0. Handle Axis Constraint Mode
+    Offset effectiveRawCenter = rawCenter;
+    if (axisLockMode == StructuralAxisLockMode.lockX && anchorCenter != null) {
+      effectiveRawCenter = Offset(anchorCenter.dx, effectiveRawCenter.dy);
+    } else if (axisLockMode == StructuralAxisLockMode.lockY && anchorCenter != null) {
+      effectiveRawCenter = Offset(effectiveRawCenter.dx, anchorCenter.dy);
+    }
+
+    // 0b. Hysteresis tolerance window (sticky snap)
+    double effectiveTol = toleranceCad;
+    if (previousSnappedCenter != null &&
+        (effectiveRawCenter - previousSnappedCenter).distance <= toleranceCad * 1.35) {
+      effectiveTol = toleranceCad * 1.35;
+    }
+
+    ShearWallMagneticAlignmentResult wrapWallResult(ShearWallMagneticAlignmentResult res) {
+      if (axisLockMode == StructuralAxisLockMode.lockX && anchorCenter != null) {
+        return ShearWallMagneticAlignmentResult(
+          snappedCenter: Offset(anchorCenter.dx, res.snappedCenter.dy),
+          snappedRotationRad: res.snappedRotationRad,
+          guideLines: res.guideLines,
+          description: res.description,
+          markerPoint: res.markerPoint != null ? Offset(anchorCenter.dx, res.markerPoint!.dy) : null,
+          liveDimensionText: res.liveDimensionText,
+          dimensionLine: res.dimensionLine,
+        );
+      } else if (axisLockMode == StructuralAxisLockMode.lockY && anchorCenter != null) {
+        return ShearWallMagneticAlignmentResult(
+          snappedCenter: Offset(res.snappedCenter.dx, anchorCenter.dy),
+          snappedRotationRad: res.snappedRotationRad,
+          guideLines: res.guideLines,
+          description: res.description,
+          markerPoint: res.markerPoint != null ? Offset(res.markerPoint!.dx, anchorCenter.dy) : null,
+          liveDimensionText: res.liveDimensionText,
+          dimensionLine: res.dimensionLine,
+        );
+      }
+      return res;
+    }
+
     // Snap rotation to clean orthogonal if close
     double effectiveWallRot = wallRotationRad;
     const double angleTol = 0.15; // ~8.5 degrees
@@ -608,10 +961,10 @@ class StructuralMagneticAlignmentHelper {
 
       // Case A: Parallel to grid axis -> magnetically lock centerline onto axis + 2-DOF step snapping
       if (dot > 0.94) {
-        final distPerp = (rawCenter - axis.start).dx * nAxis.dx +
-            (rawCenter - axis.start).dy * nAxis.dy;
-        if (distPerp.abs() <= toleranceCad) {
-          final baseCenterOnAxis = rawCenter - nAxis * distPerp;
+        final distPerp = (effectiveRawCenter - axis.start).dx * nAxis.dx +
+            (effectiveRawCenter - axis.start).dy * nAxis.dy;
+        if (distPerp.abs() <= effectiveTol) {
+          final baseCenterOnAxis = effectiveRawCenter - nAxis * distPerp;
 
           // Check if start or end touches any perpendicular grid axis (T-junction with cross-axis)
           for (final otherAxis in activeStorey.gridAxes) {
@@ -619,26 +972,26 @@ class StructuralMagneticAlignmentHelper {
             final inter = axis.intersectionWith(otherAxis);
             if (inter != null) {
               final dStart = (baseCenterOnAxis - uWall * halfLen - inter).distance;
-              if (dStart <= toleranceCad) {
+              if (dStart <= effectiveTol) {
                 final snappedCenter = inter + uWall * halfLen;
-                return ShearWallMagneticAlignmentResult(
+                return wrapWallResult(ShearWallMagneticAlignmentResult(
                   snappedCenter: snappedCenter,
                   snappedRotationRad: axis.angleRad,
                   guideLines: [(axis.start, axis.end), (otherAxis.start, otherAxis.end)],
                   description: 'gridAxisAndCrossAxis',
                   markerPoint: inter,
-                );
+                ));
               }
               final dEnd = (baseCenterOnAxis + uWall * halfLen - inter).distance;
-              if (dEnd <= toleranceCad) {
+              if (dEnd <= effectiveTol) {
                 final snappedCenter = inter - uWall * halfLen;
-                return ShearWallMagneticAlignmentResult(
+                return wrapWallResult(ShearWallMagneticAlignmentResult(
                   snappedCenter: snappedCenter,
                   snappedRotationRad: axis.angleRad,
                   guideLines: [(axis.start, axis.end), (otherAxis.start, otherAxis.end)],
                   description: 'gridAxisAndCrossAxis',
                   markerPoint: inter,
-                );
+                ));
               }
             }
           }
@@ -647,26 +1000,26 @@ class StructuralMagneticAlignmentHelper {
           for (final col in activeStorey.columns) {
             final proj = axis.projectPoint(col.center);
             final dStart = (baseCenterOnAxis - uWall * halfLen - proj).distance;
-            if (dStart <= toleranceCad) {
+            if (dStart <= effectiveTol) {
               final snappedCenter = proj + uWall * halfLen;
-              return ShearWallMagneticAlignmentResult(
+              return wrapWallResult(ShearWallMagneticAlignmentResult(
                 snappedCenter: snappedCenter,
                 snappedRotationRad: axis.angleRad,
                 guideLines: [(axis.start, axis.end), (col.center, proj)],
                 description: 'gridAxisAndColumn',
                 markerPoint: proj,
-              );
+              ));
             }
             final dEnd = (baseCenterOnAxis + uWall * halfLen - proj).distance;
-            if (dEnd <= toleranceCad) {
+            if (dEnd <= effectiveTol) {
               final snappedCenter = proj - uWall * halfLen;
-              return ShearWallMagneticAlignmentResult(
+              return wrapWallResult(ShearWallMagneticAlignmentResult(
                 snappedCenter: snappedCenter,
                 snappedRotationRad: axis.angleRad,
                 guideLines: [(axis.start, axis.end), (col.center, proj)],
                 description: 'gridAxisAndColumn',
                 markerPoint: proj,
-              );
+              ));
             }
           }
 
@@ -746,7 +1099,7 @@ class StructuralMagneticAlignmentHelper {
             }
           }
 
-          return ShearWallMagneticAlignmentResult(
+          return wrapWallResult(ShearWallMagneticAlignmentResult(
             snappedCenter: finalCenter,
             snappedRotationRad: axis.angleRad,
             guideLines: [(axis.start, axis.end)],
@@ -754,17 +1107,17 @@ class StructuralMagneticAlignmentHelper {
             markerPoint: finalCenter,
             liveDimensionText: dimText,
             dimensionLine: dimLine,
-          );
+          ));
         }
       }
 
       // Case B: Perpendicular to grid axis -> end, center, or 12.5 cm module touches axis
       if (dot < 0.20) {
-        final pStart = rawCenter - uWall * halfLen;
-        final pEnd = rawCenter + uWall * halfLen;
+        final pStart = effectiveRawCenter - uWall * halfLen;
+        final pEnd = effectiveRawCenter + uWall * halfLen;
         final mod12_5 = 0.125 * cadUnitsPerMeter;
-        final pModStart = rawCenter - uWall * (halfLen - mod12_5);
-        final pModEnd = rawCenter + uWall * (halfLen - mod12_5);
+        final pModStart = effectiveRawCenter - uWall * (halfLen - mod12_5);
+        final pModEnd = effectiveRawCenter + uWall * (halfLen - mod12_5);
 
         final testNodes = [
           (pStart, 'wallStart'),
@@ -776,16 +1129,16 @@ class StructuralMagneticAlignmentHelper {
         for (final node in testNodes) {
           final distPerp = (node.$1 - axis.start).dx * nAxis.dx +
               (node.$1 - axis.start).dy * nAxis.dy;
-          if (distPerp.abs() <= toleranceCad) {
+          if (distPerp.abs() <= effectiveTol) {
             final snappedNode = node.$1 - nAxis * distPerp;
-            final offsetFromNode = rawCenter - node.$1;
+            final offsetFromNode = effectiveRawCenter - node.$1;
             final snappedCenter = snappedNode + offsetFromNode;
-            return ShearWallMagneticAlignmentResult(
+            return wrapWallResult(ShearWallMagneticAlignmentResult(
               snappedCenter: snappedCenter,
               guideLines: [(axis.start, axis.end)],
               description: 'gridAxis',
               markerPoint: snappedNode,
-            );
+            ));
           }
         }
       }
@@ -802,16 +1155,16 @@ class StructuralMagneticAlignmentHelper {
 
       final dot = (uWall.dx * uOther.dx + uWall.dy * uOther.dy).abs();
       if (dot > 0.94) {
-        final distPerp = (rawCenter - wall.start).dx * nOther.dx +
-            (rawCenter - wall.start).dy * nOther.dy;
-        if (distPerp.abs() <= toleranceCad) {
-          final snapped = rawCenter - nOther * distPerp;
-          return ShearWallMagneticAlignmentResult(
+        final distPerp = (effectiveRawCenter - wall.start).dx * nOther.dx +
+            (effectiveRawCenter - wall.start).dy * nOther.dy;
+        if (distPerp.abs() <= effectiveTol) {
+          final snapped = effectiveRawCenter - nOther * distPerp;
+          return wrapWallResult(ShearWallMagneticAlignmentResult(
             snappedCenter: snapped,
             guideLines: [(wall.start - uOther * 3.0, wall.end + uOther * 3.0)],
             description: 'shearWall',
             markerPoint: snapped,
-          );
+          ));
         }
       }
     }
@@ -826,34 +1179,34 @@ class StructuralMagneticAlignmentHelper {
 
       final dot = (uWall.dx * uBeam.dx + uWall.dy * uBeam.dy).abs();
       if (dot > 0.94) {
-        final distPerp = (rawCenter - beam.start).dx * nBeam.dx +
-            (rawCenter - beam.start).dy * nBeam.dy;
-        if (distPerp.abs() <= toleranceCad) {
-          final snapped = rawCenter - nBeam * distPerp;
-          return ShearWallMagneticAlignmentResult(
+        final distPerp = (effectiveRawCenter - beam.start).dx * nBeam.dx +
+            (effectiveRawCenter - beam.start).dy * nBeam.dy;
+        if (distPerp.abs() <= effectiveTol) {
+          final snapped = effectiveRawCenter - nBeam * distPerp;
+          return wrapWallResult(ShearWallMagneticAlignmentResult(
             snappedCenter: snapped,
             guideLines: [(beam.start - uBeam * 2.0, beam.end + uBeam * 2.0)],
             description: 'beam',
             markerPoint: snapped,
-          );
+          ));
         }
       }
     }
 
     // 4. Wall centerline passes through an existing Column
     for (final col in activeStorey.columns) {
-      final distPerp = (col.center - rawCenter).dx * nWall.dx +
-          (col.center - rawCenter).dy * nWall.dy;
-      if (distPerp.abs() <= toleranceCad) {
-        final snapped = rawCenter + nWall * distPerp;
+      final distPerp = (col.center - effectiveRawCenter).dx * nWall.dx +
+          (col.center - effectiveRawCenter).dy * nWall.dy;
+      if (distPerp.abs() <= effectiveTol) {
+        final snapped = effectiveRawCenter + nWall * distPerp;
         final guideStart = snapped - uWall * (halfLen + 2.0);
         final guideEnd = snapped + uWall * (halfLen + 2.0);
-        return ShearWallMagneticAlignmentResult(
+        return wrapWallResult(ShearWallMagneticAlignmentResult(
           snappedCenter: snapped,
           guideLines: [(guideStart, guideEnd)],
           description: 'column',
           markerPoint: col.center,
-        );
+        ));
       }
     }
 
@@ -871,15 +1224,15 @@ class StructuralMagneticAlignmentHelper {
 
           final dot = (uWall.dx * uLine.dx + uWall.dy * uLine.dy).abs();
           if (dot > 0.94) {
-            final distPerp = (rawCenter - p1).dx * nLine.dx + (rawCenter - p1).dy * nLine.dy;
-            if (distPerp.abs() <= toleranceCad) {
-              final snapped = rawCenter - nLine * distPerp;
-              return ShearWallMagneticAlignmentResult(
+            final distPerp = (effectiveRawCenter - p1).dx * nLine.dx + (effectiveRawCenter - p1).dy * nLine.dy;
+            if (distPerp.abs() <= effectiveTol) {
+              final snapped = effectiveRawCenter - nLine * distPerp;
+              return wrapWallResult(ShearWallMagneticAlignmentResult(
                 snappedCenter: snapped,
                 guideLines: [(p1 - uLine * 1.5, p2 + uLine * 1.5)],
                 description: 'dxfLine',
                 markerPoint: snapped,
-              );
+              ));
             }
           }
         }

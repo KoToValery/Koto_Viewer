@@ -703,6 +703,24 @@
   "alignRightFace": "Дясно лице",
   "alignTopFace": "Горно лице",
   "alignBottomFace": "Долно лице",
-  "shearWallRefLineChanged": "Референтна линия: {line}"
+  "shearWallRefLineChanged": "Референтна линия: {line}",
+  "axisLockAuto": "Авто",
+  "axisLockX": "↔ Заключи X",
+  "axisLockY": "↕ Заключи Y",
+  "axisLockTitle": "Ограничение по ос",
+  "equalSpacing": "Равни разстояния",
+  "equalSpacingDimension": "{distance} = {distance} m",
+  "clearDistanceToNeighbors": "Светъл размер до съседи",
+  "clearDistanceLeft": "До {name} (наляво): {dist} m",
+  "clearDistanceRight": "До {name} (надясно): {dist} m",
+  "clearDistanceTop": "До {name} (нагоре): {dist} m",
+  "clearDistanceBottom": "До {name} (надолу): {dist} m",
+  "setClearDistanceAction": "Светъл размер",
+  "targetClearDistanceLabel": "Желан светъл размер (m)",
+  "applyClearDistance": "Приложи",
+  "noNeighborsFound": "Няма съседни елементи по осите",
+  "precisionMoveActive": "Преместване",
+  "confirmMove": "Потвърди",
+  "cancelMove": "Отказ"
 }
 

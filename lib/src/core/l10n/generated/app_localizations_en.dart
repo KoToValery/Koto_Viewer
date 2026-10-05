@@ -2464,4 +2464,68 @@ class AppLocalizationsEn extends AppLocalizations {
   String shearWallRefLineChanged(String line) {
     return 'Reference line: $line';
   }
+
+  @override
+  String get axisLockAuto => 'Auto';
+
+  @override
+  String get axisLockX => '↔ Lock X';
+
+  @override
+  String get axisLockY => '↕ Lock Y';
+
+  @override
+  String get axisLockTitle => 'Axis Constraint';
+
+  @override
+  String get equalSpacing => 'Equal Spacing';
+
+  @override
+  String equalSpacingDimension(String distance) {
+    return '$distance = $distance m';
+  }
+
+  @override
+  String get clearDistanceToNeighbors => 'Clear Distance to Neighbors';
+
+  @override
+  String clearDistanceLeft(String name, String dist) {
+    return 'To $name (Left): $dist m';
+  }
+
+  @override
+  String clearDistanceRight(String name, String dist) {
+    return 'To $name (Right): $dist m';
+  }
+
+  @override
+  String clearDistanceTop(String name, String dist) {
+    return 'To $name (Top): $dist m';
+  }
+
+  @override
+  String clearDistanceBottom(String name, String dist) {
+    return 'To $name (Bottom): $dist m';
+  }
+
+  @override
+  String get setClearDistanceAction => 'Clear Distance';
+
+  @override
+  String get targetClearDistanceLabel => 'Desired clear distance (m)';
+
+  @override
+  String get applyClearDistance => 'Apply';
+
+  @override
+  String get noNeighborsFound => 'No adjacent elements along axes';
+
+  @override
+  String get precisionMoveActive => 'Positioning active';
+
+  @override
+  String get confirmMove => 'Confirm';
+
+  @override
+  String get cancelMove => 'Cancel';
 }

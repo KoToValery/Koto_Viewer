@@ -2473,4 +2473,68 @@ class AppLocalizationsBg extends AppLocalizations {
   String shearWallRefLineChanged(String line) {
     return 'Референтна линия: $line';
   }
+
+  @override
+  String get axisLockAuto => 'Авто';
+
+  @override
+  String get axisLockX => '↔ Заключи X';
+
+  @override
+  String get axisLockY => '↕ Заключи Y';
+
+  @override
+  String get axisLockTitle => 'Ограничение по ос';
+
+  @override
+  String get equalSpacing => 'Равни разстояния';
+
+  @override
+  String equalSpacingDimension(String distance) {
+    return '$distance = $distance m';
+  }
+
+  @override
+  String get clearDistanceToNeighbors => 'Светъл размер до съседи';
+
+  @override
+  String clearDistanceLeft(String name, String dist) {
+    return 'До $name (наляво): $dist m';
+  }
+
+  @override
+  String clearDistanceRight(String name, String dist) {
+    return 'До $name (надясно): $dist m';
+  }
+
+  @override
+  String clearDistanceTop(String name, String dist) {
+    return 'До $name (нагоре): $dist m';
+  }
+
+  @override
+  String clearDistanceBottom(String name, String dist) {
+    return 'До $name (надолу): $dist m';
+  }
+
+  @override
+  String get setClearDistanceAction => 'Светъл размер';
+
+  @override
+  String get targetClearDistanceLabel => 'Желан светъл размер (m)';
+
+  @override
+  String get applyClearDistance => 'Приложи';
+
+  @override
+  String get noNeighborsFound => 'Няма съседни елементи по осите';
+
+  @override
+  String get precisionMoveActive => 'Преместване';
+
+  @override
+  String get confirmMove => 'Потвърди';
+
+  @override
+  String get cancelMove => 'Отказ';
 }

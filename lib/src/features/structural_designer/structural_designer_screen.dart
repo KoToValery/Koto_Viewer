@@ -151,6 +151,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   bool _hasMovedSelectedColumn = false;
   bool _isMovingShearWall = false;
   bool _hasMovedSelectedShearWall = false;
+  StructuralAxisLockMode _axisLockMode = StructuralAxisLockMode.autoMode;
+  Offset? _lastSnappedCad;
+  Offset? _elementMoveOriginalCenter;
   List<(Offset, Offset)>? _activeMagneticGuides;
   bool _isMovingOpening = false;
   bool _hasMovedSelectedOpening = false;
@@ -1136,6 +1139,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _isMovingColumn = true;
       _hasMovedSelectedColumn = false;
       _isPlacingWithHold = false;
+      _elementMoveOriginalCenter = _selectedColumn!.center;
     });
     _updatePointer(screenPos, isMouse: false);
     HapticFeedback.selectionClick();
@@ -1148,8 +1152,54 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _isMovingShearWall = true;
       _hasMovedSelectedShearWall = false;
       _isPlacingWithHold = false;
+      _elementMoveOriginalCenter = _selectedShearWall!.center;
     });
     _updatePointer(screenPos, isMouse: false);
+    HapticFeedback.selectionClick();
+  }
+
+  void _confirmCurrentMove() {
+    setState(() {
+      _isMovingColumn = false;
+      _isMovingShearWall = false;
+      _elementMoveOriginalCenter = null;
+      _activeMagneticGuides = null;
+      _liveDimensionText = null;
+      _activeDynamicDimensionLine = null;
+      _lastSnappedCad = null;
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  void _cancelCurrentMove() {
+    if (_elementMoveOriginalCenter != null) {
+      final active = _project.activeStorey;
+      if (_isMovingColumn && _selectedColumn != null) {
+        final reverted = _selectedColumn!.copyWith(center: _elementMoveOriginalCenter!);
+        final cols = active.columns.map((c) => c.id == reverted.id ? reverted : c).toList();
+        _updateActiveStorey(active.copyWith(columns: cols));
+        setState(() => _selectedColumn = reverted);
+      } else if (_isMovingShearWall && _selectedShearWall != null) {
+        final halfLen = _selectedShearWall!.length / 2.0;
+        final u = Offset(math.cos(_selectedShearWall!.angleRad), math.sin(_selectedShearWall!.angleRad));
+        final reverted = _selectedShearWall!.copyWith(
+          start: _elementMoveOriginalCenter! - u * halfLen,
+          end: _elementMoveOriginalCenter! + u * halfLen,
+        );
+        final walls = active.shearWalls.map((w) => w.id == reverted.id ? reverted : w).toList();
+        _updateActiveStorey(active.copyWith(shearWalls: walls));
+        setState(() => _selectedShearWall = reverted);
+      }
+    }
+    setState(() {
+      _isMovingColumn = false;
+      _isMovingShearWall = false;
+      _elementMoveOriginalCenter = null;
+      _activeMagneticGuides = null;
+      _liveDimensionText = null;
+      _activeDynamicDimensionLine = null;
+      _lastSnappedCad = null;
+    });
     HapticFeedback.selectionClick();
   }
 
@@ -1523,6 +1573,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 18),
+                    // Clear Distance to Neighbors Section (Светъл размер до съседи)
+                    _buildNeighborClearDistancesSection(
+                      context: ctx,
+                      center: center,
+                      width: isColumn ? liveCol!.width : liveWall!.length,
+                      height: isColumn ? liveCol!.height : liveWall!.thickness,
+                      activeStorey: activeStorey,
+                      currentElementId: isColumn ? liveCol!.id : liveWall!.id,
+                      onApplyDelta: applyDelta,
+                    ),
                   ],
                 ),
               ),
@@ -1530,6 +1591,144 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildNeighborClearDistancesSection({
+    required BuildContext context,
+    required Offset center,
+    required double width,
+    required double height,
+    required StoreyLevel activeStorey,
+    required String currentElementId,
+    required void Function(double dxM, double dyM) onApplyDelta,
+  }) {
+    final neighbors = StructuralMagneticAlignmentHelper.findNeighborClearDistances(
+      center: center,
+      width: width,
+      height: height,
+      activeStorey: activeStorey,
+      currentElementId: currentElementId,
+      cadUnitsPerMeter: _cadUnitsPerMeter,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF24242C),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.space_bar_rounded, size: 16, color: Color(0xFF00E5FF)),
+              const SizedBox(width: 6),
+              Text(
+                context.l10n.clearDistanceToNeighbors,
+                style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (neighbors.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                context.l10n.noNeighborsFound,
+                style: const TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            )
+          else
+            for (final n in neighbors)
+              _buildNeighborDistanceRow(context, n, onApplyDelta),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNeighborDistanceRow(
+    BuildContext context,
+    NeighborClearDistance n,
+    void Function(double dxM, double dyM) onApplyDelta,
+  ) {
+    String label;
+    IconData icon;
+    switch (n.direction) {
+      case 'left':
+        label = context.l10n.clearDistanceLeft(n.neighborName, n.currentClearDistanceM.toStringAsFixed(2));
+        icon = Icons.arrow_back_rounded;
+        break;
+      case 'right':
+        label = context.l10n.clearDistanceRight(n.neighborName, n.currentClearDistanceM.toStringAsFixed(2));
+        icon = Icons.arrow_forward_rounded;
+        break;
+      case 'top':
+        label = context.l10n.clearDistanceTop(n.neighborName, n.currentClearDistanceM.toStringAsFixed(2));
+        icon = Icons.arrow_upward_rounded;
+        break;
+      default:
+        label = context.l10n.clearDistanceBottom(n.neighborName, n.currentClearDistanceM.toStringAsFixed(2));
+        icon = Icons.arrow_downward_rounded;
+        break;
+    }
+
+    final controller = TextEditingController(text: n.currentClearDistanceM.toStringAsFixed(2));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.white70),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(
+            width: 70,
+            height: 34,
+            child: TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFF1E1E24),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00E5FF),
+              foregroundColor: Colors.black,
+              minimumSize: const Size(40, 34),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            onPressed: () {
+              final targetM = double.tryParse(controller.text.trim());
+              if (targetM != null && targetM > 0) {
+                final deltaCad = n.computeDeltaCad(
+                  targetClearDistanceM: targetM,
+                  cadUnitsPerMeter: _cadUnitsPerMeter,
+                );
+                onApplyDelta(deltaCad.dx / _cadUnitsPerMeter, deltaCad.dy / _cadUnitsPerMeter);
+              }
+            },
+            child: Text(context.l10n.applyClearDistance, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -4026,6 +4225,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final double currentScale = _transformController.value.getMaxScaleOnAxis();
       final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
 
+      StructuralAxisLockMode effectiveLockMode = _axisLockMode;
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        final anchor = _elementMoveOriginalCenter ?? _selectedColumn?.center ?? _selectedShearWall?.center;
+        if (anchor != null) {
+          final dx = (rawCad.dx - anchor.dx).abs();
+          final dy = (rawCad.dy - anchor.dy).abs();
+          if (dx > dy) {
+            effectiveLockMode = StructuralAxisLockMode.lockY;
+          } else {
+            effectiveLockMode = StructuralAxisLockMode.lockX;
+          }
+        }
+      }
+
       if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
         final colW = (_isMovingColumn && _selectedColumn != null)
             ? _selectedColumn!.width
@@ -4047,17 +4260,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           movingColumnId: _isMovingColumn ? _selectedColumn?.id : null,
           dxfDocument: _document,
           cadUnitsPerMeter: _cadUnitsPerMeter,
+          axisLockMode: effectiveLockMode,
+          anchorCenter: _elementMoveOriginalCenter ?? _selectedColumn?.center,
+          previousSnappedCenter: _lastSnappedCad,
         );
         if (mag != null) {
           effectiveCad = mag.snappedCenter;
           _activeMagneticGuides = mag.guideLines;
           _liveDimensionText = mag.liveDimensionText;
           _activeDynamicDimensionLine = mag.dimensionLine;
+          _lastSnappedCad = effectiveCad;
         } else {
           effectiveCad = rawCad;
           _activeMagneticGuides = null;
           _liveDimensionText = null;
           _activeDynamicDimensionLine = null;
+          _lastSnappedCad = null;
         }
         _snappedScreenPositions = [];
       } else if (_isMovingOpening ||
@@ -4260,17 +4478,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           movingWallId: _isMovingShearWall ? _selectedShearWall?.id : null,
           dxfDocument: _document,
           cadUnitsPerMeter: _cadUnitsPerMeter,
+          axisLockMode: effectiveLockMode,
+          anchorCenter: _elementMoveOriginalCenter ?? _selectedShearWall?.center,
+          previousSnappedCenter: _lastSnappedCad,
         );
         if (mag != null) {
           effectiveCad = mag.snappedCenter;
           _activeMagneticGuides = mag.guideLines;
           _liveDimensionText = mag.liveDimensionText;
           _activeDynamicDimensionLine = mag.dimensionLine;
+          _lastSnappedCad = effectiveCad;
         } else {
           effectiveCad = rawCad;
           _activeMagneticGuides = null;
           _liveDimensionText = null;
           _activeDynamicDimensionLine = null;
+          _lastSnappedCad = null;
         }
         _snappedScreenPositions = [];
       } else if (_activeTool == StructuralDrawTool.beam) {
@@ -4847,16 +5070,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           HapticFeedback.mediumImpact();
         }
       }
+      final bool keepMoveActiveOnTouch = _elementMoveOriginalCenter != null && event.kind != PointerDeviceKind.mouse;
       setState(() {
-        _isMovingColumn = false;
+        _isMovingColumn = keepMoveActiveOnTouch;
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
         _snappedScreenPositions = [];
         _activeSnap = null;
-        _activeMagneticGuides = null;
-        _liveDimensionText = null;
-        _activeDynamicDimensionLine = null;
+        if (!keepMoveActiveOnTouch) {
+          _activeMagneticGuides = null;
+          _liveDimensionText = null;
+          _activeDynamicDimensionLine = null;
+          _elementMoveOriginalCenter = null;
+          _lastSnappedCad = null;
+        }
       });
       return;
     }
@@ -4883,16 +5111,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           HapticFeedback.mediumImpact();
         }
       }
+      final bool keepMoveActiveOnTouch = _elementMoveOriginalCenter != null && event.kind != PointerDeviceKind.mouse;
       setState(() {
-        _isMovingShearWall = false;
+        _isMovingShearWall = keepMoveActiveOnTouch;
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
         _snappedScreenPositions = [];
         _activeSnap = null;
-        _activeMagneticGuides = null;
-        _liveDimensionText = null;
-        _activeDynamicDimensionLine = null;
+        if (!keepMoveActiveOnTouch) {
+          _activeMagneticGuides = null;
+          _liveDimensionText = null;
+          _activeDynamicDimensionLine = null;
+          _elementMoveOriginalCenter = null;
+          _lastSnappedCad = null;
+        }
       });
       return;
     }
@@ -7545,16 +7778,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                 ),
 
-              // 5. Bottom Dock Bar (Switches to Slab Correction Bar when editing slab, or Contextual Element Dock when element is selected)
+              // 5. Bottom Dock Bar (Switches to Slab Correction Bar when editing slab, Floating Move Bar when moving, or Contextual Element Dock when element is selected)
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
                 child: _isEditingSlab
                     ? _buildSlabCorrectionBottomBar(context)
-                    : (_hasSelectedElement && !_isMovingColumn && !_isMovingShearWall && !_isMovingOpening && !_isPlacingWithHold)
-                        ? _buildContextualElementBottomDock(context)
-                        : ElementPaletteBar(
+                    : (_isMovingColumn || _isMovingShearWall)
+                        ? _buildFloatingMoveBottomBar(context)
+                        : (_hasSelectedElement && !_isMovingColumn && !_isMovingShearWall && !_isMovingOpening && !_isPlacingWithHold)
+                            ? _buildContextualElementBottomDock(context)
+                            : ElementPaletteBar(
+                        axisLockMode: _axisLockMode,
+                        onUpdateAxisLockMode: (mode) => setState(() => _axisLockMode = mode),
                         activeTool: _activeTool,
                         onSelectTool: (tool) {
                           setState(() {
@@ -7751,6 +7988,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           onTap: () => _showFinePositionSheet(context, isColumn: true),
         ),
         _buildDockActionButton(
+          icon: Icons.space_bar_rounded,
+          label: context.l10n.setClearDistanceAction,
+          color: const Color(0xFF64B5F6),
+          onTap: () => _showFinePositionSheet(context, isColumn: true),
+        ),
+        _buildDockActionButton(
           icon: Icons.straighten_rounded,
           label: context.l10n.offsetAction,
           color: const Color(0xFF00E5FF),
@@ -7802,6 +8045,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           icon: Icons.tune_rounded,
           label: context.l10n.finePositionTitle,
           color: const Color(0xFF00E5FF),
+          onTap: () => _showFinePositionSheet(context, isColumn: false),
+        ),
+        _buildDockActionButton(
+          icon: Icons.space_bar_rounded,
+          label: context.l10n.setClearDistanceAction,
+          color: const Color(0xFF64B5F6),
           onTap: () => _showFinePositionSheet(context, isColumn: false),
         ),
         _buildDockActionButton(
@@ -8373,4 +8622,177 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ),
     );
   }
+
+  Widget _buildFloatingMoveBottomBar(BuildContext context) {
+    final String elementName = _selectedColumn != null
+        ? _selectedColumn!.displayName
+        : (_selectedShearWall != null
+            ? (_selectedShearWall!.displayName.isNotEmpty
+                ? _selectedShearWall!.displayName
+                : context.l10n.shearWallTitle)
+            : context.l10n.moveElement);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFA1E1E24),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(
+          top: BorderSide(color: Color(0xFF69F0AE), width: 1.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 14,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Row 1: Header with move indicator and Axis Lock chips
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF69F0AE),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${context.l10n.precisionMoveActive}: $elementName',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _buildFloatingAxisLockChips(context),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Row 2: Actions - [✖ Cancel] [⚙ Fine position / Clear distance] [✔ Confirm]
+            Row(
+              children: [
+                // Cancel Button
+                OutlinedButton.icon(
+                  onPressed: _cancelCurrentMove,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFF5252),
+                    side: const BorderSide(color: Color(0xFFFF5252), width: 1.2),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  label: Text(
+                    context.l10n.cancelMove,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Fine Position & Clear Distance Button
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showFinePositionSheet(context, isColumn: _isMovingColumn),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF00E5FF),
+                      side: const BorderSide(color: Color(0xFF00E5FF), width: 1.2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.tune_rounded, size: 16),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        context.l10n.finePositionTitle,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Confirm Button
+                ElevatedButton.icon(
+                  onPressed: _confirmCurrentMove,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00C853),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 2,
+                  ),
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: Text(
+                    context.l10n.confirmMove,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingAxisLockChips(BuildContext context) {
+    final modes = [
+      (StructuralAxisLockMode.autoMode, context.l10n.axisLockAuto),
+      (StructuralAxisLockMode.lockX, context.l10n.axisLockX),
+      (StructuralAxisLockMode.lockY, context.l10n.axisLockY),
+    ];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: modes.map((m) {
+        final isSelected = _axisLockMode == m.$1;
+        return Padding(
+          padding: const EdgeInsets.only(left: 3),
+          child: InkWell(
+            onTap: () {
+              setState(() => _axisLockMode = m.$1);
+              HapticFeedback.selectionClick();
+            },
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF00E5FF).withValues(alpha: 0.25) : Colors.white10,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF00E5FF) : Colors.white24,
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                m.$2,
+                style: TextStyle(
+                  color: isSelected ? const Color(0xFF00E5FF) : Colors.white70,
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
 }
+
