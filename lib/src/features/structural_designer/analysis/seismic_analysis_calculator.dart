@@ -99,7 +99,7 @@ class SeismicAnalysisCalculator {
             }
             if (!hasSupportBelow) {
               floatingIds.add(col.id);
-              floatingNames.add('C${cIdx + 1}');
+              floatingNames.add(col.displayName);
               totalFloatingColsCount++;
             }
           }
@@ -408,7 +408,7 @@ class SeismicAnalysisCalculator {
 
           if (!hasSupportBelow) {
             floatingIds.add(col.id);
-            floatingNames.add('C${cIdx + 1}');
+            floatingNames.add(col.displayName);
             totalFloatingColsCount++;
           }
         }

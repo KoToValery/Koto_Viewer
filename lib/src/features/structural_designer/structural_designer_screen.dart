@@ -30,6 +30,9 @@ import 'widgets/element_palette_bar.dart';
 import 'widgets/seismic_analysis_sheet.dart';
 import 'widgets/storey_manager_sheet.dart';
 import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
+import '../dxf_viewer/widgets/dxf_entity_context_sheet.dart';
+import 'analysis/structural_column_synchronizer.dart';
+import 'widgets/underlay_filter_config_sheet.dart';
 import 'models/structural_bim_context.dart';
 import 'widgets/structural_3d_viewport.dart';
 import 'widgets/vertical_capacity_sheet.dart';
@@ -200,6 +203,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   // Layer filter for structural underlay (isolate thick walls & grid axes)
   bool _underlayFilterActive = false;
+  int _underlayRevision = 0;
+  bool _isFilteringUnderlay = false;
+  Set<String>? _customUnderlayFilterLayers;
   final Map<String, bool> _originalLayerVisibility = {};
 
   // Analysis result
@@ -4235,6 +4241,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_isExtrudingEdge || _activeGrip != null) return;
     if (_isMultiTouchGesture || _activePointersCount > 1) return;
 
+    // -1. If Layers tab is active: holding on an element triggers layer context sheet (hide/isolate)
+    if (_activeTool == StructuralDrawTool.layers) {
+      _handleLayerContextAtPoint(details.localPosition);
+      return;
+    }
+
     // 0. If in slab correction mode: long press on vertex deletes it!
     if (_isEditingSlab) {
       final hitVIdx = _hitTestSlabVertex(details.localPosition, _editingSlab!);
@@ -4642,6 +4654,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handleTapUp(TapUpDetails details) {
     if (_activePointerKind == PointerDeviceKind.mouse) return;
+    if (_activeTool == StructuralDrawTool.layers) {
+      _handleLayerContextAtPoint(details.localPosition);
+      return;
+    }
     if (_isEditingSlab) {
       final hitVIdx = _hitTestSlabVertex(details.localPosition, _editingSlab!);
       setState(() {
@@ -4877,10 +4893,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     if (_activeTool == StructuralDrawTool.column) {
       _pushUndo();
-      final nextColName = _generateNextColumnName(active.columns);
-      final newCol = StructuralColumn(
+      final candidateCol = StructuralColumn(
         id: 'col_${DateTime.now().millisecondsSinceEpoch}',
-        name: nextColName,
         center: cadCoord,
         shape: _currentColumnPreset.shape,
         width: _currentColumnPreset.width * scale,
@@ -4889,6 +4903,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         thickness: _currentColumnPreset.thickness * scale,
         isMirrored: _currentColumnPreset.isMirrored,
       );
+
+      final matchingName = StructuralColumnSynchronizer.findMatchingColumnName(
+        _project,
+        cadCoord,
+        candidateCol,
+        cadUnitsPerMeter: scale,
+      );
+      final nextColName = matchingName ??
+          StructuralColumnSynchronizer.generateNextProjectColumnName(_project);
+      final newCol = candidateCol.copyWith(name: nextColName);
+
       final updatedColumns = List<StructuralColumn>.from(active.columns)
         ..add(newCol);
       final updatedStorey = active.copyWith(columns: updatedColumns);
@@ -5162,11 +5187,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _applyUnderlayFilter(bool activate) {
     _underlayFilterActive = activate;
     if (activate) {
-      final visibleLayerNames = StructuralUnderlayFilter.filterLayers(
-        layers: _document.layers.values,
-        entities: _document.entities,
-        blocks: _document.blocks,
-      );
+      final Set<String> visibleLayerNames = _customUnderlayFilterLayers ??
+          StructuralUnderlayFilter.filterLayers(
+            layers: _document.layers.values,
+            entities: _document.entities,
+            blocks: _document.blocks,
+          );
+      _customUnderlayFilterLayers ??= Set<String>.from(visibleLayerNames);
 
       // Verify how many entities in Model space will actually be visible
       final modelEntities = _document.layoutEntities['Model'] ?? _document.entities;
@@ -5191,6 +5218,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         for (final entry in _originalLayerVisibility.entries) {
           _document.layers[entry.key]?.isVisible = entry.value;
         }
+        _underlayRevision++;
         return;
       }
 
@@ -5203,9 +5231,140 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
     }
 
+    _underlayRevision++;
+
     if (widget.bimContext != null) {
       final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
       widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+    }
+  }
+
+  void _showUnderlayFilterConfig() {
+    final activeSet = _customUnderlayFilterLayers ??
+        StructuralUnderlayFilter.filterLayers(
+          layers: _document.layers.values,
+          entities: _document.entities,
+          blocks: _document.blocks,
+        );
+    _customUnderlayFilterLayers ??= Set<String>.from(activeSet);
+
+    UnderlayFilterConfigSheet.show(
+      context: context,
+      document: _document,
+      activeFilterLayers: _customUnderlayFilterLayers!,
+      isDark: _canvasTheme.isDark,
+      onFilterLayersChanged: (newLayers) {
+        setState(() {
+          _customUnderlayFilterLayers = Set<String>.from(newLayers);
+          if (_underlayFilterActive) {
+            for (final layer in _document.layers.values) {
+              layer.isVisible = _customUnderlayFilterLayers!.contains(layer.name);
+            }
+            _underlayRevision++;
+          }
+        });
+        if (widget.bimContext != null) {
+          final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
+          widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+        }
+      },
+      onResetToAuto: () {
+        setState(() {
+          _customUnderlayFilterLayers = null;
+          if (_underlayFilterActive) {
+            _applyUnderlayFilter(true);
+          }
+        });
+      },
+    );
+  }
+
+  void _handleLayerContextAtPoint(Offset localPos) {
+    final scenePoint = _transformController.toScene(localPos);
+    final cadPoint = _sceneToCad(scenePoint);
+
+    final fitScale = _getCadFitScale();
+    final currentScale = _transformController.value.getMaxScaleOnAxis();
+    final toleranceCad = 26.0 / (fitScale * currentScale.clamp(0.0001, 10000.0));
+
+    final entity = DxfSnapHelper.hitTestEntity(
+      document: _document,
+      cadPoint: cadPoint,
+      toleranceCad: toleranceCad,
+    );
+
+    if (entity != null) {
+      HapticFeedback.heavyImpact();
+      final layerName = entity.layer.trim().isEmpty ? '0' : entity.layer;
+      final layer = _document.layers[layerName];
+
+      DxfEntityContextSheet.show(
+        context: context,
+        entity: entity,
+        document: _document,
+        isDark: _canvasTheme.isDark,
+        onHideLayer: () {
+          if (layer != null) {
+            setState(() {
+              layer.isVisible = false;
+              _underlayRevision++;
+              if (_customUnderlayFilterLayers != null) {
+                _customUnderlayFilterLayers!.remove(layerName);
+              }
+            });
+            if (widget.bimContext != null) {
+              final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
+              widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(context.l10n.layerHiddenNotice(layerName)),
+                action: SnackBarAction(
+                  label: context.l10n.undoAction,
+                  onPressed: () {
+                    setState(() {
+                      layer.isVisible = true;
+                      _underlayRevision++;
+                      if (_customUnderlayFilterLayers != null) {
+                        _customUnderlayFilterLayers!.add(layerName);
+                      }
+                    });
+                    if (widget.bimContext != null) {
+                      final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
+                      widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+                    }
+                  },
+                ),
+              ),
+            );
+          }
+        },
+        onIsolateLayer: () {
+          setState(() {
+            for (final l in _document.layers.values) {
+              l.isVisible = (l.name == layerName);
+            }
+            _underlayRevision++;
+          });
+          if (widget.bimContext != null) {
+            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
+            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+          }
+        },
+        onShowAllLayers: () {
+          setState(() {
+            for (final l in _document.layers.values) {
+              l.isVisible = true;
+            }
+            _underlayRevision++;
+          });
+          if (widget.bimContext != null) {
+            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
+            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+          }
+        },
+        onOpenLayerManager: _showLayersSheet,
+      );
     }
   }
 
@@ -5222,7 +5381,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
             widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
           }
-          setState(() {});
+          setState(() {
+            _underlayRevision++;
+          });
         },
       ),
     );
@@ -5555,9 +5716,31 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _toggleUnderlayFilter() {
     setState(() {
-      _applyUnderlayFilter(!_underlayFilterActive);
+      _isFilteringUnderlay = true;
     });
     HapticFeedback.selectionClick();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _applyUnderlayFilter(!_underlayFilterActive);
+        _isFilteringUnderlay = false;
+      });
+    });
+  }
+
+  void _syncColumnNumbersAcrossStoreys() {
+    final (syncedProject, count) = StructuralColumnSynchronizer.synchronize(
+      _project,
+      cadUnitsPerMeter: _cadUnitsPerMeter,
+    );
+    setState(() {
+      _project = syncedProject;
+    });
+    _saveProject();
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.l10n.syncColumnsSuccess(count))),
+    );
   }
 
   // --- Storey Management Actions ---
@@ -5632,16 +5815,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             newElevation: newElev,
           );
           final updated = List<StoreyLevel>.from(_project.storeys)..add(duplicated);
-          setState(() {
-            _project = _project.copyWith(
+          final (syncedProject, _) = StructuralColumnSynchronizer.synchronize(
+            _project.copyWith(
               storeys: updated,
               activeStoreyIndex: updated.length - 1,
-            );
+            ),
+            cadUnitsPerMeter: _cadUnitsPerMeter,
+          );
+          setState(() {
+            _project = syncedProject;
             _runAnalysis();
           });
           _saveProject();
           HapticFeedback.heavyImpact();
         },
+        onSyncColumns: _syncColumnNumbersAcrossStoreys,
         onDeleteStorey: (idx) {
           if (_project.storeys.length <= 1) return;
           _pushUndo();
@@ -5714,22 +5902,28 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       onPressed: _showLayersSheet,
     );
 
-    final filterButton = IconButton(
-      icon: Icon(
-        _underlayFilterActive
-            ? Icons.filter_alt_rounded
-            : Icons.filter_alt_outlined,
-        color: _underlayFilterActive
-            ? const Color(0xFF00E5FF)
-            : Colors.white70,
-        size: 20,
-      ),
-      tooltip: _underlayFilterActive
+    final filterButton = Tooltip(
+      message: _underlayFilterActive
           ? context.l10n.structuralFilterActive
           : context.l10n.structuralFilterInactive,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-      onPressed: _toggleUnderlayFilter,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: _toggleUnderlayFilter,
+        onLongPress: _showUnderlayFilterConfig,
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          alignment: Alignment.center,
+          child: Icon(
+            _underlayFilterActive
+                ? Icons.filter_alt_rounded
+                : Icons.filter_alt_outlined,
+            color: _underlayFilterActive
+                ? const Color(0xFF00E5FF)
+                : Colors.white70,
+            size: 20,
+          ),
+        ),
+      ),
     );
 
     final snapButton = IconButton(
@@ -5789,6 +5983,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           case 'filter':
             _toggleUnderlayFilter();
             break;
+          case 'filter_config':
+            _showUnderlayFilterConfig();
+            break;
+          case 'sync_columns':
+            _syncColumnNumbersAcrossStoreys();
+            break;
           case 'display_settings':
             _showDisplaySettingsSheet();
             break;
@@ -5844,6 +6044,29 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+              ],
+            ),
+          ),
+        PopupMenuItem(
+          value: 'filter_config',
+          child: Row(
+            children: [
+              const Icon(Icons.tune_rounded, size: 20, color: Color(0xFF00E5FF)),
+              const SizedBox(width: 12),
+              Text(context.l10n.manageUnderlayFilter,
+                  style: const TextStyle(color: Colors.white, fontSize: 13)),
+            ],
+          ),
+        ),
+        if (_project.storeys.length > 1)
+          PopupMenuItem(
+            value: 'sync_columns',
+            child: Row(
+              children: [
+                const Icon(Icons.sync_alt_rounded, size: 20, color: Color(0xFF00E5FF)),
+                const SizedBox(width: 12),
+                Text(context.l10n.syncColumnsAcrossStoreys,
+                    style: const TextStyle(color: Colors.white, fontSize: 13)),
               ],
             ),
           ),
@@ -6113,6 +6336,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                     currentScale: _renderScale,
                                     visibleCadRect: _getVisibleCadRect(),
                                     settings: _displaySettings,
+                                    revision: _underlayRevision,
                                     entityFilter: _underlayFilterActive
                                         ? (entity) {
                                             // 1. Suppress all hatches (fill patterns) in structural underlay
@@ -6215,6 +6439,35 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                 ),
                               ),
                             ),
+                            if (_isFilteringUnderlay)
+                              Positioned(
+                                top: 16,
+                                right: 16,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xE61E1E24),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: const Color(0xFF00E5FF)),
+                                    boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10)],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        context.l10n.filteringUnderlay,
+                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -6525,6 +6778,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         onCustomBeamDimensions: _showCustomBeamDialog,
                         onCustomSlabThickness: _showCustomSlabDialog,
                         onCustomAxisName: _showCustomAxisDialog,
+                        onOpenLayerManager: _showLayersSheet,
+                        onOpenUnderlayFilterConfig: _showUnderlayFilterConfig,
+                        onShowAllLayers: () {
+                          setState(() {
+                            for (final l in _document.layers.values) {
+                              l.isVisible = true;
+                            }
+                            _underlayRevision++;
+                          });
+                          if (widget.bimContext != null) {
+                            final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
+                            widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+                          }
+                        },
+                        onIsolateWhiteLayers: () {
+                          _applyUnderlayFilter(true);
+                        },
                       ),
               ),
             ],

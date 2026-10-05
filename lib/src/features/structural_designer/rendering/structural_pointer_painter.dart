@@ -13,7 +13,8 @@ enum StructuralDrawTool {
   beam(Icons.horizontal_rule_rounded),
   slab(Icons.crop_square_rounded),
   slabOpening(Icons.tab_unselected_rounded),
-  measure(Icons.straighten_rounded);
+  measure(Icons.straighten_rounded),
+  layers(Icons.layers_rounded);
 
   final IconData icon;
   const StructuralDrawTool(this.icon);
@@ -36,6 +37,8 @@ enum StructuralDrawTool {
         return l10n.toolOpening;
       case StructuralDrawTool.measure:
         return l10n.toolMeasure;
+      case StructuralDrawTool.layers:
+        return l10n.layersTabTitle;
     }
   }
 }

@@ -897,7 +897,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get snapDisabledTooltip => 'Прилепване (Snap): Изключено';
 
   @override
-  String get undoAction => 'Отмени последно действие';
+  String get undoAction => 'Отмени';
 
   @override
   String traceReferenceLayer(String storey) {
@@ -1123,16 +1123,67 @@ class AppLocalizationsBg extends AppLocalizations {
   String get gpuAccelerationInactive => 'Хардуерно GPU ускорение (Изключено)';
 
   @override
-  String get structuralFilterActive =>
-      'Филтър подложка: Само стени и оси (Вкл.)';
+  String get structuralFilterActive => 'Филтър подложка (Вкл.)';
 
   @override
-  String get structuralFilterInactive =>
-      'Филтър подложка: Всички слоеве (Изкл.)';
+  String get structuralFilterInactive => 'Филтър подложка (Изкл.)';
 
   @override
   String get structuralFilterNoWallsFound =>
       'Няма разпознати специфични слоеве за стени; показани са всички слоеве';
+
+  @override
+  String get floatingColumnBadge => 'НАСАДЕНА';
+
+  @override
+  String alignedOffsetFlush(String offset) {
+    return '$offset m (Прилепено)';
+  }
+
+  @override
+  String get layersTabTitle => 'Слоеве';
+
+  @override
+  String get layersTabHint =>
+      'Задръжте елемент от чертежа, за да скриете или изолирате слоя му';
+
+  @override
+  String get underlayFilterTitle => 'Филтър подложка';
+
+  @override
+  String get underlayFilterSubtitle =>
+      'Изберете кои CAD слоеве да се показват при активен филтър';
+
+  @override
+  String get underlayFilterAutoReset => 'Автоматично (Стени и оси)';
+
+  @override
+  String get underlayFilterSelectAll => 'Всички слоеве';
+
+  @override
+  String get underlayFilterClearAll => 'Изчисти';
+
+  @override
+  String get syncColumnsAcrossStoreys => 'Синхронизирай колоните по нива';
+
+  @override
+  String syncColumnsSuccess(int count) {
+    return '$count колони са синхронизирани по нива';
+  }
+
+  @override
+  String layerHiddenNotice(String layer) {
+    return 'Слоят \"$layer\" е скрит';
+  }
+
+  @override
+  String get filteringUnderlay => 'Прилагане на филтър за подложка...';
+
+  @override
+  String get searchLayers => 'Търсене на слой...';
+
+  @override
+  String get manageUnderlayFilter => 'Настройка на филтъра';
 
   @override
   String get previewSlabCorner1Tag => 'Плоча: посочете 1-ви ъгъл';
@@ -1383,9 +1434,6 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get floatingColumnsTitle => 'Насадени колони';
-
-  @override
-  String get floatingColumnBadge => 'НАСАДЕНА';
 
   @override
   String get discontinuousWallsTitle => 'Прекъснати шайби';

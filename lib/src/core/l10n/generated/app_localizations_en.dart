@@ -892,7 +892,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get snapDisabledTooltip => 'Snap: Disabled';
 
   @override
-  String get undoAction => 'Undo last action';
+  String get undoAction => 'Undo';
 
   @override
   String traceReferenceLayer(String storey) {
@@ -1118,14 +1118,67 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gpuAccelerationInactive => 'Hardware GPU Acceleration (Off)';
 
   @override
-  String get structuralFilterActive => 'Underlay Filter: Walls & Axes only';
+  String get structuralFilterActive => 'Underlay Filter (On)';
 
   @override
-  String get structuralFilterInactive => 'Underlay Filter: All Layers (Off)';
+  String get structuralFilterInactive => 'Underlay Filter (Off)';
 
   @override
   String get structuralFilterNoWallsFound =>
       'No specific wall or axis layers identified; showing full drawing';
+
+  @override
+  String get floatingColumnBadge => 'FLOATING';
+
+  @override
+  String alignedOffsetFlush(String offset) {
+    return '$offset m (Flush)';
+  }
+
+  @override
+  String get layersTabTitle => 'Layers';
+
+  @override
+  String get layersTabHint =>
+      'Hold any drawing element to hide or isolate its layer';
+
+  @override
+  String get underlayFilterTitle => 'Underlay Filter';
+
+  @override
+  String get underlayFilterSubtitle =>
+      'Customize which CAD layers are visible in underlay filter mode';
+
+  @override
+  String get underlayFilterAutoReset => 'Auto (Walls & Axes)';
+
+  @override
+  String get underlayFilterSelectAll => 'Select All';
+
+  @override
+  String get underlayFilterClearAll => 'Clear All';
+
+  @override
+  String get syncColumnsAcrossStoreys => 'Sync Column Numbers Across Storeys';
+
+  @override
+  String syncColumnsSuccess(int count) {
+    return '$count columns synchronized across storeys';
+  }
+
+  @override
+  String layerHiddenNotice(String layer) {
+    return 'Layer \"$layer\" is now hidden';
+  }
+
+  @override
+  String get filteringUnderlay => 'Applying underlay filter...';
+
+  @override
+  String get searchLayers => 'Search layers...';
+
+  @override
+  String get manageUnderlayFilter => 'Configure Filter';
 
   @override
   String get previewSlabCorner1Tag => 'Slab: pick 1st corner';
@@ -1376,9 +1429,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get floatingColumnsTitle => 'Transfer / Floating Columns';
-
-  @override
-  String get floatingColumnBadge => 'FLOATING';
 
   @override
   String get discontinuousWallsTitle => 'Discontinuous Shear Walls';

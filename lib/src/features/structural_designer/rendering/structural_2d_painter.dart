@@ -877,7 +877,7 @@ class Structural2dPainter extends CustomPainter {
     final distText = isAligned
         ? (l10n != null
             ? l10n!.slabParallelAligned(d.abs().toStringAsFixed(2))
-            : '${d.abs().toStringAsFixed(2)} m (Прилепено)')
+            : '${d.abs().toStringAsFixed(2)} m')
         : '${d.abs().toStringAsFixed(2)} m';
 
     final textSpan = TextSpan(
@@ -1454,9 +1454,10 @@ class Structural2dPainter extends CustomPainter {
       canvas.translate(centerScene.dx, badgeAnchorY);
       canvas.scale(1.0 / zoomScale);
 
-      const textSpan = TextSpan(
-        text: 'НАСАДЕНА',
-        style: TextStyle(
+      final badgeLabel = l10n?.floatingColumnBadge ?? 'FLOATING';
+      final textSpan = TextSpan(
+        text: badgeLabel,
+        style: const TextStyle(
           color: Colors.white,
           fontSize: 9.0,
           fontWeight: FontWeight.bold,

@@ -54,6 +54,10 @@ class ElementPaletteBar extends StatelessWidget {
   final VoidCallback? onCustomBeamDimensions;
   final VoidCallback? onCustomSlabThickness;
   final VoidCallback? onCustomAxisName;
+  final VoidCallback? onOpenLayerManager;
+  final VoidCallback? onOpenUnderlayFilterConfig;
+  final VoidCallback? onShowAllLayers;
+  final VoidCallback? onIsolateWhiteLayers;
 
   const ElementPaletteBar({
     super.key,
@@ -102,6 +106,10 @@ class ElementPaletteBar extends StatelessWidget {
     this.onCustomBeamDimensions,
     this.onCustomSlabThickness,
     this.onCustomAxisName,
+    this.onOpenLayerManager,
+    this.onOpenUnderlayFilterConfig,
+    this.onShowAllLayers,
+    this.onIsolateWhiteLayers,
   });
 
   @override
@@ -140,7 +148,9 @@ class ElementPaletteBar extends StatelessWidget {
             else if (activeTool == StructuralDrawTool.slabOpening)
               _buildOpeningOptionsBar(context)
             else if (activeTool == StructuralDrawTool.measure)
-              _buildMeasureOptionsBar(context),
+              _buildMeasureOptionsBar(context)
+            else if (activeTool == StructuralDrawTool.layers)
+              _buildLayersOptionsBar(context),
 
             const SizedBox(height: 6),
 
@@ -185,6 +195,11 @@ class ElementPaletteBar extends StatelessWidget {
                     tool: StructuralDrawTool.measure,
                     icon: Icons.straighten_rounded,
                     label: context.l10n.toolMeasure,
+                  ),
+                  _buildToolButton(
+                    tool: StructuralDrawTool.layers,
+                    icon: Icons.layers_rounded,
+                    label: context.l10n.layersTabTitle,
                   ),
                   // Vertical divider between modeling elements and engineering checks
                   Container(
@@ -610,6 +625,78 @@ class ElementPaletteBar extends StatelessWidget {
               label: Text(context.l10n.clearMeasurement, style: const TextStyle(fontSize: 11)),
               onPressed: onClearMeasurement,
               visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLayersOptionsBar(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          // Hint badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            margin: const EdgeInsets.only(right: 6),
+            decoration: BoxDecoration(
+              color: const Color(0x2200E5FF),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0x4400E5FF)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.touch_app_rounded, color: Color(0xFF00E5FF), size: 15),
+                const SizedBox(width: 6),
+                Text(
+                  context.l10n.layersTabHint,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          if (onOpenLayerManager != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: ActionChip(
+                avatar: const Icon(Icons.tune_rounded, size: 14, color: Color(0xFF00E5FF)),
+                label: Text(context.l10n.layers, style: const TextStyle(fontSize: 11)),
+                onPressed: onOpenLayerManager,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          if (onOpenUnderlayFilterConfig != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: ActionChip(
+                avatar: const Icon(Icons.filter_alt_rounded, size: 14, color: Color(0xFF00E5FF)),
+                label: Text(context.l10n.underlayFilterTitle, style: const TextStyle(fontSize: 11)),
+                onPressed: onOpenUnderlayFilterConfig,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          if (onShowAllLayers != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: ActionChip(
+                avatar: const Icon(Icons.visibility_rounded, size: 14, color: Colors.white70),
+                label: Text(context.l10n.showAllLayers, style: const TextStyle(fontSize: 11)),
+                onPressed: onShowAllLayers,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          if (onIsolateWhiteLayers != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: ActionChip(
+                avatar: const Icon(Icons.filter_list_rounded, size: 14, color: Colors.white70),
+                label: Text(context.l10n.isolateStructuralLayers, style: const TextStyle(fontSize: 11)),
+                onPressed: onIsolateWhiteLayers,
+                visualDensity: VisualDensity.compact,
+              ),
             ),
         ],
       ),

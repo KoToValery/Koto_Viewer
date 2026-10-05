@@ -1652,10 +1652,10 @@ abstract class AppLocalizations {
   /// **'Snap: Disabled'**
   String get snapDisabledTooltip;
 
-  /// Tooltip for undo button
+  /// General undo action label for snackbars
   ///
   /// In en, this message translates to:
-  /// **'Undo last action'**
+  /// **'Undo'**
   String get undoAction;
 
   /// Trace reference storey indicator pill
@@ -2050,13 +2050,13 @@ abstract class AppLocalizations {
   /// Tooltip when structural underlay filter is active
   ///
   /// In en, this message translates to:
-  /// **'Underlay Filter: Walls & Axes only'**
+  /// **'Underlay Filter (On)'**
   String get structuralFilterActive;
 
   /// Tooltip when structural underlay filter is off
   ///
   /// In en, this message translates to:
-  /// **'Underlay Filter: All Layers (Off)'**
+  /// **'Underlay Filter (Off)'**
   String get structuralFilterInactive;
 
   /// Snackbar notice when drawing has no isolated wall layers
@@ -2064,6 +2064,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No specific wall or axis layers identified; showing full drawing'**
   String get structuralFilterNoWallsFound;
+
+  /// Badge label for floating columns
+  ///
+  /// In en, this message translates to:
+  /// **'FLOATING'**
+  String get floatingColumnBadge;
+
+  /// Magnetic offset label when snapped flush to edge
+  ///
+  /// In en, this message translates to:
+  /// **'{offset} m (Flush)'**
+  String alignedOffsetFlush(String offset);
+
+  /// Title for Layers tab in structural bottom palette
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get layersTabTitle;
+
+  /// Instruction hint when Layers tab is active in structural designer
+  ///
+  /// In en, this message translates to:
+  /// **'Hold any drawing element to hide or isolate its layer'**
+  String get layersTabHint;
+
+  /// Title for Underlay Filter configuration sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay Filter'**
+  String get underlayFilterTitle;
+
+  /// Subtitle for Underlay Filter configuration sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Customize which CAD layers are visible in underlay filter mode'**
+  String get underlayFilterSubtitle;
+
+  /// Button to reset underlay filter to automatically detected walls and axes
+  ///
+  /// In en, this message translates to:
+  /// **'Auto (Walls & Axes)'**
+  String get underlayFilterAutoReset;
+
+  /// Button to select all layers in underlay filter
+  ///
+  /// In en, this message translates to:
+  /// **'Select All'**
+  String get underlayFilterSelectAll;
+
+  /// Button to clear all layers in underlay filter
+  ///
+  /// In en, this message translates to:
+  /// **'Clear All'**
+  String get underlayFilterClearAll;
+
+  /// Action button to synchronize column designations across building levels
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Column Numbers Across Storeys'**
+  String get syncColumnsAcrossStoreys;
+
+  /// Notice when column numbering synchronization completes
+  ///
+  /// In en, this message translates to:
+  /// **'{count} columns synchronized across storeys'**
+  String syncColumnsSuccess(int count);
+
+  /// Notice when a CAD layer is hidden via long-press
+  ///
+  /// In en, this message translates to:
+  /// **'Layer \"{layer}\" is now hidden'**
+  String layerHiddenNotice(String layer);
+
+  /// Progress message while underlay filter is calculating and rendering
+  ///
+  /// In en, this message translates to:
+  /// **'Applying underlay filter...'**
+  String get filteringUnderlay;
+
+  /// Search input placeholder for layer filtering
+  ///
+  /// In en, this message translates to:
+  /// **'Search layers...'**
+  String get searchLayers;
+
+  /// Button to open underlay filter configuration
+  ///
+  /// In en, this message translates to:
+  /// **'Configure Filter'**
+  String get manageUnderlayFilter;
 
   /// Pointer badge for rectangular slab 1st corner
   ///
@@ -2514,12 +2604,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Transfer / Floating Columns'**
   String get floatingColumnsTitle;
-
-  /// Badge label for floating columns
-  ///
-  /// In en, this message translates to:
-  /// **'FLOATING'**
-  String get floatingColumnBadge;
 
   /// Title for discontinuous walls
   ///

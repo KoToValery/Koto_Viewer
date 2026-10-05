@@ -959,12 +959,59 @@
   "@gpuAccelerationActive": { "description": "Hardware GPU Acceleration active state" },
   "gpuAccelerationInactive": "Hardware GPU Acceleration (Off)",
   "@gpuAccelerationInactive": { "description": "Hardware GPU Acceleration inactive state" },
-  "structuralFilterActive": "Underlay Filter: Walls & Axes only",
+  "structuralFilterActive": "Underlay Filter (On)",
   "@structuralFilterActive": { "description": "Tooltip when structural underlay filter is active" },
-  "structuralFilterInactive": "Underlay Filter: All Layers (Off)",
+  "structuralFilterInactive": "Underlay Filter (Off)",
   "@structuralFilterInactive": { "description": "Tooltip when structural underlay filter is off" },
   "structuralFilterNoWallsFound": "No specific wall or axis layers identified; showing full drawing",
   "@structuralFilterNoWallsFound": { "description": "Snackbar notice when drawing has no isolated wall layers" },
+  "floatingColumnBadge": "FLOATING",
+  "@floatingColumnBadge": { "description": "Alert badge text for floating or transfer column" },
+  "alignedOffsetFlush": "{offset} m (Flush)",
+  "@alignedOffsetFlush": {
+    "description": "Magnetic offset label when snapped flush to edge",
+    "placeholders": {
+      "offset": { "type": "String" }
+    }
+  },
+  "layersTabTitle": "Layers",
+  "@layersTabTitle": { "description": "Title for Layers tab in structural bottom palette" },
+  "layersTabHint": "Hold any drawing element to hide or isolate its layer",
+  "@layersTabHint": { "description": "Instruction hint when Layers tab is active in structural designer" },
+  "underlayFilterTitle": "Underlay Filter",
+  "@underlayFilterTitle": { "description": "Title for Underlay Filter configuration sheet" },
+  "underlayFilterSubtitle": "Customize which CAD layers are visible in underlay filter mode",
+  "@underlayFilterSubtitle": { "description": "Subtitle for Underlay Filter configuration sheet" },
+  "underlayFilterAutoReset": "Auto (Walls & Axes)",
+  "@underlayFilterAutoReset": { "description": "Button to reset underlay filter to automatically detected walls and axes" },
+  "underlayFilterSelectAll": "Select All",
+  "@underlayFilterSelectAll": { "description": "Button to select all layers in underlay filter" },
+  "underlayFilterClearAll": "Clear All",
+  "@underlayFilterClearAll": { "description": "Button to clear all layers in underlay filter" },
+  "syncColumnsAcrossStoreys": "Sync Column Numbers Across Storeys",
+  "@syncColumnsAcrossStoreys": { "description": "Action button to synchronize column designations across building levels" },
+  "syncColumnsSuccess": "{count} columns synchronized across storeys",
+  "@syncColumnsSuccess": {
+    "description": "Notice when column numbering synchronization completes",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "layerHiddenNotice": "Layer \"{layer}\" is now hidden",
+  "@layerHiddenNotice": {
+    "description": "Notice when a CAD layer is hidden via long-press",
+    "placeholders": {
+      "layer": { "type": "String" }
+    }
+  },
+  "undoAction": "Undo",
+  "@undoAction": { "description": "General undo action label for snackbars" },
+  "filteringUnderlay": "Applying underlay filter...",
+  "@filteringUnderlay": { "description": "Progress message while underlay filter is calculating and rendering" },
+  "searchLayers": "Search layers...",
+  "@searchLayers": { "description": "Search input placeholder for layer filtering" },
+  "manageUnderlayFilter": "Configure Filter",
+  "@manageUnderlayFilter": { "description": "Button to open underlay filter configuration" },
   "previewSlabCorner1Tag": "Slab: pick 1st corner",
   "@previewSlabCorner1Tag": { "description": "Pointer badge for rectangular slab 1st corner" },
   "previewSlabCorner2Tag": "Slab: pick opposite corner",

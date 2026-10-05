@@ -144,6 +144,7 @@ class DxfPainter extends CustomPainter {
   final DxfDisplaySettings settings;
   final Rect? visibleCadRect;
   final bool Function(DxfEntity entity)? entityFilter;
+  final int revision;
 
   DxfPainter({
     required this.document,
@@ -158,6 +159,7 @@ class DxfPainter extends CustomPainter {
     this.settings = const DxfDisplaySettings(),
     this.visibleCadRect,
     this.entityFilter,
+    this.revision = 0,
   });
 
   @override
@@ -3722,6 +3724,8 @@ class DxfPainter extends CustomPainter {
     }
 
     if (oldDelegate.document != document ||
+        oldDelegate.revision != revision ||
+        oldDelegate.entityFilter != entityFilter ||
         oldDelegate.theme != theme ||
         oldDelegate.activeLayout != activeLayout ||
         oldDelegate.measurement != measurement ||

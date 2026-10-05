@@ -13,6 +13,7 @@ class StoreyManagerSheet extends StatelessWidget {
   final VoidCallback? onDuplicateCurrentStorey;
   final void Function(int index) onDeleteStorey;
   final VoidCallback? onManageStoreys;
+  final VoidCallback? onSyncColumns;
 
   const StoreyManagerSheet({
     super.key,
@@ -24,6 +25,7 @@ class StoreyManagerSheet extends StatelessWidget {
     this.onDuplicateCurrentStorey,
     required this.onDeleteStorey,
     this.onManageStoreys,
+    this.onSyncColumns,
   });
 
   @override
@@ -278,6 +280,24 @@ class StoreyManagerSheet extends StatelessWidget {
                   ),
                 ],
               ),
+            if (onSyncColumns != null && project.storeys.length > 1) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  onSyncColumns!();
+                },
+                icon: const Icon(Icons.sync_alt_rounded, size: 18, color: Color(0xFF00E5FF)),
+                label: Text(
+                  context.l10n.syncColumnsAcrossStoreys,
+                  style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0x6600E5FF)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ],
           ],
         ),
       ),

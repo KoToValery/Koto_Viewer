@@ -1139,12 +1139,16 @@ void main() {
     // Verify rotate 90 button exists and can be tapped
     final rotateButton = find.byIcon(Icons.rotate_90_degrees_ccw);
     expect(rotateButton, findsOneWidget);
+    await tester.ensureVisible(rotateButton);
+    await tester.pumpAndSettle();
     await tester.tap(rotateButton);
     expect(rotatedCalled, isTrue);
 
     // Verify custom opening preset exists
     final customButton = find.textContaining('Свободен');
     expect(customButton, findsOneWidget);
+    await tester.ensureVisible(customButton);
+    await tester.pumpAndSettle();
     await tester.tap(customButton);
     await tester.pumpAndSettle();
     expect(selectedPreset, equals('custom'));
