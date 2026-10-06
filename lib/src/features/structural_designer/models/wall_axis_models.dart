@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
+import '../analysis/structural_column_detector.dart';
 
 /// Representation of an extracted 2D segment from CAD geometry.
 class WallSegment {
@@ -100,6 +101,7 @@ class WallAxisDetectionResult {
   final List<(Offset, Offset)> wallContourSegments;
   final List<(Offset, Offset)> closureSegments;
   final List<WallPairCandidate> selectedWallPairs;
+  final List<DetectedStructuralColumn> detectedColumns;
 
   const WallAxisDetectionResult({
     required this.evaluatedGroups,
@@ -113,6 +115,7 @@ class WallAxisDetectionResult {
     required this.wallContourSegments,
     this.closureSegments = const [],
     this.selectedWallPairs = const [],
+    this.detectedColumns = const [],
   });
 
   bool get hasWallsFound => bestGroup != null && bestGroup!.pairCount > 0;
@@ -128,5 +131,6 @@ class WallAxisDetectionResult {
     snappedCenterlines: [],
     wallContourSegments: [],
     closureSegments: [],
+    detectedColumns: [],
   );
 }

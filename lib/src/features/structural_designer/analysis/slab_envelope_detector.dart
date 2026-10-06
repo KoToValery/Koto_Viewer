@@ -7,6 +7,7 @@ import 'slab_wall_regions.dart';
 import 'slab_boundary_refiner.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import 'slab_opening_evidence.dart';
+import 'structural_column_detector.dart';
 
 /// Conservative preview only: enclosed free space is not proof of a slab.
 /// Coordinates remain in source CAD units, before project alignment.
@@ -76,6 +77,11 @@ class SlabEnvelopeDetector {
           : SlabOpeningEvidence.collect(document),
     );
     if (partition.tooComplex) return empty('analysisComplexityLimit');
+    final columns = walls.detectedColumns.isNotEmpty
+        ? walls.detectedColumns
+        : (document != null
+            ? StructuralColumnDetector.detect(document, wallPairs: pairs, scale: scale)
+            : const <DetectedStructuralColumn>[]);
     final contours = <List<Offset>>[];
     final gaps = <SlabGapHypothesis>[];
     final reports = <Map<String, dynamic>>[];
@@ -88,7 +94,21 @@ class SlabEnvelopeDetector {
         break;
       }
       final region = partition.regions[i];
-      final baseline = _raster(region, scale);
+      var rMinX = double.infinity, rMaxX = -double.infinity;
+      var rMinY = double.infinity, rMaxY = -double.infinity;
+      for (final w in region) {
+        rMinX = math.min(rMinX, math.min(w.centerlineStart.dx, w.centerlineEnd.dx));
+        rMaxX = math.max(rMaxX, math.max(w.centerlineStart.dx, w.centerlineEnd.dx));
+        rMinY = math.min(rMinY, math.min(w.centerlineStart.dy, w.centerlineEnd.dy));
+        rMaxY = math.max(rMaxY, math.max(w.centerlineStart.dy, w.centerlineEnd.dy));
+      }
+      final regionBounds = Rect.fromLTRB(rMinX, rMinY, rMaxX, rMaxY).inflate(100.0 * scale);
+      final regionColumns = columns
+          .where((c) => regionBounds.overlaps(c.bounds))
+          .map((c) => c.polygon)
+          .toList();
+
+      final baseline = _raster(region, scale, regionColumns);
       final hypotheses = partition.gaps[i];
       final augmented = [...region];
       for (final gap in hypotheses) {
@@ -106,7 +126,7 @@ class SlabEnvelopeDetector {
       }
       final proposed = hypotheses.isEmpty
           ? baseline
-          : _raster(augmented, scale);
+          : _raster(augmented, scale, regionColumns);
       final chosen = proposed.contours.isNotEmpty ? proposed : baseline;
       contours.addAll(chosen.contours);
       gaps.addAll(hypotheses);
@@ -241,17 +261,23 @@ class SlabEnvelopeDetector {
 
   static SlabEnvelopeResult _raster(
     List<WallPairCandidate> pairs,
-    double scale,
-  ) {
+    double scale, [
+    List<List<Offset>> extraPolygons = const [],
+  ]) {
     SlabEnvelopeResult empty(String reason) =>
         SlabEnvelopeResult(const [], [reason], 0, 0);
-    final footprints = [for (final p in pairs) _footprint(p, pairs, scale)];
+    final footprints = [
+      for (final p in pairs) _footprint(p, pairs, scale),
+      for (final poly in extraPolygons) poly,
+    ];
     var left = double.infinity, top = double.infinity;
     var right = double.negativeInfinity, bottom = double.negativeInfinity;
     var minThickness = double.infinity;
     for (var i = 0; i < pairs.length; i++) {
       minThickness = math.min(minThickness, pairs[i].perpendicularDistance);
-      for (final v in footprints[i]) {
+    }
+    for (final poly in footprints) {
+      for (final v in poly) {
         left = math.min(left, v.dx);
         right = math.max(right, v.dx);
         top = math.min(top, v.dy);

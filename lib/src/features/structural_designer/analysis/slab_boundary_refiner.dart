@@ -37,8 +37,8 @@ class SlabBoundaryRefiner {
           b = edges[j],
           u = (a.$2 - a.$1) / (a.$2 - a.$1).distance,
           v = (b.$2 - b.$1) / (b.$2 - b.$1).distance;
-      return _cross(u, v).abs() < 1e-7 &&
-          _cross(b.$1 - a.$1, u).abs() < 0.01 * scale;
+      return _cross(u, v).abs() < 1e-4 &&
+          _cross(b.$1 - a.$1, u).abs() < 0.1 * scale;
     }
 
     final runs = <(int, int)>[];
@@ -66,9 +66,18 @@ class SlabBoundaryRefiner {
         runs.add((selected, i));
       }
     }
-    if (runs.length > 1 && same(runs.first.$1, runs.last.$1)) {
-      runs[0] = (runs.first.$1, runs.last.$2);
-      runs.removeLast();
+    // Merge any adjacent collinear runs (including wrap-around)
+    var changed = true;
+    while (changed && runs.length > 2) {
+      changed = false;
+      for (var i = 0; i < runs.length; i++) {
+        final nextIdx = (i + 1) % runs.length;
+        if (same(runs[i].$1, runs[nextIdx].$1)) {
+          runs.removeAt(nextIdx);
+          changed = true;
+          break;
+        }
+      }
     }
     if (runs.length < 3 || runs.length > 2000) return null;
     final result = <Offset>[];

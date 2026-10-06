@@ -75,18 +75,21 @@ class SlabOpeningEvidence {
     final candidates = <(double, double, double, String)>[];
     for (final (a, b, layer) in strokes) {
       final v = b - a;
-      if (v.distance < length * .55 || cross(v).abs() > scale * 5) continue;
+      if (v.distance < length * .25 || cross(v).abs() > scale * 5) continue;
       final lo = math.min(dot(a - start), dot(b - start));
       final hi = math.max(dot(a - start), dot(b - start));
       final offset = cross((a + b) / 2 - start);
       if (lo < -50 * scale ||
           hi > length + 50 * scale ||
-          offset.abs() > thickness / 2 + 20 * scale) {
+          offset.abs() > thickness / 2 + 35 * scale) {
         continue;
       }
       candidates.add((lo, hi, offset, layer));
       if (candidates.length > 200) return false;
     }
+    if (candidates.length < 2) return false;
+
+    // Check 1: Pair of parallel frame / glazing strokes
     for (var i = 0; i < candidates.length; i++) {
       for (var j = i + 1; j < candidates.length; j++) {
         final a = candidates[i], b = candidates[j];
@@ -94,11 +97,39 @@ class SlabOpeningEvidence {
         if (a.$4 == b.$4 &&
             separation >= 5 * scale &&
             separation <= 100 * scale &&
-            math.min(a.$2, b.$2) - math.max(a.$1, b.$1) >= .55 * length) {
+            math.min(a.$2, b.$2) - math.max(a.$1, b.$1) >= .40 * length) {
           return true;
         }
       }
     }
+
+    // Check 2: Multi-sash window coverage on the same layer
+    final strokesByLayer = <String, List<(double, double)>>{};
+    for (final c in candidates) {
+      strokesByLayer.putIfAbsent(c.$4, () => []).add((c.$1, c.$2));
+    }
+    for (final spans in strokesByLayer.values) {
+      if (spans.length < 2) continue;
+      spans.sort((a, b) => a.$1.compareTo(b.$1));
+      double totalCovered = 0.0;
+      double curStart = spans.first.$1;
+      double curEnd = spans.first.$2;
+      for (int k = 1; k < spans.length; k++) {
+        final next = spans[k];
+        if (next.$1 <= curEnd + 15 * scale) {
+          curEnd = math.max(curEnd, next.$2);
+        } else {
+          totalCovered += math.max(0.0, curEnd - curStart);
+          curStart = next.$1;
+          curEnd = next.$2;
+        }
+      }
+      totalCovered += math.max(0.0, curEnd - curStart);
+      if (totalCovered >= 0.50 * length) {
+        return true;
+      }
+    }
+
     return false;
   }
 }

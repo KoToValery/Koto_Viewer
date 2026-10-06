@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/structural_element.dart';
 import '../models/wall_axis_models.dart';
+import 'structural_column_detector.dart';
 
 /// Intelligent Wall & Centerline Axis Detector for CAD / BIM drawings.
 ///
@@ -204,8 +205,34 @@ class WallAxisDetector {
       // Include other high-scoring wall layers (e.g. interior + exterior walls, 12cm partition walls)
       // Geometry-driven without rigid keyword gating: any wall candidate group with >= 25% score is included
       const double scoreThreshold = 0.25;
-      if (g.score >= bestGroup.score * scoreThreshold && g.pairCount >= 2) {
+      if (g.score >= bestGroup.score * scoreThreshold &&
+          g.pairCount >= 2 &&
+          !_isClutterOrBorderLayer(g.layerName.toLowerCase())) {
         activeGroups.add(g);
+      }
+    }
+
+    final allPairs = <WallPairCandidate>[];
+    for (final group in activeGroups) {
+      allPairs.addAll(group.wallPairs);
+    }
+
+    // Detect structural columns and shear walls using verified wall pairs
+    final detectedColumns = StructuralColumnDetector.detect(
+      document,
+      wallPairs: allPairs,
+      scale: scale,
+    );
+
+    // If any secondary group contains confirmed shear walls or column keywords, include its wall pairs
+    for (int i = 1; i < evaluatedGroups.length; i++) {
+      final g = evaluatedGroups[i];
+      if (activeGroups.contains(g)) continue;
+      final isShearOrCol = StructuralColumnDetector.matchesColumnKeyword(g.layerName) ||
+          detectedColumns.any((c) => c.sourceLayer == g.layerName && c.isShearWall);
+      if (isShearOrCol && g.pairCount >= 1 && !_isClutterOrBorderLayer(g.layerName.toLowerCase())) {
+        activeGroups.add(g);
+        allPairs.addAll(g.wallPairs);
       }
     }
 
@@ -213,11 +240,6 @@ class WallAxisDetector {
     final rawCenterlines = <(Offset, Offset)>[];
     final wallContourSegments = <(Offset, Offset)>[];
     final closureSegments = <(Offset, Offset)>[];
-
-    final allPairs = <WallPairCandidate>[];
-    for (final group in activeGroups) {
-      allPairs.addAll(group.wallPairs);
-    }
 
     for (final group in activeGroups) {
       for (final pair in group.wallPairs) {
@@ -228,6 +250,14 @@ class WallAxisDetector {
           wallContourSegments,
           closureSegments,
         );
+      }
+    }
+
+    // Add perimeter faces of all detected columns and shear walls to wall contour & closure
+    for (final col in detectedColumns) {
+      for (final seg in col.boundarySegments) {
+        _addSegmentUnique(wallContourSegments, seg.$1, seg.$2);
+        _addSegmentUnique(closureSegments, seg.$1, seg.$2);
       }
     }
 
@@ -256,6 +286,7 @@ class WallAxisDetector {
       selectedWallPairs: allPairs,
       wallContourSegments: wallContourSegments,
       closureSegments: closureSegments,
+      detectedColumns: detectedColumns,
     );
   }
 
@@ -634,7 +665,7 @@ class WallAxisDetector {
       'антетка', 'antetka', 'рамка', 'ramka', 'border', 'title',
       'sheet', 'лист', 'format', 'формат', 'stamp', 'печат',
       'defpoints', 'dim', 'размер', 'hatch', 'штрих',
-      'furn', 'мебел', 'text', 'текст',
+      'furn', 'мебел', 'обзавеждане', 'text', 'текст',
     ];
     for (final kw in clutter) {
       if (lowerName.contains(kw)) return true;

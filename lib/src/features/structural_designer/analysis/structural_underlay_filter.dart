@@ -114,7 +114,7 @@ class StructuralUnderlayFilter {
       'fill', 'запълване', 'плътно',
       'pattern',
       'insul', 'изолац', 'изолация',
-      'furn', 'мебел',
+      'furn', 'мебел', 'обзавеждане',
       'dim', 'размер',
       'text', 'текст',
       'annot',
@@ -140,9 +140,11 @@ class StructuralUnderlayFilter {
     const structuralKeywords = [
       // English
       'slab', 'slabs',
-      'col', 'column', 'columns',
+      'col', 'cols', 'column', 'columns',
       'beam', 'beams',
       'pillar', 'pillars',
+      'shear', 'shearwall', 'shear_wall',
+      'rc_col', 'rc_wall',
       'foundation',
       'structure', 'structural',
       'construction',
@@ -150,8 +152,9 @@ class StructuralUnderlayFilter {
       // Bulgarian (Cyrillic)
       'плоча', 'плочи', 'плоч',
       'колона', 'колони',
+      'шайба', 'шайби',
       'греда', 'греди',
-      'стб',
+      'стб', 'сб', 'к-', 'ш-', 'к_', 'ш_',
       'структура',
       'фундамент',
       'констр', 'конструкция',
@@ -159,6 +162,8 @@ class StructuralUnderlayFilter {
       // Bulgarian (Latinized / Transliterated)
       'plocha', 'ploca', 'plochi', 'ploci',
       'kolona', 'koloni',
+      'shaiba', 'shayba',
+      'stb',
       'greda', 'gredi',
       'konstr',
     ];
