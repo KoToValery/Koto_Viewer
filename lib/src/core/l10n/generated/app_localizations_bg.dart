@@ -2696,4 +2696,40 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get seismicOpeningNotEvaluated =>
       'Липсва опора или валидна геометрия на отвора; близостта не е оценена.';
+
+  @override
+  String seismicConnectionReview(String names) {
+    return 'Непроверена връзка с плочата: $names. Частичният контакт или невалидната/твърде сложна геометрия изискват преглед; коравината и ексцентрицитетът не са оценени.';
+  }
+
+  @override
+  String get seismicInvalidSlabGeometry =>
+      'Неоценено: невалиден контур на плоча или отвор. Проверете самопресичанията, отворите извън плочата и допиращите се/припокрити отвори.';
+
+  @override
+  String get seismicOverlappingSlabs =>
+      'Неоценено: плочите се припокриват. Уточнете геометрията и товарите, за да не се брои масата два пъти.';
+
+  @override
+  String seismicSeparateRegions(int count) {
+    return 'Открити са $count несвързани области на плочите. Общ център на коравина и ексцентрицитет не са оценени; необходими са отделни диафрагми или модел на връзките.';
+  }
+
+  @override
+  String get seismicSlabGeometryLimit =>
+      'Неоценено: геометрията на плочите надвишава възможностите на предварителната проверка. Нужен е отделен геометричен преглед.';
+
+  @override
+  String seismicRegionTitle(int index, int columns, int walls) {
+    return 'Област $index · колони: $columns, шайби: $walls';
+  }
+
+  @override
+  String seismicRegionSharedSupport(String names) {
+    return 'Неоценено: обща опора или неясна принадлежност: $names. Необходим е модел на взаимодействието.';
+  }
+
+  @override
+  String get seismicRegionScope =>
+      'Отделни предварителни модели със собствените тегла на плочите и зададените площни товари. Взаимодействието, гредите между областите и вертикалната непрекъснатост не са оценени.';
 }

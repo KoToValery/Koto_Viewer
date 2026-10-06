@@ -4665,6 +4665,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No support or valid opening geometry is available; proximity is not evaluated.'**
   String get seismicOpeningNotEvaluated;
+
+  /// No description provided for @seismicConnectionReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Unverified slab connection: {names}. Partial contact or invalid/overly complex geometry requires review; stiffness and eccentricity are not evaluated.'**
+  String seismicConnectionReview(String names);
+
+  /// No description provided for @seismicInvalidSlabGeometry.
+  ///
+  /// In en, this message translates to:
+  /// **'Not evaluated: invalid slab or opening contour. Check self-intersections, openings outside the slab and touching/overlapping openings.'**
+  String get seismicInvalidSlabGeometry;
+
+  /// No description provided for @seismicOverlappingSlabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Not evaluated: slabs overlap. Resolve geometry and loads to avoid counting mass twice.'**
+  String get seismicOverlappingSlabs;
+
+  /// No description provided for @seismicSeparateRegions.
+  ///
+  /// In en, this message translates to:
+  /// **'Detected {count} disconnected slab regions. A shared centre of rigidity and eccentricity are not evaluated; separate diaphragms or a connection model are required.'**
+  String seismicSeparateRegions(int count);
+
+  /// No description provided for @seismicSlabGeometryLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Not evaluated: slab geometry exceeds the preliminary check\'s capacity. A separate geometry review is required.'**
+  String get seismicSlabGeometryLimit;
+
+  /// No description provided for @seismicRegionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Region {index} · columns: {columns}, walls: {walls}'**
+  String seismicRegionTitle(int index, int columns, int walls);
+
+  /// No description provided for @seismicRegionSharedSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Not evaluated: shared or uncertain support assignment: {names}. A coupling model is required.'**
+  String seismicRegionSharedSupport(String names);
+
+  /// No description provided for @seismicRegionScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Isolated preliminary region models with existing slab weights and project surface loads. Coupling, beams between regions and vertical continuity are not evaluated.'**
+  String get seismicRegionScope;
 }
 
 class _AppLocalizationsDelegate

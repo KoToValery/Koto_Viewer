@@ -208,7 +208,7 @@ void main() {
     final slab = StructuralSlab(
       id: 's',
       polygon: box(0, 0, 10, 10),
-      openings: [box(6, 2, 4, 6)],
+      openings: [box(5, 2, 4, 6)],
     );
     final report = SeismicAnalysisCalculator.analyzeProject(
       StructuralProject(
@@ -218,9 +218,9 @@ void main() {
       ),
     );
     final check = report.storeyChecks.single;
-    // Rectangle minus hole: A=76, first moment X=500-24*8=308.
-    final cx = 308 / 76;
-    final rawJ = 100 * 200 / 3 - 24 * ((16 + 36) / 12 + 64 + 25);
+    // Interior off-centre hole: A=76, first moment X=500-24*7=332.
+    final cx = 332 / 76;
+    final rawJ = 100 * 200 / 3 - 24 * ((16 + 36) / 12 + 49 + 25);
     final radius = math.sqrt(rawJ / 76 - cx * cx - 25);
     expect(check.centerOfMassCad!.dx, closeTo(cx, 1e-10));
     expect(check.massRadiusOfGyration, closeTo(radius, 1e-10));

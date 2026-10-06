@@ -276,6 +276,34 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
 
 
 
+  Widget _buildRegion(BuildContext context, DiaphragmRegionCheck region, int index) {
+    final check = region.check;
+    final eccentricity = check?.eccentricityM;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(context.l10n.seismicRegionTitle(index + 1, region.columnIds.length, region.wallIds.length),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+        const SizedBox(height: 6),
+        if (region.ambiguousSupportNames.isNotEmpty)
+          Text(context.l10n.seismicRegionSharedSupport(region.ambiguousSupportNames.join(', ')),
+            style: const TextStyle(color: Colors.amber, fontSize: 11))
+        else if (check != null) ...[
+          Wrap(spacing: 20, runSpacing: 6, children: [
+            _buildSubmetric('A', '${check.floorAreaM2.toStringAsFixed(2)} m²'),
+            _buildSubmetric(context.l10n.seismicEccentricityXLabel,
+              eccentricity == null ? '—' : '${eccentricity.dx.toStringAsFixed(3)} m'),
+            _buildSubmetric(context.l10n.seismicEccentricityYLabel,
+              eccentricity == null ? '—' : '${eccentricity.dy.toStringAsFixed(3)} m'),
+          ]),
+          const SizedBox(height: 6),
+          Text(check.localizedRecommendation(context.l10n),
+            style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        ],
+      ]),
+    );
+  }
+
   Widget _buildTorsionalTab(BuildContext context, SeismicAnalysisReport report) {
     if (report.storeyChecks.isEmpty) {
       return Center(
@@ -369,6 +397,13 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                     ],
                   ),
                 ),
+                if (check.diaphragmRegions.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(context.l10n.seismicRegionScope,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  for (var i = 0; i < check.diaphragmRegions.length; i++)
+                    _buildRegion(context, check.diaphragmRegions[i], i),
+                ],
               ],
             ),
           );

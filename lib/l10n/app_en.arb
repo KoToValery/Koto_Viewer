@@ -2235,5 +2235,17 @@
   "seismicRigidityUnavailable": "Lateral layout cannot be evaluated: no usable connected supports, an unsupported section, or an ill-conditioned model. CR and eccentricity are unavailable.",
   "seismicNotEvaluated": "Not evaluated",
   "seismicModelAssumptions": "Preliminary layout only: rigid diaphragm, common material/restraint factors and simplified weights. Cracking, core coupling, accidental torsion and 3D response are not verified.",
-  "seismicOpeningNotEvaluated": "No support or valid opening geometry is available; proximity is not evaluated."
+  "seismicOpeningNotEvaluated": "No support or valid opening geometry is available; proximity is not evaluated.",
+  "seismicConnectionReview": "Unverified slab connection: {names}. Partial contact or invalid/overly complex geometry requires review; stiffness and eccentricity are not evaluated.",
+  "@seismicConnectionReview": { "placeholders": { "names": { "type": "String" } } },
+  "seismicInvalidSlabGeometry": "Not evaluated: invalid slab or opening contour. Check self-intersections, openings outside the slab and touching/overlapping openings.",
+  "seismicOverlappingSlabs": "Not evaluated: slabs overlap. Resolve geometry and loads to avoid counting mass twice.",
+  "seismicSeparateRegions": "Detected {count} disconnected slab regions. A shared centre of rigidity and eccentricity are not evaluated; separate diaphragms or a connection model are required.",
+  "@seismicSeparateRegions": { "placeholders": { "count": { "type": "int" } } },
+  "seismicSlabGeometryLimit": "Not evaluated: slab geometry exceeds the preliminary check's capacity. A separate geometry review is required.",
+  "seismicRegionTitle": "Region {index} · columns: {columns}, walls: {walls}",
+  "@seismicRegionTitle": { "placeholders": { "index": {"type":"int"}, "columns": {"type":"int"}, "walls": {"type":"int"} } },
+  "seismicRegionSharedSupport": "Not evaluated: shared or uncertain support assignment: {names}. A coupling model is required.",
+  "@seismicRegionSharedSupport": { "placeholders": { "names": {"type":"String"} } },
+  "seismicRegionScope": "Isolated preliminary region models with existing slab weights and project surface loads. Coupling, beams between regions and vertical continuity are not evaluated."
 }

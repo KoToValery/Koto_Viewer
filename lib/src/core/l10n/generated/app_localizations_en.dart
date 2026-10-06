@@ -2686,4 +2686,40 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get seismicOpeningNotEvaluated =>
       'No support or valid opening geometry is available; proximity is not evaluated.';
+
+  @override
+  String seismicConnectionReview(String names) {
+    return 'Unverified slab connection: $names. Partial contact or invalid/overly complex geometry requires review; stiffness and eccentricity are not evaluated.';
+  }
+
+  @override
+  String get seismicInvalidSlabGeometry =>
+      'Not evaluated: invalid slab or opening contour. Check self-intersections, openings outside the slab and touching/overlapping openings.';
+
+  @override
+  String get seismicOverlappingSlabs =>
+      'Not evaluated: slabs overlap. Resolve geometry and loads to avoid counting mass twice.';
+
+  @override
+  String seismicSeparateRegions(int count) {
+    return 'Detected $count disconnected slab regions. A shared centre of rigidity and eccentricity are not evaluated; separate diaphragms or a connection model are required.';
+  }
+
+  @override
+  String get seismicSlabGeometryLimit =>
+      'Not evaluated: slab geometry exceeds the preliminary check\'s capacity. A separate geometry review is required.';
+
+  @override
+  String seismicRegionTitle(int index, int columns, int walls) {
+    return 'Region $index · columns: $columns, walls: $walls';
+  }
+
+  @override
+  String seismicRegionSharedSupport(String names) {
+    return 'Not evaluated: shared or uncertain support assignment: $names. A coupling model is required.';
+  }
+
+  @override
+  String get seismicRegionScope =>
+      'Isolated preliminary region models with existing slab weights and project surface loads. Coupling, beams between regions and vertical continuity are not evaluated.';
 }

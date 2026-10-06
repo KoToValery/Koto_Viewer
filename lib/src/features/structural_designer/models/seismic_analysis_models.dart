@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import 'slab_topology.dart';
 
 /// Eurocode 8 (EC8 EN 1998-1) Seismic Regularity & Risk Classification.
 enum SeismicRiskLevel {
   /// Regular structural layout, low torsional eccentricity, adequate shear walls.
-  regular('Без сигнал от предварителния модел', Color(0xFF00E676), Color(0x3300E676)),
+  regular(
+    'Без сигнал от предварителния модел',
+    Color(0xFF00E676),
+    Color(0x3300E676),
+  ),
 
   /// Moderate eccentricity or mild shear wall deficit.
   warning('Повишен сеизмичен риск', Color(0xFFFFB300), Color(0x33FFB300)),
 
   /// Severe irregularity: floating/transfer columns, high torsional sensitivity (>15%), or soft storey.
-  critical('Критична сеизмична уязвимост', Color(0xFFD500F9), Color(0x33D500F9));
+  critical(
+    'Критична сеизмична уязвимост',
+    Color(0xFFD500F9),
+    Color(0x33D500F9),
+  );
 
   final String label;
   final Color color;
@@ -36,16 +45,19 @@ class StoreySeismicCheck {
   final String storeyName;
   final int storeyIndex;
 
-  /// True if the storey has a reinforced concrete slab acting as a horizontal seismic diaphragm.
+  /// Slab geometry is present; this alone does not certify diaphragm behaviour.
   final bool hasSlabDiaphragm;
 
   /// False when the preliminary lateral model cannot be evaluated.
   final bool hasLateralStiffness;
+  final List<String> connectionReviewNames;
+  final SlabTopology slabTopology;
+  final List<DiaphragmRegionCheck> diaphragmRegions;
 
-  /// Center of Mass (CM) in CAD coordinates, or null if no slab diaphragm exists.
+  /// Center of Mass (CM), null when the single-diaphragm model is unavailable.
   final Offset? centerOfMassCad;
 
-  /// Center of Rigidity / Stiffness (CR) in CAD coordinates, or null if no diaphragm exists.
+  /// Center of Rigidity (CR), null when geometry or stiffness is unevaluated.
   final Offset? centerOfRigidityCad;
 
   /// Physical eccentricity vector (e_x, e_y) in meters, or null if no diaphragm exists.
@@ -138,6 +150,9 @@ class StoreySeismicCheck {
     required this.storeyIndex,
     this.hasSlabDiaphragm = true,
     this.hasLateralStiffness = true,
+    this.connectionReviewNames = const [],
+    this.slabTopology = const SlabTopology(SlabTopologyIssue.none, 1),
+    this.diaphragmRegions = const [],
     this.centerOfMassCad,
     this.centerOfRigidityCad,
     this.eccentricityM,
@@ -189,29 +204,52 @@ class StoreySeismicCheck {
   }
 
   String localizedRecommendation(AppLocalizations l10n) {
+    switch (slabTopology.issue) {
+      case SlabTopologyIssue.invalidGeometry:
+        return l10n.seismicInvalidSlabGeometry;
+      case SlabTopologyIssue.overlappingSlabs:
+        return l10n.seismicOverlappingSlabs;
+      case SlabTopologyIssue.separateRegions:
+        return l10n.seismicSeparateRegions(slabTopology.regionCount);
+      case SlabTopologyIssue.computationLimit:
+        return l10n.seismicSlabGeometryLimit;
+      case SlabTopologyIssue.none:
+        break;
+    }
     if (!hasSlabDiaphragm) {
       return l10n.seismicRecNoSlabDiaphragm;
     }
 
+    if (connectionReviewNames.isNotEmpty) {
+      return l10n.seismicConnectionReview(connectionReviewNames.join(', '));
+    }
     if (!hasLateralStiffness) return l10n.seismicRigidityUnavailable;
 
     final StringBuffer rec = StringBuffer();
     if (disconnectedWallNames.isNotEmpty) {
-      rec.write(l10n.seismicRecDisconnectedWalls(disconnectedWallNames.join(', ')));
+      rec.write(
+        l10n.seismicRecDisconnectedWalls(disconnectedWallNames.join(', ')),
+      );
       rec.write(' ');
     }
     if (disconnectedColumnNames.isNotEmpty) {
-      rec.write(l10n.seismicRecDisconnectedCols(disconnectedColumnNames.join(', ')));
+      rec.write(
+        l10n.seismicRecDisconnectedCols(disconnectedColumnNames.join(', ')),
+      );
       rec.write(' ');
     }
     if (floatingColumnNames.isNotEmpty) {
       rec.write(l10n.seismicRecFloatingCols(floatingColumnNames.join(', ')));
     }
-    if (isTorsionallySensitive && centerOfMassCad != null && centerOfRigidityCad != null) {
-      rec.write(l10n.seismicRecHighTorsion(
-        maxEccentricityM.toStringAsFixed(2),
-        (maxEccentricityRatio * 100).round(),
-      ));
+    if (isTorsionallySensitive &&
+        centerOfMassCad != null &&
+        centerOfRigidityCad != null) {
+      rec.write(
+        l10n.seismicRecHighTorsion(
+          maxEccentricityM.toStringAsFixed(2),
+          (maxEccentricityRatio * 100).round(),
+        ),
+      );
       if (centerOfRigidityCad!.dx < centerOfMassCad!.dx) {
         rec.write(l10n.seismicRecAddWallEast);
       } else if (centerOfRigidityCad!.dx > centerOfMassCad!.dx) {
@@ -223,18 +261,22 @@ class StoreySeismicCheck {
         rec.write(l10n.seismicRecAddWallSouth);
       }
     } else if (isTorsionallyStiff && hasSignificantEccentricity) {
-      rec.write(l10n.seismicRecTorsionStiffEccentric(
-        torsionalRadiusX.toStringAsFixed(2),
-        torsionalRadiusY.toStringAsFixed(2),
-        massRadiusOfGyration.toStringAsFixed(2),
-        maxEccentricityM.toStringAsFixed(2),
-      ));
+      rec.write(
+        l10n.seismicRecTorsionStiffEccentric(
+          torsionalRadiusX.toStringAsFixed(2),
+          torsionalRadiusY.toStringAsFixed(2),
+          massRadiusOfGyration.toStringAsFixed(2),
+          maxEccentricityM.toStringAsFixed(2),
+        ),
+      );
     } else if (!isWallCoverageSufficientX || !isWallCoverageSufficientY) {
       if (!isWallCoverageSufficientX && !isWallCoverageSufficientY) {
-        rec.write(l10n.seismicRecDeficitBoth(
-          wallRatioX.toStringAsFixed(1),
-          wallRatioY.toStringAsFixed(1),
-        ));
+        rec.write(
+          l10n.seismicRecDeficitBoth(
+            wallRatioX.toStringAsFixed(1),
+            wallRatioY.toStringAsFixed(1),
+          ),
+        );
       } else if (!isWallCoverageSufficientX) {
         rec.write(l10n.seismicRecDeficitX(wallRatioX.toStringAsFixed(1)));
       } else {
@@ -297,11 +339,7 @@ class BeamSizingCheck {
     } else if (!isWidthSufficient) {
       return l10n.seismicRecBeamWidthInsufficient(wCm, dCm);
     } else {
-      return l10n.seismicRecBeamSizingOk(
-        wCm,
-        dCm,
-        spanM.toStringAsFixed(2),
-      );
+      return l10n.seismicRecBeamSizingOk(wCm, dCm, spanM.toStringAsFixed(2));
     }
   }
 }
@@ -343,7 +381,19 @@ class OpeningProximityCheck {
   }
 }
 
-/// Comprehensive Eurocode 8 Seismic & Structural Regularity Report.
+/// Isolated preliminary region model. No cross-storey or coupling verification.
+class DiaphragmRegionCheck {
+  final List<int> slabIndices;
+  final List<String> columnIds;
+  final List<String> wallIds;
+  final List<String> ambiguousSupportNames;
+  final StoreySeismicCheck? check;
+  const DiaphragmRegionCheck({required this.slabIndices,
+    required this.columnIds, required this.wallIds,
+    required this.ambiguousSupportNames, this.check});
+}
+
+/// Preliminary seismic and structural layout report.
 class SeismicAnalysisReport {
   final List<StoreySeismicCheck> storeyChecks;
   final List<BeamSizingCheck> beamChecks;
@@ -394,8 +444,7 @@ class SeismicAnalysisReport {
   bool get hasDisconnectedElements =>
       totalDisconnectedWallsCount > 0 || totalDisconnectedColumnsCount > 0;
 
-  bool get hasAnySlabDiaphragm =>
-      storeyChecks.any((s) => s.hasSlabDiaphragm);
+  bool get hasAnySlabDiaphragm => storeyChecks.any((s) => s.hasSlabDiaphragm);
 
   bool isColumnFloating(String columnId) {
     for (final s in storeyChecks) {
