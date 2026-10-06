@@ -122,6 +122,8 @@ class BimUnderlayLoader {
             layer.isVisible = visibleLayerNames.contains(layer.name);
           }
         }
+      } else {
+        BimUnderlayMetadata.setFiltered(transformed, true);
       }
 
       final metadata = BimUnderlayMetadata.read(doc);

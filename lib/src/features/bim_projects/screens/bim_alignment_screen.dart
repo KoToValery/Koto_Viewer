@@ -37,7 +37,6 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
   bool _isLoading = true;
   String? _loadError;
   bool _showOnionSkin = false;
-  bool _underlayFilterActive = false;
 
   DxfCanvasTheme _canvasTheme = DxfCanvasTheme.darkCad;
   DxfDisplaySettings _displaySettings = const DxfDisplaySettings();
@@ -154,17 +153,17 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       for (final storey in _project.storeys) {
         if (!storey.hasUnderlay) continue;
         final doc = _loadedDocs[storey.storeyId]!;
-        for (final entry in storey.layerVisibility.entries) {
-          doc.layers[entry.key]?.isVisible = entry.value;
+        // Underlay filter must NOT be enabled or applied when placing control points.
+        // Keep all original layers visible and generated BIM layers hidden.
+        if (BimUnderlayMetadata.read(doc) != null) {
+          BimUnderlayMetadata.setFiltered(doc, false);
+        } else {
+          for (final l in doc.layers.values) {
+            l.isVisible = true;
+          }
         }
         _loadedDocs[storey.storeyId] = doc;
       }
-      final currentDoc = _loadedDocs[_currentStorey.storeyId];
-      _underlayFilterActive =
-          currentDoc != null &&
-          BimUnderlayMetadata.generatedLayers(
-            currentDoc,
-          ).any((name) => currentDoc.layers[name]?.isVisible == true);
     } catch (error) {
       _loadError = error.toString();
     }
@@ -475,7 +474,38 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     );
 
     if (confirmed == true && mounted) {
+      // The structural underlay filter is applied AFTER clicking Ready • Start BiM!
+      for (final storey in _project.storeys) {
+        final doc = _loadedDocs[storey.storeyId];
+        if (doc == null) continue;
+        if (BimUnderlayMetadata.read(doc) != null) {
+          BimUnderlayMetadata.setFiltered(doc, true);
+        } else {
+          final visible = StructuralUnderlayFilter.filterLayers(
+            layers: doc.layers.values,
+            entities: doc.entities,
+            blocks: doc.blocks,
+          );
+          if (visible.isNotEmpty) {
+            for (final l in doc.layers.values) {
+              l.isVisible = visible.contains(l.name);
+            }
+          }
+        }
+      }
+
+      final updatedStoreys = _project.storeys.map((storey) {
+        final doc = _loadedDocs[storey.storeyId];
+        if (doc == null) return storey;
+        return storey.copyWith(
+          layerVisibility: {
+            for (final l in doc.layers.values) l.name: l.isVisible,
+          },
+        );
+      }).toList();
+
       final updated = _project.copyWith(
+        storeys: updatedStoreys,
         alignmentConfirmed: true,
         updatedAt: DateTime.now(),
       );
@@ -490,48 +520,6 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
         );
       }
     }
-  }
-
-  void _toggleUnderlayFilter() {
-    setState(() {
-      _underlayFilterActive = !_underlayFilterActive;
-      for (final doc in _loadedDocs.values) {
-        if (BimUnderlayMetadata.read(doc) != null) {
-          BimUnderlayMetadata.setFiltered(doc, _underlayFilterActive);
-          continue;
-        }
-        if (_underlayFilterActive) {
-          final visible = StructuralUnderlayFilter.filterLayers(
-            layers: doc.layers.values,
-            entities: doc.entities,
-            blocks: doc.blocks,
-          );
-          if (visible.isNotEmpty) {
-            for (final l in doc.layers.values) {
-              l.isVisible = visible.contains(l.name);
-            }
-          }
-        } else {
-          for (final l in doc.layers.values) {
-            l.isVisible = true;
-          }
-        }
-      }
-    });
-    _project = _project.copyWith(
-      storeys: _project.storeys.map((storey) {
-        final doc = _loadedDocs[storey.storeyId];
-        return doc == null
-            ? storey
-            : storey.copyWith(
-                layerVisibility: {
-                  for (final l in doc.layers.values) l.name: l.isVisible,
-                },
-              );
-      }).toList(),
-    );
-    BimProjectLibraryService.instance.saveProjectManifest(_project);
-    HapticFeedback.selectionClick();
   }
 
   Future<void> _manageElevation({bool add = false, bool sort = false}) async {
@@ -667,18 +655,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                 ? null
                 : _pickAndAttachUnderlayForCurrentStorey,
           ),
-          IconButton(
-            icon: Icon(
-              _underlayFilterActive
-                  ? Icons.filter_alt_rounded
-                  : Icons.filter_alt_outlined,
-              color: _underlayFilterActive ? const Color(0xFF00E5FF) : null,
-            ),
-            tooltip: _underlayFilterActive
-                ? l10n.structuralFilterActive
-                : l10n.structuralFilterInactive,
-            onPressed: _toggleUnderlayFilter,
-          ),
+
           IconButton(
             icon: const Icon(Icons.layers_rounded),
             tooltip: l10n.layersTooltip,

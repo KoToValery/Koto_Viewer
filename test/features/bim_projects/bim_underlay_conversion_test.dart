@@ -535,4 +535,25 @@ void main() {
       expect(aligned.end, before.end - const Offset(400, 400));
     },
   );
+
+  test(
+    'Underlay filter is not applied during control point placement and is applied after Ready Start BiM',
+    () async {
+      final result = await BimUnderlayConversionService.convert(source);
+      addTearDown(result.dispose);
+      final baked = await KcadService.loadKcadFile(result.kcadFile);
+
+      // 1. When placing control points, the underlay filter is NOT enabled or applied:
+      // Original architectural layers are visible, generated BIM layers are hidden.
+      expect(baked.layers['walls']!.isVisible, isTrue);
+      expect(baked.layers['slab']!.isVisible, isTrue);
+      expect(baked.layers['BIM_Walls']!.isVisible, isFalse);
+
+      // 2. After pressing "Ready • Start BiM", the underlay filter IS applied:
+      BimUnderlayMetadata.setFiltered(baked, true);
+      expect(baked.layers['walls']!.isVisible, isFalse);
+      expect(baked.layers['slab']!.isVisible, isFalse);
+      expect(baked.layers['BIM_Walls']!.isVisible, isTrue);
+    },
+  );
 }

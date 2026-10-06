@@ -337,6 +337,6 @@ DxfDocument _analyse(DxfDocument doc) {
     'visibility': originalVisibility,
     'axes': axes.map((a) => a.toJson()).toList(),
   });
-  BimUnderlayMetadata.setFiltered(doc, true);
+  BimUnderlayMetadata.setFiltered(doc, false);
   return doc.toIsolateSafe();
 }
