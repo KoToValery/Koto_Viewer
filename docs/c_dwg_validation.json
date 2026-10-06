@@ -1,0 +1,359 @@
+{
+  "source": "C.dwg",
+  "scale": 0.1,
+  "envelope": {
+    "version": 3,
+    "status": "needsReview",
+    "coordinateSpace": "sourceCad",
+    "cellSize": 3.717105263157896,
+    "enclosedRegionCount": 9,
+    "diagnostics": [
+      "approximateRasterBoundary",
+      "courtyardsAndSlabOpeningsUnclassified",
+      "remainingGapsMayLeak",
+      "mayBePartialEnvelope",
+      "levelAndConcreteEdgeUnverified",
+      "unconfirmedOpeningHypotheses"
+    ],
+    "assumedGaps": [
+      {
+        "start": [
+          -340.7715625195186,
+          851.832807349748
+        ],
+        "end": [
+          -250.7715625195186,
+          851.832807349748
+        ],
+        "thickness": 25.0,
+        "walls": [
+          12,
+          13
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      }
+    ],
+    "regions": [
+      {
+        "index": 0,
+        "wallCount": 41,
+        "baselineContours": [
+          [
+            [
+              -1009.4557730458357,
+              -189.3842979134099
+            ],
+            [
+              417.9126480067962,
+              -189.3842979134099
+            ],
+            [
+              417.9126480067962,
+              -36.982982123936154
+            ],
+            [
+              1120.4455427436387,
+              -36.982982123936154
+            ],
+            [
+              1120.4455427436387,
+              1241.70122840238
+            ],
+            [
+              823.077121691007,
+              1241.70122840238
+            ],
+            [
+              823.077121691007,
+              1390.3854389286957
+            ],
+            [
+              -57.876825677414445,
+              1390.3854389286957
+            ],
+            [
+              -57.876825677414445,
+              1208.2472810339589
+            ],
+            [
+              -533.6662993616251,
+              1208.2472810339589
+            ],
+            [
+              -533.6662993616251,
+              1390.3854389286957
+            ],
+            [
+              -1414.6202467300463,
+              1390.3854389286957
+            ],
+            [
+              -1414.6202467300463,
+              1241.70122840238
+            ],
+            [
+              -1711.988667782678,
+              1241.70122840238
+            ],
+            [
+              -1711.988667782678,
+              -36.982982123936154
+            ],
+            [
+              -1009.4557730458357,
+              -36.982982123936154
+            ]
+          ]
+        ],
+        "contourCount": 1,
+        "cellSize": 3.717105263157896,
+        "diagnostics": [
+          "approximateRasterBoundary",
+          "courtyardsAndSlabOpeningsUnclassified",
+          "remainingGapsMayLeak",
+          "mayBePartialEnvelope",
+          "levelAndConcreteEdgeUnverified"
+        ],
+        "hypothesisDiagnostics": [
+          "approximateRasterBoundary",
+          "courtyardsAndSlabOpeningsUnclassified",
+          "remainingGapsMayLeak",
+          "mayBePartialEnvelope",
+          "levelAndConcreteEdgeUnverified"
+        ],
+        "assumedGaps": [
+          {
+            "start": [
+              -340.7715625195186,
+              851.832807349748
+            ],
+            "end": [
+              -250.7715625195186,
+              851.832807349748
+            ],
+            "thickness": 25.0,
+            "walls": [
+              12,
+              13
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          }
+        ],
+        "usesAssumedGaps": true
+      }
+    ],
+    "skippedRegions": 0,
+    "contours": [
+      [
+        [
+          -1009.4557730458357,
+          -189.3842979134099
+        ],
+        [
+          417.9126480067962,
+          -189.3842979134099
+        ],
+        [
+          417.9126480067962,
+          -36.982982123936154
+        ],
+        [
+          1120.4455427436387,
+          -36.982982123936154
+        ],
+        [
+          1120.4455427436387,
+          1241.70122840238
+        ],
+        [
+          823.077121691007,
+          1241.70122840238
+        ],
+        [
+          823.077121691007,
+          1390.3854389286957
+        ],
+        [
+          -57.876825677414445,
+          1390.3854389286957
+        ],
+        [
+          -57.876825677414445,
+          1208.2472810339589
+        ],
+        [
+          -533.6662993616251,
+          1208.2472810339589
+        ],
+        [
+          -533.6662993616251,
+          1390.3854389286957
+        ],
+        [
+          -1414.6202467300463,
+          1390.3854389286957
+        ],
+        [
+          -1414.6202467300463,
+          1241.70122840238
+        ],
+        [
+          -1711.988667782678,
+          1241.70122840238
+        ],
+        [
+          -1711.988667782678,
+          -36.982982123936154
+        ],
+        [
+          -1009.4557730458357,
+          -36.982982123936154
+        ]
+      ]
+    ]
+  },
+  "projections": [
+    {
+      "kind": "externalArea",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 103902.87396121919,
+      "contour": [
+        [
+          1116.728437480483,
+          -36.982982123936154
+        ],
+        [
+          1116.728437480483,
+          -47.66719265025196
+        ],
+        [
+          1116.728437480482,
+          -185.667192650252
+        ],
+        [
+          428.7284374804825,
+          -185.667192650252
+        ],
+        [
+          417.9126480067962,
+          -185.667192650252
+        ],
+        [
+          417.9126480067962,
+          -36.982982123936154
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    },
+    {
+      "kind": "externalArea",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 103902.87396121882,
+      "contour": [
+        [
+          -1708.27156251952,
+          -36.982982123936154
+        ],
+        [
+          -1708.27156251952,
+          -47.66719265025196
+        ],
+        [
+          -1708.271562519519,
+          -185.667192650252
+        ],
+        [
+          -1020.271562519519,
+          -185.667192650252
+        ],
+        [
+          -1009.4557730458357,
+          -185.66719265025196
+        ],
+        [
+          -1009.4557730458357,
+          -36.982982123936154
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    },
+    {
+      "kind": "externalArea",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 43352.20740997247,
+      "contour": [
+        [
+          1116.728437480483,
+          1241.70122840238
+        ],
+        [
+          1116.728437480483,
+          1251.332807349748
+        ],
+        [
+          1116.728437480482,
+          1389.332807349748
+        ],
+        [
+          831.2236531679663,
+          1389.332807349748
+        ],
+        [
+          823.077121691007,
+          1389.332807349748
+        ],
+        [
+          823.077121691007,
+          1241.70122840238
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    },
+    {
+      "kind": "externalArea",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 43352.207409972216,
+      "contour": [
+        [
+          -1708.27156251952,
+          1241.70122840238
+        ],
+        [
+          -1708.27156251952,
+          1251.332807349748
+        ],
+        [
+          -1708.27156251952,
+          1389.332807349748
+        ],
+        [
+          -1422.771562519519,
+          1389.332807349748
+        ],
+        [
+          -1414.6202467300463,
+          1389.332807349748
+        ],
+        [
+          -1414.6202467300463,
+          1241.70122840238
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    }
+  ]
+}

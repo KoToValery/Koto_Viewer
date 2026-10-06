@@ -26,7 +26,7 @@ class SlabEnvelopeResult {
   });
 
   Map<String, dynamic> toJson() => {
-    'version': 2,
+    'version': 3,
     'status': contours.isEmpty ? 'unresolved' : 'needsReview',
     'coordinateSpace': 'sourceCad',
     'cellSize': cellSize,
@@ -129,23 +129,122 @@ class SlabEnvelopeDetector {
     );
   }
 
+  static double _distance(Offset p, Offset a, Offset b) {
+    final d = b - a, l = d.distanceSquared;
+    if (l == 0) return (p - a).distance;
+    final t = (((p - a).dx * d.dx + (p - a).dy * d.dy) / l).clamp(0.0, 1.0);
+    return (p - a - d * t).distance;
+  }
+
+  static List<Offset> _footprint(
+    WallPairCandidate pair,
+    List<WallPairCandidate> pairs,
+    double scale,
+  ) {
+    final a = pair.centerlineStart, b = pair.centerlineEnd, d = b - a;
+    if (d.distance == 0) return const [];
+    final u = d / d.distance, n = Offset(-u.dy, u.dx);
+    double along(Offset p) => (p - a).dx * u.dx + (p - a).dy * u.dy;
+    double across(Offset p) => (p - a).dx * n.dx + (p - a).dy * n.dy;
+    final half = pair.perpendicularDistance / 2;
+    // A T-junction splits the inner face while the outer face stays continuous.
+    // Join only pairs sharing that same observed face, never across two jambs.
+    var startT = 0.0, endT = d.distance;
+    bool sameFace(WallSegment x, WallSegment y) =>
+        ((x.start - y.start).distance <= 5 * scale &&
+            (x.end - y.end).distance <= 5 * scale) ||
+        ((x.start - y.end).distance <= 5 * scale &&
+            (x.end - y.start).distance <= 5 * scale);
+    for (final other in pairs) {
+      if (identical(pair, other) ||
+          (other.perpendicularDistance - pair.perpendicularDistance).abs() >
+              5 * scale) {
+        continue;
+      }
+      if (![
+        pair.segmentA,
+        pair.segmentB,
+      ].any((f) => [other.segmentA, other.segmentB].any((g) => sameFace(f, g)))) {
+        continue;
+      }
+      if (across(other.centerlineStart).abs() > 5 * scale ||
+          across(other.centerlineEnd).abs() > 5 * scale) {
+        continue;
+      }
+      final lo = math.min(
+        along(other.centerlineStart),
+        along(other.centerlineEnd),
+      );
+      final hi = math.max(
+        along(other.centerlineStart),
+        along(other.centerlineEnd),
+      );
+      if (lo > d.distance &&
+          lo - d.distance <= pair.perpendicularDistance * 1.5) {
+        endT = math.max(endT, (lo + d.distance) / 2);
+      }
+      if (hi < 0 && -hi <= pair.perpendicularDistance * 1.5) {
+        startT = math.min(startT, hi / 2);
+      }
+    }
+
+    final ends = <List<Offset>>[];
+    for (final face in [pair.segmentA, pair.segmentB]) {
+      final lo = along(face.start) < along(face.end) ? face.start : face.end;
+      final hi = identical(lo, face.start) ? face.end : face.start;
+      final offset = (across(face.start) + across(face.end)) / 2;
+      // Virtual gaps borrow source faces; those faces do not overlap the gap.
+      if (along(hi) < -scale ||
+          along(lo) > d.distance + scale ||
+          (offset.abs() - half).abs() > 25 * scale) {
+        return [a + n * half, b + n * half, b - n * half, a - n * half];
+      }
+      bool witnessed(Offset endpoint, double limit) {
+        if (limit > pair.perpendicularDistance * 1.5 || limit <= 0) {
+          return false;
+        }
+        for (final other in pairs) {
+          if (identical(pair, other)) continue;
+          final v = other.centerlineEnd - other.centerlineStart;
+          if (v.distance == 0 ||
+              (u.dx * v.dy - u.dy * v.dx).abs() / v.distance < 0.5) {
+            continue;
+          }
+          for (final f in [other.segmentA, other.segmentB]) {
+            if (_distance(endpoint, f.start, f.end) <= 5 * scale) return true;
+          }
+        }
+        return false;
+      }
+
+      final start = witnessed(lo, -along(lo))
+          ? lo
+          : a + u * startT + n * offset;
+      final end = witnessed(hi, along(hi) - d.distance)
+          ? hi
+          : a + u * endT + n * offset;
+      ends.add([start, end]);
+    }
+    return [ends[0][0], ends[0][1], ends[1][1], ends[1][0]];
+  }
+
   static SlabEnvelopeResult _raster(
     List<WallPairCandidate> pairs,
     double scale,
   ) {
     SlabEnvelopeResult empty(String reason) =>
         SlabEnvelopeResult(const [], [reason], 0, 0);
+    final footprints = [for (final p in pairs) _footprint(p, pairs, scale)];
     var left = double.infinity, top = double.infinity;
     var right = double.negativeInfinity, bottom = double.negativeInfinity;
     var minThickness = double.infinity;
-    for (final p in pairs) {
-      final r = p.perpendicularDistance / 2;
-      minThickness = math.min(minThickness, p.perpendicularDistance);
-      for (final v in [p.centerlineStart, p.centerlineEnd]) {
-        left = math.min(left, v.dx - r);
-        right = math.max(right, v.dx + r);
-        top = math.min(top, v.dy - r);
-        bottom = math.max(bottom, v.dy + r);
+    for (var i = 0; i < pairs.length; i++) {
+      minThickness = math.min(minThickness, pairs[i].perpendicularDistance);
+      for (final v in footprints[i]) {
+        left = math.min(left, v.dx);
+        right = math.max(right, v.dx);
+        top = math.min(top, v.dy);
+        bottom = math.max(bottom, v.dy);
       }
     }
     final cell = math.max(
@@ -160,41 +259,40 @@ class SlabEnvelopeDetector {
     final width = ((right - left) / cell).ceil() + 3;
     final height = ((bottom - top) / cell).ceil() + 3;
     final mask = Uint8List(width * height);
-    // Rasterize measured wall bands, not extended BIM axes. Conservative cell
-    // coverage introduces a visible uncertainty of roughly two cell widths.
-    for (final p in pairs) {
-      final a = p.centerlineStart, b = p.centerlineEnd;
-      final d = b - a;
-      final length = d.distance;
-      if (length == 0) continue;
-      final u = d / length;
-      final radius = p.perpendicularDistance / 2 + cell * 0.707107;
-      final x0 = ((math.min(a.dx, b.dx) - radius - left) / cell).floor().clamp(
-        0,
-        width - 1,
-      );
-      final x1 = ((math.max(a.dx, b.dx) + radius - left) / cell).ceil().clamp(
-        0,
-        width - 1,
-      );
-      final y0 = ((math.min(a.dy, b.dy) - radius - top) / cell).floor().clamp(
-        0,
-        height - 1,
-      );
-      final y1 = ((math.max(a.dy, b.dy) + radius - top) / cell).ceil().clamp(
-        0,
-        height - 1,
-      );
+    // Rasterize witnessed face endpoints. An overlap-only rectangle removes
+    // the outer quarter of every mitred corner.
+    for (final polygon in footprints) {
+      if (polygon.isEmpty) continue;
+      final padding = cell * 0.707107;
+      final x0 =
+          ((polygon.map((p) => p.dx).reduce(math.min) - padding - left) / cell)
+              .floor()
+              .clamp(0, width - 1);
+      final x1 =
+          ((polygon.map((p) => p.dx).reduce(math.max) + padding - left) / cell)
+              .ceil()
+              .clamp(0, width - 1);
+      final y0 =
+          ((polygon.map((p) => p.dy).reduce(math.min) - padding - top) / cell)
+              .floor()
+              .clamp(0, height - 1);
+      final y1 =
+          ((polygon.map((p) => p.dy).reduce(math.max) + padding - top) / cell)
+              .ceil()
+              .clamp(0, height - 1);
       for (var y = y0; y <= y1; y++) {
         for (var x = x0; x <= x1; x++) {
-          final v = Offset(left + (x + 0.5) * cell, top + (y + 0.5) * cell) - a;
-          final along = v.dx * u.dx + v.dy * u.dy;
-          final across = (v.dx * u.dy - v.dy * u.dx).abs();
-          if (along >= -cell * 0.707107 &&
-              along <= length + cell * 0.707107 &&
-              across <= radius) {
-            mask[y * width + x] = 1;
+          final p = Offset(left + (x + 0.5) * cell, top + (y + 0.5) * cell);
+          var inside = false, near = false;
+          for (var i = 0; i < polygon.length; i++) {
+            final a = polygon[i], b = polygon[(i + 1) % polygon.length];
+            if ((a.dy > p.dy) != (b.dy > p.dy) &&
+                p.dx < (b.dx - a.dx) * (p.dy - a.dy) / (b.dy - a.dy) + a.dx) {
+              inside = !inside;
+            }
+            if (_distance(p, a, b) <= padding) near = true;
           }
+          if (inside || near) mask[y * width + x] = 1;
         }
       }
     }

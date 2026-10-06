@@ -4480,6 +4480,12 @@ abstract class AppLocalizations {
   /// **'Reprocess underlay'**
   String get bimProjectReprocessUnderlay;
 
+  /// No description provided for @bimSlabProjectionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'External areas for review (cyan): {count}. Type and level are not confirmed.'**
+  String bimSlabProjectionCount(int count);
+
   /// No description provided for @bimSlabPreviewTitle.
   ///
   /// In en, this message translates to:

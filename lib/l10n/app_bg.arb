@@ -732,6 +732,8 @@
   "bimProjectKcadReady": "KCAD готов",
   "bimProjectConversionFailed": "Неуспешна конверсия на подложката",
   "bimProjectReprocessUnderlay": "Повторен анализ на подложката",
+  "bimSlabProjectionCount": "Външни участъци за преглед (цианено): {count}. Видът и нивото още не са потвърдени.",
+  "@bimSlabProjectionCount": {"placeholders": {"count": {"type": "int"}}},
   "bimSlabPreviewTitle": "Предложения за контур на плоча",
   "bimSlabPreviewMissing": "Няма записан анализ на контура. Стартирайте повторен анализ на подложката.",
   "bimSlabPreviewCount": "Предложени контури: {count}",

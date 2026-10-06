@@ -11,6 +11,7 @@ import '../../dxf_viewer/parser/dxf_parser.dart';
 import '../../structural_designer/analysis/structural_underlay_filter.dart';
 import '../../structural_designer/analysis/wall_axis_detector.dart';
 import '../../structural_designer/analysis/slab_envelope_detector.dart';
+import '../../structural_designer/analysis/slab_projection_detector.dart';
 import '../../structural_designer/models/structural_element.dart';
 import 'dxf_document_transformer.dart';
 
@@ -214,6 +215,12 @@ DxfDocument _analyse(DxfDocument doc) {
   final slabs = unique('BIM_Slabs', doc.layers.keys);
   final detected = WallAxisDetector.detect(doc);
   final envelope = SlabEnvelopeDetector.detect(detected);
+  final projections = SlabProjectionDetector.detect(
+    doc,
+    envelope,
+    detected.detectedScale,
+  );
+  final projectionLayer = unique('BIM_Projection_Candidates', doc.layers.keys);
   final candidates = unique('BIM_Slab_Candidates', doc.layers.keys);
   final assumed = unique('BIM_Slab_Assumed_Gaps', doc.layers.keys);
   final slabLayers = StructuralUnderlayFilter.detectSlabLayers(
@@ -221,6 +228,26 @@ DxfDocument _analyse(DxfDocument doc) {
   ).detectedLayers.toSet();
   final additions = <DxfEntity>[];
   final generatedBlocks = <String>[];
+  for (final candidate in projections) {
+    final ring = candidate.contour;
+    for (var i = 0; i < ring.length; i++) {
+      additions.add(
+        DxfLine(
+          p1: ring[i],
+          p2: ring[(i + 1) % ring.length],
+          layer: projectionLayer,
+          colorIndex: 4,
+        ),
+      );
+    }
+  }
+  if (projections.isNotEmpty) {
+    doc.layers[projectionLayer] = DxfLayer(
+      name: projectionLayer,
+      colorIndex: 4,
+    );
+  }
+
   for (final gap in envelope.assumedGaps) {
     additions.add(
       DxfLine(p1: gap.start, p2: gap.end, layer: assumed, colorIndex: 1),
@@ -331,8 +358,10 @@ DxfDocument _analyse(DxfDocument doc) {
       slabs,
       if (envelope.contours.isNotEmpty) candidates,
       if (envelope.assumedGaps.isNotEmpty) assumed,
+      if (projections.isNotEmpty) projectionLayer,
     ],
     'slabEnvelope': envelope.toJson(),
+    'slabProjections': projections.map((p) => p.toJson()).toList(),
     'blocks': generatedBlocks,
     'visibility': originalVisibility,
     'axes': axes.map((a) => a.toJson()).toList(),
