@@ -739,5 +739,93 @@ void main() {
       );
       expect(steniClosingLines.first.colorIndex, 7);
     });
+
+    test('20. Angled walls (e.g. 45 degrees) are detected at their authentic angle and generate angled StructuralGridAxis', () {
+      final sqrt2 = math.sqrt(2.0);
+      final normalOffset = 250.0 / sqrt2; // 250mm wall thickness along normal (-1/sqrt2, 1/sqrt2)
+
+      // 45 degree wall with 250mm thickness and length ~4.24m (3000 x 3000)
+      final wallLayer = DxfLayer(name: 'WALL_ANGLED', colorIndex: 7, isVisible: true);
+      final line1 = const DxfLine(
+        p1: Offset(0, 0),
+        p2: Offset(3000, 3000),
+        layer: 'WALL_ANGLED',
+      );
+      final line2 = DxfLine(
+        p1: Offset(-normalOffset, normalOffset),
+        p2: Offset(3000 - normalOffset, 3000 + normalOffset),
+        layer: 'WALL_ANGLED',
+      );
+
+      final doc = _createTestDoc(
+        layers: {'WALL_ANGLED': wallLayer},
+        entities: [line1, line2],
+        bounds: Rect.fromLTRB(-normalOffset, 0, 3000, 3000 + normalOffset),
+      );
+
+      final result = WallAxisDetector.detect(doc);
+      expect(result.hasWallsFound, isTrue);
+      expect(result.snappedCenterlines.length, 1);
+
+      final centerline = result.snappedCenterlines.first;
+      final angle = math.atan2(centerline.$2.dy - centerline.$1.dy, centerline.$2.dx - centerline.$1.dx);
+      // Angle should be exactly 45 degrees (pi / 4)
+      expect(angle, closeTo(math.pi / 4.0, 0.05));
+
+      final axes = WallAxisDetector.convertToStructuralGridAxes(
+        result.snappedCenterlines,
+        isBulgarian: true,
+        scale: result.detectedScale,
+      );
+      expect(axes.length, 1);
+
+      final axis = axes.first;
+      final axisAngle = axis.angleRad;
+      // Axis preserves authentic 45 degree angle without snapping to orthogonal
+      expect(axisAngle, closeTo(math.pi / 4.0, 0.05));
+      expect(axis.bubbleAtStart, isTrue);
+      expect(axis.bubbleAtEnd, isTrue);
+    });
+
+    test('21. Architect using 0.35mm or 0.40mm lineweight: structural walls & columns are detected, thin lines are excluded', () {
+      final doc = _createTestDoc(
+        layers: {
+          '01_BRICK_35': DxfLayer(name: '01_BRICK_35', colorIndex: 1, customLineweight: 0.35, isVisible: true),
+          '02_PARTITION_25': DxfLayer(name: '02_PARTITION_25', colorIndex: 2, customLineweight: 0.25, isVisible: true),
+          '03_INSUL_15': DxfLayer(name: '03_INSUL_15', colorIndex: 3, customLineweight: 0.15, isVisible: true),
+          '04_FURN_13': DxfLayer(name: '04_FURN_13', colorIndex: 4, customLineweight: 0.13, isVisible: true),
+        },
+        entities: const [
+          // 250mm structural masonry (0.35mm lineweight)
+          DxfLine(p1: Offset(0, 0), p2: Offset(5000, 0), layer: '01_BRICK_35'),
+          DxfLine(p1: Offset(0, 250), p2: Offset(5000, 250), layer: '01_BRICK_35'),
+          DxfLine(p1: Offset(0, 0), p2: Offset(0, 4000), layer: '01_BRICK_35'),
+          DxfLine(p1: Offset(250, 0), p2: Offset(250, 4000), layer: '01_BRICK_35'),
+
+          // 120mm interior partition wall (0.25mm lineweight)
+          DxfLine(p1: Offset(2000, 250), p2: Offset(2000, 3000), layer: '02_PARTITION_25'),
+          DxfLine(p1: Offset(2120, 250), p2: Offset(2120, 3000), layer: '02_PARTITION_25'),
+
+          // Insulation lines (0.15mm lineweight) - should be excluded
+          DxfLine(p1: Offset(-100, 0), p2: Offset(-100, 4000), layer: '03_INSUL_15'),
+          DxfLine(p1: Offset(-200, 0), p2: Offset(-200, 4000), layer: '03_INSUL_15'),
+
+          // Furniture lines (0.13mm lineweight) - should be excluded
+          DxfLine(p1: Offset(500, 500), p2: Offset(1500, 500), layer: '04_FURN_13'),
+          DxfLine(p1: Offset(500, 750), p2: Offset(1500, 750), layer: '04_FURN_13'),
+        ],
+        bounds: const Rect.fromLTWH(-200, 0, 5200, 4000),
+      );
+
+      final result = WallAxisDetector.detect(doc);
+      expect(result.hasWallsFound, isTrue);
+      expect(result.bestGroup?.layerName, '01_BRICK_35');
+
+      // Thin layers must NOT be active wall groups
+      final activeLayerNames = result.selectedWallPairs.map((p) => p.segmentA.sourceLayer).toSet();
+      expect(activeLayerNames.contains('01_BRICK_35'), isTrue);
+      expect(activeLayerNames.contains('03_INSUL_15'), isFalse);
+      expect(activeLayerNames.contains('04_FURN_13'), isFalse);
+    });
   });
 }

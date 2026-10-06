@@ -78,7 +78,7 @@ class WallAxisDetector {
         }
       }
     }
-    final cutLwThreshold = maxDocLineweight >= 0.35 ? 0.24 : (maxDocLineweight - 0.06);
+    final cutLwThreshold = maxDocLineweight >= 0.35 ? 0.22 : (maxDocLineweight - 0.07);
 
     final List<LayerColorGroupResult> evaluatedGroups = [];
 
@@ -473,12 +473,9 @@ class WallAxisDetector {
         }
 
         final isOrthogonal = refAngle == 0.0 || (refAngle - math.pi / 2.0).abs() < 1e-4;
-        final minReqLength = isOrthogonal ? minTotalWallLengthCad : math.max(minTotalWallLengthCad, 3000.0 * scale);
+        final minReqLength = isOrthogonal ? minTotalWallLengthCad : math.max(minTotalWallLengthCad, 1500.0 * scale);
         // Filter out tiny artifacts below minimum wall length
         if (totalLen < minReqLength && minReqLength > 0) {
-          continue;
-        }
-        if (!isOrthogonal && cluster.length < 2) {
           continue;
         }
 
