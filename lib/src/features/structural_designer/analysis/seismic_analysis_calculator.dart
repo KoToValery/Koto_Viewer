@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import 'seismic_layout_properties.dart';
+import 'structural_polygon_distance.dart';
 
-/// Eurocode 8 (EC8 EN 1998-1) Seismic Regularity, Torsion, and Layout Engine.
+/// Preliminary elastic layout indicators; not an EC8 compliance verification.
 ///
 /// Computes:
 /// 1. Storey Center of Mass (CM) and Center of Rigidity (CR)
@@ -17,7 +18,7 @@ import 'seismic_layout_properties.dart';
 class SeismicAnalysisCalculator {
   const SeismicAnalysisCalculator._();
 
-  /// Analyzes seismic concept and regularity for the entire project according to Eurocode 8.
+  /// Screens manually placed elements under the documented simplified assumptions.
   static SeismicAnalysisReport analyzeProject(
     StructuralProject project, {
     double cadUnitsPerMeter = 1.0,
@@ -26,6 +27,9 @@ class SeismicAnalysisCalculator {
       return SeismicAnalysisReport.empty;
     }
 
+    if (!cadUnitsPerMeter.isFinite || cadUnitsPerMeter <= 0) {
+      throw ArgumentError.value(cadUnitsPerMeter, 'cadUnitsPerMeter', 'must be finite and positive');
+    }
     final scale = cadUnitsPerMeter;
     final int numStoreys = project.storeys.length;
 
@@ -478,7 +482,8 @@ class SeismicAnalysisCalculator {
       bool isSoft = false;
       if (sIdx < numStoreys - 1) {
         final kAbove = storeyStiffnessList[sIdx + 1];
-        if (cur.hasSlabDiaphragm && kAbove > 1e-4) {
+        if (cur.hasSlabDiaphragm && cur.hasLateralStiffness &&
+            storeyChecks[sIdx + 1].hasLateralStiffness && kAbove > 1e-4) {
           ratioToAbove = storeyStiffnessList[sIdx] / kAbove;
           if (ratioToAbove < 0.70) {
             isSoft = true;
@@ -587,24 +592,32 @@ class SeismicAnalysisCalculator {
       for (final slab in storey.slabs) {
         for (int opIdx = 0; opIdx < slab.openings.length; opIdx++) {
           final op = slab.openings[opIdx];
-          final opCentroid = _computePolygonCentroid(op);
 
           double minSupportDist = double.infinity;
           String? nearestSupport;
 
           for (int cIdx = 0; cIdx < storey.columns.length; cIdx++) {
             final col = storey.columns[cIdx];
-            final dist = (col.center - opCentroid).distance / scale;
+            final dist = (col.shape == ColumnShape.circular
+                ? StructuralPolygonDistance.toCircle(op, col.center, col.width/2)
+                : StructuralPolygonDistance.between(op, col.polygonVertices)) / scale;
             if (dist < minSupportDist) {
               minSupportDist = dist;
-              nearestSupport = 'Колона C${cIdx + 1}';
+              nearestSupport = col.displayName;
             }
           }
 
-          final bool isTooClose = minSupportDist < 0.70; // 4d ~ 0.70m
-          final String opRec = isTooClose
-              ? 'Отворът е на ${minSupportDist.toStringAsFixed(2)} m от $nearestSupport (< 0.70 m), нарушава конуса на пробиване и изисква специално окантване!'
-              : 'Отворът е на безопасно разстояние (${minSupportDist.toStringAsFixed(2)} m от $nearestSupport).';
+          for (final wall in storey.shearWalls) {
+            final dist = StructuralPolygonDistance.between(op, wall.polygonVertices) / scale;
+            if (dist < minSupportDist) {
+              minSupportDist = dist;
+              nearestSupport = wall.displayName;
+            }
+          }
+          // Retained 0.70 m screening threshold, explicitly not a 4d/code check.
+          final bool isTooClose = minSupportDist < 0.70;
+          final String opRec = !minSupportDist.isFinite ? 'Липсва опора за геометричната проверка.'
+              : 'Геометрично разстояние до опора: ${minSupportDist.toStringAsFixed(2)} m. Пробиване не е проверено.';
 
           openingChecks.add(OpeningProximityCheck(
             openingId: '${slab.id}_op_$opIdx',
@@ -647,29 +660,15 @@ class SeismicAnalysisCalculator {
 
   /// Calculates the exact centroid of a slab polygon, taking into account any cutout openings.
   static Offset _computeSlabNetCentroid(StructuralSlab slab) {
-    final grossArea = StructuralSlab.calculateArea(slab.polygon);
-    if (grossArea < 1e-6) return slab.centroid;
-    final grossCentroid = _computePolygonCentroid(slab.polygon);
-    if (slab.openings.isEmpty) return grossCentroid;
-
-    double netArea = grossArea;
-    double sumAx = grossArea * grossCentroid.dx;
-    double sumAy = grossArea * grossCentroid.dy;
-
-    for (final op in slab.openings) {
-      final opArea = StructuralSlab.calculateArea(op);
-      if (opArea > 1e-6) {
-        final opCentroid = _computePolygonCentroid(op);
-        netArea -= opArea;
-        sumAx -= opArea * opCentroid.dx;
-        sumAy -= opArea * opCentroid.dy;
-      }
+    if (slab.polygon.isEmpty) return Offset.zero;
+    final origin = slab.polygon.first;
+    final gross = PolygonMassIntegrals.integrate(slab.polygon, origin, 1);
+    var area = gross.area, x = gross.firstX, y = gross.firstY;
+    for (final opening in slab.openings) {
+      final hole = PolygonMassIntegrals.integrate(opening, origin, 1);
+      area -= hole.area; x -= hole.firstX; y -= hole.firstY;
     }
-
-    if (netArea > 1e-6) {
-      return Offset(sumAx / netArea, sumAy / netArea);
-    }
-    return grossCentroid;
+    return area > 0 ? origin + Offset(x/area, y/area) : origin;
   }
 
   /// Checks if a point lies inside any of the given slabs (with optional CAD tolerance).
@@ -815,38 +814,6 @@ class SeismicAnalysisCalculator {
       effectiveLengthM: effLenM,
       effectiveCenterCad: effCenter,
     );
-  }
-
-  static Offset _computePolygonCentroid(List<Offset> poly) {
-    if (poly.isEmpty) return Offset.zero;
-    if (poly.length == 1) return poly.first;
-    if (poly.length == 2) return (poly[0] + poly[1]) / 2.0;
-
-    double signedArea = 0.0;
-    double cx = 0.0;
-    double cy = 0.0;
-    final int n = poly.length;
-
-    for (int i = 0; i < n; i++) {
-      final p0 = poly[i];
-      final p1 = poly[(i + 1) % n];
-      final a = p0.dx * p1.dy - p1.dx * p0.dy;
-      signedArea += a;
-      cx += (p0.dx + p1.dx) * a;
-      cy += (p0.dy + p1.dy) * a;
-    }
-
-    signedArea *= 0.5;
-    if (signedArea.abs() < 1e-6) {
-      double sx = 0.0, sy = 0.0;
-      for (final p in poly) {
-        sx += p.dx;
-        sy += p.dy;
-      }
-      return Offset(sx / n, sy / n);
-    }
-
-    return Offset(cx / (6.0 * signedArea), cy / (6.0 * signedArea));
   }
 
   static double _distancePointToSegment(Offset p, Offset a, Offset b) {

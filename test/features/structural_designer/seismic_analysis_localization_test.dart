@@ -167,7 +167,7 @@ void main() {
       expect(find.text('Макс. ексц.'), findsOneWidget);
       expect(find.text('Усукване'), findsOneWidget);
       expect(find.text('Насадени колони'), findsOneWidget);
-      expect(find.text('Шайби (EC8)'), findsOneWidget);
+      expect(find.text('Дял шайби*'), findsOneWidget);
       expect(find.text('Баланс (CM/CR)'), findsOneWidget);
       expect(find.text('Шайби (%)'), findsOneWidget);
       expect(find.text('Регулярност'), findsOneWidget);
@@ -243,7 +243,7 @@ void main() {
       expect(find.text('Max. Ecc.'), findsOneWidget);
       expect(find.text('Torsion'), findsOneWidget);
       expect(find.text('Floating Cols'), findsOneWidget);
-      expect(find.text('Shear Walls (EC8)'), findsOneWidget);
+      expect(find.text('Wall ratio*'), findsOneWidget);
       expect(find.text('Balance (CM/CR)'), findsOneWidget);
       expect(find.text('Walls (%)'), findsOneWidget);
       expect(find.text('Regularity'), findsOneWidget);

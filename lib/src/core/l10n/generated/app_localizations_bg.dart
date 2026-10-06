@@ -1411,11 +1411,11 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
-  String get seismicAnalysisTitle => 'Сеизмичен анализ (EC8)';
+  String get seismicAnalysisTitle => 'Предварителна сеизмична оценка';
 
   @override
   String get seismicAnalysisSubtitle =>
-      'Ексцентрицитет, шайби, насадени колони и греди';
+      'Показатели за схема — без доказано съответствие с EC8';
 
   @override
   String get centerOfMass => 'Център на масите (CM)';
@@ -1645,13 +1645,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get seismicStatFloatingColumns => 'Насадени колони';
 
   @override
-  String get seismicStatShearWallsEc8 => 'Шайби (EC8)';
+  String get seismicStatShearWallsEc8 => 'Дял шайби*';
 
   @override
   String get seismicStatusDeficit => 'ДЕФИЦИТ';
 
   @override
-  String get seismicStatusOkCoverage => 'ОК >=1%';
+  String get seismicStatusOkCoverage => '≥1%*';
 
   @override
   String get seismicTabBalance => 'Баланс (CM/CR)';
@@ -1684,7 +1684,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get seismicEccentricityYLabel => 'Ексцентрицитет Y (ey)';
 
   @override
-  String get seismicLimitEc8Label => 'Лимит по EC8';
+  String get seismicLimitEc8Label => 'Ориентир за ексц.';
 
   @override
   String get seismicTorsionStiffEccentric => 'Торзионно устойчива (e > 0.30·r)';
@@ -1702,13 +1702,14 @@ class AppLocalizationsBg extends AppLocalizations {
   String get seismicLimitEc8Formula => '≤ 0.30·r (EC8)';
 
   @override
-  String get seismicShearWallCoverageTitle => 'Покритие със земетръсни шайби';
+  String get seismicShearWallCoverageTitle =>
+      'Площен дял на шайбите — евристика';
 
   @override
-  String get seismicOkMinCoverage => 'ОК (≥ 1.0%)';
+  String get seismicOkMinCoverage => 'Ориентир ≥1%';
 
   @override
-  String get seismicDeficitMinCoverage => 'ДЕФИЦИТ (< 1.0%)';
+  String get seismicDeficitMinCoverage => 'Ориентир <1%';
 
   @override
   String get seismicWallCoverageXLabel => 'Покритие по X (ρ_wx):';
@@ -1775,7 +1776,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get seismicOpeningsProximityTitle =>
-      'Инсталационни отвори близо до опори (< 4d):';
+      'Геометрична близост на отвори — ориентир 0,70 m';
 
   @override
   String seismicRecFloatingCols(String names) {
@@ -1820,7 +1821,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get seismicRecBalanced =>
-      'Сеизмичният баланс и процентното покритие с шайби са отлични. ';
+      'Няма сигнал от предварителните показатели за схемата. Съответствие с EC8 не е доказано. ';
 
   @override
   String seismicRecTorsionStiffEccentric(
@@ -1868,12 +1869,12 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String seismicRecOpeningClose(String dist, String support) {
-    return 'Отворът е на $dist m от $support (< 0.70 m), нарушава конуса на пробиване и изисква специално окантване!';
+    return 'Отстояние между контурите на отвора и $support: $dist m — под ориентировъчните 0,70 m. Необходима е отделна проверка за пробиване и окантване.';
   }
 
   @override
   String seismicRecOpeningSafe(String dist, String support) {
-    return 'Отворът е на безопасно разстояние ($dist m от $support).';
+    return 'Отстояние между контурите на отвора и $support: $dist m. Геометричният ориентир 0,70 m не е нарушен; пробиване не е проверено.';
   }
 
   @override
@@ -1912,11 +1913,11 @@ class AppLocalizationsBg extends AppLocalizations {
       'Не може да се пресметне процентно покритие на шайбите без подова плоча.';
 
   @override
-  String get seismicPreliminaryBalanced => 'Балансирано';
+  String get seismicPreliminaryBalanced => 'Без сигнал от модела';
 
   @override
   String get seismicRigidityUnavailable =>
-      'Липсва коравина на срязване. Необходими са вертикални конструктивни елементи (шайби/колони) за сеизмична оценка.';
+      'Напречната схема не може да се оцени: липсват използваеми свързани опори, има неподдържано сечение или неустойчив числен модел. CR и ексцентрицитетът са неопределени.';
 
   @override
   String get verticalBasePressure => 'Базисен натиск';
@@ -2684,4 +2685,15 @@ class AppLocalizationsBg extends AppLocalizations {
   String bimSlabSeedsReview(int count, int skipped, String thickness) {
     return 'Създаване на $count редактируеми плочи на този етаж; пропуснати: $skipped. Дебелина: $thickness cm, от текущата настройка за плоча.\n\nРъбовете се прилепват само при разстояние под 2 cm. Това са начални предложения: проверете контура, отворите, котите и дебелината преди използване в конструктивната схема.';
   }
+
+  @override
+  String get seismicNotEvaluated => 'Неоценено';
+
+  @override
+  String get seismicModelAssumptions =>
+      'Предварителна схема: корава диафрагма, общи фактори за материал и закрепване и опростени тегла. Напукване, взаимодействие на ядра, случаен ексцентрицитет и 3D поведение не са проверени.';
+
+  @override
+  String get seismicOpeningNotEvaluated =>
+      'Липсва опора или валидна геометрия на отвора; близостта не е оценена.';
 }

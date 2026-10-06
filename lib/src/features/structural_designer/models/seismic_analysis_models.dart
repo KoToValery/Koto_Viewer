@@ -4,7 +4,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 /// Eurocode 8 (EC8 EN 1998-1) Seismic Regularity & Risk Classification.
 enum SeismicRiskLevel {
   /// Regular structural layout, low torsional eccentricity, adequate shear walls.
-  regular('Регулярна / В норма', Color(0xFF00E676), Color(0x3300E676)),
+  regular('Без сигнал от предварителния модел', Color(0xFF00E676), Color(0x3300E676)),
 
   /// Moderate eccentricity or mild shear wall deficit.
   warning('Повишен сеизмичен риск', Color(0xFFFFB300), Color(0x33FFB300)),
@@ -68,10 +68,10 @@ class StoreySeismicCheck {
   /// Eurocode 8 Torsional radius in Y direction: r_y = sqrt(I_p,R / K_x).
   final double torsionalRadiusY;
 
-  /// Eurocode 8 Floor mass radius of gyration: l_s = sqrt((L_x^2 + L_y^2) / 12).
+  /// Radius of gyration from the modeled distributed weights, including openings.
   final double massRadiusOfGyration;
 
-  /// Torsional rigidity of vertical elements about CR (I_p,R in m^4 or stiffness units).
+  /// Preliminary torsional layout index in m^6 (common E/height/restraint factor omitted).
   final double torsionalRigidity;
 
   /// True if building is torsionally stiff (r_x >= l_s and r_y >= l_s) per EC8 §4.2.3.2.
@@ -80,7 +80,7 @@ class StoreySeismicCheck {
   /// True if building has structural eccentricity exceeding 0.30*r per EC8 §4.2.3.2.
   final bool hasSignificantEccentricity;
 
-  /// True if building is regular in plan per EC8 §4.2.3.2 (r >= l_s and e_0 <= 0.30*r).
+  /// Legacy flag. Always false from the preliminary calculator: full compliance is unverified.
   final bool isPlanRegularEC8;
 
   /// Total cross-sectional area of shear walls oriented along X axis (m²).
@@ -327,6 +327,7 @@ class OpeningProximityCheck {
   });
 
   String localizedRecommendation(AppLocalizations l10n) {
+    if (!distanceToSupportM.isFinite) return l10n.seismicOpeningNotEvaluated;
     final support = nearestSupportName ?? '';
     if (isTooClose) {
       return l10n.seismicRecOpeningClose(

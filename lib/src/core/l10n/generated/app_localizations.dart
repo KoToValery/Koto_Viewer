@@ -2560,13 +2560,13 @@ abstract class AppLocalizations {
   /// Title for EC8 seismic analysis
   ///
   /// In en, this message translates to:
-  /// **'Seismic Analysis (EC8)'**
+  /// **'Preliminary seismic layout'**
   String get seismicAnalysisTitle;
 
   /// Subtitle for EC8 seismic analysis
   ///
   /// In en, this message translates to:
-  /// **'Eccentricity, shear walls, transfer columns & beams'**
+  /// **'Layout indicators — not EC8 compliance'**
   String get seismicAnalysisSubtitle;
 
   /// Label for center of mass
@@ -2998,7 +2998,7 @@ abstract class AppLocalizations {
   /// Title for shear walls EC8 stat card
   ///
   /// In en, this message translates to:
-  /// **'Shear Walls (EC8)'**
+  /// **'Wall ratio*'**
   String get seismicStatShearWallsEc8;
 
   /// Deficit status indicator
@@ -3010,7 +3010,7 @@ abstract class AppLocalizations {
   /// OK coverage status indicator
   ///
   /// In en, this message translates to:
-  /// **'OK >=1%'**
+  /// **'≥1%*'**
   String get seismicStatusOkCoverage;
 
   /// Tab title for seismic balance CM/CR
@@ -3076,7 +3076,7 @@ abstract class AppLocalizations {
   /// Label for Eurocode 8 limit
   ///
   /// In en, this message translates to:
-  /// **'EC8 Limit'**
+  /// **'Eccentricity reference'**
   String get seismicLimitEc8Label;
 
   /// Status badge for building that is torsionally stiff but has eccentricity
@@ -3112,19 +3112,19 @@ abstract class AppLocalizations {
   /// Header title for shear wall coverage
   ///
   /// In en, this message translates to:
-  /// **'Shear Wall Coverage'**
+  /// **'Wall area ratio — heuristic'**
   String get seismicShearWallCoverageTitle;
 
   /// Badge for OK wall coverage
   ///
   /// In en, this message translates to:
-  /// **'OK (≥ 1.0%)'**
+  /// **'≥1% reference'**
   String get seismicOkMinCoverage;
 
   /// Badge for deficient wall coverage
   ///
   /// In en, this message translates to:
-  /// **'DEFICIT (< 1.0%)'**
+  /// **'<1% reference'**
   String get seismicDeficitMinCoverage;
 
   /// Label for X wall coverage
@@ -3226,7 +3226,7 @@ abstract class AppLocalizations {
   /// Title for openings near supports check
   ///
   /// In en, this message translates to:
-  /// **'Slab openings near supports (< 4d):'**
+  /// **'Opening proximity — 0.70 m screening reference'**
   String get seismicOpeningsProximityTitle;
 
   /// Recommendation text for floating columns
@@ -3286,7 +3286,7 @@ abstract class AppLocalizations {
   /// Balanced seismic layout
   ///
   /// In en, this message translates to:
-  /// **'Seismic balance and shear wall percentage coverage are excellent. '**
+  /// **'No warning from the preliminary layout indicators. EC8 compliance has not been established. '**
   String get seismicRecBalanced;
 
   /// Recommendation text when building is torsionally stiff but has structural eccentricity
@@ -3344,13 +3344,13 @@ abstract class AppLocalizations {
   /// Opening too close to support recommendation
   ///
   /// In en, this message translates to:
-  /// **'Opening is {dist} m from {support} (< 0.70 m), penetrating the punching cone and requiring special edge trimming!'**
+  /// **'Clear distance between opening and {support}: {dist} m — below the 0.70 m screening reference. Punching shear and edge reinforcement require separate checks.'**
   String seismicRecOpeningClose(String dist, String support);
 
   /// Opening at safe distance recommendation
   ///
   /// In en, this message translates to:
-  /// **'Opening is at a safe distance ({dist} m from {support}).'**
+  /// **'Clear distance between opening and {support}: {dist} m. Outside the 0.70 m screening band; punching shear has not been verified.'**
   String seismicRecOpeningSafe(String dist, String support);
 
   /// Badge when a storey lacks a slab diaphragm
@@ -3398,13 +3398,13 @@ abstract class AppLocalizations {
   /// Label for balanced preliminary seismic risk level
   ///
   /// In en, this message translates to:
-  /// **'Balanced'**
+  /// **'No layout warning'**
   String get seismicPreliminaryBalanced;
 
   /// Recommendation when lateral stiffness cannot be computed
   ///
   /// In en, this message translates to:
-  /// **'Lateral stiffness unavailable. Vertical structural elements (shear walls/columns) are required to evaluate seismic behaviour.'**
+  /// **'Lateral layout cannot be evaluated: no usable connected supports, an unsupported section, or an ill-conditioned model. CR and eccentricity are unavailable.'**
   String get seismicRigidityUnavailable;
 
   /// Foundation base pressure stat card title
@@ -4647,6 +4647,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create {count} editable slabs on this storey; skipped: {skipped}. Thickness: {thickness} cm, from the current slab setting.\n\nEdges snap only at distances below 2 cm. These are initial proposals: review the contour, openings, levels and thickness before using them in the structural scheme.'**
   String bimSlabSeedsReview(int count, int skipped, String thickness);
+
+  /// No description provided for @seismicNotEvaluated.
+  ///
+  /// In en, this message translates to:
+  /// **'Not evaluated'**
+  String get seismicNotEvaluated;
+
+  /// No description provided for @seismicModelAssumptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Preliminary layout only: rigid diaphragm, common material/restraint factors and simplified weights. Cracking, core coupling, accidental torsion and 3D response are not verified.'**
+  String get seismicModelAssumptions;
+
+  /// No description provided for @seismicOpeningNotEvaluated.
+  ///
+  /// In en, this message translates to:
+  /// **'No support or valid opening geometry is available; proximity is not evaluated.'**
+  String get seismicOpeningNotEvaluated;
 }
 
 class _AppLocalizationsDelegate

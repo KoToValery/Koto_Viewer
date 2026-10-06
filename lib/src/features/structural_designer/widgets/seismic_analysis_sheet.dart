@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/seismic_analysis_models.dart';
@@ -34,6 +33,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
   @override
   Widget build(BuildContext context) {
     final report = widget.report;
+    final canEvaluate = report.storeyChecks.isNotEmpty && report.storeyChecks.every((c) => c.hasSlabDiaphragm && c.hasLateralStiffness);
 
     return Container(
       decoration: const BoxDecoration(
@@ -105,15 +105,18 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
             ),
             const SizedBox(height: 10),
 
+            Text(context.l10n.seismicModelAssumptions,
+              style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            const SizedBox(height: 10),
             // Summary Metrics Cards
             Row(
               children: [
                 _buildStatCard(
                   title: context.l10n.seismicStatMaxEccentricity,
-                  value: report.hasAnySlabDiaphragm
+                  value: canEvaluate
                       ? '${(report.maxEccentricityRatio * 100).round()}%'
                       : '—',
-                  color: report.hasTorsionalSensitivity
+                  color: !canEvaluate ? const Color(0xFFFFB300) : report.hasTorsionalSensitivity
                       ? const Color(0xFFFF1744)
                       : (report.maxEccentricityRatio > 0.08
                           ? const Color(0xFFFFB300)
@@ -122,12 +125,12 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 const SizedBox(width: 6),
                 _buildStatCard(
                   title: context.l10n.seismicStatTorsion,
-                  value: report.hasTorsionalSensitivity
+                  value: !canEvaluate ? context.l10n.seismicNotEvaluated : report.hasTorsionalSensitivity
                       ? context.l10n.seismicStatusHigh
                       : (report.hasStructuralEccentricity
                           ? context.l10n.seismicStatusEccentricShort
                           : context.l10n.seismicStatusNormal),
-                  color: report.hasTorsionalSensitivity
+                  color: !canEvaluate ? const Color(0xFFFFB300) : report.hasTorsionalSensitivity
                       ? const Color(0xFFFF1744)
                       : (report.hasStructuralEccentricity
                           ? const Color(0xFFFFB300)
@@ -288,7 +291,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
       itemBuilder: (context, idx) {
         final check = report.storeyChecks[idx];
 
-        if (!check.hasSlabDiaphragm) {
+        if (!check.hasSlabDiaphragm || !check.hasLateralStiffness) {
           const color = Color(0xFFFFB300);
           return Container(
             padding: const EdgeInsets.all(12),
@@ -322,7 +325,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                         border: Border.all(color: color),
                       ),
                       child: Text(
-                        context.l10n.seismicNoSlabBadge,
+                        !check.hasSlabDiaphragm ? context.l10n.seismicNoSlabBadge : context.l10n.seismicNotEvaluated,
                         style: const TextStyle(
                           color: color,
                           fontSize: 10,
@@ -338,7 +341,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   children: [
                     _buildSubmetric(context.l10n.seismicEccentricityXLabel, context.l10n.seismicNoSlabEccentricity),
                     _buildSubmetric(context.l10n.seismicEccentricityYLabel, context.l10n.seismicNoSlabEccentricity),
-                    _buildSubmetric(context.l10n.seismicLimitEc8Label, '≤ 15%'),
+                    _buildSubmetric(context.l10n.seismicLimitEc8Label, '—'),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -439,8 +442,8 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                   _buildSubmetric(
                     context.l10n.seismicLimitEc8Label,
                     check.torsionalRadiusX > 0 && check.torsionalRadiusY > 0
-                        ? '≤ 0.30·r (≤ ${(0.30 * math.min(check.torsionalRadiusX, check.torsionalRadiusY)).toStringAsFixed(2)} m)'
-                        : '≤ 15%',
+                        ? 'X ≤ ${(0.30 * check.torsionalRadiusX).toStringAsFixed(2)} m; Y ≤ ${(0.30 * check.torsionalRadiusY).toStringAsFixed(2)} m'
+                        : '—',
                   ),
                 ],
               ),
@@ -896,7 +899,7 @@ class _SeismicAnalysisSheetState extends State<SeismicAnalysisSheet>
                 color: const Color(0xFF262626),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: op.isTooClose ? const Color(0xFFFF1744) : const Color(0xFF00E676),
+                  color: !op.distanceToSupportM.isFinite ? const Color(0xFFFFB300) : op.isTooClose ? const Color(0xFFFF1744) : Colors.white38,
                 ),
               ),
               child: Text(op.localizedRecommendation(context.l10n), style: TextStyle(

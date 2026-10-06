@@ -1406,11 +1406,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get seismicAnalysisTitle => 'Seismic Analysis (EC8)';
+  String get seismicAnalysisTitle => 'Preliminary seismic layout';
 
   @override
   String get seismicAnalysisSubtitle =>
-      'Eccentricity, shear walls, transfer columns & beams';
+      'Layout indicators — not EC8 compliance';
 
   @override
   String get centerOfMass => 'Center of Mass (CM)';
@@ -1641,13 +1641,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seismicStatFloatingColumns => 'Floating Cols';
 
   @override
-  String get seismicStatShearWallsEc8 => 'Shear Walls (EC8)';
+  String get seismicStatShearWallsEc8 => 'Wall ratio*';
 
   @override
   String get seismicStatusDeficit => 'DEFICIT';
 
   @override
-  String get seismicStatusOkCoverage => 'OK >=1%';
+  String get seismicStatusOkCoverage => '≥1%*';
 
   @override
   String get seismicTabBalance => 'Balance (CM/CR)';
@@ -1680,7 +1680,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seismicEccentricityYLabel => 'Eccentricity Y (ey)';
 
   @override
-  String get seismicLimitEc8Label => 'EC8 Limit';
+  String get seismicLimitEc8Label => 'Eccentricity reference';
 
   @override
   String get seismicTorsionStiffEccentric => 'Torsionally Stiff (e > 0.30·r)';
@@ -1698,13 +1698,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seismicLimitEc8Formula => '≤ 0.30·r (EC8)';
 
   @override
-  String get seismicShearWallCoverageTitle => 'Shear Wall Coverage';
+  String get seismicShearWallCoverageTitle => 'Wall area ratio — heuristic';
 
   @override
-  String get seismicOkMinCoverage => 'OK (≥ 1.0%)';
+  String get seismicOkMinCoverage => '≥1% reference';
 
   @override
-  String get seismicDeficitMinCoverage => 'DEFICIT (< 1.0%)';
+  String get seismicDeficitMinCoverage => '<1% reference';
 
   @override
   String get seismicWallCoverageXLabel => 'X Coverage (ρ_wx):';
@@ -1769,7 +1769,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get seismicOpeningsProximityTitle =>
-      'Slab openings near supports (< 4d):';
+      'Opening proximity — 0.70 m screening reference';
 
   @override
   String seismicRecFloatingCols(String names) {
@@ -1814,7 +1814,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get seismicRecBalanced =>
-      'Seismic balance and shear wall percentage coverage are excellent. ';
+      'No warning from the preliminary layout indicators. EC8 compliance has not been established. ';
 
   @override
   String seismicRecTorsionStiffEccentric(
@@ -1862,12 +1862,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String seismicRecOpeningClose(String dist, String support) {
-    return 'Opening is $dist m from $support (< 0.70 m), penetrating the punching cone and requiring special edge trimming!';
+    return 'Clear distance between opening and $support: $dist m — below the 0.70 m screening reference. Punching shear and edge reinforcement require separate checks.';
   }
 
   @override
   String seismicRecOpeningSafe(String dist, String support) {
-    return 'Opening is at a safe distance ($dist m from $support).';
+    return 'Clear distance between opening and $support: $dist m. Outside the 0.70 m screening band; punching shear has not been verified.';
   }
 
   @override
@@ -1906,11 +1906,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Shear wall ratio cannot be computed without a floor slab diaphragm.';
 
   @override
-  String get seismicPreliminaryBalanced => 'Balanced';
+  String get seismicPreliminaryBalanced => 'No layout warning';
 
   @override
   String get seismicRigidityUnavailable =>
-      'Lateral stiffness unavailable. Vertical structural elements (shear walls/columns) are required to evaluate seismic behaviour.';
+      'Lateral layout cannot be evaluated: no usable connected supports, an unsupported section, or an ill-conditioned model. CR and eccentricity are unavailable.';
 
   @override
   String get verticalBasePressure => 'Base Pressure';
@@ -2675,4 +2675,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String bimSlabSeedsReview(int count, int skipped, String thickness) {
     return 'Create $count editable slabs on this storey; skipped: $skipped. Thickness: $thickness cm, from the current slab setting.\n\nEdges snap only at distances below 2 cm. These are initial proposals: review the contour, openings, levels and thickness before using them in the structural scheme.';
   }
+
+  @override
+  String get seismicNotEvaluated => 'Not evaluated';
+
+  @override
+  String get seismicModelAssumptions =>
+      'Preliminary layout only: rigid diaphragm, common material/restraint factors and simplified weights. Cracking, core coupling, accidental torsion and 3D response are not verified.';
+
+  @override
+  String get seismicOpeningNotEvaluated =>
+      'No support or valid opening geometry is available; proximity is not evaluated.';
 }

@@ -1201,9 +1201,9 @@
       "ratio": { "type": "String" }
     }
   },
-  "seismicAnalysisTitle": "Seismic Analysis (EC8)",
+  "seismicAnalysisTitle": "Preliminary seismic layout",
   "@seismicAnalysisTitle": { "description": "Title for EC8 seismic analysis" },
-  "seismicAnalysisSubtitle": "Eccentricity, shear walls, transfer columns & beams",
+  "seismicAnalysisSubtitle": "Layout indicators — not EC8 compliance",
   "@seismicAnalysisSubtitle": { "description": "Subtitle for EC8 seismic analysis" },
   "centerOfMass": "Center of Mass (CM)",
   "@centerOfMass": { "description": "Label for center of mass" },
@@ -1373,11 +1373,11 @@
   "@seismicStatusNormal": { "description": "Normal status indicator" },
   "seismicStatFloatingColumns": "Floating Cols",
   "@seismicStatFloatingColumns": { "description": "Title for floating columns stat card" },
-  "seismicStatShearWallsEc8": "Shear Walls (EC8)",
+  "seismicStatShearWallsEc8": "Wall ratio*",
   "@seismicStatShearWallsEc8": { "description": "Title for shear walls EC8 stat card" },
   "seismicStatusDeficit": "DEFICIT",
   "@seismicStatusDeficit": { "description": "Deficit status indicator" },
-  "seismicStatusOkCoverage": "OK >=1%",
+  "seismicStatusOkCoverage": "≥1%*",
   "@seismicStatusOkCoverage": { "description": "OK coverage status indicator" },
   "seismicTabBalance": "Balance (CM/CR)",
   "@seismicTabBalance": { "description": "Tab title for seismic balance CM/CR" },
@@ -1399,7 +1399,7 @@
   "@seismicEccentricityXLabel": { "description": "Label for eccentricity in X" },
   "seismicEccentricityYLabel": "Eccentricity Y (ey)",
   "@seismicEccentricityYLabel": { "description": "Label for eccentricity in Y" },
-  "seismicLimitEc8Label": "EC8 Limit",
+  "seismicLimitEc8Label": "Eccentricity reference",
   "@seismicLimitEc8Label": { "description": "Label for Eurocode 8 limit" },
   "seismicTorsionStiffEccentric": "Torsionally Stiff (e > 0.30·r)",
   "@seismicTorsionStiffEccentric": { "description": "Status badge for building that is torsionally stiff but has eccentricity" },
@@ -1411,11 +1411,11 @@
   "@seismicMassRadiusLabel": { "description": "Label for Eurocode 8 floor mass gyration radius" },
   "seismicLimitEc8Formula": "≤ 0.30·r (EC8)",
   "@seismicLimitEc8Formula": { "description": "Formula label for EC8 eccentricity limit" },
-  "seismicShearWallCoverageTitle": "Shear Wall Coverage",
+  "seismicShearWallCoverageTitle": "Wall area ratio — heuristic",
   "@seismicShearWallCoverageTitle": { "description": "Header title for shear wall coverage" },
-  "seismicOkMinCoverage": "OK (≥ 1.0%)",
+  "seismicOkMinCoverage": "≥1% reference",
   "@seismicOkMinCoverage": { "description": "Badge for OK wall coverage" },
-  "seismicDeficitMinCoverage": "DEFICIT (< 1.0%)",
+  "seismicDeficitMinCoverage": "<1% reference",
   "@seismicDeficitMinCoverage": { "description": "Badge for deficient wall coverage" },
   "seismicWallCoverageXLabel": "X Coverage (ρ_wx):",
   "@seismicWallCoverageXLabel": { "description": "Label for X wall coverage" },
@@ -1464,7 +1464,7 @@
     "description": "Span length in meters",
     "placeholders": { "span": { "type": "String" } }
   },
-  "seismicOpeningsProximityTitle": "Slab openings near supports (< 4d):",
+  "seismicOpeningsProximityTitle": "Opening proximity — 0.70 m screening reference",
   "@seismicOpeningsProximityTitle": { "description": "Title for openings near supports check" },
   "seismicRecFloatingCols": "Columns {names} are FLOATING on the slab (no column underneath). This is a serious seismic vulnerability! ",
   "@seismicRecFloatingCols": {
@@ -1505,7 +1505,7 @@
     "description": "Deficit in Y direction",
     "placeholders": { "ry": { "type": "String" } }
   },
-  "seismicRecBalanced": "Seismic balance and shear wall percentage coverage are excellent. ",
+  "seismicRecBalanced": "No warning from the preliminary layout indicators. EC8 compliance has not been established. ",
   "@seismicRecBalanced": { "description": "Balanced seismic layout" },
   "seismicRecTorsionStiffEccentric": "Torsionally stiff layout (rx={rx} m, ry={ry} m ≥ ls={ls} m), but structural eccentricity ({ecc} m) exceeds 0.30·r. Requires 3D spatial dynamic modal response spectrum analysis per Eurocode 8. ",
   "@seismicRecTorsionStiffEccentric": {
@@ -1564,7 +1564,7 @@
       "span": { "type": "String" }
     }
   },
-  "seismicRecOpeningClose": "Opening is {dist} m from {support} (< 0.70 m), penetrating the punching cone and requiring special edge trimming!",
+  "seismicRecOpeningClose": "Clear distance between opening and {support}: {dist} m — below the 0.70 m screening reference. Punching shear and edge reinforcement require separate checks.",
   "@seismicRecOpeningClose": {
     "description": "Opening too close to support recommendation",
     "placeholders": {
@@ -1572,7 +1572,7 @@
       "support": { "type": "String" }
     }
   },
-  "seismicRecOpeningSafe": "Opening is at a safe distance ({dist} m from {support}).",
+  "seismicRecOpeningSafe": "Clear distance between opening and {support}: {dist} m. Outside the 0.70 m screening band; punching shear has not been verified.",
   "@seismicRecOpeningSafe": {
     "description": "Opening at safe distance recommendation",
     "placeholders": {
@@ -2230,6 +2230,10 @@
         "type": "String"
       }
     }
-  }
-
+  },
+  "seismicPreliminaryBalanced": "No layout warning",
+  "seismicRigidityUnavailable": "Lateral layout cannot be evaluated: no usable connected supports, an unsupported section, or an ill-conditioned model. CR and eccentricity are unavailable.",
+  "seismicNotEvaluated": "Not evaluated",
+  "seismicModelAssumptions": "Preliminary layout only: rigid diaphragm, common material/restraint factors and simplified weights. Cracking, core coupling, accidental torsion and 3D response are not verified.",
+  "seismicOpeningNotEvaluated": "No support or valid opening geometry is available; proximity is not evaluated."
 }

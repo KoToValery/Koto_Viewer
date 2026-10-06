@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/seismic_analysis_calculator.dart';
 import 'package:kotoview/src/features/structural_designer/models/seismic_analysis_models.dart';
@@ -61,7 +62,8 @@ void main() {
       expect(check.centerOfMassCad!.dx, closeTo(250.0, 1.0));
       expect(check.centerOfRigidityCad!.dx, closeTo(250.0, 1.0));
       expect(check.eccentricityM!.dx, closeTo(0.0, 0.05));
-      expect(check.isTorsionallySensitive, isFalse);
+      // Symmetry does not compensate for small torsional radius.
+      expect(check.isTorsionallySensitive, isTrue);
     });
 
     test('2. Torsional sensitivity and eccentricity when shear wall is placed on one edge', () {
@@ -132,7 +134,7 @@ void main() {
       expect(check.architectRecommendation, contains('запад'));
     });
 
-    test('3. Shear wall ratio check (EC8 & BG norms >= 1.0% floor area)', () {
+    test('3. Shear wall ratio check (EC8 & BG norms 1.0% floor area heuristic)', () {
       const scale = 50.0;
       // 10m x 10m = 100 m² floor
       final slab = StructuralSlab(
@@ -635,7 +637,7 @@ void main() {
       expect(check.centerOfMassCad!.dx, lessThan(240.0));
     });
 
-    test('11. Real engineer project layout: grid of columns + shear wall on one side has adequate torsional stiffness (rx, ry >= ls)', () {
+    test('11. Peripheral walls improve torsional radius but cannot use a 10% relaxed criterion', () {
       const scale = 50.0;
       // 16m x 16m slab (0 to 800 CAD)
       final slab = StructuralSlab(
@@ -706,7 +708,14 @@ void main() {
       expect(check.massRadiusOfGyration, closeTo(6.53, 0.1));
 
       // With a single uncoupled core on one side, rx is calculated via EC8 formulation:
-      expect(check.torsionalRadiusX, closeTo(1.14, 0.05));
+      // Removing the incompatible m^4 intrinsic term reduces the layout radius.
+      final columnI = math.pow(.25, 4) / 12;
+      final wallKy = .25 * math.pow(4, 3) / 12;
+      final centerX = (16 * columnI * 8 + wallKy * 14) / (16 * columnI + wallKy);
+      // The 4x4 grid has mean squared offsets 20 m² in each direction.
+      final torsion = 16 * columnI * (40 + math.pow(8 - centerX, 2)) +
+          wallKy * math.pow(14 - centerX, 2);
+      expect(check.torsionalRadiusX, closeTo(math.sqrt(torsion / (16 * columnI + wallKy)), 1e-6));
       expect(check.isTorsionallySensitive, isTrue);
 
       // But it is classified as WARNING (requires 3D modal analysis per EC8), NOT CRITICAL COLLAPSE:
@@ -763,7 +772,8 @@ void main() {
       expect(checkBalanced.isTorsionallyStiff, isTrue);
       expect(checkBalanced.isTorsionallySensitive, isFalse);
       expect(checkBalanced.hasSignificantEccentricity, isFalse);
-      expect(checkBalanced.isPlanRegularEC8, isTrue);
+      // A preliminary layout never certifies all plan-regularity conditions.
+      expect(checkBalanced.isPlanRegularEC8, isFalse);
       expect(checkBalanced.riskLevel, SeismicRiskLevel.regular);
     });
   });
