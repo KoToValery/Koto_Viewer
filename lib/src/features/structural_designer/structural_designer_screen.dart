@@ -16,6 +16,7 @@ import 'analysis/seismic_analysis_calculator.dart';
 import 'analysis/structural_underlay_filter.dart';
 import 'analysis/vertical_capacity_calculator.dart';
 import 'analysis/slab_parallel_alignment_helper.dart';
+import 'analysis/slab_seed_generator.dart';
 import 'analysis/structural_magnetic_alignment_helper.dart';
 import 'analysis/wall_axis_detector.dart';
 import 'models/cantilever_analysis_models.dart';
@@ -399,6 +400,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _project = _undoStack.removeLast();
         _runAnalysis();
       });
+      _saveProject();
       HapticFeedback.lightImpact();
     }
   }
@@ -6195,6 +6197,45 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
+  Future<void> _generateSlabSeeds() async {
+    final active = _project.activeStorey;
+    final metadata = BimUnderlayMetadata.read(_document);
+    if (metadata == null) return;
+    if (active.slabs.any((s) => s.id.startsWith(SlabSeedGenerator.prefix(active.id)))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.bimSlabsAlreadyGenerated)));
+      return;
+    }
+    final seeds = SlabSeedGenerator.generate(
+      metadata: metadata, document: _document, storeyId: active.id,
+      existing: active.slabs, unitsPerMeter: _cadUnitsPerMeter,
+      thickness: _currentSlabThickness,
+    );
+    final total = ((metadata['slabEnvelope'] as Map?)?['contours'] as List? ?? []).length +
+        (metadata['slabProjections'] as List? ?? []).length;
+    if (seeds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.bimSlabSeedsEmpty)));
+      return;
+    }
+    final accepted = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(context.l10n.bimGenerateSlabs),
+      content: Text(context.l10n.bimSlabSeedsReview(seeds.length, total - seeds.length,
+          (_currentSlabThickness * 100).toStringAsFixed(1))),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(context.l10n.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(context.l10n.ok)),
+      ],
+    ));
+    if (!mounted || accepted != true || _project.activeStorey.id != active.id) return;
+    _pushUndo();
+    _updateActiveStorey(active.copyWith(slabs: [...active.slabs,
+      for (var i = 0; i < seeds.length; i++) seeds[i].copyWith(
+        colorValue: Structural2dPainter.slabPalette[
+          (active.slabs.length + i) % Structural2dPainter.slabPalette.length].toARGB32()),
+    ]));
+  }
+
   void _closeSlabPolygon() {
     if (_slabPointsCad.length >= 3) {
       _pushUndo();
@@ -7171,12 +7212,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           case 'auto_walls':
             _runManualAutoDetectWalls();
             break;
+          case 'generate_slabs':
+            _generateSlabSeeds();
+            break;
           case 'export':
             _showExportDialog();
             break;
         }
       },
       itemBuilder: (context) => [
+        if (widget.bimContext != null)
+          PopupMenuItem(value: 'generate_slabs',
+            child: Text(context.l10n.bimGenerateSlabs,
+              style: const TextStyle(color: Colors.white, fontSize: 13))),
         if (isCompact)
           PopupMenuItem(
             value: 'layers',

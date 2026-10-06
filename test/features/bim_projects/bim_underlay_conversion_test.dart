@@ -533,6 +533,11 @@ void main() {
       ).first;
       expect(aligned.start, before.start - const Offset(400, 400));
       expect(aligned.end, before.end - const Offset(400, 400));
+      final metadata = BimUnderlayMetadata.read(loaded.underlaysByStorey['b']!)!;
+      expect(metadata['sourceToProject'], {
+        'scale': 1.0, 'translation': [-400.0, -400.0],
+      });
+      expect(metadata['slabEnvelope'], BimUnderlayMetadata.read(local)!['slabEnvelope']);
     },
   );
 

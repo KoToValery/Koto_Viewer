@@ -6,6 +6,7 @@ import 'package:kotoview/src/features/bim_projects/services/bim_underlay_convers
 import 'package:kotoview/src/features/dxf_viewer/binary/kcad_service.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/wall_axis_detector.dart';
+import 'package:kotoview/src/features/structural_designer/analysis/slab_seed_generator.dart';
 
 bool containsPoint(double x, double y, List ring) {
   var inside = false;
@@ -34,6 +35,13 @@ void main() {
     final doc = await KcadService.loadKcadFile(result.kcadFile);
     final walls = WallAxisDetector.detect(pure);
     final report = BimUnderlayMetadata.read(doc)!['slabEnvelope'];
+    final seeds = SlabSeedGenerator.generate(
+      metadata: BimUnderlayMetadata.read(doc)!, document: doc,
+      storeyId: 'c', existing: [], unitsPerMeter: walls.detectedScale * 1000,
+      thickness: .20,
+    );
+    expect(seeds.where((s) => s.id.contains('_main_')).length, 1);
+    expect(seeds.where((s) => s.id.contains('_projection_')).length, 7);
     await File(
       '${Directory.systemTemp.path}/koto_C_analysis.json',
     ).writeAsString(

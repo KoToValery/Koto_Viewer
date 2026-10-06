@@ -356,6 +356,7 @@ DxfDocument _analyse(DxfDocument doc) {
     'complete': true,
     'hasResults': additions.isNotEmpty,
     'wallsFound': detected.hasWallsFound,
+    'wallLayer': walls,
     'layers': [
       walls,
       slabs,

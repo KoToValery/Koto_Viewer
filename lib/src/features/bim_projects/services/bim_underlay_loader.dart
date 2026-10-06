@@ -128,6 +128,11 @@ class BimUnderlayLoader {
 
       final metadata = BimUnderlayMetadata.read(doc);
       if (metadata != null) {
+        // Candidate contours stay in source CAD coordinates.
+        metadata['sourceToProject'] = {
+          'scale': scale,
+          'translation': [translation.dx, translation.dy],
+        };
         metadata['axes'] = BimUnderlayMetadata.axes(doc)
             .map(
               (a) => a

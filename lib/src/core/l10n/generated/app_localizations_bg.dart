@@ -2661,4 +2661,20 @@ class AppLocalizationsBg extends AppLocalizations {
   String cadLayersMm(String mm) {
     return '$mm мм';
   }
+
+  @override
+  String get bimGenerateSlabs => 'Генерирай начални плочи';
+
+  @override
+  String get bimSlabsAlreadyGenerated =>
+      'На този етаж вече има генерирани плочи. Редактирайте ги директно; генерирането няма да презапише промените.';
+
+  @override
+  String get bimSlabSeedsEmpty =>
+      'Няма валидни контури за плочи. Първо обработете основата.';
+
+  @override
+  String bimSlabSeedsReview(int count, int skipped, String thickness) {
+    return 'Създаване на $count редактируеми плочи на този етаж; пропуснати: $skipped. Дебелина: $thickness cm, от текущата настройка за плоча.\n\nРъбовете се прилепват само при разстояние под 2 cm. Това са начални предложения: проверете контура, отворите, котите и дебелината преди използване в конструктивната схема.';
+  }
 }

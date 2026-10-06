@@ -2208,5 +2208,24 @@
     "placeholders": {
       "mm": { "type": "String" }
     }
+  },
+  "bimGenerateSlabs": "Generate initial slabs",
+  "bimSlabsAlreadyGenerated": "This storey already has generated slabs. Edit them directly; generation will not overwrite your changes.",
+  "bimSlabSeedsEmpty": "No valid slab contours are available. Process the underlay first.",
+  "bimSlabSeedsReview": "Create {count} editable slabs on this storey; skipped: {skipped}. Thickness: {thickness} cm, from the current slab setting.\n\nEdges snap only at distances below 2 cm. These are initial proposals: review the contour, openings, levels and thickness before using them in the structural scheme."
+,
+  "@bimSlabSeedsReview": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "thickness": {
+        "type": "String"
+      }
+    }
   }
+
 }

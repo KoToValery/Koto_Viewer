@@ -2652,4 +2652,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String cadLayersMm(String mm) {
     return '$mm mm';
   }
+
+  @override
+  String get bimGenerateSlabs => 'Generate initial slabs';
+
+  @override
+  String get bimSlabsAlreadyGenerated =>
+      'This storey already has generated slabs. Edit them directly; generation will not overwrite your changes.';
+
+  @override
+  String get bimSlabSeedsEmpty =>
+      'No valid slab contours are available. Process the underlay first.';
+
+  @override
+  String bimSlabSeedsReview(int count, int skipped, String thickness) {
+    return 'Create $count editable slabs on this storey; skipped: $skipped. Thickness: $thickness cm, from the current slab setting.\n\nEdges snap only at distances below 2 cm. These are initial proposals: review the contour, openings, levels and thickness before using them in the structural scheme.';
+  }
 }

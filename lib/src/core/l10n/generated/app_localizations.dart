@@ -4611,6 +4611,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{mm} mm'**
   String cadLayersMm(String mm);
+
+  /// No description provided for @bimGenerateSlabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate initial slabs'**
+  String get bimGenerateSlabs;
+
+  /// No description provided for @bimSlabsAlreadyGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'This storey already has generated slabs. Edit them directly; generation will not overwrite your changes.'**
+  String get bimSlabsAlreadyGenerated;
+
+  /// No description provided for @bimSlabSeedsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No valid slab contours are available. Process the underlay first.'**
+  String get bimSlabSeedsEmpty;
+
+  /// No description provided for @bimSlabSeedsReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Create {count} editable slabs on this storey; skipped: {skipped}. Thickness: {thickness} cm, from the current slab setting.\n\nEdges snap only at distances below 2 cm. These are initial proposals: review the contour, openings, levels and thickness before using them in the structural scheme.'**
+  String bimSlabSeedsReview(int count, int skipped, String thickness);
 }
 
 class _AppLocalizationsDelegate
