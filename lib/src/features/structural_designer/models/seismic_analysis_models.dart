@@ -21,7 +21,7 @@ enum SeismicRiskLevel {
   String localizedLabel(AppLocalizations l10n) {
     switch (this) {
       case SeismicRiskLevel.regular:
-        return l10n.statusSafe;
+        return l10n.seismicPreliminaryBalanced;
       case SeismicRiskLevel.warning:
         return l10n.statusWarning;
       case SeismicRiskLevel.critical:
@@ -38,6 +38,9 @@ class StoreySeismicCheck {
 
   /// True if the storey has a reinforced concrete slab acting as a horizontal seismic diaphragm.
   final bool hasSlabDiaphragm;
+
+  /// False when the preliminary lateral model cannot be evaluated.
+  final bool hasLateralStiffness;
 
   /// Center of Mass (CM) in CAD coordinates, or null if no slab diaphragm exists.
   final Offset? centerOfMassCad;
@@ -134,6 +137,7 @@ class StoreySeismicCheck {
     required this.storeyName,
     required this.storeyIndex,
     this.hasSlabDiaphragm = true,
+    this.hasLateralStiffness = true,
     this.centerOfMassCad,
     this.centerOfRigidityCad,
     this.eccentricityM,
@@ -188,6 +192,8 @@ class StoreySeismicCheck {
     if (!hasSlabDiaphragm) {
       return l10n.seismicRecNoSlabDiaphragm;
     }
+
+    if (!hasLateralStiffness) return l10n.seismicRigidityUnavailable;
 
     final StringBuffer rec = StringBuffer();
     if (disconnectedWallNames.isNotEmpty) {

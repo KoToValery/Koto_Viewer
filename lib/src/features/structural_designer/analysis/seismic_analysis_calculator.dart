@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
+import 'seismic_layout_properties.dart';
 
 /// Eurocode 8 (EC8 EN 1998-1) Seismic Regularity, Torsion, and Layout Engine.
 ///
@@ -119,6 +120,7 @@ class SeismicAnalysisCalculator {
           storeyName: storey.name,
           storeyIndex: sIdx,
           hasSlabDiaphragm: false,
+          hasLateralStiffness: false,
           centerOfMassCad: null,
           centerOfRigidityCad: null,
           eccentricityM: null,
@@ -204,11 +206,15 @@ class SeismicAnalysisCalculator {
 
       // Connected columns tributary mass
       for (final col in connectedCols) {
-        final colAreaM2 = (col.width / scale) * (col.height / scale);
+        final section = PolygonMassIntegrals.integrate(col.polygonVertices, col.center, scale);
+        final colAreaM2 = col.shape == ColumnShape.circular
+            ? math.pi * math.pow(col.width / scale, 2) / 4 : section.area;
+        final centroid = col.shape == ColumnShape.circular || section.area <= 0 ? col.center
+            : col.center + Offset(section.firstX / section.area, section.firstY / section.area) * scale;
         final colMass = colAreaM2 * hM * 25.0;
         totalMass += colMass;
-        sumMassX += colMass * col.center.dx;
-        sumMassY += colMass * col.center.dy;
+        sumMassX += colMass * centroid.dx;
+        sumMassY += colMass * centroid.dy;
       }
 
       // Connected shear walls tributary mass
@@ -228,145 +234,81 @@ class SeismicAnalysisCalculator {
         cmCad = Offset((minX + maxX) / 2.0, (minY + maxY) / 2.0);
       }
 
-      // B. Calculate Center of Rigidity (CR) & Shear Wall Areas
-      // ONLY elements connected to the slab diaphragm participate in resisting lateral diaphragm forces!
-      double sumKx = 0.0;
-      double sumKy = 0.0;
-      double sumKxY = 0.0;
-      double sumKyX = 0.0;
-
-      double totalWallAreaX = 0.0;
-      double totalWallAreaY = 0.0;
-
-      // Connected shear walls rigidity contribution
+      // Preliminary elastic layout model: shared E/end-restraint factors cancel.
+      // A complete frame/shell model is still required for design verification.
+      final supports = <LayoutSupport>[];
+      double totalWallAreaX = 0, totalWallAreaY = 0;
       for (final cw in connectedWalls) {
         final wall = cw.wall;
-        final conn = cw.connection;
-        final lenM = math.max(0.40, conn.effectiveLengthM);
-        final tM = math.max(0.15, wall.thickness / scale);
-        final center = conn.effectiveCenterCad;
-
-        // Strong axis moment of inertia: t * L^3 / 12
-        final iStrong = (tM * math.pow(lenM, 3)) / 12.0;
-        final iWeak = (lenM * math.pow(tM, 3)) / 12.0;
-
+        final length = cw.connection.effectiveLengthM;
+        final thickness = wall.thickness / scale;
         final delta = wall.end - wall.start;
         final angle = math.atan2(delta.dy, delta.dx);
-        final cosA = math.cos(angle);
-        final sinA = math.sin(angle);
-
-        // Lateral stiffness along building axes
-        final kX = (iStrong * cosA * cosA + iWeak * sinA * sinA);
-        final kY = (iStrong * sinA * sinA + iWeak * cosA * cosA);
-
-        sumKx += kX;
-        sumKy += kY;
-        sumKxY += kX * center.dy;
-        sumKyX += kY * center.dx;
-
-        totalWallAreaX += lenM * tM * cosA.abs();
-        totalWallAreaY += lenM * tM * sinA.abs();
+        supports.add(LayoutSupport.rotated(cw.connection.effectiveCenterCad / scale,
+          thickness * math.pow(length, 3) / 12,
+          length * math.pow(thickness, 3) / 12, angle));
+        totalWallAreaX += length * thickness * math.cos(angle).abs();
+        totalWallAreaY += length * thickness * math.sin(angle).abs();
       }
-
-      // Connected columns rigidity contribution
+      var unsupportedSection = false;
       for (final col in connectedCols) {
-        final wM = math.max(0.20, col.width / scale);
-        final hColM = math.max(0.20, col.height / scale);
-        final pos = col.center;
-
-        // Bending inertia: kX resists X force (depth in X is wM)
-        final double iX = (hColM * math.pow(wM, 3)) / 12.0;
-        final double iY = (wM * math.pow(hColM, 3)) / 12.0;
-
-        sumKx += iX;
-        sumKy += iY;
-        sumKxY += iX * pos.dy;
-        sumKyX += iY * pos.dx;
+        final w = col.width / scale, h = col.height / scale;
+        if (col.shape == ColumnShape.lShape) {
+          unsupportedSection = true;
+          continue;
+        }
+        final ix = col.shape == ColumnShape.circular ? math.pi * math.pow(w, 4) / 64 : h * math.pow(w, 3) / 12;
+        final iy = col.shape == ColumnShape.circular ? ix : w * math.pow(h, 3) / 12;
+        supports.add(LayoutSupport.rotated(col.center / scale, ix, iy, col.rotationRad));
       }
+      final rigidity = unsupportedSection ? null : LayoutRigidity.calculate(supports);
+      final hasLateralStiffness = rigidity != null;
+      final sumKx = rigidity?.kx ?? 0.0, sumKy = rigidity?.ky ?? 0.0;
+      // Internal placeholder only: unavailable CR is exported as null below.
+      final crCad = rigidity == null ? cmCad : rigidity.center * scale;
+      final sumIpR = rigidity?.torsion ?? 0.0; // m^6 layout index, not m^4 + m^6.
 
-      final Offset crCad;
-      if (sumKx > 1e-6 && sumKy > 1e-6) {
-        // x_CR is determined by ky (resistance to Y displacement at X distance)
-        // y_CR is determined by kx (resistance to X displacement at Y distance)
-        crCad = Offset(sumKyX / sumKy, sumKxY / sumKx);
-      } else {
-        crCad = cmCad;
+      // Integrate the same distributed weights used for CM, about that CM.
+      double polarWeight = 0;
+      for (final slab in storey.slabs) {
+        var polar = PolygonMassIntegrals.integrate(slab.polygon, cmCad, scale).polar;
+        for (final opening in slab.openings) {
+          polar -= PolygonMassIntegrals.integrate(opening, cmCad, scale).polar;
+        }
+        polarWeight += polar * (25 * slab.thickness + project.deadLoadSuperimposed + 0.3 * project.liveLoad);
       }
-
-      // Eurocode 8 §4.2.3.2 Torsional Rigidity, Radii & Regularity Engine
-      // 1. Floor mass polar radius of gyration in plan: l_s = sqrt((Lx^2 + Ly^2) / 12)
-      final double ls = math.sqrt((dimXM * dimXM + dimYM * dimYM) / 12.0);
-
-      // 2. Eccentricity vector in meters
-      final double exM = (cmCad.dx - crCad.dx).abs() / scale;
-      final double eyM = (cmCad.dy - crCad.dy).abs() / scale;
-      final double eRatioX = exM / dimXM;
-      final double eRatioY = eyM / dimYM;
-      if (eRatioX > maxGlobalEccRatio) maxGlobalEccRatio = eRatioX;
-      if (eRatioY > maxGlobalEccRatio) maxGlobalEccRatio = eRatioY;
-
-      // 3. Torsional rigidity I_p,R about CR (sum [Kxi * dy^2 + Kyi * dx^2] + sum [I_p0])
-      double sumIpR = 0.0;
-      final crM = Offset(crCad.dx / scale, crCad.dy / scale);
-
+      for (final col in connectedCols) {
+        if (col.shape == ColumnShape.circular) {
+          final radius = col.width / scale / 2;
+          final area = math.pi * radius * radius;
+          polarWeight += 25 * hM * area * (radius*radius/2 + ((col.center-cmCad)/scale).distanceSquared);
+        } else {
+          polarWeight += 25 * hM * PolygonMassIntegrals.integrate(col.polygonVertices, cmCad, scale).polar;
+        }
+      }
       for (final cw in connectedWalls) {
-        final wall = cw.wall;
-        final conn = cw.connection;
-        final lenM = math.max(0.40, conn.effectiveLengthM);
-        final tM = math.max(0.15, wall.thickness / scale);
-        final centerM = Offset(conn.effectiveCenterCad.dx / scale, conn.effectiveCenterCad.dy / scale);
-
-        final iStrong = (tM * math.pow(lenM, 3)) / 12.0;
-        final iWeak = (lenM * math.pow(tM, 3)) / 12.0;
-
-        final delta = wall.end - wall.start;
-        final angle = math.atan2(delta.dy, delta.dx);
-        final cosA = math.cos(angle);
-        final sinA = math.sin(angle);
-
-        final kX = (iStrong * cosA * cosA + iWeak * sinA * sinA);
-        final kY = (iStrong * sinA * sinA + iWeak * cosA * cosA);
-
-        final dx = centerM.dx - crM.dx;
-        final dy = centerM.dy - crM.dy;
-
-        // Bending inertia around element's own centroid + Huygens/Steiner transfer to CR
-        sumIpR += (kX * dy * dy + kY * dx * dx) + iStrong;
+        final length = cw.connection.effectiveLengthM, thickness = cw.wall.thickness / scale;
+        final area = length * thickness;
+        polarWeight += 25*hM*area*((length*length+thickness*thickness)/12 +
+            ((cw.connection.effectiveCenterCad-cmCad)/scale).distanceSquared);
       }
-
-      for (final col in connectedCols) {
-        final wM = math.max(0.20, col.width / scale);
-        final hColM = math.max(0.20, col.height / scale);
-        final posM = Offset(col.center.dx / scale, col.center.dy / scale);
-
-        final double iX = (hColM * math.pow(wM, 3)) / 12.0;
-        final double iY = (wM * math.pow(hColM, 3)) / 12.0;
-
-        final dx = posM.dx - crM.dx;
-        final dy = posM.dy - crM.dy;
-
-        sumIpR += (iX * dy * dy + iY * dx * dx);
+      final ls = totalMass > 0 ? math.sqrt(math.max(0, polarWeight / totalMass)) : 0.0;
+      final exM = (cmCad.dx-crCad.dx).abs()/scale;
+      final eyM = (cmCad.dy-crCad.dy).abs()/scale;
+      final eRatioX = exM/dimXM, eRatioY = eyM/dimYM;
+      if (hasLateralStiffness) {
+        maxGlobalEccRatio = math.max(maxGlobalEccRatio, math.max(eRatioX, eRatioY));
       }
-
-      // 4. Eurocode 8 Torsional radii: r_x = sqrt(I_p,R / Ky), r_y = sqrt(I_p,R / Kx)
-      final double rx = (sumKy > 1e-6) ? math.sqrt(sumIpR / sumKy) : 0.0;
-      final double ry = (sumKx > 1e-6) ? math.sqrt(sumIpR / sumKx) : 0.0;
-
-      // 5. Eurocode 8 Plan Regularity & Torsional Sensitivity checks:
-      // Condition 1: Torsionally stiff structure (r_x >= l_s and r_y >= l_s per EC8 §4.2.3.2(4) & (6))
-      final bool isTorsionallyStiff = (rx >= ls * 0.90) && (ry >= ls * 0.90);
-
-      // Condition 2: Structural eccentricity limits (e_0x <= 0.30*rx and e_0y <= 0.30*ry per EC8 §4.2.3.2(4))
-      final bool hasSignificantEccentricity = (exM > 0.30 * rx) || (eyM > 0.30 * ry) || (eRatioX > 0.15) || (eRatioY > 0.15);
+      final rx = sumKy > 0 ? math.sqrt(sumIpR/sumKy) : 0.0;
+      final ry = sumKx > 0 ? math.sqrt(sumIpR/sumKx) : 0.0;
+      final isTorsionallyStiff = hasLateralStiffness && rx >= ls && ry >= ls;
+      final hasSignificantEccentricity = hasLateralStiffness && (exM > .30*rx || eyM > .30*ry);
       if (hasSignificantEccentricity) anyStructuralEccentricity = true;
-
-      // Condition 3: Plan regularity per EC8
-      final bool isPlanRegularEC8 = isTorsionallyStiff && !hasSignificantEccentricity;
-
-      // Condition 4: True torsional sensitivity (unbalanced layout with torsional flexibility)
-      final bool isSymmetric = (eRatioX <= 0.05) && (eRatioY <= 0.05);
-      final bool isTorsionallySensitive = !isSymmetric && (!isTorsionallyStiff || (eRatioX > 0.25 || eRatioY > 0.25));
+      // Symmetry alone does not exempt a torsionally flexible layout.
+      final isTorsionallySensitive = hasLateralStiffness && !isTorsionallyStiff;
       if (isTorsionallySensitive) anyTorsionalSensitivity = true;
+      // These two indicators alone cannot establish all EC8 plan regularity criteria.
+      const isPlanRegularEC8 = false;
 
       // Shear wall ratios (%)
       final double wallRatioX = (totalWallAreaX / floorAreaM2) * 100.0;
@@ -480,7 +422,7 @@ class SeismicAnalysisCalculator {
       final SeismicRiskLevel risk;
       if (floatingIds.isNotEmpty) {
         risk = SeismicRiskLevel.critical;
-      } else if (isTorsionallySensitive || !wallOkX || !wallOkY || hasSignificantEccentricity || eRatioX > 0.08 || eRatioY > 0.08 || disconnectedWallIds.isNotEmpty || disconnectedColIds.isNotEmpty) {
+      } else if (!hasLateralStiffness || isTorsionallySensitive || !wallOkX || !wallOkY || hasSignificantEccentricity || eRatioX > 0.08 || eRatioY > 0.08 || disconnectedWallIds.isNotEmpty || disconnectedColIds.isNotEmpty) {
         risk = SeismicRiskLevel.warning;
       } else {
         risk = SeismicRiskLevel.regular;
@@ -492,8 +434,9 @@ class SeismicAnalysisCalculator {
         storeyIndex: sIdx,
         hasSlabDiaphragm: true,
         centerOfMassCad: cmCad,
-        centerOfRigidityCad: crCad,
-        eccentricityM: Offset(exM, eyM),
+        centerOfRigidityCad: hasLateralStiffness ? crCad : null,
+        hasLateralStiffness: hasLateralStiffness,
+        eccentricityM: hasLateralStiffness ? Offset(exM, eyM) : null,
         dimensionXM: dimXM,
         dimensionYM: dimYM,
         eccentricityRatioX: eRatioX,
@@ -559,6 +502,7 @@ class SeismicAnalysisCalculator {
         storeyName: cur.storeyName,
         storeyIndex: cur.storeyIndex,
         hasSlabDiaphragm: cur.hasSlabDiaphragm,
+        hasLateralStiffness: cur.hasLateralStiffness,
         centerOfMassCad: cur.centerOfMassCad,
         centerOfRigidityCad: cur.centerOfRigidityCad,
         eccentricityM: cur.eccentricityM,
@@ -678,7 +622,7 @@ class SeismicAnalysisCalculator {
     final SeismicRiskLevel overallRisk;
     if (totalFloatingColsCount > 0 || anySoftStorey) {
       overallRisk = SeismicRiskLevel.critical;
-    } else if (anyTorsionalSensitivity || anyWallDeficit || anyStructuralEccentricity || maxGlobalEccRatio > 0.08 || totalDisconnectedWallsCount > 0 || totalDisconnectedColsCount > 0) {
+    } else if (storeyChecks.any((c) => !c.hasLateralStiffness) || anyTorsionalSensitivity || anyWallDeficit || anyStructuralEccentricity || maxGlobalEccRatio > 0.08 || totalDisconnectedWallsCount > 0 || totalDisconnectedColsCount > 0) {
       overallRisk = SeismicRiskLevel.warning;
     } else {
       overallRisk = SeismicRiskLevel.regular;
