@@ -2147,5 +2147,15 @@
   "bimProjectDetectingWallsAndSlabs": "Detecting walls and slabs…",
   "bimProjectKcadReady": "KCAD ready",
   "bimProjectConversionFailed": "Underlay conversion failed",
-  "bimProjectReprocessUnderlay": "Reprocess underlay"
+  "bimProjectReprocessUnderlay": "Reprocess underlay",
+  "bimSlabPreviewTitle": "Slab contour proposals",
+  "bimSlabPreviewMissing": "No contour analysis is saved. Use Reprocess underlay to run it.",
+  "bimSlabPreviewCount": "Proposed contours: {count}",
+  "@bimSlabPreviewCount": {"placeholders": {"count": {"type": "int"}}},
+  "bimSlabPreviewExplanation": "Orange contours are approximate proposals. Red connections are assumed openings requiring review; they may appear even when no contour was obtained. Enable the structural filter to see them. A proposal may cover only part of the building. Courtyards, shafts and stair openings are not classified. Check the level and concrete edge. No structural slab has been created.",
+  "bimSlabPreviewRegions": "Analysed regions: {regions}; without contours: {unresolved}; assumed connections: {gaps}.",
+  "bimSlabPreviewSkipped": "Regions not processed due to the work limit: {count}.",
+  "@bimSlabPreviewSkipped": {"placeholders": {"count": {"type": "int"}}},
+  "@bimSlabPreviewRegions": {"placeholders": {"regions": {"type": "int"}, "unresolved": {"type": "int"}, "gaps": {"type": "int"}}},
+  "bimSlabPreviewEmpty": "No reliable closed contour was obtained. Possible causes include open wall gaps, missing walls, ambiguous connections, very small enclosed areas or drawing extents too large for the current resolution."
 }

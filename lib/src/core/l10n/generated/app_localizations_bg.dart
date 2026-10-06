@@ -2568,4 +2568,34 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get bimProjectReprocessUnderlay => 'Повторен анализ на подложката';
+
+  @override
+  String get bimSlabPreviewTitle => 'Предложения за контур на плоча';
+
+  @override
+  String get bimSlabPreviewMissing =>
+      'Няма записан анализ на контура. Стартирайте повторен анализ на подложката.';
+
+  @override
+  String bimSlabPreviewCount(int count) {
+    return 'Предложени контури: $count';
+  }
+
+  @override
+  String get bimSlabPreviewExplanation =>
+      'Оранжевите контури са приблизителни предложения. Червените връзки са предположени отвори, които трябва да проверите; могат да се показват и без получен контур. Включете структурния филтър, за да ги видите. Предложението може да обхваща само част от сградата. Дворове, шахти и стълбищни отвори не са класифицирани. Проверете нивото и ръба на бетона. Не е създадена конструктивна плоча.';
+
+  @override
+  String bimSlabPreviewRegions(int regions, int unresolved, int gaps) {
+    return 'Анализирани области: $regions; без контур: $unresolved; предположени връзки: $gaps.';
+  }
+
+  @override
+  String bimSlabPreviewSkipped(int count) {
+    return 'Необработени области поради ограничението за обем: $count.';
+  }
+
+  @override
+  String get bimSlabPreviewEmpty =>
+      'Не е получен надежден затворен контур. Възможните причини включват прекъсвания или липсващи стени, нееднозначни връзки, много малки затворени площи или прекалено голям чертеж за текущата разделителна способност.';
 }

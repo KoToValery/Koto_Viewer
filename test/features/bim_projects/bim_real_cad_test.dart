@@ -49,6 +49,27 @@ void main() {
                 .where((e) => generated.contains(e.layer))
                 .length,
             'axes': BimUnderlayMetadata.axes(doc).length,
+            'slabGapHypotheses':
+                (BimUnderlayMetadata.read(doc)?['slabEnvelope']?['assumedGaps']
+                        as List?)
+                    ?.length,
+            'slabRegions':
+                (BimUnderlayMetadata.read(doc)?['slabEnvelope']?['regions']
+                        as List?)
+                    ?.length,
+            'slabSkippedRegions': BimUnderlayMetadata.read(
+              doc,
+            )?['slabEnvelope']?['skippedRegions'],
+            'slabEnvelopeStatus': BimUnderlayMetadata.read(
+              doc,
+            )?['slabEnvelope']?['status'],
+            'slabEnvelopeDiagnostics': BimUnderlayMetadata.read(
+              doc,
+            )?['slabEnvelope']?['diagnostics'],
+            'slabEnvelopeContours':
+                (BimUnderlayMetadata.read(doc)?['slabEnvelope']?['contours']
+                        as List?)
+                    ?.length,
             'kcadBytes': await result.kcadFile.length(),
           };
           reports.add(report);

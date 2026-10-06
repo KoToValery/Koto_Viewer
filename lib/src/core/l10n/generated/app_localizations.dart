@@ -4479,6 +4479,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reprocess underlay'**
   String get bimProjectReprocessUnderlay;
+
+  /// No description provided for @bimSlabPreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Slab contour proposals'**
+  String get bimSlabPreviewTitle;
+
+  /// No description provided for @bimSlabPreviewMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No contour analysis is saved. Use Reprocess underlay to run it.'**
+  String get bimSlabPreviewMissing;
+
+  /// No description provided for @bimSlabPreviewCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed contours: {count}'**
+  String bimSlabPreviewCount(int count);
+
+  /// No description provided for @bimSlabPreviewExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Orange contours are approximate proposals. Red connections are assumed openings requiring review; they may appear even when no contour was obtained. Enable the structural filter to see them. A proposal may cover only part of the building. Courtyards, shafts and stair openings are not classified. Check the level and concrete edge. No structural slab has been created.'**
+  String get bimSlabPreviewExplanation;
+
+  /// No description provided for @bimSlabPreviewRegions.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysed regions: {regions}; without contours: {unresolved}; assumed connections: {gaps}.'**
+  String bimSlabPreviewRegions(int regions, int unresolved, int gaps);
+
+  /// No description provided for @bimSlabPreviewSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Regions not processed due to the work limit: {count}.'**
+  String bimSlabPreviewSkipped(int count);
+
+  /// No description provided for @bimSlabPreviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reliable closed contour was obtained. Possible causes include open wall gaps, missing walls, ambiguous connections, very small enclosed areas or drawing extents too large for the current resolution.'**
+  String get bimSlabPreviewEmpty;
 }
 
 class _AppLocalizationsDelegate

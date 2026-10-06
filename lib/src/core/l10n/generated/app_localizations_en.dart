@@ -2559,4 +2559,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bimProjectReprocessUnderlay => 'Reprocess underlay';
+
+  @override
+  String get bimSlabPreviewTitle => 'Slab contour proposals';
+
+  @override
+  String get bimSlabPreviewMissing =>
+      'No contour analysis is saved. Use Reprocess underlay to run it.';
+
+  @override
+  String bimSlabPreviewCount(int count) {
+    return 'Proposed contours: $count';
+  }
+
+  @override
+  String get bimSlabPreviewExplanation =>
+      'Orange contours are approximate proposals. Red connections are assumed openings requiring review; they may appear even when no contour was obtained. Enable the structural filter to see them. A proposal may cover only part of the building. Courtyards, shafts and stair openings are not classified. Check the level and concrete edge. No structural slab has been created.';
+
+  @override
+  String bimSlabPreviewRegions(int regions, int unresolved, int gaps) {
+    return 'Analysed regions: $regions; without contours: $unresolved; assumed connections: $gaps.';
+  }
+
+  @override
+  String bimSlabPreviewSkipped(int count) {
+    return 'Regions not processed due to the work limit: $count.';
+  }
+
+  @override
+  String get bimSlabPreviewEmpty =>
+      'No reliable closed contour was obtained. Possible causes include open wall gaps, missing walls, ambiguous connections, very small enclosed areas or drawing extents too large for the current resolution.';
 }

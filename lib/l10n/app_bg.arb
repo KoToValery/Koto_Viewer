@@ -731,5 +731,15 @@
   "bimProjectDetectingWallsAndSlabs": "Разпознаване на стени и плочи…",
   "bimProjectKcadReady": "KCAD готов",
   "bimProjectConversionFailed": "Неуспешна конверсия на подложката",
-  "bimProjectReprocessUnderlay": "Повторен анализ на подложката"
+  "bimProjectReprocessUnderlay": "Повторен анализ на подложката",
+  "bimSlabPreviewTitle": "Предложения за контур на плоча",
+  "bimSlabPreviewMissing": "Няма записан анализ на контура. Стартирайте повторен анализ на подложката.",
+  "bimSlabPreviewCount": "Предложени контури: {count}",
+  "@bimSlabPreviewCount": {"placeholders": {"count": {"type": "int"}}},
+  "bimSlabPreviewExplanation": "Оранжевите контури са приблизителни предложения. Червените връзки са предположени отвори, които трябва да проверите; могат да се показват и без получен контур. Включете структурния филтър, за да ги видите. Предложението може да обхваща само част от сградата. Дворове, шахти и стълбищни отвори не са класифицирани. Проверете нивото и ръба на бетона. Не е създадена конструктивна плоча.",
+  "bimSlabPreviewRegions": "Анализирани области: {regions}; без контур: {unresolved}; предположени връзки: {gaps}.",
+  "bimSlabPreviewSkipped": "Необработени области поради ограничението за обем: {count}.",
+  "@bimSlabPreviewSkipped": {"placeholders": {"count": {"type": "int"}}},
+  "@bimSlabPreviewRegions": {"placeholders": {"regions": {"type": "int"}, "unresolved": {"type": "int"}, "gaps": {"type": "int"}}},
+  "bimSlabPreviewEmpty": "Не е получен надежден затворен контур. Възможните причини включват прекъсвания или липсващи стени, нееднозначни връзки, много малки затворени площи или прекалено голям чертеж за текущата разделителна способност."
 }

@@ -7,7 +7,8 @@ class WallSegment {
   final Offset start;
   final Offset end;
   final double angleRad; // Normalized in [0, pi)
-  final double offsetFromOrigin; // Perpendicular distance to origin (p * normal)
+  final double
+  offsetFromOrigin; // Perpendicular distance to origin (p * normal)
   final double length;
   final String sourceLayer;
   final int? sourceColorIndex;
@@ -78,7 +79,9 @@ class LayerColorGroupResult {
   });
 
   String get groupKey {
-    final cKey = trueColor != null ? 'tc_$trueColor' : 'aci_${colorIndex ?? 256}';
+    final cKey = trueColor != null
+        ? 'tc_$trueColor'
+        : 'aci_${colorIndex ?? 256}';
     return '$layerName##$cKey';
   }
 }
@@ -87,7 +90,8 @@ class LayerColorGroupResult {
 class WallAxisDetectionResult {
   final List<LayerColorGroupResult> evaluatedGroups;
   final LayerColorGroupResult? bestGroup;
-  final double detectedScale; // CAD units per mm (e.g. 1.0 for mm, 0.1 for cm, 0.001 for m)
+  final double
+  detectedScale; // CAD units per mm (e.g. 1.0 for mm, 0.1 for cm, 0.001 for m)
   final String detectedUnitName; // 'mm', 'cm', or 'm'
   final double targetThicknessMm;
   final List<(Offset, Offset)> rawCenterlines;
@@ -95,6 +99,7 @@ class WallAxisDetectionResult {
   final List<(Offset, Offset)> snappedCenterlines;
   final List<(Offset, Offset)> wallContourSegments;
   final List<(Offset, Offset)> closureSegments;
+  final List<WallPairCandidate> selectedWallPairs;
 
   const WallAxisDetectionResult({
     required this.evaluatedGroups,
@@ -107,6 +112,7 @@ class WallAxisDetectionResult {
     required this.snappedCenterlines,
     required this.wallContourSegments,
     this.closureSegments = const [],
+    this.selectedWallPairs = const [],
   });
 
   bool get hasWallsFound => bestGroup != null && bestGroup!.pairCount > 0;

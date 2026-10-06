@@ -255,6 +255,7 @@ class WallAxisDetector {
       rawCenterlines: rawCenterlines,
       bridgedCenterlines: bridgedCenterlines,
       snappedCenterlines: snappedCenterlines,
+      selectedWallPairs: allPairs,
       wallContourSegments: wallContourSegments,
       closureSegments: closureSegments,
     );

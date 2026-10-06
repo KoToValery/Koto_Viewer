@@ -10,6 +10,7 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/parser/dxf_parser.dart';
 import '../../structural_designer/analysis/structural_underlay_filter.dart';
 import '../../structural_designer/analysis/wall_axis_detector.dart';
+import '../../structural_designer/analysis/slab_envelope_detector.dart';
 import '../../structural_designer/models/structural_element.dart';
 import 'dxf_document_transformer.dart';
 
@@ -212,11 +213,31 @@ DxfDocument _analyse(DxfDocument doc) {
   final walls = unique('BIM_Walls', doc.layers.keys);
   final slabs = unique('BIM_Slabs', doc.layers.keys);
   final detected = WallAxisDetector.detect(doc);
+  final envelope = SlabEnvelopeDetector.detect(detected);
+  final candidates = unique('BIM_Slab_Candidates', doc.layers.keys);
+  final assumed = unique('BIM_Slab_Assumed_Gaps', doc.layers.keys);
   final slabLayers = StructuralUnderlayFilter.detectSlabLayers(
     doc,
   ).detectedLayers.toSet();
   final additions = <DxfEntity>[];
   final generatedBlocks = <String>[];
+  for (final gap in envelope.assumedGaps) {
+    additions.add(
+      DxfLine(p1: gap.start, p2: gap.end, layer: assumed, colorIndex: 1),
+    );
+  }
+  for (final ring in envelope.contours) {
+    for (var i = 0; i < ring.length; i++) {
+      additions.add(
+        DxfLine(
+          p1: ring[i],
+          p2: ring[(i + 1) % ring.length],
+          layer: candidates,
+          colorIndex: 30,
+        ),
+      );
+    }
+  }
   for (final segment in {
     ...detected.wallContourSegments,
     ...detected.closureSegments,
@@ -285,6 +306,12 @@ DxfDocument _analyse(DxfDocument doc) {
     customLineweight: 0.30,
   );
   doc.layers[slabs] = DxfLayer(name: slabs, colorIndex: 7);
+  if (envelope.contours.isNotEmpty) {
+    doc.layers[candidates] = DxfLayer(name: candidates, colorIndex: 30);
+  }
+  if (envelope.assumedGaps.isNotEmpty) {
+    doc.layers[assumed] = DxfLayer(name: assumed, colorIndex: 1);
+  }
   doc.entities.addAll(additions);
   final model = doc.layoutEntities['Model'];
   if (model != null && !identical(model, doc.entities)) model.addAll(additions);
@@ -299,7 +326,13 @@ DxfDocument _analyse(DxfDocument doc) {
     'complete': true,
     'hasResults': additions.isNotEmpty,
     'wallsFound': detected.hasWallsFound,
-    'layers': [walls, slabs],
+    'layers': [
+      walls,
+      slabs,
+      if (envelope.contours.isNotEmpty) candidates,
+      if (envelope.assumedGaps.isNotEmpty) assumed,
+    ],
+    'slabEnvelope': envelope.toJson(),
     'blocks': generatedBlocks,
     'visibility': originalVisibility,
     'axes': axes.map((a) => a.toJson()).toList(),

@@ -591,6 +591,44 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     }
   }
 
+  void _showSlabPreviewReport() {
+    final l10n = context.l10n;
+    final doc = _loadedDocs[_currentStorey.storeyId];
+    final report = doc == null
+        ? null
+        : BimUnderlayMetadata.read(doc)?['slabEnvelope'];
+    final count = report is Map
+        ? (report['contours'] as List? ?? []).length
+        : 0;
+    final regions = report is Map ? (report['regions'] as List? ?? []) : [];
+    final gaps = report is Map
+        ? (report['assumedGaps'] as List? ?? []).length
+        : 0;
+    final unresolved = regions
+        .where((r) => r is Map && r['contourCount'] == 0)
+        .length;
+    final skipped = report is Map ? (report['skippedRegions'] as int? ?? 0) : 0;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.bimSlabPreviewTitle),
+        content: SingleChildScrollView(
+          child: Text(
+            report == null
+                ? l10n.bimSlabPreviewMissing
+                : '${l10n.bimSlabPreviewCount(count)}\n${l10n.bimSlabPreviewRegions(regions.length, unresolved, gaps)}${skipped > 0 ? '\n${l10n.bimSlabPreviewSkipped(skipped)}' : ''}\n\n${count == 0 ? '${l10n.bimSlabPreviewEmpty}\n\n' : ''}${l10n.bimSlabPreviewExplanation}',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(MaterialLocalizations.of(ctx).closeButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _reprocess() async {
     if (_isLoading || !_currentStorey.hasUnderlay) return;
     setState(() => _isLoading = true);
@@ -672,6 +710,9 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                 case 'reprocess':
                   _reprocess();
                   break;
+                case 'slab_preview':
+                  _showSlabPreviewReport();
+                  break;
                 case 'settings':
                   _showDisplaySettingsSheet();
                   break;
@@ -707,6 +748,11 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
                 value: 'reprocess',
                 enabled: !_isLoading && _currentStorey.hasUnderlay,
                 child: Text(l10n.bimProjectReprocessUnderlay),
+              ),
+              PopupMenuItem(
+                value: 'slab_preview',
+                enabled: !_isLoading && _currentStorey.hasUnderlay,
+                child: Text(l10n.bimSlabPreviewTitle),
               ),
               PopupMenuItem(
                 value: 'settings',

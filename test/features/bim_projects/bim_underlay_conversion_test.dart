@@ -20,7 +20,7 @@ class FailingLibrary extends BimProjectLibraryService {
       failSave ? Future.value(false) : super.saveProjectManifest(project);
 }
 
-String drawing() {
+String drawing({bool opening = false}) {
   final b = StringBuffer(
     '0\nSECTION\n2\nHEADER\n9\n\$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n2\n',
   );
@@ -33,7 +33,12 @@ String drawing() {
   }
 
   for (final inset in [0.0, 250.0]) {
-    line(inset, inset, 10000 - inset, inset, 'walls');
+    if (opening) {
+      line(inset, inset, 4000, inset, 'walls');
+      line(5000, inset, 10000 - inset, inset, 'walls');
+    } else {
+      line(inset, inset, 10000 - inset, inset, 'walls');
+    }
     line(10000 - inset, inset, 10000 - inset, 8000 - inset, 'walls');
     line(10000 - inset, 8000 - inset, inset, 8000 - inset, 'walls');
     line(inset, 8000 - inset, inset, inset, 'walls');
@@ -58,6 +63,30 @@ void main() {
     lib = FailingLibrary(temp);
   });
   tearDown(() async => temp.delete(recursive: true));
+
+  test(
+    'assumed opening layer and region report survive KCAD and reprocessing',
+    () async {
+      await source.writeAsString(drawing(opening: true));
+      final result = await BimUnderlayConversionService.convert(source);
+      addTearDown(result.dispose);
+      final baked = await KcadService.loadKcadFile(result.kcadFile);
+      final report = BimUnderlayMetadata.read(baked)!['slabEnvelope'];
+      expect(report['assumedGaps'], isNotEmpty);
+      expect(report['contours'], isNotEmpty);
+      expect(
+        baked.entities.where((e) => e.layer == 'BIM_Slab_Assumed_Gaps'),
+        isNotEmpty,
+      );
+      BimUnderlayMetadata.setFiltered(baked, false);
+      expect(baked.layers['BIM_Slab_Assumed_Gaps']!.isVisible, isFalse);
+      final again = await BimUnderlayConversionService.convert(result.kcadFile);
+      addTearDown(again.dispose);
+      final reloaded = await KcadService.loadKcadFile(again.kcadFile);
+      expect(BimUnderlayMetadata.read(reloaded)!['slabEnvelope'], report);
+      expect(reloaded.entities.length, baked.entities.length);
+    },
+  );
 
   Future<BimWorkProject> project() => lib.createProject(
     name: 'P',
@@ -95,6 +124,15 @@ void main() {
       expect(baked.entities.where((e) => e.layer == 'BIM_Walls'), isNotEmpty);
       expect(baked.entities.where((e) => e.layer == 'BIM_Slabs').length, 1);
       expect(BimUnderlayMetadata.axes(baked), isNotEmpty);
+      expect(
+        BimUnderlayMetadata.read(baked)!['slabEnvelope']['status'],
+        'needsReview',
+      );
+      expect(
+        baked.entities.where((e) => e.layer == 'BIM_Slab_Candidates'),
+        isNotEmpty,
+      );
+      expect(pure.layers.containsKey('BIM_Slab_Candidates'), isFalse);
       expect(baked.layers.containsKey('BIM_Axis'), isFalse);
       expect(stages, BimConversionStage.values);
       BimUnderlayMetadata.setFiltered(baked, false);
@@ -109,6 +147,10 @@ void main() {
     () async {
       final doc = DxfParser.parseString(drawing());
       doc.layers['BIM_Walls'] = DxfLayer(name: 'BIM_Walls', colorIndex: 3);
+      doc.layers['BIM_Slab_Candidates'] = DxfLayer(
+        name: 'BIM_Slab_Candidates',
+        colorIndex: 5,
+      );
       doc.blocks['slabPart'] = DxfBlock(
         name: 'slabPart',
         basePoint: const Offset(2, 3),
@@ -141,6 +183,11 @@ void main() {
       addTearDown(result.dispose);
       final baked = await KcadService.loadKcadFile(result.kcadFile);
       expect(baked.layers['BIM_Walls']!.colorIndex, 3);
+      expect(baked.layers['BIM_Slab_Candidates']!.colorIndex, 5);
+      expect(
+        BimUnderlayMetadata.generatedLayers(baked),
+        contains('BIM_Slab_Candidates_1'),
+      );
       expect(
         BimUnderlayMetadata.generatedLayers(baked),
         contains('BIM_Walls_1'),
