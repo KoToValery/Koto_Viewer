@@ -1912,6 +1912,13 @@ class AppLocalizationsBg extends AppLocalizations {
       'Не може да се пресметне процентно покритие на шайбите без подова плоча.';
 
   @override
+  String get seismicPreliminaryBalanced => 'Балансирано';
+
+  @override
+  String get seismicRigidityUnavailable =>
+      'Липсва коравина на срязване. Необходими са вертикални конструктивни елементи (шайби/колони) за сеизмична оценка.';
+
+  @override
   String get verticalBasePressure => 'Базисен натиск';
 
   @override

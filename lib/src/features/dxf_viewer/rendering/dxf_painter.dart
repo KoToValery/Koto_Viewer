@@ -3738,11 +3738,11 @@ class DxfPainter extends CustomPainter {
     }
 
     // Zoom-Out & Fit-to-screen Hardware Transform Optimization:
-    // When zoomed out (scale <= 1.05) and previous frame was also at zoom-out (oldScale <= 1.05),
-    // all document entities are already rasterized into the RepaintBoundary layer at 1:1 screen resolution.
-    // Further zooming out (e.g. scale 1.0 -> 0.5 -> 0.26 -> 0.13) or panning at bird's-eye view
-    // does NOT require CPU repaint — GPU hardware transforms the layer at 120 FPS for 0.0 ms!
-    if (currentScale <= 1.05 && oldDelegate.currentScale <= 1.05) {
+    // When zoomed out (scale <= 1.05) and visibleCadRect is null (all document entities
+    // are already rasterized into the RepaintBoundary layer at 1:1 screen resolution),
+    // further zooming out or panning does NOT require CPU repaint — GPU transforms the layer at 120 FPS.
+    if (visibleCadRect == null && oldDelegate.visibleCadRect == null &&
+        currentScale <= 1.05 && oldDelegate.currentScale <= 1.05) {
       return false;
     }
 

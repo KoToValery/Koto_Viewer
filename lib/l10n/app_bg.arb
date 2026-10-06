@@ -556,6 +556,8 @@
   "seismicRecDisconnectedCols": "Колони {names} са разположени извън очертанията на плочата и не са свързани с подовата диафрагма.",
   "seismicWallsOutsideSlabWarning": "{count, plural, =1{1 шайба извън плочата (изключена от диафрагмата)} other{{count} шайби извън плочата (изключени от диафрагмата)}}",
   "seismicNoSlabWallCoverage": "Не може да се пресметне процентно покритие на шайбите без подова плоча.",
+  "seismicPreliminaryBalanced": "Балансирано",
+  "seismicRigidityUnavailable": "Липсва коравина на срязване. Необходими са вертикални конструктивни елементи (шайби/колони) за сеизмична оценка.",
   "verticalBasePressure": "Базисен натиск",
   "verticalNoColumns": "Няма дефинирани колони в проекта.",
   "verticalPunchingCheckLabel": "Пробиване (EC2 §6.4):",

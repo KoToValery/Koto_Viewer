@@ -375,11 +375,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (!mounted) return;
       final currentScale =
           _transformController.value.getMaxScaleOnAxis().clamp(0.001, 10000.0);
-      if ((currentScale - _renderScale).abs() / _renderScale > 0.05) {
-        setState(() {
-          _renderScale = currentScale;
-        });
-      }
+      setState(() {
+        _renderScale = currentScale;
+      });
     });
   }
 
@@ -6299,107 +6297,132 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _saveProject();
   }
 
+  bool _filterUnderlayEntity(DxfEntity entity) {
+    // 1. Suppress all hatches (fill patterns) in structural underlay
+    if (entity is DxfHatch) return false;
+    // 2. If entity is on a white structural layer, suppress non-white entities (e.g. insulation lines with color 30)
+    final layer = _document.layers[entity.layer];
+    if (layer != null && StructuralUnderlayFilter.isWhiteLayer(layer)) {
+      if (entity.colorIndex != null &&
+          entity.colorIndex != 256 &&
+          entity.colorIndex != 0 &&
+          entity.colorIndex != 7 &&
+          entity.colorIndex != 255) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   // --- Structural Underlay Layer Filtering (White Thick Walls & Slabs focus) ---
 
   void _applyUnderlayFilter(bool activate) {
-    if (BimUnderlayMetadata.read(_document) != null) {
-      _underlayFilterActive = activate;
-      final docs = widget.bimContext?.underlaysByStorey ?? {'': _document};
-      for (final entry in docs.entries) {
-        BimUnderlayMetadata.setFiltered(entry.value, activate);
-        widget.bimContext?.onLayerVisibilityChanged(entry.key,
-          {for (final l in entry.value.layers.values) l.name: l.isVisible});
-      }
-      _underlayRevision++;
-      return;
-    }
-    _underlayFilterActive = activate;
-    if (activate) {
-      final Set<String> visibleLayerNames = _customUnderlayFilterLayers ??
-          StructuralUnderlayFilter.filterLayers(
-            layers: _document.layers.values,
-            entities: _document.entities,
-            blocks: _document.blocks,
-          );
-      _customUnderlayFilterLayers ??= Set<String>.from(visibleLayerNames);
-
-      // Verify how many entities in Model space will actually be visible
-      final modelEntities = _document.layoutEntities['Model'] ?? _document.entities;
-      int visibleCount = 0;
-      for (final e in modelEntities) {
-        if (e is DxfInsert) {
-          final block = _document.blocks[e.blockName];
-          if (block != null) {
-            final hasChild = block.entities.any((child) => visibleLayerNames.contains(child.layer));
-            if (hasChild || visibleLayerNames.contains(e.layer)) visibleCount++;
-          } else if (visibleLayerNames.contains(e.layer)) {
-            visibleCount++;
-          }
-        } else if (visibleLayerNames.contains(e.layer)) {
-          visibleCount++;
-        }
-      }
-
-      // If the filter resulted in ZERO visible entities, abort filter so screen is NEVER blank!
-      if (visibleLayerNames.isEmpty || visibleCount == 0) {
-        _underlayFilterActive = false;
-        for (final entry in _originalLayerVisibility.entries) {
-          _document.layers[entry.key]?.isVisible = entry.value;
+    void execute() {
+      if (BimUnderlayMetadata.read(_document) != null) {
+        _underlayFilterActive = activate;
+        final docs = widget.bimContext?.underlaysByStorey ?? {'': _document};
+        for (final entry in docs.entries) {
+          BimUnderlayMetadata.setFiltered(entry.value, activate);
+          widget.bimContext?.onLayerVisibilityChanged(entry.key,
+            {for (final l in entry.value.layers.values) l.name: l.isVisible});
         }
         _underlayRevision++;
         return;
       }
+      _underlayFilterActive = activate;
+      if (activate) {
+        final Set<String> visibleLayerNames = _customUnderlayFilterLayers ??
+            StructuralUnderlayFilter.filterLayers(
+              layers: _document.layers.values,
+              entities: _document.entities,
+              blocks: _document.blocks,
+            );
+        _customUnderlayFilterLayers ??= Set<String>.from(visibleLayerNames);
 
-      for (final layer in _document.layers.values) {
-        layer.isVisible = visibleLayerNames.contains(layer.name);
-      }
-
-      // Propagate filter to all subsequent storey layouts in the BIM project
-      if (widget.bimContext != null) {
-        for (final entry in widget.bimContext!.underlaysByStorey.entries) {
-          final storeyId = entry.key;
-          final doc = entry.value;
-          if (storeyId == _project.activeStorey.id) continue;
-          final sVisible = _customUnderlayFilterLayers ??
-              StructuralUnderlayFilter.filterLayers(
-                layers: doc.layers.values,
-                entities: doc.entities,
-                blocks: doc.blocks,
-              );
-          if (sVisible.isNotEmpty) {
-            for (final l in doc.layers.values) {
-              l.isVisible = sVisible.contains(l.name);
+        // Verify how many entities in Model space will actually be visible
+        final modelEntities = _document.layoutEntities['Model'] ?? _document.entities;
+        int visibleCount = 0;
+        for (final e in modelEntities) {
+          if (e is DxfInsert) {
+            final block = _document.blocks[e.blockName];
+            if (block != null) {
+              final hasChild = block.entities.any((child) => visibleLayerNames.contains(child.layer));
+              if (hasChild || visibleLayerNames.contains(e.layer)) visibleCount++;
+            } else if (visibleLayerNames.contains(e.layer)) {
+              visibleCount++;
             }
+          } else if (visibleLayerNames.contains(e.layer)) {
+            visibleCount++;
           }
-          final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible};
-          widget.bimContext!.onLayerVisibilityChanged(storeyId, sVisMap);
         }
-      }
-    } else {
-      for (final entry in _originalLayerVisibility.entries) {
-        _document.layers[entry.key]?.isVisible = entry.value;
+
+        // If the filter resulted in ZERO visible entities, abort filter so screen is NEVER blank!
+        if (visibleLayerNames.isEmpty || visibleCount == 0) {
+          _underlayFilterActive = false;
+          for (final entry in _originalLayerVisibility.entries) {
+            _document.layers[entry.key]?.isVisible = entry.value;
+          }
+          _underlayRevision++;
+          return;
+        }
+
+        for (final layer in _document.layers.values) {
+          layer.isVisible = visibleLayerNames.contains(layer.name);
+        }
+
+        // Propagate filter to all subsequent storey layouts in the BIM project
+        if (widget.bimContext != null) {
+          for (final entry in widget.bimContext!.underlaysByStorey.entries) {
+            final storeyId = entry.key;
+            final doc = entry.value;
+            if (storeyId == _project.activeStorey.id) continue;
+            final sVisible = _customUnderlayFilterLayers ??
+                StructuralUnderlayFilter.filterLayers(
+                  layers: doc.layers.values,
+                  entities: doc.entities,
+                  blocks: doc.blocks,
+                );
+            if (sVisible.isNotEmpty) {
+              for (final l in doc.layers.values) {
+                l.isVisible = sVisible.contains(l.name);
+              }
+            }
+            final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible};
+            widget.bimContext!.onLayerVisibilityChanged(storeyId, sVisMap);
+          }
+        }
+      } else {
+        for (final entry in _originalLayerVisibility.entries) {
+          _document.layers[entry.key]?.isVisible = entry.value;
+        }
+
+        // Restore all layers across all storeys
+        if (widget.bimContext != null) {
+          for (final entry in widget.bimContext!.underlaysByStorey.entries) {
+            final storeyId = entry.key;
+            final doc = entry.value;
+            if (storeyId == _project.activeStorey.id) continue;
+            for (final l in doc.layers.values) {
+              l.isVisible = true;
+            }
+            final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible};
+            widget.bimContext!.onLayerVisibilityChanged(storeyId, sVisMap);
+          }
+        }
       }
 
-      // Restore all layers across all storeys
+      _underlayRevision++;
+
       if (widget.bimContext != null) {
-        for (final entry in widget.bimContext!.underlaysByStorey.entries) {
-          final storeyId = entry.key;
-          final doc = entry.value;
-          if (storeyId == _project.activeStorey.id) continue;
-          for (final l in doc.layers.values) {
-            l.isVisible = true;
-          }
-          final sVisMap = {for (final l in doc.layers.values) l.name: l.isVisible};
-          widget.bimContext!.onLayerVisibilityChanged(storeyId, sVisMap);
-        }
+        final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
+        widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
       }
     }
 
-    _underlayRevision++;
-
-    if (widget.bimContext != null) {
-      final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
-      widget.bimContext!.onLayerVisibilityChanged(_project.activeStorey.id, visMap);
+    if (mounted) {
+      setState(execute);
+    } else {
+      execute();
     }
   }
 
@@ -7531,6 +7554,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       onInteractionEnd: (details) {
                         _activePointersCount = 0;
                         _isMultiTouchGesture = false;
+                        _scaleSettleTimer?.cancel();
+                        _scaleSettleTimer = Timer(const Duration(milliseconds: 60), () {
+                          if (!mounted) return;
+                          final currentScale =
+                              _transformController.value.getMaxScaleOnAxis().clamp(0.001, 10000.0);
+                          setState(() {
+                            _renderScale = currentScale;
+                          });
+                        });
                       },
                       child: Container(
                         color: _canvasTheme.bgColor,
@@ -7550,26 +7582,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                     theme: _canvasTheme,
                                     activeLayout: 'Model',
                                     currentScale: _renderScale,
-                                    visibleCadRect: _getVisibleCadRect(),
+                                    visibleCadRect: _underlayFilterActive ? null : _getVisibleCadRect(),
                                     settings: _displaySettings,
                                     revision: _underlayRevision,
-                                    entityFilter: _underlayFilterActive && BimUnderlayMetadata.read(_document) == null
-                                        ? (entity) {
-                                            // 1. Suppress all hatches (fill patterns) in structural underlay
-                                            if (entity is DxfHatch) return false;
-                                            // 2. If entity is on a white structural layer, suppress non-white entities (e.g. insulation lines with color 30)
-                                            final layer = _document.layers[entity.layer];
-                                            if (layer != null && StructuralUnderlayFilter.isWhiteLayer(layer)) {
-                                              if (entity.colorIndex != null &&
-                                                  entity.colorIndex != 256 &&
-                                                  entity.colorIndex != 0 &&
-                                                  entity.colorIndex != 7 &&
-                                                  entity.colorIndex != 255) {
-                                                return false;
-                                              }
-                                            }
-                                            return true;
-                                          }
+                                    entityFilter: (_underlayFilterActive && BimUnderlayMetadata.read(_document) == null)
+                                        ? _filterUnderlayEntity
                                         : null,
                                   ),
                                 ),

@@ -1906,6 +1906,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Shear wall ratio cannot be computed without a floor slab diaphragm.';
 
   @override
+  String get seismicPreliminaryBalanced => 'Balanced';
+
+  @override
+  String get seismicRigidityUnavailable =>
+      'Lateral stiffness unavailable. Vertical structural elements (shear walls/columns) are required to evaluate seismic behaviour.';
+
+  @override
   String get verticalBasePressure => 'Base Pressure';
 
   @override

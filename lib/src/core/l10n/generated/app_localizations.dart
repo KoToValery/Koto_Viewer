@@ -3395,6 +3395,18 @@ abstract class AppLocalizations {
   /// **'Shear wall ratio cannot be computed without a floor slab diaphragm.'**
   String get seismicNoSlabWallCoverage;
 
+  /// Label for balanced preliminary seismic risk level
+  ///
+  /// In en, this message translates to:
+  /// **'Balanced'**
+  String get seismicPreliminaryBalanced;
+
+  /// Recommendation when lateral stiffness cannot be computed
+  ///
+  /// In en, this message translates to:
+  /// **'Lateral stiffness unavailable. Vertical structural elements (shear walls/columns) are required to evaluate seismic behaviour.'**
+  String get seismicRigidityUnavailable;
+
   /// Foundation base pressure stat card title
   ///
   /// In en, this message translates to:

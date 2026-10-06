@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'dart:convert';
 import '../../dxf_viewer/models/dxf_models.dart';
+import '../../dxf_viewer/rendering/dxf_quadtree.dart';
 import 'bim_underlay_conversion_service.dart';
 import '../../structural_designer/analysis/structural_underlay_filter.dart';
 import '../models/bim_work_project.dart';
@@ -157,6 +158,14 @@ class BimUnderlayLoader {
     // 4. Second pass: unify bounds across all transformed documents so framing matches
     final alignedDocs = <String, DxfDocument>{};
     for (final entry in transformedDocs.entries) {
+      final spatialIndex = (entry.value.bounds == finalProjectBounds)
+          ? entry.value.spatialIndex
+          : DxfQuadTree.build(
+              entry.value.entities,
+              entry.value.blocks,
+              finalProjectBounds,
+            );
+
       alignedDocs[entry.key] = DxfDocument(
         layers: entry.value.layers,
         blocks: entry.value.blocks,
@@ -167,7 +176,7 @@ class BimUnderlayLoader {
         entityStats: entry.value.entityStats,
         lineTypes: entry.value.lineTypes,
         dimStyles: entry.value.dimStyles,
-        spatialIndex: entry.value.spatialIndex,
+        spatialIndex: spatialIndex,
         layouts: entry.value.layouts,
         layoutEntities: entry.value.layoutEntities,
         layoutBounds: entry.value.layoutBounds,
