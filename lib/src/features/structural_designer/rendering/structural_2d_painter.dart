@@ -1351,20 +1351,6 @@ class Structural2dPainter extends CustomPainter {
     canvas.translate(center.dx, center.dy);
     canvas.scale(1.0 / zoomScale);
 
-    const radius = 13.0;
-    final bgPaint = Paint()
-      ..color = isGhost ? const Color(0xCC2C2C2E) : const Color(0xFF1C1C1E)
-      ..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..color = isGhost
-          ? const Color(0x66FF453A)
-          : (isSelected ? const Color(0xFFFF9F0A) : const Color(0xFFFF453A))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = isSelected ? 2.5 : 1.8;
-
-    canvas.drawCircle(Offset.zero, radius, bgPaint);
-    canvas.drawCircle(Offset.zero, radius, borderPaint);
-
     final textSpan = TextSpan(
       text: label,
       style: TextStyle(
@@ -1377,6 +1363,22 @@ class Structural2dPainter extends CustomPainter {
       text: textSpan,
       textDirection: TextDirection.ltr,
     )..layout();
+
+    final textMaxDim = math.max(textPainter.width, textPainter.height);
+    final radius = math.max(8.0, textMaxDim / 2.0 + 1.8);
+
+    final bgPaint = Paint()
+      ..color = isGhost ? const Color(0xCC2C2C2E) : const Color(0xFF1C1C1E)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = isGhost
+          ? const Color(0x66FF453A)
+          : (isSelected ? const Color(0xFFFF9F0A) : const Color(0xFFFF453A))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = isSelected ? 2.0 : 1.4;
+
+    canvas.drawCircle(Offset.zero, radius, bgPaint);
+    canvas.drawCircle(Offset.zero, radius, borderPaint);
 
     final textOffset = Offset(
       -textPainter.width / 2.0,

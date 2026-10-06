@@ -5,6 +5,8 @@ import 'dart:ui';
 import '../models/wall_axis_models.dart';
 import 'slab_wall_regions.dart';
 import 'slab_boundary_refiner.dart';
+import '../../dxf_viewer/models/dxf_models.dart';
+import 'slab_opening_evidence.dart';
 
 /// Conservative preview only: enclosed free space is not proof of a slab.
 /// Coordinates remain in source CAD units, before project alignment.
@@ -45,7 +47,10 @@ class SlabEnvelopeResult {
 class SlabEnvelopeDetector {
   /// Geometric gap hypotheses remain visible and require review. No semantic
   /// door/window classification is implied by matching collinear wall faces.
-  static SlabEnvelopeResult detect(WallAxisDetectionResult walls) {
+  static SlabEnvelopeResult detect(
+    WallAxisDetectionResult walls, {
+    DxfDocument? document,
+  }) {
     final scale = walls.detectedScale;
     final pairs = walls.selectedWallPairs;
     SlabEnvelopeResult empty(String reason) =>
@@ -63,7 +68,13 @@ class SlabEnvelopeDetector {
     )) {
       return empty('invalidWallGeometry');
     }
-    final partition = SlabWallRegions.build(pairs, scale);
+    final partition = SlabWallRegions.build(
+      pairs,
+      scale,
+      openingEvidence: document == null
+          ? const []
+          : SlabOpeningEvidence.collect(document),
+    );
     if (partition.tooComplex) return empty('analysisComplexityLimit');
     final contours = <List<Offset>>[];
     final gaps = <SlabGapHypothesis>[];

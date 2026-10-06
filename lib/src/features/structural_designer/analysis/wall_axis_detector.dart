@@ -157,8 +157,6 @@ class WallAxisDetector {
         final lowerName = layerName.toLowerCase();
         if (_isClutterOrBorderLayer(lowerName)) {
           keywordMultiplier = 0.1; // Soft penalty for title block, format, borders
-        } else if (_isStructuralLayer(lowerName)) {
-          keywordMultiplier = 1.5; // Soft boost for wall layers
         }
 
         // Score: combines total length, pair count diversity, layout quality, and topological connectivity
@@ -639,17 +637,6 @@ class WallAxisDetector {
       'furn', 'мебел', 'text', 'текст',
     ];
     for (final kw in clutter) {
-      if (lowerName.contains(kw)) return true;
-    }
-    return false;
-  }
-
-  static bool _isStructuralLayer(String lowerName) {
-    const structural = [
-      'wall', 'стена', 'стен', 'stena', 'zid', 'masonry', 'mason', 'структура', 'констр',
-      '12', 'прегр', 'pregr', 'part', 'partition', 'вътр', 'interior'
-    ];
-    for (final kw in structural) {
       if (lowerName.contains(kw)) return true;
     }
     return false;
@@ -1328,8 +1315,8 @@ class WallAxisDetector {
     Rect docBounds,
     double targetDistCad,
   ) {
-    // Structural wall layers are never sheet borders
-    if (_isStructuralLayer(s.sourceLayer.toLowerCase())) return false;
+    // Only reject lines as sheet borders if they belong to border/clutter layers
+    if (!_isClutterOrBorderLayer(s.sourceLayer.toLowerCase())) return false;
 
     final double docWidth = docBounds.width.abs();
     final double docHeight = docBounds.height.abs();

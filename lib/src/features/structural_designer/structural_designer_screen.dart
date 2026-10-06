@@ -6210,7 +6210,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     List<(Offset, Offset)>? wallReferences;
     if (metadata == null) {
       final walls = WallAxisDetector.detect(_document);
-      final envelope = SlabEnvelopeDetector.detect(walls);
+      final envelope = SlabEnvelopeDetector.detect(walls, document: _document);
       final projections = SlabProjectionDetector.detect(
         _document, envelope, walls.detectedScale,
         wallLayers: walls.selectedWallPairs.expand((p) =>
@@ -7153,23 +7153,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ),
     );
 
-    final snapButton = IconButton(
-      icon: Icon(
-        _snapEnabled ? Icons.grain_rounded : Icons.lens_blur_rounded,
-        color: _snapEnabled ? const Color(0xFF00E5FF) : Colors.white38,
-        size: 20,
-      ),
-      tooltip: _snapEnabled
-          ? context.l10n.snapEnabledTooltip
-          : context.l10n.snapDisabledTooltip,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-      onPressed: () {
-        setState(() => _snapEnabled = !_snapEnabled);
-        HapticFeedback.selectionClick();
-      },
-    );
-
     final undoButton = IconButton(
       icon: Icon(Icons.undo_rounded,
           color: _undoStack.isNotEmpty ? Colors.white : Colors.white24,
@@ -7204,6 +7187,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       onSelected: (value) {
         switch (value) {
+          case 'toggle_snap':
+            setState(() => _snapEnabled = !_snapEnabled);
+            HapticFeedback.selectionClick();
+            break;
           case 'layers':
             _showLayersSheet();
             break;
@@ -7241,6 +7228,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           PopupMenuItem(value: 'generate_slabs',
             child: Text(context.l10n.bimGenerateSlabs,
               style: const TextStyle(color: Colors.white, fontSize: 13))),
+        PopupMenuItem(
+          value: 'toggle_snap',
+          child: Row(
+            children: [
+              Icon(
+                _snapEnabled ? Icons.grain_rounded : Icons.lens_blur_rounded,
+                size: 20,
+                color: _snapEnabled ? const Color(0xFF00E5FF) : Colors.white70,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                _snapEnabled ? context.l10n.snapEnabledTooltip : context.l10n.snapDisabledTooltip,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
         if (isCompact)
           PopupMenuItem(
             value: 'layers',
@@ -7338,7 +7342,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return [
         layersButton,
         filterButton,
-        snapButton,
         undoButton,
         exportButton,
         viewport3dButton,
@@ -7351,7 +7354,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // Display primary actions directly with Underlay filter quick button
     return [
       filterButton,
-      snapButton,
       undoButton,
       viewport3dButton,
       moreMenu,
@@ -8883,4 +8885,3 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 }
-

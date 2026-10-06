@@ -214,7 +214,7 @@ DxfDocument _analyse(DxfDocument doc) {
   final walls = unique('BIM_Walls', doc.layers.keys);
   final slabs = unique('BIM_Slabs', doc.layers.keys);
   final detected = WallAxisDetector.detect(doc);
-  final envelope = SlabEnvelopeDetector.detect(detected);
+  final envelope = SlabEnvelopeDetector.detect(detected, document: doc);
   final projections = SlabProjectionDetector.detect(
     doc,
     envelope,

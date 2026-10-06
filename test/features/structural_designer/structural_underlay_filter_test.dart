@@ -59,32 +59,33 @@ void main() {
       expect(visible, equals({'WALLS_PLAN'}));
     });
 
-    test('5. When NO White layers exist, filters by keywords (wall, slab, плоча, стена, stena, etc.)', () {
+    test('5. When NO White layers exist, filters slabs/structural elements and ignores wall keywords', () {
       final layers = [
-        DxfLayer(name: 'A-WALL-EXTR', colorIndex: 1), // Red, 'wall'
-        DxfLayer(name: 'PLOCHA_ET0', colorIndex: 4), // Cyan, 'plocha'
-        DxfLayer(name: 'STENA_BETON', colorIndex: 3), // Green, 'stena'
+        DxfLayer(name: 'A-WALL-EXTR', colorIndex: 1), // Red, 'wall' - no longer detected by keyword!
+        DxfLayer(name: 'PLOCHA_ET0', colorIndex: 4), // Cyan, 'plocha' - structural slab
+        DxfLayer(name: 'STENA_BETON', colorIndex: 3), // Green, 'stena' - no longer detected by keyword!
         DxfLayer(name: 'DOORS_SWING', colorIndex: 2), // Yellow, 'door' -> negative
         DxfLayer(name: 'FURNITURE_OFFICE', colorIndex: 5), // Blue, 'furn' -> negative
       ];
 
       final visible = StructuralUnderlayFilter.filterLayers(layers: layers);
 
-      expect(visible, equals({'A-WALL-EXTR', 'PLOCHA_ET0', 'STENA_BETON'}));
+      // Walls are no longer detected by hardcoded keywords ('wall', 'stena'); only structural slabs/elements remain
+      expect(visible, equals({'PLOCHA_ET0'}));
     });
 
-    test('6. Supports Bulgarian Cyrillic structural keywords (стена, плоча, колона, шайба, etc.)', () {
+    test('6. Supports Bulgarian Cyrillic structural keywords (плоча, колона) without hardcoded wall keywords', () {
       final layers = [
-        DxfLayer(name: 'Стени_носещи', colorIndex: 2), // Yellow, 'стени'
-        DxfLayer(name: 'Стоманобетонна_плоча', colorIndex: 1), // Red, 'плоча'
-        DxfLayer(name: 'Шайби_стб', colorIndex: 3), // Green, 'шайби'
+        DxfLayer(name: 'Стени_носещи', colorIndex: 2), // Yellow, 'стени' - not matched by keyword
+        DxfLayer(name: 'Стоманобетонна_плоча', colorIndex: 1), // Red, 'плоча' - matched
+        DxfLayer(name: 'Колони_стб', colorIndex: 3), // Green, 'колони' - matched
         DxfLayer(name: 'Размери_коти', colorIndex: 4), // Cyan, negative 'размер'
         DxfLayer(name: 'Текст_описания', colorIndex: 5), // Blue, negative 'текст'
       ];
 
       final visible = StructuralUnderlayFilter.filterLayers(layers: layers);
 
-      expect(visible, equals({'Стени_носещи', 'Стоманобетонна_плоча', 'Шайби_стб'}));
+      expect(visible, equals({'Стоманобетонна_плоча', 'Колони_стб'}));
     });
 
     test('7. Recognizes TrueColor White (0x00FFFFFF or RGB >= 220) with thickness', () {
@@ -137,17 +138,17 @@ void main() {
       expect(visible, isEmpty);
     });
 
-    test('10. Excludes empty layer 0 and DEFPOINTS, selecting real structural keyword layers', () {
+    test('10. Excludes empty layer 0 and DEFPOINTS, selecting real structural slab layers', () {
       final layers = [
         DxfLayer(name: '0', colorIndex: 7), // Empty layer 0
         DxfLayer(name: 'DEFPOINTS', colorIndex: 7), // Empty DEFPOINTS
-        DxfLayer(name: 'WALLS', colorIndex: 1, lineweight: 0.35), // Red walls with entities
+        DxfLayer(name: 'SLAB_FOUNDATION', colorIndex: 1, lineweight: 0.35), // Red slab with entities
         DxfLayer(name: 'DOORS', colorIndex: 2),
       ];
 
       final entities = [
-        const DxfLine(layer: 'WALLS', p1: Offset(0, 0), p2: Offset(10, 0)),
-        const DxfLine(layer: 'WALLS', p1: Offset(10, 0), p2: Offset(10, 10)),
+        const DxfLine(layer: 'SLAB_FOUNDATION', p1: Offset(0, 0), p2: Offset(10, 0)),
+        const DxfLine(layer: 'SLAB_FOUNDATION', p1: Offset(10, 0), p2: Offset(10, 10)),
         const DxfLine(layer: 'DOORS', p1: Offset(2, 0), p2: Offset(4, 0)),
       ];
 
@@ -156,22 +157,22 @@ void main() {
         entities: entities,
       );
 
-      // '0' and 'DEFPOINTS' have 0 entities and are ignored; 'WALLS' is correctly selected!
-      expect(visible, equals({'WALLS'}));
+      // '0' and 'DEFPOINTS' have 0 entities and are ignored; 'SLAB_FOUNDATION' is correctly selected!
+      expect(visible, equals({'SLAB_FOUNDATION'}));
     });
 
     test('11. Counts entities inside blocks and includes structural block layers', () {
       final layers = [
         DxfLayer(name: '0', colorIndex: 7),
-        DxfLayer(name: 'A-WALL', colorIndex: 4, lineweight: 0.50), // Cyan walls inside block
+        DxfLayer(name: 'A-SLAB', colorIndex: 4, lineweight: 0.50), // Cyan slab inside block
       ];
 
       final blocks = {
-        'WALL_BLOCK': DxfBlock(
-          name: 'WALL_BLOCK',
+        'SLAB_BLOCK': DxfBlock(
+          name: 'SLAB_BLOCK',
           basePoint: Offset.zero,
           entities: [
-            const DxfLine(layer: 'A-WALL', p1: Offset(0, 0), p2: Offset(5, 0)),
+            const DxfLine(layer: 'A-SLAB', p1: Offset(0, 0), p2: Offset(5, 0)),
           ],
         ),
       };
@@ -181,7 +182,7 @@ void main() {
         blocks: blocks,
       );
 
-      expect(visible, equals({'A-WALL'}));
+      expect(visible, equals({'A-SLAB'}));
     });
 
     test('12. Preserves 12 cm walls with same white color as 25 cm walls in a separate layer', () {
@@ -198,11 +199,11 @@ void main() {
       expect(visible, equals({'WALLS_25', 'WALLS_12'}));
     });
 
-    test('13. Preserves Bulgarian partition walls (Преградни, Зид 12) alongside 25cm walls', () {
+    test('13. Preserves Bulgarian partition walls (Преградни) alongside 25cm walls by lineweight without keyword reliance', () {
       final layers = [
         DxfLayer(name: 'Стени_25см', colorIndex: 7, lineweight: 0.50), // White 25cm
         DxfLayer(name: 'Преградни_стени_12', colorIndex: 7, lineweight: 0.25), // White 12cm
-        DxfLayer(name: 'Зидария_12', colorIndex: 2, lineweight: 0.25), // Different layer color
+        DxfLayer(name: 'Зидария_12', colorIndex: 2, lineweight: 0.25), // Non-white without geometry - not matched by word
         DxfLayer(name: 'Щрих_штрих', colorIndex: 7, lineweight: 0.13), // Hatch
       ];
 
@@ -210,7 +211,8 @@ void main() {
 
       expect(visible.contains('Стени_25см'), isTrue);
       expect(visible.contains('Преградни_стени_12'), isTrue);
-      expect(visible.contains('Зидария_12'), isTrue);
+      // Non-white layer without geometry is not selected simply because it has 'Зидария' or '12' in its name
+      expect(visible.contains('Зидария_12'), isFalse);
       expect(visible.contains('Щрих_штрих'), isFalse);
     });
 

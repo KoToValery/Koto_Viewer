@@ -41,7 +41,7 @@ void main() {
       thickness: .20,
     );
     expect(seeds.where((s) => s.id.contains('_main_')).length, 1);
-    expect(seeds.where((s) => s.id.contains('_projection_')).length, 7);
+    expect(seeds.where((s) => s.id.contains('_projection_')).length, 8);
     await File(
       '${Directory.systemTemp.path}/koto_C_analysis.json',
     ).writeAsString(
@@ -81,6 +81,8 @@ void main() {
     );
     expect(report['contours'], isNotEmpty);
     final ring = (report['contours'] as List).single as List;
+    expect(containsPoint(-1500, 1100, ring), isTrue,
+        reason: 'the room behind the 275 cm door/window opening belongs to the slab');
     for (final point in [
       [-1707.0, -34.0],
       [1115.0, -34.0],
@@ -96,6 +98,8 @@ void main() {
     }
     final projections =
         BimUnderlayMetadata.read(doc)!['slabProjections'] as List;
+    expect(projections.any((p) => containsPoint(-1500, 1300, p['contour'] as List)), isTrue,
+        reason: 'upper-left terrace outside the wide facade opening');
     expect(projections.where((p) => p['kind'] == 'loggiaCandidate').length, 2);
     for (final point in [
       [-389.0, -110.0],

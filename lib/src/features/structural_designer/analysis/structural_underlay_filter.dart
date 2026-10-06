@@ -1,4 +1,6 @@
+import 'dart:ui';
 import '../../dxf_viewer/models/dxf_models.dart';
+import 'wall_axis_detector.dart';
 
 /// Intelligent CAD layer filter for the BIM Structural Designer module.
 ///
@@ -8,7 +10,7 @@ import '../../dxf_viewer/models/dxf_models.dart';
 /// 2. If lines have no thickness:
 ///    Keep ALL White layers ("остават всички бели"), hiding non-white layers.
 /// 3. If NO White layers exist in the drawing (or only empty/non-model layers):
-///    Fallback to structural keywords: 'wall', 'slab', 'плоча', 'стена', 'stena', etc.
+///    Geometrically detects wall pairs (without hardcoded keywords) and retains structural slabs/columns.
 class StructuralUnderlayFilter {
   const StructuralUnderlayFilter._();
 
@@ -128,53 +130,36 @@ class StructuralUnderlayFilter {
     return false;
   }
 
-  /// Checks if a layer name matches structural element keywords (wall, slab, column, etc.)
+  /// Checks if a layer name matches non-wall structural element keywords (slab, column, beam, etc.)
   /// Supports English, Bulgarian (Cyrillic), and Bulgarian (Latinized/transliterated).
+  /// Note: Walls are never detected by hardcoded keywords.
   static bool matchesStructuralKeyword(String layerName) {
     final name = layerName.toLowerCase();
     if (isNegativeKeyword(name)) return false;
 
     const structuralKeywords = [
       // English
-      'wall', 'walls',
-      'wall12', 'walls12', 'wall_12', 'walls_12', 'w12',
-      'partition', 'partitions', 'part_wall', 'interior_wall', 'int_wall', 'int-wall', 'intwall',
       'slab', 'slabs',
       'col', 'column', 'columns',
       'beam', 'beams',
       'pillar', 'pillars',
       'foundation',
-      'shearwall', 'shear_wall',
       'structure', 'structural',
       'construction',
 
       // Bulgarian (Cyrillic)
-      'стена', 'стени', 'стен',
-      '12', '12см', '12cm',
-      'прегр', 'преградна', 'преградни', 'прегради',
-      'зид 12', 'зидария 12', 'стена 12', 'стени 12', 'ст12', 'ст-12', 'ст 12',
-      'вътр', 'вътрешна', 'вътрешни',
       'плоча', 'плочи', 'плоч',
       'колона', 'колони',
       'греда', 'греди',
-      'стб', 'носещ', 'носещи', 'носеща',
+      'стб',
       'структура',
       'фундамент',
-      'зид', 'зидария',
-      'бетон',
-      'шайба', 'шайби', // Bulgarian structural engineering term for shear walls
       'констр', 'конструкция',
 
       // Bulgarian (Latinized / Transliterated)
-      'stena', 'steni',
-      'pregr', 'pregrad',
-      'zid 12', 'stena 12', 'steni 12', 'st12', 'st-12',
       'plocha', 'ploca', 'plochi', 'ploci',
       'kolona', 'koloni',
       'greda', 'gredi',
-      'zid', 'zidar',
-      'beton',
-      'shaiba', 'shaibi',
       'konstr',
     ];
 
@@ -194,24 +179,6 @@ class StructuralUnderlayFilter {
       'slab', 'slabs',
       'плоча', 'плочи', 'плоч',
       'plocha', 'ploca', 'plochi', 'ploci',
-    ];
-    for (final kw in keywords) {
-      if (name.contains(kw)) return true;
-    }
-    return false;
-  }
-
-  /// Checks if a layer name specifically matches 12cm walls or partition walls
-  /// (e.g. 12, 12cm, 12см, прегр, partition, interior).
-  static bool matchesPartitionOr12cmKeyword(String layerName) {
-    final name = layerName.toLowerCase();
-    if (isNegativeKeyword(name)) return false;
-
-    const keywords = [
-      '12', '12cm', '12см',
-      'прегр', 'pregr',
-      'partit',
-      'вътр', 'interior',
     ];
     for (final kw in keywords) {
       if (name.contains(kw)) return true;
@@ -328,22 +295,18 @@ class StructuralUnderlayFilter {
       }
 
       if (maxWhiteLw > 0.0) {
-        // "Най-дебелия Бял цвят да остава, плюс 12 см стени"
         final preservedWhite = whiteLayers.where((l) {
           final lw = getLayerThickness(l, entitiesByLayer[l.name]);
 
-          // 1. Thickest White layer(s) (25cm main walls)
+          // 1. Thickest White layer(s) (main walls)
           if (lw >= maxWhiteLw - 0.005) return true;
 
-          // 2. Explicit 12cm / partition wall keywords
-          if (matchesPartitionOr12cmKeyword(l.name)) return true;
-
-          // 3. Structural wall or slab keywords
+          // 2. Structural non-wall keywords (slab, columns, etc.)
           if (matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name)) return true;
 
-          // 4. Secondary wall thickness: 12cm partition walls drawn with medium pen
+          // 3. Secondary wall thickness: 12cm partition walls drawn with medium pen
           // (e.g. 0.20mm - 0.35mm when main walls are 0.50mm - 0.70mm)
-          // No rigid keyword check: preserves all medium white walls!
+          // Preserves medium white walls without any hardcoded keyword!
           if (maxWhiteLw >= 0.35 && lw >= 0.20 && !isNegativeKeyword(l.name)) {
             return true;
           }
@@ -351,28 +314,50 @@ class StructuralUnderlayFilter {
           return false;
         }).toList();
 
-        // Also check if any non-white layers explicitly match 12cm / partition walls or slab
-        final extra12cmAndSlabLayers = candidateList.where((l) =>
+        // Also check if any non-white layers explicitly match slab or structural keywords
+        final extraStructuralLayers = candidateList.where((l) =>
             !whiteLayers.contains(l) &&
-            (matchesPartitionOr12cmKeyword(l.name) || matchesSlabKeyword(l.name))).map((l) => l.name);
+            (matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name))).map((l) => l.name);
 
         final result = preservedWhite.map((l) => l.name).toSet();
-        result.addAll(extra12cmAndSlabLayers);
+        result.addAll(extraStructuralLayers);
         return result;
       } else {
-        // "Ако нямат линиите дебелина- остават всички бели"
-        // Without rigid keyword gating: all white layers stay!
-        final extra12cmAndSlab = candidateList
-            .where((l) => matchesPartitionOr12cmKeyword(l.name) || matchesSlabKeyword(l.name))
+        // When lines have no thickness, all white layers stay plus slabs/structural layers
+        final extraStructural = candidateList
+            .where((l) => matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name))
             .map((l) => l.name);
 
         final result = whiteLayers.map((l) => l.name).toSet();
-        result.addAll(extra12cmAndSlab);
+        result.addAll(extraStructural);
         return result;
       }
     }
 
-    // Step 2: "ако няма бели тогава ще филтрираме по думи wall, slab, плоча,стена,stena и т.н."
+    // Step 2: When NO White layers exist in the drawing:
+    // 1. If geometry (entities) is provided, discover walls geometrically via WallAxisDetector (no hardcoded words)
+    if (entities != null && entities.isNotEmpty) {
+      final doc = DxfDocument(
+        headerVars: const {},
+        bounds: Rect.zero,
+        entityStats: const {},
+        layers: {for (final l in candidateList) l.name: l},
+        entities: entities.toList(),
+        blocks: blocks ?? {},
+      );
+      final wallResult = WallAxisDetector.detect(doc);
+      if (wallResult.hasWallsFound) {
+        final detectedWallLayers = wallResult.selectedWallPairs
+            .expand((p) => [p.segmentA.sourceLayer, p.segmentB.sourceLayer])
+            .toSet();
+        final extraStructural = candidateList
+            .where((l) => matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name))
+            .map((l) => l.name);
+        return {...detectedWallLayers, ...extraStructural};
+      }
+    }
+
+    // 2. Otherwise fall back to non-wall structural elements (slabs, columns, beams)
     return keywordLayers.map((l) => l.name).toSet();
   }
 }

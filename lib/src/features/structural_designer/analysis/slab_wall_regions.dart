@@ -1,24 +1,29 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import '../models/wall_axis_models.dart';
+import 'slab_opening_evidence.dart';
 
 class SlabGapHypothesis {
   final Offset start, end;
   final double thickness;
   final int wallA, wallB;
+  final bool wideOpeningEvidence;
   const SlabGapHypothesis(
     this.start,
     this.end,
     this.thickness,
     this.wallA,
-    this.wallB,
-  );
+    this.wallB, {
+    this.wideOpeningEvidence = false,
+  });
   Map<String, dynamic> toJson() => {
     'start': [start.dx, start.dy],
     'end': [end.dx, end.dy],
     'thickness': thickness,
     'walls': [wallA, wallB],
-    'reason': 'collinearMatchingWallFaces',
+    'reason': wideOpeningEvidence
+        ? 'matchingWallFacesWithParallelFrameStrokes'
+        : 'collinearMatchingWallFaces',
     'confirmedOpening': false,
   };
 }
@@ -31,7 +36,11 @@ class SlabWallRegions {
   final bool tooComplex;
   SlabWallRegions(this.regions, this.gaps, {this.tooComplex = false});
 
-  static SlabWallRegions build(List<WallPairCandidate> walls, double scale) {
+  static SlabWallRegions build(
+    List<WallPairCandidate> walls,
+    double scale, {
+    List<(Offset, Offset, String)> openingEvidence = const [],
+  }) {
     final parent = List.generate(walls.length, (i) => i);
     int root(int i) {
       while (parent[i] != i) {
@@ -114,7 +123,22 @@ class SlabWallRegions {
             continue;
           }
           final length = (end - start).distance;
-          if (length < 75 * scale || length > 1500 * scale) continue;
+          if (length < 75 * scale || length > 4500 * scale) continue;
+          if (length > 1500 * scale) {
+            comparisons += openingEvidence.length;
+            if (comparisons > 2000000) {
+              return SlabWallRegions([], [], tooComplex: true);
+            }
+            if (!SlabOpeningEvidence.supports(
+              openingEvidence,
+              start,
+              end,
+              (a.perpendicularDistance + b.perpendicularDistance) / 2,
+              scale,
+            )) {
+              continue;
+            }
+          }
           // Avoid joining across an intervening wall or a return into a recess.
           final gapBounds = Rect.fromPoints(start, end).inflate(25 * scale);
           var blocked = false;
@@ -169,6 +193,7 @@ class SlabWallRegions {
                 (a.perpendicularDistance + b.perpendicularDistance) / 2,
                 i,
                 j,
+                wideOpeningEvidence: length > 1500 * scale,
               ),
             );
           }
