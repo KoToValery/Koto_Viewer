@@ -67,10 +67,26 @@ class WallAxisDetector {
     final double snapRadiusCad = cornerSnapRadiusMm * scale;
 
     // Step 3: Run pair detection on each Layer and rank them
+    // Architectural principle: "елементи през които се реже са зададени с дебела линия"
+    // In CAD floor plans, cut elements (walls, columns, shear walls) are drawn with thick pen.
+    // Thin pen lines (stairs, furniture, insulation, hatches, dimensions) are not cut elements.
+    double maxDocLineweight = 0.0;
+    for (final segs in segmentsByLayer.values) {
+      for (final s in segs) {
+        if (s.lineweight > maxDocLineweight) {
+          maxDocLineweight = s.lineweight;
+        }
+      }
+    }
+    final cutLwThreshold = maxDocLineweight >= 0.35 ? 0.24 : (maxDocLineweight - 0.06);
+
     final List<LayerColorGroupResult> evaluatedGroups = [];
 
     for (final entry in segmentsByLayer.entries) {
-      final segments = entry.value;
+      var segments = entry.value;
+      if (maxDocLineweight >= 0.25) {
+        segments = segments.where((s) => s.lineweight >= cutLwThreshold).toList();
+      }
       if (segments.length < 2) continue;
 
       final firstSeg = segments.first;
@@ -164,7 +180,7 @@ class WallAxisDetector {
         final pairFactor = 1.0 + math.sqrt(pairs.length);
         final score = totalOverlap * pairFactor * layoutBonus * networkBonus * keywordMultiplier;
 
-        final firstSeg = segments.first;
+        final avgLw = segments.fold<double>(0.0, (sum, s) => sum + s.lineweight) / segments.length;
         evaluatedGroups.add(
           LayerColorGroupResult(
             layerName: layerName,
@@ -174,6 +190,7 @@ class WallAxisDetector {
             totalOverlapLength: totalOverlap / scale / 1000.0, // in meters
             score: score,
             wallPairs: pairs,
+            averageLineweight: avgLw,
           ),
         );
       }
@@ -202,12 +219,18 @@ class WallAxisDetector {
 
     for (int i = 1; i < evaluatedGroups.length; i++) {
       final g = evaluatedGroups[i];
+      if (maxDocLineweight >= 0.25 && g.averageLineweight < cutLwThreshold) {
+        continue;
+      }
       // Include other high-scoring wall layers (e.g. interior + exterior walls, 12cm partition walls)
       // Geometry-driven without rigid keyword gating: any wall candidate group with >= 25% score is included
       const double scoreThreshold = 0.25;
       if (g.score >= bestGroup.score * scoreThreshold &&
           g.pairCount >= 2 &&
           !_isClutterOrBorderLayer(g.layerName.toLowerCase())) {
+        if (_isInsulationOrCladdingGroup(g, bestGroup, scale)) {
+          continue;
+        }
         activeGroups.add(g);
       }
     }
@@ -372,9 +395,10 @@ class WallAxisDetector {
       if (refAngle >= math.pi - 1e-4) refAngle = 0.0;
 
       // Snap near horizontal / vertical to exact 0.0 and pi/2
-      if (refAngle < 2.0 * math.pi / 180.0 || (refAngle - math.pi).abs() < 2.0 * math.pi / 180.0) {
+      const snapThreshold = 8.0 * math.pi / 180.0;
+      if (refAngle < snapThreshold || (refAngle - math.pi).abs() < snapThreshold) {
         refAngle = 0.0;
-      } else if ((refAngle - math.pi / 2.0).abs() < 2.0 * math.pi / 180.0) {
+      } else if ((refAngle - math.pi / 2.0).abs() < snapThreshold) {
         refAngle = math.pi / 2.0;
       }
 
@@ -448,8 +472,13 @@ class WallAxisDetector {
           clusterMaxT = math.max(clusterMaxT, item.tMax);
         }
 
+        final isOrthogonal = refAngle == 0.0 || (refAngle - math.pi / 2.0).abs() < 1e-4;
+        final minReqLength = isOrthogonal ? minTotalWallLengthCad : math.max(minTotalWallLengthCad, 3000.0 * scale);
         // Filter out tiny artifacts below minimum wall length
-        if (totalLen < minTotalWallLengthCad && minTotalWallLengthCad > 0) {
+        if (totalLen < minReqLength && minReqLength > 0) {
+          continue;
+        }
+        if (!isOrthogonal && cluster.length < 2) {
           continue;
         }
 
@@ -613,49 +642,123 @@ class WallAxisDetector {
     String axisLayerName = 'AXIS',
     bool isBulgarian = true,
   }) {
+    bool isAxisLayer(String name) {
+      final n = name.trim().toLowerCase();
+      if (axisLayerName.isNotEmpty && n == axisLayerName.toLowerCase()) return true;
+      const keywords = ['axis', 'axes', 'grid', 'grids', 'grid_axes', 'gridaxes', 'оси', 'ос'];
+      for (final kw in keywords) {
+        if (n == kw || n.startsWith('${kw}_') || n.startsWith('$kw-') || n.endsWith('_$kw')) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     final entities = document.layoutEntities['Model'] ?? document.entities;
     final axisLines = entities
         .whereType<DxfLine>()
-        .where((l) => l.layer == axisLayerName || l.layer == 'AXIS')
+        .where((l) => isAxisLayer(l.layer))
         .toList();
 
     if (axisLines.isEmpty) return const [];
 
-    final axisTexts = entities
-        .whereType<DxfText>()
-        .where((t) => t.layer == axisLayerName || t.layer == 'AXIS')
-        .toList();
+    final axisTexts = <(Offset, String)>[];
+    for (final e in entities) {
+      if (isAxisLayer(e.layer)) {
+        if (e is DxfText && e.text.trim().isNotEmpty) {
+          axisTexts.add((e.insertPoint, e.text.trim()));
+        } else if (e is DxfMText && e.cleanText.trim().isNotEmpty) {
+          axisTexts.add((e.insertPoint, e.cleanText.trim()));
+        }
+      }
+    }
 
-    final result = <StructuralGridAxis>[];
-    int idx = 0;
-
+    // Cluster collinear lines along the same coordinate (merging broken axis segments and end stubs)
+    final clusters = <List<DxfLine>>[];
     for (final line in axisLines) {
-      idx++;
-      String name = '$idx';
+      bool added = false;
+      final isHoriz = (line.p2.dy - line.p1.dy).abs() < (line.p2.dx - line.p1.dx).abs();
+      for (final cluster in clusters) {
+        final c0 = cluster.first;
+        final cHoriz = (c0.p2.dy - c0.p1.dy).abs() < (c0.p2.dx - c0.p1.dx).abs();
+        if (isHoriz == cHoriz) {
+          if (isHoriz) {
+            final y0 = (c0.p1.dy + c0.p2.dy) / 2.0;
+            final yL = (line.p1.dy + line.p2.dy) / 2.0;
+            if ((y0 - yL).abs() < 5.0) {
+              cluster.add(line);
+              added = true;
+              break;
+            }
+          } else {
+            final x0 = (c0.p1.dx + c0.p2.dx) / 2.0;
+            final xL = (line.p1.dx + line.p2.dx) / 2.0;
+            if ((x0 - xL).abs() < 5.0) {
+              cluster.add(line);
+              added = true;
+              break;
+            }
+          }
+        }
+      }
+      if (!added) clusters.add([line]);
+    }
+
+    final rawAxes = <StructuralGridAxis>[];
+    int autoIdx = 0;
+    bool foundAnyDrawingLabel = false;
+
+    for (final cluster in clusters) {
+      autoIdx++;
+      final isHoriz = (cluster.first.p2.dy - cluster.first.p1.dy).abs() < (cluster.first.p2.dx - cluster.first.p1.dx).abs();
+      double minCoord = double.infinity, maxCoord = -double.infinity, fixedCoord = 0;
+      for (final l in cluster) {
+        if (isHoriz) {
+          minCoord = math.min(minCoord, math.min(l.p1.dx, l.p2.dx));
+          maxCoord = math.max(maxCoord, math.max(l.p1.dx, l.p2.dx));
+          fixedCoord += (l.p1.dy + l.p2.dy) / 2.0;
+        } else {
+          minCoord = math.min(minCoord, math.min(l.p1.dy, l.p2.dy));
+          maxCoord = math.max(maxCoord, math.max(l.p1.dy, l.p2.dy));
+          fixedCoord += (l.p1.dx + l.p2.dx) / 2.0;
+        }
+      }
+      fixedCoord /= cluster.length;
+      final pStart = isHoriz ? Offset(minCoord, fixedCoord) : Offset(fixedCoord, minCoord);
+      final pEnd = isHoriz ? Offset(maxCoord, fixedCoord) : Offset(fixedCoord, maxCoord);
+
+      String name = '$autoIdx';
       double bestDist = double.infinity;
-      for (final txt in axisTexts) {
-        final d1 = (txt.insertPoint - line.p1).distance;
-        final d2 = (txt.insertPoint - line.p2).distance;
-        final d = math.min(d1, d2);
+      for (final t in axisTexts) {
+        final d = math.min((t.$1 - pStart).distance, (t.$1 - pEnd).distance);
         if (d < bestDist && d < 2000.0) {
           bestDist = d;
-          name = txt.text;
+          name = t.$2;
+          foundAnyDrawingLabel = true;
         }
       }
 
-      result.add(
+      rawAxes.add(
         StructuralGridAxis(
-          id: 'axis_imported_${idx}_${DateTime.now().millisecondsSinceEpoch}',
+          id: 'axis_imported_${autoIdx}_${DateTime.now().millisecondsSinceEpoch}',
           name: name,
-          start: line.p1,
-          end: line.p2,
+          start: pStart,
+          end: pEnd,
           bubbleAtStart: true,
           bubbleAtEnd: true,
         ),
       );
     }
 
-    return resequenceGridAxes(result, isBulgarian: isBulgarian);
+    if (foundAnyDrawingLabel) {
+      final verticalAxes = rawAxes.where((a) => (a.end.dx - a.start.dx).abs() <= (a.end.dy - a.start.dy).abs()).toList()
+        ..sort((a, b) => ((a.start.dx + a.end.dx) / 2.0).compareTo((b.start.dx + b.end.dx) / 2.0));
+      final horizontalAxes = rawAxes.where((a) => (a.end.dx - a.start.dx).abs() > (a.end.dy - a.start.dy).abs()).toList()
+        ..sort((a, b) => ((b.start.dy + b.end.dy) / 2.0).compareTo((a.start.dy + a.end.dy) / 2.0));
+      return [...verticalAxes, ...horizontalAxes];
+    }
+
+    return resequenceGridAxes(rawAxes, isBulgarian: isBulgarian);
   }
 
   // --- Internal Geometric & Grouping Methods ---
@@ -664,12 +767,95 @@ class WallAxisDetector {
     const clutter = [
       'антетка', 'antetka', 'рамка', 'ramka', 'border', 'title',
       'sheet', 'лист', 'format', 'формат', 'stamp', 'печат',
-      'defpoints', 'dim', 'размер', 'hatch', 'штрих',
-      'furn', 'мебел', 'обзавеждане', 'text', 'текст',
+      'defpoints', 'dim', 'размер', 'размери', 'hatch', 'штрих', 'щрих',
+      'furn', 'мебел', 'обзавеждане', 'interior',
+      'text', 'текст', 'надпис', 'надписи',
+      'линии', 'линия', 'lines', 'line',
+      'стълби', 'стълба', 'стълбище', 'stairs', 'stair', 'staircase', 'steps',
+      'парапет', 'парапети', 'railing', 'railings', 'balustrade', 'handrail',
+      'котировки', 'котировка', 'коти', 'кота', 'elev', 'elevation', 'разрези', 'разрез', 'section', 'sections',
+      'изолац', 'изолация', 'insul', 'insulation', 'xps', 'eps', 'стиропор', 'вата', 'термо',
+      'таблица', 'таблици', 'table', 'подпис', 'подписи', 'sign',
+      'сан', 'plumb', 'санитария', 'elec', 'ел',
     ];
     for (final kw in clutter) {
       if (lowerName.contains(kw)) return true;
     }
+    return false;
+  }
+
+  /// Checks whether a candidate wall group represents thermal insulation or exterior cladding
+  /// offset along the faces of the primary structural walls rather than independent walls.
+  static bool _isInsulationOrCladdingGroup(
+    LayerColorGroupResult candidate,
+    LayerColorGroupResult primary,
+    double scale,
+  ) {
+    if (primary.wallPairs.isEmpty || candidate.wallPairs.isEmpty) return false;
+
+    // 1. Same layer with a different color (e.g. orange EPS lines drawn on layer "стени"):
+    // In CAD standards, secondary accent colors on the primary wall layer represent insulation/finishes.
+    final sameLayer = candidate.layerName.toLowerCase() == primary.layerName.toLowerCase() &&
+        candidate.colorIndex != primary.colorIndex;
+
+    int adjacentStripCount = 0;
+    // Max perpendicular offset from centerline to centerline (primary 25cm / 2 + insulation 15cm / 2 + margin = 28cm)
+    final maxOffsetCad = 300.0 * scale;
+
+    for (final candPair in candidate.wallPairs) {
+      final candAngle = candPair.segmentA.angleRad;
+      final u = Offset(math.cos(candAngle), math.sin(candAngle));
+      final n = Offset(-math.sin(candAngle), math.cos(candAngle));
+
+      final candMid = (candPair.centerlineStart + candPair.centerlineEnd) / 2.0;
+      final candD = candMid.dx * n.dx + candMid.dy * n.dy;
+
+      final candT1 = candPair.centerlineStart.dx * u.dx + candPair.centerlineStart.dy * u.dy;
+      final candT2 = candPair.centerlineEnd.dx * u.dx + candPair.centerlineEnd.dy * u.dy;
+      final candTMin = math.min(candT1, candT2);
+      final candTMax = math.max(candT1, candT2);
+
+      for (final primPair in primary.wallPairs) {
+        final primAngle = primPair.segmentA.angleRad;
+        double diff = (candAngle - primAngle).abs() * 180.0 / math.pi;
+        if (diff > 180.0) diff = (360.0 - diff).abs();
+        if (diff > 90.0) diff = (180.0 - diff).abs();
+
+        if (diff <= 10.0) {
+          final primMid = (primPair.centerlineStart + primPair.centerlineEnd) / 2.0;
+          final primD = primMid.dx * n.dx + primMid.dy * n.dy;
+          final perpDist = (candD - primD).abs();
+
+          if (perpDist <= maxOffsetCad) {
+            final primT1 = primPair.centerlineStart.dx * u.dx + primPair.centerlineStart.dy * u.dy;
+            final primT2 = primPair.centerlineEnd.dx * u.dx + primPair.centerlineEnd.dy * u.dy;
+            final primTMin = math.min(primT1, primT2);
+            final primTMax = math.max(primT1, primT2);
+
+            final overlap = math.min(candTMax, primTMax) - math.max(candTMin, primTMin);
+            if (overlap > -50.0 * scale) {
+              adjacentStripCount++;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    final adjacentRatio = adjacentStripCount / candidate.wallPairs.length;
+
+    // If on the same layer with different color and pairs run adjacent to primary walls
+    if (sameLayer && adjacentRatio >= 0.30) {
+      return true;
+    }
+
+    // If on a different layer, but >= 50% of pairs are thin strips running adjacent to primary walls
+    final avgThicknessMm = candidate.wallPairs.fold<double>(0.0, (sum, p) => sum + p.perpendicularDistance) /
+        candidate.wallPairs.length / scale;
+    if (avgThicknessMm <= 160.0 && adjacentRatio >= 0.50) {
+      return true;
+    }
+
     return false;
   }
 
@@ -715,6 +901,10 @@ class WallAxisDetector {
         ? entity.colorIndex
         : layerObj?.colorIndex ?? 7;
     final resolvedTrueColor = entity.trueColor ?? layerObj?.trueColor;
+    final double layerLw = layerObj?.effectiveLineweight ?? (layerObj?.isThick == true ? 0.70 : 0.0);
+    final resolvedLineweight = (entity.lineWeight != null && entity.lineWeight! > 0)
+        ? entity.lineWeight!
+        : layerLw;
 
     if (entity is DxfLine) {
       _addSegmentIfValid(
@@ -725,6 +915,7 @@ class WallAxisDetector {
         resolvedColorIndex,
         resolvedTrueColor,
         entity,
+        resolvedLineweight,
       );
     } else if (entity is DxfLwPolyline) {
       final vertices = entity.vertices;
@@ -741,6 +932,7 @@ class WallAxisDetector {
               resolvedColorIndex,
               resolvedTrueColor,
               entity,
+              resolvedLineweight,
             );
           }
         }
@@ -756,6 +948,7 @@ class WallAxisDetector {
               resolvedColorIndex,
               resolvedTrueColor,
               entity,
+              resolvedLineweight,
             );
           }
         }
@@ -775,6 +968,7 @@ class WallAxisDetector {
               resolvedColorIndex,
               resolvedTrueColor,
               entity,
+              resolvedLineweight,
             );
           }
         }
@@ -790,6 +984,7 @@ class WallAxisDetector {
               resolvedColorIndex,
               resolvedTrueColor,
               entity,
+              resolvedLineweight,
             );
           }
         }
@@ -831,6 +1026,12 @@ class WallAxisDetector {
       final layerObj = document.layers[effectiveLayer];
       final resolvedColor = child.colorIndex ?? insert.colorIndex ?? layerObj?.colorIndex ?? 7;
       final resolvedTrueColor = child.trueColor ?? insert.trueColor ?? layerObj?.trueColor;
+      final double layerLw = layerObj?.effectiveLineweight ?? (layerObj?.isThick == true ? 0.70 : 0.0);
+      final resolvedLineweight = (child.lineWeight != null && child.lineWeight! > 0)
+          ? child.lineWeight!
+          : (insert.lineWeight != null && insert.lineWeight! > 0)
+              ? insert.lineWeight!
+              : layerLw;
 
       if (child is DxfLine) {
         _addSegmentIfValid(
@@ -841,6 +1042,7 @@ class WallAxisDetector {
           resolvedColor,
           resolvedTrueColor,
           child,
+          resolvedLineweight,
         );
       } else if (child is DxfLwPolyline) {
         final vertices = child.vertices;
@@ -855,6 +1057,7 @@ class WallAxisDetector {
                 resolvedColor,
                 resolvedTrueColor,
                 child,
+                resolvedLineweight,
               );
             }
           }
@@ -867,6 +1070,7 @@ class WallAxisDetector {
               resolvedColor,
               resolvedTrueColor,
               child,
+              resolvedLineweight,
             );
           }
         }
@@ -884,6 +1088,7 @@ class WallAxisDetector {
     int? colorIndex,
     int? trueColor,
     DxfEntity entity,
+    double lineweight,
   ) {
     final double dx = p2.dx - p1.dx;
     final double dy = p2.dy - p1.dy;
@@ -922,6 +1127,7 @@ class WallAxisDetector {
       sourceColorIndex: colorIndex,
       sourceTrueColor: trueColor,
       sourceEntity: entity,
+      lineweight: lineweight,
     );
 
     final groupKey = '${seg.sourceLayer}#c${seg.sourceColorIndex ?? 0}';

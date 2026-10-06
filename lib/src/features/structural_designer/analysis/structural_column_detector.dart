@@ -315,7 +315,6 @@ class StructuralColumnDetector {
     DxfLine l4,
     double snapDist,
   ) {
-    final list = [l1, l2, l3, l4];
     final ordered = <Offset>[l1.p1, l1.p2];
     final remaining = [l2, l3, l4];
 

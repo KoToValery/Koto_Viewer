@@ -2,103 +2,85 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/services/universal_encoding_service.dart';
 import 'package:kotoview/src/features/dxf_viewer/parser/dxf_parser.dart';
-import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
-import 'package:kotoview/src/features/structural_designer/analysis/structural_column_detector.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/structural_underlay_filter.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/wall_axis_detector.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/slab_envelope_detector.dart';
 
 void main() {
-  test('Investigate 0.dwg / 0.dxf geometry, layers, walls, columns, stairs, and axes', () async {
+  test('0.dwg / 0.dxf regression test: clean walls, no insulation/stairs/lines clutter, authentic axes and slab envelope', () async {
     final file = File('test_files/0.dxf');
-    expect(file.existsSync(), isTrue);
+    expect(file.existsSync(), isTrue, reason: 'test_files/0.dxf must exist');
 
     final content = UniversalEncodingService.decodeBytes(file.readAsBytesSync());
     final doc = DxfParser.parseString(content);
 
-    print('=== ALL LAYERS IN 0.DXF ===');
-    for (final l in doc.layers.values) {
-      final isWhite = StructuralUnderlayFilter.isWhiteLayer(l);
-      final isNeg = StructuralUnderlayFilter.isNegativeKeyword(l.name);
-      final isStruct = StructuralUnderlayFilter.matchesStructuralKeyword(l.name);
-      final thickness = StructuralUnderlayFilter.getLayerThickness(l, doc.entities.where((e) => e.layer == l.name).toList());
-      print('Layer "${l.name}": colorIndex=${l.colorIndex}, thick=$thickness, isWhite=$isWhite, isNeg=$isNeg, isStruct=$isStruct');
-    }
-
+    // 1. Structural Underlay Filter Verification: isolates cut elements
     final filteredLayers = StructuralUnderlayFilter.filterLayers(
       layers: doc.layers.values,
       entities: doc.entities,
       blocks: doc.blocks,
     );
-    print('\n=== UNDERLAY FILTER RESULT ===');
-    print('Filtered layers: $filteredLayers');
+    expect(filteredLayers.contains('стени'), isTrue);
+    expect(filteredLayers.contains('колони'), isTrue);
+    expect(filteredLayers.contains('стълби'), isFalse, reason: 'Stairs must be excluded from structural underlay');
+    expect(filteredLayers.contains('линии'), isFalse, reason: 'Generic lines/borders must be excluded');
+    expect(filteredLayers.contains('обзавеждане'), isFalse, reason: 'Furniture must be excluded');
+    expect(filteredLayers.contains('парапет'), isFalse, reason: 'Railings must be excluded');
+    expect(filteredLayers.contains('котировки'), isFalse, reason: 'Elevation levels must be excluded');
 
-    print('\n=== LAYER ОСИ ENTITIES ===');
-    final osiEntities = doc.entities.where((e) => e.layer.toLowerCase().contains('ос')).toList();
-    print('Entities on layer оси: count=${osiEntities.length}');
-    for (final e in osiEntities) {
-      if (e is DxfLine) {
-        final angle = (e.p2 - e.p1).direction * 180 / 3.141592653589793;
-        print('  Line: ${e.p1} -> ${e.p2}, len=${(e.p2 - e.p1).distance.toStringAsFixed(1)}, angle=${angle.toStringAsFixed(1)} deg');
-      } else if (e is DxfText) {
-        print('  Text: "${e.text}" at ${e.insertPoint}');
-      } else if (e is DxfMText) {
-        print('  MText: "${e.cleanText}" at ${e.insertPoint}');
-      } else if (e is DxfCircle) {
-        print('  Circle at ${e.center}, r=${e.radius}');
-      } else {
-        print('  Entity: ${e.typeName}');
-      }
-    }
-
-    final docAxes = WallAxisDetector.extractGridAxesFromDocument(doc);
-    print('extractGridAxesFromDocument: ${docAxes.length} axes found');
-
+    // 2. Wall and Column Detection
     final wallsResult = WallAxisDetector.detect(doc);
+    expect(wallsResult.hasWallsFound, isTrue);
 
-    // subsequent code
-    print('\n=== WALL AXIS DETECTOR RESULT ===');
-    print('Detected scale: ${wallsResult.detectedScale} (${wallsResult.detectedUnitName})');
-    print('Target thickness: ${wallsResult.targetThicknessMm} mm');
-    print('Best group: ${wallsResult.bestGroup?.layerName}, pairCount=${wallsResult.bestGroup?.pairCount}, score=${wallsResult.bestGroup?.score}');
+    // 3. Autonomous Structural Grid Axis Generation along detected walls
+    // The program itself generates clean orthogonal structural axes from found wall centerlines.
+    final generatedAxes = WallAxisDetector.convertToStructuralGridAxes(
+      wallsResult.snappedCenterlines,
+      scale: wallsResult.detectedScale,
+      isBulgarian: false,
+      collinearToleranceMm: 120.0,
+      minTotalWallLengthM: 0.80,
+    );
+    expect(generatedAxes.isNotEmpty, isTrue, reason: 'Axes must be generated from detected walls');
 
-    print('\n--- Evaluated Groups ---');
-    for (final g in wallsResult.evaluatedGroups) {
-      print('  Group: "${g.layerName}", color=${g.colorIndex}, pairs=${g.pairCount}, len=${g.totalOverlapLength.toStringAsFixed(1)}m, score=${g.score.toStringAsFixed(1)}');
+    // Verify all generated axes are strictly orthogonal (vertical or horizontal) - NO chaotic angles!
+    for (final axis in generatedAxes) {
+      final dx = (axis.end.dx - axis.start.dx).abs();
+      final dy = (axis.end.dy - axis.start.dy).abs();
+      final isOrthogonal = dx < 1e-3 || dy < 1e-3;
+      expect(isOrthogonal, isTrue, reason: 'Generated axis "${axis.name}" must be strictly orthogonal (dx=$dx, dy=$dy)');
     }
 
-    print('\n--- Active Selected Wall Pairs ---');
-    print('Selected pairs count: ${wallsResult.selectedWallPairs.length}');
-    final pairsByLayer = <String, int>{};
+    // Verify NO clutter layers in selected wall pairs
+    final selectedLayers = wallsResult.selectedWallPairs.map((p) => p.segmentA.sourceLayer).toSet();
+    expect(selectedLayers, contains('стени'));
+    expect(selectedLayers, contains('колони'));
+    expect(selectedLayers.contains('линии'), isFalse, reason: 'Generic lines must NOT be selected as walls');
+    expect(selectedLayers.contains('стълби'), isFalse, reason: 'Stairs must NOT be selected as walls');
+    expect(selectedLayers.contains('обзавеждане'), isFalse, reason: 'Furniture must NOT be selected as walls');
+
+    // Verify NO insulation (color 30) selected as walls
+    final selectedColorsOnWalls = wallsResult.selectedWallPairs
+        .where((p) => p.segmentA.sourceLayer == 'стени')
+        .map((p) => p.segmentA.sourceColorIndex)
+        .toSet();
+    expect(selectedColorsOnWalls.contains(30), isFalse, reason: 'Thermal insulation (color 30) must be excluded from wall pairs');
+    expect(selectedColorsOnWalls, contains(7));
+
+    // Exactly 45 masonry wall pairs and 17 column/shear wall pairs
+    final wallPairsByLayer = <String, int>{};
     for (final p in wallsResult.selectedWallPairs) {
-      pairsByLayer[p.segmentA.sourceLayer] = (pairsByLayer[p.segmentA.sourceLayer] ?? 0) + 1;
+      wallPairsByLayer[p.segmentA.sourceLayer] = (wallPairsByLayer[p.segmentA.sourceLayer] ?? 0) + 1;
     }
-    print('Pairs by layer: $pairsByLayer');
+    expect(wallPairsByLayer['стени'], equals(45));
+    expect(wallPairsByLayer['колони'], equals(17));
+    expect(wallsResult.selectedWallPairs.length, equals(62));
 
-    print('\n--- Snapped Centerlines (Axes) ---');
-    print('Snapped centerlines count: ${wallsResult.snappedCenterlines.length}');
-    for (int i = 0; i < wallsResult.snappedCenterlines.length; i++) {
-      final (p1, p2) = wallsResult.snappedCenterlines[i];
-      final dx = (p2.dx - p1.dx).abs();
-      final dy = (p2.dy - p1.dy).abs();
-      final angle = (p2 - p1).direction * 180 / 3.141592653589793;
-      print('  Axis $i: $p1 -> $p2, len=${(p2 - p1).distance.toStringAsFixed(1)}, angle=${angle.toStringAsFixed(1)} deg');
-    }
-
-    print('\n--- Detected Columns ---');
-    print('Detected columns count: ${wallsResult.detectedColumns.length}');
-    for (int i = 0; i < wallsResult.detectedColumns.length; i++) {
-      final col = wallsResult.detectedColumns[i];
-      print('  Col $i: layer="${col.sourceLayer}", bounds=${col.bounds}, isShear=${col.isShearWall}');
-    }
-
-    print('\n--- Slab Envelope ---');
+    // 4. Slab Envelope Detection
     final slabResult = SlabEnvelopeDetector.detect(wallsResult, document: doc);
-    print('Slab contours count: ${slabResult.contours.length}');
-    print('Diagnostics: ${slabResult.diagnostics}');
-    print('Assumed gaps: ${slabResult.assumedGaps.length}');
-    for (final r in slabResult.regionReports) {
-      print('  Region ${r['index']}: walls=${r['wallCount']}, contours=${r['contourCount']}, diag=${r['diagnostics']}');
-    }
+    expect(slabResult.contours.isNotEmpty, isTrue, reason: 'Slab envelope contour must be successfully detected');
+    expect(slabResult.diagnostics.contains('drawingTooLargeSelectSmallerRegion'), isFalse,
+        reason: 'Drawing must not be flagged as too large when border lines are excluded');
+    expect(slabResult.contours.first.length, greaterThanOrEqualTo(10), reason: 'Building perimeter must have a substantial polygon');
   });
 }

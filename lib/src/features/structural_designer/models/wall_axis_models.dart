@@ -15,6 +15,7 @@ class WallSegment {
   final int? sourceColorIndex;
   final int? sourceTrueColor;
   final DxfEntity? sourceEntity;
+  final double lineweight;
 
   const WallSegment({
     required this.start,
@@ -26,6 +27,7 @@ class WallSegment {
     this.sourceColorIndex,
     this.sourceTrueColor,
     this.sourceEntity,
+    this.lineweight = 0.0,
   });
 
   /// Unit direction vector along this segment.
@@ -68,6 +70,7 @@ class LayerColorGroupResult {
   final double totalOverlapLength;
   final double score;
   final List<WallPairCandidate> wallPairs;
+  final double averageLineweight;
 
   const LayerColorGroupResult({
     required this.layerName,
@@ -77,6 +80,7 @@ class LayerColorGroupResult {
     required this.totalOverlapLength,
     required this.score,
     required this.wallPairs,
+    this.averageLineweight = 0.0,
   });
 
   String get groupKey {

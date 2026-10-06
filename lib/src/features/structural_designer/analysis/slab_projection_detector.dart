@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../../dxf_viewer/models/dxf_models.dart';
 import 'slab_envelope_detector.dart';
+import 'structural_underlay_filter.dart';
 
 /// External areas bounded by existing straight CAD chains and the envelope.
 /// They are proposals, not a determination of material, level or balcony type.
@@ -99,6 +100,17 @@ class SlabProjectionDetector {
     return true;
   }
 
+  static bool _isNonProjectionLayer(String layerName) {
+    final name = layerName.toLowerCase();
+    if (name.contains('railing') ||
+        name.contains('парапет') ||
+        name.contains('balustrade') ||
+        name.contains('handrail')) {
+      return false;
+    }
+    return StructuralUnderlayFilter.isNegativeKeyword(layerName);
+  }
+
   static List<SlabProjectionCandidate> detect(
     DxfDocument doc,
     SlabEnvelopeResult envelope,
@@ -121,7 +133,11 @@ class SlabProjectionDetector {
     }
 
     for (final e in doc.entities) {
-      if (e.isPaperSpace || wallLayers.contains(e.layer)) continue;
+      if (e.isPaperSpace ||
+          wallLayers.contains(e.layer) ||
+          _isNonProjectionLayer(e.layer)) {
+        continue;
+      }
       var lt = e.lineType?.toUpperCase() ?? 'BYLAYER';
       if (lt == 'BYLAYER') {
         lt = doc.layers[e.layer]?.lineType?.toUpperCase() ?? 'CONTINUOUS';

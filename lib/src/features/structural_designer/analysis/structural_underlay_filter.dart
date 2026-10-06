@@ -113,19 +113,31 @@ class StructuralUnderlayFilter {
       'hatch', 'штрих', 'щрих',
       'fill', 'запълване', 'плътно',
       'pattern',
-      'insul', 'изолац', 'изолация',
-      'furn', 'мебел', 'обзавеждане',
-      'dim', 'размер',
-      'text', 'текст',
+      'insul', 'изолац', 'изолация', 'xps', 'eps', 'стиропор', 'вата', 'термо',
+      'furn', 'мебел', 'обзавеждане', 'interior',
+      'dim', 'размер', 'размери',
+      'text', 'текст', 'надпис', 'надписи',
       'annot',
       'door', 'врати', 'врата',
       'win', 'прозор',
       'glass', 'стъкло',
-      'сан', 'plumb',
+      'сан', 'plumb', 'санитария',
       'elec', 'ел',
+      'стълби', 'стълба', 'стълбище', 'stairs', 'stair', 'staircase', 'steps',
+      'парапет', 'парапети', 'railing', 'railings', 'balustrade', 'handrail',
+      'линии', 'линия',
+      'border', 'ramka', 'рамка', 'sheet', 'лист', 'format', 'формат', 'stamp', 'печат',
+      'антетка', 'antetka', 'таблица', 'таблици', 'table', 'подпис', 'подписи', 'sign',
+      'котировки', 'котировка', 'разрези', 'разрез', 'section', 'sections',
     ];
     for (final kw in thinKeywords) {
       if (name.contains(kw)) return true;
+    }
+    // Check whole tokens for generic "line" / "lines" / "коти" to avoid substring collision with outline, guideline, etc.
+    final tokens = name.split(RegExp(r'[^a-zA-Z0-9а-яА-Я]+'));
+    if ((tokens.contains('line') || tokens.contains('lines') || tokens.contains('линия') || tokens.contains('линии') || tokens.contains('коти')) &&
+        !name.contains('slab') && !name.contains('плоч') && !name.contains('ploc') && !name.contains('wall') && !name.contains('стен')) {
+      return true;
     }
     return false;
   }
