@@ -1,6 +1,6 @@
-import '../bim_projects/services/bim_underlay_conversion_service.dart';
 import 'dart:async';
 import 'dart:math' as math;
+import '../bim_projects/services/bim_underlay_conversion_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7487,7 +7487,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                     visibleCadRect: _getVisibleCadRect(),
                                     settings: _displaySettings,
                                     revision: _underlayRevision,
-                                    entityFilter: _underlayFilterActive
+                                    entityFilter: _underlayFilterActive && BimUnderlayMetadata.read(_document) == null
                                         ? (entity) {
                                             // 1. Suppress all hatches (fill patterns) in structural underlay
                                             if (entity is DxfHatch) return false;

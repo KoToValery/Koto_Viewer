@@ -1,0 +1,35 @@
+[
+  {
+    "source": "test_files/Archicad_export.dwg",
+    "sourceBytes": 167268,
+    "conversionMs": 943,
+    "loadMs": 17,
+    "repeatedLoadMs": 33,
+    "entities": 3886,
+    "generatedEntities": 167,
+    "axes": 23,
+    "kcadBytes": 51064
+  },
+  {
+    "source": "test_files/OVK_converted.dxf",
+    "sourceBytes": 9371876,
+    "conversionMs": 2031,
+    "loadMs": 50,
+    "repeatedLoadMs": 50,
+    "entities": 11075,
+    "generatedEntities": 1386,
+    "axes": 243,
+    "kcadBytes": 313203
+  },
+  {
+    "source": "test_files/930_ovk.dxf",
+    "sourceBytes": 61755826,
+    "conversionMs": 13906,
+    "loadMs": 398,
+    "repeatedLoadMs": 379,
+    "entities": 69882,
+    "generatedEntities": 465,
+    "axes": 40,
+    "kcadBytes": 1468382
+  }
+]

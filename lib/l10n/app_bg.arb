@@ -635,7 +635,7 @@
   "bimProjectAddUnderlay": "Зареди подложка",
   "bimProjectReplaceUnderlay": "Смени подложка",
   "bimProjectNoUnderlay": "Няма заредена подложка",
-  "bimProjectUnderlayFormatError": "Моля, изберете валиден CAD чертеж във формат .dxf или .dwg.",
+  "bimProjectUnderlayFormatError": "Моля, изберете валиден CAD чертеж във формат .dxf, .dwg или .kcad.",
   "bimProjectElevation": "Кота (м)",
   "bimProjectHeight": "Височина (м)",
   "bimProjectStoreyName": "Име на етаж",

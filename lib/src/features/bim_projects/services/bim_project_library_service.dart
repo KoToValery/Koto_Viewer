@@ -10,9 +10,20 @@ import 'bim_underlay_conversion_service.dart';
 import '../../structural_designer/models/structural_element.dart';
 import '../models/bim_work_project.dart';
 
+class _BimWriteQueue {
+  Future<void> _tail = Future<void>.value();
+  Future<T> run<T>(Future<T> Function() action) {
+    final result = _tail.then((_) => action());
+    _tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
+}
+
 /// Service responsible for managing, persisting, and querying standalone
 /// BiM Work Projects stored on the local file system.
 class BimProjectLibraryService {
+  static final _writes = _BimWriteQueue();
+  static final _publications = _BimWriteQueue();
   final Directory? _customRootDir;
 
   BimProjectLibraryService({Directory? customRootDir})
@@ -100,7 +111,9 @@ class BimProjectLibraryService {
     );
 
     await getProjectDirectory(id);
-    if (!await saveProjectManifest(project)) throw FileSystemException('Cannot create project');
+    if (!await saveProjectManifest(project)) {
+      throw FileSystemException('Cannot create project');
+    }
 
     // Initialize corresponding structural project
     final initialStructuralStoreys = storeys.map((s) {
@@ -127,7 +140,9 @@ class BimProjectLibraryService {
       activeStoreyIndex: 0,
     );
 
-    if (!await saveStructuralProject(id, initialStructural)) throw FileSystemException('Cannot initialize structural model');
+    if (!await saveStructuralProject(id, initialStructural)) {
+      throw FileSystemException('Cannot initialize structural model');
+    }
     return project;
   }
 
@@ -152,7 +167,10 @@ class BimProjectLibraryService {
       loadProject(projectId);
 
   /// Atomically saves the project manifest.
-  Future<bool> saveProjectManifest(BimWorkProject project) async {
+  Future<bool> saveProjectManifest(BimWorkProject project) =>
+      _writes.run(() => _saveProjectManifestNow(project));
+
+  Future<bool> _saveProjectManifestNow(BimWorkProject project) async {
     try {
       final projDir = await getProjectDirectory(project.id);
       final manifestFile = File('${projDir.path}/project.json');
@@ -222,6 +240,11 @@ class BimProjectLibraryService {
   Future<bool> saveStructuralProject(
     String projectId,
     StructuralProject structural,
+  ) => _writes.run(() => _saveStructuralProjectNow(projectId, structural));
+
+  Future<bool> _saveStructuralProjectNow(
+    String projectId,
+    StructuralProject structural,
   ) async {
     try {
       final projDir = await getProjectDirectory(projectId);
@@ -239,7 +262,9 @@ class BimProjectLibraryService {
       // Update project updatedAt timestamp
       final manifest = await loadProject(projectId);
       if (manifest != null) {
-        await saveProjectManifest(manifest.copyWith(updatedAt: DateTime.now()));
+        await _saveProjectManifestNow(
+          manifest.copyWith(updatedAt: DateTime.now()),
+        );
       }
       return true;
     } catch (e) {
@@ -251,6 +276,22 @@ class BimProjectLibraryService {
   /// Publishes a validated, immutable revision. The old revision remains valid
   /// until the manifest rename commits the new paths.
   Future<BimStoreyUnderlay> attachUnderlayFile(
+    String projectId,
+    String storeyId,
+    File sourceFile, {
+    BimConversionResult? prepared,
+    bool preserveAlignment = false,
+  }) => _publications.run(
+    () => _attachUnderlayFile(
+      projectId,
+      storeyId,
+      sourceFile,
+      prepared: prepared,
+      preserveAlignment: preserveAlignment,
+    ),
+  );
+
+  Future<BimStoreyUnderlay> _attachUnderlayFile(
     String projectId,
     String storeyId,
     File sourceFile, {
@@ -322,7 +363,8 @@ class BimProjectLibraryService {
   }
 
   /// Migrates legacy underlays once; a legacy wallsDetected flag is not a cache.
-  Future<BimWorkProject> prepareUnderlays(BimWorkProject project, {
+  Future<BimWorkProject> prepareUnderlays(
+    BimWorkProject project, {
     Map<String, DxfDocument>? loadedDocuments,
   }) async {
     var current = await loadProject(project.id) ?? project;
@@ -360,8 +402,10 @@ class BimProjectLibraryService {
       );
       current = await loadProject(current.id) ?? current;
       if (loadedDocuments != null) {
-        loadedDocuments[storey.storeyId] = await loadUnderlay(current.id,
-          current.storeys.firstWhere((s) => s.storeyId == storey.storeyId));
+        loadedDocuments[storey.storeyId] = await loadUnderlay(
+          current.id,
+          current.storeys.firstWhere((s) => s.storeyId == storey.storeyId),
+        );
       }
     }
     return current;
@@ -433,19 +477,26 @@ class BimProjectLibraryService {
   /// Consume local analysis seeds exactly once, after alignment. An empty
   /// saved axis list thereafter represents the user's choice, not missing data.
   Future<(BimWorkProject, StructuralProject)> initializeAxes(
-    BimWorkProject project, StructuralProject structural,
+    BimWorkProject project,
+    StructuralProject structural,
     Map<String, DxfDocument> alignedDocuments,
   ) async {
-    if (project.axisSeedsConsumed || alignedDocuments.isEmpty) return (project, structural);
+    if (project.axisSeedsConsumed || alignedDocuments.isEmpty) {
+      return (project, structural);
+    }
     if (structural.effectiveGridAxes.isEmpty) {
       final doc = alignedDocuments[project.referenceStorey?.storeyId];
-      if (doc != null) structural = structural.copyWithGridAxes(BimUnderlayMetadata.axes(doc));
+      if (doc != null) {
+        structural = structural.copyWithGridAxes(BimUnderlayMetadata.axes(doc));
+      }
     }
     if (!await saveStructuralProject(project.id, structural)) {
       throw StateError('Cannot save initial axes');
     }
     project = project.copyWith(axisSeedsConsumed: true);
-    if (!await saveProjectManifest(project)) throw StateError('Cannot save axis initialization');
+    if (!await saveProjectManifest(project)) {
+      throw StateError('Cannot save axis initialization');
+    }
     return (project, structural);
   }
 

@@ -93,7 +93,18 @@ class BimExportService {
         final metadata = BimUnderlayMetadata.read(doc);
         // Export original architecture; generated contours are a working filter.
         if (metadata != null) {
-          visibility = Map<String, bool>.from(metadata['visibility'] as Map);
+          final original = Map<String, bool>.from(
+            metadata['visibility'] as Map,
+          );
+          final filtered = BimUnderlayMetadata.generatedLayers(
+            doc,
+          ).any((name) => visibility[name] == true);
+          visibility = filtered
+              ? original
+              : {
+                  for (final entry in original.entries)
+                    entry.key: visibility[entry.key] ?? entry.value,
+                };
         }
       }
 

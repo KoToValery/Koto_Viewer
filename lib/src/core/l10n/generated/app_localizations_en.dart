@@ -2230,7 +2230,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bimProjectUnderlayFormatError =>
-      'Please select a valid .dxf or .dwg CAD drawing file.';
+      'Please select a valid .dxf, .dwg or .kcad CAD drawing file.';
 
   @override
   String get bimProjectElevation => 'Elevation (m)';

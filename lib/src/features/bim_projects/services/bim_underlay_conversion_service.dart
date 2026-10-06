@@ -119,10 +119,16 @@ class BimUnderlayConversionService {
           .toString();
       File? dxf;
       if (ext == 'dwg') {
+        // The converter cache keys include the basename, size and mtime.
+        // A content-derived name avoids collisions between unrelated inputs.
+        final converterInput = await original.copy(
+          '${dir.path}/$fingerprint.dwg',
+        );
         final converted = await DwgConverterService.convertDwgToDxf(
-          original.path,
+          converterInput.uri.toFilePath(),
         );
         dxf = await File(converted).copy('${dir.path}/source.dxf');
+        await converterInput.delete();
       } else if (ext == 'dxf') {
         dxf = original;
       }
@@ -176,9 +182,14 @@ class BimUnderlayConversionService {
 }
 
 DxfDocument _parseSourceDxf(String path) {
-  final content = UniversalEncodingService.decodeBytes(File(path).readAsBytesSync());
+  final content = UniversalEncodingService.decodeBytes(
+    File(path).readAsBytesSync(),
+  );
   if (!RegExp(r'^\s*0\s*\r?\n\s*EOF\s*$', multiLine: true).hasMatch(content) ||
-      !RegExp(r'^\s*0\s*\r?\n\s*SECTION\s*$', multiLine: true).hasMatch(content)) {
+      !RegExp(
+        r'^\s*0\s*\r?\n\s*SECTION\s*$',
+        multiLine: true,
+      ).hasMatch(content)) {
     throw const FormatException('Invalid or unsupported DXF');
   }
   return DxfParser.parseString(content).toIsolateSafe();

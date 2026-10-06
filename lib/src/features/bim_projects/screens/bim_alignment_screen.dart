@@ -147,7 +147,10 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
 
     try {
       _loadError = null;
-      _project = await lib.prepareUnderlays(_project, loadedDocuments: _loadedDocs);
+      _project = await lib.prepareUnderlays(
+        _project,
+        loadedDocuments: _loadedDocs,
+      );
       for (final storey in _project.storeys) {
         if (!storey.hasUnderlay) continue;
         final doc = _loadedDocs[storey.storeyId]!;
@@ -156,7 +159,12 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
         }
         _loadedDocs[storey.storeyId] = doc;
       }
-      _underlayFilterActive = true;
+      final currentDoc = _loadedDocs[_currentStorey.storeyId];
+      _underlayFilterActive =
+          currentDoc != null &&
+          BimUnderlayMetadata.generatedLayers(
+            currentDoc,
+          ).any((name) => currentDoc.layers[name]?.isVisible == true);
     } catch (error) {
       _loadError = error.toString();
     }
@@ -510,6 +518,19 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
         }
       }
     });
+    _project = _project.copyWith(
+      storeys: _project.storeys.map((storey) {
+        final doc = _loadedDocs[storey.storeyId];
+        return doc == null
+            ? storey
+            : storey.copyWith(
+                layerVisibility: {
+                  for (final l in doc.layers.values) l.name: l.isVisible,
+                },
+              );
+      }).toList(),
+    );
+    BimProjectLibraryService.instance.saveProjectManifest(_project);
     HapticFeedback.selectionClick();
   }
 

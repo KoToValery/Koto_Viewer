@@ -104,8 +104,12 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
         );
       }
 
-      final initialized = await BimProjectLibraryService.instance.initializeAxes(
-        latestProject, structural, loadedUnderlays.underlaysByStorey);
+      final initialized = await BimProjectLibraryService.instance
+          .initializeAxes(
+            latestProject,
+            structural,
+            loadedUnderlays.underlaysByStorey,
+          );
       latestProject = initialized.$1;
       structural = initialized.$2;
 

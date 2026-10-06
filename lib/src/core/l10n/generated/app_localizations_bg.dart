@@ -2239,7 +2239,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get bimProjectUnderlayFormatError =>
-      'Моля, изберете валиден CAD чертеж във формат .dxf или .dwg.';
+      'Моля, изберете валиден CAD чертеж във формат .dxf, .dwg или .kcad.';
 
   @override
   String get bimProjectElevation => 'Кота (м)';
