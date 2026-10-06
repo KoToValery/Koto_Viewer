@@ -17,6 +17,8 @@ import 'analysis/structural_underlay_filter.dart';
 import 'analysis/vertical_capacity_calculator.dart';
 import 'analysis/slab_parallel_alignment_helper.dart';
 import 'analysis/slab_seed_generator.dart';
+import 'analysis/slab_envelope_detector.dart';
+import 'analysis/slab_projection_detector.dart';
 import 'analysis/structural_magnetic_alignment_helper.dart';
 import 'analysis/wall_axis_detector.dart';
 import 'models/cantilever_analysis_models.dart';
@@ -6199,17 +6201,32 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   Future<void> _generateSlabSeeds() async {
     final active = _project.activeStorey;
-    final metadata = BimUnderlayMetadata.read(_document);
-    if (metadata == null) return;
+    var metadata = BimUnderlayMetadata.read(_document);
     if (active.slabs.any((s) => s.id.startsWith(SlabSeedGenerator.prefix(active.id)))) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.bimSlabsAlreadyGenerated)));
       return;
     }
+    List<(Offset, Offset)>? wallReferences;
+    if (metadata == null) {
+      final walls = WallAxisDetector.detect(_document);
+      final envelope = SlabEnvelopeDetector.detect(walls);
+      final projections = SlabProjectionDetector.detect(
+        _document, envelope, walls.detectedScale,
+        wallLayers: walls.selectedWallPairs.expand((p) =>
+          [p.segmentA.sourceLayer, p.segmentB.sourceLayer]).toSet(),
+      );
+      metadata = {
+        'slabEnvelope': envelope.toJson(),
+        'slabProjections': projections.map((p) => p.toJson()).toList(),
+      };
+      wallReferences = [...walls.wallContourSegments, ...walls.closureSegments];
+    }
     final seeds = SlabSeedGenerator.generate(
       metadata: metadata, document: _document, storeyId: active.id,
       existing: active.slabs, unitsPerMeter: _cadUnitsPerMeter,
       thickness: _currentSlabThickness,
+      wallReferences: wallReferences,
     );
     final total = ((metadata['slabEnvelope'] as Map?)?['contours'] as List? ?? []).length +
         (metadata['slabProjections'] as List? ?? []).length;
@@ -7221,7 +7238,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
       },
       itemBuilder: (context) => [
-        if (widget.bimContext != null)
           PopupMenuItem(value: 'generate_slabs',
             child: Text(context.l10n.bimGenerateSlabs,
               style: const TextStyle(color: Colors.white, fontSize: 13))),
@@ -7950,6 +7966,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         hasSlabStartCorner: _slabPointsCad.isNotEmpty,
                         slabPointCount: _slabPointsCad.length,
                         onCloseSlab: _closeSlabPolygon,
+                        onGenerateSlabs: _generateSlabSeeds,
                         onUndoPoint: () {
                           setState(() {
                             _slabStartCornerCad = null;

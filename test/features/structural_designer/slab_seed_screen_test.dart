@@ -7,9 +7,75 @@ import 'package:kotoview/src/features/bim_projects/services/bim_underlay_convers
 import 'package:kotoview/src/features/structural_designer/models/structural_bim_context.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
 import 'package:kotoview/src/features/structural_designer/structural_designer_screen.dart';
-import 'slab_corner_and_projection_test.dart' show document;
+import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
+import 'package:kotoview/src/features/structural_designer/services/structural_persistence_service.dart';
+import 'slab_corner_and_projection_test.dart' show document, rectangle;
 
 void main() {
+  testWidgets(
+    'standalone drawing exposes menu and slab button and generates without metadata',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final doc = document(
+        rectangle().selectedWallPairs
+            .expand(
+              (p) => [
+                DxfLine(
+                  p1: p.segmentA.start,
+                  p2: p.segmentA.end,
+                  layer: 'walls',
+                ),
+                DxfLine(
+                  p1: p.segmentB.start,
+                  p2: p.segmentB.end,
+                  layer: 'walls',
+                ),
+              ],
+            )
+            .toList(),
+      );
+      doc.headerVars[r'$INSUNITS'] = '4';
+      doc.layers['walls'] = DxfLayer(name: 'walls');
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('en'),
+          home: StructuralDesignerScreen(
+            document: doc,
+            title: 'slab_menu_test',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // Close the existing standalone wall-detection suggestion.
+      expect(find.byType(BottomSheet), findsOneWidget);
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('Generate initial slabs'), findsOneWidget);
+      await tester.tap(find.text('Generate initial slabs'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      final saved = await StructuralPersistenceService.loadProject(
+        documentKey: 'slab_menu_test',
+      );
+      expect(saved!.activeStorey.slabs, hasLength(1));
+      await tester.tap(find.text('Slab'));
+      await tester.pumpAndSettle();
+      final button = find.widgetWithText(ActionChip, 'Generate initial slabs');
+      expect(button, findsOneWidget);
+      expect(button.hitTestable(), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
   testWidgets(
     'explicit generation saves, repeat preserves edits, undo saves removal',
     (tester) async {
@@ -51,10 +117,10 @@ void main() {
               projectBounds: doc.bounds,
               cadUnitsPerMeter: 1000,
               onProjectChanged: saved.add,
-              onLayerVisibilityChanged: (_, __) {},
+              onLayerVisibilityChanged: (_, _) {},
               onWallsDetected: (_) {},
               onManageStoreys: () {},
-              onExport: (_, __, ___) async {},
+              onExport: (_, _, _) async {},
             ),
           ),
         ),

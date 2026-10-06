@@ -34,7 +34,12 @@ void main() {
       unitsPerMeter: 1000,
       thickness: .25,
     );
-    expect(result.single.polygon, rectangle(0));
+    for (var i = 0; i < 4; i++) {
+      expect(
+        (result.single.polygon[i] - rectangle(0)[i]).distance,
+        lessThan(1e-8),
+      );
+    }
     expect(manual.polygon, rectangle(10));
   });
   test('strict 20 mm threshold and shared corners, without inward steps', () {

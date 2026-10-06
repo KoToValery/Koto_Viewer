@@ -15,6 +15,7 @@ class SlabSeedGenerator {
     required List<StructuralSlab> existing,
     required double unitsPerMeter,
     required double thickness,
+    List<(Offset, Offset)>? wallReferences,
   }) {
     final idPrefix = prefix(storeyId);
     if (existing.any((s) => s.id.startsWith(idPrefix)) ||
@@ -41,11 +42,13 @@ class SlabSeedGenerator {
     final wallLayer =
         metadata['wallLayer'] as String? ??
         ownedLayers.where((s) => s.startsWith('BIM_Walls')).firstOrNull;
-    final walls = document.entities
-        .whereType<DxfLine>()
-        .where((e) => e.layer == wallLayer && !e.isPaperSpace)
-        .map((e) => (e.p1, e.p2))
-        .toList();
+    final walls =
+        wallReferences ??
+        document.entities
+            .whereType<DxfLine>()
+            .where((e) => e.layer == wallLayer && !e.isPaperSpace)
+            .map((e) => (e.p1, e.p2))
+            .toList();
     final tolerance = 0.02 * unitsPerMeter;
     final epsilon = 0.00001 * unitsPerMeter;
     final result = <StructuralSlab>[];
@@ -173,7 +176,9 @@ class SlabSeedGenerator {
   ).fold(0.0, (sum, e) => sum + _cross(e.$1 - p.first, e.$2 - p.first));
 
   static bool _valid(List<Offset> p, double epsilon) {
-    if (p.length < 3 || p.length > 2000 || _area(p).abs() <= epsilon * epsilon) {
+    if (p.length < 3 ||
+        p.length > 2000 ||
+        _area(p).abs() <= epsilon * epsilon) {
       return false;
     }
     final segments = edges(p).toList();
