@@ -219,6 +219,9 @@ DxfDocument _analyse(DxfDocument doc) {
     doc,
     envelope,
     detected.detectedScale,
+    wallLayers: detected.selectedWallPairs
+        .expand((p) => [p.segmentA.sourceLayer, p.segmentB.sourceLayer])
+        .toSet(),
   );
   final projectionLayer = unique('BIM_Projection_Candidates', doc.layers.keys);
   final candidates = unique('BIM_Slab_Candidates', doc.layers.keys);

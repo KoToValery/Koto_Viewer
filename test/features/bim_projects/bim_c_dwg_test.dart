@@ -88,7 +88,46 @@ void main() {
     }
     final projections =
         BimUnderlayMetadata.read(doc)!['slabProjections'] as List;
-    expect(projections.length, 4);
+    expect(projections.where((p) => p['kind'] == 'loggiaCandidate').length, 2);
+    for (final point in [
+      [-389.0, -110.0],
+      [-202.0, -110.0],
+    ]) {
+      expect(
+        projections.any(
+          (p) =>
+              p['kind'] == 'loggiaCandidate' &&
+              containsPoint(point[0], point[1], p['contour'] as List),
+        ),
+        isTrue,
+      );
+    }
+    // Every output edge follows an observed wall-face support line (0.1 mm).
+    final faces = walls.selectedWallPairs
+        .expand((p) => [p.segmentA, p.segmentB])
+        .toList();
+    for (var i = 0; i < ring.length; i++) {
+      final a = ring[i] as List, b = ring[(i + 1) % ring.length] as List;
+      final x = (a[0] + b[0]) / 2, y = (a[1] + b[1]) / 2;
+      final supports = [
+        ...faces.map((f) => (f.start, f.end)),
+        ...walls.wallContourSegments,
+        ...walls.closureSegments,
+      ];
+      final best = supports
+          .where((f) => (f.$2 - f.$1).distance > 0)
+          .map((f) {
+            final d = f.$2 - f.$1;
+            return ((x - f.$1.dx) * d.dy - (y - f.$1.dy) * d.dx).abs() /
+                d.distance;
+          })
+          .reduce((a, b) => a < b ? a : b);
+      expect(
+        best / walls.detectedScale,
+        lessThan(0.1),
+        reason: 'offset at edge $i',
+      );
+    }
     for (final p in projections) {
       expect(p['sourceLayer'], '2D Drafting - General');
     }

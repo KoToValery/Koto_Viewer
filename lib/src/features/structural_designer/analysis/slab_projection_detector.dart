@@ -9,9 +9,15 @@ class SlabProjectionCandidate {
   final List<Offset> contour;
   final String sourceLayer;
   final double area;
-  const SlabProjectionCandidate(this.contour, this.sourceLayer, this.area);
+  final String kind;
+  const SlabProjectionCandidate(
+    this.contour,
+    this.sourceLayer,
+    this.area, {
+    this.kind = 'externalArea',
+  });
   Map<String, dynamic> toJson() => {
-    'kind': 'externalArea',
+    'kind': kind,
     'coordinateSpace': 'sourceCad',
     'status': 'needsReview',
     'sourceLayer': sourceLayer,
@@ -47,11 +53,19 @@ class SlabProjectionDetector {
 
   static ({Offset point, int edge, double distance}) _nearest(
     Offset p,
-    List<Offset> ring,
-  ) {
+    List<Offset> ring, {
+    Offset? transverseTo,
+  }) {
     var best = double.infinity, index = 0, point = Offset.zero;
     for (var i = 0; i < ring.length; i++) {
       final a = ring[i], d = ring[(i + 1) % ring.length] - a;
+      if (transverseTo != null &&
+          (d.distance == 0 ||
+              (d.dx * transverseTo.dx + d.dy * transverseTo.dy).abs() /
+                      (d.distance * transverseTo.distance) >
+                  0.2)) {
+        continue;
+      }
       final t = d.distanceSquared == 0
           ? 0.0
           : (((p - a).dx * d.dx + (p - a).dy * d.dy) / d.distanceSquared).clamp(
@@ -88,8 +102,9 @@ class SlabProjectionDetector {
   static List<SlabProjectionCandidate> detect(
     DxfDocument doc,
     SlabEnvelopeResult envelope,
-    double scale,
-  ) {
+    double scale, {
+    Set<String> wallLayers = const {},
+  }) {
     if (envelope.contours.isEmpty || scale <= 0 || !scale.isFinite) return [];
     final byLayer = <String, List<(Offset, Offset)>>{};
     bool outside(Offset p) => !envelope.contours.any((r) => _inside(p, r));
@@ -106,7 +121,7 @@ class SlabProjectionDetector {
     }
 
     for (final e in doc.entities) {
-      if (e.isPaperSpace) continue;
+      if (e.isPaperSpace || wallLayers.contains(e.layer)) continue;
       var lt = e.lineType?.toUpperCase() ?? 'BYLAYER';
       if (lt == 'BYLAYER') {
         lt = doc.layers[e.layer]?.lineType?.toUpperCase() ?? 'CONTINUOUS';
@@ -123,7 +138,7 @@ class SlabProjectionDetector {
       }
     }
     final candidates = <SlabProjectionCandidate>[];
-    final attachment = 200 * scale + 2 * envelope.cellSize;
+    final attachment = 200 * scale;
     for (final entry in byLayer.entries) {
       final points = <Offset>[],
           edges = <(int, int)>[],
@@ -170,12 +185,35 @@ class SlabProjectionDetector {
           current = edges[edge].$1 == current ? edges[edge].$2 : edges[edge].$1;
           chain.add(points[current]);
         }
-        if (ambiguous || chain.length < 3) continue;
+        if (ambiguous || chain.length < 2) continue;
         for (final ring in envelope.contours) {
-          final first = _nearest(chain.first, ring),
-              last = _nearest(chain.last, ring);
+          final mouthDirection = chain.length == 2
+              ? chain.last - chain.first
+              : null;
+          final first = _nearest(
+                chain.first,
+                ring,
+                transverseTo: mouthDirection,
+              ),
+              last = _nearest(chain.last, ring, transverseTo: mouthDirection);
           if (first.distance > attachment || last.distance > attachment) {
             continue;
+          }
+          final isLoggia = chain.length == 2;
+          if (isLoggia) {
+            // A single railing across a recess needs two opposing side walls.
+            final mouth = chain.last - chain.first;
+            final sideA =
+                ring[(first.edge + 1) % ring.length] - ring[first.edge];
+            final sideB = ring[(last.edge + 1) % ring.length] - ring[last.edge];
+            double cosine(Offset a, Offset b) =>
+                (a.dx * b.dx + a.dy * b.dy) / (a.distance * b.distance);
+            if (first.edge == last.edge ||
+                mouth.distance > 6000 * scale ||
+                cosine(mouth, sideA).abs() > 0.2 ||
+                cosine(mouth, sideB).abs() > 0.2) {
+              continue;
+            }
           }
           final routes = <List<Offset>>[];
           if (first.edge == last.edge) {
@@ -193,6 +231,16 @@ class SlabProjectionDetector {
           }
           routes.sort((a, b) => _area(a).compareTo(_area(b)));
           for (final polygon in routes) {
+            // A long detour into an unclosed building is not a balcony.
+            final chainLength = List.generate(
+              chain.length - 1,
+              (i) => (chain[i + 1] - chain[i]).distance,
+            ).fold<double>(0, (a, b) => a + b);
+            final perimeter = List.generate(
+              polygon.length,
+              (i) => (polygon[(i + 1) % polygon.length] - polygon[i]).distance,
+            ).fold<double>(0, (a, b) => a + b);
+            if (perimeter > chainLength * 4 + 2 * attachment) continue;
             final area = _area(polygon);
             if (area < 500000 * scale * scale ||
                 area > 100000000 * scale * scale) {
@@ -219,7 +267,14 @@ class SlabProjectionDetector {
               }
             }
             if (samples < 5 || external / samples < 0.95) continue;
-            candidates.add(SlabProjectionCandidate(polygon, entry.key, area));
+            candidates.add(
+              SlabProjectionCandidate(
+                polygon,
+                entry.key,
+                area,
+                kind: isLoggia ? 'loggiaCandidate' : 'externalArea',
+              ),
+            );
             break;
           }
         }

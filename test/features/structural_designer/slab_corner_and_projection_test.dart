@@ -113,6 +113,60 @@ DxfDocument document(List<DxfEntity> entities) => DxfDocument(
   entityStats: {},
 );
 void main() {
+  test('no grid offset remains at any outer face', () {
+    final result = SlabEnvelopeDetector.detect(rectangle());
+    expect(result.contours.single.toSet(), {
+      const Offset(0, 0),
+      const Offset(10000, 0),
+      const Offset(10000, 8000),
+      const Offset(0, 8000),
+    });
+  });
+  test('single railing across recessed facade produces a loggia', () {
+    const recessed = SlabEnvelopeResult(
+      [
+        [
+          Offset(0, 0),
+          Offset(3000, 0),
+          Offset(3000, 1500),
+          Offset(5000, 1500),
+          Offset(5000, 0),
+          Offset(10000, 0),
+          Offset(10000, 8000),
+          Offset(0, 8000),
+        ],
+      ],
+      [],
+      25,
+      1,
+    );
+    final doc = document([
+      const DxfLine(p1: Offset(3000, 0), p2: Offset(5000, 0), layer: 'outline'),
+    ]);
+    final result = SlabProjectionDetector.detect(doc, recessed, 1);
+    expect(result, hasLength(1));
+    expect(result.single.kind, 'loggiaCandidate');
+    expect(result.single.area, closeTo(3000000, 0.001));
+  });
+  test('single line beside straight facade is not a loggia', () {
+    const flat = SlabEnvelopeResult(
+      [
+        [Offset(0, 0), Offset(10000, 0), Offset(10000, 8000), Offset(0, 8000)],
+      ],
+      [],
+      25,
+      1,
+    );
+    final doc = document([
+      const DxfLine(
+        p1: Offset(3000, -100),
+        p2: Offset(5000, -100),
+        layer: 'outline',
+      ),
+    ]);
+    expect(SlabProjectionDetector.detect(doc, flat, 1), isEmpty);
+  });
+
   test('actual mitred faces retain all four outer corners', () {
     final result = SlabEnvelopeDetector.detect(rectangle());
     expect(result.contours, hasLength(1));

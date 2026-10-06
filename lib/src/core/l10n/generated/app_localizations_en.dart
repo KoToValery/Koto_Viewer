@@ -2561,6 +2561,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bimProjectReprocessUnderlay => 'Reprocess underlay';
 
   @override
+  String bimSlabLoggiaCount(int count) {
+    return 'Of these, loggia proposals: $count.';
+  }
+
+  @override
   String bimSlabProjectionCount(int count) {
     return 'External areas for review (cyan): $count. Type and level are not confirmed.';
   }

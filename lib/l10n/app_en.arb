@@ -2148,6 +2148,8 @@
   "bimProjectKcadReady": "KCAD ready",
   "bimProjectConversionFailed": "Underlay conversion failed",
   "bimProjectReprocessUnderlay": "Reprocess underlay",
+  "bimSlabLoggiaCount": "Of these, loggia proposals: {count}.",
+  "@bimSlabLoggiaCount": {"placeholders": {"count": {"type": "int"}}},
   "bimSlabProjectionCount": "External areas for review (cyan): {count}. Type and level are not confirmed.",
   "@bimSlabProjectionCount": {"placeholders": {"count": {"type": "int"}}},
   "bimSlabPreviewTitle": "Slab contour proposals",

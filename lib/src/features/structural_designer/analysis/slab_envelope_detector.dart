@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import '../models/wall_axis_models.dart';
 import 'slab_wall_regions.dart';
+import 'slab_boundary_refiner.dart';
 
 /// Conservative preview only: enclosed free space is not proof of a slab.
 /// Coordinates remain in source CAD units, before project alignment.
@@ -26,7 +27,7 @@ class SlabEnvelopeResult {
   });
 
   Map<String, dynamic> toJson() => {
-    'version': 3,
+    'version': 4,
     'status': contours.isEmpty ? 'unresolved' : 'needsReview',
     'coordinateSpace': 'sourceCad',
     'cellSize': cellSize,
@@ -161,10 +162,9 @@ class SlabEnvelopeDetector {
               5 * scale) {
         continue;
       }
-      if (![
-        pair.segmentA,
-        pair.segmentB,
-      ].any((f) => [other.segmentA, other.segmentB].any((g) => sameFace(f, g)))) {
+      if (![pair.segmentA, pair.segmentB].any(
+        (f) => [other.segmentA, other.segmentB].any((g) => sameFace(f, g)),
+      )) {
         continue;
       }
       if (across(other.centerlineStart).abs() > 5 * scale ||
@@ -381,6 +381,7 @@ class SlabEnvelopeDetector {
       );
     }
     final contours = <List<Offset>>[];
+    var refinementFailures = 0;
     while (edges.isNotEmpty) {
       final start = edges.keys.first;
       var current = start;
@@ -408,12 +409,25 @@ class SlabEnvelopeDetector {
           simplified.add(b);
         }
       }
-      if (simplified.length >= 3) contours.add(simplified);
+      if (simplified.length >= 3) {
+        final refined = SlabBoundaryRefiner.refine(
+          ring,
+          footprints,
+          cell,
+          scale,
+        );
+        if (refined == null) {
+          refinementFailures++;
+        } else {
+          contours.add(refined);
+        }
+      }
     }
     return SlabEnvelopeResult(
       contours,
       [
-        'approximateRasterBoundary',
+        'sourceAlignedBoundary',
+        if (refinementFailures > 0) 'boundaryRefinementFailed',
         'courtyardsAndSlabOpeningsUnclassified',
         'remainingGapsMayLeak',
         'mayBePartialEnvelope',

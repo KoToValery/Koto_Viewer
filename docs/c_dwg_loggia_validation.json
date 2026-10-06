@@ -1,0 +1,974 @@
+{
+  "source": "C.dwg",
+  "sourceBytes": 67901,
+  "scale": 0.1,
+  "envelope": {
+    "version": 4,
+    "status": "needsReview",
+    "coordinateSpace": "sourceCad",
+    "cellSize": 3.717105263157896,
+    "enclosedRegionCount": 7,
+    "diagnostics": [
+      "sourceAlignedBoundary",
+      "courtyardsAndSlabOpeningsUnclassified",
+      "remainingGapsMayLeak",
+      "mayBePartialEnvelope",
+      "levelAndConcreteEdgeUnverified",
+      "unconfirmedOpeningHypotheses"
+    ],
+    "assumedGaps": [
+      {
+        "start": [
+          -785.7715625195182,
+          501.83280734974807
+        ],
+        "end": [
+          -760.7715625195179,
+          501.83280734974807
+        ],
+        "thickness": 24.999999999999886,
+        "walls": [
+          6,
+          7
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -433.2715725778122,
+          501.83280734974807
+        ],
+        "end": [
+          -333.2715614019306,
+          501.83280734974807
+        ],
+        "thickness": 24.999999999999886,
+        "walls": [
+          6,
+          8
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -258.271563637107,
+          501.83280734974807
+        ],
+        "end": [
+          -158.2715524612254,
+          501.83280734974807
+        ],
+        "thickness": 24.999999999999886,
+        "walls": [
+          9,
+          10
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          169.2284374804815,
+          501.83280734974807
+        ],
+        "end": [
+          194.2284374804816,
+          501.83280734974807
+        ],
+        "thickness": 24.999999999999886,
+        "walls": [
+          10,
+          11
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -785.7715625195182,
+          676.832807349748
+        ],
+        "end": [
+          -760.771562519518,
+          676.832807349748
+        ],
+        "thickness": 25.0,
+        "walls": [
+          12,
+          13
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -685.771558496201,
+          676.832807349748
+        ],
+        "end": [
+          -585.7715640096361,
+          676.832807349748
+        ],
+        "thickness": 25.0,
+        "walls": [
+          13,
+          14
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -5.771558458948256,
+          676.832807349748
+        ],
+        "end": [
+          94.22844116852245,
+          676.832807349748
+        ],
+        "thickness": 25.0,
+        "walls": [
+          17,
+          18
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          169.2284374804815,
+          676.832807349748
+        ],
+        "end": [
+          194.2284374804815,
+          676.832807349748
+        ],
+        "thickness": 25.0,
+        "walls": [
+          18,
+          19
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -340.7715625195186,
+          886.832807349748
+        ],
+        "end": [
+          -250.7715625195186,
+          886.832807349748
+        ],
+        "thickness": 25.0,
+        "walls": [
+          20,
+          21
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          181.7284374804815,
+          539.332807349748
+        ],
+        "end": [
+          181.7284374804815,
+          639.332807349748
+        ],
+        "thickness": 25.0,
+        "walls": [
+          34,
+          35
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -43.27156262626632,
+          1264.332806979065
+        ],
+        "end": [
+          -43.271562572892414,
+          1339.332807349748
+        ],
+        "thickness": 25.000000160121687,
+        "walls": [
+          36,
+          38
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -295.7715625195186,
+          -35.66719265025196
+        ],
+        "end": [
+          -295.7715625195185,
+          -10.66719265025196
+        ],
+        "thickness": 25.0,
+        "walls": [
+          41,
+          42
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -548.2715623911114,
+          1264.332806979065
+        ],
+        "end": [
+          -548.2715624553149,
+          1339.332807349748
+        ],
+        "thickness": 25.000000192611083,
+        "walls": [
+          45,
+          46
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -773.2715625195182,
+          539.332807349748
+        ],
+        "end": [
+          -773.2715625195182,
+          639.332807349748
+        ],
+        "thickness": 25.0,
+        "walls": [
+          48,
+          49
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      },
+      {
+        "start": [
+          -1273.271562519518,
+          1214.332807349748
+        ],
+        "end": [
+          -1273.271562472952,
+          1239.332807349748
+        ],
+        "thickness": 24.99999995343387,
+        "walls": [
+          52,
+          53
+        ],
+        "reason": "collinearMatchingWallFaces",
+        "confirmedOpening": false
+      }
+    ],
+    "regions": [
+      {
+        "index": 0,
+        "wallCount": 55,
+        "baselineContours": [],
+        "contourCount": 1,
+        "cellSize": 3.717105263157896,
+        "diagnostics": [
+          "sourceAlignedBoundary",
+          "courtyardsAndSlabOpeningsUnclassified",
+          "remainingGapsMayLeak",
+          "mayBePartialEnvelope",
+          "levelAndConcreteEdgeUnverified"
+        ],
+        "hypothesisDiagnostics": [
+          "sourceAlignedBoundary",
+          "courtyardsAndSlabOpeningsUnclassified",
+          "remainingGapsMayLeak",
+          "mayBePartialEnvelope",
+          "levelAndConcreteEdgeUnverified"
+        ],
+        "assumedGaps": [
+          {
+            "start": [
+              -785.7715625195182,
+              501.83280734974807
+            ],
+            "end": [
+              -760.7715625195179,
+              501.83280734974807
+            ],
+            "thickness": 24.999999999999886,
+            "walls": [
+              6,
+              7
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -433.2715725778122,
+              501.83280734974807
+            ],
+            "end": [
+              -333.2715614019306,
+              501.83280734974807
+            ],
+            "thickness": 24.999999999999886,
+            "walls": [
+              6,
+              8
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -258.271563637107,
+              501.83280734974807
+            ],
+            "end": [
+              -158.2715524612254,
+              501.83280734974807
+            ],
+            "thickness": 24.999999999999886,
+            "walls": [
+              9,
+              10
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              169.2284374804815,
+              501.83280734974807
+            ],
+            "end": [
+              194.2284374804816,
+              501.83280734974807
+            ],
+            "thickness": 24.999999999999886,
+            "walls": [
+              10,
+              11
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -785.7715625195182,
+              676.832807349748
+            ],
+            "end": [
+              -760.771562519518,
+              676.832807349748
+            ],
+            "thickness": 25.0,
+            "walls": [
+              12,
+              13
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -685.771558496201,
+              676.832807349748
+            ],
+            "end": [
+              -585.7715640096361,
+              676.832807349748
+            ],
+            "thickness": 25.0,
+            "walls": [
+              13,
+              14
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -5.771558458948256,
+              676.832807349748
+            ],
+            "end": [
+              94.22844116852245,
+              676.832807349748
+            ],
+            "thickness": 25.0,
+            "walls": [
+              17,
+              18
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              169.2284374804815,
+              676.832807349748
+            ],
+            "end": [
+              194.2284374804815,
+              676.832807349748
+            ],
+            "thickness": 25.0,
+            "walls": [
+              18,
+              19
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -340.7715625195186,
+              886.832807349748
+            ],
+            "end": [
+              -250.7715625195186,
+              886.832807349748
+            ],
+            "thickness": 25.0,
+            "walls": [
+              20,
+              21
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              181.7284374804815,
+              539.332807349748
+            ],
+            "end": [
+              181.7284374804815,
+              639.332807349748
+            ],
+            "thickness": 25.0,
+            "walls": [
+              34,
+              35
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -43.27156262626632,
+              1264.332806979065
+            ],
+            "end": [
+              -43.271562572892414,
+              1339.332807349748
+            ],
+            "thickness": 25.000000160121687,
+            "walls": [
+              36,
+              38
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -295.7715625195186,
+              -35.66719265025196
+            ],
+            "end": [
+              -295.7715625195185,
+              -10.66719265025196
+            ],
+            "thickness": 25.0,
+            "walls": [
+              41,
+              42
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -548.2715623911114,
+              1264.332806979065
+            ],
+            "end": [
+              -548.2715624553149,
+              1339.332807349748
+            ],
+            "thickness": 25.000000192611083,
+            "walls": [
+              45,
+              46
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -773.2715625195182,
+              539.332807349748
+            ],
+            "end": [
+              -773.2715625195182,
+              639.332807349748
+            ],
+            "thickness": 25.0,
+            "walls": [
+              48,
+              49
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          },
+          {
+            "start": [
+              -1273.271562519518,
+              1214.332807349748
+            ],
+            "end": [
+              -1273.271562472952,
+              1239.332807349748
+            ],
+            "thickness": 24.99999995343387,
+            "walls": [
+              52,
+              53
+            ],
+            "reason": "collinearMatchingWallFaces",
+            "confirmedOpening": false
+          }
+        ],
+        "usesAssumedGaps": true
+      }
+    ],
+    "skippedRegions": 0,
+    "contours": [
+      [
+        [
+          -1008.2715624729528,
+          -185.667192650252
+        ],
+        [
+          -470.2715625195184,
+          -185.667192650252
+        ],
+        [
+          -470.2715625195184,
+          -35.66719265025196
+        ],
+        [
+          -308.2715625195186,
+          -35.66719265025196
+        ],
+        [
+          -308.2715625195186,
+          -185.667192650252
+        ],
+        [
+          -283.2715625195186,
+          -185.667192650252
+        ],
+        [
+          -283.2715625195186,
+          -35.66719265025196
+        ],
+        [
+          -121.27156247295252,
+          -35.66719265025196
+        ],
+        [
+          -121.27156247295254,
+          -185.667192650252
+        ],
+        [
+          416.7284374804813,
+          -185.667192650252
+        ],
+        [
+          416.7284374804813,
+          -35.66719265025196
+        ],
+        [
+          1116.728437480481,
+          -35.66719265025196
+        ],
+        [
+          1116.728437480481,
+          1239.332807349748
+        ],
+        [
+          694.2284374804816,
+          1239.332807349748
+        ],
+        [
+          694.2284374804816,
+          1389.332807349748
+        ],
+        [
+          -55.771562626266245,
+          1389.332807349748
+        ],
+        [
+          -55.77156262626631,
+          1239.332807349748
+        ],
+        [
+          -535.7715622627039,
+          1239.332807349748
+        ],
+        [
+          -535.77156237506,
+          1389.332807349748
+        ],
+        [
+          -1285.7715624263858,
+          1389.332807349748
+        ],
+        [
+          -1285.7715624263858,
+          1239.332807349748
+        ],
+        [
+          -1335.771562519518,
+          1239.332807349748
+        ],
+        [
+          -1335.771562519518,
+          1214.332807349748
+        ],
+        [
+          -1285.771562519518,
+          1214.332807349748
+        ],
+        [
+          -1285.771562519518,
+          664.332807349748
+        ],
+        [
+          -785.7715625195182,
+          664.332807349748
+        ],
+        [
+          -785.7715625195182,
+          514.332807349748
+        ],
+        [
+          -1008.271562519519,
+          514.332807349748
+        ],
+        [
+          -1008.271562519519,
+          -10.667192650251991
+        ],
+        [
+          -1683.2715625195196,
+          -10.66719265025196
+        ],
+        [
+          -1683.2715625195196,
+          1214.332807349748
+        ],
+        [
+          -1610.77156404689,
+          1214.332807349748
+        ],
+        [
+          -1610.77156404689,
+          1239.3328077967835
+        ],
+        [
+          -1708.2715625195194,
+          1239.3328077967835
+        ],
+        [
+          -1708.2715625195194,
+          -35.66719265025199
+        ],
+        [
+          -1008.2715624729528,
+          -35.66719265025196
+        ]
+      ]
+    ]
+  },
+  "projections": [
+    {
+      "kind": "externalArea",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 105000.000006985,
+      "contour": [
+        [
+          -1708.2715625195194,
+          -35.66719265025199
+        ],
+        [
+          -1708.27156251952,
+          -47.66719265025196
+        ],
+        [
+          -1708.271562519519,
+          -185.667192650252
+        ],
+        [
+          -1020.271562519519,
+          -185.667192650252
+        ],
+        [
+          -1008.2715624729528,
+          -185.667192650252
+        ],
+        [
+          -1008.2715624729528,
+          -185.667192650252
+        ],
+        [
+          -1008.2715624729528,
+          -35.66719265025196
+        ],
+        [
+          -1708.2715625195194,
+          -35.66719265025199
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    },
+    {
+      "kind": "externalArea",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 105000.0000000002,
+      "contour": [
+        [
+          1116.728437480481,
+          -35.66719265025196
+        ],
+        [
+          1116.728437480483,
+          -47.66719265025196
+        ],
+        [
+          1116.728437480482,
+          -185.667192650252
+        ],
+        [
+          428.7284374804825,
+          -185.667192650252
+        ],
+        [
+          416.7284374804813,
+          -185.667192650252
+        ],
+        [
+          416.7284374804813,
+          -185.667192650252
+        ],
+        [
+          416.7284374804813,
+          -35.66719265025196
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    },
+    {
+      "kind": "externalArea",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 63375.00000000013,
+      "contour": [
+        [
+          1116.728437480481,
+          1239.332807349748
+        ],
+        [
+          1116.728437480483,
+          1251.332807349748
+        ],
+        [
+          1116.728437480482,
+          1389.332807349748
+        ],
+        [
+          705.8206711805506,
+          1389.332807349748
+        ],
+        [
+          694.2284374804816,
+          1389.332807349748
+        ],
+        [
+          694.2284374804816,
+          1239.332807349748
+        ],
+        [
+          1116.728437480481,
+          1239.332807349748
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    },
+    {
+      "kind": "loggiaCandidate",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 24300.00000698492,
+      "contour": [
+        [
+          -283.2715625195186,
+          -185.667192650252
+        ],
+        [
+          -283.2715625195187,
+          -185.667192650252
+        ],
+        [
+          -133.2715625195187,
+          -185.667192650252
+        ],
+        [
+          -121.27156247295254,
+          -185.667192650252
+        ],
+        [
+          -121.27156247295252,
+          -35.66719265025196
+        ],
+        [
+          -283.2715625195186,
+          -35.66719265025196
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    },
+    {
+      "kind": "loggiaCandidate",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 24299.999999999964,
+      "contour": [
+        [
+          -470.2715625195184,
+          -185.6671926502519
+        ],
+        [
+          -458.2715625195184,
+          -185.6671926502519
+        ],
+        [
+          -308.2715625195187,
+          -185.667192650252
+        ],
+        [
+          -308.2715625195186,
+          -185.667192650252
+        ],
+        [
+          -308.2715625195186,
+          -35.66719265025196
+        ],
+        [
+          -470.2715625195184,
+          -35.66719265025196
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    },
+    {
+      "kind": "externalArea",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 22499.999983987796,
+      "contour": [
+        [
+          -55.771562626266245,
+          1389.332807349748
+        ],
+        [
+          -67.77156251951828,
+          1389.332807349748
+        ],
+        [
+          -205.7715625195183,
+          1389.332807349748
+        ],
+        [
+          -205.7715625195182,
+          1251.332807349748
+        ],
+        [
+          -205.7715625195182,
+          1239.332807349748
+        ],
+        [
+          -55.77156262626631,
+          1239.332807349748
+        ],
+        [
+          -55.771562626266245,
+          1389.332807349748
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    },
+    {
+      "kind": "externalArea",
+      "coordinateSpace": "sourceCad",
+      "status": "needsReview",
+      "sourceLayer": "2D Drafting - General",
+      "areaCadSquared": 22499.99996985057,
+      "contour": [
+        [
+          -535.77156237506,
+          1389.3328073407595
+        ],
+        [
+          -523.7715625195185,
+          1389.332807349748
+        ],
+        [
+          -385.7715625195185,
+          1389.332807349748
+        ],
+        [
+          -385.7715625195186,
+          1251.332807349748
+        ],
+        [
+          -385.7715625195187,
+          1239.332807349748
+        ],
+        [
+          -535.7715622627039,
+          1239.332807349748
+        ]
+      ],
+      "levelVerified": false,
+      "materialVerified": false
+    }
+  ]
+}

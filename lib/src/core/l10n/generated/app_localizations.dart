@@ -4480,6 +4480,12 @@ abstract class AppLocalizations {
   /// **'Reprocess underlay'**
   String get bimProjectReprocessUnderlay;
 
+  /// No description provided for @bimSlabLoggiaCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Of these, loggia proposals: {count}.'**
+  String bimSlabLoggiaCount(int count);
+
   /// No description provided for @bimSlabProjectionCount.
   ///
   /// In en, this message translates to:

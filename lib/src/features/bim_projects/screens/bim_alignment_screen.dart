@@ -592,6 +592,11 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
         ? 0
         : (BimUnderlayMetadata.read(doc)?['slabProjections'] as List? ?? [])
               .length;
+    final loggias = doc == null
+        ? 0
+        : (BimUnderlayMetadata.read(doc)?['slabProjections'] as List? ?? [])
+              .where((p) => p is Map && p['kind'] == 'loggiaCandidate')
+              .length;
     final regions = report is Map ? (report['regions'] as List? ?? []) : [];
     final gaps = report is Map
         ? (report['assumedGaps'] as List? ?? []).length
@@ -608,7 +613,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
           child: Text(
             report == null
                 ? l10n.bimSlabPreviewMissing
-                : '${l10n.bimSlabPreviewCount(count)}\n${l10n.bimSlabProjectionCount(projections)}\n${l10n.bimSlabPreviewRegions(regions.length, unresolved, gaps)}${skipped > 0 ? '\n${l10n.bimSlabPreviewSkipped(skipped)}' : ''}\n\n${count == 0 ? '${l10n.bimSlabPreviewEmpty}\n\n' : ''}${l10n.bimSlabPreviewExplanation}',
+                : '${l10n.bimSlabPreviewCount(count)}\n${l10n.bimSlabProjectionCount(projections)}\n${l10n.bimSlabLoggiaCount(loggias)}\n${l10n.bimSlabPreviewRegions(regions.length, unresolved, gaps)}${skipped > 0 ? '\n${l10n.bimSlabPreviewSkipped(skipped)}' : ''}\n\n${count == 0 ? '${l10n.bimSlabPreviewEmpty}\n\n' : ''}${l10n.bimSlabPreviewExplanation}',
           ),
         ),
         actions: [

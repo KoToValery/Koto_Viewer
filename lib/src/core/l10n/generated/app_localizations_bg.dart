@@ -2570,6 +2570,11 @@ class AppLocalizationsBg extends AppLocalizations {
   String get bimProjectReprocessUnderlay => 'Повторен анализ на подложката';
 
   @override
+  String bimSlabLoggiaCount(int count) {
+    return 'От тях предложения за лоджии: $count.';
+  }
+
+  @override
   String bimSlabProjectionCount(int count) {
     return 'Външни участъци за преглед (цианено): $count. Видът и нивото още не са потвърдени.';
   }

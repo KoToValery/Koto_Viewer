@@ -732,6 +732,8 @@
   "bimProjectKcadReady": "KCAD готов",
   "bimProjectConversionFailed": "Неуспешна конверсия на подложката",
   "bimProjectReprocessUnderlay": "Повторен анализ на подложката",
+  "bimSlabLoggiaCount": "От тях предложения за лоджии: {count}.",
+  "@bimSlabLoggiaCount": {"placeholders": {"count": {"type": "int"}}},
   "bimSlabProjectionCount": "Външни участъци за преглед (цианено): {count}. Видът и нивото още не са потвърдени.",
   "@bimSlabProjectionCount": {"placeholders": {"count": {"type": "int"}}},
   "bimSlabPreviewTitle": "Предложения за контур на плоча",
