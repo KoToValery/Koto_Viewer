@@ -2159,5 +2159,52 @@
   "bimSlabPreviewSkipped": "Regions not processed due to the work limit: {count}.",
   "@bimSlabPreviewSkipped": {"placeholders": {"count": {"type": "int"}}},
   "@bimSlabPreviewRegions": {"placeholders": {"regions": {"type": "int"}, "unresolved": {"type": "int"}, "gaps": {"type": "int"}}},
-  "bimSlabPreviewEmpty": "No reliable closed contour was obtained. Possible causes include open wall gaps, missing walls, ambiguous connections, very small enclosed areas or drawing extents too large for the current resolution."
+  "bimSlabPreviewEmpty": "No reliable closed contour was obtained. Possible causes include open wall gaps, missing walls, ambiguous connections, very small enclosed areas or drawing extents too large for the current resolution.",
+  "cadLayersTitle": "CAD Layers",
+  "@cadLayersTitle": { "description": "Title in CAD layers bottom sheet" },
+  "cadLayersVisibleCount": "{visible} of {total} layers visible",
+  "@cadLayersVisibleCount": {
+    "description": "Visible layers counter",
+    "placeholders": {
+      "visible": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "cadLayersShowAll": "Show All",
+  "@cadLayersShowAll": { "description": "Button to show all CAD layers" },
+  "cadLayersHideAll": "Hide All",
+  "@cadLayersHideAll": { "description": "Button to hide all CAD layers" },
+  "cadLayersLineweightForAll": "Lineweight for all:",
+  "@cadLayersLineweightForAll": { "description": "Label for global lineweight selector" },
+  "cadLayersSelectForAll": "Select for all...",
+  "@cadLayersSelectForAll": { "description": "Placeholder for global lineweight selector" },
+  "cadLayersUnnamed": "Unnamed Layer",
+  "@cadLayersUnnamed": { "description": "Default name for layers with empty name" },
+  "cadLayersObjectCount": "{count, plural, =1{1 object} other{{count} objects}}",
+  "@cadLayersObjectCount": {
+    "description": "Number of objects in layer",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "cadLayersFrozen": "Frozen",
+  "@cadLayersFrozen": { "description": "Label when layer is frozen" },
+  "cadLayersLineweight": "Lineweight:",
+  "@cadLayersLineweight": { "description": "Label for layer lineweight selector" },
+  "cadLayersOriginal": "Original",
+  "@cadLayersOriginal": { "description": "Original lineweight option" },
+  "cadLayersOriginalWithMm": "Original ({mm} mm)",
+  "@cadLayersOriginalWithMm": {
+    "description": "Original lineweight with thickness value",
+    "placeholders": {
+      "mm": { "type": "String" }
+    }
+  },
+  "cadLayersMm": "{mm} mm",
+  "@cadLayersMm": {
+    "description": "Lineweight in millimeters",
+    "placeholders": {
+      "mm": { "type": "String" }
+    }
+  }
 }

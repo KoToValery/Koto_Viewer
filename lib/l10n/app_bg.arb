@@ -743,5 +743,18 @@
   "bimSlabPreviewSkipped": "Необработени области поради ограничението за обем: {count}.",
   "@bimSlabPreviewSkipped": {"placeholders": {"count": {"type": "int"}}},
   "@bimSlabPreviewRegions": {"placeholders": {"regions": {"type": "int"}, "unresolved": {"type": "int"}, "gaps": {"type": "int"}}},
-  "bimSlabPreviewEmpty": "Не е получен надежден затворен контур. Възможните причини включват прекъсвания или липсващи стени, нееднозначни връзки, много малки затворени площи или прекалено голям чертеж за текущата разделителна способност."
+  "bimSlabPreviewEmpty": "Не е получен надежден затворен контур. Възможните причини включват прекъсвания или липсващи стени, нееднозначни връзки, много малки затворени площи или прекалено голям чертеж за текущата разделителна способност.",
+  "cadLayersTitle": "CAD Слоеве",
+  "cadLayersVisibleCount": "{visible} от {total} слоя са видими",
+  "cadLayersShowAll": "Покажи всички",
+  "cadLayersHideAll": "Скрий всички",
+  "cadLayersLineweightForAll": "Дебелина за всички:",
+  "cadLayersSelectForAll": "Избери за всички...",
+  "cadLayersUnnamed": "Неименуван слой",
+  "cadLayersObjectCount": "{count, plural, =1{1 обект} other{{count} обекта}}",
+  "cadLayersFrozen": "Замразен",
+  "cadLayersLineweight": "Дебелина:",
+  "cadLayersOriginal": "Оригинална",
+  "cadLayersOriginalWithMm": "Оригинална ({mm} мм)",
+  "cadLayersMm": "{mm} мм"
 }

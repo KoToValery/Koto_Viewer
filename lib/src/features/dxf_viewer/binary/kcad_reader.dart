@@ -200,12 +200,18 @@ class KcadReader {
       final isVisible = bodyReader.readUint8() != 0;
       final isFrozen = bodyReader.readUint8() != 0;
       final hasLineweight = bodyReader.readUint8() != 0;
-      final lineweight = hasLineweight
+      final rawLineweight = hasLineweight
           ? (isV2 ? bodyReader.readFloat32() : bodyReader.readFloat64())
           : null;
+      final lineweight = rawLineweight != null
+          ? (rawLineweight * 100).round() / 100.0
+          : null;
       final hasCustomLineweight = bodyReader.readUint8() != 0;
-      final customLineweight = hasCustomLineweight
+      final rawCustomLineweight = hasCustomLineweight
           ? (isV2 ? bodyReader.readFloat32() : bodyReader.readFloat64())
+          : null;
+      final customLineweight = rawCustomLineweight != null
+          ? (rawCustomLineweight * 100).round() / 100.0
           : null;
       final hasLineType = bodyReader.readUint8() != 0;
       final lineType = hasLineType ? stringTable[bodyReader.readUint32()] : null;

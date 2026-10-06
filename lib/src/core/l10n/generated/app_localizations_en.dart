@@ -2594,4 +2594,57 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bimSlabPreviewEmpty =>
       'No reliable closed contour was obtained. Possible causes include open wall gaps, missing walls, ambiguous connections, very small enclosed areas or drawing extents too large for the current resolution.';
+
+  @override
+  String get cadLayersTitle => 'CAD Layers';
+
+  @override
+  String cadLayersVisibleCount(int visible, int total) {
+    return '$visible of $total layers visible';
+  }
+
+  @override
+  String get cadLayersShowAll => 'Show All';
+
+  @override
+  String get cadLayersHideAll => 'Hide All';
+
+  @override
+  String get cadLayersLineweightForAll => 'Lineweight for all:';
+
+  @override
+  String get cadLayersSelectForAll => 'Select for all...';
+
+  @override
+  String get cadLayersUnnamed => 'Unnamed Layer';
+
+  @override
+  String cadLayersObjectCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count objects',
+      one: '1 object',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cadLayersFrozen => 'Frozen';
+
+  @override
+  String get cadLayersLineweight => 'Lineweight:';
+
+  @override
+  String get cadLayersOriginal => 'Original';
+
+  @override
+  String cadLayersOriginalWithMm(String mm) {
+    return 'Original ($mm mm)';
+  }
+
+  @override
+  String cadLayersMm(String mm) {
+    return '$mm mm';
+  }
 }

@@ -90,7 +90,11 @@ class DxfLayer {
   bool isVisible;
   bool isFrozen;
   final double? lineweight;
-  double? customLineweight; // null = Original (from DXF), or 0.12, 0.25, 0.35, 0.70 mm override
+  double? _customLineweight;
+  double? get customLineweight => _customLineweight;
+  set customLineweight(double? val) {
+    _customLineweight = val != null ? (val * 100).round() / 100.0 : null;
+  }
   double? defaultEntityLineweight; // Inferred dominant lineweight from entities on this layer
   final String? lineType;
 
@@ -114,13 +118,15 @@ class DxfLayer {
     this.isVisible = true,
     this.isFrozen = false,
     this.lineweight,
-    this.customLineweight,
+    double? customLineweight,
     this.defaultEntityLineweight,
     this.lineType,
     bool isThick = false,
-  }) {
-    if (isThick && customLineweight == null) {
-      customLineweight = 0.70;
+  }) : _customLineweight = customLineweight != null
+            ? (customLineweight * 100).round() / 100.0
+            : null {
+    if (isThick && _customLineweight == null) {
+      _customLineweight = 0.70;
     }
   }
 

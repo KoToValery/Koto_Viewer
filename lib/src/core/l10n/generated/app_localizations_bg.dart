@@ -2603,4 +2603,57 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get bimSlabPreviewEmpty =>
       'Не е получен надежден затворен контур. Възможните причини включват прекъсвания или липсващи стени, нееднозначни връзки, много малки затворени площи или прекалено голям чертеж за текущата разделителна способност.';
+
+  @override
+  String get cadLayersTitle => 'CAD Слоеве';
+
+  @override
+  String cadLayersVisibleCount(int visible, int total) {
+    return '$visible от $total слоя са видими';
+  }
+
+  @override
+  String get cadLayersShowAll => 'Покажи всички';
+
+  @override
+  String get cadLayersHideAll => 'Скрий всички';
+
+  @override
+  String get cadLayersLineweightForAll => 'Дебелина за всички:';
+
+  @override
+  String get cadLayersSelectForAll => 'Избери за всички...';
+
+  @override
+  String get cadLayersUnnamed => 'Неименуван слой';
+
+  @override
+  String cadLayersObjectCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count обекта',
+      one: '1 обект',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cadLayersFrozen => 'Замразен';
+
+  @override
+  String get cadLayersLineweight => 'Дебелина:';
+
+  @override
+  String get cadLayersOriginal => 'Оригинална';
+
+  @override
+  String cadLayersOriginalWithMm(String mm) {
+    return 'Оригинална ($mm мм)';
+  }
+
+  @override
+  String cadLayersMm(String mm) {
+    return '$mm мм';
+  }
 }

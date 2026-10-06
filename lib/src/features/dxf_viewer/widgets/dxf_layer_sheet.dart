@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 import '../models/dxf_color_table.dart';
 import '../models/dxf_models.dart';
 
@@ -133,12 +134,12 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'CAD Layers',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      Text(
+                        context.l10n.cadLayersTitle,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        '$totalVisible of ${sortedLayers.length} layers visible',
+                        context.l10n.cadLayersVisibleCount(totalVisible, sortedLayers.length),
                         style: TextStyle(
                           fontSize: 12,
                           color: theme.textTheme.bodySmall?.color,
@@ -149,11 +150,11 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                 ),
                 TextButton(
                   onPressed: () => _toggleAll(true),
-                  child: const Text('Show All'),
+                  child: Text(context.l10n.cadLayersShowAll),
                 ),
                 TextButton(
                   onPressed: () => _toggleAll(false),
-                  child: const Text('Hide All'),
+                  child: Text(context.l10n.cadLayersHideAll),
                 ),
               ],
             ),
@@ -172,7 +173,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Lineweight for all:',
+                  context.l10n.cadLayersLineweightForAll,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -195,7 +196,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                     child: DropdownButton<double?>(
                       value: null,
                       hint: Text(
-                        'Select for all...',
+                        context.l10n.cadLayersSelectForAll,
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,
@@ -209,24 +210,20 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                       items: [
                         DropdownMenuItem<double?>(
                           value: null,
-                          child: _buildDropdownItemRow(label: 'Original', thickness: 1.0, theme: theme),
+                          child: _buildDropdownItemRow(
+                            label: context.l10n.cadLayersOriginal,
+                            thickness: 1.0,
+                            theme: theme,
+                          ),
                         ),
-                        DropdownMenuItem<double?>(
-                          value: 0.12,
-                          child: _buildDropdownItemRow(label: '0.12 mm', thickness: 0.9, theme: theme),
-                        ),
-                        DropdownMenuItem<double?>(
-                          value: 0.25,
-                          child: _buildDropdownItemRow(label: '0.25 mm', thickness: 1.4, theme: theme),
-                        ),
-                        DropdownMenuItem<double?>(
-                          value: 0.35,
-                          child: _buildDropdownItemRow(label: '0.35 mm', thickness: 2.0, theme: theme),
-                        ),
-                        DropdownMenuItem<double?>(
-                          value: 0.70,
-                          child: _buildDropdownItemRow(label: '0.70 mm', thickness: 3.5, theme: theme),
-                        ),
+                        ..._standardLineweights.map((w) => DropdownMenuItem<double?>(
+                          value: w,
+                          child: _buildDropdownItemRow(
+                            label: context.l10n.cadLayersMm(w.toStringAsFixed(2)),
+                            thickness: _thicknessFor(w),
+                            theme: theme,
+                          ),
+                        )),
                       ],
                       onChanged: (val) {
                         _setAllLineweight(val);
@@ -257,6 +254,11 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                 final count = _layerCounts[layer.name] ?? 0;
 
                             final effLw = layer.effectiveLineweight;
+                            final selectedLineweight = _resolveLineweight(layer.customLineweight);
+                            if (layer.customLineweight != null && layer.customLineweight != selectedLineweight) {
+                              layer.customLineweight = selectedLineweight;
+                            }
+
                             return Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               child: Row(
@@ -290,7 +292,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                          layer.name.isEmpty ? 'Unnamed Layer' : layer.name,
+                                          layer.name.isEmpty ? context.l10n.cadLayersUnnamed : layer.name,
                                           style: TextStyle(
                                             fontWeight: FontWeight.w600,
                                             fontSize: 14,
@@ -300,7 +302,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          '$count ${count == 1 ? "object" : "objects"} ${layer.isFrozen ? "• Frozen" : ""}${effLw != null && effLw > 0 ? " • DXF: ${effLw.toStringAsFixed(2)} mm" : ""}',
+                                          '${context.l10n.cadLayersObjectCount(count)}${layer.isFrozen ? " • ${context.l10n.cadLayersFrozen}" : ""}${effLw != null && effLw > 0 ? " • DXF: ${effLw.toStringAsFixed(2)} mm" : ""}',
                                           style: TextStyle(
                                             fontSize: 11.5,
                                             color: theme.textTheme.bodySmall?.color,
@@ -313,12 +315,13 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Text(
-                                              'Lineweight: ',
+                                              context.l10n.cadLayersLineweight,
                                               style: TextStyle(
                                                 fontSize: 11.5,
                                                 color: theme.textTheme.bodySmall?.color,
                                               ),
                                             ),
+                                            const SizedBox(width: 4),
                                             Container(
                                               height: 27,
                                               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -332,80 +335,56 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
                                               ),
                                               child: DropdownButtonHideUnderline(
                                                 child: DropdownButton<double?>(
-                                                  value: layer.customLineweight,
+                                                  value: selectedLineweight,
                                                   isDense: true,
                                                   icon: Icon(Icons.arrow_drop_down, size: 17, color: theme.colorScheme.primary),
                                                   dropdownColor: theme.colorScheme.surface,
                                                   borderRadius: BorderRadius.circular(8),
-                                                  items: [
-                                                    DropdownMenuItem<double?>(
-                                                      value: null,
-                                                      child: _buildDropdownItemRow(
-                                                        label: (effLw != null && effLw > 0)
-                                                            ? 'Original (${effLw.toStringAsFixed(2)} mm)'
-                                                            : 'Original',
-                                                        thickness: (effLw != null && effLw > 0)
-                                                            ? (effLw * 9.5).clamp(0.8, 4.0)
-                                                            : 1.0,
-                                                        theme: theme,
-                                                      ),
-                                                    ),
-                                        DropdownMenuItem<double?>(
-                                          value: 0.12,
-                                          child: _buildDropdownItemRow(label: '0.12 mm', thickness: 0.9, theme: theme),
-                                        ),
-                                        DropdownMenuItem<double?>(
-                                          value: 0.25,
-                                          child: _buildDropdownItemRow(label: '0.25 mm', thickness: 1.4, theme: theme),
-                                        ),
-                                        DropdownMenuItem<double?>(
-                                          value: 0.35,
-                                          child: _buildDropdownItemRow(label: '0.35 mm', thickness: 2.0, theme: theme),
-                                        ),
-                                        DropdownMenuItem<double?>(
-                                          value: 0.70,
-                                          child: _buildDropdownItemRow(label: '0.70 mm', thickness: 3.5, theme: theme),
+                                                  items: _buildLineweightDropdownItems(
+                                                    effectiveLineweight: effLw,
+                                                    selectedValue: selectedLineweight,
+                                                    context: context,
+                                                    theme: theme,
+                                                  ),
+                                                  onChanged: (val) {
+                                                    setState(() {
+                                                      layer.customLineweight = val;
+                                                    });
+                                                    widget.onLayersChanged();
+                                                  },
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
-                                      onChanged: (val) {
-                                        setState(() {
-                                          layer.customLineweight = val;
-                                        });
-                                        widget.onLayersChanged();
-                                      },
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+
+                                  // Visibility Switch
+                                  Switch.adaptive(
+                                    value: layer.isVisible,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        layer.isVisible = val;
+                                        if (val && layer.isFrozen) {
+                                          layer.isFrozen = false;
+                                        }
+                                      });
+                                      widget.onLayersChanged();
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ),
-
-                      // Visibility Switch
-                      Switch.adaptive(
-                        value: layer.isVisible,
-                        onChanged: (val) {
-                          setState(() {
-                            layer.isVisible = val;
-                            if (val && layer.isFrozen) {
-                              layer.isFrozen = false;
-                            }
-                          });
-                          widget.onLayersChanged();
-                        },
-                      ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 );
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
+              }
 
   void _setAllLineweight(double? weight) {
     setState(() {
@@ -414,6 +393,78 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
       }
     });
     widget.onLayersChanged();
+  }
+
+  static const List<double> _standardLineweights = [
+    0.12,
+    0.25,
+    0.30,
+    0.35,
+    0.50,
+    0.70,
+  ];
+
+  static double _thicknessFor(double w) {
+    if (w <= 0.15) return 0.9;
+    if (w <= 0.25) return 1.4;
+    if (w <= 0.30) return 1.7;
+    if (w <= 0.35) return 2.0;
+    if (w <= 0.50) return 2.7;
+    return 3.5;
+  }
+
+  static double? _resolveLineweight(double? value) {
+    if (value == null) return null;
+    for (final std in _standardLineweights) {
+      if ((std - value).abs() < 0.01) return std;
+    }
+    return (value * 100).round() / 100.0;
+  }
+
+  List<DropdownMenuItem<double?>> _buildLineweightDropdownItems({
+    required double? effectiveLineweight,
+    required double? selectedValue,
+    required BuildContext context,
+    required ThemeData theme,
+  }) {
+    final l10n = context.l10n;
+    final items = <DropdownMenuItem<double?>>[
+      DropdownMenuItem<double?>(
+        value: null,
+        child: _buildDropdownItemRow(
+          label: (effectiveLineweight != null && effectiveLineweight > 0)
+              ? l10n.cadLayersOriginalWithMm(effectiveLineweight.toStringAsFixed(2))
+              : l10n.cadLayersOriginal,
+          thickness: (effectiveLineweight != null && effectiveLineweight > 0)
+              ? (effectiveLineweight * 9.5).clamp(0.8, 4.0)
+              : 1.0,
+          theme: theme,
+        ),
+      ),
+      ..._standardLineweights.map((w) => DropdownMenuItem<double?>(
+        value: w,
+        child: _buildDropdownItemRow(
+          label: l10n.cadLayersMm(w.toStringAsFixed(2)),
+          thickness: _thicknessFor(w),
+          theme: theme,
+        ),
+      )),
+    ];
+
+    if (selectedValue != null && !_standardLineweights.any((w) => (w - selectedValue).abs() < 0.001)) {
+      items.add(
+        DropdownMenuItem<double?>(
+          value: selectedValue,
+          child: _buildDropdownItemRow(
+            label: l10n.cadLayersMm(selectedValue.toStringAsFixed(2)),
+            thickness: _thicknessFor(selectedValue),
+            theme: theme,
+          ),
+        ),
+      );
+    }
+
+    return items;
   }
 
   Widget _buildDropdownItemRow({

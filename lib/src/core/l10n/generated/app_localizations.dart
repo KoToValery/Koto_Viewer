@@ -4527,6 +4527,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No reliable closed contour was obtained. Possible causes include open wall gaps, missing walls, ambiguous connections, very small enclosed areas or drawing extents too large for the current resolution.'**
   String get bimSlabPreviewEmpty;
+
+  /// Title in CAD layers bottom sheet
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Layers'**
+  String get cadLayersTitle;
+
+  /// Visible layers counter
+  ///
+  /// In en, this message translates to:
+  /// **'{visible} of {total} layers visible'**
+  String cadLayersVisibleCount(int visible, int total);
+
+  /// Button to show all CAD layers
+  ///
+  /// In en, this message translates to:
+  /// **'Show All'**
+  String get cadLayersShowAll;
+
+  /// Button to hide all CAD layers
+  ///
+  /// In en, this message translates to:
+  /// **'Hide All'**
+  String get cadLayersHideAll;
+
+  /// Label for global lineweight selector
+  ///
+  /// In en, this message translates to:
+  /// **'Lineweight for all:'**
+  String get cadLayersLineweightForAll;
+
+  /// Placeholder for global lineweight selector
+  ///
+  /// In en, this message translates to:
+  /// **'Select for all...'**
+  String get cadLayersSelectForAll;
+
+  /// Default name for layers with empty name
+  ///
+  /// In en, this message translates to:
+  /// **'Unnamed Layer'**
+  String get cadLayersUnnamed;
+
+  /// Number of objects in layer
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 object} other{{count} objects}}'**
+  String cadLayersObjectCount(int count);
+
+  /// Label when layer is frozen
+  ///
+  /// In en, this message translates to:
+  /// **'Frozen'**
+  String get cadLayersFrozen;
+
+  /// Label for layer lineweight selector
+  ///
+  /// In en, this message translates to:
+  /// **'Lineweight:'**
+  String get cadLayersLineweight;
+
+  /// Original lineweight option
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get cadLayersOriginal;
+
+  /// Original lineweight with thickness value
+  ///
+  /// In en, this message translates to:
+  /// **'Original ({mm} mm)'**
+  String cadLayersOriginalWithMm(String mm);
+
+  /// Lineweight in millimeters
+  ///
+  /// In en, this message translates to:
+  /// **'{mm} mm'**
+  String cadLayersMm(String mm);
 }
 
 class _AppLocalizationsDelegate
