@@ -9,6 +9,8 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import 'slab_opening_evidence.dart';
 import 'structural_column_detector.dart';
 
+import 'geometric_window_detector.dart';
+
 /// Conservative preview only: enclosed free space is not proof of a slab.
 /// Coordinates remain in source CAD units, before project alignment.
 class SlabEnvelopeResult {
@@ -69,19 +71,23 @@ class SlabEnvelopeDetector {
     )) {
       return empty('invalidWallGeometry');
     }
-    final partition = SlabWallRegions.build(
-      pairs,
-      scale,
-      openingEvidence: document == null
-          ? const []
-          : SlabOpeningEvidence.collect(document),
-    );
-    if (partition.tooComplex) return empty('analysisComplexityLimit');
     final columns = walls.detectedColumns.isNotEmpty
         ? walls.detectedColumns
         : (document != null
             ? StructuralColumnDetector.detect(document, wallPairs: pairs, scale: scale)
             : const <DetectedStructuralColumn>[]);
+    final windowOpenings = document != null
+        ? GeometricWindowDetector.detect(document, pairs, scale, columns: columns)
+        : const <GeometricWindowOpening>[];
+    final partition = SlabWallRegions.build(
+      pairs,
+      scale,
+      windowOpenings: windowOpenings,
+      openingEvidence: document == null
+          ? const []
+          : SlabOpeningEvidence.collect(document),
+    );
+    if (partition.tooComplex) return empty('analysisComplexityLimit');
     final contours = <List<Offset>>[];
     final gaps = <SlabGapHypothesis>[];
     final reports = <Map<String, dynamic>>[];
@@ -107,8 +113,12 @@ class SlabEnvelopeDetector {
           .where((c) => regionBounds.overlaps(c.bounds))
           .map((c) => c.polygon)
           .toList();
-
-      final baseline = _raster(region, scale, regionColumns);
+      final regionWindows = windowOpenings
+          .where((w) => regionBounds.contains(w.start) || regionBounds.contains(w.end))
+          .map((w) => w.barrierPolygon)
+          .toList();
+      final extraObstacles = [...regionColumns, ...regionWindows];
+      final baseline = _raster(region, scale, extraObstacles);
       final hypotheses = partition.gaps[i];
       final augmented = [...region];
       for (final gap in hypotheses) {
@@ -126,7 +136,7 @@ class SlabEnvelopeDetector {
       }
       final proposed = hypotheses.isEmpty
           ? baseline
-          : _raster(augmented, scale, regionColumns);
+          : _raster(augmented, scale, extraObstacles);
       final chosen = proposed.contours.isNotEmpty ? proposed : baseline;
       contours.addAll(chosen.contours);
       gaps.addAll(hypotheses);

@@ -81,4 +81,112 @@ void main() {
     );
     expect(result.assumedGaps, isEmpty);
   });
+
+  group('3.5m - 4.0m Vitrina & Dimension Geometric Detection', () {
+    final widePaths = [
+      [const Offset(0, 0), const Offset(4000, 0)],
+      [
+        const Offset(7500, 0),
+        const Offset(10000, 0),
+        const Offset(10000, 8000),
+        const Offset(0, 8000),
+        const Offset(0, 0),
+      ],
+    ];
+
+    test('3.5m vitrina with multi-sash mullions on wall layer (стени) closes slab without breaking', () {
+      // 3.5m clear opening (x: 4000 to 7500).
+      // Glazing lines and 3 vertical mullions (dividing into 4 sashes of ~875mm).
+      // All entities placed on the exact same layer as walls ('стени' / Archicad Worksheet convention).
+      final doc = document([
+        const DxfLine(
+          p1: Offset(4000, -20),
+          p2: Offset(7500, -20),
+          layer: 'стени',
+        ),
+        const DxfLine(
+          p1: Offset(4000, 20),
+          p2: Offset(7500, 20),
+          layer: 'стени',
+        ),
+        // Mullions / шпроси (transverse lines across thickness)
+        const DxfLine(
+          p1: Offset(4875, -50),
+          p2: Offset(4875, 50),
+          layer: 'стени',
+        ),
+        const DxfLine(
+          p1: Offset(5750, -50),
+          p2: Offset(5750, 50),
+          layer: 'стени',
+        ),
+        const DxfLine(
+          p1: Offset(6625, -50),
+          p2: Offset(6625, 50),
+          layer: 'стени',
+        ),
+      ]);
+
+      final wallDetection = walls(widePaths);
+      final result = SlabEnvelopeDetector.detect(wallDetection, document: doc);
+
+      // The 3.5m vitrina must close the slab into a single complete envelope
+      expect(result.contours, hasLength(1));
+      expect(result.assumedGaps, hasLength(1));
+      expect(result.assumedGaps.single.wideOpeningEvidence, isTrue);
+
+      // Verify windows are NOT converted to structural walls
+      expect(
+        wallDetection.wallContourSegments.any(
+          (s) => s.$1.dx >= 4000 && s.$2.dx <= 7500 && s.$1.dy.abs() <= 50,
+        ),
+        isFalse,
+      );
+    });
+
+    test('3.5m vitrina with single centerline glazing and dimension witness ticks closes slab', () {
+      // Single glazing line + perpendicular dimension ticks / witness markers at the jambs
+      final doc = document([
+        const DxfLine(
+          p1: Offset(4000, 0),
+          p2: Offset(7500, 0),
+          layer: '0',
+        ),
+        const DxfLine(
+          p1: Offset(4000, -150),
+          p2: Offset(4000, 150),
+          layer: '0',
+        ),
+        const DxfLine(
+          p1: Offset(7500, -150),
+          p2: Offset(7500, 150),
+          layer: '0',
+        ),
+      ]);
+
+      final result = SlabEnvelopeDetector.detect(walls(widePaths), document: doc);
+      expect(result.contours, hasLength(1));
+      expect(result.assumedGaps, hasLength(1));
+      expect(result.assumedGaps.single.wideOpeningEvidence, isTrue);
+    });
+
+    test('3.5m wide open passage without geometric window evidence leaves slab open', () {
+      // Completely empty opening
+      final emptyDoc = document([]);
+      expect(
+        SlabEnvelopeDetector.detect(walls(widePaths), document: emptyDoc).contours,
+        isEmpty,
+      );
+
+      // Single threshold line without frame pairs or mullions
+      final singleLineDoc = document([
+        const DxfLine(p1: Offset(4000, 0), p2: Offset(7500, 0)),
+      ]);
+      expect(
+        SlabEnvelopeDetector.detect(walls(widePaths), document: singleLineDoc).contours,
+        isEmpty,
+      );
+    });
+  });
 }
+

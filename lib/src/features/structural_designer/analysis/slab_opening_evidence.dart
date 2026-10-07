@@ -58,7 +58,7 @@ class SlabOpeningEvidence {
     for (final e in doc.layoutEntities['Model'] ?? doc.entities) {
       visit(e, (p) => p, '0', 'CONTINUOUS', 0);
     }
-    return visited > 40000 ? [] : result;
+    return result;
   }
 
   static bool supports(
@@ -68,42 +68,63 @@ class SlabOpeningEvidence {
     double thickness,
     double scale,
   ) {
-    final length = (end - start).distance,
-        u = (end - start) / (end - start).distance;
+    final length = (end - start).distance;
+    if (length <= 0) return false;
+    final u = (end - start) / length;
     double dot(Offset p) => p.dx * u.dx + p.dy * u.dy;
     double cross(Offset p) => p.dx * u.dy - p.dy * u.dx;
     final candidates = <(double, double, double, String)>[];
+    int transverseCount = 0;
+    final minStrokeLen = math.min(length * 0.12, 60.0 * scale);
+    final maxOffset = thickness / 2 + 120.0 * scale;
+
     for (final (a, b, layer) in strokes) {
       final v = b - a;
-      if (v.distance < length * .25 || cross(v).abs() > scale * 5) continue;
+      final vDist = v.distance;
+      if (vDist < 10.0 * scale) continue;
+
+      final sinAngle = (cross(v) / vDist).abs();
+      final cosAngle = ((v.dx * u.dx + v.dy * u.dy) / vDist).abs();
+
       final lo = math.min(dot(a - start), dot(b - start));
       final hi = math.max(dot(a - start), dot(b - start));
       final offset = cross((a + b) / 2 - start);
-      if (lo < -50 * scale ||
-          hi > length + 50 * scale ||
-          offset.abs() > thickness / 2 + 35 * scale) {
+
+      if (lo < -60.0 * scale ||
+          hi > length + 60.0 * scale ||
+          offset.abs() > maxOffset) {
         continue;
       }
-      candidates.add((lo, hi, offset, layer));
-      if (candidates.length > 200) return false;
+
+      // Longitudinal frame / glazing stroke (aligned with opening axis within ~10 deg)
+      if (sinAngle <= 0.174 && vDist >= minStrokeLen) {
+        candidates.add((lo, hi, offset, layer));
+      }
+      // Transverse stroke (mullion / profile / делител)
+      else if (cosAngle <= 0.25 && vDist >= 20.0 * scale && vDist <= thickness * 1.5) {
+        transverseCount++;
+      }
+
+      if (candidates.length > 500) break;
     }
+
     if (candidates.length < 2) return false;
 
-    // Check 1: Pair of parallel frame / glazing strokes
+    // Check 1: Pair of parallel frame / glazing strokes (Archicad 2D or standard CAD window)
     for (var i = 0; i < candidates.length; i++) {
       for (var j = i + 1; j < candidates.length; j++) {
         final a = candidates[i], b = candidates[j];
         final separation = (a.$3 - b.$3).abs();
-        if (a.$4 == b.$4 &&
-            separation >= 5 * scale &&
-            separation <= 100 * scale &&
-            math.min(a.$2, b.$2) - math.max(a.$1, b.$1) >= .40 * length) {
+        final overlap = math.min(a.$2, b.$2) - math.max(a.$1, b.$1);
+        if (separation >= 5.0 * scale &&
+            separation <= 150.0 * scale &&
+            overlap >= 0.25 * length) {
           return true;
         }
       }
     }
 
-    // Check 2: Multi-sash window coverage on the same layer
+    // Check 2: Multi-sash window / vitrina coverage (handles 3-4m openings divided into sashes)
     final strokesByLayer = <String, List<(double, double)>>{};
     for (final c in candidates) {
       strokesByLayer.putIfAbsent(c.$4, () => []).add((c.$1, c.$2));
@@ -116,7 +137,7 @@ class SlabOpeningEvidence {
       double curEnd = spans.first.$2;
       for (int k = 1; k < spans.length; k++) {
         final next = spans[k];
-        if (next.$1 <= curEnd + 15 * scale) {
+        if (next.$1 <= curEnd + 30.0 * scale) {
           curEnd = math.max(curEnd, next.$2);
         } else {
           totalCovered += math.max(0.0, curEnd - curStart);
@@ -125,7 +146,13 @@ class SlabOpeningEvidence {
         }
       }
       totalCovered += math.max(0.0, curEnd - curStart);
-      if (totalCovered >= 0.50 * length) {
+
+      // 35% longitudinal coverage is conclusive for multi-sash vitrines
+      if (totalCovered >= 0.35 * length) {
+        return true;
+      }
+      // 20% coverage with at least 1 transverse mullion / frame profile tick
+      if (totalCovered >= 0.20 * length && transverseCount >= 1) {
         return true;
       }
     }

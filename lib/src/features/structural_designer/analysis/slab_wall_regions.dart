@@ -3,6 +3,8 @@ import 'dart:ui';
 import '../models/wall_axis_models.dart';
 import 'slab_opening_evidence.dart';
 
+import 'geometric_window_detector.dart';
+
 class SlabGapHypothesis {
   final Offset start, end;
   final double thickness;
@@ -39,6 +41,7 @@ class SlabWallRegions {
   static SlabWallRegions build(
     List<WallPairCandidate> walls,
     double scale, {
+    List<GeometricWindowOpening> windowOpenings = const [],
     List<(Offset, Offset, String)> openingEvidence = const [],
   }) {
     final parent = List.generate(walls.length, (i) => i);
@@ -50,12 +53,38 @@ class SlabWallRegions {
       return i;
     }
 
+    // Connect walls directly if a confirmed geometric window opening bridges them
+    for (final win in windowOpenings) {
+      int? idxA, idxB;
+      final dWin = win.end - win.start;
+      if (dWin.distance == 0) continue;
+      final uWin = dWin / dWin.distance;
+      for (int i = 0; i < walls.length; i++) {
+        final w = walls[i];
+        final dW = w.centerlineEnd - w.centerlineStart;
+        if (dW.distance == 0) continue;
+        final uW = dW / dW.distance;
+        if ((uW.dx * uWin.dx + uW.dy * uWin.dy).abs() < 0.85) continue;
+
+        final nearStartA = (w.centerlineStart - win.start).distance <= 120.0 * scale ||
+                           (w.centerlineEnd - win.start).distance <= 120.0 * scale;
+        final nearEndB = (w.centerlineStart - win.end).distance <= 120.0 * scale ||
+                         (w.centerlineEnd - win.end).distance <= 120.0 * scale;
+        if (nearStartA) idxA = i;
+        if (nearEndB) idxB = i;
+      }
+      if (idxA != null && idxB != null && idxA != idxB) {
+        parent[root(idxB)] = root(idxA);
+      }
+    }
+
+    // Cluster walls with reach of 2500 * scale (up to 5.0m openings between walls)
     final boxes = walls
         .map(
           (w) => Rect.fromPoints(
             w.centerlineStart,
             w.centerlineEnd,
-          ).inflate(w.perpendicularDistance / 2 + 750 * scale),
+          ).inflate(w.perpendicularDistance / 2 + 2500 * scale),
         )
         .toList();
     final order = List.generate(walls.length, (i) => i)
@@ -86,6 +115,71 @@ class SlabWallRegions {
     final allGaps = <List<SlabGapHypothesis>>[];
     for (final group in regions) {
       final proposals = <SlabGapHypothesis>[];
+
+      // Add confirmed geometric window openings between walls in this group
+      for (final win in windowOpenings) {
+        int? iA, iB;
+        final dWin = win.end - win.start;
+        if (dWin.distance == 0) continue;
+        final uWin = dWin / dWin.distance;
+        for (int k = 0; k < group.length; k++) {
+          final w = group[k];
+          final dW = w.centerlineEnd - w.centerlineStart;
+          if (dW.distance == 0) continue;
+          final uW = dW / dW.distance;
+          if ((uW.dx * uWin.dx + uW.dy * uWin.dy).abs() < 0.85) continue;
+
+          final nearA = (w.centerlineStart - win.start).distance <= 120.0 * scale ||
+                        (w.centerlineEnd - win.start).distance <= 120.0 * scale;
+          final nearB = (w.centerlineStart - win.end).distance <= 120.0 * scale ||
+                        (w.centerlineEnd - win.end).distance <= 120.0 * scale;
+          if (nearA) iA = k;
+          if (nearB) iB = k;
+        }
+        if (iA != null && iB != null && iA != iB) {
+          final gapBounds = Rect.fromPoints(win.start, win.end).inflate(25 * scale);
+          var blocked = false;
+          final dWin = win.end - win.start;
+          if (dWin.distance > 0) {
+            final uWin = dWin / dWin.distance;
+            double crossW(Offset p) => p.dx * uWin.dy - p.dy * uWin.dx;
+            double dotW(Offset p) => p.dx * uWin.dx + p.dy * uWin.dy;
+            for (var k = 0; k < group.length; k++) {
+              if (k == iA || k == iB) continue;
+              final w = group[k];
+              if (!gapBounds.overlaps(
+                Rect.fromPoints(w.centerlineStart, w.centerlineEnd)
+                    .inflate(w.perpendicularDistance / 2),
+              )) {
+                continue;
+              }
+              final v = w.centerlineEnd - w.centerlineStart;
+              final den = crossW(v);
+              if (den.abs() > 1e-5) {
+                final t = -crossW(w.centerlineStart - win.start) / den;
+                final along = dotW(w.centerlineStart + v * t - win.start);
+                if (t >= -0.05 && t <= 1.05 && along >= -25 * scale && along <= win.length + 25 * scale) {
+                  blocked = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (!blocked) {
+            proposals.add(
+              SlabGapHypothesis(
+                win.start,
+                win.end,
+                win.thickness,
+                iA,
+                iB,
+                wideOpeningEvidence: true,
+              ),
+            );
+          }
+        }
+      }
+
       for (var i = 0; i < group.length; i++) {
         final a = group[i], d = a.centerlineEnd - a.centerlineStart;
         if (d.distance < 100 * scale) continue;
@@ -98,16 +192,15 @@ class SlabWallRegions {
           }
           final b = group[j], e = b.centerlineEnd - b.centerlineStart;
           if (e.distance < 100 * scale ||
-              cross(e / e.distance).abs() > 0.01745) {
+              cross(e / e.distance).abs() > 0.035) {
             continue;
           }
-          if (a.segmentA.sourceLayer != b.segmentA.sourceLayer ||
-              (a.perpendicularDistance - b.perpendicularDistance).abs() >
-                  20 * scale) {
+          final thickDiff = (a.perpendicularDistance - b.perpendicularDistance).abs();
+          if (thickDiff > 100 * scale) {
             continue;
           }
-          if (cross(b.centerlineStart - a.centerlineStart).abs() > 15 * scale ||
-              cross(b.centerlineEnd - a.centerlineStart).abs() > 15 * scale) {
+          if (cross(b.centerlineStart - a.centerlineStart).abs() > 35 * scale ||
+              cross(b.centerlineEnd - a.centerlineStart).abs() > 35 * scale) {
             continue;
           }
           final b0 = dot(b.centerlineStart - a.centerlineStart),
@@ -123,7 +216,7 @@ class SlabWallRegions {
             continue;
           }
           final length = (end - start).distance;
-          if (length < 75 * scale || length > 4500 * scale) continue;
+          if (length < 75 * scale || length > 5500 * scale) continue;
           if (length > 1500 * scale) {
             comparisons += openingEvidence.length;
             if (comparisons > 2000000) {
@@ -204,16 +297,23 @@ class SlabWallRegions {
       }
       // Competing proposals sharing a jamb are ambiguous; do not choose one.
       bool near(Offset a, Offset b) => (a - b).distance <= 25 * scale;
+      final uniqueProposals = <SlabGapHypothesis>[];
+      for (final p in proposals) {
+        final isDup = uniqueProposals.any((u) =>
+            (near(u.start, p.start) && near(u.end, p.end)) ||
+            (near(u.start, p.end) && near(u.end, p.start)));
+        if (!isDup) uniqueProposals.add(p);
+      }
       allGaps.add(
-        proposals
+        uniqueProposals
             .where(
-              (p) => !proposals.any(
+              (p) => !uniqueProposals.any(
                 (q) =>
                     !identical(p, q) &&
-                    (near(p.start, q.start) ||
-                        near(p.start, q.end) ||
-                        near(p.end, q.start) ||
-                        near(p.end, q.end)),
+                    ((near(p.start, q.start) && !near(p.end, q.end)) ||
+                     (near(p.start, q.end) && !near(p.end, q.start)) ||
+                     (near(p.end, q.start) && !near(p.start, q.end)) ||
+                     (near(p.end, q.end) && !near(p.start, q.start))),
               ),
             )
             .toList(),
