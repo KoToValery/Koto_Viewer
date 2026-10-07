@@ -54,6 +54,7 @@ class ElementPaletteBar extends StatelessWidget {
   final VoidCallback? onCustomWallThickness;
   final VoidCallback? onCustomBeamDimensions;
   final VoidCallback? onCustomSlabThickness;
+  final VoidCallback? onGenerateSlabs;
   final VoidCallback? onCustomAxisName;
   final VoidCallback? onOpenLayerManager;
   final VoidCallback? onOpenUnderlayFilterConfig;
@@ -108,6 +109,7 @@ class ElementPaletteBar extends StatelessWidget {
     this.onCustomWallThickness,
     this.onCustomBeamDimensions,
     this.onCustomSlabThickness,
+    this.onGenerateSlabs,
     this.onCustomAxisName,
     this.onOpenLayerManager,
     this.onOpenUnderlayFilterConfig,
@@ -119,7 +121,40 @@ class ElementPaletteBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ChipTheme(
+      data: ChipThemeData(
+        backgroundColor: const Color(0xFF282B34),
+        selectedColor: const Color(0x3300E5FF),
+        disabledColor: const Color(0xFF1E1E24),
+        labelStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: Color(0xFF00E5FF),
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+        side: WidgetStateBorderSide.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const BorderSide(color: Color(0xFF00E5FF), width: 1.5);
+          }
+          return const BorderSide(color: Colors.white30, width: 1.0);
+        }),
+        color: WidgetStateProperty.resolveWith<Color?>((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const Color(0x3300E5FF);
+          }
+          return const Color(0xFF282B34);
+        }),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        iconTheme: const IconThemeData(color: Colors.white, size: 16),
+      ),
+      child: Container(
       decoration: BoxDecoration(
         color: const Color(0xF5181A20),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
@@ -224,6 +259,7 @@ class ElementPaletteBar extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -782,6 +818,16 @@ class ElementPaletteBar extends StatelessWidget {
               avatar: const Icon(Icons.tune_rounded, size: 14),
               label: Text(context.l10n.otherEllipsis, style: const TextStyle(fontSize: 11)),
               onPressed: onCustomSlabThickness,
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 4),
+          ],
+          if (onGenerateSlabs != null) ...[
+            ActionChip(
+              avatar: const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF00E5FF)),
+              label: Text(context.l10n.bimGenerateSlabs, style: const TextStyle(fontSize: 11, color: Color(0xFF00E5FF))),
+              backgroundColor: const Color(0x2200E5FF),
+              onPressed: onGenerateSlabs,
               visualDensity: VisualDensity.compact,
             ),
             const SizedBox(width: 4),

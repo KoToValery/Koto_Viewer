@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/bim_projects/models/bim_work_project.dart';
 import 'package:kotoview/src/features/bim_projects/services/bim_export_service.dart';
+import 'package:kotoview/src/features/bim_projects/services/bim_project_library_service.dart';
+import 'package:kotoview/src/features/bim_projects/services/bim_underlay_conversion_service.dart';
 import 'package:kotoview/src/features/bim_projects/widgets/bim_elevation_dialog.dart';
 import 'package:kotoview/src/features/bim_projects/widgets/bim_new_project_wizard.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
@@ -233,5 +235,63 @@ void main() {
         expect(doc.entities.where((e) => e.layer == 'BIM_Axis'), isEmpty);
       },
     );
+
+    test('BimProjectLibraryService initializes axes and dynamic slabs simultaneously', () async {
+      final doc = DxfDocument(
+        bounds: const Rect.fromLTWH(0, 0, 500, 500),
+        layers: {},
+        blocks: {},
+        entities: [],
+        entityStats: const {},
+        headerVars: {
+          BimUnderlayMetadata.key: jsonEncode({
+        'version': BimUnderlayMetadata.version,
+        'complete': true,
+        'hasResults': true,
+        'wallsFound': true,
+        'axes': [axis.toJson()],
+        'layers': ['BIM_Walls', 'BIM_Slabs'],
+        'slabEnvelope': {
+          'contours': [
+            [
+              [0, 0],
+              [500, 0],
+              [500, 500],
+              [0, 500],
+            ],
+          ],
+        },
+        'slabProjections': [],
+      })},
+    );
+      final service = BimProjectLibraryService(customRootDir: temp);
+      final project = BimWorkProject(
+        id: 'p_test',
+        name: 'P Test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        referenceStoreyId: 's1',
+        storeys: const [
+          BimStoreyUnderlay(storeyId: 's1', name: 'S1', elevation: 0),
+        ],
+      );
+      await service.saveProjectManifest(project);
+      final structural = StructuralProject(
+        title: 'P Test',
+        storeys: const [
+          StoreyLevel(id: 's1', name: 'S1', elevation: 0),
+        ],
+      );
+      await service.saveStructuralProject(project.id, structural);
+      final (updatedProj, updatedStruct) = await service.initializeAxes(
+        project,
+        structural,
+        {'s1': doc},
+      );
+      expect(updatedProj.axisSeedsConsumed, isTrue);
+      expect(updatedStruct.effectiveGridAxes.length, 1);
+      expect(updatedStruct.storeys.first.slabs.length, 1);
+      expect(updatedStruct.storeys.first.slabs.first.polygon.length, 4);
+    });
   });
 }

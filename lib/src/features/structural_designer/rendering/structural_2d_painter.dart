@@ -581,7 +581,10 @@ class Structural2dPainter extends CustomPainter {
           ? (1.0 / zoomScale)
           : (isSelected ? (2.5 / zoomScale) : (1.8 / zoomScale));
 
-    canvas.drawPath(path, fillPaint);
+    final bool isSlabTool = activeTool == StructuralDrawTool.slab;
+    if (isSlabTool) {
+      canvas.drawPath(path, fillPaint);
+    }
 
     // Smooth clean outline without diagonal hatching (as requested)
     canvas.drawPath(path, borderPaint);
@@ -675,16 +678,18 @@ class Structural2dPainter extends CustomPainter {
     }
 
     // Central structural elevation marker (concise elevation marker)
-    _drawSlabLevelMarker(
-      canvas,
-      slab,
-      slabColor,
-      isGhost: isGhost,
-      isOverheadFromAbove: isOverheadFromAbove,
-    );
+    if (isSlabTool) {
+      _drawSlabLevelMarker(
+        canvas,
+        slab,
+        slabColor,
+        isGhost: isGhost,
+        isOverheadFromAbove: isOverheadFromAbove,
+      );
+    }
 
-    // Draw corner vertex handles and midpoint edge grips ONLY when this slab is selected
-    if (isSelected && !isGhost) {
+    // Draw corner vertex handles and midpoint edge grips ONLY when the slab tool is active AND this slab is selected
+    if (isSlabTool && isSelected && !isGhost) {
       _drawSlabVertexHandles(canvas, polygon);
       _drawSlabEdgeGrips(canvas, slab);
     }

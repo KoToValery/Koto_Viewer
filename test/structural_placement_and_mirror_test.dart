@@ -1218,11 +1218,11 @@ void main() {
       columns: const [obstacleCol],
     );
 
-    // Column near (8.12, 10.03) -> distance to obstacle is ~3.12m
-    // Snapped to 5 cm increments: 3.12 / 0.05 = 62.4 -> 62 * 0.05 = 3.10m.
-    // Snapped position from obstacle (5.0, 10.0): 5.0 + 3.10 = 8.10.
+    // Column near (8.123, 10.03) -> distance to obstacle (5.0, 10.0) is ~3.123m
+    // Snapped to 1 cm precision (0.01m): 3.123 -> 3.12m.
+    // Snapped position from obstacle (5.0, 10.0): 5.0 + 3.12 = 8.12.
     final res = StructuralMagneticAlignmentHelper.alignColumn(
-      rawCenter: const Offset(8.12, 10.03),
+      rawCenter: const Offset(8.123, 10.03),
       columnWidth: 0.25,
       columnHeight: 0.25,
       toleranceCad: 0.20,
@@ -1231,14 +1231,26 @@ void main() {
 
     expect(res, isNotNull);
     expect(res!.snappedCenter.dy, closeTo(10.0, 1e-4));
-    expect(res.snappedCenter.dx, closeTo(8.10, 1e-4));
-    expect(res.liveDimensionText, '3.10 m');
+    expect(res.snappedCenter.dx, closeTo(8.12, 1e-4));
+    expect(res.liveDimensionText, '3.12 m');
     expect(res.dimensionLine, isNotNull);
     expect(res.dimensionLine!.$1, const Offset(5.0, 10.0));
-    expect(res.dimensionLine!.$2.dx, closeTo(8.10, 1e-4));
+    expect(res.dimensionLine!.$2.dx, closeTo(8.12, 1e-4));
+
+    // Test flush 0.00 m snapping when column is within 2 cm of obstacle
+    final resFlush = StructuralMagneticAlignmentHelper.alignColumn(
+      rawCenter: const Offset(5.015, 10.02),
+      columnWidth: 0.25,
+      columnHeight: 0.25,
+      toleranceCad: 0.20,
+      activeStorey: storey,
+    );
+    expect(resFlush, isNotNull);
+    expect(resFlush!.snappedCenter.dx, closeTo(5.0, 1e-4));
+    expect(resFlush.liveDimensionText, '0.00 m');
   });
 
-  test('Shear wall snaps symmetrically along axial centerline with 5 cm steps and dynamic dimension', () {
+  test('Shear wall snaps symmetrically along axial centerline with 1 cm steps and dynamic dimension', () {
     const axisY = StructuralGridAxis(
       id: 'ax_y',
       name: 'A',
@@ -1253,10 +1265,10 @@ void main() {
       gridAxes: const [axisY],
     );
 
-    // Wall 2.0m long, vertical (rotation = pi/2), placed near (10.04, 4.38)
-    // Snapped along axis in 5 cm step: 4.38 / 0.05 = 87.6 -> 88 * 0.05 = 4.40m.
+    // Wall 2.0m long, vertical (rotation = pi/2), placed near (10.04, 4.382)
+    // Snapped along axis in 1 cm step: 4.382 -> 4.38m.
     final res = StructuralMagneticAlignmentHelper.alignShearWall(
-      rawCenter: const Offset(10.04, 4.38),
+      rawCenter: const Offset(10.04, 4.382),
       wallLength: 2.0,
       wallThickness: 0.25,
       wallRotationRad: math.pi / 2,
@@ -1266,9 +1278,106 @@ void main() {
 
     expect(res, isNotNull);
     expect(res!.snappedCenter.dx, closeTo(10.0, 1e-4));
-    expect(res.snappedCenter.dy, closeTo(4.40, 1e-4));
-    expect(res.liveDimensionText, '4.40 m');
+    expect(res.snappedCenter.dy, closeTo(4.38, 1e-4));
+    expect(res.liveDimensionText, '4.38 m');
     expect(res.dimensionLine, isNotNull);
+  });
+
+  test('Column attaches flush to wall closure line (end cap / jamb) next to opening', () {
+    // Existing shear wall from (0, 0) to (3.0, 0) with thickness 0.25m.
+    // End cap (closure line next to opening) is at x = 3.0, extending from y = -0.125 to y = 0.125.
+    const wall = StructuralShearWall(
+      id: 'w_opening',
+      name: 'Ш1',
+      start: Offset(0.0, 0.0),
+      end: Offset(3.0, 0.0),
+      thickness: 0.25,
+    );
+    final storey = StoreyLevel(
+      id: 's1',
+      name: 'Ниво 1',
+      elevation: 0.0,
+      height: 3.0,
+      shearWalls: const [wall],
+    );
+
+    // Dragging column 25x30 cm near the closure line at (3.125, 0.0)
+    // 1. Column dragged near center of closure line (y = 0.0) -> left edge snaps flush at x = 3.125, y = 0.0
+    final colResCenter = StructuralMagneticAlignmentHelper.alignColumn(
+      rawCenter: const Offset(3.14, 0.00),
+      columnWidth: 0.25,
+      columnHeight: 0.30,
+      columnRotationRad: 0.0,
+      toleranceCad: 0.15,
+      activeStorey: storey,
+    );
+
+    expect(colResCenter, isNotNull);
+    expect(colResCenter!.snappedCenter.dx, closeTo(3.125, 1e-3));
+    expect(colResCenter.snappedCenter.dy, closeTo(0.0, 1e-3));
+    expect(colResCenter.description, 'wallCap');
+
+    // 2. Column dragged near corner of wall cap -> bottom corner BL aligns with wall corner p1
+    final colResCorner = StructuralMagneticAlignmentHelper.alignColumn(
+      rawCenter: const Offset(3.14, 0.025),
+      columnWidth: 0.25,
+      columnHeight: 0.30,
+      columnRotationRad: 0.0,
+      toleranceCad: 0.15,
+      activeStorey: storey,
+    );
+
+    expect(colResCorner, isNotNull);
+    expect(colResCorner!.snappedCenter.dx, closeTo(3.125, 1e-3));
+    expect(colResCorner.snappedCenter.dy, closeTo(0.025, 1e-3));
+    expect(colResCorner.description, 'wallCap');
+  });
+
+  test('Shear wall snaps flush to outer edge of angled CAD wall polyline', () {
+    // Angled CAD wall segment along 45 degrees: from (0, 0) to (5.0, 5.0)
+    final dxfDoc = DxfDocument(
+      entities: [
+        const DxfLwPolyline(
+          layer: 'A-WALL',
+          vertices: [
+            DxfPolylineVertex(x: 0.0, y: 0.0),
+            DxfPolylineVertex(x: 5.0, y: 5.0),
+          ],
+        ),
+      ],
+      layers: {
+        'A-WALL': DxfLayer(name: 'A-WALL', isVisible: true),
+      },
+      blocks: const {},
+      headerVars: const {},
+      bounds: const Rect.fromLTWH(0, 0, 5, 5),
+      entityStats: const {'LWPOLYLINE': 1},
+    );
+
+    final storey = StoreyLevel(
+      id: 's1',
+      name: 'Ниво 1',
+      elevation: 0.0,
+      height: 3.0,
+    );
+
+    // Shear wall 2.0m long, 0.25m thick, oriented roughly along 45 degrees
+    // Placed slightly off the outer edge
+    final wallRes = StructuralMagneticAlignmentHelper.alignShearWall(
+      rawCenter: const Offset(2.0, 2.08),
+      wallLength: 2.0,
+      wallThickness: 0.25,
+      wallRotationRad: math.pi / 4,
+      toleranceCad: 0.20,
+      activeStorey: storey,
+      dxfDocument: dxfDoc,
+    );
+
+    expect(wallRes, isNotNull);
+    expect(wallRes!.description, 'angleWallEdge');
+    // Wall adopts the 45-degree angle of the CAD polyline
+    expect(wallRes.snappedRotationRad, isNotNull);
+    expect(wallRes.snappedRotationRad!, closeTo(math.pi / 4, 1e-2));
   });
 
   test('Beam endpoint magnetically snaps to shear wall axial centerline and 12.5 cm modular nodes', () {

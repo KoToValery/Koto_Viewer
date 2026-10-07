@@ -1,5 +1,8 @@
+import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
+import 'package:kotoview/src/features/structural_designer/rendering/structural_2d_painter.dart';
+import 'package:kotoview/src/features/structural_designer/rendering/structural_pointer_painter.dart';
 
 void main() {
   group('Dynamic Slab Correction & Artifact Prevention Tests', () {
@@ -153,5 +156,50 @@ void main() {
       expect(updated.openings[0][2], equals(const Offset(6, 5)));
       expect(StructuralSlab.hasSelfIntersections(updated.openings[0]), isFalse);
     });
+
+    test('7. Structural2dPainter respects activeTool modal rendering for slabs', () {
+      const slab = StructuralSlab(
+        id: 'slab_1',
+        polygon: [
+          Offset(0, 0),
+          Offset(5, 0),
+          Offset(5, 5),
+          Offset(0, 5),
+        ],
+      );
+      const storey = StoreyLevel(
+        id: 's1',
+        name: 'Storey 1',
+        elevation: 0.0,
+        height: 3.0,
+        slabs: [slab],
+      );
+
+      // Verify that painter compiles and paints without error in column tool mode (slab contour only)
+      final painterColumnTool = Structural2dPainter(
+        currentStorey: storey,
+        activeTool: StructuralDrawTool.column,
+        selectedSlabId: 'slab_1',
+        cadToScene: (pt) => pt,
+        cadScale: 1.0,
+      );
+      expect(painterColumnTool.activeTool, equals(StructuralDrawTool.column));
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+      expect(() => painterColumnTool.paint(canvas, const Size(800, 600)), returnsNormally);
+
+      // Verify that painter compiles and paints without error in slab tool mode (full fill and handles)
+      final painterSlabTool = Structural2dPainter(
+        currentStorey: storey,
+        activeTool: StructuralDrawTool.slab,
+        selectedSlabId: 'slab_1',
+        cadToScene: (pt) => pt,
+        cadScale: 1.0,
+      );
+      expect(painterSlabTool.activeTool, equals(StructuralDrawTool.slab));
+      expect(() => painterSlabTool.paint(canvas, const Size(800, 600)), returnsNormally);
+    });
   });
 }
+

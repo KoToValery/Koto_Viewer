@@ -7,7 +7,10 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/binary/kcad_service.dart';
 import '../../dxf_viewer/parser/dxf_parser.dart';
 import 'bim_underlay_conversion_service.dart';
+import 'bim_underlay_loader.dart';
+import '../../structural_designer/analysis/slab_seed_generator.dart';
 import '../../structural_designer/models/structural_element.dart';
+import '../../structural_designer/rendering/structural_2d_painter.dart';
 import '../models/bim_work_project.dart';
 
 class _BimWriteQueue {
@@ -474,28 +477,69 @@ class BimProjectLibraryService {
     return updated;
   }
 
-  /// Consume local analysis seeds exactly once, after alignment. An empty
-  /// saved axis list thereafter represents the user's choice, not missing data.
+  /// Consume local analysis seeds after alignment. Initializes dynamic axes
+  /// and dynamic slabs for storeys matching their analysed floor underlays.
   Future<(BimWorkProject, StructuralProject)> initializeAxes(
     BimWorkProject project,
     StructuralProject structural,
     Map<String, DxfDocument> alignedDocuments,
   ) async {
-    if (project.axisSeedsConsumed || alignedDocuments.isEmpty) {
+    if (alignedDocuments.isEmpty) {
       return (project, structural);
     }
-    if (structural.effectiveGridAxes.isEmpty) {
+    bool structuralChanged = false;
+    if (!project.axisSeedsConsumed && structural.effectiveGridAxes.isEmpty) {
       final doc = alignedDocuments[project.referenceStorey?.storeyId];
       if (doc != null) {
         structural = structural.copyWithGridAxes(BimUnderlayMetadata.axes(doc));
+        structuralChanged = true;
       }
     }
-    if (!await saveStructuralProject(project.id, structural)) {
-      throw StateError('Cannot save initial axes');
+
+    // Auto-generate dynamic slabs for each storey if not already present
+    final updatedStoreys = <StoreyLevel>[];
+    for (final storey in structural.storeys) {
+      var currentStorey = storey;
+      final doc = alignedDocuments[storey.id];
+      if (doc != null && currentStorey.slabs.isEmpty) {
+        final meta = BimUnderlayMetadata.read(doc);
+        if (meta != null && meta['slabEnvelope'] != null) {
+          final unitsPerMeter = BimUnderlayLoader.computeUnitsPerMeter(doc, doc.bounds);
+          final seeds = SlabSeedGenerator.generate(
+            metadata: meta,
+            document: doc,
+            storeyId: storey.id,
+            existing: currentStorey.slabs,
+            unitsPerMeter: unitsPerMeter,
+            thickness: 0.20,
+          );
+          if (seeds.isNotEmpty) {
+            final coloredSeeds = [
+              for (var i = 0; i < seeds.length; i++)
+                seeds[i].copyWith(
+                  colorValue: Structural2dPainter.slabPalette[
+                      i % Structural2dPainter.slabPalette.length].toARGB32(),
+                ),
+            ];
+            currentStorey = currentStorey.copyWith(slabs: coloredSeeds);
+            structuralChanged = true;
+          }
+        }
+      }
+      updatedStoreys.add(currentStorey);
     }
-    project = project.copyWith(axisSeedsConsumed: true);
-    if (!await saveProjectManifest(project)) {
-      throw StateError('Cannot save axis initialization');
+
+    if (structuralChanged) {
+      structural = structural.copyWith(storeys: updatedStoreys);
+      if (!await saveStructuralProject(project.id, structural)) {
+        throw StateError('Cannot save initial structural project');
+      }
+    }
+    if (!project.axisSeedsConsumed) {
+      project = project.copyWith(axisSeedsConsumed: true);
+      if (!await saveProjectManifest(project)) {
+        throw StateError('Cannot save axis initialization');
+      }
     }
     return (project, structural);
   }

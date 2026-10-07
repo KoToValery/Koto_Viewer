@@ -175,6 +175,120 @@ class StructuralMagneticAlignmentHelper {
     return anchors;
   }
 
+  /// Extracts architectural and structural reference segments (outer wall faces, closure lines,
+  /// opening corridors, column faces, and CAD polylines/lines) for magnetic edge-to-edge alignment.
+  static List<({Offset p1, Offset p2, String source, double thickness})> _extractReferenceSegments({
+    required StoreyLevel activeStorey,
+    DxfDocument? dxfDocument,
+    double cadUnitsPerMeter = 1.0,
+    String? excludeWallId,
+    String? excludeColumnId,
+  }) {
+    final segments = <({Offset p1, Offset p2, String source, double thickness})>[];
+
+    // 1. Existing Shear Walls: Faces and End Caps (closure lines)
+    for (final wall in activeStorey.shearWalls) {
+      if (excludeWallId != null && wall.id == excludeWallId) continue;
+      final segVec = wall.end - wall.start;
+      final segLen = segVec.distance;
+      if (segLen < 1e-4) continue;
+      final u = segVec / segLen;
+      final n = Offset(-u.dy, u.dx);
+      final halfL = wall.length / 2.0;
+      final halfT = wall.thickness / 2.0;
+      final c = wall.center;
+
+      // Start Cap (transverse closure line next to opening/end)
+      segments.add((p1: c - u * halfL - n * halfT, p2: c - u * halfL + n * halfT, source: 'wallCap', thickness: wall.thickness));
+      // End Cap (transverse closure line next to opening/end)
+      segments.add((p1: c + u * halfL - n * halfT, p2: c + u * halfL + n * halfT, source: 'wallCap', thickness: wall.thickness));
+      // Outer Faces (left and right)
+      segments.add((p1: c - n * halfT - u * halfL, p2: c - n * halfT + u * halfL, source: 'wallFace', thickness: wall.thickness));
+      segments.add((p1: c + n * halfT - u * halfL, p2: c + n * halfT + u * halfL, source: 'wallFace', thickness: wall.thickness));
+      // Centerline
+      segments.add((p1: wall.start, p2: wall.end, source: 'wallCenterline', thickness: wall.thickness));
+    }
+
+    // 2. Slab Openings (shafts, staircases, elevators, custom openings)
+    for (final slab in activeStorey.slabs) {
+      for (final op in slab.openings) {
+        final poly = op;
+        final nPts = poly.length;
+        if (nPts < 2) continue;
+        for (int i = 0; i < nPts; i++) {
+          final p1 = poly[i];
+          final p2 = poly[(i + 1) % nPts];
+          if ((p2 - p1).distance >= 0.04 * cadUnitsPerMeter) {
+            segments.add((p1: p1, p2: p2, source: 'openingEdge', thickness: 0.0));
+          }
+        }
+      }
+    }
+
+    // 3. Existing Columns (outer perimeter faces)
+    for (final col in activeStorey.columns) {
+      if (excludeColumnId != null && col.id == excludeColumnId) continue;
+      final poly = col.polygonVertices;
+      final nPts = poly.length;
+      if (nPts >= 3) {
+        for (int i = 0; i < nPts; i++) {
+          final p1 = poly[i];
+          final p2 = poly[(i + 1) % nPts];
+          segments.add((p1: p1, p2: p2, source: 'columnFace', thickness: 0.0));
+        }
+      }
+    }
+
+    // 4. DXF Underlay (Lines, LwPolylines, Polylines)
+    if (dxfDocument != null) {
+      for (final entity in dxfDocument.entities) {
+        final layer = dxfDocument.layers[entity.layer];
+        if (layer != null && !layer.isVisible) continue;
+
+        if (entity is DxfLine) {
+          final len = (entity.p2 - entity.p1).distance;
+          if (len >= 0.04 * cadUnitsPerMeter) {
+            segments.add((p1: entity.p1, p2: entity.p2, source: 'dxfLine', thickness: 0.0));
+          }
+        } else if (entity is DxfLwPolyline) {
+          final v = entity.vertices;
+          for (int i = 0; i < v.length - 1; i++) {
+            final p1 = v[i].offset;
+            final p2 = v[i + 1].offset;
+            if ((p2 - p1).distance >= 0.04 * cadUnitsPerMeter) {
+              segments.add((p1: p1, p2: p2, source: 'dxfPolyline', thickness: 0.0));
+            }
+          }
+          if (entity.isClosed && v.length > 2) {
+            final p1 = v.last.offset;
+            final p2 = v.first.offset;
+            if ((p2 - p1).distance >= 0.04 * cadUnitsPerMeter) {
+              segments.add((p1: p1, p2: p2, source: 'dxfPolyline', thickness: 0.0));
+            }
+          }
+        } else if (entity is DxfPolyline) {
+          final v = entity.vertices;
+          for (int i = 0; i < v.length - 1; i++) {
+            final p1 = v[i].offset;
+            final p2 = v[i + 1].offset;
+            if ((p2 - p1).distance >= 0.04 * cadUnitsPerMeter) {
+              segments.add((p1: p1, p2: p2, source: 'dxfPolyline', thickness: 0.0));
+            }
+          }
+          if (entity.isClosed && v.length > 2) {
+            final p1 = v.last.offset;
+            final p2 = v.first.offset;
+            if ((p2 - p1).distance >= 0.04 * cadUnitsPerMeter) {
+              segments.add((p1: p1, p2: p2, source: 'dxfPolyline', thickness: 0.0));
+            }
+          }
+        }
+      }
+    }
+
+    return segments;
+  }
+
   /// Discovers adjacent columns and shear walls along the horizontal and vertical corridors
   /// and calculates exact face-to-face clear distances (светли размери).
   static List<NeighborClearDistance> findNeighborClearDistances({
@@ -579,10 +693,10 @@ class StructuralMagneticAlignmentHelper {
         String? dimText;
         (Offset, Offset)? dimLine;
 
-        const double stepM = 0.05; // 5 cm construction snap step
+        const double stepM = 0.01; // 1 cm construction precision
         if (closestObstacle != null && minObstacleDist <= 12.0 * cadUnitsPerMeter) {
           final distM = minObstacleDist / cadUnitsPerMeter;
-          final snappedM = math.max(stepM, (distM / stepM).round() * stepM);
+          final snappedM = distM <= 0.02 ? 0.0 : (distM / stepM).round() * stepM;
           final snappedDistCad = snappedM * cadUnitsPerMeter;
 
           final v = baseCenterOnAxis - closestObstacle;
@@ -599,7 +713,7 @@ class StructuralMagneticAlignmentHelper {
           final snappedTm = (tM / stepM).round() * stepM;
           final snappedAnchorWorld = axis.start + uAxis * (snappedTm * cadUnitsPerMeter);
           finalCenter = snappedAnchorWorld - bestAnchor.offset;
-          if (snappedTm.abs() > 0.01) {
+          if (snappedTm.abs() > 0.005) {
             dimText = '${snappedTm.abs().toStringAsFixed(2)} m';
             dimLine = (axis.start, snappedAnchorWorld);
           }
@@ -809,7 +923,78 @@ class StructuralMagneticAlignmentHelper {
       ));
     }
 
-    // 4. Centerline of Shear Walls
+    // 4. Wall Closure lines, Openings, and CAD Underlay reference segments
+    final refSegments = _extractReferenceSegments(
+      activeStorey: activeStorey,
+      dxfDocument: dxfDocument,
+      cadUnitsPerMeter: cadUnitsPerMeter,
+      excludeColumnId: movingColumnId,
+    );
+
+    ColumnMagneticAlignmentResult? bestClosureSnap;
+    double bestClosureDist = double.infinity;
+
+    for (final seg in refSegments) {
+      final p1 = seg.p1;
+      final p2 = seg.p2;
+      final segVec = p2 - p1;
+      final segLen = segVec.distance;
+      if (segLen < 1e-4) continue;
+      final u = segVec / segLen;
+      final n = Offset(-u.dy, u.dx);
+
+      for (final anchor in anchors) {
+        if (anchor.name.startsWith('wallModule')) continue;
+        final anchorWorld = effectiveRawCenter + anchor.offset;
+        final distPerp = (anchorWorld - p1).dx * n.dx + (anchorWorld - p1).dy * n.dy;
+        if (distPerp.abs() <= effectiveTol) {
+          final proj = anchorWorld - n * distPerp;
+          final t = (proj - p1).dx * u.dx + (proj - p1).dy * u.dy;
+
+          // Check if projection is within or near the segment
+          if (t >= -effectiveTol && t <= segLen + effectiveTol) {
+            Offset snappedAnchor = proj;
+            // Snap to closest feature: endpoint p1, endpoint p2, or midpoint
+            final distP1 = t.abs();
+            final distP2 = (t - segLen).abs();
+            final distMid = (t - segLen / 2.0).abs();
+
+            if (distMid <= distP1 && distMid <= distP2 && distMid <= effectiveTol) {
+              snappedAnchor = (p1 + p2) / 2.0;
+            } else if (distP1 <= distP2 && distP1 <= effectiveTol) {
+              snappedAnchor = p1;
+            } else if (distP2 <= effectiveTol) {
+              snappedAnchor = p2;
+            } else {
+              snappedAnchor = p1 + u * t.clamp(0.0, segLen);
+            }
+
+            final snappedCenter = snappedAnchor - anchor.offset;
+            final moveDist = (snappedCenter - effectiveRawCenter).distance;
+
+            // Prioritize wall closure lines (caps) and opening edges
+            final isHighPriority = seg.source == 'wallCap' || seg.source == 'openingEdge';
+            final score = moveDist - (isHighPriority ? effectiveTol : 0.0);
+
+            if (score < bestClosureDist) {
+              bestClosureDist = score;
+              bestClosureSnap = ColumnMagneticAlignmentResult(
+                snappedCenter: snappedCenter,
+                guideLines: [(p1 - u * 0.5, p2 + u * 0.5)],
+                description: seg.source,
+                markerPoint: snappedAnchor,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    if (bestClosureSnap != null) {
+      return wrapResult(bestClosureSnap);
+    }
+
+    // 5. Centerline of Shear Walls (within wall span)
     for (final wall in activeStorey.shearWalls) {
       final segVec = wall.end - wall.start;
       final segLen = segVec.distance;
@@ -818,17 +1003,20 @@ class StructuralMagneticAlignmentHelper {
       final n = Offset(-u.dy, u.dx);
       final distPerp = (effectiveRawCenter - wall.start).dx * n.dx + (effectiveRawCenter - wall.start).dy * n.dy;
       if (distPerp.abs() <= effectiveTol) {
-        final proj = effectiveRawCenter - n * distPerp;
-        return wrapResult(ColumnMagneticAlignmentResult(
-          snappedCenter: proj,
-          guideLines: [(wall.start - u * 2.0, wall.end + u * 2.0)],
-          description: 'shearWall',
-          markerPoint: proj,
-        ));
+        final t = (effectiveRawCenter - wall.start).dx * u.dx + (effectiveRawCenter - wall.start).dy * u.dy;
+        if (t >= 0.0 && t <= segLen) {
+          final proj = effectiveRawCenter - n * distPerp;
+          return wrapResult(ColumnMagneticAlignmentResult(
+            snappedCenter: proj,
+            guideLines: [(wall.start - u * 2.0, wall.end + u * 2.0)],
+            description: 'shearWall',
+            markerPoint: proj,
+          ));
+        }
       }
     }
 
-    // 5. Centerline of Beams
+    // 6. Centerline of Beams
     for (final beam in activeStorey.beams) {
       final segVec = beam.end - beam.start;
       final segLen = segVec.distance;
@@ -844,34 +1032,6 @@ class StructuralMagneticAlignmentHelper {
           description: 'beam',
           markerPoint: proj,
         ));
-      }
-    }
-
-    // 6. DXF Underlay lines
-    if (dxfDocument != null) {
-      for (final entity in dxfDocument.entities) {
-        if (entity is DxfLine) {
-          final p1 = entity.p1;
-          final p2 = entity.p2;
-          final segVec = p2 - p1;
-          final segLen = segVec.distance;
-          if (segLen < 0.2 * cadUnitsPerMeter) continue;
-          final u = segVec / segLen;
-          final n = Offset(-u.dy, u.dx);
-          final distPerp = (effectiveRawCenter - p1).dx * n.dx + (effectiveRawCenter - p1).dy * n.dy;
-          if (distPerp.abs() <= effectiveTol) {
-            final proj = effectiveRawCenter - n * distPerp;
-            final t = ((proj - p1).dx * u.dx + (proj - p1).dy * u.dy) / segLen;
-            if (t >= -0.2 && t <= 1.2) {
-              return wrapResult(ColumnMagneticAlignmentResult(
-                snappedCenter: proj,
-                guideLines: [(p1 - u * 1.5, p2 + u * 1.5)],
-                description: 'dxfLine',
-                markerPoint: proj,
-              ));
-            }
-          }
-        }
       }
     }
 
@@ -1061,10 +1221,10 @@ class StructuralMagneticAlignmentHelper {
           String? dimText;
           (Offset, Offset)? dimLine;
 
-          const double stepM = 0.05; // 5 cm construction snap step
+          const double stepM = 0.01; // 1 cm construction precision
           if (closestObstacle != null && minObstacleDist <= 12.0 * cadUnitsPerMeter) {
             final distM = minObstacleDist / cadUnitsPerMeter;
-            final snappedM = math.max(stepM, (distM / stepM).round() * stepM);
+            final snappedM = distM <= 0.02 ? 0.0 : (distM / stepM).round() * stepM;
             final snappedDistCad = snappedM * cadUnitsPerMeter;
 
             final dStart = (baseCenterOnAxis - uWall * halfLen - closestObstacle).distance;
@@ -1093,7 +1253,7 @@ class StructuralMagneticAlignmentHelper {
             final tM = t / cadUnitsPerMeter;
             final snappedTm = (tM / stepM).round() * stepM;
             finalCenter = axis.start + uAxis * (snappedTm * cadUnitsPerMeter);
-            if (snappedTm.abs() > 0.01) {
+            if (snappedTm.abs() > 0.005) {
               dimText = '${snappedTm.abs().toStringAsFixed(2)} m';
               dimLine = (axis.start, finalCenter);
             }
@@ -1210,33 +1370,134 @@ class StructuralMagneticAlignmentHelper {
       }
     }
 
-    // 5. Parallel to DXF Underlay wall lines
-    if (dxfDocument != null) {
-      for (final entity in dxfDocument.entities) {
-        if (entity is DxfLine) {
-          final p1 = entity.p1;
-          final p2 = entity.p2;
-          final lVec = p2 - p1;
-          final lLen = lVec.distance;
-          if (lLen < 0.3 * cadUnitsPerMeter) continue;
-          final uLine = lVec / lLen;
-          final nLine = Offset(-uLine.dy, uLine.dx);
+    // 5. Angle wall outer edge, corner walls, and CAD underlay reference segments
+    final refSegments = _extractReferenceSegments(
+      activeStorey: activeStorey,
+      dxfDocument: dxfDocument,
+      cadUnitsPerMeter: cadUnitsPerMeter,
+      excludeWallId: movingWallId,
+    );
 
-          final dot = (uWall.dx * uLine.dx + uWall.dy * uLine.dy).abs();
-          if (dot > 0.94) {
-            final distPerp = (effectiveRawCenter - p1).dx * nLine.dx + (effectiveRawCenter - p1).dy * nLine.dy;
-            if (distPerp.abs() <= effectiveTol) {
-              final snapped = effectiveRawCenter - nLine * distPerp;
-              return wrapWallResult(ShearWallMagneticAlignmentResult(
-                snappedCenter: snapped,
+    ShearWallMagneticAlignmentResult? bestWallSegSnap;
+    double bestWallSegDist = double.infinity;
+
+    for (final seg in refSegments) {
+      final p1 = seg.p1;
+      final p2 = seg.p2;
+      final segVec = p2 - p1;
+      final segLen = segVec.distance;
+      if (segLen < 0.1 * cadUnitsPerMeter) continue;
+      final uLine = segVec / segLen;
+      final nLine = Offset(-uLine.dy, uLine.dx);
+
+      final dot = (uWall.dx * uLine.dx + uWall.dy * uLine.dy).abs();
+      final dotPerp = (uWall.dx * nLine.dx + uWall.dy * nLine.dy).abs();
+
+      // Case A: Parallel or Angle Wall Alignment (wall orients along the line)
+      if (dot >= 0.88) {
+        final alignDir = (uWall.dx * uLine.dx + uWall.dy * uLine.dy) >= 0 ? 1.0 : -1.0;
+        final uW = uLine * alignDir;
+        final snappedRot = (alignDir > 0)
+            ? math.atan2(uLine.dy, uLine.dx)
+            : math.atan2(-uLine.dy, -uLine.dx);
+
+        final distCenter = (effectiveRawCenter - p1).dx * nLine.dx + (effectiveRawCenter - p1).dy * nLine.dy;
+        final halfThick = wallThickness / 2.0;
+
+        // Test Left Face, Right Face, and Centerline
+        final faceOffsets = [
+          (0.0, 'center'),
+          (-halfThick, 'leftFace'),
+          (halfThick, 'rightFace'),
+        ];
+
+        for (final (fOff, _) in faceOffsets) {
+          final distFace = distCenter - fOff;
+          if (distFace.abs() <= effectiveTol) {
+            final baseCenter = effectiveRawCenter - nLine * distFace;
+
+            // Along the segment, test start cap, end cap, and corners against p1 and p2
+            Offset finalCenter = baseCenter;
+            final dStartP1 = (baseCenter - uW * halfLen - p1).distance;
+            final dStartP2 = (baseCenter - uW * halfLen - p2).distance;
+            final dEndP1 = (baseCenter + uW * halfLen - p1).distance;
+            final dEndP2 = (baseCenter + uW * halfLen - p2).distance;
+
+            if (dStartP1 <= effectiveTol * 1.2) {
+              finalCenter = p1 + uW * halfLen;
+            } else if (dStartP2 <= effectiveTol * 1.2) {
+              finalCenter = p2 + uW * halfLen;
+            } else if (dEndP1 <= effectiveTol * 1.2) {
+              finalCenter = p1 - uW * halfLen;
+            } else if (dEndP2 <= effectiveTol * 1.2) {
+              finalCenter = p2 - uW * halfLen;
+            } else {
+              // 1 cm step snapping along the wall segment
+              final t = (baseCenter - p1).dx * uLine.dx + (baseCenter - p1).dy * uLine.dy;
+              final tM = t / cadUnitsPerMeter;
+              const double stepM = 0.01;
+              final snappedTm = (tM / stepM).round() * stepM;
+              finalCenter = p1 + uLine * (snappedTm * cadUnitsPerMeter);
+            }
+
+            final moveDist = (finalCenter - effectiveRawCenter).distance;
+            if (moveDist < bestWallSegDist) {
+              bestWallSegDist = moveDist;
+              bestWallSegSnap = ShearWallMagneticAlignmentResult(
+                snappedCenter: finalCenter,
+                snappedRotationRad: snappedRot,
                 guideLines: [(p1 - uLine * 1.5, p2 + uLine * 1.5)],
-                description: 'dxfLine',
-                markerPoint: snapped,
-              ));
+                description: 'angleWallEdge',
+                markerPoint: finalCenter,
+              );
             }
           }
         }
       }
+
+      // Case B: Perpendicular Alignment (Start cap or End cap flush to return wall / corner)
+      if (dotPerp >= 0.88) {
+        final startCapCenter = effectiveRawCenter - uWall * halfLen;
+        final endCapCenter = effectiveRawCenter + uWall * halfLen;
+
+        final distStart = (startCapCenter - p1).dx * nLine.dx + (startCapCenter - p1).dy * nLine.dy;
+        if (distStart.abs() <= effectiveTol) {
+          final snappedStart = startCapCenter - nLine * distStart;
+          final snappedCenter = snappedStart + uWall * halfLen;
+          final moveDist = (snappedCenter - effectiveRawCenter).distance;
+          if (moveDist < bestWallSegDist) {
+            bestWallSegDist = moveDist;
+            bestWallSegSnap = ShearWallMagneticAlignmentResult(
+              snappedCenter: snappedCenter,
+              snappedRotationRad: effectiveWallRot,
+              guideLines: [(p1 - uLine * 1.5, p2 + uLine * 1.5)],
+              description: 'cornerReturnWall',
+              markerPoint: snappedStart,
+            );
+          }
+        }
+
+        final distEnd = (endCapCenter - p1).dx * nLine.dx + (endCapCenter - p1).dy * nLine.dy;
+        if (distEnd.abs() <= effectiveTol) {
+          final snappedEnd = endCapCenter - nLine * distEnd;
+          final snappedCenter = snappedEnd - uWall * halfLen;
+          final moveDist = (snappedCenter - effectiveRawCenter).distance;
+          if (moveDist < bestWallSegDist) {
+            bestWallSegDist = moveDist;
+            bestWallSegSnap = ShearWallMagneticAlignmentResult(
+              snappedCenter: snappedCenter,
+              snappedRotationRad: effectiveWallRot,
+              guideLines: [(p1 - uLine * 1.5, p2 + uLine * 1.5)],
+              description: 'cornerReturnWall',
+              markerPoint: snappedEnd,
+            );
+          }
+        }
+      }
+    }
+
+    if (bestWallSegSnap != null) {
+      return wrapWallResult(bestWallSegSnap);
     }
 
     return null;
