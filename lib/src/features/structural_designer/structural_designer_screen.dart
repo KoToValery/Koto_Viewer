@@ -32,6 +32,7 @@ import 'services/structural_persistence_service.dart';
 import 'widgets/cantilever_analysis_sheet.dart';
 import 'widgets/element_palette_bar.dart';
 import 'widgets/seismic_analysis_sheet.dart';
+import 'widgets/seismic_load_dialog.dart';
 import 'widgets/storey_manager_sheet.dart';
 import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
 import '../dxf_viewer/widgets/dxf_entity_context_sheet.dart';
@@ -7115,8 +7116,74 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => SeismicAnalysisSheet(report: _seismicAnalysisReport),
+      builder: (ctx) => SeismicAnalysisSheet(report: _seismicAnalysisReport,
+        onLocateElement: (storeyId, elementId, isWall) {
+          Navigator.of(ctx).pop();
+          _locateSeismicElement(storeyId, elementId, isWall);
+        },
+        onEditLoads: () {
+          Navigator.of(ctx).pop();
+          _editSeismicLoads();
+        }),
     );
+  }
+
+  void _locateSeismicElement(String storeyId, String elementId, bool isWall) {
+    final index = _project.storeys.indexWhere((s) => s.id == storeyId);
+    if (index < 0) return;
+    final storey = _project.storeys[index];
+    StructuralColumn? column;
+    StructuralShearWall? wall;
+    if (isWall) {
+      for (final candidate in storey.shearWalls) { if(candidate.id == elementId) wall = candidate; }
+    } else {
+      for (final candidate in storey.columns) { if(candidate.id == elementId) column = candidate; }
+    }
+    if (column == null && wall == null) return;
+    final center = wall?.center ?? column!.center;
+    setState(() {
+      _project = _project.copyWith(activeStoreyIndex: index);
+      _selectedColumn = column;
+      _selectedShearWall = wall;
+      _selectedBeam = null;
+      _selectedOpening = null;
+      _editingSlab = null;
+      _initialSlabBeforeCorrection = null;
+      _activeTool = isWall ? StructuralDrawTool.shearWall : StructuralDrawTool.column;
+      _isMovingColumn = false;
+      _isMovingShearWall = false;
+      _slabPointsCad.clear();
+      _wallStartCad = null;
+      _beamStartCad = null;
+      _runAnalysis();
+    });
+    if (!_viewportSize.isEmpty && center.dx.isFinite && center.dy.isFinite) {
+      final scene = _cadToScene(center);
+      final rawExtent = wall?.length ?? math.max(column!.width, column.height);
+      final extent = rawExtent.isFinite ? rawExtent : _cadUnitsPerMeter;
+      final edge = _cadToScene(center + Offset(math.max(extent, _cadUnitsPerMeter), 0));
+      final zoom = (math.min(_viewportSize.width,_viewportSize.height)*0.45 /
+        math.max((edge-scene).distance, 1e-6)).clamp(0.001,10000.0);
+      final matrix = Matrix4.diagonal3Values(zoom,zoom,1);
+      matrix.setEntry(0,3,_viewportSize.width/2-scene.dx*zoom);
+      matrix.setEntry(1,3,_viewportSize.height*.4-scene.dy*zoom);
+      _transformController.value = matrix;
+    }
+  }
+
+  Future<void> _editSeismicLoads() async {
+    final updated = await showDialog<StructuralProject>(context: context,
+      builder: (_) => SeismicLoadDialog(project: _project));
+    if (!mounted || updated == null) return;
+    _pushUndo();
+    setState(() {
+      _project = updated;
+      _editingSlab = null;
+      _initialSlabBeforeCorrection = null;
+      _runAnalysis();
+    });
+    _saveProject();
+    _openSeismicReport();
   }
 
   void _open3dViewport() {

@@ -2732,4 +2732,80 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get seismicRegionScope =>
       'Отделни предварителни модели със собствените тегла на плочите и зададените площни товари. Взаимодействието, гредите между областите и вертикалната непрекъснатост не са оценени.';
+
+  @override
+  String get seismicLoadsTitle => 'Товари за сеизмичната маса';
+
+  @override
+  String get seismicLoadsScope =>
+      'Само за предварителния сеизмичен модел. Собственото тегло 25 × h се добавя отделно. Постоянният товар е без него. При изключена настройка: проектните G/Q и дял 0,3. Дялът се задава от конструктора; не се избира автоматично по Еврокод. Вертикалните и конзолните проверки запазват своите товари.';
+
+  @override
+  String get seismicLoadPermanent => 'Допълнителен постоянен товар G';
+
+  @override
+  String get seismicLoadVariable => 'Полезен товар Q';
+
+  @override
+  String get seismicLoadParticipation => 'Дял на Q за масата (0–1)';
+
+  @override
+  String get seismicLoadOverride => 'Отделни стойности за тази плоча';
+
+  @override
+  String seismicLoadSlab(int index) {
+    return 'Плоча $index';
+  }
+
+  @override
+  String get seismicInvalidMassLoads =>
+      'Неоценено: проверете товарите и дебелината. G и Q трябва да са крайни неотрицателни числа, дялът на Q — между 0 и 1, дебелината — положителна.';
+
+  @override
+  String get seismicWallContinuityTitle => 'Непрекъснатост на шайбите';
+
+  @override
+  String get seismicWallContinuityScope =>
+      'Застъпване на сечението с успоредни шайби на предходния етаж в проекта. Под 100% изисква преглед за отместване, скъсяване или прекъсване. Това не е проверка на носимоспособност; насаждане върху греди/колони и фундаментите не са оценени.';
+
+  @override
+  String seismicWallContinuityItem(
+    String storey,
+    String wall,
+    String coverage,
+  ) {
+    return '$storey · $wall: застъпване $coverage';
+  }
+
+  @override
+  String get seismicElevationAmbiguous =>
+      'Вертикалните проверки са неоценени: има еднакви или невалидни коти. Уточнете нивата на етажите.';
+
+  @override
+  String get seismicDirectionalScope =>
+      'Отношение на предварителната коравина към горния етаж по X/Y. Под 0,70 е сигнал за преглед, а не нормативна присъда. Сравняват се само еднозначно свързани единични области.';
+
+  @override
+  String get seismicRegionTrackingTitle => 'Области между етажите';
+
+  @override
+  String get seismicLinkUnique => 'еднозначно застъпване';
+
+  @override
+  String get seismicLinkBranching => 'разделяне/сливане — преглед';
+
+  @override
+  String get seismicLinkAbsent => 'без застъпване — преглед';
+
+  @override
+  String seismicRegionTrackingItem(
+    String storey,
+    int region,
+    String lower,
+    String matches,
+    String coverage,
+    String status,
+  ) {
+    return '$storey, област $region → $lower, области $matches: $coverage; $status. Геометрична връзка, не доказан път на усилията.';
+  }
 }

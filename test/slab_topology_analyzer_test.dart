@@ -212,6 +212,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text(strings.seismicSeparateRegions(2)), findsOneWidget);
+      expect(find.text(strings.seismicRegionTitle(1, 0, 0)), findsOneWidget);
+      expect(find.text(strings.seismicRegionTitle(2, 0, 0)), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

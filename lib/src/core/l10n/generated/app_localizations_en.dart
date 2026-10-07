@@ -2722,4 +2722,80 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get seismicRegionScope =>
       'Isolated preliminary region models with existing slab weights and project surface loads. Coupling, beams between regions and vertical continuity are not evaluated.';
+
+  @override
+  String get seismicLoadsTitle => 'Seismic mass loads';
+
+  @override
+  String get seismicLoadsScope =>
+      'Preliminary seismic model only. Self-weight 25 × h is added separately; exclude it from the permanent load. When disabled: project G/Q and participation 0.3. Participation is specified by the engineer, not selected automatically from Eurocodes. Vertical and cantilever checks retain their own loads.';
+
+  @override
+  String get seismicLoadPermanent => 'Additional permanent load G';
+
+  @override
+  String get seismicLoadVariable => 'Imposed load Q';
+
+  @override
+  String get seismicLoadParticipation => 'Q participation in mass (0–1)';
+
+  @override
+  String get seismicLoadOverride => 'Separate values for this slab';
+
+  @override
+  String seismicLoadSlab(int index) {
+    return 'Slab $index';
+  }
+
+  @override
+  String get seismicInvalidMassLoads =>
+      'Not evaluated: check loads and thickness. G and Q must be finite nonnegative values, Q participation must be between 0 and 1, and thickness must be positive.';
+
+  @override
+  String get seismicWallContinuityTitle => 'Wall vertical continuity';
+
+  @override
+  String get seismicWallContinuityScope =>
+      'Footprint overlap with parallel walls on the preceding project storey. Below 100% requires review for offsets, shortening or interruption. This is not a capacity check; transfer onto beams/columns and foundations are not evaluated.';
+
+  @override
+  String seismicWallContinuityItem(
+    String storey,
+    String wall,
+    String coverage,
+  ) {
+    return '$storey · $wall: overlap $coverage';
+  }
+
+  @override
+  String get seismicElevationAmbiguous =>
+      'Vertical checks are not evaluated: duplicate or invalid elevations. Review storey levels.';
+
+  @override
+  String get seismicDirectionalScope =>
+      'Preliminary stiffness ratio to the upper storey along X/Y. Below 0.70 flags review, not a code verdict. Only uniquely matched single regions are compared.';
+
+  @override
+  String get seismicRegionTrackingTitle => 'Regions across storeys';
+
+  @override
+  String get seismicLinkUnique => 'unique overlap';
+
+  @override
+  String get seismicLinkBranching => 'split/merge — review';
+
+  @override
+  String get seismicLinkAbsent => 'no overlap — review';
+
+  @override
+  String seismicRegionTrackingItem(
+    String storey,
+    int region,
+    String lower,
+    String matches,
+    String coverage,
+    String status,
+  ) {
+    return '$storey, region $region → $lower, regions $matches: $coverage; $status. Geometric link, not a verified load path.';
+  }
 }

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'seismic_slab_load.dart';
 
 /// Supported geometric cross-section shapes for columns.
 enum ColumnShape {
@@ -737,6 +738,11 @@ class StructuralSlab {
   final List<List<Offset>> openings; // Staircase, elevator, shaft cutouts
   final List<SlabOpeningType>? openingTypes; // Typed categorization of openings
   final double thickness; // in meters (default 0.20)
+  final SeismicSlabLoad? seismicLoad;
+
+  SeismicSlabLoad effectiveSeismicLoad(StructuralProject project) => seismicLoad ??
+      SeismicSlabLoad(permanentKnM2: project.deadLoadSuperimposed,
+        variableKnM2: project.liveLoad, participation: 0.3);
   final double? floorFinish; // in meters (flooring/screed finish thickness, default 0.05)
   final int? colorValue; // ARGB hex integer for distinct custom color
 
@@ -746,6 +752,7 @@ class StructuralSlab {
     this.openings = const [],
     this.openingTypes,
     this.thickness = 0.20,
+    this.seismicLoad,
     this.floorFinish,
     this.colorValue,
   });
@@ -1409,6 +1416,8 @@ class StructuralSlab {
     double? thickness,
     double? floorFinish,
     int? colorValue,
+    SeismicSlabLoad? seismicLoad,
+    bool clearSeismicLoad = false,
   }) {
     return StructuralSlab(
       id: id ?? this.id,
@@ -1418,6 +1427,7 @@ class StructuralSlab {
       thickness: thickness ?? this.thickness,
       floorFinish: floorFinish ?? this.floorFinish,
       colorValue: colorValue ?? this.colorValue,
+      seismicLoad: clearSeismicLoad ? null : seismicLoad ?? this.seismicLoad,
     );
   }
 
@@ -1428,6 +1438,7 @@ class StructuralSlab {
     if (openingTypes != null) 'openingTypes': openingTypes!.map((t) => t.name).toList(),
     'thickness': thickness,
     'floorFinish': floorFinish,
+    if (seismicLoad != null) 'seismicLoad': seismicLoad!.toJson(),
     'colorValue': colorValue,
   };
 
@@ -1452,6 +1463,8 @@ class StructuralSlab {
           .toList(),
       thickness: (json['thickness'] as num?)?.toDouble() ?? 0.20,
       floorFinish: (json['floorFinish'] as num?)?.toDouble(),
+      seismicLoad: json['seismicLoad'] is Map
+          ? SeismicSlabLoad.fromJson(Map<String, dynamic>.from(json['seismicLoad'] as Map)) : null,
       colorValue: json['colorValue'] as int?,
     );
   }

@@ -7,6 +7,8 @@ import 'structural_polygon_distance.dart';
 import 'slab_contact_geometry.dart';
 import 'slab_topology_analyzer.dart';
 import '../models/slab_topology.dart';
+import 'wall_vertical_continuity.dart';
+import 'diaphragm_storey_links.dart';
 
 /// Preliminary elastic layout indicators; not an EC8 compliance verification.
 ///
@@ -38,6 +40,13 @@ class SeismicAnalysisCalculator {
       );
     }
     final scale = cadUnitsPerMeter;
+    // Work on a sorted copy; never reorder the user's project or active storey.
+    final sortedStoreys = project.storeys.toList()
+      ..sort((a,b) => a.elevation.compareTo(b.elevation));
+    final verticalOrderValid = sortedStoreys.every((s) => s.elevation.isFinite) &&
+      List.generate(sortedStoreys.length-1, (i) =>
+        (sortedStoreys[i+1].elevation-sortedStoreys[i].elevation).abs()>1e-6).every((v)=>v);
+    if (verticalOrderValid) project = project.copyWith(storeys:sortedStoreys);
     final int numStoreys = project.storeys.length;
 
     final List<StoreySeismicCheck> storeyChecks = [];
@@ -60,7 +69,20 @@ class SeismicAnalysisCalculator {
     for (int sIdx = 0; sIdx < numStoreys; sIdx++) {
       final storey = project.storeys[sIdx];
       final double hM = math.max(2.4, storey.height);
+      final regionLinks = verticalOrderValid && sIdx > 0
+          ? DiaphragmStoreyLink.between(storey, project.storeys[sIdx-1], scale)
+          : const <DiaphragmStoreyLink>[];
+      final wallVerticalChecks = sIdx == 0 || !verticalOrderValid ? <WallVerticalContinuity>[] : [
+        for (final wall in storey.shearWalls)
+          WallVerticalContinuity.evaluate(wall, project.storeys[sIdx-1].shearWalls, scale),
+      ];
+      final discWallIds = [for (final check in wallVerticalChecks)
+        if (!check.isContinuous) check.wallId];
+      totalDiscontinuousWallsCount += discWallIds.length;
       final slabTopology = SlabTopologyAnalyzer.analyze(storey.slabs, scale);
+      final invalidMassLoads = storey.slabs.any((s) =>
+          !s.thickness.isFinite || s.thickness <= 0 ||
+          !s.effectiveSeismicLoad(project).isValid);
 
       // Floor slab area & bounding dimensions of the slab diaphragm
       double floorAreaM2 = 0.0;
@@ -83,11 +105,37 @@ class SeismicAnalysisCalculator {
 
       // Withhold this single-diaphragm model for ambiguous geometry or separate
       // regions. Do not silently sum overlapping masses or couple separate floors.
-      if (!hasSlabDiaphragm || !slabTopology.allowsSingleDiaphragm) {
+      if (!hasSlabDiaphragm || !slabTopology.allowsSingleDiaphragm || invalidMassLoads) {
         final List<String> floatingIds = [];
         final List<String> floatingNames = [];
+        final disconnectedCols = <StructuralColumn>[];
+        final disconnectedWalls = <StructuralShearWall>[];
+        if (slabTopology.issue == SlabTopologyIssue.separateRegions) {
+          for (final col in storey.columns) {
+            final contact = SlabContactGeometry.columnContact(
+              col,
+              storey.slabs,
+              scale,
+            );
+            if (contact != null && contact.areaM2 <= 1e-10) {
+              disconnectedCols.add(col);
+            }
+          }
+          for (final wall in storey.shearWalls) {
+            final contact = getWallDiaphragmConnection(
+              wall,
+              storey.slabs,
+              scale,
+            );
+            if (!contact.isConnected && !contact.requiresReview) {
+              disconnectedWalls.add(wall);
+            }
+          }
+          totalDisconnectedColsCount += disconnectedCols.length;
+          totalDisconnectedWallsCount += disconnectedWalls.length;
+        }
 
-        if (sIdx > 0) {
+        if (verticalOrderValid && sIdx > 0) {
           final lowerStorey = project.storeys[sIdx - 1];
           for (int cIdx = 0; cIdx < storey.columns.length; cIdx++) {
             final col = storey.columns[cIdx];
@@ -141,12 +189,18 @@ class SeismicAnalysisCalculator {
             storeyId: storey.id,
             storeyName: storey.name,
             storeyIndex: sIdx,
-            hasSlabDiaphragm: storey.slabs.isNotEmpty &&
+            hasSlabDiaphragm:
+                storey.slabs.isNotEmpty &&
                 (!slabTopology.allowsSingleDiaphragm || hasSlabDiaphragm),
             slabTopology: slabTopology,
-            diaphragmRegions: slabTopology.issue == SlabTopologyIssue.separateRegions
-                ? _analyzeRegions(project, storey, slabTopology, scale) : const [],
+            invalidMassLoads: invalidMassLoads,
+            diaphragmRegions:
+                slabTopology.issue == SlabTopologyIssue.separateRegions
+                ? _analyzeRegions(project, storey, slabTopology, scale)
+                : const [],
             hasLateralStiffness: false,
+            verticalOrderValid: verticalOrderValid,
+            regionLinksBelow: regionLinks,
             centerOfMassCad: null,
             centerOfRigidityCad: null,
             eccentricityM: null,
@@ -164,11 +218,16 @@ class SeismicAnalysisCalculator {
             isWallCoverageSufficientY: false,
             floatingColumnIds: floatingIds,
             floatingColumnNames: floatingNames,
-            discontinuousWallIds: const [],
-            disconnectedWallIds: const [],
-            disconnectedWallNames: const [],
-            disconnectedColumnIds: const [],
-            disconnectedColumnNames: const [],
+            discontinuousWallIds: discWallIds,
+            wallVerticalChecks: wallVerticalChecks,
+            disconnectedWallIds: disconnectedWalls.map((w) => w.id).toList(),
+            disconnectedWallNames: disconnectedWalls
+                .map((w) => w.displayName)
+                .toList(),
+            disconnectedColumnIds: disconnectedCols.map((c) => c.id).toList(),
+            disconnectedColumnNames: disconnectedCols
+                .map((c) => c.displayName)
+                .toList(),
             lateralStiffnessIndex: 0.0,
             isSoftStorey: false,
             riskLevel: risk,
@@ -238,9 +297,7 @@ class SeismicAnalysisCalculator {
         final cCad = _computeSlabNetCentroid(slab);
         final slabMass =
             aM2 *
-            (25.0 * slab.thickness +
-                project.deadLoadSuperimposed +
-                0.3 * project.liveLoad);
+            slab.effectiveSeismicLoad(project).weightKnM2(slab.thickness);
         totalMass += slabMass;
         sumMassX += slabMass * cCad.dx;
         sumMassY += slabMass * cCad.dy;
@@ -349,9 +406,7 @@ class SeismicAnalysisCalculator {
         }
         polarWeight +=
             polar *
-            (25 * slab.thickness +
-                project.deadLoadSuperimposed +
-                0.3 * project.liveLoad);
+            slab.effectiveSeismicLoad(project).weightKnM2(slab.thickness);
       }
       for (final col in connectedCols) {
         if (col.shape == ColumnShape.circular) {
@@ -421,7 +476,7 @@ class SeismicAnalysisCalculator {
       final List<String> floatingIds = [];
       final List<String> floatingNames = [];
 
-      if (sIdx > 0) {
+      if (verticalOrderValid && sIdx > 0) {
         final lowerStorey = project.storeys[sIdx - 1];
         for (int cIdx = 0; cIdx < storey.columns.length; cIdx++) {
           final col = storey.columns[cIdx];
@@ -458,29 +513,6 @@ class SeismicAnalysisCalculator {
             floatingIds.add(col.id);
             floatingNames.add(col.displayName);
             totalFloatingColsCount++;
-          }
-        }
-      }
-
-      // D. Discontinuous Shear Walls Detection
-      final List<String> discWallIds = [];
-      if (sIdx > 0) {
-        final lowerStorey = project.storeys[sIdx - 1];
-        for (final wall in storey.shearWalls) {
-          final mid = (wall.start + wall.end) / 2.0;
-          bool hasWallBelow = false;
-          for (final lowerWall in lowerStorey.shearWalls) {
-            final dist =
-                _distancePointToSegment(mid, lowerWall.start, lowerWall.end) /
-                scale;
-            if (dist <= 0.30) {
-              hasWallBelow = true;
-              break;
-            }
-          }
-          if (!hasWallBelow) {
-            discWallIds.add(wall.id);
-            totalDiscontinuousWallsCount++;
           }
         }
       }
@@ -549,6 +581,8 @@ class SeismicAnalysisCalculator {
       if (floatingIds.isNotEmpty) {
         risk = SeismicRiskLevel.critical;
       } else if (!hasLateralStiffness ||
+          discWallIds.isNotEmpty ||
+          regionLinks.any((link) => link.kind != RegionLinkKind.oneToOne) ||
           isTorsionallySensitive ||
           !wallOkX ||
           !wallOkY ||
@@ -595,11 +629,16 @@ class SeismicAnalysisCalculator {
           floatingColumnIds: floatingIds,
           floatingColumnNames: floatingNames,
           discontinuousWallIds: discWallIds,
+          wallVerticalChecks: wallVerticalChecks,
           disconnectedWallIds: disconnectedWallIds,
           disconnectedWallNames: disconnectedWallNames,
           disconnectedColumnIds: disconnectedColIds,
           disconnectedColumnNames: disconnectedColNames,
           lateralStiffnessIndex: latStiffness,
+          stiffnessX: sumKx / math.pow(hM, 3),
+          stiffnessY: sumKy / math.pow(hM, 3),
+          verticalOrderValid: verticalOrderValid,
+          regionLinksBelow: regionLinks,
           isSoftStorey: false,
           riskLevel: risk,
           architectRecommendation: rec.toString().trim(),
@@ -612,15 +651,21 @@ class SeismicAnalysisCalculator {
     for (int sIdx = 0; sIdx < numStoreys; sIdx++) {
       final cur = storeyChecks[sIdx];
       double? ratioToAbove;
+      double? ratioX, ratioY;
       bool isSoft = false;
-      if (sIdx < numStoreys - 1) {
+      if (verticalOrderValid && sIdx < numStoreys - 1) {
         final kAbove = storeyStiffnessList[sIdx + 1];
         if (cur.hasSlabDiaphragm &&
+            storeyChecks[sIdx + 1].regionLinksBelow.length == 1 &&
+            storeyChecks[sIdx + 1].regionLinksBelow.single.kind == RegionLinkKind.oneToOne &&
             cur.hasLateralStiffness &&
             storeyChecks[sIdx + 1].hasLateralStiffness &&
             kAbove > 1e-4) {
           ratioToAbove = storeyStiffnessList[sIdx] / kAbove;
-          if (ratioToAbove < 0.70) {
+          final above = storeyChecks[sIdx+1];
+          ratioX = above.stiffnessX > 1e-12 ? cur.stiffnessX / above.stiffnessX : null;
+          ratioY = above.stiffnessY > 1e-12 ? cur.stiffnessY / above.stiffnessY : null;
+          if ((ratioX != null && ratioX < 0.70) || (ratioY != null && ratioY < 0.70)) {
             isSoft = true;
             anySoftStorey = true;
           }
@@ -645,6 +690,7 @@ class SeismicAnalysisCalculator {
           storeyIndex: cur.storeyIndex,
           hasSlabDiaphragm: cur.hasSlabDiaphragm,
           slabTopology: cur.slabTopology,
+          invalidMassLoads: cur.invalidMassLoads,
           diaphragmRegions: cur.diaphragmRegions,
           hasLateralStiffness: cur.hasLateralStiffness,
           connectionReviewNames: cur.connectionReviewNames,
@@ -673,11 +719,18 @@ class SeismicAnalysisCalculator {
           floatingColumnIds: cur.floatingColumnIds,
           floatingColumnNames: cur.floatingColumnNames,
           discontinuousWallIds: cur.discontinuousWallIds,
+          wallVerticalChecks: cur.wallVerticalChecks,
           disconnectedWallIds: cur.disconnectedWallIds,
           disconnectedWallNames: cur.disconnectedWallNames,
           disconnectedColumnIds: cur.disconnectedColumnIds,
           disconnectedColumnNames: cur.disconnectedColumnNames,
           lateralStiffnessIndex: cur.lateralStiffnessIndex,
+          stiffnessX: cur.stiffnessX,
+          stiffnessY: cur.stiffnessY,
+          stiffnessRatioXToAbove: ratioX,
+          stiffnessRatioYToAbove: ratioY,
+          verticalOrderValid: verticalOrderValid,
+          regionLinksBelow: cur.regionLinksBelow,
           stiffnessRatioToAbove: ratioToAbove,
           isSoftStorey: isSoft,
           riskLevel: finalRisk,
@@ -799,7 +852,9 @@ class SeismicAnalysisCalculator {
     final SeismicRiskLevel overallRisk;
     if (totalFloatingColsCount > 0 || anySoftStorey) {
       overallRisk = SeismicRiskLevel.critical;
-    } else if (storeyChecks.any((c) => !c.hasLateralStiffness) ||
+    } else if (!verticalOrderValid || storeyChecks.any((c) => !c.hasLateralStiffness) ||
+        storeyChecks.any((c) => c.regionLinksBelow.any((l) => l.kind != RegionLinkKind.oneToOne)) ||
+        totalDiscontinuousWallsCount > 0 ||
         anyTorsionalSensitivity ||
         anyWallDeficit ||
         anyStructuralEccentricity ||
@@ -831,14 +886,24 @@ class SeismicAnalysisCalculator {
   /// Assign supports exclusively. A shared support couples regions and cannot
   /// be counted twice in independent elastic models. Unknown contact blocks all
   /// possible assignments rather than quietly dropping the uncertain element.
-  static List<DiaphragmRegionCheck> _analyzeRegions(StructuralProject project,
-      StoreyLevel storey, SlabTopology topology, double scale) {
-    final floors = [for (final region in topology.regions)
-      [for (final i in region) storey.slabs[i]]];
+  static List<DiaphragmRegionCheck> _analyzeRegions(
+    StructuralProject project,
+    StoreyLevel storey,
+    SlabTopology topology,
+    double scale,
+  ) {
+    final floors = [
+      for (final region in topology.regions)
+        [for (final i in region) storey.slabs[i]],
+    ];
     final columns = [for (final _ in floors) <StructuralColumn>[]];
     final walls = [for (final _ in floors) <StructuralShearWall>[]];
     final ambiguous = [for (final _ in floors) <String>[]];
-    void assign(String name, List<SlabContactMeasure?> contacts, void Function(int) add) {
+    void assign(
+      String name,
+      List<SlabContactMeasure?> contacts,
+      void Function(int) add,
+    ) {
       final owners = <int>[];
       for (var i = 0; i < contacts.length; i++) {
         if (contacts[i] == null || contacts[i]!.areaM2 > 1e-10) owners.add(i);
@@ -846,30 +911,54 @@ class SeismicAnalysisCalculator {
       if (owners.length == 1 && contacts[owners.single] != null) {
         add(owners.single);
       } else {
-        for (final i in owners) { ambiguous[i].add(name); }
+        for (final i in owners) {
+          ambiguous[i].add(name);
+        }
       }
     }
+
     for (final col in storey.columns) {
-      assign(col.displayName, [for (final slabs in floors)
-        SlabContactGeometry.columnContact(col, slabs, scale)],
-        (i) => columns[i].add(col));
+      assign(col.displayName, [
+        for (final slabs in floors)
+          SlabContactGeometry.columnContact(col, slabs, scale),
+      ], (i) => columns[i].add(col));
     }
     for (final wall in storey.shearWalls) {
-      assign(wall.displayName, [for (final slabs in floors)
-        wall.thickness > 0 && wall.length > 0
-          ? SlabContactGeometry.measure(wall.polygonVertices, slabs, scale,
-              direction: wall.end-wall.start) : null],
-        (i) => walls[i].add(wall));
+      assign(wall.displayName, [
+        for (final slabs in floors)
+          wall.thickness > 0 && wall.length > 0
+              ? SlabContactGeometry.measure(
+                  wall.polygonVertices,
+                  slabs,
+                  scale,
+                  direction: wall.end - wall.start,
+                )
+              : null,
+      ], (i) => walls[i].add(wall));
     }
-    return [for (var i = 0; i < floors.length; i++)
-      DiaphragmRegionCheck(slabIndices: topology.regions[i],
-        columnIds: columns[i].map((c) => c.id).toList(),
-        wallIds: walls[i].map((w) => w.id).toList(),
-        ambiguousSupportNames: ambiguous[i],
-        check: ambiguous[i].isNotEmpty ? null : analyzeProject(
-          project.copyWith(storeys: [storey.copyWith(slabs: floors[i],
-            columns: columns[i], shearWalls: walls[i], beams: const [])]),
-          cadUnitsPerMeter: scale).storeyChecks.single),
+    return [
+      for (var i = 0; i < floors.length; i++)
+        DiaphragmRegionCheck(
+          slabIndices: topology.regions[i],
+          columnIds: columns[i].map((c) => c.id).toList(),
+          wallIds: walls[i].map((w) => w.id).toList(),
+          ambiguousSupportNames: ambiguous[i],
+          check: ambiguous[i].isNotEmpty
+              ? null
+              : analyzeProject(
+                  project.copyWith(
+                    storeys: [
+                      storey.copyWith(
+                        slabs: floors[i],
+                        columns: columns[i],
+                        shearWalls: walls[i],
+                        beams: const [],
+                      ),
+                    ],
+                  ),
+                  cadUnitsPerMeter: scale,
+                ).storeyChecks.single,
+        ),
     ];
   }
 

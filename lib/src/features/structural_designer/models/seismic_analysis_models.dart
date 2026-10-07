@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'slab_topology.dart';
+import '../analysis/wall_vertical_continuity.dart';
+import '../analysis/diaphragm_storey_links.dart';
 
 /// Eurocode 8 (EC8 EN 1998-1) Seismic Regularity & Risk Classification.
 enum SeismicRiskLevel {
@@ -52,6 +54,7 @@ class StoreySeismicCheck {
   final bool hasLateralStiffness;
   final List<String> connectionReviewNames;
   final SlabTopology slabTopology;
+  final bool invalidMassLoads;
   final List<DiaphragmRegionCheck> diaphragmRegions;
 
   /// Center of Mass (CM), null when the single-diaphragm model is unavailable.
@@ -120,6 +123,7 @@ class StoreySeismicCheck {
 
   /// IDs of shear walls discontinued on this storey.
   final List<String> discontinuousWallIds;
+  final List<WallVerticalContinuity> wallVerticalChecks;
 
   /// IDs of shear walls located outside the slab boundary (not connected to diaphragm).
   final List<String> disconnectedWallIds;
@@ -131,6 +135,10 @@ class StoreySeismicCheck {
 
   /// Lateral stiffness index (sum EI / h³).
   final double lateralStiffnessIndex;
+  final double stiffnessX, stiffnessY;
+  final double? stiffnessRatioXToAbove, stiffnessRatioYToAbove;
+  final bool verticalOrderValid;
+  final List<DiaphragmStoreyLink> regionLinksBelow;
 
   /// Ratio of stiffness to the storey above (soft storey check).
   final double? stiffnessRatioToAbove;
@@ -152,6 +160,7 @@ class StoreySeismicCheck {
     this.hasLateralStiffness = true,
     this.connectionReviewNames = const [],
     this.slabTopology = const SlabTopology(SlabTopologyIssue.none, 1),
+    this.invalidMassLoads = false,
     this.diaphragmRegions = const [],
     this.centerOfMassCad,
     this.centerOfRigidityCad,
@@ -178,11 +187,18 @@ class StoreySeismicCheck {
     required this.floatingColumnIds,
     required this.floatingColumnNames,
     required this.discontinuousWallIds,
+    this.wallVerticalChecks = const [],
     this.disconnectedWallIds = const [],
     this.disconnectedWallNames = const [],
     this.disconnectedColumnIds = const [],
     this.disconnectedColumnNames = const [],
     required this.lateralStiffnessIndex,
+    this.stiffnessX = 0,
+    this.stiffnessY = 0,
+    this.stiffnessRatioXToAbove,
+    this.stiffnessRatioYToAbove,
+    this.verticalOrderValid = true,
+    this.regionLinksBelow = const [],
     this.stiffnessRatioToAbove,
     required this.isSoftStorey,
     required this.riskLevel,
@@ -204,13 +220,20 @@ class StoreySeismicCheck {
   }
 
   String localizedRecommendation(AppLocalizations l10n) {
+    if (invalidMassLoads) return l10n.seismicInvalidMassLoads;
     switch (slabTopology.issue) {
       case SlabTopologyIssue.invalidGeometry:
         return l10n.seismicInvalidSlabGeometry;
       case SlabTopologyIssue.overlappingSlabs:
         return l10n.seismicOverlappingSlabs;
       case SlabTopologyIssue.separateRegions:
-        return l10n.seismicSeparateRegions(slabTopology.regionCount);
+        return [
+          l10n.seismicSeparateRegions(slabTopology.regionCount),
+          if (disconnectedColumnNames.isNotEmpty)
+            l10n.seismicRecDisconnectedCols(disconnectedColumnNames.join(', ')),
+          if (disconnectedWallNames.isNotEmpty)
+            l10n.seismicRecDisconnectedWalls(disconnectedWallNames.join(', ')),
+        ].join(' ');
       case SlabTopologyIssue.computationLimit:
         return l10n.seismicSlabGeometryLimit;
       case SlabTopologyIssue.none:
@@ -388,9 +411,13 @@ class DiaphragmRegionCheck {
   final List<String> wallIds;
   final List<String> ambiguousSupportNames;
   final StoreySeismicCheck? check;
-  const DiaphragmRegionCheck({required this.slabIndices,
-    required this.columnIds, required this.wallIds,
-    required this.ambiguousSupportNames, this.check});
+  const DiaphragmRegionCheck({
+    required this.slabIndices,
+    required this.columnIds,
+    required this.wallIds,
+    required this.ambiguousSupportNames,
+    this.check,
+  });
 }
 
 /// Preliminary seismic and structural layout report.

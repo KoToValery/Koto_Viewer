@@ -4713,6 +4713,121 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Isolated preliminary region models with existing slab weights and project surface loads. Coupling, beams between regions and vertical continuity are not evaluated.'**
   String get seismicRegionScope;
+
+  /// No description provided for @seismicLoadsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Seismic mass loads'**
+  String get seismicLoadsTitle;
+
+  /// No description provided for @seismicLoadsScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Preliminary seismic model only. Self-weight 25 × h is added separately; exclude it from the permanent load. When disabled: project G/Q and participation 0.3. Participation is specified by the engineer, not selected automatically from Eurocodes. Vertical and cantilever checks retain their own loads.'**
+  String get seismicLoadsScope;
+
+  /// No description provided for @seismicLoadPermanent.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional permanent load G'**
+  String get seismicLoadPermanent;
+
+  /// No description provided for @seismicLoadVariable.
+  ///
+  /// In en, this message translates to:
+  /// **'Imposed load Q'**
+  String get seismicLoadVariable;
+
+  /// No description provided for @seismicLoadParticipation.
+  ///
+  /// In en, this message translates to:
+  /// **'Q participation in mass (0–1)'**
+  String get seismicLoadParticipation;
+
+  /// No description provided for @seismicLoadOverride.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate values for this slab'**
+  String get seismicLoadOverride;
+
+  /// No description provided for @seismicLoadSlab.
+  ///
+  /// In en, this message translates to:
+  /// **'Slab {index}'**
+  String seismicLoadSlab(int index);
+
+  /// No description provided for @seismicInvalidMassLoads.
+  ///
+  /// In en, this message translates to:
+  /// **'Not evaluated: check loads and thickness. G and Q must be finite nonnegative values, Q participation must be between 0 and 1, and thickness must be positive.'**
+  String get seismicInvalidMassLoads;
+
+  /// No description provided for @seismicWallContinuityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall vertical continuity'**
+  String get seismicWallContinuityTitle;
+
+  /// No description provided for @seismicWallContinuityScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Footprint overlap with parallel walls on the preceding project storey. Below 100% requires review for offsets, shortening or interruption. This is not a capacity check; transfer onto beams/columns and foundations are not evaluated.'**
+  String get seismicWallContinuityScope;
+
+  /// No description provided for @seismicWallContinuityItem.
+  ///
+  /// In en, this message translates to:
+  /// **'{storey} · {wall}: overlap {coverage}'**
+  String seismicWallContinuityItem(String storey, String wall, String coverage);
+
+  /// No description provided for @seismicElevationAmbiguous.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical checks are not evaluated: duplicate or invalid elevations. Review storey levels.'**
+  String get seismicElevationAmbiguous;
+
+  /// No description provided for @seismicDirectionalScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Preliminary stiffness ratio to the upper storey along X/Y. Below 0.70 flags review, not a code verdict. Only uniquely matched single regions are compared.'**
+  String get seismicDirectionalScope;
+
+  /// No description provided for @seismicRegionTrackingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Regions across storeys'**
+  String get seismicRegionTrackingTitle;
+
+  /// No description provided for @seismicLinkUnique.
+  ///
+  /// In en, this message translates to:
+  /// **'unique overlap'**
+  String get seismicLinkUnique;
+
+  /// No description provided for @seismicLinkBranching.
+  ///
+  /// In en, this message translates to:
+  /// **'split/merge — review'**
+  String get seismicLinkBranching;
+
+  /// No description provided for @seismicLinkAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'no overlap — review'**
+  String get seismicLinkAbsent;
+
+  /// No description provided for @seismicRegionTrackingItem.
+  ///
+  /// In en, this message translates to:
+  /// **'{storey}, region {region} → {lower}, regions {matches}: {coverage}; {status}. Geometric link, not a verified load path.'**
+  String seismicRegionTrackingItem(
+    String storey,
+    int region,
+    String lower,
+    String matches,
+    String coverage,
+    String status,
+  );
 }
 
 class _AppLocalizationsDelegate
