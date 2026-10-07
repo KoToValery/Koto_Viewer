@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/seismic_analysis_calculator.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/diaphragm_storey_links.dart';
