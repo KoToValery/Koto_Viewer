@@ -420,8 +420,8 @@ void main() {
         beamZValues.add(tri.v1.z);
         beamZValues.add(tri.v2.z);
       }
-      expect(beamZValues.contains(280.0), isTrue); // ceiling level
-      expect(beamZValues.contains(230.0), isTrue); // beam bottom level: 50 cm below ceiling
+      expect(beamZValues.any((z) => (z - 275).abs() < 1e-8), isTrue); // ceiling level
+      expect(beamZValues.any((z) => (z - 225).abs() < 1e-8), isTrue); // beam bottom level: 50 cm below ceiling
       // Check that it didn't plunge into deep negative distance
       expect(beamZValues.any((z) => z < 0), isFalse);
     });

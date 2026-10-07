@@ -161,16 +161,10 @@ class Structural2dPainter extends CustomPainter {
       _drawGhostStorey(canvas, ghostStorey!);
     }
 
-    // 2. Draw Active Storey Slabs or Overhead Slabs (from level +2.80)
+    // 2. The active storey owns its ceiling slabs; picking uses the same list.
     if (currentStorey.slabs.isNotEmpty) {
       for (int i = 0; i < currentStorey.slabs.length; i++) {
         _drawSlab(canvas, currentStorey.slabs[i], slabIndex: i, isGhost: false);
-      }
-    } else if (currentStorey.elevation.abs() < 1e-4 &&
-        overheadStorey != null &&
-        overheadStorey!.slabs.isNotEmpty) {
-      for (int i = 0; i < overheadStorey!.slabs.length; i++) {
-        _drawSlab(canvas, overheadStorey!.slabs[i], slabIndex: i, isGhost: false, isOverheadFromAbove: true);
       }
     }
 
@@ -431,15 +425,7 @@ class Structural2dPainter extends CustomPainter {
     if (isGhost || slab.polygon.length < 3) return;
 
     final centroidScene = cadToScene(slab.centroid);
-    final double overheadElev;
-    if (isOverheadFromAbove && overheadStorey != null) {
-      overheadElev = overheadStorey!.elevation -
-          (slab.floorFinish ?? overheadStorey!.floorFinishThickness);
-    } else {
-      overheadElev = currentStorey.elevation +
-          currentStorey.height -
-          (slab.floorFinish ?? currentStorey.floorFinishThickness);
-    }
+    final overheadElev = currentStorey.structuralElevationFor(slab);
     final int thickCm = (slab.thickness * 100).round();
 
     final sign = overheadElev > 0 ? '+' : (overheadElev == 0 ? '±' : '');
@@ -451,7 +437,7 @@ class Structural2dPainter extends CustomPainter {
 
     // Concise architectural section level marker (only elevation and thickness)
     final elevSpan = TextSpan(
-      text: elevStr,
+      text: '↑ $elevStr',
       style: const TextStyle(
         color: Colors.white,
         fontSize: 11.5,
@@ -697,26 +683,22 @@ class Structural2dPainter extends CustomPainter {
       isOverheadFromAbove: isOverheadFromAbove,
     );
 
-    // If selected or slab tool is active, draw corner vertex handles
-    if (isSelected || activeTool == StructuralDrawTool.slab) {
+    // Draw corner vertex handles and midpoint edge grips ONLY when this slab is selected
+    if (isSelected && !isGhost) {
       _drawSlabVertexHandles(canvas, polygon);
-    }
-
-    // Draw midpoint edge grips for slabs on active storey
-    if (!isGhost) {
       _drawSlabEdgeGrips(canvas, slab);
     }
   }
 
   void _drawSlabVertexHandles(Canvas canvas, List<Offset> polygon) {
-    final double radius = 6.0 / zoomScale;
+    final double radius = 3.8 / zoomScale;
     final handleFill = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
     final handleStroke = Paint()
       ..color = const Color(0xFF7C4DFF)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0 / zoomScale;
+      ..strokeWidth = 1.5 / zoomScale;
 
     final candidateFill = Paint()
       ..color = const Color(0x55F44336)
@@ -724,14 +706,34 @@ class Structural2dPainter extends CustomPainter {
     final candidateStroke = Paint()
       ..color = const Color(0xFFE53935)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5 / zoomScale;
+      ..strokeWidth = 2.0 / zoomScale;
+
+    // Magnetic link line between dragged vertex and candidate
+    if (mergeCandidateVertexIndex != null &&
+        draggingSlabVertexIndex != null &&
+        mergeCandidateVertexIndex! < polygon.length &&
+        draggingSlabVertexIndex! < polygon.length) {
+      final sCand = cadToScene(polygon[mergeCandidateVertexIndex!]);
+      final sDrag = cadToScene(polygon[draggingSlabVertexIndex!]);
+      final linkPaint = Paint()
+        ..color = const Color(0xFFFF5252)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4 / zoomScale;
+      _drawDashDotLine(canvas, sDrag, sCand, linkPaint);
+
+      final outerRingPaint = Paint()
+        ..color = const Color(0x88FF1744)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2 / zoomScale;
+      canvas.drawCircle(sCand, radius * 1.8, outerRingPaint);
+    }
 
     for (int i = 0; i < polygon.length; i++) {
       final scenePt = cadToScene(polygon[i]);
       if (mergeCandidateVertexIndex == i) {
         // Highlight merge candidate with glowing red target
-        canvas.drawCircle(scenePt, radius * 1.8, candidateFill);
-        canvas.drawCircle(scenePt, radius * 1.8, candidateStroke);
+        canvas.drawCircle(scenePt, radius * 1.6, candidateFill);
+        canvas.drawCircle(scenePt, radius * 1.6, candidateStroke);
       }
 
       if (draggingSlabVertexIndex == i) {
@@ -739,8 +741,8 @@ class Structural2dPainter extends CustomPainter {
         final activeFill = Paint()
           ..color = const Color(0xFFFFD600)
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(scenePt, radius * 1.3, activeFill);
-        canvas.drawCircle(scenePt, radius * 1.3, handleStroke);
+        canvas.drawCircle(scenePt, radius * 1.2, activeFill);
+        canvas.drawCircle(scenePt, radius * 1.2, handleStroke);
       } else {
         canvas.drawCircle(scenePt, radius, handleFill);
         canvas.drawCircle(scenePt, radius, handleStroke);
@@ -752,14 +754,14 @@ class Structural2dPainter extends CustomPainter {
     final grips = slab.edgeGrips;
     if (grips.isEmpty) return;
 
-    final double radius = 4.5 / zoomScale;
+    final double radius = 3.0 / zoomScale;
     final gripFill = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.fill;
     final gripBorder = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2 / zoomScale;
+      ..strokeWidth = 1.0 / zoomScale;
 
     for (final grip in grips) {
       if (extrudingGrip != null &&
@@ -973,6 +975,25 @@ class Structural2dPainter extends CustomPainter {
       ..color = const Color(0xFFE53935)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5 / zoomScale;
+
+    if (mergeCandidateOpeningVertexIndex != null &&
+        draggingOpeningVertexIndex != null &&
+        mergeCandidateOpeningVertexIndex! < polygon.length &&
+        draggingOpeningVertexIndex! < polygon.length) {
+      final sCand = cadToScene(polygon[mergeCandidateOpeningVertexIndex!]);
+      final sDrag = cadToScene(polygon[draggingOpeningVertexIndex!]);
+      final linkPaint = Paint()
+        ..color = const Color(0xFFFF5252)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6 / zoomScale;
+      _drawDashDotLine(canvas, sDrag, sCand, linkPaint);
+
+      final outerRingPaint = Paint()
+        ..color = const Color(0x88FF1744)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5 / zoomScale;
+      canvas.drawCircle(sCand, radius * 2.4, outerRingPaint);
+    }
 
     for (int i = 0; i < polygon.length; i++) {
       final scenePt = cadToScene(polygon[i]);

@@ -248,6 +248,7 @@ DxfDocument _analyse(DxfDocument doc) {
     doc.layers[projectionLayer] = DxfLayer(
       name: projectionLayer,
       colorIndex: 4,
+      isVisible: false,
     );
   }
 
@@ -337,10 +338,10 @@ DxfDocument _analyse(DxfDocument doc) {
   );
   doc.layers[slabs] = DxfLayer(name: slabs, colorIndex: 7);
   if (envelope.contours.isNotEmpty) {
-    doc.layers[candidates] = DxfLayer(name: candidates, colorIndex: 30);
+    doc.layers[candidates] = DxfLayer(name: candidates, colorIndex: 30, isVisible: false);
   }
   if (envelope.assumedGaps.isNotEmpty) {
-    doc.layers[assumed] = DxfLayer(name: assumed, colorIndex: 1);
+    doc.layers[assumed] = DxfLayer(name: assumed, colorIndex: 1, isVisible: false);
   }
   doc.entities.addAll(additions);
   final model = doc.layoutEntities['Model'];
@@ -360,9 +361,6 @@ DxfDocument _analyse(DxfDocument doc) {
     'layers': [
       walls,
       slabs,
-      if (envelope.contours.isNotEmpty) candidates,
-      if (envelope.assumedGaps.isNotEmpty) assumed,
-      if (projections.isNotEmpty) projectionLayer,
     ],
     'slabEnvelope': envelope.toJson(),
     'slabProjections': projections.map((p) => p.toJson()).toList(),

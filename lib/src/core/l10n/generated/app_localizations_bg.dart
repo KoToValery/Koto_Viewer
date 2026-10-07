@@ -2808,4 +2808,122 @@ class AppLocalizationsBg extends AppLocalizations {
   ) {
     return '$storey, област $region → $lower, области $matches: $coverage; $status. Геометрична връзка, не доказан път на усилията.';
   }
+
+  @override
+  String get ceilingSlabTitle => 'Плоча над етажа';
+
+  @override
+  String ceilingSlabContext(String level) {
+    return 'Архитектурна основа $level · изглед нагоре';
+  }
+
+  @override
+  String get ceilingExplicitLevel => 'Задай горна конструктивна кота';
+
+  @override
+  String get ceilingConcreteTop => 'Горен ръб бетон';
+
+  @override
+  String ceilingSlabLevels(String top, String bottom) {
+    return 'Горен ръб $top m · долен ръб $bottom m';
+  }
+
+  @override
+  String get ceilingSlabLevelHint =>
+      'Без зададена кота: основа + височина − настилка. Зададената кота е за бетон и настилка не се изважда повторно. Промяната на дебелината запазва горния ръб.';
+
+  @override
+  String get ceilingSlabInvalid =>
+      'Въведете крайни числа, положителна дебелина и долен ръб над котата на основата.';
+
+  @override
+  String get slabEdgeOffset => 'Отместване на ръб';
+
+  @override
+  String get slabEdgeNumber => 'Ръб';
+
+  @override
+  String get slabEdgeDistance => 'Отместване (cm)';
+
+  @override
+  String get slabEdgeHint =>
+      'Положително: навън. Отрицателно: навътре. Общият ръб се мести и в съседната плоча.';
+
+  @override
+  String get slabEdgeInvalid =>
+      'Корекцията създава невалиден контур или засяга частично общ ръб. Разделете общата граница на съвпадащи ръбове.';
+
+  @override
+  String get cleanSlabContour => 'Почисти контура';
+
+  @override
+  String get cleanSlabContourTooltip =>
+      'Премахни излишни точки и поправи артефакти';
+
+  @override
+  String slabContourCleaned(int count) {
+    return 'Контурът на плочата е почистен (премахнати $count излишни точки)';
+  }
+
+  @override
+  String get slabContourAlreadyClean =>
+      'Контурът на плочата вече е чист и оптимален';
+
+  @override
+  String get openingNoSlab => 'Първо създайте плочата над етажа.';
+
+  @override
+  String get openingInvalidPlacement =>
+      'Отворът трябва да е изцяло в една плоча, без да докосва контура или друг отвор.';
+
+  @override
+  String get openingAmbiguousOwner =>
+      'Повече от една плоча обхваща отвора. Коригирайте застъпването на плочите.';
+
+  @override
+  String get openingMissing => 'Избраният отвор вече не съществува.';
+
+  @override
+  String get schemeReadinessTitle => 'Проверка преди генериране';
+
+  @override
+  String get schemeGeometryReady =>
+      'Плочите и стълбището са геометрично готови.';
+
+  @override
+  String get schemeReadinessHint =>
+      'Това проверява входните обекти. Не генерира колони и шайби и не е конструктивна оценка.';
+
+  @override
+  String get schemeEditing => 'Завършете текущата редакция на плочата.';
+
+  @override
+  String get schemeMissingStairs =>
+      'Поставете отвор от тип „Стълбище“ в покриващата плоча. Асансьорът е допълнителен.';
+
+  @override
+  String get schemeAmbiguousLevels =>
+      'Етажът или плочата нямат еднозначна принадлежност. Проверете повторени коти и идентификатори.';
+
+  @override
+  String get schemeInvalidLevel =>
+      'Проверете котата и дебелината на покриващата плоча: долният бетон трябва да е над основата на етажа.';
+
+  @override
+  String get schemeInvalidGeometry =>
+      'Има невалидна плоча или отвор. Проверете самопресичанията, ръбовете и застъпването на отворите.';
+
+  @override
+  String get schemeOverlappingSlabs =>
+      'Плочите се застъпват. Коригирайте контурите преди генериране.';
+
+  @override
+  String get schemeComputationLimit =>
+      'Контурите са твърде сложни за тази проверка. Опростете ги.';
+
+  @override
+  String get schemeCeilingLabel => 'Плоча';
+
+  @override
+  String get schemeRegionsLabel => 'Отделни области';
 }

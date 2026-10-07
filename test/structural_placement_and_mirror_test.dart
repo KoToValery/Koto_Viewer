@@ -940,7 +940,7 @@ void main() {
     );
 
     // Architectural elevation 0.00 with 5cm screed gives structural elevation -0.05m
-    expect(storey0.structuralElevationFor(slabStandard), closeTo(-0.05, 1e-4));
+    expect(storey0.structuralElevationFor(slabStandard), closeTo(2.75, 1e-4));
 
     const storey1 = StoreyLevel(
       id: 'storey_1',
@@ -951,11 +951,11 @@ void main() {
     );
 
     // Architectural elevation 2.80 gives structural elevation 2.75m
-    expect(storey1.structuralElevationFor(slabStandard), closeTo(2.75, 1e-4));
+    expect(storey1.structuralElevationFor(slabStandard), closeTo(5.55, 1e-4));
 
     // Custom slab finish (e.g. 8cm / 0.08m thick finish for terraces/bathrooms)
     final slabCustomFinish = slabStandard.copyWith(floorFinish: 0.08);
-    expect(storey1.structuralElevationFor(slabCustomFinish), closeTo(2.72, 1e-4));
+    expect(storey1.structuralElevationFor(slabCustomFinish), closeTo(5.52, 1e-4));
   });
 
   test('StoreyLevel cloneToNextLevel preserves floorFinishThickness', () {

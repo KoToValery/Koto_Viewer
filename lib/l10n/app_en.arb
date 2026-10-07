@@ -2268,5 +2268,67 @@
   "seismicLinkBranching": "split/merge — review",
   "seismicLinkAbsent": "no overlap — review",
   "seismicRegionTrackingItem": "{storey}, region {region} → {lower}, regions {matches}: {coverage}; {status}. Geometric link, not a verified load path.",
-  "@seismicRegionTrackingItem": {"placeholders":{"storey":{"type":"String"},"region":{"type":"int"},"lower":{"type":"String"},"matches":{"type":"String"},"coverage":{"type":"String"},"status":{"type":"String"}}}
+  "@seismicRegionTrackingItem": {"placeholders":{"storey":{"type":"String"},"region":{"type":"int"},"lower":{"type":"String"},"matches":{"type":"String"},"coverage":{"type":"String"},"status":{"type":"String"}}},
+  "ceilingSlabTitle": "Slab above the storey",
+  "ceilingSlabContext": "Architectural underlay {level} · looking up",
+  "@ceilingSlabContext": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "ceilingExplicitLevel": "Set concrete top elevation",
+  "ceilingConcreteTop": "Top of concrete",
+  "ceilingSlabLevels": "Top {top} m · soffit {bottom} m",
+  "@ceilingSlabLevels": {
+    "placeholders": {
+      "top": {
+        "type": "String"
+      },
+      "bottom": {
+        "type": "String"
+      }
+    }
+  },
+  "ceilingSlabLevelHint": "Without an explicit level: base + storey height − finish. An explicit level is concrete; finish is not subtracted again. Thickness changes retain the top.",
+  "ceilingSlabInvalid": "Enter finite values, positive thickness and a soffit above the base elevation.",
+
+  "slabEdgeOffset": "Offset edge",
+  "slabEdgeNumber": "Edge",
+  "slabEdgeDistance": "Offset (cm)",
+  "slabEdgeHint": "Positive: outward. Negative: inward. A shared edge also moves in the adjacent slab.",
+  "slabEdgeInvalid": "This correction creates an invalid outline or affects a partially shared edge. Split the shared boundary into matching edges.",
+
+  "cleanSlabContour": "Clean contour",
+  "@cleanSlabContour": { "description": "Button to clean redundant collinear points in slab" },
+  "cleanSlabContourTooltip": "Remove redundant collinear points and repair artifacts",
+  "@cleanSlabContourTooltip": { "description": "Tooltip for cleaning slab contour" },
+  "slabContourCleaned": "Slab contour cleaned ({count} redundant points removed)",
+  "@slabContourCleaned": {
+    "description": "Message after cleaning slab contour",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "slabContourAlreadyClean": "Slab contour is already clean and optimal",
+  "@slabContourAlreadyClean": { "description": "Message when slab contour has no redundant vertices" },
+
+  "openingNoSlab": "Create the ceiling slab first.",
+  "openingInvalidPlacement": "The entire opening must lie inside one slab without touching its outline or another opening.",
+  "openingAmbiguousOwner": "More than one slab contains this opening. Resolve the slab overlap.",
+  "openingMissing": "The selected opening no longer exists.",
+  "schemeReadinessTitle": "Check before generation",
+  "schemeGeometryReady": "Slabs and staircase are geometrically ready.",
+  "schemeReadinessHint": "This checks the input objects. It does not generate columns or shear walls and is not a structural assessment.",
+  "schemeEditing": "Finish the current slab edit.",
+  "schemeMissingStairs": "Place a Staircase opening in the ceiling slab. An elevator is optional.",
+  "schemeAmbiguousLevels": "The storey or slab ownership is ambiguous. Check duplicate elevations and identifiers.",
+  "schemeInvalidLevel": "Check the ceiling elevation and thickness: its soffit must be above the working storey base.",
+  "schemeInvalidGeometry": "A slab or opening is invalid. Check self-intersections, boundaries and overlapping openings.",
+  "schemeOverlappingSlabs": "Slabs overlap. Correct their outlines before generation.",
+  "schemeComputationLimit": "These outlines exceed the check's complexity limit. Simplify them.",
+  "schemeCeilingLabel": "Slab",
+  "schemeRegionsLabel": "Separate regions"
+
 }

@@ -34,7 +34,6 @@ class ElementPaletteBar extends StatelessWidget {
   final bool hasSlabStartCorner;
   final int slabPointCount;
   final VoidCallback onCloseSlab;
-  final VoidCallback? onGenerateSlabs;
   final VoidCallback onUndoPoint;
   final VoidCallback onClearSlab;
   final VoidCallback onRotateColumn;
@@ -94,7 +93,6 @@ class ElementPaletteBar extends StatelessWidget {
     this.hasSlabStartCorner = false,
     required this.slabPointCount,
     required this.onCloseSlab,
-    this.onGenerateSlabs,
     required this.onUndoPoint,
     required this.onClearSlab,
     required this.onRotateColumn,
@@ -757,14 +755,6 @@ class ElementPaletteBar extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          if (onGenerateSlabs != null) ...[
-            ActionChip(
-              avatar: const Icon(Icons.auto_awesome, size: 16),
-              label: Text(context.l10n.bimGenerateSlabs),
-              onPressed: onGenerateSlabs,
-            ),
-            const SizedBox(width: 8),
-          ],
           for (final t in thicknesses)
             Padding(
               padding: const EdgeInsets.only(right: 4),

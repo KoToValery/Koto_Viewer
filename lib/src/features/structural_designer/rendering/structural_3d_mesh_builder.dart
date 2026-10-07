@@ -28,7 +28,7 @@ class Structural3dMeshBuilder {
           highlightStoreyIndex == null || highlightStoreyIndex == sIdx;
 
       final double zBase = storey.elevation * cadUnitsPerMeter;
-      final double zTop = (storey.elevation + storey.height) * cadUnitsPerMeter;
+      final double zTop = (storey.elevation + storey.height - storey.floorFinishThickness) * cadUnitsPerMeter;
       final List<Triangle3D> storeyTriangles = [];
 
       // 0. Extrude Ground Foundations (Strip footings or Mat) at elevation 0.00 if no basement
@@ -173,8 +173,8 @@ class Structural3dMeshBuilder {
             ? Color(slab.colorValue!)
             : slab3dPalette[slabIdx % slab3dPalette.length];
 
-        final double slabZTop = zTop;
-        final double slabZBottom = zTop - slab.thickness * cadUnitsPerMeter;
+        final double slabZTop = storey.structuralElevationFor(slab) * cadUnitsPerMeter;
+        final double slabZBottom = storey.slabSoffitElevationFor(slab) * cadUnitsPerMeter;
 
         final slabTris = _extrudePolygon(
           slab.polygon,

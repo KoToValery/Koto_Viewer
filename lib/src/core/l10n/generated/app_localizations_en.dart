@@ -2798,4 +2798,122 @@ class AppLocalizationsEn extends AppLocalizations {
   ) {
     return '$storey, region $region → $lower, regions $matches: $coverage; $status. Geometric link, not a verified load path.';
   }
+
+  @override
+  String get ceilingSlabTitle => 'Slab above the storey';
+
+  @override
+  String ceilingSlabContext(String level) {
+    return 'Architectural underlay $level · looking up';
+  }
+
+  @override
+  String get ceilingExplicitLevel => 'Set concrete top elevation';
+
+  @override
+  String get ceilingConcreteTop => 'Top of concrete';
+
+  @override
+  String ceilingSlabLevels(String top, String bottom) {
+    return 'Top $top m · soffit $bottom m';
+  }
+
+  @override
+  String get ceilingSlabLevelHint =>
+      'Without an explicit level: base + storey height − finish. An explicit level is concrete; finish is not subtracted again. Thickness changes retain the top.';
+
+  @override
+  String get ceilingSlabInvalid =>
+      'Enter finite values, positive thickness and a soffit above the base elevation.';
+
+  @override
+  String get slabEdgeOffset => 'Offset edge';
+
+  @override
+  String get slabEdgeNumber => 'Edge';
+
+  @override
+  String get slabEdgeDistance => 'Offset (cm)';
+
+  @override
+  String get slabEdgeHint =>
+      'Positive: outward. Negative: inward. A shared edge also moves in the adjacent slab.';
+
+  @override
+  String get slabEdgeInvalid =>
+      'This correction creates an invalid outline or affects a partially shared edge. Split the shared boundary into matching edges.';
+
+  @override
+  String get cleanSlabContour => 'Clean contour';
+
+  @override
+  String get cleanSlabContourTooltip =>
+      'Remove redundant collinear points and repair artifacts';
+
+  @override
+  String slabContourCleaned(int count) {
+    return 'Slab contour cleaned ($count redundant points removed)';
+  }
+
+  @override
+  String get slabContourAlreadyClean =>
+      'Slab contour is already clean and optimal';
+
+  @override
+  String get openingNoSlab => 'Create the ceiling slab first.';
+
+  @override
+  String get openingInvalidPlacement =>
+      'The entire opening must lie inside one slab without touching its outline or another opening.';
+
+  @override
+  String get openingAmbiguousOwner =>
+      'More than one slab contains this opening. Resolve the slab overlap.';
+
+  @override
+  String get openingMissing => 'The selected opening no longer exists.';
+
+  @override
+  String get schemeReadinessTitle => 'Check before generation';
+
+  @override
+  String get schemeGeometryReady =>
+      'Slabs and staircase are geometrically ready.';
+
+  @override
+  String get schemeReadinessHint =>
+      'This checks the input objects. It does not generate columns or shear walls and is not a structural assessment.';
+
+  @override
+  String get schemeEditing => 'Finish the current slab edit.';
+
+  @override
+  String get schemeMissingStairs =>
+      'Place a Staircase opening in the ceiling slab. An elevator is optional.';
+
+  @override
+  String get schemeAmbiguousLevels =>
+      'The storey or slab ownership is ambiguous. Check duplicate elevations and identifiers.';
+
+  @override
+  String get schemeInvalidLevel =>
+      'Check the ceiling elevation and thickness: its soffit must be above the working storey base.';
+
+  @override
+  String get schemeInvalidGeometry =>
+      'A slab or opening is invalid. Check self-intersections, boundaries and overlapping openings.';
+
+  @override
+  String get schemeOverlappingSlabs =>
+      'Slabs overlap. Correct their outlines before generation.';
+
+  @override
+  String get schemeComputationLimit =>
+      'These outlines exceed the check\'s complexity limit. Simplify them.';
+
+  @override
+  String get schemeCeilingLabel => 'Slab';
+
+  @override
+  String get schemeRegionsLabel => 'Separate regions';
 }

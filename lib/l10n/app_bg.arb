@@ -802,5 +802,63 @@
   "seismicLinkBranching": "разделяне/сливане — преглед",
   "seismicLinkAbsent": "без застъпване — преглед",
   "seismicRegionTrackingItem": "{storey}, област {region} → {lower}, области {matches}: {coverage}; {status}. Геометрична връзка, не доказан път на усилията.",
-  "@seismicRegionTrackingItem": {"placeholders":{"storey":{"type":"String"},"region":{"type":"int"},"lower":{"type":"String"},"matches":{"type":"String"},"coverage":{"type":"String"},"status":{"type":"String"}}}
+  "@seismicRegionTrackingItem": {"placeholders":{"storey":{"type":"String"},"region":{"type":"int"},"lower":{"type":"String"},"matches":{"type":"String"},"coverage":{"type":"String"},"status":{"type":"String"}}},
+  "ceilingSlabTitle": "Плоча над етажа",
+  "ceilingSlabContext": "Архитектурна основа {level} · изглед нагоре",
+  "@ceilingSlabContext": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "ceilingExplicitLevel": "Задай горна конструктивна кота",
+  "ceilingConcreteTop": "Горен ръб бетон",
+  "ceilingSlabLevels": "Горен ръб {top} m · долен ръб {bottom} m",
+  "@ceilingSlabLevels": {
+    "placeholders": {
+      "top": {
+        "type": "String"
+      },
+      "bottom": {
+        "type": "String"
+      }
+    }
+  },
+  "ceilingSlabLevelHint": "Без зададена кота: основа + височина − настилка. Зададената кота е за бетон и настилка не се изважда повторно. Промяната на дебелината запазва горния ръб.",
+  "ceilingSlabInvalid": "Въведете крайни числа, положителна дебелина и долен ръб над котата на основата.",
+
+  "slabEdgeOffset": "Отместване на ръб",
+  "slabEdgeNumber": "Ръб",
+  "slabEdgeDistance": "Отместване (cm)",
+  "slabEdgeHint": "Положително: навън. Отрицателно: навътре. Общият ръб се мести и в съседната плоча.",
+  "slabEdgeInvalid": "Корекцията създава невалиден контур или засяга частично общ ръб. Разделете общата граница на съвпадащи ръбове.",
+
+  "cleanSlabContour": "Почисти контура",
+  "cleanSlabContourTooltip": "Премахни излишни точки и поправи артефакти",
+  "slabContourCleaned": "Контурът на плочата е почистен (премахнати {count} излишни точки)",
+  "@slabContourCleaned": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "slabContourAlreadyClean": "Контурът на плочата вече е чист и оптимален",
+
+  "openingNoSlab": "Първо създайте плочата над етажа.",
+  "openingInvalidPlacement": "Отворът трябва да е изцяло в една плоча, без да докосва контура или друг отвор.",
+  "openingAmbiguousOwner": "Повече от една плоча обхваща отвора. Коригирайте застъпването на плочите.",
+  "openingMissing": "Избраният отвор вече не съществува.",
+  "schemeReadinessTitle": "Проверка преди генериране",
+  "schemeGeometryReady": "Плочите и стълбището са геометрично готови.",
+  "schemeReadinessHint": "Това проверява входните обекти. Не генерира колони и шайби и не е конструктивна оценка.",
+  "schemeEditing": "Завършете текущата редакция на плочата.",
+  "schemeMissingStairs": "Поставете отвор от тип „Стълбище“ в покриващата плоча. Асансьорът е допълнителен.",
+  "schemeAmbiguousLevels": "Етажът или плочата нямат еднозначна принадлежност. Проверете повторени коти и идентификатори.",
+  "schemeInvalidLevel": "Проверете котата и дебелината на покриващата плоча: долният бетон трябва да е над основата на етажа.",
+  "schemeInvalidGeometry": "Има невалидна плоча или отвор. Проверете самопресичанията, ръбовете и застъпването на отворите.",
+  "schemeOverlappingSlabs": "Плочите се застъпват. Коригирайте контурите преди генериране.",
+  "schemeComputationLimit": "Контурите са твърде сложни за тази проверка. Опростете ги.",
+  "schemeCeilingLabel": "Плоча",
+  "schemeRegionsLabel": "Отделни области"
+
 }

@@ -4828,6 +4828,198 @@ abstract class AppLocalizations {
     String coverage,
     String status,
   );
+
+  /// No description provided for @ceilingSlabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Slab above the storey'**
+  String get ceilingSlabTitle;
+
+  /// No description provided for @ceilingSlabContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Architectural underlay {level} · looking up'**
+  String ceilingSlabContext(String level);
+
+  /// No description provided for @ceilingExplicitLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Set concrete top elevation'**
+  String get ceilingExplicitLevel;
+
+  /// No description provided for @ceilingConcreteTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top of concrete'**
+  String get ceilingConcreteTop;
+
+  /// No description provided for @ceilingSlabLevels.
+  ///
+  /// In en, this message translates to:
+  /// **'Top {top} m · soffit {bottom} m'**
+  String ceilingSlabLevels(String top, String bottom);
+
+  /// No description provided for @ceilingSlabLevelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Without an explicit level: base + storey height − finish. An explicit level is concrete; finish is not subtracted again. Thickness changes retain the top.'**
+  String get ceilingSlabLevelHint;
+
+  /// No description provided for @ceilingSlabInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter finite values, positive thickness and a soffit above the base elevation.'**
+  String get ceilingSlabInvalid;
+
+  /// No description provided for @slabEdgeOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset edge'**
+  String get slabEdgeOffset;
+
+  /// No description provided for @slabEdgeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Edge'**
+  String get slabEdgeNumber;
+
+  /// No description provided for @slabEdgeDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset (cm)'**
+  String get slabEdgeDistance;
+
+  /// No description provided for @slabEdgeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Positive: outward. Negative: inward. A shared edge also moves in the adjacent slab.'**
+  String get slabEdgeHint;
+
+  /// No description provided for @slabEdgeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This correction creates an invalid outline or affects a partially shared edge. Split the shared boundary into matching edges.'**
+  String get slabEdgeInvalid;
+
+  /// Button to clean redundant collinear points in slab
+  ///
+  /// In en, this message translates to:
+  /// **'Clean contour'**
+  String get cleanSlabContour;
+
+  /// Tooltip for cleaning slab contour
+  ///
+  /// In en, this message translates to:
+  /// **'Remove redundant collinear points and repair artifacts'**
+  String get cleanSlabContourTooltip;
+
+  /// Message after cleaning slab contour
+  ///
+  /// In en, this message translates to:
+  /// **'Slab contour cleaned ({count} redundant points removed)'**
+  String slabContourCleaned(int count);
+
+  /// Message when slab contour has no redundant vertices
+  ///
+  /// In en, this message translates to:
+  /// **'Slab contour is already clean and optimal'**
+  String get slabContourAlreadyClean;
+
+  /// No description provided for @openingNoSlab.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the ceiling slab first.'**
+  String get openingNoSlab;
+
+  /// No description provided for @openingInvalidPlacement.
+  ///
+  /// In en, this message translates to:
+  /// **'The entire opening must lie inside one slab without touching its outline or another opening.'**
+  String get openingInvalidPlacement;
+
+  /// No description provided for @openingAmbiguousOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'More than one slab contains this opening. Resolve the slab overlap.'**
+  String get openingAmbiguousOwner;
+
+  /// No description provided for @openingMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected opening no longer exists.'**
+  String get openingMissing;
+
+  /// No description provided for @schemeReadinessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check before generation'**
+  String get schemeReadinessTitle;
+
+  /// No description provided for @schemeGeometryReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Slabs and staircase are geometrically ready.'**
+  String get schemeGeometryReady;
+
+  /// No description provided for @schemeReadinessHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This checks the input objects. It does not generate columns or shear walls and is not a structural assessment.'**
+  String get schemeReadinessHint;
+
+  /// No description provided for @schemeEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish the current slab edit.'**
+  String get schemeEditing;
+
+  /// No description provided for @schemeMissingStairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Place a Staircase opening in the ceiling slab. An elevator is optional.'**
+  String get schemeMissingStairs;
+
+  /// No description provided for @schemeAmbiguousLevels.
+  ///
+  /// In en, this message translates to:
+  /// **'The storey or slab ownership is ambiguous. Check duplicate elevations and identifiers.'**
+  String get schemeAmbiguousLevels;
+
+  /// No description provided for @schemeInvalidLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the ceiling elevation and thickness: its soffit must be above the working storey base.'**
+  String get schemeInvalidLevel;
+
+  /// No description provided for @schemeInvalidGeometry.
+  ///
+  /// In en, this message translates to:
+  /// **'A slab or opening is invalid. Check self-intersections, boundaries and overlapping openings.'**
+  String get schemeInvalidGeometry;
+
+  /// No description provided for @schemeOverlappingSlabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Slabs overlap. Correct their outlines before generation.'**
+  String get schemeOverlappingSlabs;
+
+  /// No description provided for @schemeComputationLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'These outlines exceed the check\'s complexity limit. Simplify them.'**
+  String get schemeComputationLimit;
+
+  /// No description provided for @schemeCeilingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Slab'**
+  String get schemeCeilingLabel;
+
+  /// No description provided for @schemeRegionsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate regions'**
+  String get schemeRegionsLabel;
 }
 
 class _AppLocalizationsDelegate
