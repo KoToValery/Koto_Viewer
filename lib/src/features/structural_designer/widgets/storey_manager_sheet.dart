@@ -30,13 +30,13 @@ class StoreyManagerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      child: SafeArea(
+    return Material(
+      color: const Color(0xFF1E1E1E),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -149,19 +149,20 @@ class StoreyManagerSheet extends StatelessWidget {
                   final storey = project.storeys[storeyIdx];
                   final bool isActive = storeyIdx == project.activeStoreyIndex;
 
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? const Color(0x3300E5FF)
-                          : const Color(0xFF262626),
+                  return Material(
+                    color: isActive
+                        ? const Color(0x3300E5FF)
+                        : const Color(0xFF262626),
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
+                      side: BorderSide(
                         color: isActive
                             ? const Color(0xFF00E5FF)
                             : Colors.white12,
                         width: isActive ? 1.5 : 1.0,
                       ),
                     ),
+                    clipBehavior: Clip.antiAlias,
                     child: ListTile(
                       dense: true,
                       leading: CircleAvatar(
@@ -300,6 +301,7 @@ class StoreyManagerSheet extends StatelessWidget {
             ],
           ],
         ),
+      ),
       ),
     );
   }

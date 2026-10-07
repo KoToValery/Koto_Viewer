@@ -59,22 +59,16 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
     final isDark = widget.isDark;
     final model = widget.ifcModel;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.72,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B2433) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black38,
-            blurRadius: 16,
-            offset: Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
+    return Material(
+      color: isDark ? const Color(0xFF1B2433) : Colors.white,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      elevation: 16,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.72,
+        child: SafeArea(
+          top: false,
+          child: Column(
           children: [
             // Drag handle
             Container(
@@ -148,6 +142,8 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
             // Tabs
             TabBar(
               controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               indicatorColor: const Color(0xFF00E5FF),
               labelColor: isDark ? const Color(0xFF00E5FF) : Theme.of(context).primaryColor,
               unselectedLabelColor: isDark ? Colors.white54 : Colors.black54,
@@ -187,6 +183,7 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -203,14 +200,15 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
         final isVisible = !model.hiddenStoreys.contains(storey.name);
         final count = storeyCounts[storey.name] ?? 0;
 
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF131A26) : const Color(0xFFF8FAFC),
+        return Material(
+          color: isDark ? const Color(0xFF131A26) : const Color(0xFFF8FAFC),
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
+            side: BorderSide(
               color: isDark ? const Color(0xFF263248) : const Color(0xFFE2E8F0),
             ),
           ),
+          clipBehavior: Clip.antiAlias,
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: isVisible
@@ -284,14 +282,15 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
         final color = IfcModel.getCategoryColor(cat);
         final icon = IfcModel.getCategoryIcon(cat);
 
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF131A26) : const Color(0xFFF8FAFC),
+        return Material(
+          color: isDark ? const Color(0xFF131A26) : const Color(0xFFF8FAFC),
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
+            side: BorderSide(
               color: isDark ? const Color(0xFF263248) : const Color(0xFFE2E8F0),
             ),
           ),
+          clipBehavior: Clip.antiAlias,
           child: ListTile(
             leading: Container(
               width: 38,
@@ -363,14 +362,15 @@ class _IfcBimSheetState extends State<IfcBimSheet> with SingleTickerProviderStat
         final isVisible = !model.hiddenLayers.contains(layer);
         final count = layerCounts[layer] ?? 0;
 
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF131A26) : const Color(0xFFF8FAFC),
+        return Material(
+          color: isDark ? const Color(0xFF131A26) : const Color(0xFFF8FAFC),
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
+            side: BorderSide(
               color: isDark ? const Color(0xFF263248) : const Color(0xFFE2E8F0),
             ),
           ),
+          clipBehavior: Clip.antiAlias,
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: isVisible
