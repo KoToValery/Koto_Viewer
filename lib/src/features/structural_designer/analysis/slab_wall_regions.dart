@@ -162,6 +162,22 @@ class SlabWallRegions {
                   blocked = true;
                   break;
                 }
+              } else {
+                final lo = math.min(
+                  dotW(w.centerlineStart - win.start),
+                  dotW(w.centerlineEnd - win.start),
+                );
+                final hi = math.max(
+                  dotW(w.centerlineStart - win.start),
+                  dotW(w.centerlineEnd - win.start),
+                );
+                if (hi > 25 * scale &&
+                    lo < win.length - 25 * scale &&
+                    crossW(w.centerlineStart - win.start).abs() <
+                        w.perpendicularDistance / 2 + 50 * scale) {
+                  blocked = true;
+                  break;
+                }
               }
             }
           }
@@ -217,6 +233,26 @@ class SlabWallRegions {
           }
           final length = (end - start).distance;
           if (length < 75 * scale || length > 5500 * scale) continue;
+
+          // Architectural Opening vs Recess principle:
+          // If both ends connect to perpendicular return walls extending inward in the same direction,
+          // this is the mouth of an inner courtyard, niche, or loggia.
+          // Unless confirmed as a glazed window in [windowOpenings], do NOT bridge across it.
+          if (GeometricWindowDetector.isRecessMouth(
+            centerA: start,
+            dirA: u,
+            thicknessA: a.perpendicularDistance,
+            centerB: end,
+            dirB: u,
+            thicknessB: b.perpendicularDistance,
+            wallPairs: group,
+            wallIndexA: i,
+            wallIndexB: j,
+            scale: scale,
+          )) {
+            continue;
+          }
+
           if (length > 1500 * scale) {
             comparisons += openingEvidence.length;
             if (comparisons > 2000000) {
@@ -279,10 +315,18 @@ class SlabWallRegions {
             if (blocked) break;
           }
           if (!blocked) {
+            // Project strictly along wall axis u so the hypothesis has zero transverse skew
+            final tStart = dot(start - a.centerlineStart);
+            final tEnd = dot(end - a.centerlineStart);
+            final n = Offset(-u.dy, u.dx);
+            final dAvg = (cross(start - a.centerlineStart) + cross(end - a.centerlineStart)) / 2.0;
+            final projStart = a.centerlineStart + u * tStart + n * dAvg;
+            final projEnd = a.centerlineStart + u * tEnd + n * dAvg;
+
             proposals.add(
               SlabGapHypothesis(
-                start,
-                end,
+                projStart,
+                projEnd,
                 (a.perpendicularDistance + b.perpendicularDistance) / 2,
                 i,
                 j,

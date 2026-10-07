@@ -266,7 +266,14 @@ class WallAxisDetector {
 
     for (final group in activeGroups) {
       for (final pair in group.wallPairs) {
-        rawCenterlines.add((pair.centerlineStart, pair.centerlineEnd));
+        // Dynamic structural grid axes are only placed on structural load-bearing walls (>= 180mm / 18cm).
+        // 12 cm partition walls (преградни стени) are kept for wall contours, room detection, and slab boundaries,
+        // but must NOT generate dynamic structural grid axes.
+        final thicknessMm = pair.perpendicularDistance / scale;
+        final minStructuralMm = math.min(180.0, targetThicknessMm - thicknessToleranceMm);
+        if (thicknessMm >= minStructuralMm) {
+          rawCenterlines.add((pair.centerlineStart, pair.centerlineEnd));
+        }
         _collectWallContourWithEndCaps(
           pair,
           allPairs,

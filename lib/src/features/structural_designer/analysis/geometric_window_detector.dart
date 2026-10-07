@@ -164,18 +164,23 @@ class GeometricWindowDetector {
         final spanDist = spanVec.distance;
         if (spanDist < minSpanCad || spanDist > maxSpanCad) continue;
 
-        // Alignment check: the opening axis should be roughly aligned with wall directions
+        // Alignment check: the opening axis should be aligned with wall directions
+        // Openings connect one part of the wall straight to the other along the facade
         final u = spanVec / spanDist;
         final alignmentA = (jA.axisDir.dx * u.dx + jA.axisDir.dy * u.dy).abs();
         final alignmentB = (jB.axisDir.dx * u.dx + jB.axisDir.dy * u.dy).abs();
 
-        // Must be near-collinear (cos >= 0.94, angle <= 20 deg)
-        // OR an L-corner opening (one aligned, one perpendicular)
-        final isCollinear = alignmentA >= 0.94 && alignmentB >= 0.94;
-        final isCorner = (alignmentA >= 0.90 && alignmentB <= 0.35) ||
-                         (alignmentB >= 0.90 && alignmentA <= 0.35);
+        // Must be near-collinear facade walls (cos >= 0.92, angle <= 23 deg)
+        // Corner/angled jumps across niches/balconies are rejected to prevent skewed slab boundaries
+        final isCollinear = alignmentA >= 0.92 && alignmentB >= 0.92;
+        if (!isCollinear) continue;
 
-        if (!isCollinear && !isCorner) continue;
+        // Face-to-face check ("лице в лице"):
+        // A true wall opening (window/vitrina) is a hole in a single wall axis.
+        // The two jamb end-caps must face directly toward each other across the gap.
+        final facingA = jA.openNormal.dx * u.dx + jA.openNormal.dy * u.dy;
+        final facingB = jB.openNormal.dx * (-u.dx) + jB.openNormal.dy * (-u.dy);
+        if (facingA < 0.85 || facingB < 0.85) continue;
 
         // Check lateral offset between the two jamb centers
         final n = Offset(-u.dy, u.dx);
@@ -183,6 +188,67 @@ class GeometricWindowDetector {
                                (jB.center - jA.center).dy * n.dy).abs();
         final maxThickness = math.max(jA.thickness, jB.thickness);
         if (lateralOffset > maxThickness * 0.85 + 50 * scale) continue;
+
+        // Check if this opening spans the mouth of an inward recess/courtyard
+        final isRecess = isRecessMouth(
+          centerA: jA.center,
+          dirA: jA.axisDir,
+          thicknessA: jA.thickness,
+          centerB: jB.center,
+          dirB: jB.axisDir,
+          thicknessB: jB.thickness,
+          wallPairs: wallPairs,
+          wallIndexA: i,
+          wallIndexB: j,
+          scale: scale,
+        );
+
+        // Intervening obstacle check: ensure no intermediate wall or column sits between jA and jB in this corridor
+        bool hasInterveningObstacle = false;
+        final corridorBounds = Rect.fromPoints(jA.center, jB.center).inflate(maxThickness);
+        for (int k = 0; k < wallPairs.length; k++) {
+          if (k == i || k == j) continue;
+          final otherWall = wallPairs[k];
+          final wRect = Rect.fromPoints(otherWall.centerlineStart, otherWall.centerlineEnd)
+              .inflate(otherWall.perpendicularDistance / 2.0);
+          if (!corridorBounds.overlaps(wRect)) continue;
+
+          final t1 = (otherWall.centerlineStart - jA.center).dx * u.dx +
+                     (otherWall.centerlineStart - jA.center).dy * u.dy;
+          final t2 = (otherWall.centerlineEnd - jA.center).dx * u.dx +
+                     (otherWall.centerlineEnd - jA.center).dy * u.dy;
+          final tMin = math.min(t1, t2);
+          final tMax = math.max(t1, t2);
+
+          if (tMax > 50.0 * scale && tMin < spanDist - 50.0 * scale) {
+            final d1 = ((otherWall.centerlineStart - jA.center).dx * n.dx +
+                        (otherWall.centerlineStart - jA.center).dy * n.dy).abs();
+            final d2 = ((otherWall.centerlineEnd - jA.center).dx * n.dx +
+                        (otherWall.centerlineEnd - jA.center).dy * n.dy).abs();
+            if (math.min(d1, d2) <= maxThickness * 0.85 + otherWall.perpendicularDistance / 2.0) {
+              hasInterveningObstacle = true;
+              break;
+            }
+          }
+        }
+        if (hasInterveningObstacle) continue;
+
+        for (final col in columns) {
+          if (!corridorBounds.overlaps(col.bounds)) continue;
+          final colCenter = col.bounds.center;
+          final tCol = (colCenter - jA.center).dx * u.dx +
+                       (colCenter - jA.center).dy * u.dy;
+          if (tCol > 50.0 * scale && tCol < spanDist - 50.0 * scale) {
+            final dCol = ((colCenter - jA.center).dx * n.dx +
+                          (colCenter - jA.center).dy * n.dy).abs();
+            final colRadius = math.max(col.width, col.height) / 2.0;
+            if (dCol <= maxThickness * 0.85 + colRadius) {
+              hasInterveningObstacle = true;
+              break;
+            }
+          }
+        }
+        if (hasInterveningObstacle) continue;
 
         // Step 4: Evaluate opening corridor geometry
         final opening = _evaluateCorridor(
@@ -192,6 +258,7 @@ class GeometricWindowDetector {
           spanDist: spanDist,
           strokes: strokes,
           scale: scale,
+          isRecessMouth: isRecess,
         );
 
         if (opening != null) {
@@ -211,14 +278,28 @@ class GeometricWindowDetector {
     required double spanDist,
     required List<(Offset, Offset, double)> strokes, // (p1, p2, lineweight)
     required double scale,
+    bool isRecessMouth = false,
   }) {
-    final u = spanVec / spanDist; // Longitudinal axis of opening
-    final n = Offset(-u.dy, u.dx); // Transversal axis (across wall thickness)
+    // Determine common facade direction along wall axis
+    var uWall = startJamb.axisDir;
+    // Snap near-orthogonal to exact (1, 0) or (0, 1)
+    if (uWall.dy.abs() <= 0.08) {
+      uWall = const Offset(1.0, 0.0);
+    } else if (uWall.dx.abs() <= 0.08) {
+      uWall = const Offset(0.0, 1.0);
+    }
+    // Orient uWall from startJamb towards endJamb
+    if ((endJamb.center - startJamb.center).dx * uWall.dx +
+        (endJamb.center - startJamb.center).dy * uWall.dy < 0) {
+      uWall = -uWall;
+    }
+    final nWall = Offset(-uWall.dy, uWall.dx);
+
     final corridorThickness = math.max(startJamb.thickness, endJamb.thickness);
     final halfCorridor = corridorThickness / 2.0 + 120.0 * scale; // Include sill/frame margin
 
-    double dotU(Offset p) => (p - startJamb.center).dx * u.dx + (p - startJamb.center).dy * u.dy;
-    double dotN(Offset p) => (p - startJamb.center).dx * n.dx + (p - startJamb.center).dy * n.dy;
+    double dotU(Offset p) => (p - startJamb.center).dx * uWall.dx + (p - startJamb.center).dy * uWall.dy;
+    double dotN(Offset p) => (p - startJamb.center).dx * nWall.dx + (p - startJamb.center).dy * nWall.dy;
 
     final longitudinalSpans = <(double, double, double)>[]; // (tMin, tMax, lateralOffset)
     int transverseMullionCount = 0;
@@ -244,7 +325,7 @@ class GeometricWindowDetector {
       final tMax = math.max(t1, t2);
       if (tMax < -60.0 * scale || tMin > spanDist + 60.0 * scale) continue;
 
-      final cosAngle = (v.dx * u.dx + v.dy * u.dy).abs() / vLen;
+      final cosAngle = (v.dx * uWall.dx + v.dy * uWall.dy).abs() / vLen;
 
       // Longitudinal stroke (glazing line, frame edge, window sill)
       // Angle <= 16 degrees (cos >= 0.96)
@@ -320,27 +401,46 @@ class GeometricWindowDetector {
     if (transverseMullionCount > 0) evidence.add('transverseMullions_$transverseMullionCount');
     if (hasDimensionMarker) evidence.add('dimensionMarker');
 
-    final bool isConfirmedWindow =
-        (hasParallelPair && coverageRatio >= 0.25) ||
-        (coverageRatio >= 0.25 && transverseMullionCount >= 1) ||
-        (coverageRatio >= 0.25 && hasDimensionMarker);
+    final bool isConfirmedWindow;
+    if (isRecessMouth) {
+      // Across an inward courtyard or recess mouth, require genuine glazing frames/lines
+      // so we never bridge an open courtyard/niche unless it is an explicitly glazed facade.
+      isConfirmedWindow =
+          (hasParallelPair && coverageRatio >= 0.25) ||
+          (coverageRatio >= 0.25 && transverseMullionCount >= 2);
+    } else {
+      isConfirmedWindow =
+          (hasParallelPair && coverageRatio >= 0.25) ||
+          (coverageRatio >= 0.25 && transverseMullionCount >= 1) ||
+          (coverageRatio >= 0.25 && hasDimensionMarker);
+    }
 
     if (!isConfirmedWindow) return null;
 
-    // Generate solid barrier polygon across the opening
+    // Project opening endpoints strictly along uWall so the bridge is 100% collinear with the wall
+    final spanAlongWall = dotU(endJamb.center);
+    if (spanAlongWall <= 0) return null;
+
+    final dEnd = dotN(endJamb.center);
+    final dMid = dEnd / 2.0;
+
+    final alignedStart = startJamb.center + nWall * dMid;
+    final alignedEnd = startJamb.center + uWall * spanAlongWall + nWall * dMid;
+
+    // Generate solid barrier polygon across the opening, strictly parallel/perpendicular to wall
     final halfThick = corridorThickness / 2.0;
     final barrierPolygon = <Offset>[
-      startJamb.center + n * halfThick,
-      endJamb.center + n * halfThick,
-      endJamb.center - n * halfThick,
-      startJamb.center - n * halfThick,
+      alignedStart + nWall * halfThick,
+      alignedEnd + nWall * halfThick,
+      alignedEnd - nWall * halfThick,
+      alignedStart - nWall * halfThick,
     ];
 
     return GeometricWindowOpening(
-      start: startJamb.center,
-      end: endJamb.center,
+      start: alignedStart,
+      end: alignedEnd,
       thickness: corridorThickness,
-      length: spanDist,
+      length: spanAlongWall,
       barrierPolygon: barrierPolygon,
       evidence: evidence,
     );
@@ -406,6 +506,109 @@ class GeometricWindowDetector {
 
     return result;
   }
+
+  /// Checks whether a jamb at [center] with wall direction [wallDir] connects to a perpendicular return wall
+  /// (such as the side wall of an inward niche, courtyard, or loggia), and returns the unit vector
+  /// pointing along the return wall away from [center].
+  static Offset? perpendicularReturnDirection({
+    required Offset center,
+    required Offset wallDir,
+    required double wallThickness,
+    required List<WallPairCandidate> wallPairs,
+    required int excludeWallIndex,
+    required double scale,
+  }) {
+    final searchRadius = wallThickness * 1.25 + 35.0 * scale;
+    for (int k = 0; k < wallPairs.length; k++) {
+      if (k == excludeWallIndex) continue;
+      final other = wallPairs[k];
+      final otherDir = other.segmentA.direction;
+      final dot = (wallDir.dx * otherDir.dx + wallDir.dy * otherDir.dy).abs();
+      // Must be perpendicular (cos <= 0.22, angle >= 77 deg)
+      if (dot <= 0.22) {
+        final d1 = (other.centerlineStart - center).distance;
+        final d2 = (other.centerlineEnd - center).distance;
+        final dMid = _closestPointOnSegment(center, other.centerlineStart, other.centerlineEnd);
+        if (math.min(d1, d2) <= searchRadius || (center - dMid).distance <= searchRadius) {
+          final otherLen = (other.centerlineEnd - other.centerlineStart).distance;
+          if (otherLen >= 400.0 * scale) {
+            final farEnd = d1 > d2 ? other.centerlineStart : other.centerlineEnd;
+            final vec = farEnd - center;
+            if (vec.distance > 1e-4) {
+              return vec / vec.distance;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Checks whether a jamb at [center] connects to any perpendicular return wall.
+  static bool hasPerpendicularReturnWall({
+    required Offset center,
+    required Offset wallDir,
+    required double wallThickness,
+    required List<WallPairCandidate> wallPairs,
+    required int excludeWallIndex,
+    required double scale,
+  }) {
+    return perpendicularReturnDirection(
+      center: center,
+      wallDir: wallDir,
+      wallThickness: wallThickness,
+      wallPairs: wallPairs,
+      excludeWallIndex: excludeWallIndex,
+      scale: scale,
+    ) != null;
+  }
+
+  /// Checks whether two jambs across an opening span the mouth of an inward architectural recess,
+  /// courtyard, or loggia by verifying that both ends connect to perpendicular return walls
+  /// heading in the same direction into the building depth.
+  static bool isRecessMouth({
+    required Offset centerA,
+    required Offset dirA,
+    required double thicknessA,
+    required Offset centerB,
+    required Offset dirB,
+    required double thicknessB,
+    required List<WallPairCandidate> wallPairs,
+    required int wallIndexA,
+    required int wallIndexB,
+    required double scale,
+  }) {
+    final rA = perpendicularReturnDirection(
+      center: centerA,
+      wallDir: dirA,
+      wallThickness: thicknessA,
+      wallPairs: wallPairs,
+      excludeWallIndex: wallIndexA,
+      scale: scale,
+    );
+    if (rA == null) return false;
+
+    final rB = perpendicularReturnDirection(
+      center: centerB,
+      wallDir: dirB,
+      wallThickness: thicknessB,
+      wallPairs: wallPairs,
+      excludeWallIndex: wallIndexB,
+      scale: scale,
+    );
+    if (rB == null) return false;
+
+    // Both return walls must extend in the same inward direction (cos >= 0.5)
+    return (rA.dx * rB.dx + rA.dy * rB.dy) >= 0.5;
+  }
+
+  static Offset _closestPointOnSegment(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final lenSq = ab.dx * ab.dx + ab.dy * ab.dy;
+    if (lenSq < 1e-8) return a;
+    final t = ((p.dx - a.dx) * ab.dx + (p.dy - a.dy) * ab.dy) / lenSq;
+    return a + ab * t.clamp(0.0, 1.0);
+  }
 }
 
 class _WallJamb {
@@ -428,4 +631,7 @@ class _WallJamb {
     required this.pRight,
     required this.isStart,
   });
+
+  /// Outward normal pointing out of the wall end into open space.
+  Offset get openNormal => isStart ? -axisDir : axisDir;
 }

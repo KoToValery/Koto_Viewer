@@ -37,8 +37,8 @@ class SlabBoundaryRefiner {
           b = edges[j],
           u = (a.$2 - a.$1) / (a.$2 - a.$1).distance,
           v = (b.$2 - b.$1) / (b.$2 - b.$1).distance;
-      return _cross(u, v).abs() < 1e-4 &&
-          _cross(b.$1 - a.$1, u).abs() < 0.1 * scale;
+      return _cross(u, v).abs() < 1e-3 &&
+          _cross(b.$1 - a.$1, u).abs() <= math.max(0.5 * cell, 25.0 * scale);
     }
 
     final runs = <(int, int)>[];
@@ -75,6 +75,23 @@ class SlabBoundaryRefiner {
         if (same(runs[i].$1, runs[nextIdx].$1)) {
           runs.removeAt(nextIdx);
           changed = true;
+          break;
+        }
+      }
+    }
+    // Merge any consecutive runs that are parallel so denominator won't collapse
+    var changedParallel = true;
+    while (changedParallel && runs.length > 2) {
+      changedParallel = false;
+      for (var i = 0; i < runs.length; i++) {
+        final nextIdx = (i + 1) % runs.length;
+        final e1 = edges[runs[i].$1];
+        final e2 = edges[runs[nextIdx].$1];
+        final u = e1.$2 - e1.$1;
+        final v = e2.$2 - e2.$1;
+        if (_cross(u, v).abs() < 1e-4 * u.distance * v.distance) {
+          runs.removeAt(nextIdx);
+          changedParallel = true;
           break;
         }
       }
