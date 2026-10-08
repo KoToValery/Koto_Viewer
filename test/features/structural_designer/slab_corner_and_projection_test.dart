@@ -264,4 +264,64 @@ void main() {
       isEmpty,
     );
   });
+
+  test('balcony with parapet is detected with kind=balcony and hasParapet=true', () {
+    // Outer balcony platform: width 3000, depth 1500 (y from 0 to -1500)
+    // Parapet: parallel line offset by 120 mm (12 cm) along the outer edges
+    final balconyDoc = document([
+      // Outer slab edges
+      const DxfLine(p1: Offset(2000, 0), p2: Offset(2000, -1500), layer: 'balcony_slab'),
+      const DxfLine(p1: Offset(2000, -1500), p2: Offset(5000, -1500), layer: 'balcony_slab'),
+      const DxfLine(p1: Offset(5000, -1500), p2: Offset(5000, 0), layer: 'balcony_slab'),
+      // Inner parapet wall / railing at 12cm inside
+      const DxfLine(p1: Offset(2120, 0), p2: Offset(2120, -1380), layer: 'railing'),
+      const DxfLine(p1: Offset(2120, -1380), p2: Offset(4880, -1380), layer: 'railing'),
+      const DxfLine(p1: Offset(4880, -1380), p2: Offset(4880, 0), layer: 'railing'),
+    ]);
+    final found = SlabProjectionDetector.detect(balconyDoc, envelope, 1);
+    expect(found, isNotEmpty);
+    final balcony = found.firstWhere((c) => c.hasParapet);
+    expect(balcony.kind, 'balcony');
+    expect(balcony.hasParapet, isTrue);
+  });
+
+  test('cornice (корниз) is detected for narrow cantilever <= 60cm without parapet', () {
+    // Narrow decorative band along facade: width 4000mm (4m), depth 250mm (25cm)
+    final corniceDoc = document([
+      const DxfLine(p1: Offset(2000, 0), p2: Offset(2000, -250), layer: 'cornice_band'),
+      const DxfLine(p1: Offset(2000, -250), p2: Offset(6000, -250), layer: 'cornice_band'),
+      const DxfLine(p1: Offset(6000, -250), p2: Offset(6000, 0), layer: 'cornice_band'),
+    ]);
+    final found = SlabProjectionDetector.detect(corniceDoc, envelope, 1);
+    expect(found, hasLength(1));
+    expect(found.single.kind, 'cornice');
+    expect(found.single.hasParapet, isFalse);
+  });
+
+  test('eave (стреха) is detected for cantilever 40-150cm along roofline without parapet', () {
+    // Eave along facade: width 6000mm (6m), depth 800mm (80cm)
+    final eaveDoc = document([
+      const DxfLine(p1: Offset(1000, 0), p2: Offset(1000, -800), layer: 'roof_eaves'),
+      const DxfLine(p1: Offset(1000, -800), p2: Offset(7000, -800), layer: 'roof_eaves'),
+      const DxfLine(p1: Offset(7000, -800), p2: Offset(7000, 0), layer: 'roof_eaves'),
+    ]);
+    final found = SlabProjectionDetector.detect(eaveDoc, envelope, 1);
+    expect(found, hasLength(1));
+    expect(found.single.kind, 'eave');
+    expect(found.single.hasParapet, isFalse);
+  });
+
+  test('snapping pulls balcony boundary segment to main slab envelope when gap < 2 cm (15 mm)', () {
+    // Balcony drawn with a 15 mm gap from facade (y = -15 to y = -1500)
+    final gapDoc = document([
+      const DxfLine(p1: Offset(2000, -15), p2: Offset(2000, -1500), layer: 'balcony'),
+      const DxfLine(p1: Offset(2000, -1500), p2: Offset(5000, -1500), layer: 'balcony'),
+      const DxfLine(p1: Offset(5000, -1500), p2: Offset(5000, -15), layer: 'balcony'),
+    ]);
+    final found = SlabProjectionDetector.detect(gapDoc, envelope, 1);
+    expect(found, hasLength(1));
+    // The side facing the facade is pulled flush to y = 0 (< 2 cm threshold)
+    final facadeSidePoints = found.single.contour.where((p) => (p.dy).abs() < 1e-6).toList();
+    expect(facadeSidePoints, isNotEmpty);
+  });
 }

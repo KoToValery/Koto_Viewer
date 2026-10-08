@@ -2926,4 +2926,77 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get schemeRegionsLabel => 'Отделни области';
+
+  @override
+  String get schemeGenerate => 'Предложи колони и шайби';
+
+  @override
+  String get schemePreview => 'Начална конструктивна схема';
+
+  @override
+  String get schemeVariantCore => 'Вариант 1 · около стълбището';
+
+  @override
+  String get schemeVariantLong => 'Вариант 2 · по дългите стени';
+
+  @override
+  String get schemeMinSpacing => 'Минимална стъпка (m)';
+
+  @override
+  String get schemeTargetSpacing => 'Целева стъпка (m)';
+
+  @override
+  String get schemeRebuild => 'Обнови вариантите';
+
+  @override
+  String get schemeConfirm => 'Потвърждавам показаните контури и отвори';
+
+  @override
+  String get schemeAccept => 'Приеми предложението';
+
+  @override
+  String get schemeNoWalls =>
+      'Няма разпознати непрекъснати стени. Първо изпълнете разпознаването на стените.';
+
+  @override
+  String get schemeNoCandidates =>
+      'Няма свободни подходящи позиции. Съществуващите елементи са запазени.';
+
+  @override
+  String get schemeLimits =>
+      'Достигнат е лимитът за тази предварителна схема. Нужен е ръчен преглед на останалите участъци.';
+
+  @override
+  String get schemePreliminary =>
+      'Размерите са текущо избраните сечения. Стъпките са настройки за подреждане, не допустими изчислени отвори. Проверете излизането на сеченията извън архитектурните стени.';
+
+  @override
+  String get schemeLegend =>
+      'Сиво: съществуващи · Синьо: плочи · Зелено: нови колони · Оранжево: нови шайби · Червено: отвори';
+
+  @override
+  String get schemeUnresolved =>
+      'Области без шайби и в двете основни направления';
+
+  @override
+  String get schemeRejected => 'Отхвърлени кандидати';
+
+  @override
+  String get schemeReport => 'Подробна оценка';
+
+  @override
+  String get schemeInvalidOptions =>
+      'Въведете положителни стъпки; целевата трябва да е поне минималната.';
+
+  @override
+  String get schemeStale =>
+      'Проектът е променен. Отворете нов преглед преди приемане.';
+
+  @override
+  String get schemeComparison =>
+      'Сравнение на вариантите · eX/eY (m) · насадени колони';
+
+  @override
+  String get schemeFresh =>
+      'Приемат се само новите обекти. Ръчните елементи и приетите редакции се запазват.';
 }

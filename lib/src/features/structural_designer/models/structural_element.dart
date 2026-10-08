@@ -20,6 +20,7 @@ enum GhostStoreyMode {
 class StructuralColumn {
   final String id;
   final String? name;
+  final String? generatedBy; // Optional provenance; edits retain normal object identity.
   final Offset center;
   final ColumnShape shape;
   final double width; // in meters (or diameter if circular, or Leg 1 for L-shape)
@@ -31,6 +32,7 @@ class StructuralColumn {
   const StructuralColumn({
     required this.id,
     this.name,
+    this.generatedBy,
     required this.center,
     this.shape = ColumnShape.rectangular,
     this.width = 0.25,
@@ -50,6 +52,7 @@ class StructuralColumn {
   factory StructuralColumn.fromTopLeft({
     required String id,
     String? name,
+    String? generatedBy,
     required Offset topLeft,
     ColumnShape shape = ColumnShape.rectangular,
     double width = 0.25,
@@ -62,6 +65,7 @@ class StructuralColumn {
     return StructuralColumn(
       id: id,
       name: name,
+      generatedBy: generatedBy,
       center: center,
       shape: shape,
       width: width,
@@ -151,6 +155,7 @@ class StructuralColumn {
   StructuralColumn copyWith({
     String? id,
     String? name,
+    String? generatedBy,
     Offset? center,
     ColumnShape? shape,
     double? width,
@@ -162,6 +167,7 @@ class StructuralColumn {
     return StructuralColumn(
       id: id ?? this.id,
       name: name ?? this.name,
+      generatedBy: generatedBy ?? this.generatedBy,
       center: center ?? this.center,
       shape: shape ?? this.shape,
       width: width ?? this.width,
@@ -175,6 +181,7 @@ class StructuralColumn {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    if (generatedBy != null) 'generatedBy': generatedBy,
     'center': {'dx': center.dx, 'dy': center.dy},
     'shape': shape.name,
     'width': width,
@@ -188,6 +195,7 @@ class StructuralColumn {
     return StructuralColumn(
       id: json['id'] as String,
       name: json['name'] as String?,
+      generatedBy: json['generatedBy'] as String?,
       center: Offset(
         (json['center']['dx'] as num).toDouble(),
         (json['center']['dy'] as num).toDouble(),
@@ -217,6 +225,7 @@ enum ShearWallReferenceLine {
 class StructuralShearWall {
   final String id;
   final String? name;
+  final String? generatedBy; // Optional provenance; edits retain normal object identity.
   final Offset start;
   final Offset end;
   final double thickness; // in meters (default 0.25)
@@ -226,6 +235,7 @@ class StructuralShearWall {
   const StructuralShearWall({
     required this.id,
     this.name,
+    this.generatedBy,
     required this.start,
     required this.end,
     this.thickness = 0.25,
@@ -300,6 +310,7 @@ class StructuralShearWall {
   StructuralShearWall copyWith({
     String? id,
     String? name,
+    String? generatedBy,
     Offset? start,
     Offset? end,
     double? thickness,
@@ -309,6 +320,7 @@ class StructuralShearWall {
     return StructuralShearWall(
       id: id ?? this.id,
       name: name ?? this.name,
+      generatedBy: generatedBy ?? this.generatedBy,
       start: start ?? this.start,
       end: end ?? this.end,
       thickness: thickness ?? this.thickness,
@@ -320,6 +332,7 @@ class StructuralShearWall {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    if (generatedBy != null) 'generatedBy': generatedBy,
     'start': {'dx': start.dx, 'dy': start.dy},
     'end': {'dx': end.dx, 'dy': end.dy},
     'thickness': thickness,
@@ -331,6 +344,7 @@ class StructuralShearWall {
     return StructuralShearWall(
       id: json['id'] as String,
       name: json['name'] as String?,
+      generatedBy: json['generatedBy'] as String?,
       start: Offset(
         (json['start']['dx'] as num).toDouble(),
         (json['start']['dy'] as num).toDouble(),
@@ -1068,7 +1082,7 @@ class StructuralSlab {
       vNew1 = v1 + normal * distance;
     } else {
       if (normProj1.abs() >= 0.20) {
-        final t1 = (distance / (normProj1 * len1)).clamp(-3.0 * distance.abs(), 3.0 * distance.abs());
+        final t1 = distance / (normProj1 * len1);
         vNew1 = v1 + d1 * t1;
       } else {
         vNew1 = v1 + normal * distance;
@@ -1081,7 +1095,7 @@ class StructuralSlab {
     } else {
       final proj2 = (d2.dx * normal.dx + d2.dy * normal.dy) / (len2 > 1e-6 ? len2 : 1.0);
       if (proj2.abs() >= 0.20) {
-        final t2 = (distance / (proj2 * len2)).clamp(-3.0 * distance.abs(), 3.0 * distance.abs());
+        final t2 = distance / (proj2 * len2);
         vNew2 = v2 + d2 * t2;
       } else {
         vNew2 = v2 + normal * distance;
@@ -1668,7 +1682,7 @@ class StructuralSlab {
       // Adjacent edge is at an angle or perpendicular: intersect the extended adjacent ray
       // with the offset edge line.
       if (normProj1.abs() >= 0.20) {
-        final t1 = (distance / (normProj1 * len1)).clamp(-3.0 * distance.abs(), 3.0 * distance.abs());
+        final t1 = distance / (normProj1 * len1);
         vNew1 = v1 + d1 * t1;
       } else {
         // Very shallow angle: fallback to perpendicular offset to avoid extreme runaway spike
@@ -1684,7 +1698,7 @@ class StructuralSlab {
       // Adjacent edge is at an angle or perpendicular: intersect with offset edge line
       final proj2 = (d2.dx * normal.dx + d2.dy * normal.dy) / (len2 > 1e-6 ? len2 : 1.0);
       if (proj2.abs() >= 0.20) {
-        final t2 = (distance / (proj2 * len2)).clamp(-3.0 * distance.abs(), 3.0 * distance.abs());
+        final t2 = distance / (proj2 * len2);
         vNew2 = v2 + d2 * t2;
       } else {
         vNew2 = v2 + normal * distance;

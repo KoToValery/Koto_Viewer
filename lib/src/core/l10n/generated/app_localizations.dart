@@ -5020,6 +5020,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Separate regions'**
   String get schemeRegionsLabel;
+
+  /// No description provided for @schemeGenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest columns and shear walls'**
+  String get schemeGenerate;
+
+  /// No description provided for @schemePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Initial structural layout'**
+  String get schemePreview;
+
+  /// No description provided for @schemeVariantCore.
+  ///
+  /// In en, this message translates to:
+  /// **'Variant 1 · near the staircase'**
+  String get schemeVariantCore;
+
+  /// No description provided for @schemeVariantLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Variant 2 · along long walls'**
+  String get schemeVariantLong;
+
+  /// No description provided for @schemeMinSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum spacing (m)'**
+  String get schemeMinSpacing;
+
+  /// No description provided for @schemeTargetSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Target spacing (m)'**
+  String get schemeTargetSpacing;
+
+  /// No description provided for @schemeRebuild.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh variants'**
+  String get schemeRebuild;
+
+  /// No description provided for @schemeConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'I confirm the displayed slab outlines and openings'**
+  String get schemeConfirm;
+
+  /// No description provided for @schemeAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept proposal'**
+  String get schemeAccept;
+
+  /// No description provided for @schemeNoWalls.
+  ///
+  /// In en, this message translates to:
+  /// **'No continuous walls were detected. Run wall detection first.'**
+  String get schemeNoWalls;
+
+  /// No description provided for @schemeNoCandidates.
+  ///
+  /// In en, this message translates to:
+  /// **'No suitable free positions. Existing elements are preserved.'**
+  String get schemeNoCandidates;
+
+  /// No description provided for @schemeLimits.
+  ///
+  /// In en, this message translates to:
+  /// **'The preliminary layout limit was reached. Review the remaining areas manually.'**
+  String get schemeLimits;
+
+  /// No description provided for @schemePreliminary.
+  ///
+  /// In en, this message translates to:
+  /// **'Sizes use the currently selected sections. Spacing is a layout setting, not a calculated allowable span. Check sections extending beyond architectural walls.'**
+  String get schemePreliminary;
+
+  /// No description provided for @schemeLegend.
+  ///
+  /// In en, this message translates to:
+  /// **'Grey: existing · Blue: slabs · Green: new columns · Orange: new walls · Red: openings'**
+  String get schemeLegend;
+
+  /// No description provided for @schemeUnresolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Regions without walls in both principal directions'**
+  String get schemeUnresolved;
+
+  /// No description provided for @schemeRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected candidates'**
+  String get schemeRejected;
+
+  /// No description provided for @schemeReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed assessment'**
+  String get schemeReport;
+
+  /// No description provided for @schemeInvalidOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter positive spacing; target must be at least the minimum.'**
+  String get schemeInvalidOptions;
+
+  /// No description provided for @schemeStale.
+  ///
+  /// In en, this message translates to:
+  /// **'The project changed. Open a new preview before accepting.'**
+  String get schemeStale;
+
+  /// No description provided for @schemeComparison.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare variants · eX/eY (m) · floating columns'**
+  String get schemeComparison;
+
+  /// No description provided for @schemeFresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Only new objects are accepted. Manual elements and accepted edits are preserved.'**
+  String get schemeFresh;
 }
 
 class _AppLocalizationsDelegate

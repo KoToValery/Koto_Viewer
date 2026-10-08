@@ -2329,6 +2329,28 @@
   "schemeOverlappingSlabs": "Slabs overlap. Correct their outlines before generation.",
   "schemeComputationLimit": "These outlines exceed the check's complexity limit. Simplify them.",
   "schemeCeilingLabel": "Slab",
-  "schemeRegionsLabel": "Separate regions"
+  "schemeRegionsLabel": "Separate regions",
+
+  "schemeGenerate": "Suggest columns and shear walls",
+  "schemePreview": "Initial structural layout",
+  "schemeVariantCore": "Variant 1 · near the staircase",
+  "schemeVariantLong": "Variant 2 · along long walls",
+  "schemeMinSpacing": "Minimum spacing (m)",
+  "schemeTargetSpacing": "Target spacing (m)",
+  "schemeRebuild": "Refresh variants",
+  "schemeConfirm": "I confirm the displayed slab outlines and openings",
+  "schemeAccept": "Accept proposal",
+  "schemeNoWalls": "No continuous walls were detected. Run wall detection first.",
+  "schemeNoCandidates": "No suitable free positions. Existing elements are preserved.",
+  "schemeLimits": "The preliminary layout limit was reached. Review the remaining areas manually.",
+  "schemePreliminary": "Sizes use the currently selected sections. Spacing is a layout setting, not a calculated allowable span. Check sections extending beyond architectural walls.",
+  "schemeLegend": "Grey: existing · Blue: slabs · Green: new columns · Orange: new walls · Red: openings",
+  "schemeUnresolved": "Regions without walls in both principal directions",
+  "schemeRejected": "Rejected candidates",
+  "schemeReport": "Detailed assessment",
+  "schemeInvalidOptions": "Enter positive spacing; target must be at least the minimum.",
+  "schemeStale": "The project changed. Open a new preview before accepting.",
+  "schemeComparison": "Compare variants · eX/eY (m) · floating columns",
+  "schemeFresh": "Only new objects are accepted. Manual elements and accepted edits are preserved."
 
 }

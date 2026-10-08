@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import '../../dxf_viewer/models/dxf_models.dart';
 import 'wall_axis_detector.dart';
@@ -135,23 +136,21 @@ class StructuralUnderlayFilter {
     }
     // Check whole tokens for generic "line" / "lines" / "коти" to avoid substring collision with outline, guideline, etc.
     final tokens = name.split(RegExp(r'[^a-zA-Z0-9а-яА-Я]+'));
-    if ((tokens.contains('line') || tokens.contains('lines') || tokens.contains('линия') || tokens.contains('линии') || tokens.contains('коти')) &&
-        !name.contains('slab') && !name.contains('плоч') && !name.contains('ploc') && !name.contains('wall') && !name.contains('стен')) {
+    if (tokens.contains('line') || tokens.contains('lines') || tokens.contains('линия') || tokens.contains('линии') || tokens.contains('коти')) {
       return true;
     }
     return false;
   }
 
-  /// Checks if a layer name matches non-wall structural element keywords (slab, column, beam, etc.)
+  /// Checks if a layer name matches non-wall and non-slab structural element keywords (column, beam, shear wall, etc.)
   /// Supports English, Bulgarian (Cyrillic), and Bulgarian (Latinized/transliterated).
-  /// Note: Walls are never detected by hardcoded keywords.
+  /// Note: Walls and slabs are detected geometrically without hardcoded keywords.
   static bool matchesStructuralKeyword(String layerName) {
     final name = layerName.toLowerCase();
     if (isNegativeKeyword(name)) return false;
 
     const structuralKeywords = [
       // English
-      'slab', 'slabs',
       'col', 'cols', 'column', 'columns',
       'beam', 'beams',
       'pillar', 'pillars',
@@ -162,7 +161,6 @@ class StructuralUnderlayFilter {
       'construction',
 
       // Bulgarian (Cyrillic)
-      'плоча', 'плочи', 'плоч',
       'колона', 'колони',
       'шайба', 'шайби',
       'греда', 'греди',
@@ -172,7 +170,6 @@ class StructuralUnderlayFilter {
       'констр', 'конструкция',
 
       // Bulgarian (Latinized / Transliterated)
-      'plocha', 'ploca', 'plochi', 'ploci',
       'kolona', 'koloni',
       'shaiba', 'shayba',
       'stb',
@@ -186,8 +183,8 @@ class StructuralUnderlayFilter {
     return false;
   }
 
-  /// Checks if a layer name specifically matches slab keywords
-  /// (e.g. slab, slabs, плоча, плочи, плоч, plocha, ploca, plochi).
+  /// Auxiliary dictionary check for slab keywords.
+  /// Note: Primary slab detection is purely geometric via [detectSlabLayers].
   static bool matchesSlabKeyword(String layerName) {
     final name = layerName.toLowerCase();
     if (isNegativeKeyword(name)) return false;
@@ -203,24 +200,28 @@ class StructuralUnderlayFilter {
     return false;
   }
 
-  /// Detects slab layers in [document] matching slab keywords and categorizes them
-  /// by whether they contain entities.
+  /// Geometrically detects slab layers in [document] by checking for closed perimeter
+  /// polylines/polygons of architectural building/room dimensions, with keyword matching
+  /// as an auxiliary fallback.
   static SlabLayerDetectionResult detectSlabLayers(
     DxfDocument document, {
     Iterable<DxfEntity>? entities,
     Map<String, DxfBlock>? blocks,
   }) {
     final entityCounts = <String, int>{};
+    final entitiesByLayer = <String, List<DxfEntity>>{};
     final allEntities = entities ?? document.entities;
     for (final e in allEntities) {
       final name = e.layer.trim();
       entityCounts[name] = (entityCounts[name] ?? 0) + 1;
+      entitiesByLayer.putIfAbsent(name, () => []).add(e);
     }
     final allBlocks = blocks ?? document.blocks;
     for (final b in allBlocks.values) {
       for (final e in b.entities) {
         final name = e.layer.trim();
         entityCounts[name] = (entityCounts[name] ?? 0) + 1;
+        entitiesByLayer.putIfAbsent(name, () => []).add(e);
       }
     }
 
@@ -229,10 +230,40 @@ class StructuralUnderlayFilter {
     bool matchedAny = false;
 
     for (final layer in document.layers.values) {
-      if (matchesSlabKeyword(layer.name)) {
+      final layerEntities = entitiesByLayer[layer.name] ?? const [];
+      final count = entityCounts[layer.name] ?? 0;
+
+      // 1. Geometric detection: check if layer contains closed polyline or line loops
+      // with architectural slab dimensions (W >= 1000mm, H >= 1000mm, Area >= 1.0 m²).
+      bool hasGeometricSlab = false;
+      for (final e in layerEntities) {
+        if (e is DxfLwPolyline && e.isClosed && e.vertices.length >= 3) {
+          final pts = e.vertices.map((v) => Offset(v.x, v.y)).toList();
+          final bbox = Rect.fromPoints(
+            Offset(pts.map((p) => p.dx).reduce(math.min), pts.map((p) => p.dy).reduce(math.min)),
+            Offset(pts.map((p) => p.dx).reduce(math.max), pts.map((p) => p.dy).reduce(math.max)),
+          );
+          if (bbox.width >= 1000.0 && bbox.height >= 1000.0) {
+            hasGeometricSlab = true;
+            break;
+          }
+        } else if (e is DxfPolyline && e.isClosed && e.vertices.length >= 3) {
+          final pts = e.vertices.map((v) => Offset(v.x, v.y)).toList();
+          final bbox = Rect.fromPoints(
+            Offset(pts.map((p) => p.dx).reduce(math.min), pts.map((p) => p.dy).reduce(math.min)),
+            Offset(pts.map((p) => p.dx).reduce(math.max), pts.map((p) => p.dy).reduce(math.max)),
+          );
+          if (bbox.width >= 1000.0 && bbox.height >= 1000.0) {
+            hasGeometricSlab = true;
+            break;
+          }
+        }
+      }
+
+      final isKeywordMatch = matchesSlabKeyword(layer.name);
+      if (hasGeometricSlab || isKeywordMatch) {
         matchedAny = true;
-        final count = entityCounts[layer.name] ?? 0;
-        if (count > 0) {
+        if (entityCounts.isEmpty || count > 0) {
           detected.add(layer.name);
         } else {
           empty.add(layer.name);
@@ -298,9 +329,20 @@ class StructuralUnderlayFilter {
         .where((l) => !isNegativeKeyword(l.name) && isWhiteLayer(l, entitiesByLayer[l.name]))
         .toList();
 
-    // Check if any layers explicitly match structural keywords
-    final keywordLayers = candidateList
-        .where((l) => matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name))
+    // Geometric slab layer detection (perimeter polylines of building/room scale)
+    final docForSlabs = DxfDocument(
+      headerVars: const {},
+      bounds: Rect.zero,
+      entityStats: const {},
+      layers: {for (final l in candidateList) l.name: l},
+      entities: entities?.toList() ?? const [],
+      blocks: blocks ?? {},
+    );
+    final detectedSlabLayers = detectSlabLayers(docForSlabs, entities: entities, blocks: blocks).detectedLayers.toSet();
+
+    // Check if any layers match structural keywords or geometric slab detection
+    final structuralLayers = candidateList
+        .where((l) => matchesStructuralKeyword(l.name) || detectedSlabLayers.contains(l.name))
         .toList();
 
     if (whiteLayers.isNotEmpty) {
@@ -318,8 +360,8 @@ class StructuralUnderlayFilter {
           // 1. Thickest White layer(s) (main walls)
           if (lw >= maxWhiteLw - 0.005) return true;
 
-          // 2. Structural non-wall keywords (slab, columns, etc.)
-          if (matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name)) return true;
+          // 2. Structural non-wall elements (slabs, columns, etc.)
+          if (matchesStructuralKeyword(l.name) || detectedSlabLayers.contains(l.name)) return true;
 
           // 3. Secondary wall thickness: 12cm partition walls drawn with medium pen
           // (e.g. 0.20mm - 0.35mm when main walls are 0.50mm - 0.70mm)
@@ -331,10 +373,10 @@ class StructuralUnderlayFilter {
           return false;
         }).toList();
 
-        // Also check if any non-white layers explicitly match slab or structural keywords
+        // Also check if any non-white layers match slab or structural elements
         final extraStructuralLayers = candidateList.where((l) =>
             !whiteLayers.contains(l) &&
-            (matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name))).map((l) => l.name);
+            (matchesStructuralKeyword(l.name) || detectedSlabLayers.contains(l.name))).map((l) => l.name);
 
         final result = preservedWhite.map((l) => l.name).toSet();
         result.addAll(extraStructuralLayers);
@@ -342,7 +384,7 @@ class StructuralUnderlayFilter {
       } else {
         // When lines have no thickness, all white layers stay plus slabs/structural layers
         final extraStructural = candidateList
-            .where((l) => matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name))
+            .where((l) => matchesStructuralKeyword(l.name) || detectedSlabLayers.contains(l.name))
             .map((l) => l.name);
 
         final result = whiteLayers.map((l) => l.name).toSet();
@@ -368,14 +410,14 @@ class StructuralUnderlayFilter {
             .expand((p) => [p.segmentA.sourceLayer, p.segmentB.sourceLayer])
             .toSet();
         final extraStructural = candidateList
-            .where((l) => matchesStructuralKeyword(l.name) || matchesSlabKeyword(l.name))
+            .where((l) => matchesStructuralKeyword(l.name) || detectedSlabLayers.contains(l.name))
             .map((l) => l.name);
         return {...detectedWallLayers, ...extraStructural};
       }
     }
 
     // 2. Otherwise fall back to non-wall structural elements (slabs, columns, beams)
-    return keywordLayers.map((l) => l.name).toSet();
+    return structuralLayers.map((l) => l.name).toSet();
   }
 }
 

@@ -2916,4 +2916,78 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get schemeRegionsLabel => 'Separate regions';
+
+  @override
+  String get schemeGenerate => 'Suggest columns and shear walls';
+
+  @override
+  String get schemePreview => 'Initial structural layout';
+
+  @override
+  String get schemeVariantCore => 'Variant 1 · near the staircase';
+
+  @override
+  String get schemeVariantLong => 'Variant 2 · along long walls';
+
+  @override
+  String get schemeMinSpacing => 'Minimum spacing (m)';
+
+  @override
+  String get schemeTargetSpacing => 'Target spacing (m)';
+
+  @override
+  String get schemeRebuild => 'Refresh variants';
+
+  @override
+  String get schemeConfirm =>
+      'I confirm the displayed slab outlines and openings';
+
+  @override
+  String get schemeAccept => 'Accept proposal';
+
+  @override
+  String get schemeNoWalls =>
+      'No continuous walls were detected. Run wall detection first.';
+
+  @override
+  String get schemeNoCandidates =>
+      'No suitable free positions. Existing elements are preserved.';
+
+  @override
+  String get schemeLimits =>
+      'The preliminary layout limit was reached. Review the remaining areas manually.';
+
+  @override
+  String get schemePreliminary =>
+      'Sizes use the currently selected sections. Spacing is a layout setting, not a calculated allowable span. Check sections extending beyond architectural walls.';
+
+  @override
+  String get schemeLegend =>
+      'Grey: existing · Blue: slabs · Green: new columns · Orange: new walls · Red: openings';
+
+  @override
+  String get schemeUnresolved =>
+      'Regions without walls in both principal directions';
+
+  @override
+  String get schemeRejected => 'Rejected candidates';
+
+  @override
+  String get schemeReport => 'Detailed assessment';
+
+  @override
+  String get schemeInvalidOptions =>
+      'Enter positive spacing; target must be at least the minimum.';
+
+  @override
+  String get schemeStale =>
+      'The project changed. Open a new preview before accepting.';
+
+  @override
+  String get schemeComparison =>
+      'Compare variants · eX/eY (m) · floating columns';
+
+  @override
+  String get schemeFresh =>
+      'Only new objects are accepted. Manual elements and accepted edits are preserved.';
 }

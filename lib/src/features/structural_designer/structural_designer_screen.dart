@@ -35,7 +35,11 @@ import 'widgets/seismic_analysis_sheet.dart';
 import 'widgets/seismic_load_dialog.dart';
 import 'widgets/slab_level_dialog.dart';
 import 'services/slab_opening_placement.dart';
+import 'services/slab_edit_validation.dart';
 import 'widgets/structural_scheme_readiness_dialog.dart';
+import 'widgets/initial_scheme_dialog.dart';
+import 'analysis/initial_scheme_generator.dart';
+import 'analysis/structural_scheme_readiness.dart';
 import 'widgets/slab_edge_offset_dialog.dart';
 import 'widgets/storey_manager_sheet.dart';
 import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
@@ -3480,8 +3484,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _wallStartCad = null;
       _slabStartCornerCad = null;
       _slabPointsCad.clear();
-      final cleaned = _cleanSlabPolygon(slab);
-      _editingSlab = cleaned;
+      _editingSlab = slab;
       _initialSlabBeforeCorrection = slab;
       _initialSlabCorrectionProject = _project;
       _slabCorrectionUndoStack.clear();
@@ -3512,11 +3515,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
-  void _updateActiveStoreySlab(StructuralSlab slab) {
+  bool _updateActiveStoreySlab(StructuralSlab slab) {
     final active = _project.activeStorey;
+    if (!SlabEditValidation.accepts(active.slabs, slab, _cadUnitsPerMeter)) {
+      if (_editingSlab?.id == slab.id) {
+        _editingSlab = active.slabs.firstWhere((s) => s.id == slab.id);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.slabEdgeInvalid)));
+      return false;
+    }
     final updatedSlabs =
         active.slabs.map((s) => s.id == slab.id ? slab : s).toList();
     _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
+    return true;
   }
 
   void _cancelSlabCorrection() {
@@ -3540,7 +3552,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_editingSlab == null) return;
     _undoStack.add(_initialSlabCorrectionProject ?? _project);
     if (_undoStack.length > 20) _undoStack.removeAt(0);
-    _updateActiveStoreySlab(_editingSlab!);
+    if (!_updateActiveStoreySlab(_editingSlab!)) return;
     setState(() {
       _editingSlab = null;
       _initialSlabBeforeCorrection = null;
@@ -5246,17 +5258,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           final slabIdx =
               active.slabs.indexWhere((s) => s.id == _activeExtrudingSlabId);
           if (slabIdx != -1) {
-            _pushUndo();
+            if (_isEditingSlab) {
+              _pushSlabCorrectionUndo();
+            } else {
+              _pushUndo();
+            }
             final updatedSlab = active.slabs[slabIdx].dynamicPullEdge(
               edgeIndex: _activeGrip!.edgeIndex,
               distance: d,
               minDistanceCad: 0.05 * scale,
             );
             final cleanedSlab = _cleanSlabPolygon(updatedSlab);
-            final updatedSlabs = List<StructuralSlab>.from(active.slabs);
-            updatedSlabs[slabIdx] = cleanedSlab;
-            _updateActiveStorey(active.copyWith(slabs: updatedSlabs));
-            if (_isEditingSlab && _editingSlab!.id == _activeExtrudingSlabId) {
+            if (_updateActiveStoreySlab(cleanedSlab) &&
+                _isEditingSlab && _editingSlab!.id == _activeExtrudingSlabId) {
               _editingSlab = cleanedSlab;
             }
             HapticFeedback.heavyImpact();
@@ -6562,6 +6576,38 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
+  Future<void> _generateInitialScheme() async {
+    final snapshot = _project;
+    final scale = _cadUnitsPerMeter;
+    final editing = _isEditingSlab || _slabPointsCad.isNotEmpty ||
+        _openingStartCad != null || _wallStartCad != null || _beamStartCad != null;
+    if (!StructuralSchemeReadiness.evaluate(snapshot, scale, editing: editing).geometryReady) {
+      await showDialog<void>(context: context, builder: (_) =>
+        StructuralSchemeReadinessDialog(project: snapshot, scale: scale, editing: editing));
+      return;
+    }
+    final detection = WallAxisDetector.detect(_document, forceScaleFactor: scale / 1000);
+    final proposal = await showDialog<InitialSchemeProposal>(
+      context: context,
+      builder: (_) => InitialSchemeDialog(project: snapshot,
+        pairs: detection.selectedWallPairs, scale: scale,
+        options: InitialSchemeOptions(columnShape: _currentColumnPreset.shape,
+          columnThicknessM: _currentColumnPreset.thickness,
+          columnWidthM: _currentColumnPreset.width,
+          columnDepthM: _currentColumnPreset.height,
+          wallLengthM: _currentWallLength, wallThicknessM: _currentWallThickness)),
+    );
+    if (!mounted || proposal == null || proposal.isEmpty) return;
+    if (!identical(_project, snapshot)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.schemeStale)));
+      return;
+    }
+    _pushUndo();
+    _updateActiveStorey(proposal.apply(_project.activeStorey));
+    _runAnalysis();
+  }
+
   Future<void> _generateSlabSeeds() async {
     final active = _project.activeStorey;
     var metadata = BimUnderlayMetadata.read(_document);
@@ -6583,6 +6629,25 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           'slabProjections': projections.map((p) => p.toJson()).toList(),
         };
         wallReferences = [...wallResult.wallContourSegments, ...wallResult.closureSegments];
+      }
+    } else if ((metadata['slabProjections'] as List? ?? []).isEmpty) {
+      final wallResult = WallAxisDetector.detect(_document);
+      if (wallResult.hasWallsFound) {
+        final envelope = SlabEnvelopeDetector.detect(wallResult, document: _document);
+        final projections = SlabProjectionDetector.detect(
+          _document,
+          envelope,
+          wallResult.detectedScale,
+          wallLayers: wallResult.selectedWallPairs
+              .expand((p) => [p.segmentA.sourceLayer, p.segmentB.sourceLayer])
+              .toSet(),
+        );
+        if (projections.isNotEmpty) {
+          metadata = {
+            ...metadata,
+            'slabProjections': projections.map((p) => p.toJson()).toList(),
+          };
+        }
       }
     }
     if (metadata == null || metadata['slabEnvelope'] == null) {
@@ -6606,12 +6671,36 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       thickness: _currentSlabThickness,
       wallReferences: wallReferences,
     );
+    final total = ((metadata['slabEnvelope'] as Map?)?['contours'] as List? ?? []).length +
+        (metadata['slabProjections'] as List? ?? []).length;
     if (seeds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.bimSlabSeedsEmpty)),
       );
       return;
     }
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.bimGenerateSlabs),
+        content: Text(context.l10n.bimSlabSeedsReview(
+          seeds.length,
+          total > seeds.length ? total - seeds.length : 0,
+          (_currentSlabThickness * 100).toStringAsFixed(1),
+        )),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(context.l10n.ok),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || accepted != true || _project.activeStorey.id != active.id) return;
     _pushUndo();
     final coloredSeeds = [
       for (var i = 0; i < seeds.length; i++)
@@ -6621,20 +6710,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
     ];
     _updateActiveStorey(active.copyWith(slabs: [...active.slabs, ...coloredSeeds]));
-    _activeTool = StructuralDrawTool.slab;
     _runAnalysis();
     setState(() {});
     _saveProject();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.bimSlabSeedsReview(
-          seeds.length,
-          0,
-          (_currentSlabThickness * 100).toStringAsFixed(1),
-        )),
-        backgroundColor: const Color(0xFF1E88E5),
-      ),
-    );
   }
 
   void _closeSlabPolygon() {
@@ -7083,7 +7161,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _checkAutoDetectWallsOnStartup() {
     // BIM underlays are analysed once at import; empty/deleted axes stay empty.
     if (widget.bimContext != null) {
-      _ensureSlabsPopulatedForActiveStorey();
       return;
     }
     if (!mounted) return;
@@ -7091,7 +7168,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // If axes are already populated in active storey (e.g. from initState or saved project)
     if (_project.effectiveGridAxes.isNotEmpty) {
-      _ensureSlabsPopulatedForActiveStorey();
       if (widget.initialDetectionResult != null || _document.layers.containsKey('WALLS_250')) {
         _applyUnderlayFilter(true);
         _runAnalysis();
@@ -7740,6 +7816,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           case 'auto_walls':
             _runManualAutoDetectWalls();
             break;
+          case 'generate_scheme':
+            _generateInitialScheme();
+            break;
           case 'scheme_readiness':
             showDialog<void>(context: context, builder: (_) =>
               StructuralSchemeReadinessDialog(project: _project,
@@ -7754,7 +7833,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
       },
       itemBuilder: (context) => [
-        if (BimUnderlayMetadata.read(_document) != null || widget.bimContext != null)
+        if (_document.entities.isNotEmpty || widget.bimContext != null || BimUnderlayMetadata.read(_document) != null)
           PopupMenuItem(
             value: 'generate_slabs',
             child: Row(
@@ -7768,6 +7847,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               ],
             ),
           ),
+          PopupMenuItem(value: 'generate_scheme',
+            child: Text(context.l10n.schemeGenerate,
+              style: const TextStyle(color: Colors.white, fontSize: 13))),
           PopupMenuItem(value: 'scheme_readiness',
             child: Text(context.l10n.schemeReadinessTitle,
               style: const TextStyle(color: Colors.white, fontSize: 13))),
@@ -9071,7 +9153,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       setState(() {
         _editingSlab = cleaned;
       });
-      _updateActiveStoreySlab(cleaned);
+      if (!_updateActiveStoreySlab(cleaned)) return;
       HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

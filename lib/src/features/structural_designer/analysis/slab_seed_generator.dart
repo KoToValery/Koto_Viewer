@@ -70,16 +70,40 @@ class SlabSeedGenerator {
     final mainEdges = result.expand((s) => edges(s.polygon)).toList();
     final projections = metadata['slabProjections'] as List? ?? [];
     for (var i = 0; i < projections.length; i++) {
+      final proj = projections[i] as Map?;
+      final kind = (proj?['kind'] as String?) ?? 'externalArea';
       final polygon = snap(
-        read(projections[i]['contour']),
+        read(proj?['contour']),
         mainEdges,
         tolerance,
         epsilon,
       );
       if (polygon != null) {
+        String typeName;
+        switch (kind) {
+          case 'balcony':
+            typeName = 'balcony';
+            break;
+          case 'cornice':
+            typeName = 'cornice';
+            break;
+          case 'terrace':
+            typeName = 'terrace';
+            break;
+          case 'eave':
+            typeName = 'eave';
+            break;
+          case 'loggia':
+          case 'loggiaCandidate':
+            typeName = 'loggia';
+            break;
+          default:
+            typeName = 'area';
+            break;
+        }
         result.add(
           StructuralSlab(
-            id: '${idPrefix}projection_$i',
+            id: '${idPrefix}projection_${typeName}_$i',
             polygon: polygon,
             thickness: thickness,
           ),
@@ -138,8 +162,8 @@ class SlabSeedGenerator {
         final length = (d - c).distance;
         if (length <= epsilon) continue;
         final axis = (d - c) / length;
-        // At most one degree, and both endpoints within the strict 20 mm band.
-        if (_cross(direction, axis).abs() > math.sin(math.pi / 180)) continue;
+        // At most five degrees, and both endpoints within the strict 20 mm band.
+        if (_cross(direction, axis).abs() > math.sin(5.0 * math.pi / 180.0)) continue;
         final distance = math.max(
           _cross(a - c, axis).abs(),
           _cross(b - c, axis).abs(),
