@@ -129,6 +129,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   double _elevatorWidthM = 1.80;
   double _elevatorHeightM = 2.00;
   final List<Offset> _slabPointsCad = [];
+  final List<Offset> _openingPointsCad = [];
+
+  SlabOpeningType get _currentOpeningType {
+    switch (_selectedOpeningPreset) {
+      case 'staircase':
+        return SlabOpeningType.staircase;
+      case 'elevator':
+        return SlabOpeningType.elevator;
+      case 'shaft':
+      default:
+        return SlabOpeningType.shaft;
+    }
+  }
 
   // Midpoint edge extrusion states (Cantilever / еркер drag)
   SlabEdgeGripInfo? _activeGrip;
@@ -2194,19 +2207,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
-  Size? _getPreviewOpeningSize() {
-    if (_activeTool == StructuralDrawTool.slabOpening &&
-        _selectedOpeningPreset != 'custom' &&
-        _openingStartCad == null &&
-        !_isMovingOpening) {
-      final double fitScale = _getCadFitScale();
-      final double currentScale = _transformController.value.getMaxScaleOnAxis();
-      final double screenScale = fitScale * currentScale.clamp(0.001, 10000.0) * _cadUnitsPerMeter;
-      final (dimW, dimH) = _getOpeningPresetDimensions(_selectedOpeningPreset);
-      return Size(dimW * screenScale, dimH * screenScale);
-    }
-    return null;
-  }
+  Size? _getPreviewOpeningSize() => null;
 
   List<Offset>? _getPreviewOpeningScreenPolygon() {
     if (_isMovingOpening && _movingOpeningRelativeOffsets != null) {
@@ -3485,6 +3486,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _wallStartCad = null;
       _slabStartCornerCad = null;
       _slabPointsCad.clear();
+      _openingPointsCad.clear();
       _editingSlab = slab;
       _initialSlabBeforeCorrection = slab;
       _initialSlabCorrectionProject = _project;
@@ -4003,11 +4005,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         return;
       }
     } else if (_activeTool == StructuralDrawTool.slabOpening) {
-      final hitOpening = _hitTestOpening(event.localPosition);
-      if (hitOpening != null) {
-        _startMovingOpening(hitOpening, event.localPosition,
-            isMouse: event.kind == PointerDeviceKind.mouse);
-        return;
+      if (_openingPointsCad.isEmpty) {
+        final hitOpening = _hitTestOpening(event.localPosition);
+        if (hitOpening != null) {
+          _startMovingOpening(hitOpening, event.localPosition,
+              isMouse: event.kind == PointerDeviceKind.mouse);
+          return;
+        }
       }
     } else if (_activeTool == StructuralDrawTool.slab && !_isEditingSlab) {
       final hitSlab = _hitTestSlab(event.localPosition);
@@ -4483,8 +4487,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _liveDimensionText = null;
           _activeDynamicDimensionLine = null;
         }
-      } else if (_isMovingOpening ||
-                 (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset != 'custom')) {
+      } else if (_isMovingOpening) {
         // Multi-edge and multi-corner weighted snapping for openings (edges snap to axes/walls, corners to landmarks)
         final List<Offset> cornerOffsets;
         if (_isMovingOpening && _movingOpeningRelativeOffsets != null) {
@@ -4635,23 +4638,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           effectiveCad = rawCad;
         }
         _liveDimensionText = null;
-      } else if (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset == 'custom') {
-        if (_openingStartCad == null) {
-          snap = _findStructuralSnap(rawCad, toleranceCad) ??
-              DxfSnapHelper.findSnapPoint(
-                document: _document,
-                cadPoint: rawCad,
-                toleranceCad: toleranceCad,
-                allowNearest: false,
-              );
-          if (snap != null) {
-            effectiveCad = snap.point;
-            snappedScreen = _cadToScreen(snap.point);
-            _snappedScreenPositions = [snappedScreen];
-          } else {
-            _snappedScreenPositions = [];
-          }
-          _liveDimensionText = null;
+      } else if (_activeTool == StructuralDrawTool.slabOpening) {
+        if (_openingPointsCad.length >= 3 &&
+            (rawCad - _openingPointsCad.first).distance <= toleranceCad) {
+          snap = DxfSnapResult(
+            point: _openingPointsCad.first,
+            type: DxfSnapType.endpoint,
+            distance: (rawCad - _openingPointsCad.first).distance,
+          );
         } else {
           snap = _findStructuralSnap(rawCad, toleranceCad) ??
               DxfSnapHelper.findSnapPoint(
@@ -4660,30 +4654,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 toleranceCad: toleranceCad,
                 allowNearest: false,
               );
-          if (snap != null) {
-            effectiveCad = snap.point;
-            snappedScreen = _cadToScreen(snap.point);
-            _snappedScreenPositions = [snappedScreen];
-          } else {
-            final c1 = _openingStartCad!;
-            final dxCad = (rawCad.dx - c1.dx).abs();
-            final dyCad = (rawCad.dy - c1.dy).abs();
-            final dxM = dxCad / _cadUnitsPerMeter;
-            final dyM = dyCad / _cadUnitsPerMeter;
-            final snappedDxM = math.max(0.10, (dxM / 0.10).round() * 0.10);
-            final snappedDxM2 = math.max(0.10, (dyM / 0.10).round() * 0.10);
-            final signX = rawCad.dx >= c1.dx ? 1.0 : -1.0;
-            final signY = rawCad.dy >= c1.dy ? 1.0 : -1.0;
-            effectiveCad = Offset(
-              c1.dx + signX * snappedDxM * _cadUnitsPerMeter,
-              c1.dy + signY * snappedDxM2 * _cadUnitsPerMeter,
-            );
-            snappedScreen = _cadToScreen(effectiveCad);
-            _snappedScreenPositions = [];
-          }
-          final wM = (effectiveCad.dx - _openingStartCad!.dx).abs() / _cadUnitsPerMeter;
-          final hM = (effectiveCad.dy - _openingStartCad!.dy).abs() / _cadUnitsPerMeter;
-          _liveDimensionText = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
+        }
+
+        if (snap != null) {
+          effectiveCad = snap.point;
+          snappedScreen = _cadToScreen(snap.point);
+          _snappedScreenPositions = [snappedScreen];
+        } else {
+          _snappedScreenPositions = [];
+        }
+
+        if (_openingPointsCad.isNotEmpty) {
+          final lenM = (effectiveCad - _openingPointsCad.last).distance / _cadUnitsPerMeter;
+          _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
+        } else {
+          _liveDimensionText = null;
         }
       } else if (_activeTool == StructuralDrawTool.shearWall || _isMovingShearWall) {
         final wallL = (_isMovingShearWall && _selectedShearWall != null)
@@ -4861,24 +4846,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
         effectiveCad = rawCad;
         _liveDimensionText = null;
-      } else if (_isMovingOpening || (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset != 'custom')) {
+      } else if (_isMovingOpening) {
         effectiveCad = rawCad;
         _liveDimensionText = null;
-      } else if (_activeTool == StructuralDrawTool.slabOpening && _selectedOpeningPreset == 'custom' && _openingStartCad != null) {
-        final c1 = _openingStartCad!;
-        final dxCad = (rawCad.dx - c1.dx).abs();
-        final dyCad = (rawCad.dy - c1.dy).abs();
-        final dxM = dxCad / _cadUnitsPerMeter;
-        final dyM = dyCad / _cadUnitsPerMeter;
-        final snappedDxM = math.max(0.10, (dxM / 0.10).round() * 0.10);
-        final snappedDyM = math.max(0.10, (dyM / 0.10).round() * 0.10);
-        final signX = rawCad.dx >= c1.dx ? 1.0 : -1.0;
-        final signY = rawCad.dy >= c1.dy ? 1.0 : -1.0;
-        effectiveCad = Offset(
-          c1.dx + signX * snappedDxM * _cadUnitsPerMeter,
-          c1.dy + signY * snappedDyM * _cadUnitsPerMeter,
-        );
-        _liveDimensionText = '${snappedDxM.toStringAsFixed(2)} x ${snappedDyM.toStringAsFixed(2)} m';
       } else if ((_activeTool == StructuralDrawTool.shearWall && _wallStartCad != null) ||
                  (_activeTool == StructuralDrawTool.beam && _beamStartCad != null)) {
         final startCad = _activeTool == StructuralDrawTool.shearWall ? _wallStartCad! : _beamStartCad!;
@@ -4900,6 +4870,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _liveDimensionText = distM >= 1.0 ? '${distM.toStringAsFixed(2)} m' : '${(distM * 100).toStringAsFixed(1)} cm';
       } else if (_activeTool == StructuralDrawTool.slab && _slabPointsCad.isNotEmpty) {
         final lenM = (rawCad - _slabPointsCad.last).distance / _cadUnitsPerMeter;
+        _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
+      } else if (_activeTool == StructuralDrawTool.slabOpening && _openingPointsCad.isNotEmpty) {
+        final lenM = (rawCad - _openingPointsCad.last).distance / _cadUnitsPerMeter;
         _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
       } else {
         _liveDimensionText = null;
@@ -6031,6 +6004,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _commitPlacement(cadPt);
       return;
     }
+    if (_activeTool == StructuralDrawTool.slabOpening && _openingPointsCad.isNotEmpty) {
+      final cadPt = _currentCadCoord ?? _screenToCad(details.localPosition);
+      _commitPlacement(cadPt);
+      return;
+    }
     if (_activeTool == StructuralDrawTool.beam && _beamStartCad != null) {
       final cadPt = _currentCadCoord ?? _screenToCad(details.localPosition);
       _commitPlacement(cadPt);
@@ -6469,53 +6447,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         });
       }
     } else if (_activeTool == StructuralDrawTool.slabOpening) {
-      if (_selectedOpeningPreset == 'custom') {
-        if (_openingStartCad == null) {
-          setState(() => _openingStartCad = cadCoord);
-          HapticFeedback.lightImpact();
-        } else {
-          final c1 = _openingStartCad!;
-          final c2 = cadCoord;
-          final minX = math.min(c1.dx, c2.dx);
-          final maxX = math.max(c1.dx, c2.dx);
-          final minY = math.min(c1.dy, c2.dy);
-          final maxY = math.max(c1.dy, c2.dy);
-          final w = maxX - minX;
-          final h = maxY - minY;
-          if (w >= 0.2 * scale && h >= 0.2 * scale) {
-            final opPoly = [
-              Offset(minX, minY),
-              Offset(maxX, minY),
-              Offset(maxX, maxY),
-              Offset(minX, maxY),
-            ];
-            _addOpeningToSlab(opPoly, type: SlabOpeningType.custom);
-          }
-          setState(() {
-            _openingStartCad = null;
-            _liveDimensionText = null;
-          });
+      if (_openingPointsCad.length >= 3) {
+        final distToFirst = (cadCoord - _openingPointsCad.first).distance;
+        final double fitScale = _getCadFitScale();
+        final double currentScale = _transformController.value.getMaxScaleOnAxis();
+        final closeThresholdCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+        if (distToFirst <= closeThresholdCad) {
+          _closeOpeningPolygon();
+          return;
         }
-      } else {
-        // Preset opening (shaft, staircase, elevator)
-        final (dimW, dimH) = _getOpeningPresetDimensions(_selectedOpeningPreset);
-        final halfW = (dimW * scale) / 2.0;
-        final halfH = (dimH * scale) / 2.0;
-        final opPoly = [
-          Offset(cadCoord.dx - halfW, cadCoord.dy - halfH),
-          Offset(cadCoord.dx + halfW, cadCoord.dy - halfH),
-          Offset(cadCoord.dx + halfW, cadCoord.dy + halfH),
-          Offset(cadCoord.dx - halfW, cadCoord.dy + halfH),
-        ];
-        final SlabOpeningType opType;
-        if (_selectedOpeningPreset == 'staircase') {
-          opType = SlabOpeningType.staircase;
-        } else if (_selectedOpeningPreset == 'elevator') {
-          opType = SlabOpeningType.elevator;
-        } else {
-          opType = SlabOpeningType.shaft;
-        }
-        _addOpeningToSlab(opPoly, type: opType);
+      }
+      if (_openingPointsCad.isEmpty ||
+          (cadCoord - _openingPointsCad.last).distance >= 0.05 * scale) {
+        setState(() {
+          _openingPointsCad.add(cadCoord);
+        });
+        HapticFeedback.lightImpact();
       }
     } else if (_activeTool == StructuralDrawTool.measure) {
       if (_measurementStartCad == null) {
@@ -6581,7 +6528,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final snapshot = _project;
     final scale = _cadUnitsPerMeter;
     final editing = _isEditingSlab || _slabPointsCad.isNotEmpty ||
-        _openingStartCad != null || _wallStartCad != null || _beamStartCad != null;
+        _openingPointsCad.isNotEmpty || _openingStartCad != null ||
+        _wallStartCad != null || _beamStartCad != null;
     if (!StructuralSchemeReadiness.evaluate(snapshot, scale, editing: editing).geometryReady) {
       await showDialog<void>(context: context, builder: (_) =>
         StructuralSchemeReadinessDialog(project: snapshot, scale: scale, editing: editing));
@@ -6746,6 +6694,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }
 
       setState(() => _slabPointsCad.clear());
+      HapticFeedback.heavyImpact();
+    }
+  }
+
+  void _closeOpeningPolygon() {
+    if (_openingPointsCad.length >= 3) {
+      final cleanedPts = StructuralSlab.cleanPolygon(
+        List.from(_openingPointsCad),
+        minDistance: 0.05 * _cadUnitsPerMeter,
+      );
+      if (cleanedPts.length >= 3) {
+        _addOpeningToSlab(cleanedPts, type: _currentOpeningType);
+      }
+      setState(() {
+        _openingPointsCad.clear();
+        _openingStartCad = null;
+        _liveDimensionText = null;
+      });
       HapticFeedback.heavyImpact();
     }
   }
@@ -7516,6 +7482,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           setState(() {
             _project = _project.copyWith(activeStoreyIndex: idx);
             _slabPointsCad.clear();
+            _openingPointsCad.clear();
             _wallStartCad = null;
             _originalLayerVisibility.clear();
             for (final entry in _document.layers.entries) {
@@ -7671,6 +7638,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _isMovingColumn = false;
       _isMovingShearWall = false;
       _slabPointsCad.clear();
+      _openingPointsCad.clear();
       _wallStartCad = null;
       _beamStartCad = null;
       _runAnalysis();
@@ -8280,6 +8248,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   currentCursorCad: _currentCadCoord,
                                   slabStartCornerCad: _slabStartCornerCad,
                                   slabPointsInProgress: _slabPointsCad,
+                                  openingPointsInProgress: _openingPointsCad,
+                                  activeOpeningType: _currentOpeningType,
                                   extrudingGrip: _activeGrip,
                                   extrusionDistance: _isExtrudingEdge ? _extrusionDistanceCad : null,
                                   activeParallelSnap: _isExtrudingEdge ? _activeParallelSnap : null,
@@ -8395,6 +8365,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         previewOpeningSize: _getPreviewOpeningSize(),
                         previewOpeningPolygon: _getPreviewOpeningScreenPolygon(),
                         slabPoints: _slabPointsCad.map(_cadToScreen).toList(),
+                        openingPoints: _openingPointsCad.map(_cadToScreen).toList(),
+                        activeOpeningType: _currentOpeningType,
                         liveDimensionText: _liveDimensionText,
                         scale: _cadUnitsPerMeter * _getCadFitScale() * _transformController.value.getMaxScaleOnAxis(),
                         l10n: context.l10n,
@@ -8553,6 +8525,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             _firstWallEdgeEndCad = null;
                             _slabStartCornerCad = null;
                             _slabPointsCad.clear();
+                            _openingPointsCad.clear();
                           });
                         },
                         currentColumnPreset: _currentColumnPreset,
@@ -8603,8 +8576,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         },
                         onRotateOpening: _rotateActiveOpeningPreset,
                         hasOpeningStartCorner: _openingStartCad != null,
+                        isDrawingOpening: _activeTool == StructuralDrawTool.slabOpening,
+                        openingPointCount: _openingPointsCad.length,
+                        onCloseOpening: _closeOpeningPolygon,
+                        onUndoOpeningPoint: () {
+                          setState(() {
+                            if (_openingPointsCad.isNotEmpty) _openingPointsCad.removeLast();
+                            if (_openingPointsCad.isEmpty) _liveDimensionText = null;
+                          });
+                        },
                         onClearOpening: () {
                           setState(() {
+                            _openingPointsCad.clear();
                             _openingStartCad = null;
                             _liveDimensionText = null;
                           });

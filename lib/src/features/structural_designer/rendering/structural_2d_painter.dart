@@ -25,6 +25,8 @@ class Structural2dPainter extends CustomPainter {
   final Offset? currentCursorCad;
   final Offset? slabStartCornerCad;
   final List<Offset> slabPointsInProgress;
+  final List<Offset> openingPointsInProgress;
+  final SlabOpeningType activeOpeningType;
   final SlabEdgeGripInfo? extrudingGrip;
   final double? extrusionDistance;
   final String? selectedColumnId;
@@ -118,6 +120,8 @@ class Structural2dPainter extends CustomPainter {
     this.currentCursorCad,
     this.slabStartCornerCad,
     this.slabPointsInProgress = const [],
+    this.openingPointsInProgress = const [],
+    this.activeOpeningType = SlabOpeningType.shaft,
     this.extrudingGrip,
     this.extrusionDistance,
     this.activeParallelSnap,
@@ -1186,10 +1190,12 @@ class Structural2dPainter extends CustomPainter {
 
   void _drawElevatorCabin(Canvas canvas, List<Offset> opPts, Paint borderPaint) {
     if (opPts.length < 4) return;
-    final center = Offset(
-      (opPts[0].dx + opPts[1].dx + opPts[2].dx + opPts[3].dx) / 4.0,
-      (opPts[0].dy + opPts[1].dy + opPts[2].dy + opPts[3].dy) / 4.0,
-    );
+    double cx = 0, cy = 0;
+    for (final p in opPts) {
+      cx += p.dx;
+      cy += p.dy;
+    }
+    final center = Offset(cx / opPts.length, cy / opPts.length);
 
     final cabinPts = opPts.map((p) => Offset.lerp(p, center, 0.3)!).toList();
     final cabinPath = Path()..moveTo(cabinPts[0].dx, cabinPts[0].dy);
@@ -2005,41 +2011,104 @@ class Structural2dPainter extends CustomPainter {
           }
         }
       }
-    } else if (activeTool == StructuralDrawTool.slabOpening &&
-        openingStartCornerCad != null &&
-        currentCursorCad != null) {
-      final c1 = openingStartCornerCad!;
-      final c2 = currentCursorCad!;
-      final minX = math.min(c1.dx, c2.dx);
-      final maxX = math.max(c1.dx, c2.dx);
-      final minY = math.min(c1.dy, c2.dy);
-      final maxY = math.max(c1.dy, c2.dy);
+    } else if (activeTool == StructuralDrawTool.slabOpening) {
+      if (openingPointsInProgress.isNotEmpty) {
+        final Color opColor;
+        switch (activeOpeningType) {
+          case SlabOpeningType.staircase:
+            opColor = const Color(0xFF00B0FF);
+            break;
+          case SlabOpeningType.elevator:
+            opColor = const Color(0xFF7C4DFF);
+            break;
+          case SlabOpeningType.shaft:
+          case SlabOpeningType.custom:
+            opColor = const Color(0xFFFF9800);
+            break;
+        }
 
-      final p1 = cadToScene(Offset(minX, maxY));
-      final p2 = cadToScene(Offset(maxX, maxY));
-      final p3 = cadToScene(Offset(maxX, minY));
-      final p4 = cadToScene(Offset(minX, minY));
+        final opBorderPaint = Paint()
+          ..color = opColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0 / zoomScale;
 
-      final path = Path()
-        ..moveTo(p1.dx, p1.dy)
-        ..lineTo(p2.dx, p2.dy)
-        ..lineTo(p3.dx, p3.dy)
-        ..lineTo(p4.dx, p4.dy)
-        ..close();
+        final pts = openingPointsInProgress.map(cadToScene).toList();
+        for (int i = 0; i < pts.length - 1; i++) {
+          canvas.drawLine(pts[i], pts[i + 1], opBorderPaint);
+        }
 
-      final opFill = Paint()
-        ..color = const Color(0x33FF9800)
-        ..style = PaintingStyle.fill;
-      final opBorder = Paint()
-        ..color = const Color(0xFFFF9800)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0 / zoomScale;
+        bool isCloseSnap = false;
+        if (currentCursorCad != null) {
+          final sCursor = cadToScene(currentCursorCad!);
+          if (openingPointsInProgress.length >= 3 &&
+              (currentCursorCad! - openingPointsInProgress.first).distance < (28.0 / (cadScale * zoomScale))) {
+            isCloseSnap = true;
+            final closeLinePaint = Paint()
+              ..color = const Color(0xFF00E676)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.5 / zoomScale;
+            canvas.drawLine(pts.last, pts.first, closeLinePaint);
+          } else {
+            canvas.drawLine(pts.last, sCursor, opBorderPaint);
+          }
+        }
 
-      canvas.drawPath(path, opFill);
-      canvas.drawPath(path, opBorder);
-      // Architectural X cross
-      canvas.drawLine(p1, p3, opBorder);
-      canvas.drawLine(p2, p4, opBorder);
+        final vDot = Paint()
+          ..color = const Color(0xFFFF5252)
+          ..style = PaintingStyle.fill;
+        for (int i = 0; i < pts.length; i++) {
+          final p = pts[i];
+          canvas.drawCircle(p, 4.0 / zoomScale, vDot);
+        }
+
+        // Highlight first point when >= 3 points with closure snap indicator
+        if (openingPointsInProgress.length >= 3) {
+          final ringPaint = Paint()
+            ..color = isCloseSnap ? const Color(0xFF00E676) : opColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = (isCloseSnap ? 3.0 : 1.5) / zoomScale;
+          canvas.drawCircle(pts.first, (isCloseSnap ? 9.0 : 6.0) / zoomScale, ringPaint);
+          if (isCloseSnap) {
+            final innerDot = Paint()
+              ..color = const Color(0xFF00E676)
+              ..style = PaintingStyle.fill;
+            canvas.drawCircle(pts.first, 4.5 / zoomScale, innerDot);
+          }
+        }
+      } else if (openingStartCornerCad != null && currentCursorCad != null) {
+        final c1 = openingStartCornerCad!;
+        final c2 = currentCursorCad!;
+        final minX = math.min(c1.dx, c2.dx);
+        final maxX = math.max(c1.dx, c2.dx);
+        final minY = math.min(c1.dy, c2.dy);
+        final maxY = math.max(c1.dy, c2.dy);
+
+        final p1 = cadToScene(Offset(minX, maxY));
+        final p2 = cadToScene(Offset(maxX, maxY));
+        final p3 = cadToScene(Offset(maxX, minY));
+        final p4 = cadToScene(Offset(minX, minY));
+
+        final path = Path()
+          ..moveTo(p1.dx, p1.dy)
+          ..lineTo(p2.dx, p2.dy)
+          ..lineTo(p3.dx, p3.dy)
+          ..lineTo(p4.dx, p4.dy)
+          ..close();
+
+        final opFill = Paint()
+          ..color = const Color(0x33FF9800)
+          ..style = PaintingStyle.fill;
+        final opBorder = Paint()
+          ..color = const Color(0xFFFF9800)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0 / zoomScale;
+
+        canvas.drawPath(path, opFill);
+        canvas.drawPath(path, opBorder);
+        // Architectural X cross
+        canvas.drawLine(p1, p3, opBorder);
+        canvas.drawLine(p2, p4, opBorder);
+      }
     } else if (activeTool == StructuralDrawTool.gridAxis) {
       // 1. Highlight first selected wall edge
       if (firstWallEdgeStartCad != null && firstWallEdgeEndCad != null) {

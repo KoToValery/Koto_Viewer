@@ -937,6 +937,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String closeOpening(int count) {
+    return 'Close ($count)';
+  }
+
+  @override
   String get storeyManagerTitle => 'Storey Manager (Levels & Layers)';
 
   @override
@@ -1202,6 +1207,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get slabPointByPointPrompt =>
       'Tap or hold with snap to place slab points';
+
+  @override
+  String get openingPointByPointPrompt => 'Tap point by point to draw opening';
 
   @override
   String get cancelSlab => 'Cancel slab';
@@ -1605,13 +1613,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hiddenBeamLabel => 'hidden';
 
   @override
-  String get shaftOpeningLabel => 'Shaft (40×60)';
+  String get shaftOpeningLabel => 'Shaft';
 
   @override
-  String get elevatorOpeningLabel => 'Elevator (1.8×2.0)';
+  String get elevatorOpeningLabel => 'Elevator';
 
   @override
-  String get stairsOpeningLabel => 'Stairs (2.4×4.5)';
+  String get stairsOpeningLabel => 'Stairs';
 
   @override
   String get nameEllipsis => 'Name...';

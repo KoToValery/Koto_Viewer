@@ -809,6 +809,13 @@
       "count": { "type": "int" }
     }
   },
+  "closeOpening": "Close ({count})",
+  "@closeOpening": {
+    "description": "Button to close opening polygon with vertex count",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "storeyManagerTitle": "Storey Manager (Levels & Layers)",
   "@storeyManagerTitle": { "description": "Title of storey manager sheet" },
   "traceReferenceTitle": "Trace Reference (Ghost Underlay)",
@@ -1035,6 +1042,10 @@
   "slabPointByPointPrompt": "Tap or hold with snap to place slab points",
   "@slabPointByPointPrompt": {
     "description": "Guidance hint for point-by-point slab placement tool"
+  },
+  "openingPointByPointPrompt": "Tap point by point to draw opening",
+  "@openingPointByPointPrompt": {
+    "description": "Guidance hint for point-by-point slab opening placement tool"
   },
   "cancelSlab": "Cancel slab",
   "@cancelSlab": { "description": "Cancel rectangular slab drawing" },
@@ -1349,11 +1360,11 @@
   "@otherEllipsis": { "description": "Other button in toolbar" },
   "hiddenBeamLabel": "hidden",
   "@hiddenBeamLabel": { "description": "Hidden beam label" },
-  "shaftOpeningLabel": "Shaft (40×60)",
+  "shaftOpeningLabel": "Shaft",
   "@shaftOpeningLabel": { "description": "Shaft opening preset label" },
-  "elevatorOpeningLabel": "Elevator (1.8×2.0)",
+  "elevatorOpeningLabel": "Elevator",
   "@elevatorOpeningLabel": { "description": "Elevator opening preset label" },
-  "stairsOpeningLabel": "Stairs (2.4×4.5)",
+  "stairsOpeningLabel": "Stairs",
   "@stairsOpeningLabel": { "description": "Stairs opening preset label" },
   "nameEllipsis": "Name...",
   "@nameEllipsis": { "description": "Name button in toolbar" },

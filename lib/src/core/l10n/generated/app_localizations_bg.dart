@@ -942,6 +942,11 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
+  String closeOpening(int count) {
+    return 'Затвори ($count)';
+  }
+
+  @override
   String get storeyManagerTitle => 'Етажен Мениджър (Нива & Слоеве)';
 
   @override
@@ -1207,6 +1212,9 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get slabPointByPointPrompt => 'Поставяйте точки със снап';
+
+  @override
+  String get openingPointByPointPrompt => 'Поставяйте точки на отвора със снап';
 
   @override
   String get cancelSlab => 'Откажи плоча';
@@ -1609,13 +1617,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get hiddenBeamLabel => 'скрита';
 
   @override
-  String get shaftOpeningLabel => 'Щранг (40×60 cm)';
+  String get shaftOpeningLabel => 'Шахта';
 
   @override
-  String get elevatorOpeningLabel => 'Асансьор (1.8×2.0)';
+  String get elevatorOpeningLabel => 'Асансьор';
 
   @override
-  String get stairsOpeningLabel => 'Стълби (2.4×4.5)';
+  String get stairsOpeningLabel => 'Стълбище';
 
   @override
   String get nameEllipsis => 'Име...';

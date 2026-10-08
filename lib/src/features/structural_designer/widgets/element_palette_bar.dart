@@ -26,6 +26,10 @@ class ElementPaletteBar extends StatelessWidget {
   final VoidCallback? onRotateOpening;
   final bool hasOpeningStartCorner;
   final VoidCallback? onClearOpening;
+  final bool isDrawingOpening;
+  final int openingPointCount;
+  final VoidCallback? onCloseOpening;
+  final VoidCallback? onUndoOpeningPoint;
   final String currentAxisName;
   final ValueChanged<String>? onUpdateAxisName;
   final bool hasFirstWallEdge;
@@ -86,6 +90,10 @@ class ElementPaletteBar extends StatelessWidget {
     this.onRotateOpening,
     this.hasOpeningStartCorner = false,
     this.onClearOpening,
+    this.isDrawingOpening = false,
+    this.openingPointCount = 0,
+    this.onCloseOpening,
+    this.onUndoOpeningPoint,
     this.currentAxisName = '1',
     this.onUpdateAxisName,
     this.hasFirstWallEdge = false,
@@ -968,7 +976,6 @@ class ElementPaletteBar extends StatelessWidget {
       ('shaft', l10n.shaftOpeningLabel),
       ('staircase', l10n.stairsOpeningLabel),
       ('elevator', l10n.elevatorOpeningLabel),
-      ('custom', l10n.openingPresetCustom),
     ];
 
     return SingleChildScrollView(
@@ -990,16 +997,7 @@ class ElementPaletteBar extends StatelessWidget {
                 visualDensity: VisualDensity.compact,
               ),
             ),
-          if (currentOpeningPreset != 'custom' && onRotateOpening != null) ...[
-            IconButton(
-              icon: const Icon(Icons.rotate_90_degrees_ccw, size: 18),
-              tooltip: l10n.rotate90,
-              onPressed: onRotateOpening,
-              visualDensity: VisualDensity.compact,
-            ),
-            const SizedBox(width: 4),
-          ],
-          if (currentOpeningPreset == 'custom' && hasOpeningStartCorner) ...[
+          if (isDrawingOpening && openingPointCount > 0) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -1008,16 +1006,67 @@ class ElementPaletteBar extends StatelessWidget {
                 border: Border.all(color: const Color(0xFFFF9800)),
               ),
               child: Text(
-                l10n.previewOpeningCorner2Tag,
-                style: const TextStyle(color: Color(0xFFFF9800), fontSize: 11),
+                '$openingPointCount т.',
+                style: const TextStyle(
+                  color: Color(0xFFFF9800),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 4),
-            IconButton.filledTonal(
-              icon: const Icon(Icons.close, size: 16),
-              tooltip: l10n.cancelOpening,
-              onPressed: onClearOpening,
-              visualDensity: VisualDensity.compact,
+            if (openingPointCount >= 3 && onCloseOpening != null) ...[
+              FilledButton.icon(
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                label: Text(
+                  context.l10n.closeOpening(openingPointCount),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF00C853),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: onCloseOpening,
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (onUndoOpeningPoint != null) ...[
+              IconButton.filledTonal(
+                icon: const Icon(Icons.undo_rounded, size: 16),
+                tooltip: context.l10n.undoPoint,
+                onPressed: onUndoOpeningPoint,
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (onClearOpening != null) ...[
+              IconButton.filledTonal(
+                icon: const Icon(Icons.close, size: 16),
+                tooltip: context.l10n.cancelOpening,
+                onPressed: onClearOpening,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ] else if (isDrawingOpening && openingPointCount == 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0x22FF9800),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFFFF9800)),
+                  const SizedBox(width: 4),
+                  Text(
+                    context.l10n.openingPointByPointPrompt,
+                    style: const TextStyle(color: Color(0xFFFF9800), fontSize: 11),
+                  ),
+                ],
+              ),
             ),
           ],
         ],

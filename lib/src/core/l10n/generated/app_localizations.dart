@@ -1730,6 +1730,12 @@ abstract class AppLocalizations {
   /// **'Close ({count})'**
   String closeSlab(int count);
 
+  /// Button to close opening polygon with vertex count
+  ///
+  /// In en, this message translates to:
+  /// **'Close ({count})'**
+  String closeOpening(int count);
+
   /// Title of storey manager sheet
   ///
   /// In en, this message translates to:
@@ -2190,6 +2196,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap or hold with snap to place slab points'**
   String get slabPointByPointPrompt;
+
+  /// Guidance hint for point-by-point slab opening placement tool
+  ///
+  /// In en, this message translates to:
+  /// **'Tap point by point to draw opening'**
+  String get openingPointByPointPrompt;
 
   /// Cancel rectangular slab drawing
   ///
@@ -2926,19 +2938,19 @@ abstract class AppLocalizations {
   /// Shaft opening preset label
   ///
   /// In en, this message translates to:
-  /// **'Shaft (40×60)'**
+  /// **'Shaft'**
   String get shaftOpeningLabel;
 
   /// Elevator opening preset label
   ///
   /// In en, this message translates to:
-  /// **'Elevator (1.8×2.0)'**
+  /// **'Elevator'**
   String get elevatorOpeningLabel;
 
   /// Stairs opening preset label
   ///
   /// In en, this message translates to:
-  /// **'Stairs (2.4×4.5)'**
+  /// **'Stairs'**
   String get stairsOpeningLabel;
 
   /// Name button in toolbar

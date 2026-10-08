@@ -1078,13 +1078,15 @@ void main() {
     expect(movedSlab.containsPoint(origCenter), isTrue); // Old spot is now solid again!
   });
 
-  testWidgets('ElementPaletteBar renders standard shaft (40x60 cm) and custom opening tools', (tester) async {
+  testWidgets('ElementPaletteBar renders 3 point-by-point opening types (shaft, staircase, elevator) with closure controls', (tester) async {
     tester.view.physicalSize = const Size(800, 600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    bool rotatedCalled = false;
+    bool closedCalled = false;
+    bool undoCalled = false;
     String selectedPreset = 'shaft';
+    int pointCount = 3;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -1113,8 +1115,10 @@ void main() {
                 onUpdateSlabThickness: (_) {},
                 currentOpeningPreset: selectedPreset,
                 onUpdateOpeningPreset: (p) => setState(() => selectedPreset = p),
-                onRotateOpening: () => rotatedCalled = true,
-                hasOpeningStartCorner: false,
+                isDrawingOpening: true,
+                openingPointCount: pointCount,
+                onCloseOpening: () => closedCalled = true,
+                onUndoOpeningPoint: () => undoCalled = true,
                 currentAxisName: '1',
                 isDrawingSlab: false,
                 hasSlabStartCorner: false,
@@ -1133,25 +1137,35 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify shaft opening preset exists with 40x60 label
-    expect(find.textContaining('40×60'), findsOneWidget);
+    // Verify 3 opening types exist
+    expect(find.text('Шахта'), findsOneWidget);
+    expect(find.text('Стълбище'), findsOneWidget);
+    expect(find.text('Асансьор'), findsOneWidget);
 
-    // Verify rotate 90 button exists and can be tapped
-    final rotateButton = find.byIcon(Icons.rotate_90_degrees_ccw);
-    expect(rotateButton, findsOneWidget);
-    await tester.ensureVisible(rotateButton);
-    await tester.pumpAndSettle();
-    await tester.tap(rotateButton);
-    expect(rotatedCalled, isTrue);
+    // Verify point count and close opening button
+    expect(find.text('3 т.'), findsOneWidget);
+    final closeButton = find.textContaining('Затвори (3)');
+    expect(closeButton, findsOneWidget);
+    await tester.tap(closeButton);
+    expect(closedCalled, isTrue);
 
-    // Verify custom opening preset exists
-    final customButton = find.textContaining('Свободен');
-    expect(customButton, findsOneWidget);
-    await tester.ensureVisible(customButton);
+    // Verify staircase preset selection
+    final stairsChip = find.text('Стълбище');
+    await tester.tap(stairsChip);
     await tester.pumpAndSettle();
-    await tester.tap(customButton);
+    expect(selectedPreset, equals('staircase'));
+
+    // Verify elevator preset selection
+    final elevatorChip = find.text('Асансьор');
+    await tester.tap(elevatorChip);
     await tester.pumpAndSettle();
-    expect(selectedPreset, equals('custom'));
+    expect(selectedPreset, equals('elevator'));
+
+    // Verify undo point button
+    final undoButton = find.byIcon(Icons.undo_rounded);
+    expect(undoButton, findsOneWidget);
+    await tester.tap(undoButton);
+    expect(undoCalled, isTrue);
   });
 
   test('Column magnetic alignment snaps 12.5 cm modular wall-axis centers to grid intersections', () {

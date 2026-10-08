@@ -60,6 +60,8 @@ class StructuralPointerPainter extends CustomPainter {
   final Size? previewOpeningSize;
   final List<Offset>? previewOpeningPolygon;
   final List<Offset>? slabPoints;
+  final List<Offset>? openingPoints;
+  final SlabOpeningType? activeOpeningType;
   final Offset? measureStartPos;
   final double? previewWallLengthScreen;
   final double? previewWallThicknessScreen;
@@ -83,6 +85,8 @@ class StructuralPointerPainter extends CustomPainter {
     this.previewOpeningSize,
     this.previewOpeningPolygon,
     this.slabPoints,
+    this.openingPoints,
+    this.activeOpeningType,
     this.measureStartPos,
     this.previewWallLengthScreen,
     this.previewWallThicknessScreen,
@@ -190,24 +194,67 @@ class StructuralPointerPainter extends CustomPainter {
       }
     }
 
-    // 4b. Live rectangular opening preview on pointer overlay (if drawing slab opening)
+    // 4b. Live opening preview on pointer overlay (if drawing slab opening)
     if (activeTool == StructuralDrawTool.slabOpening) {
-      final opFill = Paint()
-        ..color = const Color(0x33FF9800)
-        ..style = PaintingStyle.fill;
-      final opBorder = Paint()
-        ..color = const Color(0xFFFF9800)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
+      final Color opColor;
+      switch (activeOpeningType) {
+        case SlabOpeningType.staircase:
+          opColor = const Color(0xFF00B0FF);
+          break;
+        case SlabOpeningType.elevator:
+          opColor = const Color(0xFF7C4DFF);
+          break;
+        case SlabOpeningType.shaft:
+        case SlabOpeningType.custom:
+        default:
+          opColor = const Color(0xFFFF9800);
+          break;
+      }
 
-      if (openingStartCornerPos != null) {
-        final rect = Rect.fromPoints(openingStartCornerPos!, effectiveTip);
-        canvas.drawRect(rect, opFill);
-        canvas.drawRect(rect, opBorder);
-        // Architectural X cross
-        canvas.drawLine(rect.topLeft, rect.bottomRight, opBorder);
-        canvas.drawLine(rect.topRight, rect.bottomLeft, opBorder);
+      if (openingPoints != null && openingPoints!.isNotEmpty) {
+        final opBorder = Paint()
+          ..color = opColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+
+        for (int i = 0; i < openingPoints!.length - 1; i++) {
+          canvas.drawLine(openingPoints![i], openingPoints![i + 1], opBorder);
+        }
+
+        final bool isClose = openingPoints!.length >= 3 &&
+            (effectiveTip - openingPoints!.first).distance <= 24.0;
+
+        if (isClose) {
+          final closeLine = Paint()
+            ..color = const Color(0xFF00E676)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5;
+          canvas.drawLine(openingPoints!.last, openingPoints!.first, closeLine);
+
+          final closeRing = Paint()
+            ..color = const Color(0xFF00E676)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5;
+          canvas.drawCircle(openingPoints!.first, 8.0, closeRing);
+        } else {
+          canvas.drawLine(openingPoints!.last, effectiveTip, opBorder);
+        }
+
+        final vDot = Paint()
+          ..color = const Color(0xFFFF5252)
+          ..style = PaintingStyle.fill;
+        for (final p in openingPoints!) {
+          canvas.drawCircle(p, 4.0, vDot);
+        }
       } else if (previewOpeningPolygon != null && previewOpeningPolygon!.length >= 3) {
+        final opFill = Paint()
+          ..color = opColor.withValues(alpha: 0.2)
+          ..style = PaintingStyle.fill;
+        final opBorder = Paint()
+          ..color = opColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+
         final path = Path();
         for (int i = 0; i < previewOpeningPolygon!.length; i++) {
           final pt = effectiveTip + previewOpeningPolygon![i];
@@ -224,12 +271,16 @@ class StructuralPointerPainter extends CustomPainter {
           canvas.drawLine(effectiveTip + previewOpeningPolygon![0], effectiveTip + previewOpeningPolygon![2], opBorder);
           canvas.drawLine(effectiveTip + previewOpeningPolygon![1], effectiveTip + previewOpeningPolygon![3], opBorder);
         }
-      } else if (previewOpeningSize != null) {
-        final rect = Rect.fromCenter(
-          center: effectiveTip,
-          width: previewOpeningSize!.width,
-          height: previewOpeningSize!.height,
-        );
+      } else if (openingStartCornerPos != null) {
+        final opFill = Paint()
+          ..color = opColor.withValues(alpha: 0.2)
+          ..style = PaintingStyle.fill;
+        final opBorder = Paint()
+          ..color = opColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+
+        final rect = Rect.fromPoints(openingStartCornerPos!, effectiveTip);
         canvas.drawRect(rect, opFill);
         canvas.drawRect(rect, opBorder);
         canvas.drawLine(rect.topLeft, rect.bottomRight, opBorder);
@@ -435,6 +486,8 @@ class StructuralPointerPainter extends CustomPainter {
         oldDelegate.previewOpeningSize != previewOpeningSize ||
         oldDelegate.previewOpeningPolygon != previewOpeningPolygon ||
         oldDelegate.slabPoints != slabPoints ||
+        oldDelegate.openingPoints != openingPoints ||
+        oldDelegate.activeOpeningType != activeOpeningType ||
         oldDelegate.previewWallLengthScreen != previewWallLengthScreen ||
         oldDelegate.previewWallThicknessScreen != previewWallThicknessScreen ||
         oldDelegate.previewWallRotationRad != previewWallRotationRad ||
