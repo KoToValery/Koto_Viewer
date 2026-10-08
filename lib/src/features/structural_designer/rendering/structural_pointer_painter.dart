@@ -283,8 +283,17 @@ class StructuralPointerPainter extends CustomPainter {
         final rect = Rect.fromPoints(openingStartCornerPos!, effectiveTip);
         canvas.drawRect(rect, opFill);
         canvas.drawRect(rect, opBorder);
-        canvas.drawLine(rect.topLeft, rect.bottomRight, opBorder);
-        canvas.drawLine(rect.topRight, rect.bottomLeft, opBorder);
+
+        if (activeOpeningType == SlabOpeningType.staircase) {
+          final p1 = rect.topLeft;
+          final p2 = rect.topRight;
+          final p3 = rect.bottomRight;
+          final p4 = rect.bottomLeft;
+          _drawStaircaseTreads(canvas, [p1, p2, p3, p4], opBorder);
+        } else {
+          canvas.drawLine(rect.topLeft, rect.bottomRight, opBorder);
+          canvas.drawLine(rect.topRight, rect.bottomLeft, opBorder);
+        }
       }
     }
 
@@ -468,6 +477,61 @@ class StructuralPointerPainter extends CustomPainter {
     canvas.drawRRect(bgRect, bgPaint);
     canvas.drawRRect(bgRect, borderPaint);
     tp.paint(canvas, badgeOffset);
+  }
+
+  void _drawStaircaseTreads(Canvas canvas, List<Offset> opPts, Paint borderPaint) {
+    if (opPts.length < 4) return;
+    final treadPaint = Paint()
+      ..color = borderPaint.color.withValues(alpha: 0.65)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    final d1 = (opPts[1] - opPts[0]).distance;
+    final d2 = (opPts[3] - opPts[0]).distance;
+
+    final Offset pA0, pA1, pB0, pB1;
+    if (d2 >= d1) {
+      pA0 = opPts[0];
+      pA1 = opPts[3];
+      pB0 = opPts[1];
+      pB1 = opPts[2];
+    } else {
+      pA0 = opPts[0];
+      pA1 = opPts[1];
+      pB0 = opPts[3];
+      pB1 = opPts[2];
+    }
+
+    const int numTreads = 9;
+    for (int i = 1; i < numTreads; i++) {
+      final t = i / numTreads;
+      final ptA = Offset.lerp(pA0, pA1, t)!;
+      final ptB = Offset.lerp(pB0, pB1, t)!;
+      canvas.drawLine(ptA, ptB, treadPaint);
+    }
+
+    final startMid = Offset.lerp(pA0, pB0, 0.5)!;
+    final endMid = Offset.lerp(pA1, pB1, 0.5)!;
+    final arrowStart = Offset.lerp(startMid, endMid, 0.2)!;
+    final arrowEnd = Offset.lerp(startMid, endMid, 0.8)!;
+    final arrowDir = arrowEnd - arrowStart;
+    final arrowLen = arrowDir.distance;
+    if (arrowLen > 10.0) {
+      final u = arrowDir / arrowLen;
+      final normal = Offset(-u.dy, u.dx);
+      final arrowPaint = Paint()
+        ..color = borderPaint.color
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke;
+      canvas.drawCircle(arrowStart, 2.5, Paint()..color = borderPaint.color);
+      canvas.drawLine(arrowStart, arrowEnd, arrowPaint);
+      const double headLen = 6.0;
+      const double headWidth = 3.5;
+      final headLeft = arrowEnd - u * headLen + normal * headWidth;
+      final headRight = arrowEnd - u * headLen - normal * headWidth;
+      canvas.drawLine(arrowEnd, headLeft, arrowPaint);
+      canvas.drawLine(arrowEnd, headRight, arrowPaint);
+    }
   }
 
   @override

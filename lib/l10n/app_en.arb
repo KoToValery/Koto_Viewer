@@ -1047,6 +1047,10 @@
   "@openingPointByPointPrompt": {
     "description": "Guidance hint for point-by-point slab opening placement tool"
   },
+  "staircase2PointPrompt": "Tap 1st corner, then drag or tap 2nd corner for staircase",
+  "@staircase2PointPrompt": {
+    "description": "Guidance hint for 2-point rectangular staircase opening tool"
+  },
   "cancelSlab": "Cancel slab",
   "@cancelSlab": { "description": "Cancel rectangular slab drawing" },
   "slabRectDimensions": "Slab: {width} x {height} m",

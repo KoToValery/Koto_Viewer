@@ -2203,6 +2203,12 @@ abstract class AppLocalizations {
   /// **'Tap point by point to draw opening'**
   String get openingPointByPointPrompt;
 
+  /// Guidance hint for 2-point rectangular staircase opening tool
+  ///
+  /// In en, this message translates to:
+  /// **'Tap 1st corner, then drag or tap 2nd corner for staircase'**
+  String get staircase2PointPrompt;
+
   /// Cancel rectangular slab drawing
   ///
   /// In en, this message translates to:

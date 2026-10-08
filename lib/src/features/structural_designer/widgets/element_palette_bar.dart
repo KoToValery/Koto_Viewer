@@ -997,77 +997,132 @@ class ElementPaletteBar extends StatelessWidget {
                 visualDensity: VisualDensity.compact,
               ),
             ),
-          if (isDrawingOpening && openingPointCount > 0) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0x33FF9800),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFFF9800)),
-              ),
-              child: Text(
-                '$openingPointCount т.',
-                style: const TextStyle(
-                  color: Color(0xFFFF9800),
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+          if (currentOpeningPreset == 'staircase') ...[
+            if (hasOpeningStartCorner) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0x3300B0FF),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF00B0FF)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.straighten_rounded, size: 14, color: Color(0xFF00B0FF)),
+                    const SizedBox(width: 4),
+                    Text(
+                      context.l10n.previewOpeningCorner2Tag,
+                      style: const TextStyle(
+                        color: Color(0xFF00B0FF),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 4),
-            if (openingPointCount >= 3 && onCloseOpening != null) ...[
-              FilledButton.icon(
-                icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
-                label: Text(
-                  context.l10n.closeOpening(openingPointCount),
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF00C853),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              const SizedBox(width: 4),
+              if (onClearOpening != null)
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.close, size: 16),
+                  tooltip: context.l10n.cancelOpening,
+                  onPressed: onClearOpening,
                   visualDensity: VisualDensity.compact,
                 ),
-                onPressed: onCloseOpening,
+            ] else if (isDrawingOpening) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0x2200B0FF),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF00B0FF)),
+                    const SizedBox(width: 4),
+                    Text(
+                      context.l10n.staircase2PointPrompt,
+                      style: const TextStyle(color: Color(0xFF00B0FF), fontSize: 11),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 4),
             ],
-            if (onUndoOpeningPoint != null) ...[
-              IconButton.filledTonal(
-                icon: const Icon(Icons.undo_rounded, size: 16),
-                tooltip: context.l10n.undoPoint,
-                onPressed: onUndoOpeningPoint,
-                visualDensity: VisualDensity.compact,
-              ),
-              const SizedBox(width: 4),
-            ],
-            if (onClearOpening != null) ...[
-              IconButton.filledTonal(
-                icon: const Icon(Icons.close, size: 16),
-                tooltip: context.l10n.cancelOpening,
-                onPressed: onClearOpening,
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ] else if (isDrawingOpening && openingPointCount == 0) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0x22FF9800),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFFFF9800)),
-                  const SizedBox(width: 4),
-                  Text(
-                    context.l10n.openingPointByPointPrompt,
-                    style: const TextStyle(color: Color(0xFFFF9800), fontSize: 11),
+          ] else ...[
+            if (isDrawingOpening && openingPointCount > 0) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0x33FF9800),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFFF9800)),
+                ),
+                child: Text(
+                  '$openingPointCount ${context.l10n.pointsAbbr}',
+                  style: const TextStyle(
+                    color: Color(0xFFFF9800),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(width: 4),
+              if (openingPointCount >= 3 && onCloseOpening != null) ...[
+                FilledButton.icon(
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                  label: Text(
+                    context.l10n.closeOpening(openingPointCount),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF00C853),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: onCloseOpening,
+                ),
+                const SizedBox(width: 4),
+              ],
+              if (onUndoOpeningPoint != null) ...[
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.undo_rounded, size: 16),
+                  tooltip: context.l10n.undoPoint,
+                  onPressed: onUndoOpeningPoint,
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 4),
+              ],
+              if (onClearOpening != null) ...[
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.close, size: 16),
+                  tooltip: context.l10n.cancelOpening,
+                  onPressed: onClearOpening,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ] else if (isDrawingOpening && openingPointCount == 0) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0x22FF9800),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFFFF9800)),
+                    const SizedBox(width: 4),
+                    Text(
+                      context.l10n.openingPointByPointPrompt,
+                      style: const TextStyle(color: Color(0xFFFF9800), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ],
       ),

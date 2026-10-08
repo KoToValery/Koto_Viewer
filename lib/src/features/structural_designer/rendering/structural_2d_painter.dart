@@ -2095,19 +2095,42 @@ class Structural2dPainter extends CustomPainter {
           ..lineTo(p4.dx, p4.dy)
           ..close();
 
+        final Color baseColor;
+        switch (activeOpeningType) {
+          case SlabOpeningType.staircase:
+            baseColor = const Color(0xFF00B0FF);
+            break;
+          case SlabOpeningType.elevator:
+            baseColor = const Color(0xFF7C4DFF);
+            break;
+          case SlabOpeningType.shaft:
+          case SlabOpeningType.custom:
+            baseColor = const Color(0xFFFF9800);
+            break;
+        }
+
         final opFill = Paint()
-          ..color = const Color(0x33FF9800)
+          ..color = baseColor.withValues(alpha: 0.20)
           ..style = PaintingStyle.fill;
         final opBorder = Paint()
-          ..color = const Color(0xFFFF9800)
+          ..color = baseColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0 / zoomScale;
 
         canvas.drawPath(path, opFill);
         canvas.drawPath(path, opBorder);
-        // Architectural X cross
-        canvas.drawLine(p1, p3, opBorder);
-        canvas.drawLine(p2, p4, opBorder);
+
+        if (activeOpeningType == SlabOpeningType.staircase) {
+          _drawStaircaseTreads(canvas, [p1, p2, p3, p4], opBorder);
+        } else if (activeOpeningType == SlabOpeningType.elevator) {
+          canvas.drawLine(p1, p3, opBorder);
+          canvas.drawLine(p2, p4, opBorder);
+          _drawElevatorCabin(canvas, [p1, p2, p3, p4], opBorder);
+        } else {
+          // Architectural X cross
+          canvas.drawLine(p1, p3, opBorder);
+          canvas.drawLine(p2, p4, opBorder);
+        }
       }
     } else if (activeTool == StructuralDrawTool.gridAxis) {
       // 1. Highlight first selected wall edge

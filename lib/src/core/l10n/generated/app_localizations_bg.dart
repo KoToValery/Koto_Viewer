@@ -1217,6 +1217,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get openingPointByPointPrompt => 'Поставяйте точки на отвора със снап';
 
   @override
+  String get staircase2PointPrompt =>
+      'Докоснете 1-ви ъгъл, след това 2-ри за стълбище';
+
+  @override
   String get cancelSlab => 'Откажи плоча';
 
   @override

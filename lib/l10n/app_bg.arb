@@ -357,6 +357,7 @@
   "slabParallelAligned": "Прилепено към линия: {distance} m",
   "slabPointByPointPrompt": "Поставяйте точки със снап",
   "openingPointByPointPrompt": "Поставяйте точки на отвора със снап",
+  "staircase2PointPrompt": "Докоснете 1-ви ъгъл, след това 2-ри за стълбище",
   "cancelSlab": "Откажи плоча",
   "slabRectDimensions": "Плоча: {width} x {height} m",
   "moveElement": "Премести",

@@ -1212,6 +1212,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openingPointByPointPrompt => 'Tap point by point to draw opening';
 
   @override
+  String get staircase2PointPrompt =>
+      'Tap 1st corner, then drag or tap 2nd corner for staircase';
+
+  @override
   String get cancelSlab => 'Cancel slab';
 
   @override

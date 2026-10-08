@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -1480,6 +1481,135 @@ void main() {
 
     // Verify no RenderFlex overflow error was triggered
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ElementPaletteBar displays 2-point prompt and opposite corner tag for staircase opening', (tester) async {
+    tester.view.physicalSize = const Size(1200, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    bool cleared = false;
+    bool hasStart = false;
+    StateSetter? stateSetter;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('bg'),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              stateSetter = setState;
+              return ElementPaletteBar(
+                activeTool: StructuralDrawTool.slabOpening,
+                onSelectTool: (_) {},
+                currentColumnPreset: const StructuralColumn(
+                  id: 'c1',
+                  center: Offset.zero,
+                  width: 0.25,
+                  height: 0.50,
+                  thickness: 0.25,
+                ),
+                onUpdateColumnPreset: (_) {},
+                currentWallThickness: 0.25,
+                onUpdateWallThickness: (_) {},
+                currentBeamWidth: 0.25,
+                currentBeamDepth: 0.50,
+                currentSlabThickness: 0.20,
+                onUpdateSlabThickness: (_) {},
+                currentOpeningPreset: 'staircase',
+                onUpdateOpeningPreset: (_) {},
+                isDrawingOpening: true,
+                hasOpeningStartCorner: hasStart,
+                openingPointCount: 0,
+                onClearOpening: () {
+                  cleared = true;
+                  setState(() => hasStart = false);
+                },
+                currentAxisName: '1',
+                isDrawingSlab: false,
+                hasSlabStartCorner: false,
+                slabPointCount: 0,
+                onCloseSlab: () {},
+                onUndoPoint: () {},
+                onClearSlab: () {},
+                onRotateColumn: () {},
+                onOpenCantileverReport: () {},
+                analysisSummary: StructuralAnalysisSummary.empty,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // 1. When hasOpeningStartCorner == false: shows 2-point placement guidance prompt
+    expect(find.text('Докоснете 1-ви ъгъл, след това 2-ри за стълбище'), findsOneWidget);
+    expect(find.text('Отвор: избери срещуположен ъгъл'), findsNothing);
+
+    // 2. Switch hasOpeningStartCorner to true: shows opposite corner tag and cancel button
+    stateSetter!(() => hasStart = true);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Отвор: избери срещуположен ъгъл'), findsOneWidget);
+    final closeBtn = find.byIcon(Icons.close);
+    expect(closeBtn, findsOneWidget);
+
+    await tester.ensureVisible(closeBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(closeBtn);
+    await tester.pumpAndSettle();
+    expect(cleared, isTrue);
+    expect(find.text('Докоснете 1-ви ъгъл, след това 2-ри за стълбище'), findsOneWidget);
+  });
+
+  testWidgets('StructuralPointerPainter paints rubber-band rectangle with staircase treads for 2-point staircase placement', (tester) async {
+    final painter = StructuralPointerPainter(
+      touchPos: const Offset(200, 300),
+      targetPos: const Offset(200, 236),
+      snappedPos: const Offset(200, 236),
+      snappedPositions: const [Offset(200, 236)],
+      snapType: DxfSnapType.endpoint,
+      activeTool: StructuralDrawTool.slabOpening,
+      openingStartCornerPos: const Offset(100, 100),
+      activeOpeningType: SlabOpeningType.staircase,
+      liveDimensionText: '2.50 x 4.00 m',
+      scale: 100.0,
+      l10n: await AppLocalizations.delegate.load(const Locale('bg')),
+    );
+
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
+    painter.paint(canvas, const Size(800, 600));
+    final picture = recorder.endRecording();
+    expect(picture, isNotNull);
+  });
+
+  test('Structural2dPainter repaints correctly with 2-point staircase opening preview', () async {
+    final painter = Structural2dPainter(
+      currentStorey: const StoreyLevel(
+        id: 'L1',
+        name: 'Storey 1',
+        elevation: 0.0,
+        height: 3.0,
+      ),
+      activeTool: StructuralDrawTool.slabOpening,
+      openingStartCornerCad: const Offset(0.0, 0.0),
+      currentCursorCad: const Offset(2.4, 4.5),
+      activeOpeningType: SlabOpeningType.staircase,
+      cadToScene: (pt) => pt,
+      cadScale: 1.0,
+      l10n: await AppLocalizations.delegate.load(const Locale('bg')),
+    );
+
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
+    painter.paint(canvas, const Size(800, 600));
+    final picture = recorder.endRecording();
+    expect(picture, isNotNull);
   });
 }
 

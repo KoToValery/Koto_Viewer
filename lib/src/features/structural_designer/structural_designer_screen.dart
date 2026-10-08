@@ -3598,7 +3598,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _updateSlabVertexDrag(Offset screenPos) {
     if (_editingSlab == null || _draggingSlabVertexIndex == null) return;
 
-    final rawCad = _screenToCad(screenPos);
+    final bool isMouse = _activePointerKind == PointerDeviceKind.mouse;
+    final double offsetAboveFinger = isMouse ? 0.0 : 64.0;
+    final targetScreenPos = isMouse ? screenPos : (screenPos - Offset(0, offsetAboveFinger));
+
+    final rawCad = _screenToCad(targetScreenPos);
     DxfSnapResult? snap;
     if (_snapEnabled) {
       final double fitScale = _getCadFitScale();
@@ -3620,8 +3624,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final idx = _draggingSlabVertexIndex!;
 
     // Generous adaptive merge snap radius (48px touch / 36px mouse, 0.35m CAD)
-    final double mergeSnapRadiusScreen =
-        (_activePointerKind == PointerDeviceKind.mouse) ? 36.0 : 48.0;
+    final double mergeSnapRadiusScreen = isMouse ? 36.0 : 48.0;
     final double mergeSnapCadDist = 0.35 * _cadUnitsPerMeter;
 
     int? bestCandidate;
@@ -3630,7 +3633,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     for (int j = 0; j < count; j++) {
       if (j == idx) continue;
       final sPt = _cadToScreen(polygon[j]);
-      final screenDist = (screenPos - sPt).distance;
+      final screenDist = (targetScreenPos - sPt).distance;
       final cadDist = (effectiveCad - polygon[j]).distance;
 
       // Bonus radius for immediate adjacent neighbors (makes edge collapse very easy)
@@ -3651,13 +3654,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     if (bestCandidate != null) {
       effectiveCad = polygon[bestCandidate];
+      snap = DxfSnapResult(point: effectiveCad, type: DxfSnapType.endpoint, distance: 0);
     }
 
     if (bestCandidate != _mergeCandidateSlabVertexIndex) {
       HapticFeedback.selectionClick();
     }
 
+    final snappedScreen = snap != null ? _cadToScreen(effectiveCad) : null;
+
     setState(() {
+      _touchScreenPos = screenPos;
+      _targetScreenPos = targetScreenPos;
+      _snappedScreenPos = snappedScreen;
+      _snappedScreenPositions = snappedScreen != null ? [snappedScreen] : [];
+      _activeSnap = snap;
+      _currentCadCoord = effectiveCad;
       _draggingSlabVertexCad = effectiveCad;
       _mergeCandidateSlabVertexIndex = bestCandidate;
     });
@@ -3672,7 +3684,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final op = slab.openings[opIdx];
     final idx = _draggingOpeningVertexIndex!;
 
-    final rawCad = _screenToCad(screenPos);
+    final bool isMouse = _activePointerKind == PointerDeviceKind.mouse;
+    final double offsetAboveFinger = isMouse ? 0.0 : 64.0;
+    final targetScreenPos = isMouse ? screenPos : (screenPos - Offset(0, offsetAboveFinger));
+
+    final rawCad = _screenToCad(targetScreenPos);
     DxfSnapResult? snap;
     if (_snapEnabled) {
       final double fitScale = _getCadFitScale();
@@ -3689,8 +3705,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     Offset effectiveCad = snap?.point ?? rawCad;
 
     // Check snap-to-merge with ANY other vertex in the opening polygon
-    final double mergeSnapRadiusScreen =
-        (_activePointerKind == PointerDeviceKind.mouse) ? 36.0 : 48.0;
+    final double mergeSnapRadiusScreen = isMouse ? 36.0 : 48.0;
     final double mergeSnapCadDist = 0.35 * _cadUnitsPerMeter;
 
     int? bestCandidate;
@@ -3699,7 +3714,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     for (int j = 0; j < op.length; j++) {
       if (j == idx) continue;
       final sPt = _cadToScreen(op[j]);
-      final screenDist = (screenPos - sPt).distance;
+      final screenDist = (targetScreenPos - sPt).distance;
       final cadDist = (effectiveCad - op[j]).distance;
 
       final bool isAdjacent = (j == (idx - 1 + op.length) % op.length) || (j == (idx + 1) % op.length);
@@ -3719,13 +3734,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     if (bestCandidate != null) {
       effectiveCad = op[bestCandidate];
+      snap = DxfSnapResult(point: effectiveCad, type: DxfSnapType.endpoint, distance: 0);
     }
 
     if (bestCandidate != _mergeCandidateOpeningVertexIndex) {
       HapticFeedback.selectionClick();
     }
 
+    final snappedScreen = snap != null ? _cadToScreen(effectiveCad) : null;
+
     setState(() {
+      _touchScreenPos = screenPos;
+      _targetScreenPos = targetScreenPos;
+      _snappedScreenPos = snappedScreen;
+      _snappedScreenPositions = snappedScreen != null ? [snappedScreen] : [];
+      _activeSnap = snap;
+      _currentCadCoord = effectiveCad;
       _draggingOpeningVertexCad = effectiveCad;
       _mergeCandidateOpeningVertexIndex = bestCandidate;
     });
@@ -4639,13 +4663,37 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
         _liveDimensionText = null;
       } else if (_activeTool == StructuralDrawTool.slabOpening) {
-        if (_openingPointsCad.length >= 3 &&
+        if (_selectedOpeningPreset == 'staircase' && _openingStartCad != null) {
+          snap = _findStructuralSnap(rawCad, toleranceCad) ??
+              DxfSnapHelper.findSnapPoint(
+                document: _document,
+                cadPoint: rawCad,
+                toleranceCad: toleranceCad,
+                allowNearest: false,
+              );
+          if (snap != null) {
+            effectiveCad = snap.point;
+            snappedScreen = _cadToScreen(snap.point);
+            _snappedScreenPositions = [snappedScreen];
+          } else {
+            _snappedScreenPositions = [];
+          }
+
+          final wM = (effectiveCad.dx - _openingStartCad!.dx).abs() / _cadUnitsPerMeter;
+          final hM = (effectiveCad.dy - _openingStartCad!.dy).abs() / _cadUnitsPerMeter;
+          _liveDimensionText = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
+        } else if (_openingPointsCad.length >= 3 &&
             (rawCad - _openingPointsCad.first).distance <= toleranceCad) {
           snap = DxfSnapResult(
             point: _openingPointsCad.first,
             type: DxfSnapType.endpoint,
             distance: (rawCad - _openingPointsCad.first).distance,
           );
+          effectiveCad = snap.point;
+          snappedScreen = _cadToScreen(snap.point);
+          _snappedScreenPositions = [snappedScreen];
+          final lenM = (effectiveCad - _openingPointsCad.last).distance / _cadUnitsPerMeter;
+          _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
         } else {
           snap = _findStructuralSnap(rawCad, toleranceCad) ??
               DxfSnapHelper.findSnapPoint(
@@ -4654,21 +4702,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 toleranceCad: toleranceCad,
                 allowNearest: false,
               );
-        }
 
-        if (snap != null) {
-          effectiveCad = snap.point;
-          snappedScreen = _cadToScreen(snap.point);
-          _snappedScreenPositions = [snappedScreen];
-        } else {
-          _snappedScreenPositions = [];
-        }
+          if (snap != null) {
+            effectiveCad = snap.point;
+            snappedScreen = _cadToScreen(snap.point);
+            _snappedScreenPositions = [snappedScreen];
+          } else {
+            _snappedScreenPositions = [];
+          }
 
-        if (_openingPointsCad.isNotEmpty) {
-          final lenM = (effectiveCad - _openingPointsCad.last).distance / _cadUnitsPerMeter;
-          _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
-        } else {
-          _liveDimensionText = null;
+          if (_openingPointsCad.isNotEmpty) {
+            final lenM = (effectiveCad - _openingPointsCad.last).distance / _cadUnitsPerMeter;
+            _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
+          } else {
+            _liveDimensionText = null;
+          }
         }
       } else if (_activeTool == StructuralDrawTool.shearWall || _isMovingShearWall) {
         final wallL = (_isMovingShearWall && _selectedShearWall != null)
@@ -4871,6 +4919,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       } else if (_activeTool == StructuralDrawTool.slab && _slabPointsCad.isNotEmpty) {
         final lenM = (rawCad - _slabPointsCad.last).distance / _cadUnitsPerMeter;
         _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
+      } else if (_activeTool == StructuralDrawTool.slabOpening &&
+          _selectedOpeningPreset == 'staircase' &&
+          _openingStartCad != null) {
+        final wM = (rawCad.dx - _openingStartCad!.dx).abs() / _cadUnitsPerMeter;
+        final hM = (rawCad.dy - _openingStartCad!.dy).abs() / _cadUnitsPerMeter;
+        _liveDimensionText = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
       } else if (_activeTool == StructuralDrawTool.slabOpening && _openingPointsCad.isNotEmpty) {
         final lenM = (rawCad - _openingPointsCad.last).distance / _cadUnitsPerMeter;
         _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
@@ -5166,6 +5220,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingSlabVertexIndex = null;
         _draggingSlabVertexCad = null;
         _mergeCandidateSlabVertexIndex = null;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _snappedScreenPositions = [];
+        _activeSnap = null;
       });
       return;
     }
@@ -5218,6 +5277,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingOpeningVertexIndex = null;
         _draggingOpeningVertexCad = null;
         _mergeCandidateOpeningVertexIndex = null;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _snappedScreenPositions = [];
+        _activeSnap = null;
       });
       return;
     }
@@ -5676,6 +5740,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _isMovingColumn = false;
       _isMovingShearWall = false;
       _isPlacingWithHold = true;
+      if (_activeTool == StructuralDrawTool.slabOpening &&
+          _selectedOpeningPreset == 'staircase' &&
+          _openingStartCad == null) {
+        _openingStartCad = _currentCadCoord ?? _screenToCad(details.localPosition);
+      }
     });
     _updatePointer(details.localPosition, isMouse: false);
   }
@@ -5789,6 +5858,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingSlabVertexIndex = null;
         _draggingSlabVertexCad = null;
         _mergeCandidateSlabVertexIndex = null;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _snappedScreenPositions = [];
+        _activeSnap = null;
       });
       return;
     }
@@ -5826,6 +5900,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingOpeningVertexIndex = null;
         _draggingOpeningVertexCad = null;
         _mergeCandidateOpeningVertexIndex = null;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _snappedScreenPositions = [];
+        _activeSnap = null;
       });
       return;
     }
@@ -5951,6 +6030,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingSlabVertexIndex = null;
         _draggingSlabVertexCad = null;
         _mergeCandidateSlabVertexIndex = null;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _snappedScreenPositions = [];
+        _activeSnap = null;
       });
     }
     if (_draggingOpeningVertexIndex != null) {
@@ -5958,6 +6042,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingOpeningVertexIndex = null;
         _draggingOpeningVertexCad = null;
         _mergeCandidateOpeningVertexIndex = null;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _snappedScreenPositions = [];
+        _activeSnap = null;
       });
     }
     if (_isMovingShearWall) {
@@ -6004,7 +6093,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _commitPlacement(cadPt);
       return;
     }
-    if (_activeTool == StructuralDrawTool.slabOpening && _openingPointsCad.isNotEmpty) {
+    if (_activeTool == StructuralDrawTool.slabOpening &&
+        (_openingPointsCad.isNotEmpty || _openingStartCad != null)) {
       final cadPt = _currentCadCoord ?? _screenToCad(details.localPosition);
       _commitPlacement(cadPt);
       return;
@@ -6112,7 +6202,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           HapticFeedback.selectionClick();
           return;
         }
-        final cadPt = _screenToCad(details.localPosition);
+        final cadPt = _currentCadCoord ?? _screenToCad(details.localPosition);
         _commitPlacement(cadPt);
         return;
 
@@ -6447,6 +6537,41 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         });
       }
     } else if (_activeTool == StructuralDrawTool.slabOpening) {
+      if (_selectedOpeningPreset == 'staircase') {
+        if (_openingStartCad == null) {
+          setState(() {
+            _openingStartCad = cadCoord;
+          });
+          HapticFeedback.lightImpact();
+        } else {
+          final c1 = _openingStartCad!;
+          final c2 = cadCoord;
+          final minX = math.min(c1.dx, c2.dx);
+          final maxX = math.max(c1.dx, c2.dx);
+          final minY = math.min(c1.dy, c2.dy);
+          final maxY = math.max(c1.dy, c2.dy);
+          final wCad = maxX - minX;
+          final hCad = maxY - minY;
+          if (wCad >= 0.20 * scale && hCad >= 0.20 * scale) {
+            final opPoly = [
+              Offset(minX, maxY),
+              Offset(maxX, maxY),
+              Offset(maxX, minY),
+              Offset(minX, minY),
+            ];
+            _addOpeningToSlab(opPoly, type: SlabOpeningType.staircase);
+            setState(() {
+              _openingStartCad = null;
+              _liveDimensionText = null;
+            });
+            HapticFeedback.heavyImpact();
+          } else {
+            HapticFeedback.vibrate();
+          }
+        }
+        return;
+      }
+
       if (_openingPointsCad.length >= 3) {
         final distToFirst = (cadCoord - _openingPointsCad.first).distance;
         final double fitScale = _getCadFitScale();
@@ -8572,7 +8697,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         onGenerateSlabs: _generateSlabSeeds,
                         currentOpeningPreset: _selectedOpeningPreset,
                         onUpdateOpeningPreset: (preset) {
-                          setState(() => _selectedOpeningPreset = preset);
+                          setState(() {
+                            _selectedOpeningPreset = preset;
+                            _openingPointsCad.clear();
+                            _openingStartCad = null;
+                            _liveDimensionText = null;
+                          });
                         },
                         onRotateOpening: _rotateActiveOpeningPreset,
                         hasOpeningStartCorner: _openingStartCad != null,
