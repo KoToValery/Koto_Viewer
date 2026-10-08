@@ -121,7 +121,26 @@ class StructuralPointerPainter extends CustomPainter {
     canvas.drawCircle(touchPos, 18, touchBorder);
     canvas.drawCircle(touchPos, 3.5, touchDot);
 
-    // 2. Guideline Stem connecting finger to the offset target
+    // 2. Guideline Stem connecting finger to the start / top end of the element
+    Offset guideConnectionPoint = effectiveTip;
+    if (activeTool == StructuralDrawTool.column && previewColumn != null) {
+      final double h = previewColumn!.height * scale;
+      final double rot = previewColumn!.rotationRad;
+      if (rot.abs() < 1e-4) {
+        guideConnectionPoint = Offset(effectiveTip.dx, effectiveTip.dy - h / 2.0);
+      } else {
+        guideConnectionPoint = effectiveTip +
+            Offset(math.sin(rot) * (h / 2.0), -math.cos(rot) * (h / 2.0));
+      }
+    } else if (activeTool == StructuralDrawTool.shearWall && previewWallLengthScreen != null) {
+      final rot = previewWallRotationRad ?? 0.0;
+      final u = Offset(math.cos(rot), math.sin(rot));
+      final halfLen = previewWallLengthScreen! / 2.0;
+      guideConnectionPoint = effectiveTip - u * halfLen;
+    } else if (activeTool == StructuralDrawTool.beam && beamStartPos != null) {
+      guideConnectionPoint = beamStartPos!;
+    }
+
     final stemPaint = Paint()
       ..color = themeColor.withValues(alpha: 0.5)
       ..style = PaintingStyle.stroke
@@ -130,7 +149,7 @@ class StructuralPointerPainter extends CustomPainter {
 
     final stemPath = Path()
       ..moveTo(touchPos.dx, touchPos.dy - 18)
-      ..lineTo(effectiveTip.dx, effectiveTip.dy);
+      ..lineTo(guideConnectionPoint.dx, guideConnectionPoint.dy);
 
     canvas.drawPath(stemPath, stemPaint);
 
@@ -341,9 +360,20 @@ class StructuralPointerPainter extends CustomPainter {
         ..strokeWidth = 2.0;
       final w = previewColumn!.width * scale;
       final h = previewColumn!.height * scale;
-      final rect = Rect.fromCenter(center: effectiveTip, width: w, height: h);
-      canvas.drawRect(rect, colFill);
-      canvas.drawRect(rect, colBorder);
+      final rot = previewColumn!.rotationRad;
+      if (rot.abs() < 1e-4) {
+        final rect = Rect.fromCenter(center: effectiveTip, width: w, height: h);
+        canvas.drawRect(rect, colFill);
+        canvas.drawRect(rect, colBorder);
+      } else {
+        canvas.save();
+        canvas.translate(effectiveTip.dx, effectiveTip.dy);
+        canvas.rotate(rot);
+        final rect = Rect.fromCenter(center: Offset.zero, width: w, height: h);
+        canvas.drawRect(rect, colFill);
+        canvas.drawRect(rect, colBorder);
+        canvas.restore();
+      }
     }
 
     // 4c. Active measurement ruler line and architectural ticks

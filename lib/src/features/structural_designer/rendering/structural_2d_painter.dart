@@ -165,10 +165,29 @@ class Structural2dPainter extends CustomPainter {
       _drawGhostStorey(canvas, ghostStorey!);
     }
 
-    // 2. The active storey owns its ceiling slabs; picking uses the same list.
+    // 1b. Draw Overhead Slabs from the storey above (read-only ceiling underlay visible on the level below)
+    if (overheadStorey != null && overheadStorey!.slabs.isNotEmpty) {
+      for (int i = 0; i < overheadStorey!.slabs.length; i++) {
+        _drawSlab(
+          canvas,
+          overheadStorey!.slabs[i],
+          slabIndex: i,
+          isGhost: false,
+          isOverheadFromAbove: true,
+        );
+      }
+    }
+
+    // 2. The active storey owns its floor slabs; picking uses the same list.
     if (currentStorey.slabs.isNotEmpty) {
       for (int i = 0; i < currentStorey.slabs.length; i++) {
-        _drawSlab(canvas, currentStorey.slabs[i], slabIndex: i, isGhost: false);
+        _drawSlab(
+          canvas,
+          currentStorey.slabs[i],
+          slabIndex: i,
+          isGhost: false,
+          isOverheadFromAbove: false,
+        );
       }
     }
 
@@ -429,11 +448,14 @@ class Structural2dPainter extends CustomPainter {
     if (isGhost || slab.polygon.length < 3) return;
 
     final centroidScene = cadToScene(slab.centroid);
-    final overheadElev = currentStorey.structuralElevationFor(slab);
+    final overheadElev = isOverheadFromAbove && overheadStorey != null
+        ? overheadStorey!.structuralElevationFor(slab)
+        : currentStorey.structuralElevationFor(slab);
     final int thickCm = (slab.thickness * 100).round();
 
     final sign = overheadElev > 0 ? '+' : (overheadElev == 0 ? '±' : '');
     final elevStr = '$sign${overheadElev.toStringAsFixed(2)}';
+    final tagStr = isOverheadFromAbove && l10n != null ? ' (${l10n!.overheadSlabTag})' : '';
 
     canvas.save();
     canvas.translate(centroidScene.dx, centroidScene.dy);
@@ -441,7 +463,7 @@ class Structural2dPainter extends CustomPainter {
 
     // Concise architectural section level marker (only elevation and thickness)
     final elevSpan = TextSpan(
-      text: '↑ $elevStr',
+      text: '↑ $elevStr$tagStr',
       style: const TextStyle(
         color: Colors.white,
         fontSize: 11.5,
@@ -534,7 +556,7 @@ class Structural2dPainter extends CustomPainter {
   }) {
     if (slab.polygon.length < 3) return;
 
-    final isSelected = !isGhost && (slab.id == selectedSlabId);
+    final isSelected = !isGhost && !isOverheadFromAbove && (slab.id == selectedSlabId);
     List<Offset> polygon = slab.polygon;
     if (isSelected &&
         draggingSlabVertexIndex != null &&
@@ -566,27 +588,36 @@ class Structural2dPainter extends CustomPainter {
       }
     }
 
-    final slabColor = _getSlabBaseColor(slab, slabIndex);
+    // Overhead slab from level above uses distinct violet/amethyst Color(0xFF7E57C2)
+    final slabColor = isOverheadFromAbove
+        ? const Color(0xFF7E57C2)
+        : _getSlabBaseColor(slab, slabIndex);
 
     final fillPaint = Paint()
-      ..color = isGhost
-          ? slabColor.withValues(alpha: 0.08)
-          : (isSelected
-              ? slabColor.withValues(alpha: 0.35)
-              : slabColor.withValues(alpha: 0.18))
+      ..color = isOverheadFromAbove
+          ? const Color(0xFF7E57C2).withValues(alpha: 0.12)
+          : (isGhost
+              ? slabColor.withValues(alpha: 0.08)
+              : (isSelected
+                  ? slabColor.withValues(alpha: 0.35)
+                  : slabColor.withValues(alpha: 0.18)))
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
-      ..color = isGhost
-          ? slabColor.withValues(alpha: 0.35)
-          : (isSelected ? Colors.white : slabColor)
+      ..color = isOverheadFromAbove
+          ? const Color(0xFFB39DDB)
+          : (isGhost
+              ? slabColor.withValues(alpha: 0.35)
+              : (isSelected ? Colors.white : slabColor))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isGhost
-          ? (1.0 / zoomScale)
-          : (isSelected ? (2.5 / zoomScale) : (1.8 / zoomScale));
+      ..strokeWidth = isOverheadFromAbove
+          ? (1.5 / zoomScale)
+          : (isGhost
+              ? (1.0 / zoomScale)
+              : (isSelected ? (2.5 / zoomScale) : (1.8 / zoomScale)));
 
     final bool isSlabTool = activeTool == StructuralDrawTool.slab;
-    if (isSlabTool) {
+    if (isSlabTool || isOverheadFromAbove) {
       canvas.drawPath(path, fillPaint);
     }
 

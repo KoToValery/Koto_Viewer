@@ -2822,11 +2822,11 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
-  String get ceilingSlabTitle => 'Плоча над етажа';
+  String get ceilingSlabTitle => 'Подова плоча на етажа';
 
   @override
   String ceilingSlabContext(String level) {
-    return 'Архитектурна основа $level · изглед нагоре';
+    return 'Етаж $level · конструктивна подова плоча';
   }
 
   @override
@@ -2842,11 +2842,14 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get ceilingSlabLevelHint =>
-      'Без зададена кота: основа + височина − настилка. Зададената кота е за бетон и настилка не се изважда повторно. Промяната на дебелината запазва горния ръб.';
+      'Ниво на плочата: кота на етажа − настилка. Зададената кота е за бетон. Промяната на дебелината запазва горния ръб.';
 
   @override
   String get ceilingSlabInvalid =>
-      'Въведете крайни числа, положителна дебелина и долен ръб над котата на основата.';
+      'Въведете валидни числови стойности и положителна дебелина.';
+
+  @override
+  String get overheadSlabTag => 'Плоча над етажа (таван)';
 
   @override
   String get slabEdgeOffset => 'Отместване на ръб';

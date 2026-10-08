@@ -47,7 +47,6 @@ class _SlabLevelDialogState extends State<SlabLevelDialog> {
         : widget.storey.structuralElevationFor(
             widget.slab.copyWith(clearTopElevation: true),
           );
-    final base = widget.storey.elevation;
     return AlertDialog(
       title: Text(context.l10n.ceilingSlabTitle),
       content: SingleChildScrollView(
@@ -127,11 +126,7 @@ class _SlabLevelDialogState extends State<SlabLevelDialog> {
                 : widget.storey.structuralElevationFor(
                     widget.slab.copyWith(clearTopElevation: true),
                   );
-            if (!h.isFinite ||
-                h <= 0 ||
-                !z.isFinite ||
-                !base.isFinite ||
-                z - h <= base) {
+            if (!h.isFinite || h <= 0 || !z.isFinite) {
               setState(() => error = true);
               return;
             }

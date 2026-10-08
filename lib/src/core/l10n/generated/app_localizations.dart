@@ -4850,13 +4850,13 @@ abstract class AppLocalizations {
   /// No description provided for @ceilingSlabTitle.
   ///
   /// In en, this message translates to:
-  /// **'Slab above the storey'**
+  /// **'Storey floor slab'**
   String get ceilingSlabTitle;
 
   /// No description provided for @ceilingSlabContext.
   ///
   /// In en, this message translates to:
-  /// **'Architectural underlay {level} · looking up'**
+  /// **'Storey {level} · structural floor slab'**
   String ceilingSlabContext(String level);
 
   /// No description provided for @ceilingExplicitLevel.
@@ -4880,14 +4880,20 @@ abstract class AppLocalizations {
   /// No description provided for @ceilingSlabLevelHint.
   ///
   /// In en, this message translates to:
-  /// **'Without an explicit level: base + storey height − finish. An explicit level is concrete; finish is not subtracted again. Thickness changes retain the top.'**
+  /// **'Floor level: storey elevation − finish screed. Explicit level sets top of concrete directly. Changing thickness retains the top surface.'**
   String get ceilingSlabLevelHint;
 
   /// No description provided for @ceilingSlabInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Enter finite values, positive thickness and a soffit above the base elevation.'**
+  /// **'Enter valid numeric values and a positive thickness.'**
   String get ceilingSlabInvalid;
+
+  /// Tag indicating the slab is from the floor above serving as a ceiling
+  ///
+  /// In en, this message translates to:
+  /// **'Overhead slab (ceiling)'**
+  String get overheadSlabTag;
 
   /// No description provided for @slabEdgeOffset.
   ///

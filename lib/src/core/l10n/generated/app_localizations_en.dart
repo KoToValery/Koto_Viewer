@@ -2812,11 +2812,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get ceilingSlabTitle => 'Slab above the storey';
+  String get ceilingSlabTitle => 'Storey floor slab';
 
   @override
   String ceilingSlabContext(String level) {
-    return 'Architectural underlay $level · looking up';
+    return 'Storey $level · structural floor slab';
   }
 
   @override
@@ -2832,11 +2832,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ceilingSlabLevelHint =>
-      'Without an explicit level: base + storey height − finish. An explicit level is concrete; finish is not subtracted again. Thickness changes retain the top.';
+      'Floor level: storey elevation − finish screed. Explicit level sets top of concrete directly. Changing thickness retains the top surface.';
 
   @override
   String get ceilingSlabInvalid =>
-      'Enter finite values, positive thickness and a soffit above the base elevation.';
+      'Enter valid numeric values and a positive thickness.';
+
+  @override
+  String get overheadSlabTag => 'Overhead slab (ceiling)';
 
   @override
   String get slabEdgeOffset => 'Offset edge';

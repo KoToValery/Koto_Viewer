@@ -368,12 +368,13 @@ void main() {
     });
   });
 
-  group('Structural 3D Mesh Builder - Ceiling Level Positioning', () {
-    test('slabs and beams sit at ceiling level (zTop = elevation + storeyHeight)', () {
-      final storey = StoreyLevel(
+  group('Structural 3D Mesh Builder - Storey Slab Level Positioning', () {
+    test('floor slabs sit at storey level elevation and form the ceiling for the storey below', () {
+      final storey1 = StoreyLevel(
         id: 's1',
         name: 'Floor 1',
         elevation: 0.0,
+        floorFinishThickness: 0.0,
         height: 3.0,
         columns: const [
           StructuralColumn(
@@ -407,8 +408,28 @@ void main() {
         ],
       );
 
+      final storey2 = StoreyLevel(
+        id: 's2',
+        name: 'Floor 2',
+        elevation: 3.0,
+        floorFinishThickness: 0.0,
+        height: 3.0,
+        slabs: const [
+          StructuralSlab(
+            id: 'sl2',
+            thickness: 0.20,
+            polygon: [
+              Offset(0, 0),
+              Offset(4, 0),
+              Offset(4, 4),
+              Offset(0, 4),
+            ],
+          ),
+        ],
+      );
+
       final project = StructuralProject(
-        storeys: [storey],
+        storeys: [storey1, storey2],
       );
 
       final mesh = Structural3dMeshBuilder.buildProjectMesh(project);
@@ -416,29 +437,35 @@ void main() {
       // Verify that triangles are generated
       expect(mesh.triangles.isNotEmpty, isTrue);
 
-      // Find the maximum Z across all triangle vertices
-      double maxZ = -double.infinity;
-      for (final t in mesh.triangles) {
-        maxZ = math.max(maxZ, math.max(t.v0.z, math.max(t.v1.z, t.v2.z)));
-      }
+      // Storey 1 floor slab: top surface at Z = 0.0, soffit at Z = -0.20
+      final s1FloorTriangles = mesh.triangles.where((t) =>
+        (t.v0.z - 0.0).abs() < 1e-3 &&
+        (t.v1.z - 0.0).abs() < 1e-3 &&
+        (t.v2.z - 0.0).abs() < 1e-3
+      ).toList();
+      expect(s1FloorTriangles.isNotEmpty, isTrue, reason: 'Storey 1 floor slab top surface must be at Z = 0.0');
 
-      // Column height is 3.0, so the top of the columns and the slab ceiling is at Z = 3.0
-      expect(maxZ, closeTo(3.0, 1e-3));
+      final s1SoffitTriangles = mesh.triangles.where((t) =>
+        (t.v0.z - (-0.20)).abs() < 1e-3 &&
+        (t.v1.z - (-0.20)).abs() < 1e-3 &&
+        (t.v2.z - (-0.20)).abs() < 1e-3
+      ).toList();
+      expect(s1SoffitTriangles.isNotEmpty, isTrue, reason: 'Storey 1 floor slab soffit must be at Z = -0.20');
 
-      // Check that slab triangles have top surface at Z = 3.0 (ceiling) and bottom surface at Z = 2.80
-      final ceilingTriangles = mesh.triangles.where((t) =>
+      // Storey 2 slab (ceiling above Storey 1): top surface at Z = 3.0, soffit at Z = 2.80
+      final s2CeilingTriangles = mesh.triangles.where((t) =>
         (t.v0.z - 3.0).abs() < 1e-3 &&
         (t.v1.z - 3.0).abs() < 1e-3 &&
         (t.v2.z - 3.0).abs() < 1e-3
       ).toList();
-      expect(ceilingTriangles.isNotEmpty, isTrue, reason: 'Slab top surface must be at ceiling level Z = 3.0');
+      expect(s2CeilingTriangles.isNotEmpty, isTrue, reason: 'Storey 2 slab top surface must be at Z = 3.0');
 
-      final slabBottomTriangles = mesh.triangles.where((t) =>
+      final s2SoffitTriangles = mesh.triangles.where((t) =>
         (t.v0.z - 2.80).abs() < 1e-3 &&
         (t.v1.z - 2.80).abs() < 1e-3 &&
         (t.v2.z - 2.80).abs() < 1e-3
       ).toList();
-      expect(slabBottomTriangles.isNotEmpty, isTrue, reason: 'Slab bottom surface must be at Z = 2.80 (3.0 - 0.20)');
+      expect(s2SoffitTriangles.isNotEmpty, isTrue, reason: 'Storey 2 slab soffit must be at Z = 2.80');
     });
   });
 }

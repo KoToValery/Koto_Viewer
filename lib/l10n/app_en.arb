@@ -2284,8 +2284,8 @@
   "seismicLinkAbsent": "no overlap — review",
   "seismicRegionTrackingItem": "{storey}, region {region} → {lower}, regions {matches}: {coverage}; {status}. Geometric link, not a verified load path.",
   "@seismicRegionTrackingItem": {"placeholders":{"storey":{"type":"String"},"region":{"type":"int"},"lower":{"type":"String"},"matches":{"type":"String"},"coverage":{"type":"String"},"status":{"type":"String"}}},
-  "ceilingSlabTitle": "Slab above the storey",
-  "ceilingSlabContext": "Architectural underlay {level} · looking up",
+  "ceilingSlabTitle": "Storey floor slab",
+  "ceilingSlabContext": "Storey {level} · structural floor slab",
   "@ceilingSlabContext": {
     "placeholders": {
       "level": {
@@ -2306,8 +2306,12 @@
       }
     }
   },
-  "ceilingSlabLevelHint": "Without an explicit level: base + storey height − finish. An explicit level is concrete; finish is not subtracted again. Thickness changes retain the top.",
-  "ceilingSlabInvalid": "Enter finite values, positive thickness and a soffit above the base elevation.",
+  "ceilingSlabLevelHint": "Floor level: storey elevation − finish screed. Explicit level sets top of concrete directly. Changing thickness retains the top surface.",
+  "ceilingSlabInvalid": "Enter valid numeric values and a positive thickness.",
+  "overheadSlabTag": "Overhead slab (ceiling)",
+  "@overheadSlabTag": {
+    "description": "Tag indicating the slab is from the floor above serving as a ceiling"
+  },
 
   "slabEdgeOffset": "Offset edge",
   "slabEdgeNumber": "Edge",

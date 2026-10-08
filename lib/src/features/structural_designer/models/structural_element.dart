@@ -1920,10 +1920,10 @@ class StoreyLevel {
       gridAxes.isNotEmpty;
 
   /// Computes the structural elevation (Конструктивна кота) for [slab].
-  /// Calculated as explicit top elevation, or ceiling level (base + height - finish).
+  /// Calculated as explicit top elevation, or storey floor level (base elevation - finish).
   double structuralElevationFor(StructuralSlab slab) {
     return slab.topElevation ??
-        (elevation + height - (slab.floorFinish ?? floorFinishThickness));
+        (elevation - (slab.floorFinish ?? floorFinishThickness));
   }
 
   /// Absolute elevation of the underside of [slab] concrete in metres.

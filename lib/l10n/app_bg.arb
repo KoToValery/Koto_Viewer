@@ -806,8 +806,8 @@
   "seismicLinkAbsent": "без застъпване — преглед",
   "seismicRegionTrackingItem": "{storey}, област {region} → {lower}, области {matches}: {coverage}; {status}. Геометрична връзка, не доказан път на усилията.",
   "@seismicRegionTrackingItem": {"placeholders":{"storey":{"type":"String"},"region":{"type":"int"},"lower":{"type":"String"},"matches":{"type":"String"},"coverage":{"type":"String"},"status":{"type":"String"}}},
-  "ceilingSlabTitle": "Плоча над етажа",
-  "ceilingSlabContext": "Архитектурна основа {level} · изглед нагоре",
+  "ceilingSlabTitle": "Подова плоча на етажа",
+  "ceilingSlabContext": "Етаж {level} · конструктивна подова плоча",
   "@ceilingSlabContext": {
     "placeholders": {
       "level": {
@@ -828,8 +828,9 @@
       }
     }
   },
-  "ceilingSlabLevelHint": "Без зададена кота: основа + височина − настилка. Зададената кота е за бетон и настилка не се изважда повторно. Промяната на дебелината запазва горния ръб.",
-  "ceilingSlabInvalid": "Въведете крайни числа, положителна дебелина и долен ръб над котата на основата.",
+  "ceilingSlabLevelHint": "Ниво на плочата: кота на етажа − настилка. Зададената кота е за бетон. Промяната на дебелината запазва горния ръб.",
+  "ceilingSlabInvalid": "Въведете валидни числови стойности и положителна дебелина.",
+  "overheadSlabTag": "Плоча над етажа (таван)",
 
   "slabEdgeOffset": "Отместване на ръб",
   "slabEdgeNumber": "Ръб",

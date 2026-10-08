@@ -4469,48 +4469,104 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final colRot = (_isMovingColumn && _selectedColumn != null)
             ? _selectedColumn!.rotationRad
             : _currentColumnPreset.rotationRad;
+        final colShape = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.shape
+            : _currentColumnPreset.shape;
+        final colThick = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.thickness
+            : _currentColumnPreset.thickness * _cadUnitsPerMeter;
+        final colMirrored = (_isMovingColumn && _selectedColumn != null)
+            ? _selectedColumn!.isMirrored
+            : _currentColumnPreset.isMirrored;
 
-        final mag = StructuralMagneticAlignmentHelper.alignColumn(
-          rawCenter: rawCad,
-          columnWidth: colW,
-          columnHeight: colH,
-          columnRotationRad: colRot,
-          toleranceCad: toleranceCad,
-          activeStorey: _project.activeStorey,
-          movingColumnId: _isMovingColumn ? _selectedColumn?.id : null,
-          dxfDocument: _document,
-          cadUnitsPerMeter: _cadUnitsPerMeter,
-          axisLockMode: effectiveLockMode,
-          anchorCenter: _elementMoveOriginalCenter ?? _selectedColumn?.center,
-          previousSnappedCenter: _lastSnappedCad,
+        // 1. Column Corners Snapping (ъгли на колоната към крайни точки, ъгли и оси)
+        final dummyCol = StructuralColumn(
+          id: 'dummy_col',
+          center: Offset.zero,
+          shape: colShape,
+          width: colW,
+          height: colH,
+          rotationRad: colRot,
+          thickness: colThick,
+          isMirrored: colMirrored,
         );
-        if (mag != null) {
-          effectiveCad = mag.snappedCenter;
-          _activeMagneticGuides = mag.guideLines;
-          _liveDimensionText = mag.liveDimensionText;
-          _activeDynamicDimensionLine = mag.dimensionLine;
-          _lastSnappedCad = effectiveCad;
-        } else {
-          snap = _findStructuralSnap(rawCad, toleranceCad) ??
+        final cornerOffsets = dummyCol.polygonVertices;
+
+        DxfSnapResult? bestCornerSnap;
+        Offset? bestCandidateCenter;
+        double minCornerDist = toleranceCad;
+
+        for (final cornerOffset in cornerOffsets) {
+          final p = rawCad + cornerOffset;
+          final s = _findStructuralSnap(p, toleranceCad) ??
               DxfSnapHelper.findSnapPoint(
                 document: _document,
-                cadPoint: rawCad,
+                cadPoint: p,
                 toleranceCad: toleranceCad,
                 allowNearest: false,
               );
-          if (snap != null) {
-            effectiveCad = snap.point;
-            snappedScreen = _cadToScreen(snap.point);
-            _snappedScreenPositions = [snappedScreen];
-            _lastSnappedCad = effectiveCad;
-          } else {
-            effectiveCad = rawCad;
-            _snappedScreenPositions = [];
-            _lastSnappedCad = null;
+          if (s != null) {
+            final d = (p - s.point).distance;
+            if (d < minCornerDist) {
+              minCornerDist = d;
+              bestCornerSnap = s;
+              bestCandidateCenter = s.point - cornerOffset;
+            }
           }
+        }
+
+        if (bestCandidateCenter != null) {
+          effectiveCad = bestCandidateCenter;
+          snap = bestCornerSnap;
+          snappedScreen = _cadToScreen(bestCornerSnap!.point);
+          _snappedScreenPositions = [snappedScreen];
+          _lastSnappedCad = effectiveCad;
           _activeMagneticGuides = null;
           _liveDimensionText = null;
           _activeDynamicDimensionLine = null;
+        } else {
+          final mag = StructuralMagneticAlignmentHelper.alignColumn(
+            rawCenter: rawCad,
+            columnWidth: colW,
+            columnHeight: colH,
+            columnRotationRad: colRot,
+            toleranceCad: toleranceCad,
+            activeStorey: _project.activeStorey,
+            movingColumnId: _isMovingColumn ? _selectedColumn?.id : null,
+            dxfDocument: _document,
+            cadUnitsPerMeter: _cadUnitsPerMeter,
+            axisLockMode: effectiveLockMode,
+            anchorCenter: _elementMoveOriginalCenter ?? _selectedColumn?.center,
+            previousSnappedCenter: _lastSnappedCad,
+          );
+          if (mag != null) {
+            effectiveCad = mag.snappedCenter;
+            _activeMagneticGuides = mag.guideLines;
+            _liveDimensionText = mag.liveDimensionText;
+            _activeDynamicDimensionLine = mag.dimensionLine;
+            _lastSnappedCad = effectiveCad;
+          } else {
+            snap = _findStructuralSnap(rawCad, toleranceCad) ??
+                DxfSnapHelper.findSnapPoint(
+                  document: _document,
+                  cadPoint: rawCad,
+                  toleranceCad: toleranceCad,
+                  allowNearest: false,
+                );
+            if (snap != null) {
+              effectiveCad = snap.point;
+              snappedScreen = _cadToScreen(snap.point);
+              _snappedScreenPositions = [snappedScreen];
+              _lastSnappedCad = effectiveCad;
+            } else {
+              effectiveCad = rawCad;
+              _snappedScreenPositions = [];
+              _lastSnappedCad = null;
+            }
+            _activeMagneticGuides = null;
+            _liveDimensionText = null;
+            _activeDynamicDimensionLine = null;
+          }
         }
       } else if (_isMovingOpening) {
         // Multi-edge and multi-corner weighted snapping for openings (edges snap to axes/walls, corners to landmarks)
@@ -4729,48 +4785,107 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final wallRot = (_isMovingShearWall && _selectedShearWall != null)
             ? _selectedShearWall!.angleRad
             : _currentWallRotationRad;
+        final wallRef = (_isMovingShearWall && _selectedShearWall != null)
+            ? _selectedShearWall!.referenceLine
+            : ShearWallReferenceLine.center;
+        final wallFlipped = (_isMovingShearWall && _selectedShearWall != null)
+            ? _selectedShearWall!.isFlipped
+            : false;
 
-        final mag = StructuralMagneticAlignmentHelper.alignShearWall(
-          rawCenter: rawCad,
-          wallLength: wallL,
-          wallThickness: wallT,
-          wallRotationRad: wallRot,
-          toleranceCad: toleranceCad,
-          activeStorey: _project.activeStorey,
-          movingWallId: _isMovingShearWall ? _selectedShearWall?.id : null,
-          dxfDocument: _document,
-          cadUnitsPerMeter: _cadUnitsPerMeter,
-          axisLockMode: effectiveLockMode,
-          anchorCenter: _elementMoveOriginalCenter ?? _selectedShearWall?.center,
-          previousSnappedCenter: _lastSnappedCad,
+        final u = Offset(math.cos(wallRot), math.sin(wallRot));
+        final halfLen = wallL / 2.0;
+
+        final dummyWall = StructuralShearWall(
+          id: 'dummy_wall',
+          start: -u * halfLen,
+          end: u * halfLen,
+          thickness: wallT,
+          referenceLine: wallRef,
+          isFlipped: wallFlipped,
         );
-        if (mag != null) {
-          effectiveCad = mag.snappedCenter;
-          _activeMagneticGuides = mag.guideLines;
-          _liveDimensionText = mag.liveDimensionText;
-          _activeDynamicDimensionLine = mag.dimensionLine;
-          _lastSnappedCad = effectiveCad;
-        } else {
-          snap = _findStructuralSnap(rawCad, toleranceCad) ??
+
+        // Feature points: endpoints (start, end) and 4 box corners
+        final List<Offset> wallFeatureOffsets = [
+          -u * halfLen, // Start endpoint (крайна точка начало)
+          u * halfLen,  // End endpoint (крайна точка край)
+          ...dummyWall.polygonVertices, // 4 corner vertices (ъгли)
+        ];
+
+        DxfSnapResult? bestWallSnap;
+        Offset? bestWallCandCenter;
+        double minWallSnapDist = toleranceCad;
+
+        for (final featOffset in wallFeatureOffsets) {
+          final p = rawCad + featOffset;
+          final s = _findStructuralSnap(p, toleranceCad) ??
               DxfSnapHelper.findSnapPoint(
                 document: _document,
-                cadPoint: rawCad,
+                cadPoint: p,
                 toleranceCad: toleranceCad,
                 allowNearest: false,
               );
-          if (snap != null) {
-            effectiveCad = snap.point;
-            snappedScreen = _cadToScreen(snap.point);
-            _snappedScreenPositions = [snappedScreen];
-            _lastSnappedCad = effectiveCad;
-          } else {
-            effectiveCad = rawCad;
-            _snappedScreenPositions = [];
-            _lastSnappedCad = null;
+          if (s != null) {
+            final dist = (p - s.point).distance;
+            if (dist < minWallSnapDist) {
+              minWallSnapDist = dist;
+              bestWallSnap = s;
+              bestWallCandCenter = s.point - featOffset;
+            }
           }
+        }
+
+        if (bestWallCandCenter != null) {
+          effectiveCad = bestWallCandCenter;
+          snap = bestWallSnap;
+          snappedScreen = _cadToScreen(bestWallSnap!.point);
+          _snappedScreenPositions = [snappedScreen];
+          _lastSnappedCad = effectiveCad;
           _activeMagneticGuides = null;
           _liveDimensionText = null;
           _activeDynamicDimensionLine = null;
+        } else {
+          final mag = StructuralMagneticAlignmentHelper.alignShearWall(
+            rawCenter: rawCad,
+            wallLength: wallL,
+            wallThickness: wallT,
+            wallRotationRad: wallRot,
+            toleranceCad: toleranceCad,
+            activeStorey: _project.activeStorey,
+            movingWallId: _isMovingShearWall ? _selectedShearWall?.id : null,
+            dxfDocument: _document,
+            cadUnitsPerMeter: _cadUnitsPerMeter,
+            axisLockMode: effectiveLockMode,
+            anchorCenter: _elementMoveOriginalCenter ?? _selectedShearWall?.center,
+            previousSnappedCenter: _lastSnappedCad,
+          );
+          if (mag != null) {
+            effectiveCad = mag.snappedCenter;
+            _activeMagneticGuides = mag.guideLines;
+            _liveDimensionText = mag.liveDimensionText;
+            _activeDynamicDimensionLine = mag.dimensionLine;
+            _lastSnappedCad = effectiveCad;
+          } else {
+            snap = _findStructuralSnap(rawCad, toleranceCad) ??
+                DxfSnapHelper.findSnapPoint(
+                  document: _document,
+                  cadPoint: rawCad,
+                  toleranceCad: toleranceCad,
+                  allowNearest: false,
+                );
+            if (snap != null) {
+              effectiveCad = snap.point;
+              snappedScreen = _cadToScreen(snap.point);
+              _snappedScreenPositions = [snappedScreen];
+              _lastSnappedCad = effectiveCad;
+            } else {
+              effectiveCad = rawCad;
+              _snappedScreenPositions = [];
+              _lastSnappedCad = null;
+            }
+            _activeMagneticGuides = null;
+            _liveDimensionText = null;
+            _activeDynamicDimensionLine = null;
+          }
         }
       } else if (_activeTool == StructuralDrawTool.beam) {
         // Magnetic axial alignment for beams (column center, shear wall center/axis, other beams, grid axes, and ortho-lock)
@@ -4947,9 +5062,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     double minDist = toleranceCad;
     DxfSnapResult? bestSnap;
 
+    final overhead = (_project.activeStoreyIndex < _project.storeys.length - 1)
+        ? _project.storeys[_project.activeStoreyIndex + 1]
+        : null;
     final allStoreysToSnap = [
       _project.activeStorey,
-      if (_project.ghostStorey != null) _project.ghostStorey!,
+      ?overhead,
+      if (_project.ghostStorey != null && _project.ghostStorey != overhead) _project.ghostStorey!,
     ];
 
     for (final s in allStoreysToSnap) {
