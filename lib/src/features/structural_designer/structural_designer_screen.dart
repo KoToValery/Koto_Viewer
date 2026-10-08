@@ -110,6 +110,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   double _currentWallRotationRad = 0.0;
   double _currentSlabThickness = 0.20;
   bool _snapEnabled = true;
+  bool _showGroundFoundations = false;
 
   // In-progress drawing & measuring states
   Offset? _measurementStartCad;
@@ -6589,13 +6590,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final detection = WallAxisDetector.detect(_document, forceScaleFactor: scale / 1000);
     final proposal = await showDialog<InitialSchemeProposal>(
       context: context,
-      builder: (_) => InitialSchemeDialog(project: snapshot,
-        pairs: detection.selectedWallPairs, scale: scale,
-        options: InitialSchemeOptions(columnShape: _currentColumnPreset.shape,
+      builder: (_) => InitialSchemeDialog(
+        project: snapshot,
+        pairs: detection.selectedWallPairs,
+        closureSegments: detection.closureSegments,
+        scale: scale,
+        options: InitialSchemeOptions(
+          columnShape: _currentColumnPreset.shape,
           columnThicknessM: _currentColumnPreset.thickness,
           columnWidthM: _currentColumnPreset.width,
           columnDepthM: _currentColumnPreset.height,
-          wallLengthM: _currentWallLength, wallThicknessM: _currentWallThickness)),
+          wallLengthM: _currentWallLength,
+          wallThicknessM: _currentWallThickness,
+        ),
+      ),
     );
     if (!mounted || proposal == null || proposal.isEmpty) return;
     if (!identical(_project, snapshot)) {
@@ -7791,6 +7799,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             setState(() => _snapEnabled = !_snapEnabled);
             HapticFeedback.selectionClick();
             break;
+          case 'toggle_foundations':
+            setState(() => _showGroundFoundations = !_showGroundFoundations);
+            HapticFeedback.selectionClick();
+            break;
           case 'layers':
             _showLayersSheet();
             break;
@@ -7865,6 +7877,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               const SizedBox(width: 12),
               Text(
                 _snapEnabled ? context.l10n.snapEnabledTooltip : context.l10n.snapDisabledTooltip,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'toggle_foundations',
+          child: Row(
+            children: [
+              Icon(
+                _showGroundFoundations ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                size: 20,
+                color: _showGroundFoundations ? const Color(0xFF00E5FF) : Colors.white70,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                context.l10n.toggleGroundFoundations,
                 style: const TextStyle(color: Colors.white, fontSize: 13),
               ),
             ],
@@ -8205,10 +8234,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                       : null,
                                   hasBasement: _project.hasBasement,
                                   foundationType: _project.foundationType,
-                                  stripFoundations: (_project.activeStorey.elevation.abs() < 1e-4 && !_project.hasBasement)
+                                  stripFoundations: (_showGroundFoundations && _project.activeStorey.elevation.abs() < 1e-4 && !_project.hasBasement)
                                       ? _project.computeDefaultStripFoundations(_project.activeStorey, cadUnitsPerMeter: _cadUnitsPerMeter)
                                       : null,
-                                  matFoundation: (_project.activeStorey.elevation.abs() < 1e-4 && !_project.hasBasement)
+                                  matFoundation: (_showGroundFoundations && _project.activeStorey.elevation.abs() < 1e-4 && !_project.hasBasement)
                                       ? _project.computeDefaultMatFoundation(_project.activeStorey, cadUnitsPerMeter: _cadUnitsPerMeter)
                                       : null,
                                   cantileverZones: _analysisSummary.zones,

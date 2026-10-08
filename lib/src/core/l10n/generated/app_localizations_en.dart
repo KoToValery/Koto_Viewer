@@ -2990,4 +2990,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get schemeFresh =>
       'Only new objects are accepted. Manual elements and accepted edits are preserved.';
+
+  @override
+  String get toggleGroundFoundations => 'Show foundations (±0.00)';
 }

@@ -6,17 +6,20 @@ import '../models/wall_axis_models.dart';
 import '../models/seismic_analysis_models.dart';
 import '../analysis/initial_scheme_generator.dart';
 import '../analysis/seismic_analysis_calculator.dart';
+import '../analysis/wall_axis_detector.dart';
 import 'seismic_analysis_sheet.dart';
 
 class InitialSchemeDialog extends StatefulWidget {
   final StructuralProject project;
   final List<WallPairCandidate> pairs;
+  final List<(Offset, Offset)> closureSegments;
   final double scale;
   final InitialSchemeOptions options;
   const InitialSchemeDialog({
     super.key,
     required this.project,
     required this.pairs,
+    this.closureSegments = const [],
     required this.scale,
     required this.options,
   });
@@ -31,6 +34,10 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   late final target = TextEditingController(
     text: widget.options.targetSpacingM.toString(),
   );
+  late final List<(Offset, Offset)> effectiveClosureSegments =
+      widget.closureSegments.isNotEmpty
+          ? widget.closureSegments
+          : WallAxisDetector.computeClosureSegmentsForPairs(widget.pairs);
   List<InitialSchemeProposal> proposals = [];
   List<SeismicAnalysisReport> reports = [];
   int selected = 0;
@@ -200,6 +207,7 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
                       widget.project.activeStorey,
                       p,
                       widget.pairs,
+                      effectiveClosureSegments,
                     ),
                   ),
                 ),
@@ -259,10 +267,20 @@ class _SchemePainter extends CustomPainter {
   final StoreyLevel floor;
   final InitialSchemeProposal proposal;
   final List<WallPairCandidate> pairs;
-  _SchemePainter(this.floor, this.proposal, this.pairs);
+  final List<(Offset, Offset)> closureSegments;
+  _SchemePainter(this.floor, this.proposal, this.pairs, this.closureSegments);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final points = floor.slabs.expand((s) => s.polygon).toList();
+    final points = <Offset>[
+      ...floor.slabs.expand((s) => s.polygon),
+      ...pairs.expand((p) => [
+        p.segmentA.start,
+        p.segmentA.end,
+        p.segmentB.start,
+        p.segmentB.end,
+      ]),
+    ];
     if (points.isEmpty) return;
     final minX = points.map((p) => p.dx).reduce(math.min),
         maxX = points.map((p) => p.dx).reduce(math.max);
@@ -288,27 +306,93 @@ class _SchemePainter extends CustomPainter {
       );
     }
 
-    final wallPaint = Paint()
-      ..color = Colors.grey.withValues(alpha: .45)
-      ..strokeWidth = 1;
+    // 1. Draw Architectural Walls:
+    // Light solid background fill + light diagonal architectural hatch pattern + boundary stroke
+    final wallFillPaint = Paint()
+      ..color = Colors.grey.withValues(alpha: 0.16)
+      ..style = PaintingStyle.fill;
+    final wallHatchPaint = Paint()
+      ..color = Colors.grey.withValues(alpha: 0.38)
+      ..strokeWidth = 0.8
+      ..style = PaintingStyle.stroke;
+    final wallLinePaint = Paint()
+      ..color = Colors.grey.withValues(alpha: 0.70)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+
     for (final pair in pairs) {
-      canvas.drawLine(
-        screen(pair.segmentA.start),
-        screen(pair.segmentA.end),
-        wallPaint,
-      );
-      canvas.drawLine(
-        screen(pair.segmentB.start),
-        screen(pair.segmentB.end),
-        wallPaint,
-      );
+      final sA = pair.segmentA;
+      final sB = pair.segmentB;
+      final cosA = math.cos(sA.angleRad);
+      final sinA = math.sin(sA.angleRad);
+      final midA = (sA.start + sA.end) / 2.0;
+      final midB = (sB.start + sB.end) / 2.0;
+      final dA = -midA.dx * sinA + midA.dy * cosA;
+      final dB = -midB.dx * sinA + midB.dy * cosA;
+      final t1A = sA.start.dx * cosA + sA.start.dy * sinA;
+      final t2A = sA.end.dx * cosA + sA.end.dy * sinA;
+      final tMinA = math.min(t1A, t2A);
+      final tMaxA = math.max(t1A, t2A);
+      final t1B = sB.start.dx * cosA + sB.start.dy * sinA;
+      final t2B = sB.end.dx * cosA + sB.end.dy * sinA;
+      final tMinB = math.min(t1B, t2B);
+      final tMaxB = math.max(t1B, t2B);
+      final tStart = math.max(tMinA, tMinB);
+      final tEnd = math.min(tMaxA, tMaxB);
+
+      final List<Offset> polyPts;
+      if (tEnd > tStart) {
+        final pAStart = Offset(tStart * cosA - dA * sinA, tStart * sinA + dA * cosA);
+        final pAEnd = Offset(tEnd * cosA - dA * sinA, tEnd * sinA + dA * cosA);
+        final pBEnd = Offset(tEnd * cosA - dB * sinA, tEnd * sinA + dB * cosA);
+        final pBStart = Offset(tStart * cosA - dB * sinA, tStart * sinA + dB * cosA);
+        polyPts = [pAStart, pAEnd, pBEnd, pBStart];
+      } else {
+        polyPts = [sA.start, sA.end, sB.end, sB.start];
+      }
+
+      final screenPts = polyPts.map(screen).toList();
+      final polyPath = Path()..addPolygon(screenPts, true);
+
+      // Light solid shading
+      canvas.drawPath(polyPath, wallFillPaint);
+
+      // Light diagonal architectural hatch (лека щриховка под 45 градуса)
+      final bounds = polyPath.getBounds();
+      if (bounds.width > 0.5 && bounds.height > 0.5) {
+        canvas.save();
+        canvas.clipPath(polyPath);
+        const double step = 6.0;
+        final double startX = bounds.left - bounds.height;
+        for (double x = startX; x <= bounds.right; x += step) {
+          canvas.drawLine(
+            Offset(x, bounds.bottom),
+            Offset(x + bounds.height, bounds.top),
+            wallHatchPaint,
+          );
+        }
+        canvas.restore();
+      }
+
+      // Longitudinal wall face outlines
+      canvas.drawLine(screen(sA.start), screen(sA.end), wallLinePaint);
+      canvas.drawLine(screen(sB.start), screen(sB.end), wallLinePaint);
     }
+
+    // Perpendicular closing jamb lines at wall openings & free ends
+    for (final cap in closureSegments) {
+      canvas.drawLine(screen(cap.$1), screen(cap.$2), wallLinePaint);
+    }
+
+    // 2. Draw Floor Slabs & Openings
     for (final s in floor.slabs) {
       draw(s.polygon, Colors.blue);
       for (final hole in s.openings) {
         draw(hole, Colors.red);
       }
     }
+
+    // 3. Draw Existing and Proposed Columns & Walls
     for (final c in floor.columns) {
       draw(c.polygonVertices, Colors.grey, fill: true);
     }
@@ -325,5 +409,7 @@ class _SchemePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SchemePainter old) =>
-      old.proposal != proposal || old.floor != floor;
+      old.proposal != proposal ||
+      old.floor != floor ||
+      old.closureSegments != closureSegments;
 }

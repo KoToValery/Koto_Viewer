@@ -2351,6 +2351,9 @@
   "schemeInvalidOptions": "Enter positive spacing; target must be at least the minimum.",
   "schemeStale": "The project changed. Open a new preview before accepting.",
   "schemeComparison": "Compare variants · eX/eY (m) · floating columns",
-  "schemeFresh": "Only new objects are accepted. Manual elements and accepted edits are preserved."
-
+  "schemeFresh": "Only new objects are accepted. Manual elements and accepted edits are preserved.",
+  "toggleGroundFoundations": "Show foundations (±0.00)",
+  "@toggleGroundFoundations": {
+    "description": "Menu item to toggle ground foundation visibility on level 0.00"
+  }
 }

@@ -2999,4 +2999,7 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get schemeFresh =>
       'Приемат се само новите обекти. Ръчните елементи и приетите редакции се запазват.';
+
+  @override
+  String get toggleGroundFoundations => 'Показване на основи (±0.00)';
 }

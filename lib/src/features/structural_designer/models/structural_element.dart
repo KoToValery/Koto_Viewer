@@ -2154,7 +2154,7 @@ class StructuralProject {
       if (l < 1e-4) continue;
       final dir = (wall.end - wall.start) / l;
       final normal = Offset(-dir.dy, dir.dx);
-      final double halfW = math.max(wall.thickness * cadUnitsPerMeter / 2.0 + 0.15 * cadUnitsPerMeter, wCad / 2.0);
+      final double halfW = math.max(wall.thickness / 2.0 + 0.15 * cadUnitsPerMeter, wCad / 2.0);
       final double endExt = 0.20 * cadUnitsPerMeter;
       final p1 = wall.start - dir * endExt;
       final p2 = wall.end + dir * endExt;
@@ -2169,14 +2169,20 @@ class StructuralProject {
     // 2. Footing pads under columns (единични фундаменти/стъпки под колони)
     final double colPadExt = 0.25 * cadUnitsPerMeter;
     for (final col in storey.columns) {
-      final halfW = (col.width * cadUnitsPerMeter) / 2.0 + colPadExt;
-      final halfH = (col.height * cadUnitsPerMeter) / 2.0 + colPadExt;
+      final halfW = col.width / 2.0 + colPadExt;
+      final halfH = col.height / 2.0 + colPadExt;
       final c = col.center;
+      final cosA = math.cos(col.rotationRad);
+      final sinA = math.sin(col.rotationRad);
+      Offset rot(double lx, double ly) => Offset(
+        c.dx + (lx * cosA - ly * sinA),
+        c.dy + (lx * sinA + ly * cosA),
+      );
       strips.add([
-        Offset(c.dx - halfW, c.dy - halfH),
-        Offset(c.dx + halfW, c.dy - halfH),
-        Offset(c.dx + halfW, c.dy + halfH),
-        Offset(c.dx - halfW, c.dy + halfH),
+        rot(-halfW, -halfH),
+        rot(halfW, -halfH),
+        rot(halfW, halfH),
+        rot(-halfW, halfH),
       ]);
     }
 
@@ -2190,18 +2196,34 @@ class StructuralProject {
         final delta = c2 - c1;
         final dist = delta.distance;
         if (dist > 1e-4 && dist <= maxBayCad) {
-          // Check if orthogonal (aligned along X or Y within 15cm) or aligned with a grid axis
+          // Check if orthogonal (aligned along X or Y within 20cm)
           final bool isOrthogonal = delta.dx.abs() <= 0.20 * cadUnitsPerMeter || delta.dy.abs() <= 0.20 * cadUnitsPerMeter;
           if (isOrthogonal) {
             final dir = delta / dist;
-            final normal = Offset(-dir.dy, dir.dx);
-            final halfW = wCad / 2.0;
-            strips.add([
-              c1 - normal * halfW,
-              c2 - normal * halfW,
-              c2 + normal * halfW,
-              c1 + normal * halfW,
-            ]);
+            // Check if there is an intermediate column between c1 and c2 along this span
+            bool hasIntermediate = false;
+            for (int k = 0; k < cols.length; k++) {
+              if (k == i || k == j) continue;
+              final ck = cols[k].center;
+              final proj = (ck - c1).dx * dir.dx + (ck - c1).dy * dir.dy;
+              if (proj > 0.30 * cadUnitsPerMeter && proj < dist - 0.30 * cadUnitsPerMeter) {
+                final perpDist = ((ck - c1) - dir * proj).distance;
+                if (perpDist <= 0.20 * cadUnitsPerMeter) {
+                  hasIntermediate = true;
+                  break;
+                }
+              }
+            }
+            if (!hasIntermediate) {
+              final normal = Offset(-dir.dy, dir.dx);
+              final halfW = wCad / 2.0;
+              strips.add([
+                c1 - normal * halfW,
+                c2 - normal * halfW,
+                c2 + normal * halfW,
+                c1 + normal * halfW,
+              ]);
+            }
           }
         }
       }

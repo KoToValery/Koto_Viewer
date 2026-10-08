@@ -5146,6 +5146,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only new objects are accepted. Manual elements and accepted edits are preserved.'**
   String get schemeFresh;
+
+  /// Menu item to toggle ground foundation visibility on level 0.00
+  ///
+  /// In en, this message translates to:
+  /// **'Show foundations (±0.00)'**
+  String get toggleGroundFoundations;
 }
 
 class _AppLocalizationsDelegate

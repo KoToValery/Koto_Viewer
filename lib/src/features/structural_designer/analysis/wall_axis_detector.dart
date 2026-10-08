@@ -1823,6 +1823,16 @@ class WallAxisDetector {
     return Offset(x1 + t * (x2 - x1), y1 + t * (y2 - y1));
   }
 
+  /// Computes transverse closing end caps (jamb lines) for a given list of wall pair candidates.
+  static List<(Offset, Offset)> computeClosureSegmentsForPairs(List<WallPairCandidate> pairs) {
+    final closures = <(Offset, Offset)>[];
+    final dummyContours = <(Offset, Offset)>[];
+    for (final pair in pairs) {
+      _collectWallContourWithEndCaps(pair, pairs, dummyContours, closures);
+    }
+    return closures;
+  }
+
   /// Closes open wall ends at doors and windows by adding transverse closure caps (jamb lines),
   /// while preserving corner and T-junction continuity.
   static void _collectWallContourWithEndCaps(

@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
+import 'package:kotoview/src/features/structural_designer/models/wall_axis_models.dart';
+import 'package:kotoview/src/features/structural_designer/analysis/wall_axis_detector.dart';
 
 void main() {
   group('Structural Foundation & Grid Axes Instances Tests', () {
@@ -178,6 +179,92 @@ void main() {
       // Original V2 and V3 follow and remain at their exact coordinates
       expect(extruded.polygon[4], equals(const Offset(4, 4)));
       expect(extruded.polygon[5], equals(const Offset(0, 4)));
+    });
+
+    test('5. Strip foundations scaling does not explode at cm scale (100 units/m)', () {
+      // In cm: a 25x30cm column has width=25, height=30
+      const scaleCm = 100.0;
+      final groundStorey = StoreyLevel(
+        id: 'storey_cm',
+        name: 'Floor ±0.00',
+        elevation: 0.0,
+        height: 280.0,
+        columns: const [
+          StructuralColumn(
+            id: 'c1',
+            center: Offset(100, 100),
+            width: 25.0,
+            height: 30.0,
+          ),
+        ],
+        shearWalls: const [
+          StructuralShearWall(
+            id: 'w1',
+            start: Offset(200, 100),
+            end: Offset(350, 100),
+            thickness: 25.0,
+          ),
+        ],
+      );
+
+      final project = StructuralProject(
+        storeys: [groundStorey],
+        foundationType: FoundationType.stripFooting,
+      );
+
+      final strips = project.computeDefaultStripFoundations(groundStorey, cadUnitsPerMeter: scaleCm);
+      expect(strips.length, equals(2)); // 1 wall strip + 1 col pad
+
+      // Wall strip: 60cm wide (halfW = 30cm) -> width in Y is 60cm
+      final wallStrip = strips[0];
+      final wallMinY = wallStrip.map((p) => p.dy).reduce((a, b) => a < b ? a : b);
+      final wallMaxY = wallStrip.map((p) => p.dy).reduce((a, b) => a > b ? a : b);
+      expect(wallMaxY - wallMinY, closeTo(60.0, 0.1));
+
+      // Column pad: 75x80cm -> width in X is 75cm, height in Y is 80cm
+      final colPad = strips[1];
+      final colMinX = colPad.map((p) => p.dx).reduce((a, b) => a < b ? a : b);
+      final colMaxX = colPad.map((p) => p.dx).reduce((a, b) => a > b ? a : b);
+      final colMinY = colPad.map((p) => p.dy).reduce((a, b) => a < b ? a : b);
+      final colMaxY = colPad.map((p) => p.dy).reduce((a, b) => a > b ? a : b);
+      expect(colMaxX - colMinX, closeTo(75.0, 0.1));
+      expect(colMaxY - colMinY, closeTo(80.0, 0.1));
+    });
+
+    test('6. WallAxisDetector.computeClosureSegmentsForPairs returns perpendicular jamb caps', () {
+      // Wall pair: horizontal wall of length 200, thickness 25
+      const segA = WallSegment(
+        start: Offset(0, 0),
+        end: Offset(200, 0),
+        angleRad: 0.0,
+        offsetFromOrigin: 0.0,
+        length: 200.0,
+        sourceLayer: 'WALL',
+      );
+      const segB = WallSegment(
+        start: Offset(0, 25),
+        end: Offset(200, 25),
+        angleRad: 0.0,
+        offsetFromOrigin: 25.0,
+        length: 200.0,
+        sourceLayer: 'WALL',
+      );
+      const pair = WallPairCandidate(
+        segmentA: segA,
+        segmentB: segB,
+        perpendicularDistance: 25.0,
+        overlapLength: 200.0,
+        centerlineStart: Offset(0, 12.5),
+        centerlineEnd: Offset(200, 12.5),
+      );
+
+      final caps = WallAxisDetector.computeClosureSegmentsForPairs([pair]);
+      // Should have 2 closure caps (one at start x=0, one at end x=200)
+      expect(caps.length, equals(2));
+      for (final cap in caps) {
+        // Vertical jamb lines across thickness 25
+        expect((cap.$1 - cap.$2).distance, closeTo(25.0, 0.01));
+      }
     });
   });
 }
