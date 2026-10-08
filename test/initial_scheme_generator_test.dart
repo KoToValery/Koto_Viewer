@@ -414,4 +414,69 @@ void main() {
       },
     );
   }
+
+  test('guarantees at least 2x2 paired shear walls (minimum 4 walls) across orthogonal directions', () {
+    final (p, runs) = fixture();
+    final result = InitialSchemeGenerator.generate(
+      project: p,
+      wallPairs: runs,
+      scale: 1,
+      options: const InitialSchemeOptions(
+        enforcePairedWalls: true,
+        generousDensity: true,
+      ),
+    );
+
+    // Total shear walls must be at least 4 (2 in X and 2 in Y)
+    expect(result.walls.length, greaterThanOrEqualTo(4));
+
+    // Direction breakdown
+    final primary = runs.first.centerlineEnd - runs.first.centerlineStart;
+    final primaryDir = primary / primary.distance;
+    int dirCount0 = 0;
+    int dirCount1 = 0;
+    for (final w in result.walls) {
+      final u = (w.end - w.start) / w.length;
+      final dotVal = (u.dx * primaryDir.dx + u.dy * primaryDir.dy).abs();
+      if (dotVal >= 0.9239) {
+        dirCount0++;
+      } else {
+        dirCount1++;
+      }
+    }
+
+    // Both directions must have at least 2 walls (no isolated single wall)
+    expect(dirCount0, greaterThanOrEqualTo(2));
+    expect(dirCount1, greaterThanOrEqualTo(2));
+  });
+
+  test('generous layout provides denser candidate set for engineer pruning', () {
+    final (p, runs) = fixture();
+    final generous = InitialSchemeGenerator.generate(
+      project: p,
+      wallPairs: runs,
+      scale: 1,
+      options: const InitialSchemeOptions(
+        generousDensity: true,
+        targetSpacingM: 5.0,
+      ),
+    );
+
+    final sparse = InitialSchemeGenerator.generate(
+      project: p,
+      wallPairs: runs,
+      scale: 1,
+      options: const InitialSchemeOptions(
+        generousDensity: false,
+        targetSpacingM: 5.0,
+      ),
+    );
+
+    // Generous layout provides more columns and walls for engineer pruning
+    expect(generous.columns.length, greaterThan(sparse.columns.length));
+    expect(generous.walls.length, greaterThanOrEqualTo(sparse.walls.length));
+    final totalGenerous = generous.columns.length + generous.walls.length;
+    final totalSparse = sparse.columns.length + sparse.walls.length;
+    expect(totalGenerous, greaterThan(totalSparse));
+  });
 }

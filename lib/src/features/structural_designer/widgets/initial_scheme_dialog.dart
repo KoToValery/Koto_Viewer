@@ -34,6 +34,8 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   late final target = TextEditingController(
     text: widget.options.targetSpacingM.toString(),
   );
+  late bool enforcePaired = widget.options.enforcePairedWalls;
+  late bool generousDensity = widget.options.generousDensity;
   late final List<(Offset, Offset)> effectiveClosureSegments =
       widget.closureSegments.isNotEmpty
           ? widget.closureSegments
@@ -66,6 +68,8 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
       wallThicknessM: o.wallThicknessM,
       columnWidthM: o.columnWidthM,
       columnDepthM: o.columnDepthM,
+      enforcePairedWalls: enforcePaired,
+      generousDensity: generousDensity,
     );
     if (!options.valid) {
       setState(() => error = true);
@@ -158,6 +162,31 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
                     child: Text(l.schemeRebuild),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                value: enforcePaired,
+                onChanged: (v) => setState(() {
+                  enforcePaired = v;
+                  dirty = true;
+                  confirmed = false;
+                  rebuild();
+                }),
+                title: Text(l.schemePairedWalls),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                value: generousDensity,
+                onChanged: (v) => setState(() {
+                  generousDensity = v;
+                  dirty = true;
+                  confirmed = false;
+                  rebuild();
+                }),
+                title: Text(l.schemeGenerousDensity),
               ),
               if (error)
                 Text(

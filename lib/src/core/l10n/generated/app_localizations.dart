@@ -5147,6 +5147,18 @@ abstract class AppLocalizations {
   /// **'Only new objects are accepted. Manual elements and accepted edits are preserved.'**
   String get schemeFresh;
 
+  /// Option to enforce pairing shear walls in both orthogonal directions
+  ///
+  /// In en, this message translates to:
+  /// **'Enforce 2x2 paired shear walls (seismic balance)'**
+  String get schemePairedWalls;
+
+  /// Option to generate complete corner and intermediate columns
+  ///
+  /// In en, this message translates to:
+  /// **'Full structural layout (dense coverage for engineer pruning)'**
+  String get schemeGenerousDensity;
+
   /// Menu item to toggle ground foundation visibility on level 0.00
   ///
   /// In en, this message translates to:

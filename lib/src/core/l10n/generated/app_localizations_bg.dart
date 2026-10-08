@@ -3001,5 +3001,13 @@ class AppLocalizationsBg extends AppLocalizations {
       'Приемат се само новите обекти. Ръчните елементи и приетите редакции се запазват.';
 
   @override
+  String get schemePairedWalls =>
+      'Задължително сдвояване 2х2 шайби (сеизмичен баланс)';
+
+  @override
+  String get schemeGenerousDensity =>
+      'Пълна конструктивна схема (плътна за редуциране от проектанта)';
+
+  @override
   String get toggleGroundFoundations => 'Показване на основи (±0.00)';
 }

@@ -2352,6 +2352,14 @@
   "schemeStale": "The project changed. Open a new preview before accepting.",
   "schemeComparison": "Compare variants · eX/eY (m) · floating columns",
   "schemeFresh": "Only new objects are accepted. Manual elements and accepted edits are preserved.",
+  "schemePairedWalls": "Enforce 2x2 paired shear walls (seismic balance)",
+  "@schemePairedWalls": {
+    "description": "Option to enforce pairing shear walls in both orthogonal directions"
+  },
+  "schemeGenerousDensity": "Full structural layout (dense coverage for engineer pruning)",
+  "@schemeGenerousDensity": {
+    "description": "Option to generate complete corner and intermediate columns"
+  },
   "toggleGroundFoundations": "Show foundations (±0.00)",
   "@toggleGroundFoundations": {
     "description": "Menu item to toggle ground foundation visibility on level 0.00"

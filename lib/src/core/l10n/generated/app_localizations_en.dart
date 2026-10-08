@@ -2992,5 +2992,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only new objects are accepted. Manual elements and accepted edits are preserved.';
 
   @override
+  String get schemePairedWalls =>
+      'Enforce 2x2 paired shear walls (seismic balance)';
+
+  @override
+  String get schemeGenerousDensity =>
+      'Full structural layout (dense coverage for engineer pruning)';
+
+  @override
   String get toggleGroundFoundations => 'Show foundations (±0.00)';
 }
