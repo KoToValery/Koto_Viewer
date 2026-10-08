@@ -2355,7 +2355,7 @@
   "schemeRebuild": "Next variant",
   "schemeConfirm": "I confirm the displayed slab outlines and openings",
   "schemeAccept": "Accept proposal",
-  "schemeNoWalls": "No continuous walls detected. Columns use grid axes; shear walls require detected walls.",
+  "schemeNoWalls": "No solid wall runs detected. Grid axes alone do not authorize columns inside rooms.",
   "schemeNoCandidates": "No suitable free positions. Existing elements are preserved.",
   "schemeLimits": "The preliminary layout limit was reached. Review the remaining areas manually.",
   "schemePreliminary": "Sizes use the currently selected sections. Spacing is a layout setting, not a calculated allowable span. Check sections extending beyond architectural walls.",
@@ -2367,11 +2367,11 @@
   "schemeStale": "The project changed. Open a new preview before accepting.",
   "schemeComparison": "Compare variants · eX/eY (m) · floating columns",
   "schemeFresh": "Only new objects are accepted. Manual elements and accepted edits are preserved.",
-  "schemePairedWalls": "Enforce 2x2 paired shear walls (seismic balance)",
+  "schemePairedWalls": "Prefer distributed walls in both directions",
   "@schemePairedWalls": {
     "description": "Option to enforce pairing shear walls in both orthogonal directions"
   },
-  "schemeGenerousDensity": "Full structural layout (dense coverage for engineer pruning)",
+  "schemeGenerousDensity": "Additional support density (optional)",
   "@schemeGenerousDensity": {
     "description": "Option to generate complete corner and intermediate columns"
   },
@@ -2382,5 +2382,8 @@
   "schemeVariant": "Variant",
   "schemeNoAlternative": "No distinct alternative found in this search. Change spacing or try again.",
   "schemeCoverage": "Red samples: distance exceeds half the target spacing / greatest support distance",
-  "schemeEurocodeScope": "Preliminary geometric screening. Support distance is not a calculated span or deflection. EC2 verification requires a structural model, loads, materials and reinforcement; the EC8 report contains preliminary indicators only."
+  "schemeEurocodeScope": "Preliminary geometric screening. Support distance is not a calculated span or deflection. EC2 verification requires a structural model, loads, materials and reinforcement; the EC8 report contains preliminary indicators only.",
+  "schemeSpanUnknown": "Support span is undetermined",
+  "schemeSupportSpan": "Critical support spacing (preliminary)",
+  "schemeOpeningFallback": "Purple: fallback columns in door/window openings — review opening"
 }

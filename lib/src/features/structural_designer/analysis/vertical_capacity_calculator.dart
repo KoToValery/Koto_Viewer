@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
+import 'structural_polygon_distance.dart';
 
 /// Eurocode 2 (EC2 EN 1992-1-1) Vertical Gravitational Capacity & Feasibility Calculator.
 ///
@@ -364,6 +365,42 @@ class VerticalCapacityCalculator {
     return best;
   }
 
+  /// Split at every slab/opening crossing; a span may not bridge a void or
+  /// disconnected slab. Boundary segments remain valid for edge supports.
+  static bool _spanOnSlab(Offset a,Offset b,StoreyLevel floor,double scale) {
+    if(floor.slabs.isEmpty) return true; // geometry-only callers
+    final u=b-a;
+    double cross(Offset x,Offset y)=>x.dx*y.dy-x.dy*y.dx;
+    final cuts=<double>[0,1];
+    for(final slab in floor.slabs) {
+      for(final ring in [slab.polygon,...slab.openings]) {
+        for(var i=0;i<ring.length;i++) {
+          final c=ring[i],v=ring[(i+1)%ring.length]-c;
+          final den=cross(u,v);
+          if(den.abs()<=1e-10*u.distance*v.distance) continue;
+          final t=cross(c-a,v)/den, q=cross(c-a,u)/den;
+          if(t>0 && t<1 && q>=0 && q<=1) cuts.add(t);
+        }
+      }
+    }
+    cuts.sort();
+    bool onEdge(Offset p,List<Offset> ring) {
+      for(var i=0;i<ring.length;i++) {
+        if(StructuralPolygonDistance.pointToSegment(p,ring[i],ring[(i+1)%ring.length])<=1e-7*scale) return true;
+      }
+      return false;
+    }
+    for(var i=1;i<cuts.length;i++) {
+      if(cuts[i]-cuts[i-1]<1e-9) continue;
+      final p=a+u*((cuts[i]+cuts[i-1])/2);
+      if(!floor.slabs.any((s)=>(StructuralPolygonDistance.inside(p,s.polygon)||onEdge(p,s.polygon)) &&
+        !s.openings.any((h)=>StructuralPolygonDistance.inside(p,h)&&!onEdge(p,h)))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /// Calculates max clear span between adjacent supports in the storey (meters)
   /// and returns the coordinates of the critical span segment.
   static ({double maxSpanM, (Offset, Offset)? criticalSpanSegment}) calculateClearSpan(
@@ -486,7 +523,7 @@ class VerticalCapacityCalculator {
         final c1 = cols[i].center;
         final c2 = cols[j].center;
         final dM = (c2 - c1).distance / scale;
-        if (dM < 1.0 || dM > 10.0) continue;
+        if (dM < 1.0) continue;
 
         if (_hasInterveningSupport(
           p1: c1,
@@ -519,7 +556,7 @@ class VerticalCapacityCalculator {
       for (final wall in storey.shearWalls) {
         final wallPt = _closestPointOnSegment(col.center, wall.start, wall.end);
         final dM = (col.center - wallPt).distance / scale;
-        if (dM < 1.0 || dM > 10.0) continue;
+        if (dM < 1.0) continue;
 
         if (_hasInterveningSupport(
           p1: col.center,
@@ -560,7 +597,7 @@ class VerticalCapacityCalculator {
         final p1 = pair.$1;
         final p2 = pair.$2;
         final dM = (p2 - p1).distance / scale;
-        if (dM < 1.0 || dM > 10.0) continue;
+        if (dM < 1.0) continue;
 
         if (_hasInterveningSupport(
           p1: p1,
@@ -588,8 +625,9 @@ class VerticalCapacityCalculator {
       }
     }
 
+    candidateSpans.removeWhere((s)=>!_spanOnSlab(s.segment.$1,s.segment.$2,storey,scale));
     if (candidateSpans.isEmpty) {
-      return (maxSpanM: 4.0, criticalSpanSegment: null);
+      return (maxSpanM: double.nan, criticalSpanSegment: null);
     }
 
     // Find the critical (maximum) clear span
@@ -606,6 +644,40 @@ class VerticalCapacityCalculator {
   /// Calculates max clear span between supports in the storey (meters).
   static double calculateMaxSpanM(StoreyLevel storey, double scale) {
     return calculateClearSpan(storey, scale).maxSpanM;
+  }
+
+  /// Common manual/automatic preliminary screening; this retains the legacy
+  /// span/depth assumptions and is not a full EC2 verification.
+  static SlabDeflectionCheck evaluateSlabSpan(StoreyLevel storey,double scale) {
+    final span=calculateClearSpan(storey,scale);
+    final h=storey.slabs.isEmpty ? .20 : storey.slabs.first.thickness;
+    final determined=span.maxSpanM.isFinite && h.isFinite && h>0;
+    final hasBeams=storey.beams.isNotEmpty;
+    final requiredH=determined
+      ? double.parse((span.maxSpanM/(hasBeams ? 28.0 : 22.0)+.03).toStringAsFixed(2)) : 0.0;
+    final maxSpanM=span.maxSpanM, hCurrent=h, hReqM=requiredH;
+    final isSafe=determined && h>=requiredH-.01;
+    String recommendation='Support span is undetermined.';
+    if(determined) {
+      final String rec;
+      if (!isSafe) {
+        final reqCm = (hReqM * 100).round();
+        final curCm = (hCurrent * 100).round();
+        rec = hasBeams
+            ? 'При отвор L = ${maxSpanM.toStringAsFixed(2)} m, дебелина $curCm cm е недостатъчна. Препоръчва се плоча минимум $reqCm cm.'
+            : 'При светъл отвор L = ${maxSpanM.toStringAsFixed(2)} m без греди, плоча $curCm cm ще провисне недопустимо. Препоръчва се минимум $reqCm cm или главни греди 25x50 cm.';
+      } else {
+        rec = 'Дебелината на плочата (${(hCurrent * 100).round()} cm) е напълно достатъчна за светъл отвор L = ${maxSpanM.toStringAsFixed(2)} m.';
+      }
+
+      recommendation=rec;
+    }
+    return SlabDeflectionCheck(storeyId:storey.id,storeyName:storey.name,
+      currentThicknessM:h,maxSpanM:determined ? span.maxSpanM : double.nan,
+      recommendedMinThicknessM:requiredH,isDeflectionSafe:determined && h>=requiredH-.01,
+      deflectionRatio:determined ? requiredH/h : 0,
+      recommendation:recommendation,
+      criticalSpanSegment:span.criticalSpanSegment,hasBeams:hasBeams);
   }
 
   /// Runs comprehensive Eurocode 2 vertical capacity analysis for the given project.
@@ -686,43 +758,10 @@ class VerticalCapacityCalculator {
     double maxPunchingUtil = 0.0;
     double totalAccumulatedBaseLoadKn = 0.0;
 
-    // 2. Analyze slab deflection for each storey
-    for (int sIdx = 0; sIdx < numStoreys; sIdx++) {
-      final storey = project.storeys[sIdx];
-      final hCurrent = storeySlabThicknessM[sIdx];
-      final spanRes = calculateClearSpan(storey, scale);
-      final maxSpanM = spanRes.maxSpanM;
-      final hasBeams = storey.beams.isNotEmpty;
-      // Basic span-to-depth ratio L/d (EC2 Table 7.4N)
-      final double basicRatio = hasBeams ? 28.0 : 22.0;
-      final double dReqM = maxSpanM / basicRatio;
-      final double hReqM = double.parse((dReqM + 0.03).toStringAsFixed(2)); // +30mm cover
-      final bool isSafe = hCurrent >= (hReqM - 0.01);
-      final double ratio = hReqM / (hCurrent > 0 ? hCurrent : 0.20);
-
-      final String rec;
-      if (!isSafe) {
-        final reqCm = (hReqM * 100).round();
-        final curCm = (hCurrent * 100).round();
-        rec = hasBeams
-            ? 'При отвор L = ${maxSpanM.toStringAsFixed(2)} m, дебелина $curCm cm е недостатъчна. Препоръчва се плоча минимум $reqCm cm.'
-            : 'При светъл отвор L = ${maxSpanM.toStringAsFixed(2)} m без греди, плоча $curCm cm ще провисне недопустимо. Препоръчва се минимум $reqCm cm или главни греди 25x50 cm.';
-      } else {
-        rec = 'Дебелината на плочата (${(hCurrent * 100).round()} cm) е напълно достатъчна за светъл отвор L = ${maxSpanM.toStringAsFixed(2)} m.';
-      }
-
-      allSlabChecks.add(SlabDeflectionCheck(
-        storeyId: storey.id,
-        storeyName: storey.name,
-        currentThicknessM: hCurrent,
-        maxSpanM: maxSpanM,
-        recommendedMinThicknessM: hReqM,
-        isDeflectionSafe: isSafe,
-        deflectionRatio: ratio,
-        recommendation: rec,
-        criticalSpanSegment: spanRes.criticalSpanSegment,
-        hasBeams: hasBeams,
-      ));
+    // Shared preliminary span assessment, also used by automatic placement.
+    for (final storey in project.storeys) {
+      allSlabChecks.add(evaluateSlabSpan(storey.copyWith(
+        gridAxes:storey.gridAxes.isEmpty ? project.gridAxes : storey.gridAxes),scale));
     }
 
     // 3. Complete building vertical load accumulating at foundation level

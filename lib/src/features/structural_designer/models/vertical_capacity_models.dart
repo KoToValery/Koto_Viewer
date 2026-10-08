@@ -193,7 +193,10 @@ class SlabDeflectionCheck {
     this.hasBeams = false,
   });
 
+  bool get isSpanDetermined => maxSpanM.isFinite;
+
   String localizedRecommendation(AppLocalizations l10n) {
+    if (!isSpanDetermined) return l10n.schemeSpanUnknown;
     final int curCm = (currentThicknessM * 100).round();
     final int reqCm = (recommendedMinThicknessM * 100).ceil();
     if (!isDeflectionSafe) {

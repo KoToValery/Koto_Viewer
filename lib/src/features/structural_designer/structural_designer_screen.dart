@@ -1,3 +1,4 @@
+import 'analysis/geometric_window_detector.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../bim_projects/services/bim_underlay_conversion_service.dart';
@@ -6666,6 +6667,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       builder: (_) => InitialSchemeDialog(
         project: snapshot,
         pairs: detection.selectedWallPairs,
+        wallOpenings: GeometricWindowDetector.detect(_document, detection.selectedWallPairs, scale / 1000),
         closureSegments: detection.closureSegments,
         scale: scale,
         options: InitialSchemeOptions(

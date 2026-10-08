@@ -2959,7 +2959,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get schemeNoWalls =>
-      'No continuous walls detected. Columns use grid axes; shear walls require detected walls.';
+      'No solid wall runs detected. Grid axes alone do not authorize columns inside rooms.';
 
   @override
   String get schemeNoCandidates =>
@@ -3004,12 +3004,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only new objects are accepted. Manual elements and accepted edits are preserved.';
 
   @override
-  String get schemePairedWalls =>
-      'Enforce 2x2 paired shear walls (seismic balance)';
+  String get schemePairedWalls => 'Prefer distributed walls in both directions';
 
   @override
-  String get schemeGenerousDensity =>
-      'Full structural layout (dense coverage for engineer pruning)';
+  String get schemeGenerousDensity => 'Additional support density (optional)';
 
   @override
   String get toggleGroundFoundations => 'Show foundations (±0.00)';
@@ -3028,4 +3026,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get schemeEurocodeScope =>
       'Preliminary geometric screening. Support distance is not a calculated span or deflection. EC2 verification requires a structural model, loads, materials and reinforcement; the EC8 report contains preliminary indicators only.';
+
+  @override
+  String get schemeSpanUnknown => 'Support span is undetermined';
+
+  @override
+  String get schemeSupportSpan => 'Critical support spacing (preliminary)';
+
+  @override
+  String get schemeOpeningFallback =>
+      'Purple: fallback columns in door/window openings — review opening';
 }

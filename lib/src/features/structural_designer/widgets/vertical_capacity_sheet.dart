@@ -509,7 +509,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
       itemBuilder: (context, idx) {
         final slab = report.slabChecks[idx];
         final bool isSafe = slab.isDeflectionSafe;
-        final color = isSafe ? const Color(0xFF00E676) : const Color(0xFFFF1744);
+        final color = !slab.isSpanDetermined ? Colors.amber : isSafe ? const Color(0xFF00E676) : const Color(0xFFFF1744);
 
         return Container(
           padding: const EdgeInsets.all(12),
@@ -546,7 +546,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                       border: Border.all(color: color),
                     ),
                     child: Text(
-                      isSafe ? context.l10n.verticalSlabStatusOk : context.l10n.verticalSlabStatusEnlarge,
+                      !slab.isSpanDetermined ? context.l10n.schemeSpanUnknown : isSafe ? context.l10n.verticalSlabStatusOk : context.l10n.verticalSlabStatusEnlarge,
                       style: TextStyle(
                         color: color,
                         fontSize: 10,
@@ -563,7 +563,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 children: [
                   _buildSubmetric(
                     context.l10n.verticalClearSpanLmax,
-                    '${slab.maxSpanM.toStringAsFixed(2)} m',
+                    slab.isSpanDetermined ? '${slab.maxSpanM.toStringAsFixed(2)} m' : '—',
                   ),
                   _buildSubmetric(
                     context.l10n.verticalCurrentThicknessH,
@@ -571,7 +571,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   ),
                   _buildSubmetric(
                     context.l10n.verticalRequiredThicknessEc2,
-                    '${(slab.recommendedMinThicknessM * 100).round()} cm',
+                    slab.isSpanDetermined ? '${(slab.recommendedMinThicknessM * 100).round()} cm' : '—',
                     color: !isSafe ? const Color(0xFFFF1744) : Colors.white70,
                   ),
                 ],

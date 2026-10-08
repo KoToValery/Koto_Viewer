@@ -12,8 +12,9 @@ import 'package:kotoview/src/features/structural_designer/analysis/structural_po
 import 'package:kotoview/src/features/structural_designer/widgets/initial_scheme_dialog.dart';
 import 'package:kotoview/src/features/structural_designer/services/structural_persistence_service.dart';
 
-WallPairCandidate pair(Offset a, Offset b, double scale) {
-  final u = (b - a) / (b - a).distance, n = Offset(-u.dy, u.dx) * .125 * scale;
+WallPairCandidate pair(Offset a, Offset b, double scale, {double width = .25}) {
+  final u = (b - a) / (b - a).distance,
+      n = Offset(-u.dy, u.dx) * width / 2 * scale;
   WallSegment segment(Offset a, Offset b) => WallSegment(
     start: a,
     end: b,
@@ -25,7 +26,7 @@ WallPairCandidate pair(Offset a, Offset b, double scale) {
   return WallPairCandidate(
     segmentA: segment(a + n, b + n),
     segmentB: segment(a - n, b - n),
-    perpendicularDistance: .25 * scale,
+    perpendicularDistance: width * scale,
     overlapLength: (b - a).distance,
     centerlineStart: a,
     centerlineEnd: b,
@@ -72,7 +73,7 @@ WallPairCandidate pair(Offset a, Offset b, double scale) {
 
 void main() {
   test(
-    'requires typed staircase; explicit axes can propose columns, not walls',
+    'requires typed staircase; axes alone cannot authorize columns in rooms',
     () {
       final (p, runs) = fixture();
       final axesOnly = InitialSchemeGenerator.generate(
@@ -80,7 +81,7 @@ void main() {
         wallPairs: [],
         scale: 1,
       );
-      expect(axesOnly.columns, isNotEmpty);
+      expect(axesOnly.columns, isEmpty);
       expect(axesOnly.walls, isEmpty);
       final noStairs = p.copyWith(
         storeys: [
@@ -244,7 +245,9 @@ void main() {
     );
     final r = InitialSchemeGenerator.generate(
       project: project,
-      wallPairs: runs,
+      wallPairs: runs
+          .map((r) => pair(r.centerlineStart, r.centerlineEnd, 1, width: .5))
+          .toList(),
       scale: 1,
     );
     expect(
@@ -348,7 +351,9 @@ void main() {
       final (p, runs) = fixture();
       final r = InitialSchemeGenerator.generate(
         project: p,
-        wallPairs: runs,
+        wallPairs: runs
+            .map((r) => pair(r.centerlineStart, r.centerlineEnd, 1, width: .5))
+            .toList(),
         scale: 1,
         options: const InitialSchemeOptions(
           columnShape: ColumnShape.circular,
@@ -415,7 +420,7 @@ void main() {
     );
   });
   test(
-    'an isolated long axis gains intermediate supports and supports near edges',
+    'a long wall with an axis gains intermediate supports and supports near edges',
     () {
       final (p, _) = fixture();
       final floor = p.activeStorey.copyWith(
@@ -430,10 +435,13 @@ void main() {
       );
       final r = InitialSchemeGenerator.generate(
         project: p.copyWith(storeys: [floor]),
-        wallPairs: [],
+        wallPairs: [pair(const Offset(.2, 2), const Offset(19.8, 2), 1)],
         scale: 1,
       );
-      final x = r.columns.map((c) => c.center.dx).toList()..sort();
+      final x = [
+        ...r.columns.map((c) => c.center.dx),
+        ...r.walls.map((w) => w.center.dx),
+      ]..sort();
       expect(x.length, greaterThanOrEqualTo(4));
       expect(x.first, lessThan(2));
       expect(x.last, greaterThan(18));
@@ -559,7 +567,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           tester.widget<SwitchListTile>(find.byType(SwitchListTile).last).value,
-          isFalse,
+          isTrue,
         );
         expect(find.text('${l.schemeVariant}: 1'), findsOneWidget);
         await tester.ensureVisible(find.text(l.schemePairedWalls));

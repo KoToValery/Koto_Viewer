@@ -5096,7 +5096,7 @@ abstract class AppLocalizations {
   /// No description provided for @schemeNoWalls.
   ///
   /// In en, this message translates to:
-  /// **'No continuous walls detected. Columns use grid axes; shear walls require detected walls.'**
+  /// **'No solid wall runs detected. Grid axes alone do not authorize columns inside rooms.'**
   String get schemeNoWalls;
 
   /// No description provided for @schemeNoCandidates.
@@ -5168,13 +5168,13 @@ abstract class AppLocalizations {
   /// Option to enforce pairing shear walls in both orthogonal directions
   ///
   /// In en, this message translates to:
-  /// **'Enforce 2x2 paired shear walls (seismic balance)'**
+  /// **'Prefer distributed walls in both directions'**
   String get schemePairedWalls;
 
   /// Option to generate complete corner and intermediate columns
   ///
   /// In en, this message translates to:
-  /// **'Full structural layout (dense coverage for engineer pruning)'**
+  /// **'Additional support density (optional)'**
   String get schemeGenerousDensity;
 
   /// Menu item to toggle ground foundation visibility on level 0.00
@@ -5206,6 +5206,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preliminary geometric screening. Support distance is not a calculated span or deflection. EC2 verification requires a structural model, loads, materials and reinforcement; the EC8 report contains preliminary indicators only.'**
   String get schemeEurocodeScope;
+
+  /// No description provided for @schemeSpanUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Support span is undetermined'**
+  String get schemeSpanUnknown;
+
+  /// No description provided for @schemeSupportSpan.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical support spacing (preliminary)'**
+  String get schemeSupportSpan;
+
+  /// No description provided for @schemeOpeningFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Purple: fallback columns in door/window openings — review opening'**
+  String get schemeOpeningFallback;
 }
 
 class _AppLocalizationsDelegate

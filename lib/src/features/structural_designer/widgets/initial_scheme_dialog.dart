@@ -7,12 +7,14 @@ import '../models/seismic_analysis_models.dart';
 import '../analysis/initial_scheme_generator.dart';
 import '../analysis/seismic_analysis_calculator.dart';
 import '../analysis/wall_axis_detector.dart';
+import '../analysis/geometric_window_detector.dart';
 import 'seismic_analysis_sheet.dart';
 
 class InitialSchemeDialog extends StatefulWidget {
   final StructuralProject project;
   final List<WallPairCandidate> pairs;
   final List<(Offset, Offset)> closureSegments;
+  final List<GeometricWindowOpening> wallOpenings;
   final double scale;
   final InitialSchemeOptions options;
   const InitialSchemeDialog({
@@ -20,6 +22,7 @@ class InitialSchemeDialog extends StatefulWidget {
     required this.project,
     required this.pairs,
     this.closureSegments = const [],
+    this.wallOpenings = const [],
     required this.scale,
     required this.options,
   });
@@ -88,6 +91,7 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
       final candidate = InitialSchemeGenerator.generate(
         project: widget.project,
         wallPairs: widget.pairs,
+        wallOpenings: widget.wallOpenings,
         scale: widget.scale,
         options: options,
         variant: nextVariant++,
@@ -248,6 +252,21 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
                 '${p.maxSupportDistanceM.isFinite ? p.maxSupportDistanceM.toStringAsFixed(2) : '—'} m',
               ),
               Text(l.schemeEurocodeScope),
+              Text(
+                p.maxSupportSpanM == null
+                    ? l.schemeSpanUnknown
+                    : '${l.schemeSupportSpan}: ${p.maxSupportSpanM!.toStringAsFixed(2)} m',
+                style: TextStyle(
+                  color: p.spanCheck?.isDeflectionSafe == true
+                      ? Colors.green.shade700
+                      : Theme.of(context).colorScheme.error,
+                ),
+              ),
+              if (p.openingColumnIds.isNotEmpty)
+                Text(
+                  '${l.schemeOpeningFallback}: ${p.openingColumnIds.length}',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               Text(l.schemePreliminary),
               TextButton(
                 onPressed: () => showModalBottomSheet(
@@ -447,6 +466,26 @@ class _SchemePainter extends CustomPainter {
       canvas.drawCircle(screen(p), 2, gapPaint);
     }
     // 3. Draw Existing and Proposed Columns & Walls
+    final span = proposal.criticalSupportSpan;
+    if (span != null) {
+      canvas.drawLine(
+        screen(span.$1),
+        screen(span.$2),
+        Paint()
+          ..color = proposal.spanCheck?.isDeflectionSafe == true
+              ? Colors.green
+              : Colors.red
+          ..strokeWidth = 2,
+      );
+      final label = TextPainter(
+        text: TextSpan(
+          text: 'L = ${proposal.maxSupportSpanM!.toStringAsFixed(2)} m',
+          style: const TextStyle(color: Colors.deepPurple, fontSize: 12),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      label.paint(canvas, screen((span.$1 + span.$2) / 2));
+    }
     for (final c in floor.columns) {
       draw(c.polygonVertices, Colors.grey, fill: true);
     }
@@ -454,7 +493,11 @@ class _SchemePainter extends CustomPainter {
       draw(w.polygonVertices, Colors.grey, fill: true);
     }
     for (final c in proposal.columns) {
-      draw(c.polygonVertices, Colors.green, fill: true);
+      draw(
+        c.polygonVertices,
+        proposal.openingColumnIds.contains(c.id) ? Colors.purple : Colors.green,
+        fill: true,
+      );
     }
     for (final w in proposal.walls) {
       draw(w.polygonVertices, Colors.orange, fill: true);

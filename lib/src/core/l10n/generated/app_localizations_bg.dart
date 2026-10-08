@@ -2968,7 +2968,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get schemeNoWalls =>
-      'Няма разпознати непрекъснати стени. Колоните се предлагат по осите; за шайби е нужно разпознаване на стените.';
+      'Няма разпознати плътни стенни участъци. Осите сами по себе си не разрешават колони в помещенията.';
 
   @override
   String get schemeNoCandidates =>
@@ -3014,11 +3014,11 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get schemePairedWalls =>
-      'Задължително сдвояване 2х2 шайби (сеизмичен баланс)';
+      'Предпочитай разпределени шайби по двете направления';
 
   @override
   String get schemeGenerousDensity =>
-      'Пълна конструктивна схема (плътна за редуциране от проектанта)';
+      'Допълнителна плътност на опорите (по избор)';
 
   @override
   String get toggleGroundFoundations => 'Показване на основи (±0.00)';
@@ -3037,4 +3037,15 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get schemeEurocodeScope =>
       'Геометрична предварителна проверка. Разстоянието до опора не е изчислен отвор или провисване. За проверка по EC2 са нужни статическа схема, товари, материали и армировка; докладът за EC8 съдържа само предварителни показатели.';
+
+  @override
+  String get schemeSpanUnknown => 'Подпорното разстояние е неопределено';
+
+  @override
+  String get schemeSupportSpan =>
+      'Критично подпорно разстояние (предварително)';
+
+  @override
+  String get schemeOpeningFallback =>
+      'Лилаво: резервни колони във врати/прозорци — проверете отвора';
 }
