@@ -2958,7 +2958,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get schemeTargetSpacing => 'Целева стъпка (m)';
 
   @override
-  String get schemeRebuild => 'Обнови вариантите';
+  String get schemeRebuild => 'Следващ вариант';
 
   @override
   String get schemeConfirm => 'Потвърждавам показаните контури и отвори';
@@ -2968,7 +2968,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get schemeNoWalls =>
-      'Няма разпознати непрекъснати стени. Първо изпълнете разпознаването на стените.';
+      'Няма разпознати непрекъснати стени. Колоните се предлагат по осите; за шайби е нужно разпознаване на стените.';
 
   @override
   String get schemeNoCandidates =>
@@ -3022,4 +3022,19 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get toggleGroundFoundations => 'Показване на основи (±0.00)';
+
+  @override
+  String get schemeVariant => 'Вариант';
+
+  @override
+  String get schemeNoAlternative =>
+      'Не е намерен нов различен вариант в текущото търсене. Променете отстоянията или опитайте отново.';
+
+  @override
+  String get schemeCoverage =>
+      'Червени точки: разстояние над половината от целевата стъпка / максимално разстояние до опора';
+
+  @override
+  String get schemeEurocodeScope =>
+      'Геометрична предварителна проверка. Разстоянието до опора не е изчислен отвор или провисване. За проверка по EC2 са нужни статическа схема, товари, материали и армировка; докладът за EC8 съдържа само предварителни показатели.';
 }

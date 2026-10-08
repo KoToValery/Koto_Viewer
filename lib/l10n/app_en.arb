@@ -2352,10 +2352,10 @@
   "schemeVariantLong": "Variant 2 · along long walls",
   "schemeMinSpacing": "Minimum spacing (m)",
   "schemeTargetSpacing": "Target spacing (m)",
-  "schemeRebuild": "Refresh variants",
+  "schemeRebuild": "Next variant",
   "schemeConfirm": "I confirm the displayed slab outlines and openings",
   "schemeAccept": "Accept proposal",
-  "schemeNoWalls": "No continuous walls were detected. Run wall detection first.",
+  "schemeNoWalls": "No continuous walls detected. Columns use grid axes; shear walls require detected walls.",
   "schemeNoCandidates": "No suitable free positions. Existing elements are preserved.",
   "schemeLimits": "The preliminary layout limit was reached. Review the remaining areas manually.",
   "schemePreliminary": "Sizes use the currently selected sections. Spacing is a layout setting, not a calculated allowable span. Check sections extending beyond architectural walls.",
@@ -2378,5 +2378,9 @@
   "toggleGroundFoundations": "Show foundations (±0.00)",
   "@toggleGroundFoundations": {
     "description": "Menu item to toggle ground foundation visibility on level 0.00"
-  }
+  },
+  "schemeVariant": "Variant",
+  "schemeNoAlternative": "No distinct alternative found in this search. Change spacing or try again.",
+  "schemeCoverage": "Red samples: distance exceeds half the target spacing / greatest support distance",
+  "schemeEurocodeScope": "Preliminary geometric screening. Support distance is not a calculated span or deflection. EC2 verification requires a structural model, loads, materials and reinforcement; the EC8 report contains preliminary indicators only."
 }

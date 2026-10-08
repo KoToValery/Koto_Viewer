@@ -38,11 +38,13 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   late bool generousDensity = widget.options.generousDensity;
   late final List<(Offset, Offset)> effectiveClosureSegments =
       widget.closureSegments.isNotEmpty
-          ? widget.closureSegments
-          : WallAxisDetector.computeClosureSegmentsForPairs(widget.pairs);
-  List<InitialSchemeProposal> proposals = [];
-  List<SeismicAnalysisReport> reports = [];
-  int selected = 0;
+      ? widget.closureSegments
+      : WallAxisDetector.computeClosureSegmentsForPairs(widget.pairs);
+  InitialSchemeProposal proposal = const InitialSchemeProposal();
+  SeismicAnalysisReport report = SeismicAnalysisReport.empty;
+  final seenLayouts = <String>{};
+  int nextVariant = 0, displayedVariant = 0;
+  bool noAlternative = false;
   bool confirmed = false, error = false, dirty = false;
   @override
   void initState() {
@@ -72,31 +74,48 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
       generousDensity: generousDensity,
     );
     if (!options.valid) {
-      setState(() => error = true);
+      error = true;
       return;
     }
-    proposals = [
-      for (var v = 0; v < 2; v++)
-        InitialSchemeGenerator.generate(
-          project: widget.project,
-          wallPairs: widget.pairs,
-          scale: widget.scale,
-          options: options,
-          variant: v,
+    if (dirty) {
+      seenLayouts.clear();
+      nextVariant = 0;
+      displayedVariant = 0;
+    }
+    noAlternative = true;
+    // Do not label identical layouts as a new alternative. The search is bounded.
+    for (var attempt = 0; attempt < 12; attempt++) {
+      final candidate = InitialSchemeGenerator.generate(
+        project: widget.project,
+        wallPairs: widget.pairs,
+        scale: widget.scale,
+        options: options,
+        variant: nextVariant++,
+      );
+      // Ignore changes below 5 cm when identifying a different layout.
+      String position(Offset p) =>
+          '${(p.dx / widget.scale / .05).round()},${(p.dy / widget.scale / .05).round()}';
+      final ids = [
+        ...candidate.columns.map((c) => 'c:${position(c.center)}'),
+        ...candidate.walls.map(
+          (w) => 'w:${position(w.start)}:${position(w.end)}',
         ),
-    ];
-    reports = [
-      for (final p in proposals)
-        SeismicAnalysisCalculator.analyzeProject(
-          widget.project.copyWith(
-            storeys: [
-              for (final f in widget.project.storeys)
-                f.id == widget.project.activeStorey.id ? p.apply(f) : f,
-            ],
-          ),
-          cadUnitsPerMeter: widget.scale,
+      ]..sort();
+      if (!seenLayouts.add(ids.join('|'))) continue;
+      proposal = candidate;
+      displayedVariant++;
+      noAlternative = false;
+      report = SeismicAnalysisCalculator.analyzeProject(
+        widget.project.copyWith(
+          storeys: [
+            for (final f in widget.project.storeys)
+              f.id == widget.project.activeStorey.id ? proposal.apply(f) : f,
+          ],
         ),
-    ];
+        cadUnitsPerMeter: widget.scale,
+      );
+      break;
+    }
     confirmed = false;
     error = false;
     dirty = false;
@@ -105,7 +124,7 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final p = proposals[selected];
+    final p = proposal;
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 920),
@@ -158,6 +177,7 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
                     ),
                   ),
                   TextButton(
+                    key: const ValueKey('next-scheme'),
                     onPressed: () => setState(rebuild),
                     child: Text(l.schemeRebuild),
                   ),
@@ -194,37 +214,9 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               const SizedBox(height: 8),
-              Text(l.schemeComparison),
-              for (var i = 0; i < proposals.length; i++)
-                Builder(
-                  builder: (context) {
-                    final checks = reports[i].storeyChecks.where(
-                      (c) => c.storeyId == widget.project.activeStorey.id,
-                    );
-                    final e = checks.isEmpty
-                        ? null
-                        : checks.first.eccentricityM;
-                    return ListTile(
-                      leading: Icon(
-                        selected == i
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off,
-                      ),
-                      onTap: () => setState(() {
-                        selected = i;
-                        confirmed = false;
-                      }),
-                      title: Text(
-                        i == 0 ? l.schemeVariantCore : l.schemeVariantLong,
-                      ),
-                      subtitle: Text(
-                        '${proposals[i].columns.length} C · ${proposals[i].walls.length} W · '
-                        '${e == null ? '—' : '${e.dx.toStringAsFixed(3)} / ${e.dy.toStringAsFixed(3)}'} · '
-                        '${reports[i].totalFloatingColumnsCount}',
-                      ),
-                    );
-                  },
-                ),
+              Text('${l.schemeVariant}: $displayedVariant'),
+              Text('${p.columns.length} C · ${p.walls.length} W'),
+              if (noAlternative) Text(l.schemeNoAlternative),
               SizedBox(
                 height: 320,
                 width: double.infinity,
@@ -236,6 +228,7 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
                       widget.project.activeStorey,
                       p,
                       widget.pairs,
+                      widget.project.effectiveGridAxes,
                       effectiveClosureSegments,
                     ),
                   ),
@@ -250,13 +243,17 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
               if (p.limited) Text(l.schemeLimits),
               Text('${l.schemeUnresolved}: ${p.unresolvedRegions}'),
               Text('${l.schemeRejected}: ${p.rejectedCandidates}'),
+              Text(
+                '${l.schemeCoverage}: ${p.uncoveredSamples} · '
+                '${p.maxSupportDistanceM.isFinite ? p.maxSupportDistanceM.toStringAsFixed(2) : '—'} m',
+              ),
+              Text(l.schemeEurocodeScope),
               Text(l.schemePreliminary),
               TextButton(
                 onPressed: () => showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
-                  builder: (_) =>
-                      SeismicAnalysisSheet(report: reports[selected]),
+                  builder: (_) => SeismicAnalysisSheet(report: report),
                 ),
                 child: Text(l.schemeReport),
               ),
@@ -297,18 +294,27 @@ class _SchemePainter extends CustomPainter {
   final InitialSchemeProposal proposal;
   final List<WallPairCandidate> pairs;
   final List<(Offset, Offset)> closureSegments;
-  _SchemePainter(this.floor, this.proposal, this.pairs, this.closureSegments);
+  final List<StructuralGridAxis> axes;
+  _SchemePainter(
+    this.floor,
+    this.proposal,
+    this.pairs,
+    this.axes,
+    this.closureSegments,
+  );
 
   @override
   void paint(Canvas canvas, Size size) {
     final points = <Offset>[
       ...floor.slabs.expand((s) => s.polygon),
-      ...pairs.expand((p) => [
-        p.segmentA.start,
-        p.segmentA.end,
-        p.segmentB.start,
-        p.segmentB.end,
-      ]),
+      ...pairs.expand(
+        (p) => [
+          p.segmentA.start,
+          p.segmentA.end,
+          p.segmentB.start,
+          p.segmentB.end,
+        ],
+      ),
     ];
     if (points.isEmpty) return;
     final minX = points.map((p) => p.dx).reduce(math.min),
@@ -335,6 +341,15 @@ class _SchemePainter extends CustomPainter {
       );
     }
 
+    final axisPaint = Paint()
+      ..color = Colors.blueGrey.withValues(alpha: .3)
+      ..strokeWidth = .75;
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    for (final axis in axes) {
+      canvas.drawLine(screen(axis.start), screen(axis.end), axisPaint);
+    }
+    canvas.restore();
     // 1. Draw Architectural Walls:
     // Light solid background fill + light diagonal architectural hatch pattern + boundary stroke
     final wallFillPaint = Paint()
@@ -371,10 +386,16 @@ class _SchemePainter extends CustomPainter {
 
       final List<Offset> polyPts;
       if (tEnd > tStart) {
-        final pAStart = Offset(tStart * cosA - dA * sinA, tStart * sinA + dA * cosA);
+        final pAStart = Offset(
+          tStart * cosA - dA * sinA,
+          tStart * sinA + dA * cosA,
+        );
         final pAEnd = Offset(tEnd * cosA - dA * sinA, tEnd * sinA + dA * cosA);
         final pBEnd = Offset(tEnd * cosA - dB * sinA, tEnd * sinA + dB * cosA);
-        final pBStart = Offset(tStart * cosA - dB * sinA, tStart * sinA + dB * cosA);
+        final pBStart = Offset(
+          tStart * cosA - dB * sinA,
+          tStart * sinA + dB * cosA,
+        );
         polyPts = [pAStart, pAEnd, pBEnd, pBStart];
       } else {
         polyPts = [sA.start, sA.end, sB.end, sB.start];
@@ -421,6 +442,10 @@ class _SchemePainter extends CustomPainter {
       }
     }
 
+    final gapPaint = Paint()..color = Colors.red.withValues(alpha: .65);
+    for (final p in proposal.uncoveredPoints) {
+      canvas.drawCircle(screen(p), 2, gapPaint);
+    }
     // 3. Draw Existing and Proposed Columns & Walls
     for (final c in floor.columns) {
       draw(c.polygonVertices, Colors.grey, fill: true);

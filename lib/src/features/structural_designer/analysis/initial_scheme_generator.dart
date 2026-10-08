@@ -12,9 +12,7 @@ class InitialSchemeOptions {
   final double columnWidthM, columnDepthM, wallThicknessM;
   final ColumnShape columnShape;
   final double columnThicknessM;
-  final bool enforcePairedWalls;
-  final bool generousDensity;
-
+  final bool enforcePairedWalls, generousDensity;
   const InitialSchemeOptions({
     this.columnShape = ColumnShape.rectangular,
     this.columnThicknessM = .25,
@@ -27,7 +25,6 @@ class InitialSchemeOptions {
     this.enforcePairedWalls = true,
     this.generousDensity = true,
   });
-
   bool get valid =>
       [
         minSpacingM,
@@ -47,16 +44,21 @@ class InitialSchemeProposal {
   final int unresolvedRegions, rejectedCandidates;
   final bool limited;
 
+  /// Geometric coverage only: these are not spans or calculated deflections.
+  final int uncoveredSamples;
+  final double maxSupportDistanceM;
+  final List<Offset> uncoveredPoints;
   const InitialSchemeProposal({
     this.columns = const [],
     this.walls = const [],
     this.unresolvedRegions = 0,
     this.rejectedCandidates = 0,
     this.limited = false,
+    this.uncoveredSamples = 0,
+    this.maxSupportDistanceM = 0,
+    this.uncoveredPoints = const [],
   });
-
   bool get isEmpty => columns.isEmpty && walls.isEmpty;
-
   StoreyLevel apply(StoreyLevel floor) => floor.copyWith(
     columns: [
       ...floor.columns,
@@ -78,12 +80,11 @@ class _WallRun {
   double get length => (b - a).distance;
 }
 
-/// Bounded, deterministic layout heuristic. Only unbridged paired wall runs
-/// are evidence for placement; an axis by itself never proves a solid wall.
+/// Bounded, deterministic preliminary layout. Wall runs preserve opening gaps;
+/// explicit grid axes also provide column candidates, but never wall evidence.
 class InitialSchemeGenerator {
   static double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
   static double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
-
   static InitialSchemeProposal generate({
     required StructuralProject project,
     required List<WallPairCandidate> wallPairs,
@@ -101,8 +102,10 @@ class InitialSchemeGenerator {
         floor.columns.length + floor.shearWalls.length > 500) {
       return const InitialSchemeProposal(limited: true);
     }
-    String point(Offset p) =>
-        '${(p.dx / scale).toStringAsFixed(4)},${(p.dy / scale).toStringAsFixed(4)}';
+    // Normalize sub-nanometre arithmetic noise before formatting stable IDs.
+    String coordinate(double x) =>
+        ((x / scale * 1e9).round() / 1e9).toStringAsFixed(4);
+    String point(Offset p) => '${coordinate(p.dx)},${coordinate(p.dy)}';
     final runs = <_WallRun>[];
     final seen = <String>{};
     for (final w in wallPairs) {
@@ -132,14 +135,6 @@ class InitialSchemeGenerator {
         '${point(b.a)}:${point(b.b)}',
       ),
     );
-    if (runs.isEmpty) {
-      return InitialSchemeProposal(
-        unresolvedRegions: SlabTopologyAnalyzer.analyze(
-          floor.slabs,
-          scale,
-        ).regionCount,
-      );
-    }
     final regions = SlabTopologyAnalyzer.analyze(floor.slabs, scale).regions;
     final cols = <StructuralColumn>[], walls = <StructuralShearWall>[];
     final occupied = <List<Offset>>[
@@ -156,7 +151,6 @@ class InitialSchemeGenerator {
     };
     int rejected = 0, attempts = 0;
     final directionCoverage = <int, Set<int>>{};
-
     int regionOf(List<Offset> poly) {
       final area = StructuralSlab.calculateArea(poly) / (scale * scale);
       if (!area.isFinite || area <= 1e-10) return -1;
@@ -203,7 +197,7 @@ class InitialSchemeGenerator {
 
     _WallRun? nearRun(Offset p) {
       _WallRun? best;
-      var dist = math.max(0.35 * scale, options.wallThicknessM * scale);
+      var dist = math.max(.35 * scale, options.wallThicknessM * scale);
       for (final run in runs) {
         final d = StructuralPolygonDistance.pointToSegment(p, run.a, run.b);
         if (d < dist) {
@@ -214,12 +208,44 @@ class InitialSchemeGenerator {
       return best;
     }
 
-    void addColumn(Offset p, {StructuralColumn? continuation}) {
+    // An explicit axis does not authorize filling a detected wall opening.
+    bool inWallGap(Offset p, Offset u) {
+      var before = false, after = false;
+      for (final run in runs) {
+        if (dot(run.u, u).abs() < .99 ||
+            cross(p - run.a, u).abs() > .2 * scale) {
+          continue;
+        }
+        final a = dot(run.a - p, u), b = dot(run.b - p, u);
+        if (math.max(a, b) < 0) before = true;
+        if (math.min(a, b) > 0) after = true;
+      }
+      return before && after;
+    }
+
+    bool inAnyWallGap(Offset p) => runs
+        .where((r) => cross(p - r.a, r.u).abs() <= .2 * scale)
+        .any((r) => inWallGap(p, r.u));
+
+    void addColumn(
+      Offset p, {
+      StructuralColumn? continuation,
+      _WallRun? preferredRun,
+      Offset? axisDirection,
+    }) {
       if (cols.length + walls.length >= 300 || attempts > 20000) return;
-      final run = nearRun(p);
-      if (run == null) return;
+      final run = preferredRun ?? nearRun(p);
+      if (run == null &&
+          (axisDirection == null ||
+              inWallGap(p, axisDirection) ||
+              inAnyWallGap(p))) {
+        return;
+      }
+      final u = run?.u ?? axisDirection!;
       // Preserve lower support center; other candidates project onto wall axis.
       final center = continuation != null
+          ? p
+          : run == null
           ? p
           : run.a + run.u * dot(p - run.a, run.u);
       final id = 'scheme:${floor.id}:c:${point(center)}';
@@ -237,10 +263,12 @@ class InitialSchemeGenerator {
             thickness: options.columnThicknessM * scale,
             width: options.columnWidthM * scale,
             height: options.columnDepthM * scale,
-            rotationRad: math.atan2(run.u.dy, run.u.dx),
+            rotationRad: math.atan2(u.dy, u.dx),
             generatedBy: 'initial-scheme-v1',
           );
-      if (!onRun(c.polygonVertices, run) || !allowed(c.polygonVertices, center)) {
+      if ((run == null && c.polygonVertices.any(inAnyWallGap)) ||
+          (run != null && !onRun(c.polygonVertices, run)) ||
+          !allowed(c.polygonVertices, center)) {
         return;
       }
       cols.add(c);
@@ -261,18 +289,20 @@ class InitialSchemeGenerator {
         addColumn(c.center, continuation: c);
       }
     }
-
     final longest = List<_WallRun>.of(runs)
       ..sort((a, b) => b.length.compareTo(a.length));
-    final primary = longest.first.u;
+    final primary = longest.isEmpty ? const Offset(1, 0) : longest.first.u;
+    // Irrational phase provides reproducible alternatives beyond two presets.
     final perp = Offset(-primary.dy, primary.dx);
-
+    final layoutSpacingM = options.generousDensity
+        ? math.max(options.minSpacingM, math.min(options.targetSpacingM, 3.5))
+        : options.targetSpacingM;
+    final phase = (math.max(0, variant) * .6180339887498949) % 1;
     int direction(_WallRun r) => dot(r.u, primary).abs() >= .9239
         ? 0
         : cross(r.u, primary).abs() >= .9239
         ? 1
         : 2;
-
     int elementDirection(Offset u) => dot(u, primary).abs() >= .9239
         ? 0
         : cross(u, primary).abs() >= .9239
@@ -286,18 +316,21 @@ class InitialSchemeGenerator {
               s.getOpeningType(i) == SlabOpeningType.elevator)
             s.openings[i],
     ];
-
     double stairDistance(_WallRun run) =>
-        stairRings.isEmpty
-            ? 0.0
-            : stairRings
-                    .expand((p) => p)
-                    .map(
-                      (p) => StructuralPolygonDistance.pointToSegment(p, run.a, run.b),
-                    )
-                    .fold(double.infinity, math.min) /
-                scale;
-
+        stairRings
+            .expand((p) => p)
+            .map(
+              (p) => StructuralPolygonDistance.pointToSegment(p, run.a, run.b),
+            )
+            .fold(double.infinity, math.min) /
+        scale;
+    final wallRuns = List<_WallRun>.of(runs);
+    wallRuns.sort((a, b) {
+      final av = stairDistance(a);
+      final bv = stairDistance(b);
+      final d = av.compareTo(bv);
+      return d != 0 ? d : point(a.a).compareTo(point(b.a));
+    });
     // Continue admissible lower walls before introducing new wall positions.
     if (lower.isNotEmpty) {
       final oldWalls = List<StructuralShearWall>.of(lower.first.shearWalls)
@@ -322,17 +355,67 @@ class InitialSchemeGenerator {
         ids.add(id);
       }
     }
-
     for (final w in [...floor.shearWalls, ...walls]) {
       final r = regionOf(w.polygonVertices);
       if (r >= 0 && w.length > 0) {
         final u = (w.end - w.start) / w.length;
         directionCoverage
             .putIfAbsent(r, () => {})
-            .add(elementDirection(u));
+            .add(
+              dot(u, primary).abs() >= .9239
+                  ? 0
+                  : cross(u, primary).abs() >= .9239
+                  ? 1
+                  : 2,
+            );
       }
     }
-
+    for (final run in wallRuns) {
+      if (walls.length + cols.length >= 300 || attempts > 20000) break;
+      if (stairDistance(run) > 1.5 ||
+          run.length < options.wallLengthM * scale ||
+          direction(run) > 1) {
+        continue;
+      }
+      final half = options.wallLengthM * scale / 2;
+      final core = stairDistance(run) <= 1.5;
+      final positions = <double>[
+        if (core)
+          for (final ring in stairRings)
+            for (var i = 0; i < ring.length; i++)
+              dot(
+                (ring[i] + ring[(i + 1) % ring.length]) / 2 - run.a,
+                run.u,
+              ).clamp(half, run.length - half),
+        half + (run.length - 2 * half) * (variant == 0 ? .5 : phase),
+        half,
+        run.length - half,
+      ];
+      // Try windows along the run: its midpoint may be inside the staircase.
+      for (final along in positions) {
+        final center = run.a + run.u * along;
+        final w = StructuralShearWall(
+          id: 'scheme:${floor.id}:w:${point(center)}',
+          start: center - run.u * half,
+          end: center + run.u * half,
+          thickness: options.wallThicknessM * scale,
+          generatedBy: 'initial-scheme-v1',
+        );
+        final r = regionOf(w.polygonVertices);
+        if (r < 0 ||
+            ids.contains(w.id) ||
+            !onRun(w.polygonVertices, run) ||
+            !allowed(w.polygonVertices, center)) {
+          continue;
+        }
+        walls.add(w);
+        occupied.add(w.polygonVertices);
+        centers.add(center);
+        ids.add(w.id);
+        directionCoverage.putIfAbsent(r, () => {}).add(direction(run));
+        break;
+      }
+    }
     Offset regionCentroid(int r) {
       double sumA = 0, sumX = 0, sumY = 0;
       for (final idx in regions[r]) {
@@ -356,7 +439,9 @@ class InitialSchemeGenerator {
     double regionAreaM2(int r) {
       double sumA = 0;
       for (final idx in regions[r]) {
-        sumA += StructuralSlab.calculateArea(floor.slabs[idx].polygon) / (scale * scale);
+        sumA +=
+            StructuralSlab.calculateArea(floor.slabs[idx].polygon) /
+            (scale * scale);
       }
       return sumA;
     }
@@ -379,35 +464,48 @@ class InitialSchemeGenerator {
       if (walls.length + cols.length >= 300 || attempts > 20000) return false;
       final targetLenM = overrideLengthM ?? options.wallLengthM;
       if (run.length < targetLenM * scale) return false;
-      final center = run.center;
-      final w = StructuralShearWall(
-        id: 'scheme:${floor.id}:w:${point(center)}',
-        start: center - run.u * (targetLenM * scale / 2),
-        end: center + run.u * (targetLenM * scale / 2),
-        thickness: options.wallThicknessM * scale,
-        generatedBy: 'initial-scheme-v1',
-      );
-      if (ids.contains(w.id)) return false;
-      if (regionOf(w.polygonVertices) != r) return false;
-      if (!onRun(w.polygonVertices, run)) return false;
+      final half = targetLenM * scale / 2;
+      final positions = <double>[
+        half + (run.length - 2 * half) * (variant == 0 ? .5 : phase),
+        half,
+        run.length - half,
+      ];
+      for (final along in positions) {
+        final center = run.a + run.u * along;
+        final w = StructuralShearWall(
+          id: 'scheme:${floor.id}:w:${point(center)}',
+          start: center - run.u * (targetLenM * scale / 2),
+          end: center + run.u * (targetLenM * scale / 2),
+          thickness: options.wallThicknessM * scale,
+          generatedBy: 'initial-scheme-v1',
+        );
+        if (ids.contains(w.id)) continue;
+        if (regionOf(w.polygonVertices) != r) continue;
+        if (!onRun(w.polygonVertices, run)) continue;
 
-      // Spacing check against existing shear walls in the SAME direction
-      final sameDirWalls = [...floor.shearWalls, ...walls].where((existing) {
-        if (existing.length <= 0 || regionOf(existing.polygonVertices) != r) return false;
-        final u = (existing.end - existing.start) / existing.length;
-        return elementDirection(u) == d;
-      });
-      if (sameDirWalls.any((other) => (other.center - center).distance < minWallSpacingM * scale)) {
-        return false;
+        // Spacing check against existing shear walls in the SAME direction
+        final sameDirWalls = [...floor.shearWalls, ...walls].where((existing) {
+          if (existing.length <= 0 || regionOf(existing.polygonVertices) != r) {
+            return false;
+          }
+          final u = (existing.end - existing.start) / existing.length;
+          return elementDirection(u) == d;
+        });
+        if (sameDirWalls.any(
+          (other) => (other.center - center).distance < minWallSpacingM * scale,
+        )) {
+          continue;
+        }
+        if (!allowed(w.polygonVertices, center)) continue;
+
+        walls.add(w);
+        occupied.add(w.polygonVertices);
+        centers.add(center);
+        ids.add(w.id);
+        directionCoverage.putIfAbsent(r, () => {}).add(d);
+        return true;
       }
-      if (!allowed(w.polygonVertices, center)) return false;
-
-      walls.add(w);
-      occupied.add(w.polygonVertices);
-      centers.add(center);
-      ids.add(w.id);
-      directionCoverage.putIfAbsent(r, () => {}).add(d);
-      return true;
+      return false;
     }
 
     // Shear wall pairing engine
@@ -422,16 +520,23 @@ class InitialSchemeGenerator {
             : 2;
         if (currentCount >= targetCount) continue;
 
-        final primaryRuns = runs.where((run) =>
-            direction(run) == dir &&
-            run.length >= options.wallLengthM * scale
-        ).toList();
+        final primaryRuns = runs
+            .where(
+              (run) =>
+                  direction(run) == dir &&
+                  run.length >= options.wallLengthM * scale,
+            )
+            .toList();
 
-        final fallbackRuns = runs.where((run) =>
-            direction(run) == dir &&
-            run.length < options.wallLengthM * scale &&
-            run.length >= math.max(1.0, options.wallLengthM * 0.75) * scale
-        ).toList();
+        final fallbackRuns = runs
+            .where(
+              (run) =>
+                  direction(run) == dir &&
+                  run.length < options.wallLengthM * scale &&
+                  run.length >=
+                      math.max(1.0, options.wallLengthM * 0.75) * scale,
+            )
+            .toList();
 
         List<_WallRun> orderPairCandidates(List<_WallRun> candList) {
           final posGroup = <_WallRun>[];
@@ -446,7 +551,7 @@ class InitialSchemeGenerator {
               negGroup.add(run);
             }
           }
-          if (variant == 0) {
+          if (variant % 2 == 0) {
             posGroup.sort((a, b) {
               final d = stairDistance(a).compareTo(stairDistance(b));
               return d != 0 ? d : point(a.a).compareTo(point(b.a));
@@ -479,7 +584,12 @@ class InitialSchemeGenerator {
         // Pass 1: Try placing paired walls at standard spacing
         for (final run in ordered) {
           if (existingWallsInDir(r, dir) >= targetCount) break;
-          tryAddWall(run, r, dir, minWallSpacingM: math.min(options.targetSpacingM, 3.5));
+          tryAddWall(
+            run,
+            r,
+            dir,
+            minWallSpacingM: math.min(options.targetSpacingM, 3.5),
+          );
         }
 
         // Pass 2 (Rescue): If pairing is enforced and we placed exactly 1 wall (odd/unpaired!),
@@ -487,7 +597,12 @@ class InitialSchemeGenerator {
         if (options.enforcePairedWalls && existingWallsInDir(r, dir) == 1) {
           for (final run in ordered) {
             if (existingWallsInDir(r, dir) >= 2) break;
-            tryAddWall(run, r, dir, minWallSpacingM: math.max(options.minSpacingM * 1.2, 2.5));
+            tryAddWall(
+              run,
+              r,
+              dir,
+              minWallSpacingM: math.max(options.minSpacingM * 1.2, 2.5),
+            );
           }
         }
         if (options.enforcePairedWalls && existingWallsInDir(r, dir) == 1) {
@@ -506,6 +621,21 @@ class InitialSchemeGenerator {
       }
     }
 
+    // Where a core wall cannot fit, try columns along its actual solid runs.
+    for (final run in wallRuns.where((r) => stairDistance(r) <= 1.5)) {
+      final margin =
+          math.max(options.columnWidthM, options.columnDepthM) * scale / 2;
+      if (run.length < 2 * margin) continue;
+      for (final ring in stairRings) {
+        for (final p in ring) {
+          final along = dot(
+            p - run.a,
+            run.u,
+          ).clamp(margin, run.length - margin);
+          addColumn(run.a + run.u * along, preferredRun: run);
+        }
+      }
+    }
     // Column placement
     // 1. Exterior slab corners
     for (final slab in floor.slabs) {
@@ -516,32 +646,17 @@ class InitialSchemeGenerator {
         final curr = poly[i];
         final run = nearRun(curr);
         if (run != null) {
-          final margin = math.max(options.columnWidthM, options.columnDepthM) * scale / 2;
-          final along = dot(curr - run.a, run.u).clamp(margin, math.max(margin, run.length - margin)).toDouble();
+          final margin =
+              math.max(options.columnWidthM, options.columnDepthM) * scale / 2;
+          final along = dot(
+            curr - run.a,
+            run.u,
+          ).clamp(margin, math.max(margin, run.length - margin)).toDouble();
           addColumn(run.a + run.u * along);
         }
       }
     }
 
-    // 2. Staircase and elevator opening corners
-    for (final slab in floor.slabs) {
-      for (var o = 0; o < slab.openings.length; o++) {
-        final type = slab.getOpeningType(o);
-        if (type == SlabOpeningType.staircase || type == SlabOpeningType.elevator) {
-          final opening = slab.openings[o];
-          for (final pt in opening) {
-            final run = nearRun(pt);
-            if (run != null) {
-              final margin = math.max(options.columnWidthM, options.columnDepthM) * scale / 2;
-              final along = dot(pt - run.a, run.u).clamp(margin, math.max(margin, run.length - margin)).toDouble();
-              addColumn(run.a + run.u * along);
-            }
-          }
-        }
-      }
-    }
-
-    // 3. Grid axes intersections
     final axes = List<StructuralGridAxis>.of(project.effectiveGridAxes)
       ..sort((a, b) => a.id.compareTo(b.id));
     for (var i = 0; i < axes.length; i++) {
@@ -555,11 +670,13 @@ class InitialSchemeGenerator {
         final t = cross(b.start - a.start, v) / den,
             s = cross(b.start - a.start, u) / den;
         if (t >= 0 && t <= 1 && s >= 0 && s <= 1) {
-          addColumn(a.start + u * t);
+          final p = a.start + u * t;
+          if (!inWallGap(p, u / u.distance) && !inWallGap(p, v / v.distance)) {
+            addColumn(p, axisDirection: u / u.distance);
+          }
         }
       }
     }
-
     // 4. Exact and fuzzy wall junctions
     var junctionWork = 0;
     for (var i = 0; i < runs.length && junctionWork < 50000; i++) {
@@ -592,34 +709,212 @@ class InitialSchemeGenerator {
       }
     }
 
-    // 5. Wall endpoints and intermediate samples along all runs
-    for (final run in runs) {
-      final margin =
-          math.max(options.columnWidthM, options.columnDepthM) * scale / 2;
-      if (run.length < 2 * margin) continue;
-      if (options.generousDensity) {
-        addColumn(run.a + run.u * margin);
-        addColumn(run.b - run.u * margin);
-
-        final step = math.min(options.targetSpacingM, 3.5) * scale;
-        final count = math.min(100, math.max(1, (run.length / step).ceil()));
-        for (var k = 1; k < count; k++) {
-          addColumn(
-            run.a + run.u * (margin + (run.length - 2 * margin) * k / count),
-          );
+    // Dense candidates let the repair pass react to actual support distances,
+    // instead of losing an entire bay when a fixed-spacing candidate is rejected.
+    final candidates = <({Offset p, _WallRun? run, Offset? axis})>[];
+    var samplingLimited = false;
+    final margin =
+        math.max(options.columnWidthM, options.columnDepthM) * scale / 2;
+    void sample(Offset a, Offset b, {_WallRun? run, Offset? axis}) {
+      final length = (b - a).distance;
+      if (length < 2 * margin) return;
+      final u = (b - a) / length;
+      final requested =
+          (length /
+                  (scale *
+                      (options.generousDensity
+                          ? options.minSpacingM / 2
+                          : options.targetSpacingM)))
+              .ceil();
+      if (requested > 100) samplingLimited = true;
+      final count = requested.clamp(1, 100);
+      for (var k = 0; k <= count; k++) {
+        if (candidates.length >= 2400) {
+          samplingLimited = true;
+          return;
         }
-      } else {
-        // Sparse layout: fewer divisions, only at full target spacing
-        final step = options.targetSpacingM * scale;
-        final count = math.min(60, math.max(1, (run.length / step).floor()));
-        for (var k = 1; k < count; k++) {
-          addColumn(
-            run.a + run.u * (margin + (run.length - 2 * margin) * k / count),
-          );
-        }
+        final fraction = k == 0
+            ? 0.0
+            : k == count
+            ? 1.0
+            : ((k + (phase - .5) * .5) / count).clamp(0.0, 1.0);
+        candidates.add((
+          p: a + u * (margin + (length - 2 * margin) * fraction),
+          run: run,
+          axis: axis,
+        ));
       }
     }
 
+    for (final run in runs) {
+      sample(run.a, run.b, run: run);
+    }
+    for (final axis in axes) {
+      final d = axis.end - axis.start;
+      if (d.distance > 1e-8 * scale) {
+        sample(axis.start, axis.end, axis: d / d.distance);
+      }
+    }
+    int pointRegion(Offset p) {
+      for (var r = 0; r < regions.length; r++) {
+        for (final i in regions[r]) {
+          final slab = floor.slabs[i];
+          if (StructuralPolygonDistance.inside(p, slab.polygon) &&
+              !slab.openings.any(
+                (h) => StructuralPolygonDistance.inside(p, h),
+              )) {
+            return r;
+          }
+        }
+      }
+      return -1;
+    }
+
+    final supportRegions = occupied.map(regionOf).toList();
+    double supportDistance(Offset p, int region) {
+      var d = double.infinity;
+      for (var i = 0; i < occupied.length; i++) {
+        if (supportRegions[i] != region) continue;
+        final poly = occupied[i];
+        if (StructuralPolygonDistance.inside(p, poly)) return 0;
+        for (var j = 0; j < poly.length; j++) {
+          d = math.min(
+            d,
+            StructuralPolygonDistance.pointToSegment(
+              p,
+              poly[j],
+              poly[(j + 1) % poly.length],
+            ),
+          );
+        }
+      }
+      return d;
+    }
+
+    final candidateRegions = candidates.map((c) => pointRegion(c.p)).toList();
+    final used = <int>{};
+    // Boundary probes drive infill before the general field pass. This catches
+    // corners and projections that are missed by wall/axis samples alone.
+    final boundaryProbes = <({Offset p, int region})>[];
+    for (var r = 0; r < regions.length; r++) {
+      for (final i in regions[r]) {
+        final slab = floor.slabs[i];
+        for (final ring in [slab.polygon, ...slab.openings]) {
+          for (var j = 0; j < ring.length; j++) {
+            final a = ring[j], b = ring[(j + 1) % ring.length];
+            final requested =
+                ((b - a).distance / (scale * options.minSpacingM / 2)).ceil();
+            if (requested > 100) samplingLimited = true;
+            final count = requested.clamp(1, 100);
+            for (var k = 0; k < count; k++) {
+              if (boundaryProbes.length >= 1600) {
+                samplingLimited = true;
+                break;
+              }
+              boundaryProbes.add((p: a + (b - a) * (k / count), region: r));
+            }
+          }
+        }
+      }
+    }
+    // Interior probes reveal wide fields even if all perimeter points are close
+    // to supports. Sample in the dominant structural frame, not global XY.
+    final interiorProbes = <({Offset p, int region})>[];
+    final normal = Offset(-primary.dy, primary.dx);
+    interiorSampling:
+    for (var r = 0; r < regions.length; r++) {
+      for (final i in regions[r]) {
+        final slab = floor.slabs[i];
+        final origin = slab.polygon.first;
+        final xs = slab.polygon.map((p) => dot(p - origin, primary));
+        final ys = slab.polygon.map((p) => dot(p - origin, normal));
+        final minX = xs.reduce(math.min), maxX = xs.reduce(math.max);
+        final minY = ys.reduce(math.min), maxY = ys.reduce(math.max);
+        final step = math.min(2.0, layoutSpacingM / 2) * scale;
+        final requestedX = ((maxX - minX) / step).ceil();
+        final requestedY = ((maxY - minY) / step).ceil();
+        if (requestedX > 100 || requestedY > 100) samplingLimited = true;
+        final nx = requestedX.clamp(1, 100), ny = requestedY.clamp(1, 100);
+        for (var x = 0; x < nx; x++) {
+          for (var y = 0; y < ny; y++) {
+            if (interiorProbes.length >= 1600) {
+              samplingLimited = true;
+              break interiorSampling;
+            }
+            final p =
+                origin +
+                primary * (minX + (maxX - minX) * (x + .5) / nx) +
+                normal * (minY + (maxY - minY) * (y + .5) / ny);
+            if (pointRegion(p) == r) interiorProbes.add((p: p, region: r));
+          }
+        }
+      }
+    }
+    void tryCandidate(int i) {
+      used.add(i);
+      final c = candidates[i];
+      addColumn(c.p, preferredRun: c.run, axisDirection: c.axis);
+      while (supportRegions.length < occupied.length) {
+        supportRegions.add(regionOf(occupied[supportRegions.length]));
+      }
+    }
+
+    final coverageRadius = layoutSpacingM * scale / 2;
+    // Prefer the nearest admissible position to each unsupported edge sample.
+    // No column is invented outside walls/axes or inside a slab opening.
+    for (final probe in [...boundaryProbes, ...interiorProbes]) {
+      while (supportDistance(probe.p, probe.region) > coverageRadius &&
+          cols.length + walls.length < 300 &&
+          attempts <= 20000) {
+        var best = -1;
+        var distance = supportDistance(probe.p, probe.region);
+        for (var i = 0; i < candidates.length; i++) {
+          if (used.contains(i) || candidateRegions[i] != probe.region) continue;
+          final d = (candidates[i].p - probe.p).distance;
+          if (d < distance) {
+            best = i;
+            distance = d;
+          }
+        }
+        if (best < 0) break;
+        tryCandidate(best);
+      }
+    }
+    // Farthest-first infill is deterministic and preserves manual supports.
+    while (cols.length + walls.length < 300 && attempts <= 20000) {
+      var best = -1;
+      var distance = coverageRadius;
+      for (var i = 0; i < candidates.length; i++) {
+        if (used.contains(i) || candidateRegions[i] < 0) continue;
+        final d = supportDistance(candidates[i].p, candidateRegions[i]);
+        if (d > distance) {
+          best = i;
+          distance = d;
+        }
+      }
+      if (best < 0) break;
+      tryCandidate(best);
+    }
+    // Report residual geometric gaps, including projections for which no valid
+    // support could be found. Never claim a solved span or EC2 deflection check.
+    var uncovered = 0;
+    final uncoveredPoints = <Offset>[];
+    var maxDistance = 0.0;
+    void probe(Offset p, int region) {
+      final d = supportDistance(p, region) / scale;
+      maxDistance = math.max(maxDistance, d);
+      if (d > options.targetSpacingM / 2) {
+        uncovered++;
+        uncoveredPoints.add(p);
+      }
+    }
+
+    for (var i = 0; i < candidates.length; i++) {
+      if (candidateRegions[i] >= 0) probe(candidates[i].p, candidateRegions[i]);
+    }
+    for (final sample in [...boundaryProbes, ...interiorProbes]) {
+      probe(sample.p, sample.region);
+    }
     final names = <String>{
       ...floor.columns.map((c) => c.displayName),
       ...floor.shearWalls.map((w) => w.displayName),
@@ -640,10 +935,14 @@ class InitialSchemeGenerator {
         walls.map((w) => w.copyWith(name: nextName('W'))),
       ),
       rejectedCandidates: rejected,
+      uncoveredSamples: uncovered,
+      uncoveredPoints: List.unmodifiable(uncoveredPoints),
+      maxSupportDistanceM: maxDistance,
       unresolvedRegions: List.generate(regions.length, (i) => i)
           .where((r) => !(directionCoverage[r]?.containsAll({0, 1}) ?? false))
           .length,
       limited:
+          samplingLimited ||
           attempts > 20000 ||
           cols.length + walls.length >= 300 ||
           junctionWork >= 50000,

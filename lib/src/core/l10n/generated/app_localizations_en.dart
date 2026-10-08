@@ -2948,7 +2948,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get schemeTargetSpacing => 'Target spacing (m)';
 
   @override
-  String get schemeRebuild => 'Refresh variants';
+  String get schemeRebuild => 'Next variant';
 
   @override
   String get schemeConfirm =>
@@ -2959,7 +2959,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get schemeNoWalls =>
-      'No continuous walls were detected. Run wall detection first.';
+      'No continuous walls detected. Columns use grid axes; shear walls require detected walls.';
 
   @override
   String get schemeNoCandidates =>
@@ -3013,4 +3013,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toggleGroundFoundations => 'Show foundations (±0.00)';
+
+  @override
+  String get schemeVariant => 'Variant';
+
+  @override
+  String get schemeNoAlternative =>
+      'No distinct alternative found in this search. Change spacing or try again.';
+
+  @override
+  String get schemeCoverage =>
+      'Red samples: distance exceeds half the target spacing / greatest support distance';
+
+  @override
+  String get schemeEurocodeScope =>
+      'Preliminary geometric screening. Support distance is not a calculated span or deflection. EC2 verification requires a structural model, loads, materials and reinforcement; the EC8 report contains preliminary indicators only.';
 }

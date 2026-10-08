@@ -5078,7 +5078,7 @@ abstract class AppLocalizations {
   /// No description provided for @schemeRebuild.
   ///
   /// In en, this message translates to:
-  /// **'Refresh variants'**
+  /// **'Next variant'**
   String get schemeRebuild;
 
   /// No description provided for @schemeConfirm.
@@ -5096,7 +5096,7 @@ abstract class AppLocalizations {
   /// No description provided for @schemeNoWalls.
   ///
   /// In en, this message translates to:
-  /// **'No continuous walls were detected. Run wall detection first.'**
+  /// **'No continuous walls detected. Columns use grid axes; shear walls require detected walls.'**
   String get schemeNoWalls;
 
   /// No description provided for @schemeNoCandidates.
@@ -5182,6 +5182,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show foundations (±0.00)'**
   String get toggleGroundFoundations;
+
+  /// No description provided for @schemeVariant.
+  ///
+  /// In en, this message translates to:
+  /// **'Variant'**
+  String get schemeVariant;
+
+  /// No description provided for @schemeNoAlternative.
+  ///
+  /// In en, this message translates to:
+  /// **'No distinct alternative found in this search. Change spacing or try again.'**
+  String get schemeNoAlternative;
+
+  /// No description provided for @schemeCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Red samples: distance exceeds half the target spacing / greatest support distance'**
+  String get schemeCoverage;
+
+  /// No description provided for @schemeEurocodeScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Preliminary geometric screening. Support distance is not a calculated span or deflection. EC2 verification requires a structural model, loads, materials and reinforcement; the EC8 report contains preliminary indicators only.'**
+  String get schemeEurocodeScope;
 }
 
 class _AppLocalizationsDelegate

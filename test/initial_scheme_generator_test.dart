@@ -71,37 +71,39 @@ WallPairCandidate pair(Offset a, Offset b, double scale) {
 }
 
 void main() {
-  test('requires typed staircase and never proposes from axes alone', () {
-    final (p, runs) = fixture();
-    expect(
-      InitialSchemeGenerator.generate(
+  test(
+    'requires typed staircase; explicit axes can propose columns, not walls',
+    () {
+      final (p, runs) = fixture();
+      final axesOnly = InitialSchemeGenerator.generate(
         project: p,
         wallPairs: [],
         scale: 1,
-      ).isEmpty,
-      isTrue,
-    );
-    final noStairs = p.copyWith(
-      storeys: [
-        p.activeStorey.copyWith(
-          slabs: [
-            p.activeStorey.slabs.single.copyWith(
-              openings: [],
-              openingTypes: [],
-            ),
-          ],
-        ),
-      ],
-    );
-    expect(
-      InitialSchemeGenerator.generate(
-        project: noStairs,
-        wallPairs: runs,
-        scale: 1,
-      ).isEmpty,
-      isTrue,
-    );
-  });
+      );
+      expect(axesOnly.columns, isNotEmpty);
+      expect(axesOnly.walls, isEmpty);
+      final noStairs = p.copyWith(
+        storeys: [
+          p.activeStorey.copyWith(
+            slabs: [
+              p.activeStorey.slabs.single.copyWith(
+                openings: [],
+                openingTypes: [],
+              ),
+            ],
+          ),
+        ],
+      );
+      expect(
+        InitialSchemeGenerator.generate(
+          project: noStairs,
+          wallPairs: runs,
+          scale: 1,
+        ).isEmpty,
+        isTrue,
+      );
+    },
+  );
   test(
     'all sections fit the slab, avoid holes, use both directions and respect spacing',
     () {
@@ -210,7 +212,15 @@ void main() {
       scale: 1,
     );
     for (final c in r.columns) {
-      expect(c.polygonVertices.every((v) => v.dy <= 6 || v.dy >= 10), isTrue);
+      expect(
+        StructuralPolygonDistance.between(c.polygonVertices, const [
+          Offset(1.8, 6.01),
+          Offset(2.2, 6.01),
+          Offset(2.2, 9.99),
+          Offset(1.8, 9.99),
+        ]),
+        greaterThan(0),
+      );
     }
     for (final w in r.walls) {
       expect(w.polygonVertices.every((v) => v.dy <= 6 || v.dy >= 10), isTrue);
@@ -357,6 +367,141 @@ void main() {
       expect(r.apply(first).toJson(), first.toJson());
     },
   );
+  test(
+    'core walls cover all four sides rather than stopping at two directions',
+    () {
+      final (p, _) = fixture();
+      final runs = [
+        pair(const Offset(6.7, 5.5), const Offset(6.7, 10.5), 1),
+        pair(const Offset(9.3, 5.5), const Offset(9.3, 10.5), 1),
+        pair(const Offset(6.5, 5.7), const Offset(9.5, 5.7), 1),
+        pair(const Offset(6.5, 10.3), const Offset(9.5, 10.3), 1),
+      ];
+      final r = InitialSchemeGenerator.generate(
+        project: p,
+        wallPairs: runs,
+        scale: 1,
+      );
+      expect(r.walls.length, 4);
+      for (final w in r.walls) {
+        expect(
+          StructuralPolygonDistance.between(
+            w.polygonVertices,
+            p.activeStorey.slabs.single.openings.single,
+          ),
+          greaterThan(0),
+        );
+      }
+    },
+  );
+  test('a blocked wall midpoint does not discard its usable core segments', () {
+    final (p, _) = fixture();
+    final r = InitialSchemeGenerator.generate(
+      project: p,
+      wallPairs: [pair(const Offset(8, 1), const Offset(8, 15), 1)],
+      scale: 1,
+    );
+    expect(r.walls, isNotEmpty);
+    expect(
+      r.walls.every(
+        (w) =>
+            StructuralPolygonDistance.between(
+              w.polygonVertices,
+              p.activeStorey.slabs.single.openings.single,
+            ) >
+            0,
+      ),
+      isTrue,
+    );
+  });
+  test(
+    'an isolated long axis gains intermediate supports and supports near edges',
+    () {
+      final (p, _) = fixture();
+      final floor = p.activeStorey.copyWith(
+        gridAxes: [
+          const StructuralGridAxis(
+            id: 'long',
+            name: 'A',
+            start: Offset(.2, 2),
+            end: Offset(19.8, 2),
+          ),
+        ],
+      );
+      final r = InitialSchemeGenerator.generate(
+        project: p.copyWith(storeys: [floor]),
+        wallPairs: [],
+        scale: 1,
+      );
+      final x = r.columns.map((c) => c.center.dx).toList()..sort();
+      expect(x.length, greaterThanOrEqualTo(4));
+      expect(x.first, lessThan(2));
+      expect(x.last, greaterThan(18));
+      for (var i = 1; i < x.length; i++) {
+        expect(x[i] - x[i - 1], lessThanOrEqualTo(5));
+      }
+      // The rest of this broad slab has no axes: residual gaps must stay visible.
+      expect(r.uncoveredSamples, greaterThan(0));
+      expect(r.maxSupportDistanceM, greaterThan(5));
+    },
+  );
+  test('more than two deterministic distinct layouts are available', () {
+    final (p, runs) = fixture();
+    final signatures = <String>{};
+    for (var v = 0; v < 5; v++) {
+      final r = InitialSchemeGenerator.generate(
+        project: p,
+        wallPairs: runs,
+        scale: 1,
+        variant: v,
+      );
+      final ids = [...r.columns.map((c) => c.id), ...r.walls.map((w) => w.id)]
+        ..sort();
+      signatures.add(ids.join('|'));
+      final reverse = InitialSchemeGenerator.generate(
+        project: p,
+        wallPairs: runs.reversed.toList(),
+        scale: 1,
+        variant: v,
+      );
+      expect(reverse.columns.map((c) => c.id), r.columns.map((c) => c.id));
+    }
+    expect(signatures.length, greaterThan(2));
+  });
+  testWidgets('no distinct layout and invalid settings keep the preview safe', (
+    tester,
+  ) async {
+    final (p, _) = fixture();
+    final l = await AppLocalizations.delegate.load(const Locale('en'));
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: InitialSchemeDialog(
+          project: p.copyWith(storeys: [p.activeStorey.copyWith(gridAxes: [])]),
+          pairs: const [],
+          scale: 1,
+          options: const InitialSchemeOptions(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('next-scheme')));
+    await tester.pumpAndSettle();
+    expect(find.text(l.schemeNoAlternative), findsOneWidget);
+    expect(find.text('${l.schemeVariant}: 1'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'NaN');
+    await tester.tap(find.byKey(const ValueKey('next-scheme')));
+    await tester.pumpAndSettle();
+    expect(find.text(l.schemeInvalidOptions), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('accept-scheme')))
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
   for (final lang in ['bg', 'en']) {
     testWidgets(
       'preview requires confirmation and returns native objects: $lang',
@@ -401,6 +546,38 @@ void main() {
               .onPressed,
           isNull,
         );
+        expect(find.text('${l.schemeVariant}: 1'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('next-scheme')));
+        await tester.pumpAndSettle();
+        expect(find.text('${l.schemeVariant}: 2'), findsOneWidget);
+        expect(find.text(l.schemeVariantCore), findsNothing);
+        expect(find.text(l.schemeVariantLong), findsNothing);
+        // Upstream switches remain functional with the single-preview flow.
+        expect(find.byType(SwitchListTile), findsNWidgets(2));
+        await tester.ensureVisible(find.text(l.schemeGenerousDensity));
+        await tester.tap(find.text(l.schemeGenerousDensity));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<SwitchListTile>(find.byType(SwitchListTile).last).value,
+          isFalse,
+        );
+        expect(find.text('${l.schemeVariant}: 1'), findsOneWidget);
+        await tester.ensureVisible(find.text(l.schemePairedWalls));
+        await tester.tap(find.text(l.schemePairedWalls));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<SwitchListTile>(find.byType(SwitchListTile).first)
+              .value,
+          isFalse,
+        );
+
+        expect(
+          tester
+              .widget<FilledButton>(find.byKey(const ValueKey('accept-scheme')))
+              .onPressed,
+          isNull,
+        );
         await tester.ensureVisible(find.byType(CheckboxListTile));
         await tester.tap(find.byType(CheckboxListTile));
         await tester.pumpAndSettle();
@@ -415,68 +592,74 @@ void main() {
     );
   }
 
-  test('guarantees at least 2x2 paired shear walls (minimum 4 walls) across orthogonal directions', () {
-    final (p, runs) = fixture();
-    final result = InitialSchemeGenerator.generate(
-      project: p,
-      wallPairs: runs,
-      scale: 1,
-      options: const InitialSchemeOptions(
-        enforcePairedWalls: true,
-        generousDensity: true,
-      ),
-    );
+  test(
+    'guarantees at least 2x2 paired shear walls (minimum 4 walls) across orthogonal directions',
+    () {
+      final (p, runs) = fixture();
+      final result = InitialSchemeGenerator.generate(
+        project: p,
+        wallPairs: runs,
+        scale: 1,
+        options: const InitialSchemeOptions(
+          enforcePairedWalls: true,
+          generousDensity: true,
+        ),
+      );
 
-    // Total shear walls must be at least 4 (2 in X and 2 in Y)
-    expect(result.walls.length, greaterThanOrEqualTo(4));
+      // Total shear walls must be at least 4 (2 in X and 2 in Y)
+      expect(result.walls.length, greaterThanOrEqualTo(4));
 
-    // Direction breakdown
-    final primary = runs.first.centerlineEnd - runs.first.centerlineStart;
-    final primaryDir = primary / primary.distance;
-    int dirCount0 = 0;
-    int dirCount1 = 0;
-    for (final w in result.walls) {
-      final u = (w.end - w.start) / w.length;
-      final dotVal = (u.dx * primaryDir.dx + u.dy * primaryDir.dy).abs();
-      if (dotVal >= 0.9239) {
-        dirCount0++;
-      } else {
-        dirCount1++;
+      // Direction breakdown
+      final primary = runs.first.centerlineEnd - runs.first.centerlineStart;
+      final primaryDir = primary / primary.distance;
+      int dirCount0 = 0;
+      int dirCount1 = 0;
+      for (final w in result.walls) {
+        final u = (w.end - w.start) / w.length;
+        final dotVal = (u.dx * primaryDir.dx + u.dy * primaryDir.dy).abs();
+        if (dotVal >= 0.9239) {
+          dirCount0++;
+        } else {
+          dirCount1++;
+        }
       }
-    }
 
-    // Both directions must have at least 2 walls (no isolated single wall)
-    expect(dirCount0, greaterThanOrEqualTo(2));
-    expect(dirCount1, greaterThanOrEqualTo(2));
-  });
+      // Both directions must have at least 2 walls (no isolated single wall)
+      expect(dirCount0, greaterThanOrEqualTo(2));
+      expect(dirCount1, greaterThanOrEqualTo(2));
+    },
+  );
 
-  test('generous layout provides denser candidate set for engineer pruning', () {
-    final (p, runs) = fixture();
-    final generous = InitialSchemeGenerator.generate(
-      project: p,
-      wallPairs: runs,
-      scale: 1,
-      options: const InitialSchemeOptions(
-        generousDensity: true,
-        targetSpacingM: 5.0,
-      ),
-    );
+  test(
+    'generous layout provides denser candidate set for engineer pruning',
+    () {
+      final (p, runs) = fixture();
+      final generous = InitialSchemeGenerator.generate(
+        project: p,
+        wallPairs: runs,
+        scale: 1,
+        options: const InitialSchemeOptions(
+          generousDensity: true,
+          targetSpacingM: 5.0,
+        ),
+      );
 
-    final sparse = InitialSchemeGenerator.generate(
-      project: p,
-      wallPairs: runs,
-      scale: 1,
-      options: const InitialSchemeOptions(
-        generousDensity: false,
-        targetSpacingM: 5.0,
-      ),
-    );
+      final sparse = InitialSchemeGenerator.generate(
+        project: p,
+        wallPairs: runs,
+        scale: 1,
+        options: const InitialSchemeOptions(
+          generousDensity: false,
+          targetSpacingM: 5.0,
+        ),
+      );
 
-    // Generous layout provides more columns and walls for engineer pruning
-    expect(generous.columns.length, greaterThan(sparse.columns.length));
-    expect(generous.walls.length, greaterThanOrEqualTo(sparse.walls.length));
-    final totalGenerous = generous.columns.length + generous.walls.length;
-    final totalSparse = sparse.columns.length + sparse.walls.length;
-    expect(totalGenerous, greaterThan(totalSparse));
-  });
+      // Generous layout provides more columns and walls for engineer pruning
+      expect(generous.columns.length, greaterThan(sparse.columns.length));
+      expect(generous.walls.length, greaterThanOrEqualTo(sparse.walls.length));
+      final totalGenerous = generous.columns.length + generous.walls.length;
+      final totalSparse = sparse.columns.length + sparse.walls.length;
+      expect(totalGenerous, greaterThan(totalSparse));
+    },
+  );
 }
