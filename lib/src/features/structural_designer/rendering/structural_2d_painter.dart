@@ -8,6 +8,7 @@ import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 import 'structural_pointer_painter.dart';
 import 'support_span_overlay_layout.dart';
+import 'structural_overview_layout.dart';
 
 /// 2D CustomPainter that renders structural elements, ghost storeys (ArchiCAD Trace Reference),
 /// interactive drawing previews, and cantilever warning zones projected onto CAD scene coordinates.
@@ -197,6 +198,12 @@ class Structural2dPainter extends CustomPainter {
       _drawGridAxis(canvas, axisOffsetPreview!, isGhost: false, isPreview: true);
     }
 
+    final overview = _supportOverviewLabels(size);
+    if (showSlabSpanOverlay) {
+      _drawSupportSpanFeedback(canvas, size,
+          reservedLabels: overview.map((l) => l.rect).toList());
+    }
+
     // 3. Draw Active Storey Shear Walls
     for (final wall in currentStorey.shearWalls) {
       if (movingShearWall?.id == wall.id) continue;
@@ -237,11 +244,6 @@ class Structural2dPainter extends CustomPainter {
       _drawSeismicCenters(canvas);
     }
 
-    // All support spacing problems; badge density is bounded at this zoom.
-    if (showSlabSpanOverlay) {
-      _drawSupportSpanFeedback(canvas, size);
-    }
-
     // 8. Draw Distance Measurement Dimension Line & Badge
     if (activeMeasurement != null) {
       _drawMeasurementLine(canvas, activeMeasurement!.$1, activeMeasurement!.$2, activeMeasurement!.$3);
@@ -263,6 +265,7 @@ class Structural2dPainter extends CustomPainter {
         color: const Color(0xFF00E5FF),
       );
     }
+    _drawSupportOverviewLabels(canvas, overview);
   }
 
   void _drawMeasurementLine(Canvas canvas, Offset p1Cad, Offset p2Cad, String label, {Color color = const Color(0xFFFF5252)}) {
@@ -325,19 +328,32 @@ class Structural2dPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _drawSupportSpanFeedback(Canvas canvas, Size size) {
-    final checks = supportSpanChecks ?? verticalReport?.slabChecks
-        .where((s) => s.storeyId == currentStorey.id).firstOrNull?.supportSpans ?? const <SupportSpanCheck>[];
+  List<SupportSpanCheck> get _supportChecks => supportSpanChecks ?? verticalReport?.slabChecks
+      .where((s) => s.storeyId == currentStorey.id).firstOrNull?.supportSpans ?? const [];
+
+  TextPainter _spanSummaryText() {
+    final problems=_supportChecks.where((c)=>c.isProblematic).length;
+    final unknown=_supportChecks.where((c)=>!c.isDetermined).length;
+    final count=l10n?.spanFeedbackCount(problems) ?? 'Spacing problems: $problems';
+    final scope=l10n?.spanFeedbackScope ?? 'Preliminary · assigned slab thickness';
+    return TextPainter(text:TextSpan(
+        text:'$count\n$scope${unknown>0 ? '\n${l10n?.spanFeedbackUnknown(unknown) ?? 'Unknown: $unknown'}' : ''}',
+        style:const TextStyle(color:Color(0xFFFFE0B2),fontSize:10,fontWeight:FontWeight.w600)),
+        textDirection:TextDirection.ltr)..layout();
+  }
+
+  Rect _spanSummaryRect(Rect viewport,TextPainter text) => Rect.fromLTWH(
+      viewport.left+10,viewport.top+10,
+      math.min(text.width+16,math.max(0,viewport.width-20)),text.height+12);
+
+  void _drawSupportSpanFeedback(Canvas canvas, Size size, {List<Rect> reservedLabels = const []}) {
+    final checks = _supportChecks;
     if (checks.isEmpty) return;
     final zoom = zoomScale.clamp(.001,10000.0);
     Offset pixel(Offset p) => cadToScene(p)*zoom;
     final viewport = spanVisibleCadRect == null
         ? Rect.fromLTWH(0,0,size.width*zoom,size.height*zoom)
         : Rect.fromPoints(pixel(spanVisibleCadRect!.topLeft),pixel(spanVisibleCadRect!.bottomRight));
-    final problems=checks.where((c)=>c.isProblematic).length;
-    final unknown=checks.where((c)=>!c.isDetermined).length;
-    final summary=l10n?.spanFeedbackCount(problems) ?? 'Spacing problems: $problems';
-    final scope=l10n?.spanFeedbackScope ?? 'Preliminary · assigned slab thickness';
     String label(SupportSpanCheck c) =>
         'L ${c.spanM.toStringAsFixed(2)} > ${c.allowableSpanM.toStringAsFixed(2)} m · h ${(c.thicknessM*100).round()} cm';
     Color color(SupportSpanCheck c) => !c.isProblematic ? const Color(0xFF69F0AE) :
@@ -345,15 +361,18 @@ class Structural2dPainter extends CustomPainter {
     TextPainter text(String value,Color color,{double fontSize=11}) => TextPainter(
         text:TextSpan(text:value,style:TextStyle(color:color,fontSize:fontSize,
             fontWeight:FontWeight.w600)),textDirection:TextDirection.ltr)..layout();
-    final summaryText=text('$summary\n$scope${unknown>0 ? '\n${l10n?.spanFeedbackUnknown(unknown) ?? 'Unknown: $unknown'}' : ''}',
-        const Color(0xFFFFE0B2),fontSize:10);
-    final summaryRect=Rect.fromLTWH(viewport.left+10,viewport.top+10,
-        math.min(summaryText.width+16,viewport.width-20),summaryText.height+12);
+    final summaryText=_spanSummaryText();
+    final summaryRect=_spanSummaryRect(viewport,summaryText);
     final focusRect=spanFocusCad==null ? null :
         Rect.fromCircle(center:pixel(spanFocusCad!),radius:30);
     final layout=SupportSpanOverlayLayout.build(checks:checks,toPixel:pixel,
         viewport:viewport.deflate(3),focusCad:spanFocusCad,scale:cadUnitsPerMeter,
-        reserved:[summaryRect,?focusRect],labelSize:(c) {
+        reserved:[summaryRect,?focusRect,...reservedLabels,
+          for(final c in currentStorey.columns)
+            StructuralOverviewLayout.boundsOf(StructuralOverviewLayout.columnSymbol(
+              c.polygonVertices.map(pixel).toList())).inflate(3),
+          for(final w in currentStorey.shearWalls)
+            StructuralOverviewLayout.boundsOf(w.polygonVertices.map(pixel).toList()).inflate(3)],labelSize:(c) {
           final tp=text(label(c),color(c)); return Size(tp.width+12,tp.height+8);
         });
     canvas.save();
@@ -366,7 +385,7 @@ class Structural2dPainter extends CustomPainter {
       canvas.drawLine(line.start,line.end,Paint()
         ..color=c.withValues(alpha:line.focused ? .16 : .07)..strokeWidth=line.focused ? 9 : 6);
       canvas.drawLine(line.start,line.end,Paint()
-        ..color=c.withValues(alpha:line.focused ? .95 : .6)..strokeWidth=line.focused ? 2.6 : 1.5);
+        ..color=c.withValues(alpha:line.focused ? 1 : .85)..strokeWidth=line.focused ? 2.8 : 2.0);
     }
     void badge(Rect rect,TextPainter tp,Color c) {
       final shape=RRect.fromRectAndRadius(rect,const Radius.circular(5));
@@ -379,6 +398,78 @@ class Structural2dPainter extends CustomPainter {
       badge(item.rect,text(label(item.line.check),color(item.line.check)),color(item.line.check));
     }
     badge(summaryRect,summaryText,const Color(0xFFFFB74D));
+    canvas.restore();
+  }
+
+  List<SupportOverviewLabel> _supportOverviewLabels(Size size) {
+    final zoom = zoomScale.clamp(.001,10000.0);
+    Offset pixel(Offset p) => cadToScene(p)*zoom;
+    final viewport = spanVisibleCadRect == null
+        ? Rect.fromLTWH(0,0,size.width*zoom,size.height*zoom)
+        : Rect.fromPoints(pixel(spanVisibleCadRect!.topLeft),pixel(spanVisibleCadRect!.bottomRight));
+    final entries = <SupportOverviewEntry>[];
+    void add(String id, String name, Offset anchor, Rect bounds, Color color,
+        {bool selected=false, bool warning=false}) {
+      final label = '$name${warning ? ' !' : ''}';
+      final tp = TextPainter(text: TextSpan(text:label,
+          style:const TextStyle(fontSize:11.5,fontWeight:FontWeight.w800)),
+          textDirection:TextDirection.ltr)..layout();
+      entries.add(SupportOverviewEntry(id:id,label:label,anchor:anchor,
+          symbolBounds:bounds,labelSize:Size(tp.width+10,tp.height+6),color:color,
+          priority:selected ? 3 : warning ? 2 : 0));
+    }
+    for(final c in currentStorey.columns) {
+      if(c.id==movingColumn?.id) continue;
+      final check=verticalReport?.getCheckForColumn(c.id);
+      final floating=seismicReport?.isColumnFloating(c.id) ?? false;
+      final disconnected=seismicReport?.storeyChecks.where((s)=>s.storeyId==currentStorey.id)
+          .firstOrNull?.disconnectedColumnIds.contains(c.id) ?? false;
+      final warning=floating || disconnected || (check!=null && check.status!=VerticalCapacityStatus.safe);
+      final color=floating ? const Color(0xFFE040FB) :
+        (disconnected || check?.status==VerticalCapacityStatus.critical) ? const Color(0xFFFF5252) :
+        warning ? const Color(0xFFFFB300) : const Color(0xFF82B1FF);
+      final symbol=StructuralOverviewLayout.columnSymbol(c.polygonVertices.map(pixel).toList());
+      add(c.id,c.displayName,pixel(c.center),StructuralOverviewLayout.boundsOf(symbol),
+          color,selected:c.id==selectedColumnId,warning:warning);
+    }
+    final seismic=seismicReport?.storeyChecks.where((s)=>s.storeyId==currentStorey.id).firstOrNull;
+    for(final w in currentStorey.shearWalls) {
+      if(w.id==movingShearWall?.id) continue;
+      final warning=(seismic?.discontinuousWallIds.contains(w.id) ?? false) ||
+          (seismic?.disconnectedWallIds.contains(w.id) ?? false);
+      final pts=w.polygonVertices.map(pixel).toList();
+      final center=pts.reduce((a,b)=>a+b)/pts.length.toDouble();
+      // Reserve the actual section, enlarged only enough for the overview stripe.
+      final bounds=StructuralOverviewLayout.boundsOf(pts).inflate(3);
+      add(w.id,w.displayName,center,bounds,
+          warning ? const Color(0xFFE040FB) : const Color(0xFF64FFDA),
+          selected:w.id==selectedShearWallId,warning:warning);
+    }
+    return StructuralOverviewLayout.arrange(entries,viewport.deflate(3),
+        reserved:showSlabSpanOverlay && _supportChecks.isNotEmpty
+            ? [_spanSummaryRect(viewport,_spanSummaryText())] : const []);
+  }
+
+  void _drawSupportOverviewLabels(Canvas canvas,List<SupportOverviewLabel> labels) {
+    final zoom=zoomScale.clamp(.001,10000.0);
+    canvas.save(); canvas.scale(1/zoom);
+    for(final label in labels) {
+      final entry=label.entry, rect=label.rect;
+      final edge=Offset(entry.anchor.dx.clamp(rect.left,rect.right).toDouble(),
+          entry.anchor.dy.clamp(rect.top,rect.bottom).toDouble());
+      canvas.drawLine(entry.anchor,edge,Paint()
+        ..color=const Color(0xE60B1320)..strokeWidth=3);
+      canvas.drawLine(entry.anchor,edge,Paint()
+        ..color=entry.color.withValues(alpha:.8)..strokeWidth=1);
+      final shape=RRect.fromRectAndRadius(rect,const Radius.circular(4));
+      canvas.drawRRect(shape,Paint()..color=const Color(0xF20B1320));
+      canvas.drawRRect(shape,Paint()..color=entry.color
+          ..style=PaintingStyle.stroke..strokeWidth=1.2);
+      final tp=TextPainter(text:TextSpan(text:entry.label,
+          style:TextStyle(color:entry.color,fontSize:11.5,fontWeight:FontWeight.w800)),
+          textDirection:TextDirection.ltr)..layout();
+      tp.paint(canvas,Offset(rect.left+5,rect.top+3));
+    }
     canvas.restore();
   }
 
@@ -1485,19 +1576,38 @@ class Structural2dPainter extends CustomPainter {
       ..lineTo(pts[3].dx, pts[3].dy)
       ..close();
 
+    final storeyCheck = seismicReport?.storeyChecks
+        .where((s) => s.storeyId == currentStorey.id).firstOrNull;
+    final warning = !isGhost && !isPreview && !isMoving &&
+        ((storeyCheck?.discontinuousWallIds.contains(wall.id) ?? false) ||
+         (storeyCheck?.disconnectedWallIds.contains(wall.id) ?? false));
+    final activeFill = warning ? const Color(0xFF9C27B0) : const Color(0xFF00897B);
+    final activeAccent = warning ? const Color(0xFFEA80FC) : const Color(0xFF26D6BD);
     final fillPaint = Paint()
       ..color = isPreview || isMoving
           ? const Color(0xB300E5FF)
-          : (isGhost ? const Color(0x4D78909C) : const Color(0xE637474F))
+          : (isGhost ? const Color(0x4D78909C) : activeFill)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
       ..color = isPreview || isMoving
           ? const Color(0xFF00E5FF)
-          : (isGhost ? const Color(0x8090A4AE) : const Color(0xFFCFD8DC))
+          : (isGhost ? const Color(0x8090A4AE) : activeAccent)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (isPreview || isMoving ? 2.5 : 1.2) / zoomScale;
+      ..strokeWidth = (isPreview || isMoving ? 2.5 : 1.8) / zoomScale;
 
+    if (!isGhost && !isPreview && !isMoving) {
+      final start = (pts[0] + pts[3]) / 2, end = (pts[1] + pts[2]) / 2;
+      final width = (pts[0] - pts[3]).distance * zoomScale;
+      canvas.drawPath(path, Paint()..color = const Color(0xEE0B1320)
+          ..style = PaintingStyle.stroke..strokeWidth = 4.5 / zoomScale);
+      if (width < 6) {
+        canvas.drawLine(start, end, Paint()..color = const Color(0xEE0B1320)
+            ..strokeWidth = 10 / zoomScale..strokeCap = StrokeCap.square);
+        canvas.drawLine(start, end, Paint()..color = activeAccent
+            ..strokeWidth = 6 / zoomScale..strokeCap = StrokeCap.square);
+      }
+    }
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
 
@@ -1505,7 +1615,7 @@ class Structural2dPainter extends CustomPainter {
     final centerLinePaint = Paint()
       ..color = isPreview || isMoving
           ? const Color(0xFF00E5FF)
-          : (isGhost ? const Color(0x40FFFFFF) : const Color(0xFF00E5FF).withValues(alpha: 0.8))
+          : (isGhost ? const Color(0x40FFFFFF) : activeAccent)
       ..style = PaintingStyle.stroke
       ..strokeWidth = (isPreview || isMoving ? 2.0 : 1.5) / zoomScale;
     canvas.drawLine(cadToScene(wall.start), cadToScene(wall.end), centerLinePaint);
@@ -1530,45 +1640,6 @@ class Structural2dPainter extends CustomPainter {
       }
     }
 
-    // Shear wall designation / number badge (e.g. "Ш1", "Ш2" or "W1", "W2")
-    if (!isGhost && wall.displayName.isNotEmpty) {
-      final midScene = Offset(
-        (pts[0].dx + pts[1].dx + pts[2].dx + pts[3].dx) / 4.0,
-        (pts[0].dy + pts[1].dy + pts[2].dy + pts[3].dy) / 4.0,
-      );
-
-      canvas.save();
-      canvas.translate(midScene.dx, midScene.dy);
-      canvas.scale(1.0 / zoomScale);
-
-      final textSpan = TextSpan(
-        text: wall.displayName,
-        style: TextStyle(
-          color: isSelected ? const Color(0xFFFFD54F) : Colors.white,
-          fontSize: 9.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-        ),
-      );
-      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
-      final bgRect = Rect.fromCenter(
-        center: Offset.zero,
-        width: tp.width + 6.0,
-        height: tp.height + 2.5,
-      );
-      final labelBgPaint = Paint()
-        ..color = const Color(0xCC1E1E24)
-        ..style = PaintingStyle.fill;
-      final labelBorderPaint = Paint()
-        ..color = isSelected ? const Color(0xFFFFB300) : const Color(0x66FFFFFF)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8;
-      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), labelBgPaint);
-      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), labelBorderPaint);
-      tp.paint(canvas, Offset(-tp.width / 2.0, -tp.height / 2.0));
-
-      canvas.restore();
-    }
   }
 
   void _drawMagneticGuidelines(Canvas canvas, List<(Offset, Offset)> guides) {
@@ -1611,9 +1682,11 @@ class Structural2dPainter extends CustomPainter {
       {required bool isGhost, bool isPreview = false}) {
     final pts = col.polygonVertices.map(cadToScene).toList();
     if (pts.isEmpty) return;
-    final path = Path()..moveTo(pts[0].dx, pts[0].dy);
-    for (int i = 1; i < pts.length; i++) {
-      path.lineTo(pts[i].dx, pts[i].dy);
+    final symbol = isGhost || isPreview ? pts :
+        StructuralOverviewLayout.columnSymbol(pts, minimumSize: 12 / zoomScale);
+    final path = Path()..moveTo(symbol[0].dx, symbol[0].dy);
+    for (int i = 1; i < symbol.length; i++) {
+      path.lineTo(symbol[i].dx, symbol[i].dy);
     }
     path.close();
 
@@ -1626,6 +1699,9 @@ class Structural2dPainter extends CustomPainter {
         ? (seismicReport?.isColumnFloating(col.id) ?? false)
         : false;
 
+    final isDisconnected = !isGhost && !isPreview && !isMovingThis &&
+        (seismicReport?.storeyChecks.where((s) => s.storeyId == currentStorey.id)
+            .firstOrNull?.disconnectedColumnIds.contains(col.id) ?? false);
     final Color fillColor;
     final Color borderColor;
     if (isPreview) {
@@ -1641,7 +1717,7 @@ class Structural2dPainter extends CustomPainter {
       // Glows MAGENTA for floating / transfer columns
       fillColor = const Color(0xEEAA00FF);
       borderColor = const Color(0xFFE040FB);
-    } else if (vCheck != null && vCheck.status == VerticalCapacityStatus.critical) {
+    } else if (isDisconnected || (vCheck != null && vCheck.status == VerticalCapacityStatus.critical)) {
       // Glows RED for critical crushing or punching failure
       fillColor = const Color(0xEEB71C1C);
       borderColor = const Color(0xFFFF1744);
@@ -1650,7 +1726,7 @@ class Structural2dPainter extends CustomPainter {
       fillColor = const Color(0xEEF57F17);
       borderColor = const Color(0xFFFFB300);
     } else {
-      fillColor = const Color(0xF01565C0);
+      fillColor = const Color(0xFF2979FF);
       borderColor = Colors.white;
     }
 
@@ -1679,6 +1755,10 @@ class Structural2dPainter extends CustomPainter {
           ? (2.2 / zoomScale)
           : ((isFloating || (vCheck != null && vCheck.status == VerticalCapacityStatus.critical)) ? (2.4 / zoomScale) : (1.5 / zoomScale));
 
+    if (!isGhost && !isPreview) {
+      canvas.drawPath(path, Paint()..color = const Color(0xEE0B1320)
+        ..style = PaintingStyle.stroke..strokeWidth = 5 / zoomScale);
+    }
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, borderPaint);
 
@@ -1691,38 +1771,6 @@ class Structural2dPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4 / zoomScale;
       canvas.drawCircle(centerScene, rPunching, punchPaint);
-    }
-
-    // Floating column badge (EC8 vertical regularity alert)
-    if (isFloating && !isGhost && !isMovingThis) {
-      final centerScene = cadToScene(col.center);
-      final badgeAnchorY = centerScene.dy - (col.height * cadScale / 2.0);
-      canvas.save();
-      canvas.translate(centerScene.dx, badgeAnchorY);
-      canvas.scale(1.0 / zoomScale);
-
-      final badgeLabel = l10n?.floatingColumnBadge ?? 'FLOATING';
-      final textSpan = TextSpan(
-        text: badgeLabel,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 9.0,
-          fontWeight: FontWeight.bold,
-        ),
-      );
-      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
-      final badgeCenter = Offset(0, -tp.height / 2.0 - 4.0);
-      final bgRect = Rect.fromCenter(
-        center: badgeCenter,
-        width: tp.width + 6.0,
-        height: tp.height + 2.0,
-      );
-      final badgeBgPaint = Paint()
-        ..color = const Color(0xEEAA00FF)
-        ..style = PaintingStyle.fill;
-      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), badgeBgPaint);
-      tp.paint(canvas, Offset(-tp.width / 2.0, badgeCenter.dy - tp.height / 2.0));
-      canvas.restore();
     }
 
     // Selected highlight halo & corner grip handles
@@ -1758,6 +1806,7 @@ class Structural2dPainter extends CustomPainter {
     final centerScene = cadToScene(col.center);
     final double crossLen = (math.min(col.width, col.height) * cadScale * 0.25)
         .clamp(3.0 / zoomScale, 14.0 / zoomScale);
+    if (StructuralOverviewLayout.boundsOf(pts).longestSide * zoomScale >= 18) {
     canvas.drawLine(
       Offset(centerScene.dx - crossLen, centerScene.dy),
       Offset(centerScene.dx + crossLen, centerScene.dy),
@@ -1768,44 +1817,8 @@ class Structural2dPainter extends CustomPainter {
       Offset(centerScene.dx, centerScene.dy + crossLen),
       crossPaint,
     );
-
-    // Column designation / number badge (e.g. "К1", "К2") - compact, screen-space scaled so it doesn't obstruct
-    if (!isGhost && !isMovingThis && col.displayName.isNotEmpty) {
-      canvas.save();
-      canvas.translate(centerScene.dx, centerScene.dy);
-      canvas.scale(1.0 / zoomScale);
-
-      final textSpan = TextSpan(
-        text: col.displayName,
-        style: TextStyle(
-          color: isPreview
-              ? const Color(0xFF00E5FF)
-              : (isSelected ? const Color(0xFFFFD54F) : Colors.white),
-          fontSize: 9.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-        ),
-      );
-      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
-      final bgRect = Rect.fromCenter(
-        center: Offset.zero,
-        width: tp.width + 6.0,
-        height: tp.height + 2.5,
-      );
-      final labelBgPaint = Paint()
-        ..color = const Color(0xCC1E1E24)
-        ..style = PaintingStyle.fill;
-      final labelBorderPaint = Paint()
-        ..color = isPreview
-            ? const Color(0xFF00E5FF)
-            : (isSelected ? const Color(0xFFFFB300) : const Color(0x66FFFFFF))
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8;
-      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), labelBgPaint);
-      canvas.drawRRect(RRect.fromRectAndRadius(bgRect, const Radius.circular(3.0)), labelBorderPaint);
-      tp.paint(canvas, Offset(-tp.width / 2.0, -tp.height / 2.0));
-      canvas.restore();
     }
+
   }
 
   void _drawInteractivePreview(Canvas canvas) {
