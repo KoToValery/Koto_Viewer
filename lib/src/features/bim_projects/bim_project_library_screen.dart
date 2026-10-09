@@ -10,13 +10,18 @@ import 'widgets/bim_new_project_wizard.dart';
 /// Screen listing all user's standalone BiM Work Projects with options to
 /// open, align, rename, export ZIP packages, or create new projects.
 class BimProjectLibraryScreen extends StatefulWidget {
-  const BimProjectLibraryScreen({super.key});
+  final BimProjectLibraryService? libraryService;
+
+  const BimProjectLibraryScreen({super.key, this.libraryService});
 
   @override
   State<BimProjectLibraryScreen> createState() => _BimProjectLibraryScreenState();
 }
 
 class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
+  BimProjectLibraryService get _library =>
+      widget.libraryService ?? BimProjectLibraryService.instance;
+
   bool _isLoading = true;
   List<BimWorkProject> _projects = [];
 
@@ -28,7 +33,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
 
   Future<void> _loadProjects() async {
     setState(() => _isLoading = true);
-    final projects = await BimProjectLibraryService.instance.listProjects();
+    final projects = await _library.listProjects();
     if (mounted) {
       setState(() {
         _projects = projects;
@@ -85,7 +90,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
 
   Future<void> _exportProjectZip(BimWorkProject project) async {
     try {
-      final structural = await BimProjectLibraryService.instance.loadStructuralProject(project.id);
+      final structural = await _library.loadStructuralProject(project.id);
       if (structural == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -146,7 +151,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
     );
 
     if (confirmed == true) {
-      await BimProjectLibraryService.instance.deleteProject(project.id);
+      await _library.deleteProject(project.id);
       _loadProjects();
     }
   }
@@ -184,7 +189,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
     );
 
     if (confirmed == true && controller.text.trim().isNotEmpty) {
-      await BimProjectLibraryService.instance.renameProject(project.id, controller.text.trim());
+      await _library.renameProject(project.id, controller.text.trim());
       _loadProjects();
     }
   }
@@ -244,52 +249,54 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
   Widget _buildEmptyState(BuildContext context) {
     final l10n = context.l10n;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+    return SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(32, 32, 32, 96),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.apartment_rounded,
+                  size: 64,
+                  color: Color(0xFF00E5FF),
+                ),
               ),
-              child: const Icon(
-                Icons.apartment_rounded,
-                size: 64,
-                color: Color(0xFF00E5FF),
+              const SizedBox(height: 24),
+              Text(
+                l10n.bimProjects,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              l10n.bimProjects,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+              const SizedBox(height: 10),
+              Text(
+                l10n.bimProjectNoProjects,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white60, fontSize: 14, height: 1.5),
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              l10n.bimProjectNoProjects,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60, fontSize: 14, height: 1.5),
-            ),
-            const SizedBox(height: 28),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.add_rounded),
-              label: Text(l10n.bimProjectNew),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00E5FF),
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              const SizedBox(height: 28),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.add_rounded),
+                label: Text(l10n.bimProjectNew),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00E5FF),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: _openNewProjectWizard,
               ),
-              onPressed: _openNewProjectWizard,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
