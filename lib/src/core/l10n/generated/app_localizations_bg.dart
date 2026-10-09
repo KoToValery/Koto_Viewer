@@ -3115,4 +3115,22 @@ class AppLocalizationsBg extends AppLocalizations {
   String spanFeedbackUnknown(int count) {
     return 'Връзки без валидна дебелина: $count';
   }
+
+  @override
+  String get bimClearStructure => 'Изчисти конструкцията — всички етажи';
+
+  @override
+  String bimClearStructureConfirm(int count) {
+    return 'Ще бъдат изтрити $count колони и шайби от всички етажи. Плочите, гредите и осите се запазват. Действието може да се върне с Undo.';
+  }
+
+  @override
+  String bimDeleteStoreyConfirm(String level) {
+    return 'Изтриване на етаж $level и неговите конструктивни елементи?';
+  }
+
+  @override
+  String bimUnderlayReviewNeeded(String levels) {
+    return 'Променена подложка или подравняване на $levels. Запазените конструктивни елементи и отвори изискват преглед.';
+  }
 }

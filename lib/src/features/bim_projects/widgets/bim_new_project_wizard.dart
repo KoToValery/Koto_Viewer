@@ -32,12 +32,21 @@ class _StoreyDraft {
 
 /// Modal / screen wizard for configuring and creating a new standalone BiM Project.
 class BimNewProjectWizard extends StatefulWidget {
+  final Future<File?> Function(BuildContext)? underlayPicker;
+  final Future<BimConversionResult> Function(
+    File,
+    void Function(BimConversionStage),
+    bool Function(),
+  )?
+  underlayConverter;
   final VoidCallback? onProjectCreated;
   final ValueChanged<BimWorkProject>? onProjectCreatedWithProject;
 
   const BimNewProjectWizard({
     super.key,
     this.onProjectCreated,
+    this.underlayPicker,
+    this.underlayConverter,
     this.onProjectCreatedWithProject,
   });
 
@@ -66,8 +75,6 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
   final _nameController = TextEditingController();
   final _locationController = TextEditingController();
 
-  int _basementCount = 0;
-  int _aboveGroundCount = 3;
   final double _floorHeight = 2.80;
   bool _isCreating = false;
   int _nextStoreyId = 0;
@@ -103,42 +110,24 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
     }
     _storeys.clear();
 
-    // 1. Basements (from bottom-most up to -floorHeight)
-    for (int b = _basementCount; b >= 1; b--) {
-      final elev = -b * _floorHeight;
-      _storeys.add(
-        _StoreyDraft(
-          storeyId: 'storey_${++_nextStoreyId}',
-          name: elev.toStringAsFixed(2),
-          elevation: elev,
-          height: _floorHeight,
-        ),
-      );
-    }
-
-    // 2. Ground floor (0.00)
     _storeys.add(
       _StoreyDraft(
         storeyId: 'storey_${++_nextStoreyId}',
         name: '±0.00',
-        elevation: 0.0,
-        height: _floorHeight,
+        elevation: 0,
       ),
     );
-
-    // 3. Above-ground floors (from +1 to aboveGroundCount - 1)
-    for (int f = 1; f < _aboveGroundCount; f++) {
-      final elev = f * _floorHeight;
-      _storeys.add(
-        _StoreyDraft(
-          storeyId: 'storey_${++_nextStoreyId}',
-          name: '+${elev.toStringAsFixed(2)}',
-          elevation: elev,
-          height: _floorHeight,
-        ),
-      );
-    }
   }
+
+  bool get _canCreate =>
+      !_isCreating &&
+      _storeys.isNotEmpty &&
+      _storeys.every(
+        (d) =>
+            d.converted != null &&
+            d.error == null &&
+            d.stage == BimConversionStage.ready,
+      );
 
   String _getStoreyDisplayName(_StoreyDraft draft, int index) {
     return draft.elevationLabel;
@@ -173,11 +162,14 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
           ),
         );
       }
+      _storeys.sort((a, b) => a.elevation.compareTo(b.elevation));
     });
   }
 
   Future<void> _pickUnderlayForStorey(_StoreyDraft draft) async {
-    final file = await BimUnderlayPickerHelper.pickCadUnderlayFile(context);
+    final file =
+        await (widget.underlayPicker ??
+            BimUnderlayPickerHelper.pickCadUnderlayFile)(context);
     if (mounted && file != null && !_isCreating && _storeys.contains(draft)) {
       setState(() {
         draft.pickedFile = file;
@@ -195,13 +187,21 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
         !mounted || !_storeys.contains(draft) || request != draft.request;
     draft.pending = () async {
       try {
-        final result = await BimUnderlayConversionService.convert(
-          draft.pickedFile!,
-          isCancelled: cancelled,
-          onProgress: (stage) {
-            if (!cancelled()) setState(() => draft.stage = stage);
-          },
-        );
+        void progress(BimConversionStage stage) {
+          if (!cancelled()) setState(() => draft.stage = stage);
+        }
+
+        final result = widget.underlayConverter != null
+            ? await widget.underlayConverter!(
+                draft.pickedFile!,
+                progress,
+                cancelled,
+              )
+            : await BimUnderlayConversionService.convert(
+                draft.pickedFile!,
+                isCancelled: cancelled,
+                onProgress: progress,
+              );
         if (cancelled()) {
           await result.dispose();
           return;
@@ -214,7 +214,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_canCreate || !_formKey.currentState!.validate()) return;
     if (_storeys.isEmpty) return;
 
     setState(() => _isCreating = true);
@@ -387,85 +387,6 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Quick Storey Setup Card
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: theme.dividerColor.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.auto_awesome,
-                                    size: 20,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    l10n.bimProjectQuickSetup,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildCounterField(
-                                      label: l10n.bimProjectBasementCount,
-                                      value: _basementCount,
-                                      onChanged: (val) => setState(
-                                        () => _basementCount = val.clamp(0, 5),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildCounterField(
-                                      label: l10n.bimProjectAboveGroundCount,
-                                      value: _aboveGroundCount,
-                                      onChanged: (val) => setState(
-                                        () => _aboveGroundCount = val.clamp(
-                                          1,
-                                          20,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  TextButton.icon(
-                                    icon: const Icon(
-                                      Icons.sync_rounded,
-                                      size: 18,
-                                    ),
-                                    label: Text(l10n.bimProjectGenerateStoreys),
-                                    onPressed: () {
-                                      setState(() => _generateDefaultStoreys());
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
                         // Storeys & Underlays Header
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -483,18 +404,6 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                               onPressed: () => _editElevation(null),
                             ),
                           ],
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            icon: const Icon(Icons.sort),
-                            label: Text(l10n.bimProjectSortStoreys),
-                            onPressed: () => setState(
-                              () => _storeys.sort(
-                                (a, b) => a.elevation.compareTo(b.elevation),
-                              ),
-                            ),
-                          ),
                         ),
                         const SizedBox(height: 12),
 
@@ -728,7 +637,8 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    onPressed: _isCreating ? null : _submit,
+                    key: const ValueKey('create-bim-project'),
+                    onPressed: _canCreate ? _submit : null,
                   ),
                 ),
               ],
@@ -736,49 +646,6 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildCounterField({
-    required String label,
-    required int value,
-    required ValueChanged<int> onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.remove_circle_outline, size: 20),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              onPressed: () => onChanged(value - 1),
-            ),
-            Expanded(
-              child: Text(
-                '$value',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline, size: 20),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              onPressed: () => onChanged(value + 1),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

@@ -3103,4 +3103,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String spanFeedbackUnknown(int count) {
     return 'Links without valid slab thickness: $count';
   }
+
+  @override
+  String get bimClearStructure => 'Clear structure — all storeys';
+
+  @override
+  String bimClearStructureConfirm(int count) {
+    return 'Delete $count columns and shear walls across all storeys. Slabs, beams and axes remain. You can undo this action.';
+  }
+
+  @override
+  String bimDeleteStoreyConfirm(String level) {
+    return 'Delete storey $level and its structural elements?';
+  }
+
+  @override
+  String bimUnderlayReviewNeeded(String levels) {
+    return 'Underlay or alignment changed at $levels. Review the preserved structural elements and openings.';
+  }
 }

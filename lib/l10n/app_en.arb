@@ -2434,5 +2434,30 @@
         "type": "int"
       }
     }
+  },
+  "bimClearStructure": "Clear structure — all storeys",
+  "bimClearStructureConfirm": "Delete {count} columns and shear walls across all storeys. Slabs, beams and axes remain. You can undo this action.",
+  "@bimClearStructureConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bimDeleteStoreyConfirm": "Delete storey {level} and its structural elements?",
+  "@bimDeleteStoreyConfirm": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "bimUnderlayReviewNeeded": "Underlay or alignment changed at {levels}. Review the preserved structural elements and openings.",
+  "@bimUnderlayReviewNeeded": {
+    "placeholders": {
+      "levels": {
+        "type": "String"
+      }
+    }
   }
 }

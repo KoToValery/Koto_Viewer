@@ -5332,6 +5332,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Links without valid slab thickness: {count}'**
   String spanFeedbackUnknown(int count);
+
+  /// No description provided for @bimClearStructure.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear structure — all storeys'**
+  String get bimClearStructure;
+
+  /// No description provided for @bimClearStructureConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} columns and shear walls across all storeys. Slabs, beams and axes remain. You can undo this action.'**
+  String bimClearStructureConfirm(int count);
+
+  /// No description provided for @bimDeleteStoreyConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete storey {level} and its structural elements?'**
+  String bimDeleteStoreyConfirm(String level);
+
+  /// No description provided for @bimUnderlayReviewNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay or alignment changed at {levels}. Review the preserved structural elements and openings.'**
+  String bimUnderlayReviewNeeded(String levels);
 }
 
 class _AppLocalizationsDelegate

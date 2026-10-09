@@ -940,5 +940,30 @@
         "type": "int"
       }
     }
+  },
+  "bimClearStructure": "Изчисти конструкцията — всички етажи",
+  "bimClearStructureConfirm": "Ще бъдат изтрити {count} колони и шайби от всички етажи. Плочите, гредите и осите се запазват. Действието може да се върне с Undo.",
+  "@bimClearStructureConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bimDeleteStoreyConfirm": "Изтриване на етаж {level} и неговите конструктивни елементи?",
+  "@bimDeleteStoreyConfirm": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "bimUnderlayReviewNeeded": "Променена подложка или подравняване на {levels}. Запазените конструктивни елементи и отвори изискват преглед.",
+  "@bimUnderlayReviewNeeded": {
+    "placeholders": {
+      "levels": {
+        "type": "String"
+      }
+    }
   }
 }

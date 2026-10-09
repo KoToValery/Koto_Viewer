@@ -22,8 +22,13 @@ import 'bim_workspace_screen.dart';
 /// control point (reference point) on all floors for precise multi-storey BiM alignment.
 class BimAlignmentScreen extends StatefulWidget {
   final BimWorkProject project;
+  final BimProjectLibraryService? libraryService;
 
-  const BimAlignmentScreen({super.key, required this.project});
+  const BimAlignmentScreen({
+    super.key,
+    required this.project,
+    this.libraryService,
+  });
 
   @override
   State<BimAlignmentScreen> createState() => _BimAlignmentScreenState();
@@ -31,6 +36,8 @@ class BimAlignmentScreen extends StatefulWidget {
 
 class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     with TickerProviderStateMixin {
+  BimProjectLibraryService get _lib =>
+      widget.libraryService ?? BimProjectLibraryService.instance;
   late BimWorkProject _project;
   late TabController _tabController;
   final Map<String, DxfDocument> _loadedDocs = {};
@@ -58,7 +65,9 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
   @override
   void initState() {
     super.initState();
-    _project = widget.project;
+    _project = widget.project.copyWith(
+      storeys: widget.project.sortedStoreysByElevation,
+    );
     _tabController = TabController(
       length: _project.storeys.isNotEmpty ? _project.storeys.length : 1,
       vsync: this,
@@ -141,7 +150,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
 
   Future<void> _loadAllUnderlays() async {
     setState(() => _isLoading = true);
-    final lib = BimProjectLibraryService.instance;
+    final lib = _lib;
     _loadedDocs.clear();
 
     try {
@@ -179,15 +188,9 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
 
     setState(() => _isLoading = true);
     try {
-      await BimProjectLibraryService.instance.attachUnderlayFile(
-        _project.id,
-        _currentStorey.storeyId,
-        file,
-      );
+      await _lib.attachUnderlayFile(_project.id, _currentStorey.storeyId, file);
 
-      final latestProject =
-          await BimProjectLibraryService.instance.loadProject(_project.id) ??
-          _project;
+      final latestProject = await _lib.loadProject(_project.id) ?? _project;
       if (mounted) {
         setState(() {
           _project = latestProject;
@@ -417,7 +420,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       _isDraggingPoint = false;
     });
 
-    BimProjectLibraryService.instance.saveProjectManifest(updatedProject);
+    _lib.saveProjectManifest(updatedProject);
   }
 
   void _onSetControlPoint(Offset cadPoint) {
@@ -445,7 +448,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       _isDraggingPoint = false;
     });
 
-    BimProjectLibraryService.instance.saveProjectManifest(updatedProject);
+    _lib.saveProjectManifest(updatedProject);
   }
 
   Future<void> _onConfirmAlignment() async {
@@ -509,7 +512,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
         alignmentConfirmed: true,
         updatedAt: DateTime.now(),
       );
-      await BimProjectLibraryService.instance.saveProjectManifest(updated);
+      await _lib.saveProjectManifest(updated);
       setState(() => _project = updated);
 
       if (mounted) {
@@ -522,12 +525,33 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     }
   }
 
-  Future<void> _manageElevation({bool add = false, bool sort = false}) async {
+  Future<void> _manageElevation({bool add = false, bool remove = false}) async {
     if (_isLoading) return;
     final activeId = _currentStorey.storeyId;
     final storeys = List<BimStoreyUnderlay>.of(_project.storeys);
-    if (sort) {
-      storeys.sort((a, b) => a.elevation.compareTo(b.elevation));
+    if (remove) {
+      if (storeys.length <= 1) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(context.l10n.bimProjectDeleteStorey),
+          content: Text(
+            context.l10n.bimDeleteStoreyConfirm(_currentStorey.elevationLabel),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(context.l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(context.l10n.delete),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+      storeys.removeWhere((s) => s.storeyId == activeId);
     } else {
       final elevation = await showBimElevationDialog(
         context: context,
@@ -554,10 +578,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     }
     setState(() => _isLoading = true);
     try {
-      final updated = await BimProjectLibraryService.instance.updateStoreys(
-        _project.id,
-        storeys,
-      );
+      final updated = await _lib.updateStoreys(_project.id, storeys);
       if (!mounted) return;
       _tabController.removeListener(_onTabChanged);
       _tabController.dispose();
@@ -565,9 +586,12 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       _tabController = TabController(
         length: updated.storeys.length,
         vsync: this,
-        initialIndex: updated.storeys.indexWhere((s) => s.storeyId == activeId),
+        initialIndex: updated.storeys
+            .indexWhere((s) => s.storeyId == activeId)
+            .clamp(0, updated.storeys.length - 1),
       );
       _tabController.addListener(_onTabChanged);
+      await _loadAllUnderlays();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -630,10 +654,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
     if (_isLoading || !_currentStorey.hasUnderlay) return;
     setState(() => _isLoading = true);
     try {
-      await BimProjectLibraryService.instance.reprocessUnderlay(
-        _project.id,
-        _currentStorey.storeyId,
-      );
+      await _lib.reprocessUnderlay(_project.id, _currentStorey.storeyId);
       if (mounted) await _loadAllUnderlays();
     } catch (error) {
       if (mounted) {
@@ -684,15 +705,6 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (value) {
               switch (value) {
-                case 'edit_elevation':
-                  _manageElevation();
-                  break;
-                case 'add_elevation':
-                  _manageElevation(add: true);
-                  break;
-                case 'sort_elevations':
-                  _manageElevation(sort: true);
-                  break;
                 case 'reprocess':
                   _reprocess();
                   break;
@@ -715,21 +727,6 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
               }
             },
             itemBuilder: (ctx) => [
-              PopupMenuItem(
-                value: 'edit_elevation',
-                enabled: !_isLoading,
-                child: Text(l10n.bimProjectEditElevation),
-              ),
-              PopupMenuItem(
-                value: 'add_elevation',
-                enabled: !_isLoading,
-                child: Text(l10n.bimProjectAddStorey),
-              ),
-              PopupMenuItem(
-                value: 'sort_elevations',
-                enabled: !_isLoading,
-                child: Text(l10n.bimProjectSortStoreys),
-              ),
               PopupMenuItem(
                 value: 'reprocess',
                 enabled: !_isLoading && _currentStorey.hasUnderlay,
@@ -839,6 +836,37 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
             )
           : Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      OutlinedButton.icon(
+                        key: const ValueKey('bim-add-storey'),
+                        onPressed: () => _manageElevation(add: true),
+                        icon: const Icon(Icons.add),
+                        label: Text(l10n.bimProjectAddStorey),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _manageElevation(),
+                        icon: const Icon(Icons.edit_outlined),
+                        label: Text(l10n.bimProjectEditElevation),
+                      ),
+                      TextButton.icon(
+                        key: const ValueKey('bim-remove-storey'),
+                        onPressed: _project.storeys.length > 1
+                            ? () => _manageElevation(remove: true)
+                            : null,
+                        icon: const Icon(Icons.delete_outline),
+                        label: Text(l10n.bimProjectDeleteStorey),
+                      ),
+                    ],
+                  ),
+                ),
                 // Instruction banner
                 Container(
                   padding: const EdgeInsets.symmetric(

@@ -6838,6 +6838,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
 
   void _ensureSlabsPopulatedForActiveStorey() {
+    // Project source revisions and ceilings are synchronized by the BIM library.
+    if (widget.bimContext != null) return;
     final active = _project.activeStorey;
     if (active.slabs.isNotEmpty) return;
     final metadata = BimUnderlayMetadata.read(_document);
@@ -6862,6 +6864,40 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _runAnalysis();
       setState(() {});
     }
+  }
+
+  Future<void> _clearStructuralSupports() async {
+    final snapshot = _project;
+    final count = snapshot.storeys.fold<int>(
+      0, (n, s) => n + s.columns.length + s.shearWalls.length);
+    if (count == 0) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.bimClearStructure),
+        content: Text(context.l10n.bimClearStructureConfirm(count)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: Text(context.l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+            child: Text(context.l10n.delete)),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true || !identical(_project, snapshot)) return;
+    _pushUndo();
+    setState(() {
+      _project = _project.copyWith(storeys: [
+        for (final s in _project.storeys) s.copyWith(columns: [], shearWalls: [])]);
+      _selectedColumn = null;
+      _selectedShearWall = null;
+      _isMovingColumn = false;
+      _isMovingShearWall = false;
+      _isPlacingWithHold = false;
+      _currentCadCoord = null;
+      _runAnalysis();
+    });
+    _saveProject();
   }
 
   Future<void> _generateInitialScheme() async {
@@ -7411,7 +7447,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // Automatically generate initial dynamic slabs in the same step if none exist
     final active = _project.activeStorey;
-    if (active.slabs.isEmpty || !active.slabs.any((s) => s.id.startsWith(SlabSeedGenerator.prefix(active.id)))) {
+    final higherStoreys = _project.storeys
+        .where((s) => s.elevation > active.elevation).toList()
+      ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    final hasCeilingLayout = widget.bimContext == null ||
+        (higherStoreys.isNotEmpty &&
+          widget.bimContext!.underlaysByStorey.containsKey(higherStoreys.first.id));
+    if (hasCeilingLayout && (active.slabs.isEmpty || !active.slabs.any((s) => s.id.startsWith(SlabSeedGenerator.prefix(active.id))))) {
       var slabMeta = BimUnderlayMetadata.read(_document);
       List<(Offset, Offset)>? wallReferences;
       if (slabMeta == null) {
@@ -8140,10 +8182,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           case 'generate_scheme':
             _generateInitialScheme();
             break;
-          case 'scheme_readiness':
-            showDialog<void>(context: context, builder: (_) =>
-              StructuralSchemeReadinessDialog(project: _project,
-                scale: _cadUnitsPerMeter, editing: _isEditingSlab));
+          case 'clear_structure':
+            _clearStructuralSupports();
             break;
           case 'generate_slabs':
             _generateSlabSeeds();
@@ -8171,9 +8211,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           PopupMenuItem(value: 'generate_scheme',
             child: Text(context.l10n.schemeGenerate,
               style: const TextStyle(color: Colors.white, fontSize: 13))),
-          PopupMenuItem(value: 'scheme_readiness',
-            child: Text(context.l10n.schemeReadinessTitle,
-              style: const TextStyle(color: Colors.white, fontSize: 13))),
+          PopupMenuItem(value: 'clear_structure',
+            child: Text(context.l10n.bimClearStructure,
+              style: const TextStyle(color: Colors.orangeAccent, fontSize: 13))),
         PopupMenuItem(
           value: 'toggle_snap',
           child: Row(

@@ -149,6 +149,8 @@ class BimWorkProject {
   final bool alignmentConfirmed;
   final String? referenceStoreyId;
   final bool axisSeedsConsumed;
+  final Offset? structuralOrigin;
+  final double? structuralUnitsPerMeter;
 
   const BimWorkProject({
     required this.id,
@@ -160,6 +162,8 @@ class BimWorkProject {
     this.alignmentConfirmed = false,
     this.referenceStoreyId,
     this.axisSeedsConsumed = false,
+    this.structuralOrigin,
+    this.structuralUnitsPerMeter,
   });
 
   /// True when all storeys that have an underlay attached also have their control point set.
@@ -227,6 +231,8 @@ class BimWorkProject {
     bool? alignmentConfirmed,
     String? referenceStoreyId,
     bool? axisSeedsConsumed,
+    Offset? structuralOrigin,
+    double? structuralUnitsPerMeter,
   }) {
     return BimWorkProject(
       id: id ?? this.id,
@@ -238,6 +244,9 @@ class BimWorkProject {
       alignmentConfirmed: alignmentConfirmed ?? this.alignmentConfirmed,
       referenceStoreyId: referenceStoreyId ?? this.referenceStoreyId,
       axisSeedsConsumed: axisSeedsConsumed ?? this.axisSeedsConsumed,
+      structuralOrigin: structuralOrigin ?? this.structuralOrigin,
+      structuralUnitsPerMeter:
+          structuralUnitsPerMeter ?? this.structuralUnitsPerMeter,
     );
   }
 
@@ -251,6 +260,10 @@ class BimWorkProject {
     'alignmentConfirmed': alignmentConfirmed,
     if (referenceStoreyId != null) 'referenceStoreyId': referenceStoreyId,
     'axisSeedsConsumed': axisSeedsConsumed,
+    if (structuralOrigin != null)
+      'structuralOrigin': [structuralOrigin!.dx, structuralOrigin!.dy],
+    if (structuralUnitsPerMeter != null)
+      'structuralUnitsPerMeter': structuralUnitsPerMeter,
   };
 
   factory BimWorkProject.fromJson(Map<String, dynamic> json) {
@@ -275,6 +288,14 @@ class BimWorkProject {
       alignmentConfirmed: json['alignmentConfirmed'] as bool? ?? false,
       referenceStoreyId: json['referenceStoreyId'] as String?,
       axisSeedsConsumed: json['axisSeedsConsumed'] as bool? ?? false,
+      structuralOrigin: json['structuralOrigin'] is List
+          ? Offset(
+              (json['structuralOrigin'][0] as num).toDouble(),
+              (json['structuralOrigin'][1] as num).toDouble(),
+            )
+          : null,
+      structuralUnitsPerMeter: (json['structuralUnitsPerMeter'] as num?)
+          ?.toDouble(),
     );
   }
 }

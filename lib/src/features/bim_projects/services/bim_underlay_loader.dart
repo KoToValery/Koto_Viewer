@@ -70,10 +70,14 @@ class BimUnderlayLoader {
         ? rawDocs[refStorey.storeyId]!
         : rawDocs.values.first;
 
-    final refUnitsPerMeter = computeUnitsPerMeter(refDoc, refDoc.bounds);
-    final refCp = (refStorey != null && refStorey.controlPoint != null)
-        ? refStorey.controlPoint!
-        : (refDoc.bounds.center);
+    final refUnitsPerMeter =
+        project.structuralUnitsPerMeter ??
+        computeUnitsPerMeter(refDoc, refDoc.bounds);
+    final refCp =
+        project.structuralOrigin ??
+        ((refStorey != null && refStorey.controlPoint != null)
+            ? refStorey.controlPoint!
+            : (refDoc.bounds.center));
 
     // 3. First pass: determine scales and translations, find combined bounds
     final transformedDocs = <String, DxfDocument>{};

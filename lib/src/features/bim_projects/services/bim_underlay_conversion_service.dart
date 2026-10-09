@@ -42,7 +42,7 @@ class BimConversionResult {
 /// Metadata travels with the binary document, including empty analysis results.
 class BimUnderlayMetadata {
   static const key = r'$KOTO_BIM_UNDERLAY';
-  static const version = 1;
+  static const version = 2;
 
   static Map<String, dynamic>? read(DxfDocument doc) {
     final raw = doc.headerVars[key];
@@ -50,7 +50,7 @@ class BimUnderlayMetadata {
     try {
       final value = jsonDecode(raw);
       if (value is Map<String, dynamic> &&
-          value['version'] == version &&
+          (value['version'] == version || value['version'] == 1) &&
           value['complete'] == true) {
         return value;
       }
@@ -76,12 +76,15 @@ class BimUnderlayMetadata {
     final metadata = read(doc);
     if (metadata == null) return;
     final generated = generatedLayers(doc);
+    final visible = Set<String>.from(
+      metadata['visibleLayers'] as List? ?? metadata['layers'] as List,
+    );
     final original = Map<String, dynamic>.from(metadata['visibility'] as Map);
     // A completed empty result must leave the source visible.
     final hasResults = metadata['hasResults'] == true;
     for (final layer in doc.layers.values) {
       layer.isVisible = filtered && hasResults
-          ? generated.contains(layer.name)
+          ? visible.contains(layer.name)
           : !generated.contains(layer.name) && (original[layer.name] == true);
     }
   }
@@ -338,10 +341,18 @@ DxfDocument _analyse(DxfDocument doc) {
   );
   doc.layers[slabs] = DxfLayer(name: slabs, colorIndex: 7);
   if (envelope.contours.isNotEmpty) {
-    doc.layers[candidates] = DxfLayer(name: candidates, colorIndex: 30, isVisible: false);
+    doc.layers[candidates] = DxfLayer(
+      name: candidates,
+      colorIndex: 30,
+      isVisible: false,
+    );
   }
   if (envelope.assumedGaps.isNotEmpty) {
-    doc.layers[assumed] = DxfLayer(name: assumed, colorIndex: 1, isVisible: false);
+    doc.layers[assumed] = DxfLayer(
+      name: assumed,
+      colorIndex: 1,
+      isVisible: false,
+    );
   }
   doc.entities.addAll(additions);
   final model = doc.layoutEntities['Model'];
@@ -361,7 +372,11 @@ DxfDocument _analyse(DxfDocument doc) {
     'layers': [
       walls,
       slabs,
+      if (envelope.contours.isNotEmpty) candidates,
+      if (envelope.assumedGaps.isNotEmpty) assumed,
+      if (projections.isNotEmpty) projectionLayer,
     ],
+    'visibleLayers': [walls, slabs],
     'slabEnvelope': envelope.toJson(),
     'slabProjections': projections.map((p) => p.toJson()).toList(),
     'blocks': generatedBlocks,

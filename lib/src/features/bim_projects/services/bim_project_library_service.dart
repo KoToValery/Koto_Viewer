@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
@@ -8,9 +9,8 @@ import '../../dxf_viewer/binary/kcad_service.dart';
 import '../../dxf_viewer/parser/dxf_parser.dart';
 import 'bim_underlay_conversion_service.dart';
 import 'bim_underlay_loader.dart';
-import '../../structural_designer/analysis/slab_seed_generator.dart';
+import 'bim_structural_seed_sync.dart';
 import '../../structural_designer/models/structural_element.dart';
-import '../../structural_designer/rendering/structural_2d_painter.dart';
 import '../models/bim_work_project.dart';
 
 class _BimWriteQueue {
@@ -96,6 +96,7 @@ class BimProjectLibraryService {
     String location = '',
     required List<BimStoreyUnderlay> storeys,
   }) async {
+    storeys = [...storeys]..sort((a, b) => a.elevation.compareTo(b.elevation));
     final now = DateTime.now();
     final randSuffix = math.Random()
         .nextInt(0xffffff)
@@ -158,7 +159,8 @@ class BimProjectLibraryService {
 
       final content = await manifestFile.readAsString();
       final jsonMap = jsonDecode(content) as Map<String, dynamic>;
-      return BimWorkProject.fromJson(jsonMap);
+      final project = BimWorkProject.fromJson(jsonMap);
+      return project.copyWith(storeys: project.sortedStoreysByElevation);
     } catch (e) {
       debugPrint('Error loading project $projectId: $e');
       return null;
@@ -229,10 +231,18 @@ class BimProjectLibraryService {
           )
           .toList();
       final active = synced.indexWhere((s) => s.id == activeId);
-      return structural.copyWith(
-        storeys: synced,
-        activeStoreyIndex: active < 0 ? 0 : active,
-      );
+      final axes = structural.effectiveGridAxes
+          .where(
+            (a) =>
+                !a.id.startsWith('bim_axis_') ||
+                manifest.storeys.any(
+                  (s) => a.id.startsWith('bim_axis_${s.storeyId}_'),
+                ),
+          )
+          .toList();
+      return structural
+          .copyWith(storeys: synced, activeStoreyIndex: active < 0 ? 0 : active)
+          .copyWithGridAxes(axes);
     } catch (e) {
       debugPrint('Error loading structural project for $projectId: $e');
       return null;
@@ -338,6 +348,11 @@ class BimProjectLibraryService {
           layerVisibility: preserveAlignment ? s.layerVisibility : {},
           wallsDetected: metadata['wallsFound'] == true,
           processing: {
+            if (s.processing['structuralSeeds'] != null)
+              'structuralSeeds': s.processing['structuralSeeds'],
+            if (s.processing['structuralReviewRequired'] == true)
+              'structuralReviewRequired': true,
+            if (!s.hasUnderlay) 'seedImportPending': true,
             'version': BimUnderlayMetadata.version,
             'status': metadata['hasResults'] == true
                 ? 'completedWithResults'
@@ -447,6 +462,11 @@ class BimProjectLibraryService {
   Future<BimWorkProject> updateStoreys(
     String projectId,
     List<BimStoreyUnderlay> storeys,
+  ) => _publications.run(() => _updateStoreys(projectId, storeys));
+
+  Future<BimWorkProject> _updateStoreys(
+    String projectId,
+    List<BimStoreyUnderlay> storeys,
   ) async {
     if (storeys.isEmpty ||
         storeys.any((s) => !s.elevation.isFinite) ||
@@ -454,6 +474,7 @@ class BimProjectLibraryService {
         storeys.map((s) => s.elevationLabel).toSet().length != storeys.length) {
       throw ArgumentError('Storeys must have unique IDs and elevations');
     }
+    storeys = [...storeys]..sort((a, b) => a.elevation.compareTo(b.elevation));
     final project = await loadProject(projectId);
     if (project == null) throw StateError('Missing project');
     final old = {for (final s in project.storeys) s.storeyId: s};
@@ -468,80 +489,63 @@ class BimProjectLibraryService {
             ),
           )
           .toList(),
-      referenceStoreyId: project.referenceStorey?.storeyId,
+      referenceStoreyId:
+          storeys.any((s) => s.storeyId == project.referenceStorey?.storeyId)
+          ? project.referenceStorey?.storeyId
+          : storeys.first.storeyId,
+      alignmentConfirmed:
+          project.alignmentConfirmed &&
+          storeys.length == project.storeys.length &&
+          storeys.every((s) => old[s.storeyId]?.elevation == s.elevation),
       updatedAt: DateTime.now(),
     );
     if (!await saveProjectManifest(updated)) {
       throw FileSystemException('Cannot save storeys');
     }
+    final structural = await loadStructuralProject(projectId);
+    if (structural != null &&
+        !await saveStructuralProject(projectId, structural)) {
+      throw FileSystemException('Cannot synchronize structural storeys');
+    }
     return updated;
   }
 
-  /// Consume local analysis seeds after alignment. Initializes dynamic axes
-  /// and dynamic slabs for storeys matching their analysed floor underlays.
+  /// Refresh per-storey automatic geometry after revision/alignment changes.
+  /// A fixed project frame keeps existing structural coordinates stable.
   Future<(BimWorkProject, StructuralProject)> initializeAxes(
     BimWorkProject project,
     StructuralProject structural,
-    Map<String, DxfDocument> alignedDocuments,
-  ) async {
-    if (alignedDocuments.isEmpty) {
-      return (project, structural);
+    Map<String, DxfDocument> alignedDocuments, {
+    Offset? referenceControlPoint,
+    double? cadUnitsPerMeter,
+  }) async {
+    if (alignedDocuments.isEmpty) return (project, structural);
+    final refDoc =
+        alignedDocuments[project.referenceStorey?.storeyId] ??
+        alignedDocuments.values.first;
+    project = project.copyWith(
+      structuralOrigin:
+          project.structuralOrigin ??
+          referenceControlPoint ??
+          project.referenceStorey?.controlPoint ??
+          refDoc.bounds.center,
+      structuralUnitsPerMeter:
+          project.structuralUnitsPerMeter ??
+          cadUnitsPerMeter ??
+          BimUnderlayLoader.computeUnitsPerMeter(refDoc, refDoc.bounds),
+    );
+    final refreshed = BimStructuralSeedSync.refresh(
+      project,
+      structural,
+      alignedDocuments,
+    );
+    if (!await saveStructuralProject(project.id, refreshed.$2)) {
+      throw StateError('Cannot save refreshed structural project');
     }
-    bool structuralChanged = false;
-    if (!project.axisSeedsConsumed && structural.effectiveGridAxes.isEmpty) {
-      final doc = alignedDocuments[project.referenceStorey?.storeyId];
-      if (doc != null) {
-        structural = structural.copyWithGridAxes(BimUnderlayMetadata.axes(doc));
-        structuralChanged = true;
-      }
+    if (!await saveProjectManifest(refreshed.$1)) {
+      throw StateError('Cannot save structural seed revisions');
     }
-
-    // Auto-generate dynamic slabs for each storey if not already present
-    final updatedStoreys = <StoreyLevel>[];
-    for (final storey in structural.storeys) {
-      var currentStorey = storey;
-      final doc = alignedDocuments[storey.id];
-      if (doc != null && currentStorey.slabs.isEmpty) {
-        final meta = BimUnderlayMetadata.read(doc);
-        if (meta != null && meta['slabEnvelope'] != null) {
-          final unitsPerMeter = BimUnderlayLoader.computeUnitsPerMeter(doc, doc.bounds);
-          final seeds = SlabSeedGenerator.generate(
-            metadata: meta,
-            document: doc,
-            storeyId: storey.id,
-            existing: currentStorey.slabs,
-            unitsPerMeter: unitsPerMeter,
-            thickness: 0.20,
-          );
-          if (seeds.isNotEmpty) {
-            final coloredSeeds = [
-              for (var i = 0; i < seeds.length; i++)
-                seeds[i].copyWith(
-                  colorValue: Structural2dPainter.slabPalette[
-                      i % Structural2dPainter.slabPalette.length].toARGB32(),
-                ),
-            ];
-            currentStorey = currentStorey.copyWith(slabs: coloredSeeds);
-            structuralChanged = true;
-          }
-        }
-      }
-      updatedStoreys.add(currentStorey);
-    }
-
-    if (structuralChanged) {
-      structural = structural.copyWith(storeys: updatedStoreys);
-      if (!await saveStructuralProject(project.id, structural)) {
-        throw StateError('Cannot save initial structural project');
-      }
-    }
-    if (!project.axisSeedsConsumed) {
-      project = project.copyWith(axisSeedsConsumed: true);
-      if (!await saveProjectManifest(project)) {
-        throw StateError('Cannot save axis initialization');
-      }
-    }
-    return (project, structural);
+    return refreshed;
   }
 
   /// Returns the absolute [File] for a relative underlay path within [projectId].

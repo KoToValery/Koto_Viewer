@@ -119,6 +119,11 @@ void main() {
         .widgetList<Card>(find.byType(Card))
         .map((c) => c.key)
         .toSet();
+    expect(find.byType(Card), findsOneWidget);
+    await tester.tap(find.text('Add Storey'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Delete Storey').at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add Storey'));
@@ -133,11 +138,10 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
     final cards = tester.widgetList<Card>(find.byType(Card)).toList();
-    expect(cards.length, 3);
-    expect(cards.map((c) => c.key).toSet().length, 3);
+    expect(cards.length, 2);
+    expect(cards.map((c) => c.key).toSet().length, 2);
     expect(cards.where((c) => !oldIds.contains(c.key)).length, 1);
-    await tester.tap(find.text('Sort by elevation'));
-    await tester.pumpAndSettle();
+    expect(find.text('Sort by elevation'), findsNothing);
     expect(
       find.descendant(
         of: find.byType(Card).first,
@@ -236,62 +240,68 @@ void main() {
       },
     );
 
-    test('BimProjectLibraryService initializes axes and dynamic slabs simultaneously', () async {
-      final doc = DxfDocument(
-        bounds: const Rect.fromLTWH(0, 0, 500, 500),
-        layers: {},
-        blocks: {},
-        entities: [],
-        entityStats: const {},
-        headerVars: {
-          BimUnderlayMetadata.key: jsonEncode({
-        'version': BimUnderlayMetadata.version,
-        'complete': true,
-        'hasResults': true,
-        'wallsFound': true,
-        'axes': [axis.toJson()],
-        'layers': ['BIM_Walls', 'BIM_Slabs'],
-        'slabEnvelope': {
-          'contours': [
-            [
-              [0, 0],
-              [500, 0],
-              [500, 500],
-              [0, 500],
-            ],
+    test(
+      'BimProjectLibraryService initializes axes and dynamic slabs simultaneously',
+      () async {
+        final doc = DxfDocument(
+          bounds: const Rect.fromLTWH(0, 0, 500, 500),
+          layers: {},
+          blocks: {},
+          entities: [],
+          entityStats: const {},
+          headerVars: {
+            BimUnderlayMetadata.key: jsonEncode({
+              'version': BimUnderlayMetadata.version,
+              'complete': true,
+              'hasResults': true,
+              'wallsFound': true,
+              'axes': [axis.toJson()],
+              'layers': ['BIM_Walls', 'BIM_Slabs'],
+              'slabEnvelope': {
+                'contours': [
+                  [
+                    [0, 0],
+                    [500, 0],
+                    [500, 500],
+                    [0, 500],
+                  ],
+                ],
+              },
+              'slabProjections': [],
+            }),
+          },
+        );
+        final service = BimProjectLibraryService(customRootDir: temp);
+        final project = BimWorkProject(
+          id: 'p_test',
+          name: 'P Test',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          referenceStoreyId: 's1',
+          storeys: const [
+            BimStoreyUnderlay(storeyId: 's1', name: 'S1', elevation: 0),
+            BimStoreyUnderlay(storeyId: 's2', name: 'S2', elevation: 2.8),
           ],
-        },
-        'slabProjections': [],
-      })},
+        );
+        await service.saveProjectManifest(project);
+        final structural = StructuralProject(
+          title: 'P Test',
+          storeys: const [
+            StoreyLevel(id: 's1', name: 'S1', elevation: 0),
+            StoreyLevel(id: 's2', name: 'S2', elevation: 2.8),
+          ],
+        );
+        await service.saveStructuralProject(project.id, structural);
+        final (updatedProj, updatedStruct) = await service.initializeAxes(
+          project,
+          structural,
+          {'s1': doc, 's2': doc},
+        );
+        expect(updatedProj.axisSeedsConsumed, isTrue);
+        expect(updatedStruct.effectiveGridAxes.length, 1);
+        expect(updatedStruct.storeys.first.slabs.length, 1);
+        expect(updatedStruct.storeys.first.slabs.first.polygon.length, 4);
+      },
     );
-      final service = BimProjectLibraryService(customRootDir: temp);
-      final project = BimWorkProject(
-        id: 'p_test',
-        name: 'P Test',
-        createdAt: DateTime(2026),
-        updatedAt: DateTime(2026),
-        referenceStoreyId: 's1',
-        storeys: const [
-          BimStoreyUnderlay(storeyId: 's1', name: 'S1', elevation: 0),
-        ],
-      );
-      await service.saveProjectManifest(project);
-      final structural = StructuralProject(
-        title: 'P Test',
-        storeys: const [
-          StoreyLevel(id: 's1', name: 'S1', elevation: 0),
-        ],
-      );
-      await service.saveStructuralProject(project.id, structural);
-      final (updatedProj, updatedStruct) = await service.initializeAxes(
-        project,
-        structural,
-        {'s1': doc},
-      );
-      expect(updatedProj.axisSeedsConsumed, isTrue);
-      expect(updatedStruct.effectiveGridAxes.length, 1);
-      expect(updatedStruct.storeys.first.slabs.length, 1);
-      expect(updatedStruct.storeys.first.slabs.first.polygon.length, 4);
-    });
   });
 }

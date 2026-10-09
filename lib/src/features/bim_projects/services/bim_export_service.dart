@@ -49,21 +49,26 @@ class BimExportService {
     final outBaseName = '${cleanProjName}_${cleanStoreyName}_$safeId';
 
     final refStorey = project.referenceStorey;
-    final cpRef = refStorey?.controlPoint;
+    final cpRef = project.structuralOrigin ?? refStorey?.controlPoint;
     final cpLocal = bimStorey.controlPoint;
     var unitScale = bimStorey.unitScale;
     if (bimStorey.hasUnderlay && refStorey != null && refStorey.hasUnderlay) {
       final local = await lib.loadUnderlay(project.id, bimStorey);
       final reference = await lib.loadUnderlay(project.id, refStorey);
       unitScale =
-          BimUnderlayLoader.computeUnitsPerMeter(reference, reference.bounds) /
+          (project.structuralUnitsPerMeter ??
+              BimUnderlayLoader.computeUnitsPerMeter(
+                reference,
+                reference.bounds,
+              )) /
           BimUnderlayLoader.computeUnitsPerMeter(local, local.bounds);
     }
 
     // 1. Generate structural DXF in local coordinates of the storey
     final structDxfFile =
         await StructuralPersistenceService.exportStoreyToDxfFile(
-          storey: structural.resolveCeilingStorey(structStorey)
+          storey: structural
+              .resolveCeilingStorey(structStorey)
               .copyWith(gridAxes: structural.effectiveGridAxes),
           baseName: outBaseName,
           cpRef: cpRef,

@@ -109,6 +109,8 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
             latestProject,
             structural,
             loadedUnderlays.underlaysByStorey,
+            referenceControlPoint: loadedUnderlays.referenceControlPoint,
+            cadUnitsPerMeter: loadedUnderlays.cadUnitsPerMeter,
           );
       latestProject = initialized.$1;
       structural = initialized.$2;
@@ -460,11 +462,46 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
       onManageStoreys: _openStoreyManager,
     );
 
-    return StructuralDesignerScreen(
-      document: primaryDoc,
-      title: _project.name,
-      initialProject: _structuralProject,
-      bimContext: bimContext,
+    final review = _project.storeys
+        .where((s) => s.processing['structuralReviewRequired'] == true)
+        .map((s) => s.elevationLabel)
+        .join(', ');
+    return Column(
+      children: [
+        if (review.isNotEmpty)
+          Material(
+            color: const Color(0xFF49321A),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber, color: Colors.amber),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        context.l10n.bimUnderlayReviewNeeded(review),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        Expanded(
+          child: StructuralDesignerScreen(
+            document: primaryDoc,
+            title: _project.name,
+            initialProject: _structuralProject,
+            bimContext: bimContext,
+          ),
+        ),
+      ],
     );
   }
 }
