@@ -2244,10 +2244,8 @@ class Structural2dPainter extends CustomPainter {
   void _drawCantileverOverlays(Canvas canvas) {
     for (final zone in cantileverZones) {
       final Color color = zone.riskLevel.color;
-      final Color fill = zone.riskLevel.fillColor;
 
       final s = cadToScene(zone.supportEdgeStart);
-      final e = cadToScene(zone.supportEdgeEnd);
       final tip = cadToScene(zone.overhangTip);
 
       // Draw overhang span line from support to tip
@@ -2265,18 +2263,6 @@ class Structural2dPainter extends CustomPainter {
       canvas.drawCircle(tip, 6.0 / zoomScale, tipPaint);
 
       if (zone.isCorner) {
-        // Draw corner triangle
-        final cornerPath = Path()
-          ..moveTo(s.dx, s.dy)
-          ..lineTo(e.dx, e.dy)
-          ..lineTo(tip.dx, tip.dy)
-          ..close();
-
-        final cornerFill = Paint()
-          ..color = fill
-          ..style = PaintingStyle.fill;
-        canvas.drawPath(cornerPath, cornerFill);
-
         // Corner warning badge
         final cornerRing = Paint()
           ..color = color
