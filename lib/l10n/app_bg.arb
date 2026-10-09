@@ -923,5 +923,22 @@
         "type": "int"
       }
     }
+  },
+  "spanFeedbackCount": "Проблемни връзки: {count}",
+  "@spanFeedbackCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "spanFeedbackScope": "Предварително · по зададената дебелина",
+  "spanFeedbackUnknown": "Връзки без валидна дебелина: {count}",
+  "@spanFeedbackUnknown": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

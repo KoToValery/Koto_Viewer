@@ -5314,6 +5314,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Supports that cannot be continued: {count}. Red points mark positions requiring review.'**
   String schemeBlockedContinuations(int count);
+
+  /// No description provided for @spanFeedbackCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Spacing problems: {count}'**
+  String spanFeedbackCount(int count);
+
+  /// No description provided for @spanFeedbackScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Preliminary · assigned slab thickness'**
+  String get spanFeedbackScope;
+
+  /// No description provided for @spanFeedbackUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Links without valid slab thickness: {count}'**
+  String spanFeedbackUnknown(int count);
 }
 
 class _AppLocalizationsDelegate

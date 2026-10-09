@@ -409,11 +409,34 @@ class VerticalCapacityCalculator {
   ) {
     final List<({double spanM, (Offset, Offset) segment})> candidateSpans = [];
 
-    // 1. Clear Spans along Beams (if beams exist)
+    // Beam spans are split at vertical supports, including a live preview.
     for (final beam in storey.beams) {
-      final lenM = (beam.end - beam.start).distance / scale;
-      if (lenM >= 0.5) {
-        candidateSpans.add((spanM: lenM, segment: (beam.start, beam.end)));
+      final v=beam.end-beam.start, length=v.distance;
+      if(length<.5*scale) continue;
+      final u=v/length;
+      final cuts=<double>[0,length];
+      void add(Offset p) {
+        final t=(p-beam.start).dx*u.dx+(p-beam.start).dy*u.dy;
+        if(t>.05*scale && t<length-.05*scale &&
+            StructuralPolygonDistance.pointToSegment(p,beam.start,beam.end)<=.45*scale) { cuts.add(t); }
+      }
+      for(final col in storey.columns) { add(col.center); }
+      for(final wall in storey.shearWalls) {
+        final w=wall.end-wall.start;
+        final den=v.dx*w.dy-v.dy*w.dx;
+        if(den.abs()>1e-10*length*w.distance) {
+          final d=wall.start-beam.start;
+          final t=(d.dx*w.dy-d.dy*w.dx)/den;
+          final q=(d.dx*v.dy-d.dy*v.dx)/den;
+          if(t>0 && t<1 && q>=0 && q<=1) add(beam.start+v*t);
+        }
+        add(wall.start); add(wall.end); add(wall.center);
+      }
+      cuts.sort();
+      for(var i=1;i<cuts.length;i++) {
+        final spanM=(cuts[i]-cuts[i-1])/scale;
+        if(spanM>=.5) { candidateSpans.add((spanM:spanM,
+            segment:(beam.start+u*cuts[i-1],beam.start+u*cuts[i]))); }
       }
     }
 
@@ -646,38 +669,74 @@ class VerticalCapacityCalculator {
     return calculateClearSpan(storey, scale).maxSpanM;
   }
 
-  /// Common manual/automatic preliminary screening; this retains the legacy
-  /// span/depth assumptions and is not a full EC2 verification.
-  static SlabDeflectionCheck evaluateSlabSpan(StoreyLevel storey,double scale) {
-    final span=calculateClearSpan(storey,scale);
-    final h=storey.slabs.isEmpty ? .20 : storey.slabs.first.thickness;
-    final determined=span.maxSpanM.isFinite && h.isFinite && h>0;
-    final hasBeams=storey.beams.isNotEmpty;
-    final requiredH=determined
-      ? double.parse((span.maxSpanM/(hasBeams ? 28.0 : 22.0)+.03).toStringAsFixed(2)) : 0.0;
-    final maxSpanM=span.maxSpanM, hCurrent=h, hReqM=requiredH;
-    final isSafe=determined && h>=requiredH-.01;
-    String recommendation='Support span is undetermined.';
-    if(determined) {
-      final String rec;
-      if (!isSafe) {
-        final reqCm = (hReqM * 100).round();
-        final curCm = (hCurrent * 100).round();
-        rec = hasBeams
-            ? 'При отвор L = ${maxSpanM.toStringAsFixed(2)} m, дебелина $curCm cm е недостатъчна. Препоръчва се плоча минимум $reqCm cm.'
-            : 'При светъл отвор L = ${maxSpanM.toStringAsFixed(2)} m без греди, плоча $curCm cm ще провисне недопустимо. Препоръчва се минимум $reqCm cm или главни греди 25x50 cm.';
-      } else {
-        rec = 'Дебелината на плочата (${(hCurrent * 100).round()} cm) е напълно достатъчна за светъл отвор L = ${maxSpanM.toStringAsFixed(2)} m.';
-      }
-
-      recommendation=rec;
+  /// All adjacent support intervals, deduplicated across axes and pair searches.
+  /// A crossing of slabs with different thickness uses the smallest assigned
+  /// thickness along the interval. Holes/disconnected plates remain excluded.
+  static List<SupportSpanCheck> evaluateSupportSpans(StoreyLevel floor, double scale) {
+    if (!scale.isFinite || scale <= 0 || floor.slabs.isEmpty) return const [];
+    final checks = <SupportSpanCheck>[];
+    final seen = <String>{};
+    String point(Offset p) => '${(p.dx / scale * 1e6).round()},${(p.dy / scale * 1e6).round()}';
+    for (final span in calculateSupportSpans(floor, scale)) {
+      final a = span.segment.$1, b = span.segment.$2;
+      final ends = [point(a),point(b)]..sort();
+      if (!seen.add(ends.join(':'))) continue;
+      final slabs = floor.slabs.where((slab) {
+        // Positive length within this plate, excluding isolated endpoint contact.
+        final cuts = <double>[0,1];
+        final u = b-a;
+        double cross(Offset x, Offset y) => x.dx*y.dy-x.dy*y.dx;
+        for (var i=0; i<slab.polygon.length; i++) {
+          final c=slab.polygon[i], v=slab.polygon[(i+1)%slab.polygon.length]-c;
+          final den=cross(u,v);
+          if (den.abs() <= 1e-10*u.distance*v.distance) continue;
+          final t=cross(c-a,v)/den, q=cross(c-a,u)/den;
+          if (t>0 && t<1 && q>=0 && q<=1) cuts.add(t);
+        }
+        cuts.sort();
+        for(var i=1; i<cuts.length; i++) {
+          if (cuts[i]-cuts[i-1] < 1e-9) continue;
+          final p=a+u*((cuts[i]+cuts[i-1])/2);
+          if (StructuralPolygonDistance.inside(p,slab.polygon) ||
+              List.generate(slab.polygon.length, (j) =>
+                StructuralPolygonDistance.pointToSegment(p,slab.polygon[j],
+                  slab.polygon[(j+1)%slab.polygon.length]) <= 1e-7*scale).any((v)=>v)) { return true; }
+        }
+        return false;
+      }).toList();
+      if (slabs.isEmpty) continue;
+      final h=slabs.every((s)=>s.thickness.isFinite && s.thickness>.03)
+          ? slabs.map((s)=>s.thickness).reduce(math.min) : double.nan;
+      // A beam elsewhere on this floor must not improve every slab interval.
+      final hasBeam=floor.beams.any((beam) =>
+        StructuralPolygonDistance.pointToSegment(a,beam.start,beam.end)<=.05*scale &&
+        StructuralPolygonDistance.pointToSegment(b,beam.start,beam.end)<=.05*scale);
+      checks.add(SupportSpanCheck(segment:span.segment,spanM:span.spanM,
+        thicknessM:h,allowableSpanM:h.isFinite ? (h-.03)*(hasBeam ? 28 : 22) : double.nan,
+        slabIds:List.unmodifiable(slabs.map((s)=>s.id)),hasBeams:hasBeam));
     }
+    checks.sort((a,b)=>b.utilization.compareTo(a.utilization));
+    return List.unmodifiable(checks);
+  }
+
+  /// The report and live placement assistant share the same local thickness
+  /// assessment; no hidden centimetre tolerance or rounding changes safety.
+  static SlabDeflectionCheck evaluateSlabSpan(StoreyLevel storey,double scale) {
+    final checks=evaluateSupportSpans(storey,scale);
+    final critical=checks.firstOrNull;
+    final determined=critical?.isDetermined ?? false;
+    final h=critical?.thicknessM ?? (storey.slabs.firstOrNull?.thickness ?? double.nan);
+    final requiredH=determined ? critical!.requiredThicknessM : 0.0;
+    final safe=determined && !critical!.isProblematic;
     return SlabDeflectionCheck(storeyId:storey.id,storeyName:storey.name,
-      currentThicknessM:h,maxSpanM:determined ? span.maxSpanM : double.nan,
-      recommendedMinThicknessM:requiredH,isDeflectionSafe:determined && h>=requiredH-.01,
+      currentThicknessM:h,maxSpanM:determined ? critical!.spanM : double.nan,
+      recommendedMinThicknessM:requiredH,isDeflectionSafe:safe,
       deflectionRatio:determined ? requiredH/h : 0,
-      recommendation:recommendation,
-      criticalSpanSegment:span.criticalSpanSegment,hasBeams:hasBeams);
+      recommendation:!determined ? 'Support span is undetermined.' :
+        safe ? 'Предварителната проверка по дебелината на плочата не установява превишено подпорно разстояние.' :
+        'Подпорното разстояние превишава предварителния ориентир за зададената дебелина на плочата.',
+      criticalSpanSegment:determined ? critical!.segment : null,
+      hasBeams:critical?.hasBeams ?? false,supportSpans:checks);
   }
 
   /// Runs comprehensive Eurocode 2 vertical capacity analysis for the given project.
@@ -767,7 +826,7 @@ class VerticalCapacityCalculator {
     // Shared preliminary span assessment, also used by automatic placement.
     for (final storey in project.storeys) {
       allSlabChecks.add(evaluateSlabSpan(storey.copyWith(
-        gridAxes:storey.gridAxes.isEmpty ? project.gridAxes : storey.gridAxes),scale));
+        gridAxes:storey.gridAxes.isEmpty ? project.effectiveGridAxes : storey.gridAxes),scale));
     }
 
     // 3. Complete building vertical load accumulating at foundation level

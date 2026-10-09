@@ -214,7 +214,7 @@ void main() {
       // Basic ratio for flat slab is 22 -> d_req = 6.6 / 22 = 0.30 m -> h_req >= 0.33 m
       expect(slabCheck.recommendedMinThicknessM, greaterThan(0.25));
       expect(slabCheck.isDeflectionSafe, false);
-      expect(slabCheck.recommendation, contains('провисне недопустимо'));
+      expect(slabCheck.recommendation, contains('предварителния ориентир'));
     });
 
     test('Punching shear check according to EC2 §6.4 detects shear risk', () {
@@ -276,7 +276,7 @@ void main() {
       expect(interiorCheck.punchingShearResistanceVrdMpa, greaterThan(0.0));
     });
 
-    test('4m axis raster with 25x25 columns calculates 4.0m span (not 12m) and confirms 20cm slab is safe', () {
+    test('4m axis raster with 25x25 columns calculates 4.0m span (not 12m) screens the assigned 20cm thickness without hidden tolerance', () {
       // 4 axes spaced 4m apart along X (0, 4, 8, 12) and 4 axes along Y (0, 4, 8, 12)
       // Total 16 columns 25x25 on every intersection
       final List<StructuralColumn> cols = [];
@@ -337,12 +337,10 @@ void main() {
 
       // Recommended minimum thickness for 4m flat slab:
       // d_req = 4.0 / 22 = 0.1818 m -> h_req = 0.1818 + 0.03 = 0.21 m (21 cm)
-      // Since 20 cm is within 1 cm of 21 cm, 20 cm is safe!
-      expect(slabCheck.isDeflectionSafe, true);
-      expect(slabCheck.recommendation, contains('напълно достатъчна'));
-
-      // Slabs has no issues, so slabIssuesCount is 0
-      expect(report.slabIssuesCount, 0);
+      // Evaluate the actual 20 cm, without adding a hidden 1 cm tolerance.
+      expect(slabCheck.isDeflectionSafe, false);
+      expect(slabCheck.supportSpans.where((s) => s.isProblematic), hasLength(24));
+      expect(report.slabIssuesCount, 1);
     });
 
     test('Large 6.5m clear span with 20cm slab flags warning and populates criticalSpanSegment', () {
@@ -693,9 +691,10 @@ void main() {
       expect(slabCheck.maxSpanM, lessThan(5.0));
       expect(slabCheck.maxSpanM, closeTo(4.0, 0.5));
 
-      // With a 4.0m span, the 20cm slab must be completely safe!
-      expect(slabCheck.isDeflectionSafe, true);
-      expect(report.slabIssuesCount, 0);
+      // The layout must not invent a 12 m bay. The actual 20 cm thickness
+      // is nevertheless below the simplified limit for the approximately 4 m bay.
+      expect(slabCheck.isDeflectionSafe, false);
+      expect(report.slabIssuesCount, 1);
     });
 
     test('Test 13: Spans along grid axis do not cross intersecting perpendicular shear walls (no false 9.92m span)', () {

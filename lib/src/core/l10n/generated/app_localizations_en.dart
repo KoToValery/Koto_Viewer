@@ -3090,4 +3090,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String schemeBlockedContinuations(int count) {
     return 'Supports that cannot be continued: $count. Red points mark positions requiring review.';
   }
+
+  @override
+  String spanFeedbackCount(int count) {
+    return 'Spacing problems: $count';
+  }
+
+  @override
+  String get spanFeedbackScope => 'Preliminary · assigned slab thickness';
+
+  @override
+  String spanFeedbackUnknown(int count) {
+    return 'Links without valid slab thickness: $count';
+  }
 }

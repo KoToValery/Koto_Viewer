@@ -7,6 +7,7 @@ import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 import 'structural_pointer_painter.dart';
+import 'support_span_overlay_layout.dart';
 
 /// 2D CustomPainter that renders structural elements, ghost storeys (ArchiCAD Trace Reference),
 /// interactive drawing previews, and cantilever warning zones projected onto CAD scene coordinates.
@@ -18,6 +19,9 @@ class Structural2dPainter extends CustomPainter {
   final SeismicAnalysisReport? seismicReport;
   final bool showCantileverHeatmap;
   final bool showSlabSpanOverlay;
+  final List<SupportSpanCheck>? supportSpanChecks;
+  final Offset? spanFocusCad;
+  final Rect? spanVisibleCadRect;
   final StructuralDrawTool activeTool;
   final StructuralColumn? previewColumn;
   final Offset? previewColumnPos;
@@ -92,6 +96,9 @@ class Structural2dPainter extends CustomPainter {
     this.seismicReport,
     this.showCantileverHeatmap = true,
     this.showSlabSpanOverlay = true,
+    this.supportSpanChecks,
+    this.spanFocusCad,
+    this.spanVisibleCadRect,
     this.activeTool = StructuralDrawTool.select,
     this.previewColumn,
     this.previewColumnPos,
@@ -230,9 +237,9 @@ class Structural2dPainter extends CustomPainter {
       _drawSeismicCenters(canvas);
     }
 
-    // 7b. Draw Eurocode 2 Critical Slab Span Dimension Line
-    if (showSlabSpanOverlay && verticalReport != null) {
-      _drawCriticalSlabSpan(canvas);
+    // All support spacing problems; badge density is bounded at this zoom.
+    if (showSlabSpanOverlay) {
+      _drawSupportSpanFeedback(canvas, size);
     }
 
     // 8. Draw Distance Measurement Dimension Line & Badge
@@ -318,28 +325,61 @@ class Structural2dPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _drawCriticalSlabSpan(Canvas canvas) {
-    if (verticalReport == null) return;
-    final check = verticalReport!.slabChecks
-        .where((s) => s.storeyId == currentStorey.id)
-        .firstOrNull;
-    if (check == null || check.criticalSpanSegment == null) return;
-
-    final seg = check.criticalSpanSegment!;
-    final isSafe = check.isDeflectionSafe;
-    final color = isSafe ? const Color(0xFF00E676) : const Color(0xFFFF5252);
-    final spanM = check.maxSpanM;
-    final label = isSafe
-        ? 'L = ${spanM.toStringAsFixed(2)} m'
-        : 'L = ${spanM.toStringAsFixed(2)} m ⚠️ (d ≥ ${(check.recommendedMinThicknessM * 100).ceil()} cm)';
-
-    _drawMeasurementLine(
-      canvas,
-      seg.$1,
-      seg.$2,
-      label,
-      color: color,
-    );
+  void _drawSupportSpanFeedback(Canvas canvas, Size size) {
+    final checks = supportSpanChecks ?? verticalReport?.slabChecks
+        .where((s) => s.storeyId == currentStorey.id).firstOrNull?.supportSpans ?? const <SupportSpanCheck>[];
+    if (checks.isEmpty) return;
+    final zoom = zoomScale.clamp(.001,10000.0);
+    Offset pixel(Offset p) => cadToScene(p)*zoom;
+    final viewport = spanVisibleCadRect == null
+        ? Rect.fromLTWH(0,0,size.width*zoom,size.height*zoom)
+        : Rect.fromPoints(pixel(spanVisibleCadRect!.topLeft),pixel(spanVisibleCadRect!.bottomRight));
+    final problems=checks.where((c)=>c.isProblematic).length;
+    final unknown=checks.where((c)=>!c.isDetermined).length;
+    final summary=l10n?.spanFeedbackCount(problems) ?? 'Spacing problems: $problems';
+    final scope=l10n?.spanFeedbackScope ?? 'Preliminary · assigned slab thickness';
+    String label(SupportSpanCheck c) =>
+        'L ${c.spanM.toStringAsFixed(2)} > ${c.allowableSpanM.toStringAsFixed(2)} m · h ${(c.thicknessM*100).round()} cm';
+    Color color(SupportSpanCheck c) => !c.isProblematic ? const Color(0xFF69F0AE) :
+        c.utilization>=1.3 ? const Color(0xFFFF5252) : const Color(0xFFFFB74D);
+    TextPainter text(String value,Color color,{double fontSize=11}) => TextPainter(
+        text:TextSpan(text:value,style:TextStyle(color:color,fontSize:fontSize,
+            fontWeight:FontWeight.w600)),textDirection:TextDirection.ltr)..layout();
+    final summaryText=text('$summary\n$scope${unknown>0 ? '\n${l10n?.spanFeedbackUnknown(unknown) ?? 'Unknown: $unknown'}' : ''}',
+        const Color(0xFFFFE0B2),fontSize:10);
+    final summaryRect=Rect.fromLTWH(viewport.left+10,viewport.top+10,
+        math.min(summaryText.width+16,viewport.width-20),summaryText.height+12);
+    final focusRect=spanFocusCad==null ? null :
+        Rect.fromCircle(center:pixel(spanFocusCad!),radius:30);
+    final layout=SupportSpanOverlayLayout.build(checks:checks,toPixel:pixel,
+        viewport:viewport.deflate(3),focusCad:spanFocusCad,scale:cadUnitsPerMeter,
+        reserved:[summaryRect,?focusRect],labelSize:(c) {
+          final tp=text(label(c),color(c)); return Size(tp.width+12,tp.height+8);
+        });
+    canvas.save();
+    canvas.scale(1/zoom);
+    canvas.clipRect(viewport);
+    for(final line in layout.lines) {
+      final c=color(line.check);
+      // Subtle broad stripe plus a crisp stroke keeps every zone visible while
+      // letting the drawing show through. Only local connections are emphasized.
+      canvas.drawLine(line.start,line.end,Paint()
+        ..color=c.withValues(alpha:line.focused ? .16 : .07)..strokeWidth=line.focused ? 9 : 6);
+      canvas.drawLine(line.start,line.end,Paint()
+        ..color=c.withValues(alpha:line.focused ? .95 : .6)..strokeWidth=line.focused ? 2.6 : 1.5);
+    }
+    void badge(Rect rect,TextPainter tp,Color c) {
+      final shape=RRect.fromRectAndRadius(rect,const Radius.circular(5));
+      canvas.drawRRect(shape,Paint()..color=const Color(0xED1E1E24));
+      canvas.drawRRect(shape,Paint()..color=c.withValues(alpha:.7)
+        ..style=PaintingStyle.stroke..strokeWidth=1);
+      tp.paint(canvas,Offset(rect.left+6,rect.top+4));
+    }
+    for(final item in layout.labels) {
+      badge(item.rect,text(label(item.line.check),color(item.line.check)),color(item.line.check));
+    }
+    badge(summaryRect,summaryText,const Color(0xFFFFB74D));
+    canvas.restore();
   }
 
   void _drawGhostStorey(Canvas canvas, StoreyLevel ghost) {

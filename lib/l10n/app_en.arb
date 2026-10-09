@@ -2417,5 +2417,22 @@
         "type": "int"
       }
     }
+  },
+  "spanFeedbackCount": "Spacing problems: {count}",
+  "@spanFeedbackCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "spanFeedbackScope": "Preliminary · assigned slab thickness",
+  "spanFeedbackUnknown": "Links without valid slab thickness: {count}",
+  "@spanFeedbackUnknown": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

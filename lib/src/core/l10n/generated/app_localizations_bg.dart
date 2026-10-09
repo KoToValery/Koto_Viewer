@@ -3102,4 +3102,17 @@ class AppLocalizationsBg extends AppLocalizations {
   String schemeBlockedContinuations(int count) {
     return 'Опори, които не могат да се продължат: $count. Червените точки показват местата за преглед.';
   }
+
+  @override
+  String spanFeedbackCount(int count) {
+    return 'Проблемни връзки: $count';
+  }
+
+  @override
+  String get spanFeedbackScope => 'Предварително · по зададената дебелина';
+
+  @override
+  String spanFeedbackUnknown(int count) {
+    return 'Връзки без валидна дебелина: $count';
+  }
 }

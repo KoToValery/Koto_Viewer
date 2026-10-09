@@ -167,7 +167,24 @@ class ColumnVerticalCheck {
   }
 }
 
-/// Span-to-depth deflection feasibility check for floor slabs according to EC2 §7.4.
+/// Geometric support interval screened against the assigned local slab depth.
+/// The simplified span/depth limit is preliminary, not a calculated deflection.
+class SupportSpanCheck {
+  final (Offset, Offset) segment;
+  final double spanM, thicknessM, allowableSpanM;
+  final List<String> slabIds;
+  final bool hasBeams;
+  const SupportSpanCheck({required this.segment, required this.spanM,
+    required this.thicknessM, required this.allowableSpanM,
+    this.slabIds = const [], this.hasBeams = false});
+  bool get isDetermined => thicknessM.isFinite && thicknessM > .03 &&
+      allowableSpanM.isFinite && allowableSpanM > 0;
+  bool get isProblematic => isDetermined && spanM > allowableSpanM + 1e-8;
+  double get utilization => isDetermined ? spanM / allowableSpanM : double.infinity;
+  double get requiredThicknessM => spanM / (hasBeams ? 28 : 22) + .03;
+}
+
+/// Preliminary span/depth screening under the application's simplified assumptions.
 class SlabDeflectionCheck {
   final String storeyId;
   final String storeyName;
@@ -179,6 +196,7 @@ class SlabDeflectionCheck {
   final String recommendation;
   final (Offset, Offset)? criticalSpanSegment;
   final bool hasBeams;
+  final List<SupportSpanCheck> supportSpans;
 
   const SlabDeflectionCheck({
     required this.storeyId,
@@ -191,6 +209,7 @@ class SlabDeflectionCheck {
     required this.recommendation,
     this.criticalSpanSegment,
     this.hasBeams = false,
+    this.supportSpans = const [],
   });
 
   bool get isSpanDetermined => maxSpanM.isFinite;

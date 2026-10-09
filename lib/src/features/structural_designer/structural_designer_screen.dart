@@ -16,6 +16,7 @@ import 'analysis/cantilever_detector.dart';
 import 'analysis/seismic_analysis_calculator.dart';
 import 'analysis/structural_underlay_filter.dart';
 import 'analysis/vertical_capacity_calculator.dart';
+import 'analysis/support_span_feedback_cache.dart';
 import 'analysis/slab_parallel_alignment_helper.dart';
 import 'analysis/slab_seed_generator.dart';
 import 'analysis/slab_envelope_detector.dart';
@@ -250,6 +251,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   // Analysis result
   StructuralAnalysisSummary _analysisSummary = StructuralAnalysisSummary.empty;
   VerticalCapacityReport _verticalCapacityReport = VerticalCapacityReport.empty;
+  final _spanFeedbackCache = SupportSpanFeedbackCache();
   SeismicAnalysisReport _seismicAnalysisReport = SeismicAnalysisReport.empty;
 
   @override
@@ -463,6 +465,43 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       cadUnitsPerMeter: _cadUnitsPerMeter,
     );
   }
+
+  List<SupportSpanCheck> get _liveSupportSpanChecks {
+    final center=_currentCadCoord;
+    StructuralColumn? col;
+    StructuralShearWall? wall;
+    if(center!=null) {
+      if(_isMovingColumn && _selectedColumn!=null) {
+        col=_selectedColumn!.copyWith(center:center);
+      } else if(_isPlacingWithHold && _activeTool==StructuralDrawTool.column) {
+        col=_currentColumnPreset.copyWith(id:'__spacing_preview_column__',center:center,
+          width:_currentColumnPreset.width*_cadUnitsPerMeter,
+          height:_currentColumnPreset.height*_cadUnitsPerMeter,
+          thickness:_currentColumnPreset.thickness*_cadUnitsPerMeter);
+      }
+      if(_isMovingShearWall && _selectedShearWall!=null) {
+        final delta=center-_selectedShearWall!.center;
+        wall=_selectedShearWall!.copyWith(start:_selectedShearWall!.start+delta,
+            end:_selectedShearWall!.end+delta);
+      } else if(_isPlacingWithHold && _activeTool==StructuralDrawTool.shearWall) {
+        final u=Offset(math.cos(_currentWallRotationRad),math.sin(_currentWallRotationRad));
+        wall=StructuralShearWall(id:'__spacing_preview_wall__',
+            start:center-u*_currentWallLength*_cadUnitsPerMeter/2,
+            end:center+u*_currentWallLength*_cadUnitsPerMeter/2,
+            thickness:_currentWallThickness*_cadUnitsPerMeter);
+      }
+    }
+    if(col==null && wall==null) {
+      return _verticalCapacityReport.slabChecks
+          .where((s)=>s.storeyId==_project.activeStorey.id).firstOrNull?.supportSpans ?? const [];
+    }
+    return _spanFeedbackCache.evaluate(_project,_cadUnitsPerMeter,
+        previewColumn:col,previewWall:wall);
+  }
+
+  Offset? get _spanFocusCad =>
+      (_isPlacingWithHold || _isMovingColumn || _isMovingShearWall)
+          ? _currentCadCoord : _selectedColumn?.center ?? _selectedShearWall?.center;
 
   // --- Coordinate Transformations ---
 
@@ -8512,6 +8551,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   seismicReport: _seismicAnalysisReport,
                                   showCantileverHeatmap: true,
                                   showSlabSpanOverlay: true,
+                                  supportSpanChecks: _liveSupportSpanChecks,
+                                  spanFocusCad: _spanFocusCad,
+                                  spanVisibleCadRect: Rect.fromPoints(
+                                    _sceneToCad(_transformController.toScene(Offset.zero)),
+                                    _sceneToCad(_transformController.toScene(
+                                        Offset(_viewportSize.width,_viewportSize.height)))),
                                   activeTool: _activeTool,
                                   previewColumn: _currentColumnPreset.copyWith(
                                     width: _currentColumnPreset.width * _cadUnitsPerMeter,
