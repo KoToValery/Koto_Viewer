@@ -63,7 +63,8 @@ class BimExportService {
     // 1. Generate structural DXF in local coordinates of the storey
     final structDxfFile =
         await StructuralPersistenceService.exportStoreyToDxfFile(
-          storey: structStorey.copyWith(gridAxes: structural.effectiveGridAxes),
+          storey: structural.resolveCeilingStorey(structStorey)
+              .copyWith(gridAxes: structural.effectiveGridAxes),
           baseName: outBaseName,
           cpRef: cpRef,
           cpLocal: cpLocal,

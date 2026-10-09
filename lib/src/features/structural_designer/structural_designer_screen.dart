@@ -21,6 +21,7 @@ import 'analysis/slab_seed_generator.dart';
 import 'analysis/slab_envelope_detector.dart';
 import 'analysis/slab_projection_detector.dart';
 import 'analysis/structural_magnetic_alignment_helper.dart';
+import 'analysis/structural_pointer_interaction.dart';
 import 'analysis/wall_axis_detector.dart';
 import 'models/cantilever_analysis_models.dart';
 import 'models/seismic_analysis_models.dart';
@@ -180,7 +181,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   bool _isMovingShearWall = false;
   bool _hasMovedSelectedShearWall = false;
   StructuralAxisLockMode _axisLockMode = StructuralAxisLockMode.autoMode;
-  Offset? _lastSnappedCad;
+  Offset? _elementGrabOffsetCad;
   Offset? _elementMoveOriginalCenter;
   List<(Offset, Offset)>? _activeMagneticGuides;
   bool _isMovingOpening = false;
@@ -1214,7 +1215,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _activeMagneticGuides = null;
       _liveDimensionText = null;
       _activeDynamicDimensionLine = null;
-      _lastSnappedCad = null;
     });
     HapticFeedback.mediumImpact();
   }
@@ -1246,7 +1246,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _activeMagneticGuides = null;
       _liveDimensionText = null;
       _activeDynamicDimensionLine = null;
-      _lastSnappedCad = null;
     });
     HapticFeedback.selectionClick();
   }
@@ -3823,6 +3822,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
     _isMultiTouchGesture = false;
+    _elementGrabOffsetCad = null;
 
     // 1. If currently in Slab Correction Mode:
     if (_isEditingSlab) {
@@ -4258,7 +4258,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _isMovingColumn &&
         _selectedColumn != null) {
       _updatePointer(event.localPosition, isMouse: true);
-      final effectiveCad = _activeSnap?.point ?? _currentCadCoord;
+      final effectiveCad = _currentCadCoord;
       if (effectiveCad != null) {
         final dist = (effectiveCad - _selectedColumn!.center).distance;
         if (dist > 0.05 * _cadUnitsPerMeter) {
@@ -4288,7 +4288,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _isMovingOpening &&
         _selectedOpening != null) {
       _updatePointer(event.localPosition, isMouse: true);
-      final effectiveCad = _activeSnap?.point ?? _currentCadCoord;
+      final effectiveCad = _currentCadCoord;
       if (effectiveCad != null && _movingOpeningOriginalCenter != null) {
         final dist = (effectiveCad - _movingOpeningOriginalCenter!).distance;
         if (dist > 0.05 * _cadUnitsPerMeter) {
@@ -4427,15 +4427,28 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   void _updatePointer(Offset screenPos, {bool isMouse = false}) {
     final touchPos = screenPos;
 
-    // Comfortable, fixed finger-clearance offset (~64 pt) so the finger doesn't obscure
-    // the snap crosshairs or target insertion point, while keeping large elements (shear walls, stairs)
-    // natural and tight to the finger without shooting far off the screen.
-    final double offsetAboveFinger = isMouse ? 0.0 : 64.0;
-
-    final targetPos =
-        isMouse ? screenPos : (screenPos - Offset(0, offsetAboveFinger));
-
-    final rawCad = _screenToCad(targetPos);
+    var targetPos = StructuralPointerInteraction.placementTarget(screenPos, isMouse: isMouse);
+    var rawCad = _screenToCad(targetPos);
+    final movingCenter = _isMovingColumn ? _selectedColumn?.center
+        : _isMovingShearWall ? _selectedShearWall?.center
+        : _isMovingOpening ? _movingOpeningOriginalCenter : null;
+    if (movingCenter != null) {
+      final pointerCad = _screenToCad(screenPos);
+      _elementGrabOffsetCad ??= StructuralPointerInteraction.grabOffset(movingCenter, pointerCad);
+      rawCad = StructuralPointerInteraction.dragTarget(pointerCad, _elementGrabOffsetCad!);
+      targetPos = _cadToScreen(rawCad);
+    }
+    StructuralAxisLockMode effectiveLockMode = _axisLockMode;
+    final anchor = _elementMoveOriginalCenter ?? _selectedColumn?.center ?? _selectedShearWall?.center;
+    if (HardwareKeyboard.instance.isShiftPressed && anchor != null) {
+      effectiveLockMode = (rawCad.dx-anchor.dx).abs() > (rawCad.dy-anchor.dy).abs()
+          ? StructuralAxisLockMode.lockY : StructuralAxisLockMode.lockX;
+    }
+    if (anchor != null && (_isMovingColumn || _isMovingShearWall)) {
+      if (effectiveLockMode == StructuralAxisLockMode.lockX) { rawCad = Offset(anchor.dx, rawCad.dy); }
+      if (effectiveLockMode == StructuralAxisLockMode.lockY) { rawCad = Offset(rawCad.dx, anchor.dy); }
+      targetPos = _cadToScreen(rawCad);
+    }
     DxfSnapResult? snap;
     Offset? snappedScreen;
     Offset effectiveCad = rawCad;
@@ -4443,22 +4456,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_snapEnabled) {
       final double fitScale = _getCadFitScale();
       final double currentScale = _transformController.value.getMaxScaleOnAxis();
-      final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
-
-      StructuralAxisLockMode effectiveLockMode = _axisLockMode;
-      if (HardwareKeyboard.instance.isShiftPressed) {
-        final anchor = _elementMoveOriginalCenter ?? _selectedColumn?.center ?? _selectedShearWall?.center;
-        if (anchor != null) {
-          final dx = (rawCad.dx - anchor.dx).abs();
-          final dy = (rawCad.dy - anchor.dy).abs();
-          if (dx > dy) {
-            effectiveLockMode = StructuralAxisLockMode.lockY;
-          } else {
-            effectiveLockMode = StructuralAxisLockMode.lockX;
-          }
-        }
+      final toleranceCad = StructuralPointerInteraction.snapToleranceCad(
+        isMouse: isMouse,
+        pixelsPerCadUnit: fitScale * currentScale.clamp(.001, 10000.0),
+        cadUnitsPerMeter: _cadUnitsPerMeter);
+      bool acceptsCandidate(Offset center) {
+        if (!StructuralPointerInteraction.accepts(rawCad, center, toleranceCad)) { return false; }
+        if (anchor != null && effectiveLockMode == StructuralAxisLockMode.lockX &&
+            (center.dx-anchor.dx).abs()>1e-8*_cadUnitsPerMeter) { return false; }
+        if (anchor != null && effectiveLockMode == StructuralAxisLockMode.lockY &&
+            (center.dy-anchor.dy).abs()>1e-8*_cadUnitsPerMeter) { return false; }
+        return true;
       }
-
       if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
         final colW = (_isMovingColumn && _selectedColumn != null)
             ? _selectedColumn!.width
@@ -4480,6 +4489,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             : _currentColumnPreset.isMirrored;
 
         // 1. Column Corners Snapping (ъгли на колоната към крайни точки, ъгли и оси)
+        final featureTolerance = toleranceCad * .65;
         final dummyCol = StructuralColumn(
           id: 'dummy_col',
           center: Offset.zero,
@@ -4494,20 +4504,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
         DxfSnapResult? bestCornerSnap;
         Offset? bestCandidateCenter;
-        double minCornerDist = toleranceCad;
+        double minCornerDist = featureTolerance;
 
         for (final cornerOffset in cornerOffsets) {
           final p = rawCad + cornerOffset;
-          final s = _findStructuralSnap(p, toleranceCad) ??
+          final s = _findStructuralSnap(p, featureTolerance) ??
               DxfSnapHelper.findSnapPoint(
                 document: _document,
                 cadPoint: p,
-                toleranceCad: toleranceCad,
+                toleranceCad: featureTolerance,
                 allowNearest: false,
               );
           if (s != null) {
             final d = (p - s.point).distance;
-            if (d < minCornerDist) {
+            if (d < minCornerDist && acceptsCandidate(s.point - cornerOffset)) {
               minCornerDist = d;
               bestCornerSnap = s;
               bestCandidateCenter = s.point - cornerOffset;
@@ -4515,36 +4525,37 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           }
         }
 
-        if (bestCandidateCenter != null) {
+        final mag = StructuralMagneticAlignmentHelper.alignColumn(
+          rawCenter: rawCad,
+          columnWidth: colW,
+          columnHeight: colH,
+          columnRotationRad: colRot,
+          toleranceCad: toleranceCad,
+          activeStorey: _project.activeStorey,
+          movingColumnId: _isMovingColumn ? _selectedColumn?.id : null,
+          dxfDocument: _document,
+          cadUnitsPerMeter: _cadUnitsPerMeter,
+          axisLockMode: effectiveLockMode,
+          anchorCenter: _elementMoveOriginalCenter ?? _selectedColumn?.center,
+          maxCorrectionCad: toleranceCad,
+        );
+        if (bestCandidateCenter != null && (mag == null ||
+            (bestCandidateCenter-rawCad).distance < (mag.snappedCenter-rawCad).distance - 1e-8)) {
           effectiveCad = bestCandidateCenter;
           snap = bestCornerSnap;
           snappedScreen = _cadToScreen(bestCornerSnap!.point);
           _snappedScreenPositions = [snappedScreen];
-          _lastSnappedCad = effectiveCad;
           _activeMagneticGuides = null;
           _liveDimensionText = null;
           _activeDynamicDimensionLine = null;
         } else {
-          final mag = StructuralMagneticAlignmentHelper.alignColumn(
-            rawCenter: rawCad,
-            columnWidth: colW,
-            columnHeight: colH,
-            columnRotationRad: colRot,
-            toleranceCad: toleranceCad,
-            activeStorey: _project.activeStorey,
-            movingColumnId: _isMovingColumn ? _selectedColumn?.id : null,
-            dxfDocument: _document,
-            cadUnitsPerMeter: _cadUnitsPerMeter,
-            axisLockMode: effectiveLockMode,
-            anchorCenter: _elementMoveOriginalCenter ?? _selectedColumn?.center,
-            previousSnappedCenter: _lastSnappedCad,
-          );
           if (mag != null) {
             effectiveCad = mag.snappedCenter;
+            snappedScreen = _cadToScreen(mag.markerPoint ?? effectiveCad);
+            _snappedScreenPositions = [snappedScreen];
             _activeMagneticGuides = mag.guideLines;
             _liveDimensionText = mag.liveDimensionText;
             _activeDynamicDimensionLine = mag.dimensionLine;
-            _lastSnappedCad = effectiveCad;
           } else {
             snap = _findStructuralSnap(rawCad, toleranceCad) ??
                 DxfSnapHelper.findSnapPoint(
@@ -4557,11 +4568,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               effectiveCad = snap.point;
               snappedScreen = _cadToScreen(snap.point);
               _snappedScreenPositions = [snappedScreen];
-              _lastSnappedCad = effectiveCad;
             } else {
               effectiveCad = rawCad;
               _snappedScreenPositions = [];
-              _lastSnappedCad = null;
             }
             _activeMagneticGuides = null;
             _liveDimensionText = null;
@@ -4805,6 +4814,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         );
 
         // Feature points: endpoints (start, end) and 4 box corners
+        final featureTolerance = toleranceCad * .65;
         final List<Offset> wallFeatureOffsets = [
           -u * halfLen, // Start endpoint (крайна точка начало)
           u * halfLen,  // End endpoint (крайна точка край)
@@ -4813,20 +4823,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
         DxfSnapResult? bestWallSnap;
         Offset? bestWallCandCenter;
-        double minWallSnapDist = toleranceCad;
+        double minWallSnapDist = featureTolerance;
 
         for (final featOffset in wallFeatureOffsets) {
           final p = rawCad + featOffset;
-          final s = _findStructuralSnap(p, toleranceCad) ??
+          final s = _findStructuralSnap(p, featureTolerance) ??
               DxfSnapHelper.findSnapPoint(
                 document: _document,
                 cadPoint: p,
-                toleranceCad: toleranceCad,
+                toleranceCad: featureTolerance,
                 allowNearest: false,
               );
           if (s != null) {
             final dist = (p - s.point).distance;
-            if (dist < minWallSnapDist) {
+            if (dist < minWallSnapDist && acceptsCandidate(s.point - featOffset)) {
               minWallSnapDist = dist;
               bestWallSnap = s;
               bestWallCandCenter = s.point - featOffset;
@@ -4834,36 +4844,38 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           }
         }
 
-        if (bestWallCandCenter != null) {
+        final mag = StructuralMagneticAlignmentHelper.alignShearWall(
+          rawCenter: rawCad,
+          wallLength: wallL,
+          wallThickness: wallT,
+          wallRotationRad: wallRot,
+          allowRotationSnap: false,
+          toleranceCad: toleranceCad,
+          activeStorey: _project.activeStorey,
+          movingWallId: _isMovingShearWall ? _selectedShearWall?.id : null,
+          dxfDocument: _document,
+          cadUnitsPerMeter: _cadUnitsPerMeter,
+          axisLockMode: effectiveLockMode,
+          anchorCenter: _elementMoveOriginalCenter ?? _selectedShearWall?.center,
+          maxCorrectionCad: toleranceCad,
+        );
+        if (bestWallCandCenter != null && (mag == null ||
+            (bestWallCandCenter-rawCad).distance < (mag.snappedCenter-rawCad).distance - 1e-8)) {
           effectiveCad = bestWallCandCenter;
           snap = bestWallSnap;
           snappedScreen = _cadToScreen(bestWallSnap!.point);
           _snappedScreenPositions = [snappedScreen];
-          _lastSnappedCad = effectiveCad;
           _activeMagneticGuides = null;
           _liveDimensionText = null;
           _activeDynamicDimensionLine = null;
         } else {
-          final mag = StructuralMagneticAlignmentHelper.alignShearWall(
-            rawCenter: rawCad,
-            wallLength: wallL,
-            wallThickness: wallT,
-            wallRotationRad: wallRot,
-            toleranceCad: toleranceCad,
-            activeStorey: _project.activeStorey,
-            movingWallId: _isMovingShearWall ? _selectedShearWall?.id : null,
-            dxfDocument: _document,
-            cadUnitsPerMeter: _cadUnitsPerMeter,
-            axisLockMode: effectiveLockMode,
-            anchorCenter: _elementMoveOriginalCenter ?? _selectedShearWall?.center,
-            previousSnappedCenter: _lastSnappedCad,
-          );
           if (mag != null) {
             effectiveCad = mag.snappedCenter;
+            snappedScreen = _cadToScreen(mag.markerPoint ?? effectiveCad);
+            _snappedScreenPositions = [snappedScreen];
             _activeMagneticGuides = mag.guideLines;
             _liveDimensionText = mag.liveDimensionText;
             _activeDynamicDimensionLine = mag.dimensionLine;
-            _lastSnappedCad = effectiveCad;
           } else {
             snap = _findStructuralSnap(rawCad, toleranceCad) ??
                 DxfSnapHelper.findSnapPoint(
@@ -4876,11 +4888,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               effectiveCad = snap.point;
               snappedScreen = _cadToScreen(snap.point);
               _snappedScreenPositions = [snappedScreen];
-              _lastSnappedCad = effectiveCad;
             } else {
               effectiveCad = rawCad;
               _snappedScreenPositions = [];
-              _lastSnappedCad = null;
             }
             _activeMagneticGuides = null;
             _liveDimensionText = null;
@@ -5000,12 +5010,26 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _liveDimensionText = null;
       }
 
+      // All point and face snaps obey the same displacement and axis-lock budget.
+      if ((_isMovingColumn || _isMovingShearWall ||
+          _activeTool == StructuralDrawTool.column || _activeTool == StructuralDrawTool.shearWall) &&
+          !acceptsCandidate(effectiveCad)) {
+        effectiveCad = rawCad;
+        snap = null;
+        snappedScreen = null;
+        _snappedScreenPositions = [];
+        _activeMagneticGuides = null;
+        _liveDimensionText = null;
+        _activeDynamicDimensionLine = null;
+      }
       if (snap != null) {
         if (_activeSnap == null || _activeSnap!.point != snap.point) {
           HapticFeedback.selectionClick();
         }
       }
     } else {
+      _activeMagneticGuides = null;
+      _activeDynamicDimensionLine = null;
       _snappedScreenPositions = [];
       if (_activeTool == StructuralDrawTool.column || _isMovingColumn) {
         effectiveCad = rawCad;
@@ -5058,17 +5082,51 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     });
   }
 
+  List<Offset>? _pointerElementPolygon() {
+    final center = _currentCadCoord;
+    if (center == null) return null;
+    if (_isMovingColumn || _activeTool == StructuralDrawTool.column) {
+      final col = _isMovingColumn
+          ? _selectedColumn
+          : _currentColumnPreset.copyWith(
+              width: _currentColumnPreset.width * _cadUnitsPerMeter,
+              height: _currentColumnPreset.height * _cadUnitsPerMeter,
+              thickness: _currentColumnPreset.thickness * _cadUnitsPerMeter,
+            );
+      return col
+          ?.copyWith(center: center)
+          .polygonVertices
+          .map(_cadToScreen)
+          .toList();
+    }
+    if (_isMovingShearWall || _activeTool == StructuralDrawTool.shearWall) {
+      final old = _isMovingShearWall ? _selectedShearWall : null;
+      final length = old?.length ?? _currentWallLength * _cadUnitsPerMeter;
+      final rot = old?.rotationRad ?? _currentWallRotationRad;
+      final u = Offset(math.cos(rot), math.sin(rot));
+      final wall =
+          old?.copyWith(
+            start: center - u * length / 2,
+            end: center + u * length / 2,
+          ) ??
+          StructuralShearWall(
+            id: 'pointer',
+            start: center - u * length / 2,
+            end: center + u * length / 2,
+            thickness: _currentWallThickness * _cadUnitsPerMeter,
+          );
+      return wall.polygonVertices.map(_cadToScreen).toList();
+    }
+    return null;
+  }
+
   DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad, {bool cornersOnly = false}) {
     double minDist = toleranceCad;
     DxfSnapResult? bestSnap;
 
-    final overhead = (_project.activeStoreyIndex < _project.storeys.length - 1)
-        ? _project.storeys[_project.activeStoreyIndex + 1]
-        : null;
     final allStoreysToSnap = [
       _project.activeStorey,
-      ?overhead,
-      if (_project.ghostStorey != null && _project.ghostStorey != overhead) _project.ghostStorey!,
+      if (_project.ghostStorey != null) _project.ghostStorey!,
     ];
 
     for (final s in allStoreysToSnap) {
@@ -5538,7 +5596,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _liveDimensionText = null;
           _activeDynamicDimensionLine = null;
           _elementMoveOriginalCenter = null;
-          _lastSnappedCad = null;
         }
       });
       return;
@@ -5579,7 +5636,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _liveDimensionText = null;
           _activeDynamicDimensionLine = null;
           _elementMoveOriginalCenter = null;
-          _lastSnappedCad = null;
         }
       });
       return;
@@ -8443,9 +8499,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                 painter: Structural2dPainter(
                                   currentStorey: _project.activeStorey,
                                   ghostStorey: _project.ghostStorey,
-                                  overheadStorey: (_project.activeStoreyIndex < _project.storeys.length - 1)
-                                      ? _project.storeys[_project.activeStoreyIndex + 1]
-                                      : null,
                                   hasBasement: _project.hasBasement,
                                   foundationType: _project.foundationType,
                                   stripFoundations: (_showGroundFoundations && _project.activeStorey.elevation.abs() < 1e-4 && !_project.hasBasement)
@@ -8488,7 +8541,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   previewOpeningOffsetPolygon: _isExtrudingEdge ? _previewOpeningOffsetPolygon : null,
                                   movingOpeningPolygon: _isMovingOpening && _movingOpeningRelativeOffsets != null
                                       ? _movingOpeningRelativeOffsets!
-                                          .map((r) => (_activeSnap?.point ?? _currentCadCoord ?? _movingOpeningOriginalCenter ?? Offset.zero) + r)
+                                          .map((r) => (_currentCadCoord ?? _movingOpeningOriginalCenter ?? Offset.zero) + r)
                                           .toList()
                                       : null,
                                   currentCursorCad: _currentCadCoord,
@@ -8578,6 +8631,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       painter: StructuralPointerPainter(
                         touchPos: _touchScreenPos!,
                         targetPos: _targetScreenPos!,
+                        placementPos: _currentCadCoord != null ? _cadToScreen(_currentCadCoord!) : null,
+                        previewElementPolygon: _pointerElementPolygon(),
+                        showDetailLoupe: _activePointerKind != PointerDeviceKind.mouse && (_isMovingColumn || _isMovingShearWall),
                         snappedPos: _snappedScreenPos,
                         snappedPositions: _snappedScreenPositions,
                         snapType: _activeSnap?.type,

@@ -1888,6 +1888,7 @@ class StoreyLevel {
   final List<StructuralColumn> columns;
   final List<StructuralShearWall> shearWalls;
   final List<StructuralBeam> beams;
+  /// Ceiling slabs above this storey, including their stair/shaft openings.
   final List<StructuralSlab> slabs;
   final List<StructuralGridAxis> gridAxes;
 
@@ -1920,10 +1921,11 @@ class StoreyLevel {
       gridAxes.isNotEmpty;
 
   /// Computes the structural elevation (Конструктивна кота) for [slab].
-  /// Calculated as explicit top elevation, or storey floor level (base elevation - finish).
+  /// The working storey owns its ceiling, at the next level minus finish.
+  /// Loads, openings and supports on this storey all refer to that ceiling.
   double structuralElevationFor(StructuralSlab slab) {
     return slab.topElevation ??
-        (elevation - (slab.floorFinish ?? floorFinishThickness));
+        (elevation + height - (slab.floorFinish ?? floorFinishThickness));
   }
 
   /// Absolute elevation of the underside of [slab] concrete in metres.
@@ -2114,8 +2116,26 @@ class StructuralProject {
 
   StoreyLevel get activeStorey =>
       (activeStoreyIndex >= 0 && activeStoreyIndex < storeys.length)
-          ? storeys[activeStoreyIndex]
-          : storeys.first;
+          ? resolveCeilingStorey(storeys[activeStoreyIndex])
+          : resolveCeilingStorey(storeys.first);
+
+  /// Use the actual nearest higher level, independently of list order. The top
+  /// storey uses its configured floor-to-floor height for the roof ceiling.
+  StoreyLevel resolveCeilingStorey(StoreyLevel storey) {
+    StoreyLevel? next;
+    for (final candidate in storeys) {
+      if (candidate.elevation > storey.elevation + 1e-6 &&
+          (next == null || candidate.elevation < next.elevation)) {
+        next = candidate;
+      }
+    }
+    return next == null
+        ? storey
+        : storey.copyWith(height: next.elevation - storey.elevation);
+  }
+
+  List<StoreyLevel> get ceilingStoreys =>
+      storeys.map(resolveCeilingStorey).toList();
 
   /// Effective grid axes instances shared across the entire project.
   List<StructuralGridAxis> get effectiveGridAxes {

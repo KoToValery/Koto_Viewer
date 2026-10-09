@@ -8,11 +8,370 @@ import 'package:kotoview/src/features/structural_designer/analysis/vertical_capa
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
 import 'package:kotoview/src/features/structural_designer/models/wall_axis_models.dart';
 import 'initial_scheme_generator_test.dart' as fixtures;
+import 'package:kotoview/src/features/structural_designer/analysis/seismic_analysis_calculator.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/wall_placement_network.dart';
 import 'package:kotoview/src/features/structural_designer/widgets/initial_scheme_dialog.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 
 void main() {
+  test('equal worst spans can be repaired one at a time', () {
+    final (base, _) = fixtures.fixture();
+    final floor = base.activeStorey.copyWith(
+      columns: const [
+        StructuralColumn(id: 'a', center: Offset(1, 14)),
+        StructuralColumn(id: 'b', center: Offset(9, 14)),
+        StructuralColumn(id: 'c', center: Offset(17, 14)),
+      ],
+      gridAxes: const [
+        StructuralGridAxis(
+          id: 'row',
+          name: 'D',
+          start: Offset(0, 14),
+          end: Offset(20, 14),
+        ),
+      ],
+    );
+    final original = VerticalCapacityCalculator.calculateSupportSpans(floor, 1);
+    expect(original.take(2).map((s) => s.spanM), [8.0, 8.0]);
+    final result = InitialSchemeGenerator.generate(
+      project: base.copyWith(storeys: [floor]),
+      scale: 1,
+      wallPairs: [
+        fixtures.pair(const Offset(4.75, 14), const Offset(5.25, 14), 1),
+        fixtures.pair(const Offset(12.75, 14), const Offset(13.25, 14), 1),
+      ],
+      options: const InitialSchemeOptions(
+        adaptiveSizes: false,
+        targetSpacingM: 100,
+        wallLengthM: 100,
+      ),
+    );
+    expect(result.columns, hasLength(2));
+    expect(result.maxSupportSpanM, lessThan(5));
+  });
+  test(
+    'new walls obey an explicit maximum without hiding a remaining deficit',
+    () {
+      for (final scale in [1.0, 100.0, 1000.0]) {
+        final (project, runs) = fixtures.fixture(scale: scale);
+        for (final cap in [1.5, 2.5, 4.0]) {
+          final result = InitialSchemeGenerator.generate(
+            project: project,
+            wallPairs: runs,
+            scale: scale,
+            options: InitialSchemeOptions(maxWallLengthM: cap),
+          );
+          expect(result.walls, isNotEmpty);
+          expect(
+            result.walls.every((w) => w.length / scale <= cap + 1e-8),
+            isTrue,
+          );
+          if (cap == 1.5) {
+            expect(
+              result.wallDeficitXM2 + result.wallDeficitYM2,
+              greaterThan(0),
+            );
+          }
+        }
+      }
+      expect(const InitialSchemeOptions(maxWallLengthM: 1).valid, isFalse);
+      expect(
+        const InitialSchemeOptions(maxWallLengthM: double.nan).valid,
+        isFalse,
+      );
+    },
+  );
+  test(
+    'the wall length bound preserves accepted walls and lower continuations',
+    () {
+      final (base, runs) = fixtures.fixture();
+      const old = StructuralShearWall(
+        id: 'accepted',
+        start: Offset(11, 14),
+        end: Offset(14.8, 14),
+      );
+      final floor = base.activeStorey.copyWith(shearWalls: [old]);
+      final result = InitialSchemeGenerator.generate(
+        project: base.copyWith(storeys: [floor]),
+        wallPairs: runs,
+        scale: 1,
+        options: const InitialSchemeOptions(maxWallLengthM: 1.5),
+      );
+      expect(result.apply(floor).shearWalls.first, same(old));
+      final lower = StoreyLevel(
+        id: 'lower',
+        name: 'lower',
+        elevation: -3,
+        shearWalls: [old],
+      );
+      final continued = InitialSchemeGenerator.generate(
+        project: base.copyWith(
+          storeys: [lower, base.activeStorey],
+          activeStoreyIndex: 1,
+        ),
+        wallPairs: runs,
+        scale: 1,
+        options: const InitialSchemeOptions(maxWallLengthM: 1.5),
+      );
+      expect(continued.walls.any((w) => (w.length - 3.8).abs() < 1e-8), isTrue);
+    },
+  );
+  testWidgets('preview exposes wall lengths and a comma-decimal maximum', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final (project, runs) = fixtures.fixture();
+    final l = await AppLocalizations.delegate.load(const Locale('bg'));
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('bg'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: InitialSchemeDialog(
+          project: project,
+          pairs: runs,
+          scale: 1,
+          options: const InitialSchemeOptions(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining(l.schemeWallSections), findsOneWidget);
+    final field = find.byKey(const ValueKey('scheme-max-wall-length'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, '1,5');
+    await tester.tap(find.byKey(const ValueKey('next-scheme')));
+    await tester.pumpAndSettle();
+    expect(find.text(l.schemeInvalidOptions), findsNothing);
+    expect(find.textContaining('25 cm × 1.50 m'), findsOneWidget);
+    await tester.enterText(field, '0,5');
+    await tester.tap(find.byKey(const ValueKey('next-scheme')));
+    await tester.pumpAndSettle();
+    expect(find.text(l.schemeInvalidOptions), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('accept-scheme')))
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+  test('a free 50 cm pier receives a 25 by 50 section in every CAD scale', () {
+    for (final scale in [1.0, 100.0, 1000.0]) {
+      for (final angle in [0.0, .37]) {
+        Offset p(double x, double y) =>
+            Offset(
+              x * math.cos(angle) - y * math.sin(angle),
+              x * math.sin(angle) + y * math.cos(angle),
+            ) *
+            scale;
+        final (project, _) = fixtures.fixture(scale: scale, angle: angle);
+        final runs = [fixtures.pair(p(4, 2), p(4.5, 2), scale)];
+        final result = InitialSchemeGenerator.generate(
+          project: project,
+          wallPairs: runs,
+          scale: scale,
+        );
+        expect(result.columns, hasLength(1));
+        final column = result.columns.single;
+        expect(column.width / scale, closeTo(.25, 1e-8));
+        expect(column.height / scale, closeTo(.50, 1e-8));
+        expect((column.center - p(4.25, 2)).distance / scale, lessThan(1e-7));
+        expect(
+          WallPlacementDomain.build(
+            runs,
+            [],
+            scale,
+          ).contains(column.polygonVertices),
+          isTrue,
+        );
+        expect(result.resizedColumnIds, contains(column.id));
+      }
+    }
+  });
+  test(
+    'a 20 cm lower wall can gain infill while manual corner columns stay fixed',
+    () {
+      final (base, _) = fixtures.fixture();
+      final manual = [
+        const StructuralColumn(
+          id: 'left',
+          center: Offset(1, 14),
+          width: .20,
+          height: .30,
+        ),
+        const StructuralColumn(
+          id: 'right',
+          center: Offset(19, 14),
+          width: .20,
+          height: .30,
+        ),
+      ];
+      final floor = base.activeStorey.copyWith(
+        columns: manual,
+        gridAxes: const [
+          StructuralGridAxis(
+            id: 'bottom',
+            name: 'D',
+            start: Offset(0, 14),
+            end: Offset(20, 14),
+          ),
+        ],
+      );
+      final runs = [
+        fixtures.pair(
+          const Offset(.5, 14),
+          const Offset(19.5, 14),
+          1,
+          width: .20,
+        ),
+      ];
+      final result = InitialSchemeGenerator.generate(
+        project: base.copyWith(storeys: [floor]),
+        wallPairs: runs,
+        scale: 1,
+      );
+      expect(result.isEmpty, isFalse);
+      expect(
+        [
+          ...result.columns.map((c) => c.center.dx),
+          ...result.walls.map((w) => w.center.dx),
+        ].any((x) => x > 5 && x < 15),
+        isTrue,
+      );
+      final applied = result.apply(floor);
+      expect(applied.columns.first, same(manual.first));
+      expect(applied.columns[1], same(manual.last));
+      final domain = WallPlacementDomain.build(runs, [], 1);
+      expect(
+        result.columns.every((c) => domain.contains(c.polygonVertices)),
+        isTrue,
+      );
+      expect(
+        result.walls.every((w) => domain.contains(w.polygonVertices)),
+        isTrue,
+      );
+      expect(result.maxSupportSpanM, lessThanOrEqualTo(5));
+    },
+  );
+  test('four feasible support rows snap to the same transverse grid axis', () {
+    final (base, _) = fixtures.fixture();
+    final axes = [
+      const StructuralGridAxis(
+        id: 'row',
+        name: 'A',
+        start: Offset(0, 14),
+        end: Offset(20, 14),
+      ),
+      for (final x in [2.0, 6.0, 12.0, 18.0])
+        StructuralGridAxis(
+          id: 'x$x',
+          name: '$x',
+          start: Offset(x, 0),
+          end: Offset(x, 16),
+        ),
+    ];
+    final floor = base.activeStorey.copyWith(gridAxes: axes);
+    final runs = [
+      for (final x in [2.0, 6.0, 12.0, 18.0])
+        fixtures.pair(Offset(x, 1), Offset(x, 14.4), 1),
+    ];
+    final result = InitialSchemeGenerator.generate(
+      project: base.copyWith(storeys: [floor]),
+      wallPairs: runs,
+      scale: 1,
+      options: const InitialSchemeOptions(
+        adaptiveSizes: false,
+        wallLengthM: 100,
+      ),
+    );
+    final row = result.columns
+        .where((c) => (c.center.dy - 14).abs() < .4)
+        .toList();
+    expect(row, hasLength(4));
+    expect(row.every((c) => (c.center.dy - 14).abs() < 1e-8), isTrue);
+  });
+  test(
+    'wall count does not hide area deficit and proposal matches the report',
+    () {
+      final (project, runs) = fixtures.fixture();
+      final fixed = InitialSchemeGenerator.generate(
+        project: project,
+        wallPairs: runs,
+        scale: 1,
+        options: const InitialSchemeOptions(adaptiveSizes: false),
+      );
+      final adaptive = InitialSchemeGenerator.generate(
+        project: project,
+        wallPairs: runs,
+        scale: 1,
+        options: const InitialSchemeOptions(maxWallLengthM: 4),
+      );
+      expect(fixed.walls.length, greaterThanOrEqualTo(4));
+      expect(fixed.wallRatioX, lessThan(1));
+      expect(adaptive.wallRatioX, greaterThanOrEqualTo(1 - 1e-8));
+      expect(adaptive.wallRatioY, greaterThanOrEqualTo(1 - 1e-8));
+      final report = SeismicAnalysisCalculator.analyzeProject(
+        project.copyWith(storeys: [adaptive.apply(project.activeStorey)]),
+        cadUnitsPerMeter: 1,
+      );
+      expect(
+        report.storeyChecks.single.wallRatioX,
+        closeTo(adaptive.wallRatioX, 1e-8),
+      );
+      expect(
+        report.storeyChecks.single.wallRatioY,
+        closeTo(adaptive.wallRatioY, 1e-8),
+      );
+      final limited = InitialSchemeGenerator.generate(
+        project: project,
+        wallPairs: [runs.first],
+        scale: 1,
+      );
+      expect(limited.wallDeficitXM2, greaterThan(0));
+      expect(limited.wallRatioX, lessThan(1));
+    },
+  );
+  test(
+    'higher load grows wall-aligned sections and exposes unresolved sizing',
+    () {
+      final (base, _) = fixtures.fixture();
+      final runs = [fixtures.pair(const Offset(1, 2), const Offset(19, 2), 1)];
+      final low = InitialSchemeGenerator.generate(
+        project: base,
+        wallPairs: runs,
+        scale: 1,
+      );
+      final high = InitialSchemeGenerator.generate(
+        project: base.copyWith(liveLoad: 150),
+        wallPairs: runs,
+        scale: 1,
+      );
+      expect(low.columns, isNotEmpty);
+      expect(high.columns, isNotEmpty);
+      expect(
+        high.columns.map((c) => c.height).reduce(math.max),
+        greaterThan(low.columns.map((c) => c.height).reduce(math.max)),
+      );
+      expect(high.columnSizingReviewIds, isNotEmpty);
+      final domain = WallPlacementDomain.build(runs, [], 1);
+      expect(
+        high.columns.every((c) => domain.contains(c.polygonVertices)),
+        isTrue,
+      );
+      final restored = StructuralProject.fromJson(
+        base.copyWith(storeys: [high.apply(base.activeStorey)]).toJson(),
+      );
+      expect(
+        restored.activeStorey.columns.map((c) => c.height),
+        high.columns.map((c) => c.height),
+      );
+    },
+  );
+
   test(
     'support intervals cannot cross slab openings or disconnected wings',
     () {
@@ -175,6 +534,7 @@ void main() {
         project: project,
         wallPairs: runs,
         scale: 1,
+        options: const InitialSchemeOptions(adaptiveSizes: false),
       );
       expect(proposal.columns, isNotEmpty);
       for (final c in proposal.columns) {

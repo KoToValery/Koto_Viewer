@@ -463,6 +463,7 @@ class StructuralMagneticAlignmentHelper {
     StructuralAxisLockMode axisLockMode = StructuralAxisLockMode.autoMode,
     Offset? anchorCenter,
     Offset? previousSnappedCenter,
+    double? maxCorrectionCad,
   }) {
     // 0. Handle Axis Constraint Mode
     Offset effectiveRawCenter = rawCenter;
@@ -474,12 +475,13 @@ class StructuralMagneticAlignmentHelper {
 
     // 0b. Hysteresis tolerance window (sticky snap)
     double effectiveTol = toleranceCad;
-    if (previousSnappedCenter != null &&
+    if (maxCorrectionCad == null && previousSnappedCenter != null &&
         (effectiveRawCenter - previousSnappedCenter).distance <= toleranceCad * 1.35) {
       effectiveTol = toleranceCad * 1.35;
     }
 
-    ColumnMagneticAlignmentResult wrapResult(ColumnMagneticAlignmentResult res) {
+    ColumnMagneticAlignmentResult? wrapResult(ColumnMagneticAlignmentResult res) {
+      if (maxCorrectionCad != null && (res.snappedCenter-effectiveRawCenter).distance > maxCorrectionCad+1e-8) return null;
       if (axisLockMode == StructuralAxisLockMode.lockX && anchorCenter != null) {
         return ColumnMagneticAlignmentResult(
           snappedCenter: Offset(anchorCenter.dx, res.snappedCenter.dy),
@@ -1053,6 +1055,8 @@ class StructuralMagneticAlignmentHelper {
     StructuralAxisLockMode axisLockMode = StructuralAxisLockMode.autoMode,
     Offset? anchorCenter,
     Offset? previousSnappedCenter,
+    double? maxCorrectionCad,
+    bool allowRotationSnap = true,
   }) {
     // 0. Handle Axis Constraint Mode
     Offset effectiveRawCenter = rawCenter;
@@ -1064,12 +1068,17 @@ class StructuralMagneticAlignmentHelper {
 
     // 0b. Hysteresis tolerance window (sticky snap)
     double effectiveTol = toleranceCad;
-    if (previousSnappedCenter != null &&
+    if (maxCorrectionCad == null && previousSnappedCenter != null &&
         (effectiveRawCenter - previousSnappedCenter).distance <= toleranceCad * 1.35) {
       effectiveTol = toleranceCad * 1.35;
     }
 
-    ShearWallMagneticAlignmentResult wrapWallResult(ShearWallMagneticAlignmentResult res) {
+    ShearWallMagneticAlignmentResult? wrapWallResult(ShearWallMagneticAlignmentResult res) {
+      if (maxCorrectionCad != null && (res.snappedCenter-effectiveRawCenter).distance > maxCorrectionCad+1e-8) return null;
+      if (!allowRotationSnap && res.snappedRotationRad != null) {
+        final delta = (res.snappedRotationRad! - wallRotationRad).abs() % (2 * math.pi);
+        if (math.min(delta, 2 * math.pi - delta) > 1e-8) return null;
+      }
       if (axisLockMode == StructuralAxisLockMode.lockX && anchorCenter != null) {
         return ShearWallMagneticAlignmentResult(
           snappedCenter: Offset(anchorCenter.dx, res.snappedCenter.dy),
@@ -1099,7 +1108,7 @@ class StructuralMagneticAlignmentHelper {
     const double angleTol = 0.15; // ~8.5 degrees
     for (final standardRot in [0.0, math.pi / 2, math.pi, 3 * math.pi / 2, 2 * math.pi]) {
       final diff = (wallRotationRad - standardRot).abs() % (2 * math.pi);
-      if (diff <= angleTol || (2 * math.pi - diff) <= angleTol) {
+      if (allowRotationSnap && (diff <= angleTol || (2 * math.pi - diff) <= angleTol)) {
         effectiveWallRot = standardRot % (2 * math.pi);
         break;
       }

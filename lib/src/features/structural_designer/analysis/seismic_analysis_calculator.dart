@@ -15,7 +15,7 @@ import 'diaphragm_storey_links.dart';
 /// Computes:
 /// 1. Storey Center of Mass (CM) and Center of Rigidity (CR)
 /// 2. Seismic eccentricity (e_x, e_y) and torsional sensitivity
-/// 3. Shear wall percentage coverage in X and Y (>= 1.0 - 1.5%)
+/// 3. Shear wall area in X and Y against the application 1% reference
 /// 4. Vertical regularity: floating / transfer columns and discontinuous walls
 /// 5. Soft storey stiffness drops (K_k < 0.70 K_{k+1})
 /// 6. Preliminary beam sizing (h = L/10 - L/12)
@@ -23,11 +23,46 @@ import 'diaphragm_storey_links.dart';
 class SeismicAnalysisCalculator {
   const SeismicAnalysisCalculator._();
 
+  /// Application screening reference; not a universal EC8 minimum.
+  static const wallDensityReferencePercent = 1.0;
+
+  /// Same connected wall area and net floor area used by the detailed report.
+  static ({double ratioX, double ratioY, double deficitX, double deficitY})
+  wallDensity(StoreyLevel floor, double scale) {
+    final area = floor.slabs.fold<double>(
+      0,
+      (a, s) => a + s.netArea / (scale * scale),
+    );
+    var x = 0.0, y = 0.0;
+    for (final wall in floor.shearWalls) {
+      final contact = getWallDiaphragmConnection(wall, floor.slabs, scale);
+      if (!contact.isConnected || contact.effectiveLengthM <= .05) continue;
+      final angle = math.atan2(
+        wall.end.dy - wall.start.dy,
+        wall.end.dx - wall.start.dx,
+      );
+      final section = contact.effectiveLengthM * wall.thickness / scale;
+      x += section * math.cos(angle).abs();
+      y += section * math.sin(angle).abs();
+    }
+    final target = area * wallDensityReferencePercent / 100;
+    return (
+      ratioX: area > 0 ? x / area * 100 : 0,
+      ratioY: area > 0 ? y / area * 100 : 0,
+      deficitX: math.max(0, target - x),
+      deficitY: math.max(0, target - y),
+    );
+  }
+
   /// Screens manually placed elements under the documented simplified assumptions.
   static SeismicAnalysisReport analyzeProject(
     StructuralProject project, {
     double cadUnitsPerMeter = 1.0,
   }) {
+    final originalIndices = <String, int>{
+      for (var i = 0; i < project.storeys.length; i++) project.storeys[i].id: i,
+    };
+    project = project.copyWith(storeys: project.ceilingStoreys);
     if (project.storeys.isEmpty) {
       return SeismicAnalysisReport.empty;
     }
@@ -188,7 +223,7 @@ class SeismicAnalysisCalculator {
           StoreySeismicCheck(
             storeyId: storey.id,
             storeyName: storey.name,
-            storeyIndex: sIdx,
+            storeyIndex: originalIndices[storey.id]!,
             hasSlabDiaphragm:
                 storey.slabs.isNotEmpty &&
                 (!slabTopology.allowsSingleDiaphragm || hasSlabDiaphragm),
@@ -468,8 +503,8 @@ class SeismicAnalysisCalculator {
       // Shear wall ratios (%)
       final double wallRatioX = (totalWallAreaX / floorAreaM2) * 100.0;
       final double wallRatioY = (totalWallAreaY / floorAreaM2) * 100.0;
-      final bool wallOkX = wallRatioX >= 1.0;
-      final bool wallOkY = wallRatioY >= 1.0;
+      final bool wallOkX = wallRatioX >= wallDensityReferencePercent;
+      final bool wallOkY = wallRatioY >= wallDensityReferencePercent;
       if (!wallOkX || !wallOkY) anyWallDeficit = true;
 
       // C. Floating / Transfer Columns Detection (EC8 §4.2.3.3)
@@ -600,7 +635,7 @@ class SeismicAnalysisCalculator {
         StoreySeismicCheck(
           storeyId: storey.id,
           storeyName: storey.name,
-          storeyIndex: sIdx,
+          storeyIndex: originalIndices[storey.id]!,
           hasSlabDiaphragm: true,
           centerOfMassCad: cmCad,
           centerOfRigidityCad: hasLateralStiffness ? crCad : null,

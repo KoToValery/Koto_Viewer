@@ -1731,7 +1731,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String seismicWallRecommendationText(String area) {
-    return 'Препоръка по Eurocode 8 за България: минимум 1.0% - 1.5% шайби във всяко от двете направления спрямо етажна площ ($area m²).';
+    return 'Ориентир в приложението: 1.0% площ на свързаните шайби във всяко направление спрямо нетна етажна площ ($area m²). Това не е универсален минимум по Еврокод 8 или доказателство за сеизмична носимоспособност.';
   }
 
   @override
@@ -2043,7 +2043,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String verticalSlabStoreyTitle(String storey) {
-    return 'Плоча - $storey';
+    return 'Таванна плоча над $storey';
   }
 
   @override
@@ -2822,11 +2822,11 @@ class AppLocalizationsBg extends AppLocalizations {
   }
 
   @override
-  String get ceilingSlabTitle => 'Подова плоча на етажа';
+  String get ceilingSlabTitle => 'Таванна плоча над етажа';
 
   @override
   String ceilingSlabContext(String level) {
-    return 'Етаж $level · конструктивна подова плоча';
+    return 'Етаж $level · таванна плоча над етажа';
   }
 
   @override
@@ -2842,11 +2842,11 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get ceilingSlabLevelHint =>
-      'Ниво на плочата: кота на етажа − настилка. Зададената кота е за бетон. Промяната на дебелината запазва горния ръб.';
+      'Плочата и отворите са над активния етаж. Ниво на бетона: кота на следващия етаж − настилка; за последния етаж: кота + височина − настилка. Зададената кота е за бетон.';
 
   @override
   String get ceilingSlabInvalid =>
-      'Въведете валидни числови стойности и положителна дебелина.';
+      'Въведете положителна дебелина и кота, при която плочата е над активния етаж и не надвишава следващото ниво.';
 
   @override
   String get overheadSlabTag => 'Плоча над етажа (таван)';
@@ -2983,7 +2983,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get schemePreliminary =>
-      'Размерите са текущо избраните сечения. Стъпките са настройки за подреждане, не допустими изчислени отвори. Проверете излизането на сеченията извън архитектурните стени.';
+      'Автоматичните размери отчитат свободния стенен участък и предварителните проверки за натиск/продънване. Избраните сечения са начални размери при включена адаптация. Размерите, пътят на товарите и армировката изискват потвърждение с конструктивен модел.';
 
   @override
   String get schemeLegend =>
@@ -3001,7 +3001,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get schemeInvalidOptions =>
-      'Въведете положителни стъпки; целевата трябва да е поне минималната.';
+      'Въведете положителни размери и стъпки. Целевата стъпка трябва да е поне минималната, а максималната шайба — поне началната дължина.';
 
   @override
   String get schemeStale =>
@@ -3051,4 +3051,55 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get schemeOpeningFallback =>
       'Лилаво: резервни колони във врати/прозорци — проверете отвора';
+
+  @override
+  String get schemeAdaptiveSizes =>
+      'Адаптирай сеченията към стените и предварителните проверки';
+
+  @override
+  String get schemeWallDensity =>
+      'Площ на свързаните шайби / нетна етажна площ (ориентир 1%)';
+
+  @override
+  String get schemeWallDeficit =>
+      'Оставащ недостиг на площ на шайбите — ограничения на разполагането';
+
+  @override
+  String get schemeResizedColumns => 'Колони с адаптирани сечения';
+
+  @override
+  String get schemeSizingReview =>
+      'Сечения за преглед: натоварване или продънване над предварителната цел';
+
+  @override
+  String get schemePlacementReasons => 'Отхвърлени позиции';
+
+  @override
+  String get schemeWallConstraint => 'побиране в стена';
+
+  @override
+  String get schemeSlabConstraint => 'плоча / отвор';
+
+  @override
+  String get schemeSpacingConstraint => 'отстояние / застъпване';
+
+  @override
+  String get schemeMaxWallLength => 'Макс. дължина на нова шайба (m)';
+
+  @override
+  String get schemeWallSections => 'Шайби — дебелина × дължина';
+
+  @override
+  String schemeContinueLower(String level) {
+    return 'Продължаване на схемата от кота $level. Позициите и сеченията се запазват. Нерешените разстояния и недостигът на шайби изискват преработка на долната схема.';
+  }
+
+  @override
+  String get schemeContinuityReview =>
+      'Има ръчно поставени опори, които не съвпадат със схемата отдолу. Прегледайте вертикалната непрекъснатост.';
+
+  @override
+  String schemeBlockedContinuations(int count) {
+    return 'Опори, които не могат да се продължат: $count. Червените точки показват местата за преглед.';
+  }
 }

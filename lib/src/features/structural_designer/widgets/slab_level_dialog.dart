@@ -126,7 +126,9 @@ class _SlabLevelDialogState extends State<SlabLevelDialog> {
                 : widget.storey.structuralElevationFor(
                     widget.slab.copyWith(clearTopElevation: true),
                   );
-            if (!h.isFinite || h <= 0 || !z.isFinite) {
+            if (!h.isFinite || h <= 0 || !z.isFinite ||
+                z - h <= widget.storey.elevation ||
+                z > widget.storey.elevation + widget.storey.height) {
               setState(() => error = true);
               return;
             }

@@ -1726,7 +1726,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String seismicWallRecommendationText(String area) {
-    return 'Eurocode 8 recommendation: minimum 1.0% - 1.5% shear walls in each direction relative to floor area ($area m²).';
+    return 'Application screening reference: 1.0% connected wall area in each direction relative to net floor area ($area m²). This is not a universal Eurocode 8 minimum or proof of seismic capacity.';
   }
 
   @override
@@ -2036,7 +2036,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String verticalSlabStoreyTitle(String storey) {
-    return 'Slab - $storey';
+    return 'Ceiling slab above $storey';
   }
 
   @override
@@ -2812,11 +2812,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get ceilingSlabTitle => 'Storey floor slab';
+  String get ceilingSlabTitle => 'Ceiling slab above the storey';
 
   @override
   String ceilingSlabContext(String level) {
-    return 'Storey $level · structural floor slab';
+    return 'Storey $level · ceiling slab above this storey';
   }
 
   @override
@@ -2832,11 +2832,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ceilingSlabLevelHint =>
-      'Floor level: storey elevation − finish screed. Explicit level sets top of concrete directly. Changing thickness retains the top surface.';
+      'The slab and openings are above the active storey. Concrete top: next level minus finish; at the top storey: level plus height minus finish. An explicit elevation refers to concrete.';
 
   @override
   String get ceilingSlabInvalid =>
-      'Enter valid numeric values and a positive thickness.';
+      'Enter a positive thickness and an elevation placing the slab above this storey and no higher than the next level.';
 
   @override
   String get overheadSlabTag => 'Overhead slab (ceiling)';
@@ -2974,7 +2974,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get schemePreliminary =>
-      'Sizes use the currently selected sections. Spacing is a layout setting, not a calculated allowable span. Check sections extending beyond architectural walls.';
+      'Automatic sizes use available wall space and preliminary axial/punching checks. Selected sections are starting sizes when adaptation is enabled. Confirm dimensions, load paths and reinforcement with a structural model.';
 
   @override
   String get schemeLegend =>
@@ -2992,7 +2992,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get schemeInvalidOptions =>
-      'Enter positive spacing; target must be at least the minimum.';
+      'Enter positive sizes and spacing. Target spacing must be at least the minimum; maximum wall length must be at least the starting length.';
 
   @override
   String get schemeStale =>
@@ -3039,4 +3039,55 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get schemeOpeningFallback =>
       'Purple: fallback columns in door/window openings — review opening';
+
+  @override
+  String get schemeAdaptiveSizes =>
+      'Adapt sections to walls and preliminary checks';
+
+  @override
+  String get schemeWallDensity =>
+      'Connected wall area / net floor area (1% reference)';
+
+  @override
+  String get schemeWallDeficit =>
+      'Remaining wall area deficit — placement constraints';
+
+  @override
+  String get schemeResizedColumns => 'Columns with adapted sections';
+
+  @override
+  String get schemeSizingReview =>
+      'Column sections need review: load or punching check remains above the preliminary target';
+
+  @override
+  String get schemePlacementReasons => 'Rejected positions';
+
+  @override
+  String get schemeWallConstraint => 'wall fit';
+
+  @override
+  String get schemeSlabConstraint => 'slab / hole';
+
+  @override
+  String get schemeSpacingConstraint => 'spacing / collision';
+
+  @override
+  String get schemeMaxWallLength => 'Max new wall length (m)';
+
+  @override
+  String get schemeWallSections => 'Walls — thickness × length';
+
+  @override
+  String schemeContinueLower(String level) {
+    return 'Continue the scheme from level $level, preserving positions and sections. Unresolved spans and wall deficits require revision of the lower scheme.';
+  }
+
+  @override
+  String get schemeContinuityReview =>
+      'Some manual supports do not match the lower scheme. Review vertical continuity.';
+
+  @override
+  String schemeBlockedContinuations(int count) {
+    return 'Supports that cannot be continued: $count. Red points mark positions requiring review.';
+  }
 }

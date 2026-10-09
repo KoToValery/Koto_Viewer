@@ -401,9 +401,9 @@ class VerticalCapacityCalculator {
     return true;
   }
 
-  /// Calculates max clear span between adjacent supports in the storey (meters)
-  /// and returns the coordinates of the critical span segment.
-  static ({double maxSpanM, (Offset, Offset)? criticalSpanSegment}) calculateClearSpan(
+  /// Candidate support intervals in metres, sorted from largest to smallest.
+  /// Shared by the manual report and progressive automatic infill.
+  static List<({double spanM, (Offset, Offset) segment})> calculateSupportSpans(
     StoreyLevel storey,
     double scale,
   ) {
@@ -626,19 +626,19 @@ class VerticalCapacityCalculator {
     }
 
     candidateSpans.removeWhere((s)=>!_spanOnSlab(s.segment.$1,s.segment.$2,storey,scale));
-    if (candidateSpans.isEmpty) {
-      return (maxSpanM: double.nan, criticalSpanSegment: null);
-    }
+    candidateSpans.sort((a, b) => b.spanM.compareTo(a.spanM));
+    return candidateSpans;
+  }
 
-    // Find the critical (maximum) clear span
-    var maxSpan = candidateSpans.first;
-    for (final span in candidateSpans) {
-      if (span.spanM > maxSpan.spanM) {
-        maxSpan = span;
-      }
-    }
-
-    return (maxSpanM: maxSpan.spanM, criticalSpanSegment: maxSpan.segment);
+  /// Maximum preliminary support interval, or NaN when undetermined.
+  static ({double maxSpanM, (Offset, Offset)? criticalSpanSegment}) calculateClearSpan(
+    StoreyLevel storey,
+    double scale,
+  ) {
+    final spans = calculateSupportSpans(storey, scale);
+    return spans.isEmpty
+        ? (maxSpanM: double.nan, criticalSpanSegment: null)
+        : (maxSpanM: spans.first.spanM, criticalSpanSegment: spans.first.segment);
   }
 
   /// Calculates max clear span between supports in the storey (meters).
@@ -685,6 +685,12 @@ class VerticalCapacityCalculator {
     StructuralProject project, {
     double cadUnitsPerMeter = 1.0,
   }) {
+    final originalIndices = <String, int>{
+      for (var i = 0; i < project.storeys.length; i++) project.storeys[i].id: i,
+    };
+    final sorted = project.ceilingStoreys
+      ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    project = project.copyWith(storeys: sorted);
     if (project.storeys.isEmpty) {
       return VerticalCapacityReport.empty;
     }
@@ -1030,7 +1036,7 @@ class VerticalCapacityCalculator {
           columnName: colName,
           storeyId: storey.id,
           storeyName: storey.name,
-          storeyIndex: sIdx,
+          storeyIndex: originalIndices[storey.id]!,
           numStoreysAbove: storeysAbove,
           center: col.center,
           shape: col.shape,

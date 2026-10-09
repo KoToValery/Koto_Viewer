@@ -940,7 +940,7 @@ void main() {
       thickness: 0.20,
     );
 
-    // Architectural elevation 0.00 with 5cm screed gives structural elevation -0.05m
+    // Architectural elevation 0.00 with 5cm screed gives ceiling concrete elevation 2.75m
     expect(storey0.structuralElevationFor(slabStandard), closeTo(2.75, 1e-4));
 
     const storey1 = StoreyLevel(
@@ -951,7 +951,7 @@ void main() {
       floorFinishThickness: 0.05,
     );
 
-    // Architectural elevation 2.80 gives structural elevation 2.75m
+    // Architectural elevation 2.80 gives ceiling concrete elevation 5.55m
     expect(storey1.structuralElevationFor(slabStandard), closeTo(5.55, 1e-4));
 
     // Custom slab finish (e.g. 8cm / 0.08m thick finish for terraces/bathrooms)

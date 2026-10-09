@@ -3160,7 +3160,7 @@ abstract class AppLocalizations {
   /// EC8 wall recommendation explanation
   ///
   /// In en, this message translates to:
-  /// **'Eurocode 8 recommendation: minimum 1.0% - 1.5% shear walls in each direction relative to floor area ({area} m²).'**
+  /// **'Application screening reference: 1.0% connected wall area in each direction relative to net floor area ({area} m²). This is not a universal Eurocode 8 minimum or proof of seismic capacity.'**
   String seismicWallRecommendationText(String area);
 
   /// Header title for floating columns
@@ -3573,7 +3573,7 @@ abstract class AppLocalizations {
   /// Slab storey card title
   ///
   /// In en, this message translates to:
-  /// **'Slab - {storey}'**
+  /// **'Ceiling slab above {storey}'**
   String verticalSlabStoreyTitle(String storey);
 
   /// Slab status safe
@@ -4850,13 +4850,13 @@ abstract class AppLocalizations {
   /// No description provided for @ceilingSlabTitle.
   ///
   /// In en, this message translates to:
-  /// **'Storey floor slab'**
+  /// **'Ceiling slab above the storey'**
   String get ceilingSlabTitle;
 
   /// No description provided for @ceilingSlabContext.
   ///
   /// In en, this message translates to:
-  /// **'Storey {level} · structural floor slab'**
+  /// **'Storey {level} · ceiling slab above this storey'**
   String ceilingSlabContext(String level);
 
   /// No description provided for @ceilingExplicitLevel.
@@ -4880,13 +4880,13 @@ abstract class AppLocalizations {
   /// No description provided for @ceilingSlabLevelHint.
   ///
   /// In en, this message translates to:
-  /// **'Floor level: storey elevation − finish screed. Explicit level sets top of concrete directly. Changing thickness retains the top surface.'**
+  /// **'The slab and openings are above the active storey. Concrete top: next level minus finish; at the top storey: level plus height minus finish. An explicit elevation refers to concrete.'**
   String get ceilingSlabLevelHint;
 
   /// No description provided for @ceilingSlabInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Enter valid numeric values and a positive thickness.'**
+  /// **'Enter a positive thickness and an elevation placing the slab above this storey and no higher than the next level.'**
   String get ceilingSlabInvalid;
 
   /// Tag indicating the slab is from the floor above serving as a ceiling
@@ -5120,7 +5120,7 @@ abstract class AppLocalizations {
   /// No description provided for @schemePreliminary.
   ///
   /// In en, this message translates to:
-  /// **'Sizes use the currently selected sections. Spacing is a layout setting, not a calculated allowable span. Check sections extending beyond architectural walls.'**
+  /// **'Automatic sizes use available wall space and preliminary axial/punching checks. Selected sections are starting sizes when adaptation is enabled. Confirm dimensions, load paths and reinforcement with a structural model.'**
   String get schemePreliminary;
 
   /// No description provided for @schemeLegend.
@@ -5150,7 +5150,7 @@ abstract class AppLocalizations {
   /// No description provided for @schemeInvalidOptions.
   ///
   /// In en, this message translates to:
-  /// **'Enter positive spacing; target must be at least the minimum.'**
+  /// **'Enter positive sizes and spacing. Target spacing must be at least the minimum; maximum wall length must be at least the starting length.'**
   String get schemeInvalidOptions;
 
   /// No description provided for @schemeStale.
@@ -5230,6 +5230,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Purple: fallback columns in door/window openings — review opening'**
   String get schemeOpeningFallback;
+
+  /// No description provided for @schemeAdaptiveSizes.
+  ///
+  /// In en, this message translates to:
+  /// **'Adapt sections to walls and preliminary checks'**
+  String get schemeAdaptiveSizes;
+
+  /// No description provided for @schemeWallDensity.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected wall area / net floor area (1% reference)'**
+  String get schemeWallDensity;
+
+  /// No description provided for @schemeWallDeficit.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining wall area deficit — placement constraints'**
+  String get schemeWallDeficit;
+
+  /// No description provided for @schemeResizedColumns.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns with adapted sections'**
+  String get schemeResizedColumns;
+
+  /// No description provided for @schemeSizingReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Column sections need review: load or punching check remains above the preliminary target'**
+  String get schemeSizingReview;
+
+  /// No description provided for @schemePlacementReasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected positions'**
+  String get schemePlacementReasons;
+
+  /// No description provided for @schemeWallConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'wall fit'**
+  String get schemeWallConstraint;
+
+  /// No description provided for @schemeSlabConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'slab / hole'**
+  String get schemeSlabConstraint;
+
+  /// No description provided for @schemeSpacingConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'spacing / collision'**
+  String get schemeSpacingConstraint;
+
+  /// No description provided for @schemeMaxWallLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Max new wall length (m)'**
+  String get schemeMaxWallLength;
+
+  /// No description provided for @schemeWallSections.
+  ///
+  /// In en, this message translates to:
+  /// **'Walls — thickness × length'**
+  String get schemeWallSections;
+
+  /// No description provided for @schemeContinueLower.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue the scheme from level {level}, preserving positions and sections. Unresolved spans and wall deficits require revision of the lower scheme.'**
+  String schemeContinueLower(String level);
+
+  /// No description provided for @schemeContinuityReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Some manual supports do not match the lower scheme. Review vertical continuity.'**
+  String get schemeContinuityReview;
+
+  /// No description provided for @schemeBlockedContinuations.
+  ///
+  /// In en, this message translates to:
+  /// **'Supports that cannot be continued: {count}. Red points mark positions requiring review.'**
+  String schemeBlockedContinuations(int count);
 }
 
 class _AppLocalizationsDelegate

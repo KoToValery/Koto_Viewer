@@ -18,7 +18,7 @@ void main() {
         contains(SchemeReadinessIssue.missingStaircase));
     }
   });
-  test('opening references resolve the ceiling owner and concrete levels', () {
+  test('opening references use the active storey ceiling elevation semantics', () {
     final result=StructuralSchemeReadiness.evaluate(project([
       slab.addOpening(stairs,type:SlabOpeningType.staircase)]),1);
     expect(result.geometryReady,isTrue);

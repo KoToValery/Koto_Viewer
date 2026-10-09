@@ -1436,7 +1436,7 @@
   "@seismicWallCoverageXLabel": { "description": "Label for X wall coverage" },
   "seismicWallCoverageYLabel": "Y Coverage (ρ_wy):",
   "@seismicWallCoverageYLabel": { "description": "Label for Y wall coverage" },
-  "seismicWallRecommendationText": "Eurocode 8 recommendation: minimum 1.0% - 1.5% shear walls in each direction relative to floor area ({area} m²).",
+  "seismicWallRecommendationText": "Application screening reference: 1.0% connected wall area in each direction relative to net floor area ({area} m²). This is not a universal Eurocode 8 minimum or proof of seismic capacity.",
   "@seismicWallRecommendationText": {
     "description": "EC8 wall recommendation explanation",
     "placeholders": { "area": { "type": "String" } }
@@ -1737,7 +1737,7 @@
   "@verticalAxialCompressionLabel": { "description": "Axial compression label" },
   "verticalNoSlabs": "No slabs defined in the project.",
   "@verticalNoSlabs": { "description": "Message when no slabs exist" },
-  "verticalSlabStoreyTitle": "Slab - {storey}",
+  "verticalSlabStoreyTitle": "Ceiling slab above {storey}",
   "@verticalSlabStoreyTitle": {
     "description": "Slab storey card title",
     "placeholders": { "storey": { "type": "String" } }
@@ -2284,8 +2284,8 @@
   "seismicLinkAbsent": "no overlap — review",
   "seismicRegionTrackingItem": "{storey}, region {region} → {lower}, regions {matches}: {coverage}; {status}. Geometric link, not a verified load path.",
   "@seismicRegionTrackingItem": {"placeholders":{"storey":{"type":"String"},"region":{"type":"int"},"lower":{"type":"String"},"matches":{"type":"String"},"coverage":{"type":"String"},"status":{"type":"String"}}},
-  "ceilingSlabTitle": "Storey floor slab",
-  "ceilingSlabContext": "Storey {level} · structural floor slab",
+  "ceilingSlabTitle": "Ceiling slab above the storey",
+  "ceilingSlabContext": "Storey {level} · ceiling slab above this storey",
   "@ceilingSlabContext": {
     "placeholders": {
       "level": {
@@ -2306,8 +2306,8 @@
       }
     }
   },
-  "ceilingSlabLevelHint": "Floor level: storey elevation − finish screed. Explicit level sets top of concrete directly. Changing thickness retains the top surface.",
-  "ceilingSlabInvalid": "Enter valid numeric values and a positive thickness.",
+  "ceilingSlabLevelHint": "The slab and openings are above the active storey. Concrete top: next level minus finish; at the top storey: level plus height minus finish. An explicit elevation refers to concrete.",
+  "ceilingSlabInvalid": "Enter a positive thickness and an elevation placing the slab above this storey and no higher than the next level.",
   "overheadSlabTag": "Overhead slab (ceiling)",
   "@overheadSlabTag": {
     "description": "Tag indicating the slab is from the floor above serving as a ceiling"
@@ -2362,12 +2362,12 @@
   "schemeNoWalls": "No solid wall runs detected. Grid axes alone do not authorize columns inside rooms.",
   "schemeNoCandidates": "No suitable free positions. Existing elements are preserved.",
   "schemeLimits": "The preliminary layout limit was reached. Review the remaining areas manually.",
-  "schemePreliminary": "Sizes use the currently selected sections. Spacing is a layout setting, not a calculated allowable span. Check sections extending beyond architectural walls.",
+  "schemePreliminary": "Automatic sizes use available wall space and preliminary axial/punching checks. Selected sections are starting sizes when adaptation is enabled. Confirm dimensions, load paths and reinforcement with a structural model.",
   "schemeLegend": "Grey: existing · Blue: slabs · Green: new columns · Orange: new walls · Red: openings",
   "schemeUnresolved": "Regions without walls in both principal directions",
   "schemeRejected": "Rejected candidates",
   "schemeReport": "Detailed assessment",
-  "schemeInvalidOptions": "Enter positive spacing; target must be at least the minimum.",
+  "schemeInvalidOptions": "Enter positive sizes and spacing. Target spacing must be at least the minimum; maximum wall length must be at least the starting length.",
   "schemeStale": "The project changed. Open a new preview before accepting.",
   "schemeComparison": "Compare variants · eX/eY (m) · floating columns",
   "schemeFresh": "Only new objects are accepted. Manual elements and accepted edits are preserved.",
@@ -2389,5 +2389,33 @@
   "schemeEurocodeScope": "Preliminary geometric screening. Support distance is not a calculated span or deflection. EC2 verification requires a structural model, loads, materials and reinforcement; the EC8 report contains preliminary indicators only.",
   "schemeSpanUnknown": "Support span is undetermined",
   "schemeSupportSpan": "Critical support spacing (preliminary)",
-  "schemeOpeningFallback": "Purple: fallback columns in door/window openings — review opening"
+  "schemeOpeningFallback": "Purple: fallback columns in door/window openings — review opening",
+  "schemeAdaptiveSizes": "Adapt sections to walls and preliminary checks",
+  "schemeWallDensity": "Connected wall area / net floor area (1% reference)",
+  "schemeWallDeficit": "Remaining wall area deficit — placement constraints",
+  "schemeResizedColumns": "Columns with adapted sections",
+  "schemeSizingReview": "Column sections need review: load or punching check remains above the preliminary target",
+  "schemePlacementReasons": "Rejected positions",
+  "schemeWallConstraint": "wall fit",
+  "schemeSlabConstraint": "slab / hole",
+  "schemeSpacingConstraint": "spacing / collision",
+  "schemeMaxWallLength": "Max new wall length (m)",
+  "schemeWallSections": "Walls — thickness × length",
+  "schemeContinueLower": "Continue the scheme from level {level}, preserving positions and sections. Unresolved spans and wall deficits require revision of the lower scheme.",
+  "@schemeContinueLower": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "schemeContinuityReview": "Some manual supports do not match the lower scheme. Review vertical continuity.",
+  "schemeBlockedContinuations": "Supports that cannot be continued: {count}. Red points mark positions requiring review.",
+  "@schemeBlockedContinuations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

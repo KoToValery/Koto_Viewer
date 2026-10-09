@@ -48,6 +48,9 @@ enum StructuralDrawTool {
 class StructuralPointerPainter extends CustomPainter {
   final Offset touchPos;
   final Offset targetPos;
+  final Offset? placementPos;
+  final List<Offset>? previewElementPolygon;
+  final bool showDetailLoupe;
   final Offset? snappedPos;
   final List<Offset>? snappedPositions;
   final DxfSnapType? snapType;
@@ -73,6 +76,9 @@ class StructuralPointerPainter extends CustomPainter {
   const StructuralPointerPainter({
     required this.touchPos,
     required this.targetPos,
+    this.placementPos,
+    this.previewElementPolygon,
+    this.showDetailLoupe = false,
     this.snappedPos,
     this.snappedPositions,
     this.snapType,
@@ -96,10 +102,16 @@ class StructuralPointerPainter extends CustomPainter {
     this.l10n,
   });
 
+  /// Element reference point and snap marker are deliberately independent.
+  Offset get effectivePlacementPosition =>
+      placementPos ?? snappedPos ?? targetPos;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final effectiveTip = snappedPos ?? targetPos;
-    final bool isSnapped = (snappedPositions != null && snappedPositions!.isNotEmpty) || snappedPos != null;
+    final effectiveTip = effectivePlacementPosition;
+    final bool isSnapped =
+        (snappedPositions != null && snappedPositions!.isNotEmpty) ||
+        snappedPos != null;
 
     final Color themeColor = isSnapped
         ? const Color(0xFF00E5FF)
@@ -121,25 +133,8 @@ class StructuralPointerPainter extends CustomPainter {
     canvas.drawCircle(touchPos, 18, touchBorder);
     canvas.drawCircle(touchPos, 3.5, touchDot);
 
-    // 2. Guideline Stem connecting finger to the start / top end of the element
-    Offset guideConnectionPoint = effectiveTip;
-    if (activeTool == StructuralDrawTool.column && previewColumn != null) {
-      final double h = previewColumn!.height * scale;
-      final double rot = previewColumn!.rotationRad;
-      if (rot.abs() < 1e-4) {
-        guideConnectionPoint = Offset(effectiveTip.dx, effectiveTip.dy - h / 2.0);
-      } else {
-        guideConnectionPoint = effectiveTip +
-            Offset(math.sin(rot) * (h / 2.0), -math.cos(rot) * (h / 2.0));
-      }
-    } else if (activeTool == StructuralDrawTool.shearWall && previewWallLengthScreen != null) {
-      final rot = previewWallRotationRad ?? 0.0;
-      final u = Offset(math.cos(rot), math.sin(rot));
-      final halfLen = previewWallLengthScreen! / 2.0;
-      guideConnectionPoint = effectiveTip - u * halfLen;
-    } else if (activeTool == StructuralDrawTool.beam && beamStartPos != null) {
-      guideConnectionPoint = beamStartPos!;
-    }
+    // One reference point connects the finger, ghost and committed geometry.
+    final guideConnectionPoint = effectiveTip;
 
     final stemPaint = Paint()
       ..color = themeColor.withValues(alpha: 0.5)
@@ -156,7 +151,12 @@ class StructuralPointerPainter extends CustomPainter {
     // 3. Snap Markers at all snapped positions (supports simultaneous multi-point snap)
     if (snappedPositions != null && snappedPositions!.isNotEmpty) {
       for (final sPos in snappedPositions!) {
-        _drawSnapIndicator(canvas, sPos, snapType ?? DxfSnapType.endpoint, themeColor);
+        _drawSnapIndicator(
+          canvas,
+          sPos,
+          snapType ?? DxfSnapType.endpoint,
+          themeColor,
+        );
       }
     } else if (isSnapped && snapType != null) {
       _drawSnapIndicator(canvas, effectiveTip, snapType!, themeColor);
@@ -174,7 +174,8 @@ class StructuralPointerPainter extends CustomPainter {
           canvas.drawLine(slabPoints![i], slabPoints![i + 1], slabBorder);
         }
 
-        final bool isClose = slabPoints!.length >= 3 &&
+        final bool isClose =
+            slabPoints!.length >= 3 &&
             (effectiveTip - slabPoints!.first).distance <= 24.0;
 
         if (isClose) {
@@ -240,7 +241,8 @@ class StructuralPointerPainter extends CustomPainter {
           canvas.drawLine(openingPoints![i], openingPoints![i + 1], opBorder);
         }
 
-        final bool isClose = openingPoints!.length >= 3 &&
+        final bool isClose =
+            openingPoints!.length >= 3 &&
             (effectiveTip - openingPoints!.first).distance <= 24.0;
 
         if (isClose) {
@@ -265,7 +267,8 @@ class StructuralPointerPainter extends CustomPainter {
         for (final p in openingPoints!) {
           canvas.drawCircle(p, 4.0, vDot);
         }
-      } else if (previewOpeningPolygon != null && previewOpeningPolygon!.length >= 3) {
+      } else if (previewOpeningPolygon != null &&
+          previewOpeningPolygon!.length >= 3) {
         final opFill = Paint()
           ..color = opColor.withValues(alpha: 0.2)
           ..style = PaintingStyle.fill;
@@ -287,8 +290,16 @@ class StructuralPointerPainter extends CustomPainter {
         canvas.drawPath(path, opFill);
         canvas.drawPath(path, opBorder);
         if (previewOpeningPolygon!.length >= 4) {
-          canvas.drawLine(effectiveTip + previewOpeningPolygon![0], effectiveTip + previewOpeningPolygon![2], opBorder);
-          canvas.drawLine(effectiveTip + previewOpeningPolygon![1], effectiveTip + previewOpeningPolygon![3], opBorder);
+          canvas.drawLine(
+            effectiveTip + previewOpeningPolygon![0],
+            effectiveTip + previewOpeningPolygon![2],
+            opBorder,
+          );
+          canvas.drawLine(
+            effectiveTip + previewOpeningPolygon![1],
+            effectiveTip + previewOpeningPolygon![3],
+            opBorder,
+          );
         }
       } else if (openingStartCornerPos != null) {
         final opFill = Paint()
@@ -317,7 +328,9 @@ class StructuralPointerPainter extends CustomPainter {
     }
 
     // 4d. Live shear wall preview on pointer overlay (clearly visible above finger)
-    if (activeTool == StructuralDrawTool.shearWall && previewWallLengthScreen != null) {
+    if (previewElementPolygon == null &&
+        activeTool == StructuralDrawTool.shearWall &&
+        previewWallLengthScreen != null) {
       final wallFill = Paint()
         ..color = themeColor.withValues(alpha: 0.35)
         ..style = PaintingStyle.fill;
@@ -346,11 +359,17 @@ class StructuralPointerPainter extends CustomPainter {
 
       canvas.drawPath(path, wallFill);
       canvas.drawPath(path, wallBorder);
-      canvas.drawLine(effectiveTip - u * halfLen, effectiveTip + u * halfLen, wallBorder);
+      canvas.drawLine(
+        effectiveTip - u * halfLen,
+        effectiveTip + u * halfLen,
+        wallBorder,
+      );
     }
 
     // 4e. Live column preview on pointer overlay
-    if (activeTool == StructuralDrawTool.column && previewColumn != null) {
+    if (previewElementPolygon == null &&
+        activeTool == StructuralDrawTool.column &&
+        previewColumn != null) {
       final colFill = Paint()
         ..color = themeColor.withValues(alpha: 0.35)
         ..style = PaintingStyle.fill;
@@ -358,22 +377,53 @@ class StructuralPointerPainter extends CustomPainter {
         ..color = themeColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0;
-      final w = previewColumn!.width * scale;
-      final h = previewColumn!.height * scale;
-      final rot = previewColumn!.rotationRad;
-      if (rot.abs() < 1e-4) {
-        final rect = Rect.fromCenter(center: effectiveTip, width: w, height: h);
-        canvas.drawRect(rect, colFill);
-        canvas.drawRect(rect, colBorder);
-      } else {
-        canvas.save();
-        canvas.translate(effectiveTip.dx, effectiveTip.dy);
-        canvas.rotate(rot);
-        final rect = Rect.fromCenter(center: Offset.zero, width: w, height: h);
-        canvas.drawRect(rect, colFill);
-        canvas.drawRect(rect, colBorder);
-        canvas.restore();
-      }
+      final model = previewColumn!.copyWith(
+        center: Offset.zero,
+        width: previewColumn!.width * scale,
+        height: previewColumn!.height * scale,
+        thickness: previewColumn!.thickness * scale,
+      );
+      final polygon = model.polygonVertices
+          .map((p) => effectiveTip + Offset(p.dx, -p.dy))
+          .toList();
+      final path = Path()..addPolygon(polygon, true);
+      canvas.drawPath(path, colFill);
+      canvas.drawPath(path, colBorder);
+    }
+    if (previewElementPolygon != null && previewElementPolygon!.length >= 3) {
+      final path = Path()..addPolygon(previewElementPolygon!, true);
+      canvas.drawPath(path, Paint()..color = themeColor.withValues(alpha: .22));
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = themeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+    }
+    if (activeTool == StructuralDrawTool.column ||
+        activeTool == StructuralDrawTool.shearWall) {
+      final cross = Paint()
+        ..color = themeColor
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(effectiveTip, 3, Paint()..color = Colors.white);
+      canvas.drawLine(
+        effectiveTip - const Offset(7, 0),
+        effectiveTip + const Offset(7, 0),
+        cross,
+      );
+      canvas.drawLine(
+        effectiveTip - const Offset(0, 7),
+        effectiveTip + const Offset(0, 7),
+        cross,
+      );
+    }
+    if (showDetailLoupe &&
+        previewElementPolygon != null &&
+        (effectiveTip - touchPos).distance < 36 &&
+        size.width >= 110 &&
+        size.height >= 110) {
+      _drawDetailLoupe(canvas, size, effectiveTip, themeColor);
     }
 
     // 4c. Active measurement ruler line and architectural ticks
@@ -398,10 +448,17 @@ class StructuralPointerPainter extends CustomPainter {
         final ny = ux;
 
         void drawTick(Offset p) {
-          final t1 = Offset(p.dx + (nx + ux) * tickSize * 0.7, p.dy + (ny + uy) * tickSize * 0.7);
-          final t2 = Offset(p.dx - (nx + ux) * tickSize * 0.7, p.dy - (ny + uy) * tickSize * 0.7);
+          final t1 = Offset(
+            p.dx + (nx + ux) * tickSize * 0.7,
+            p.dy + (ny + uy) * tickSize * 0.7,
+          );
+          final t2 = Offset(
+            p.dx - (nx + ux) * tickSize * 0.7,
+            p.dy - (ny + uy) * tickSize * 0.7,
+          );
           canvas.drawLine(t1, t2, measurePaint..strokeWidth = 2.5);
         }
+
         drawTick(p1);
         drawTick(p2);
       }
@@ -409,22 +466,97 @@ class StructuralPointerPainter extends CustomPainter {
 
     // 5. Dimension badge (when drawing wall, beam, slab, custom opening, column/wall axis snap, or measuring)
     if (liveDimensionText != null) {
-      final startPos = wallStartPos ?? beamStartPos ?? slabStartCornerPos ?? openingStartCornerPos ?? measureStartPos;
+      final startPos =
+          wallStartPos ??
+          beamStartPos ??
+          slabStartCornerPos ??
+          openingStartCornerPos ??
+          measureStartPos;
       if (startPos != null) {
         _drawDimensionBadge(canvas, startPos, effectiveTip, liveDimensionText!);
       } else {
         // Floating badge directly above element when positioning along an axis
-        _drawDimensionBadge(canvas, effectiveTip, Offset(effectiveTip.dx, effectiveTip.dy - 35.0), liveDimensionText!);
+        _drawDimensionBadge(
+          canvas,
+          effectiveTip,
+          Offset(effectiveTip.dx, effectiveTip.dy - 35.0),
+          liveDimensionText!,
+        );
       }
     }
   }
 
-
-
-
+  void _drawDetailLoupe(Canvas canvas, Size size, Offset center, Color color) {
+    const radius = 42.0;
+    final location = Offset(
+      touchPos.dx.clamp(radius + 8, size.width - radius - 8).toDouble(),
+      (touchPos.dy - 100)
+          .clamp(radius + 8, size.height - radius - 8)
+          .toDouble(),
+    );
+    canvas.drawCircle(
+      location,
+      radius,
+      Paint()..color = const Color(0xF5FFFFFF),
+    );
+    canvas.save();
+    canvas.clipPath(
+      Path()..addOval(Rect.fromCircle(center: location, radius: radius - 2)),
+    );
+    canvas.translate(location.dx, location.dy);
+    canvas.scale(2);
+    canvas.translate(-center.dx, -center.dy);
+    final path = Path()..addPolygon(previewElementPolygon!, true);
+    canvas.drawPath(path, Paint()..color = color.withValues(alpha: .22));
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    for (final point in snappedPositions ?? <Offset>[]) {
+      _drawSnapIndicator(canvas, point, snapType ?? DxfSnapType.nearest, color);
+    }
+    canvas.drawLine(
+      center - const Offset(5, 0),
+      center + const Offset(5, 0),
+      Paint()
+        ..color = color
+        ..strokeWidth = .7,
+    );
+    canvas.drawLine(
+      center - const Offset(0, 5),
+      center + const Offset(0, 5),
+      Paint()
+        ..color = color
+        ..strokeWidth = .7,
+    );
+    canvas.restore();
+    canvas.drawCircle(
+      location,
+      radius,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+    final label = TextPainter(
+      text: const TextSpan(
+        text: '×2',
+        style: TextStyle(color: Colors.black87, fontSize: 11),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    label.paint(canvas, location + const Offset(24, -34));
+  }
 
   void _drawSnapIndicator(
-      Canvas canvas, Offset pos, DxfSnapType type, Color color) {
+    Canvas canvas,
+    Offset pos,
+    DxfSnapType type,
+    Color color,
+  ) {
     final snapPaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -434,8 +566,9 @@ class StructuralPointerPainter extends CustomPainter {
     switch (type) {
       case DxfSnapType.endpoint:
         canvas.drawRect(
-            Rect.fromCenter(center: pos, width: s * 2, height: s * 2),
-            snapPaint);
+          Rect.fromCenter(center: pos, width: s * 2, height: s * 2),
+          snapPaint,
+        );
         break;
       case DxfSnapType.midpoint:
         final path = Path()
@@ -463,8 +596,7 @@ class StructuralPointerPainter extends CustomPainter {
     }
   }
 
-  void _drawDimensionBadge(
-      Canvas canvas, Offset p1, Offset p2, String text) {
+  void _drawDimensionBadge(Canvas canvas, Offset p1, Offset p2, String text) {
     final mid = Offset((p1.dx + p2.dx) / 2.0, (p1.dy + p2.dy) / 2.0);
     final dx = p2.dx - p1.dx;
     final dy = p2.dy - p1.dy;
@@ -494,7 +626,12 @@ class StructuralPointerPainter extends CustomPainter {
     );
 
     final bgRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(badgeOffset.dx - 6, badgeOffset.dy - 3, tp.width + 12, tp.height + 6),
+      Rect.fromLTWH(
+        badgeOffset.dx - 6,
+        badgeOffset.dy - 3,
+        tp.width + 12,
+        tp.height + 6,
+      ),
       const Radius.circular(6),
     );
 
@@ -509,7 +646,11 @@ class StructuralPointerPainter extends CustomPainter {
     tp.paint(canvas, badgeOffset);
   }
 
-  void _drawStaircaseTreads(Canvas canvas, List<Offset> opPts, Paint borderPaint) {
+  void _drawStaircaseTreads(
+    Canvas canvas,
+    List<Offset> opPts,
+    Paint borderPaint,
+  ) {
     if (opPts.length < 4) return;
     final treadPaint = Paint()
       ..color = borderPaint.color.withValues(alpha: 0.65)
@@ -568,6 +709,9 @@ class StructuralPointerPainter extends CustomPainter {
   bool shouldRepaint(covariant StructuralPointerPainter oldDelegate) {
     return oldDelegate.touchPos != touchPos ||
         oldDelegate.targetPos != targetPos ||
+        oldDelegate.placementPos != placementPos ||
+        oldDelegate.previewElementPolygon != previewElementPolygon ||
+        oldDelegate.showDetailLoupe != showDetailLoupe ||
         oldDelegate.snappedPos != snappedPos ||
         oldDelegate.snappedPositions != snappedPositions ||
         oldDelegate.snapType != snapType ||

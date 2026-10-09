@@ -440,7 +440,7 @@ void main() {
       );
       final x = [
         ...r.columns.map((c) => c.center.dx),
-        ...r.walls.map((w) => w.center.dx),
+        ...r.walls.expand((w) => [w.start.dx, w.end.dx]),
       ]..sort();
       expect(x.length, greaterThanOrEqualTo(4));
       expect(x.first, lessThan(2));
@@ -561,7 +561,7 @@ void main() {
         expect(find.text(l.schemeVariantCore), findsNothing);
         expect(find.text(l.schemeVariantLong), findsNothing);
         // Upstream switches remain functional with the single-preview flow.
-        expect(find.byType(SwitchListTile), findsNWidgets(2));
+        expect(find.byType(SwitchListTile), findsNWidgets(3));
         await tester.ensureVisible(find.text(l.schemeGenerousDensity));
         await tester.tap(find.text(l.schemeGenerousDensity));
         await tester.pumpAndSettle();
@@ -648,6 +648,7 @@ void main() {
         scale: 1,
         options: const InitialSchemeOptions(
           generousDensity: true,
+          adaptiveSizes: false,
           targetSpacingM: 5.0,
         ),
       );
@@ -658,6 +659,7 @@ void main() {
         scale: 1,
         options: const InitialSchemeOptions(
           generousDensity: false,
+          adaptiveSizes: false,
           targetSpacingM: 5.0,
         ),
       );

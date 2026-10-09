@@ -75,7 +75,6 @@ class Structural2dPainter extends CustomPainter {
   final double zoomScale;
   final Offset Function(Offset) cadToScene;
   final double cadScale;
-  final StoreyLevel? overheadStorey;
   final bool hasBasement;
   final FoundationType foundationType;
   final List<List<Offset>>? stripFoundations;
@@ -84,7 +83,6 @@ class Structural2dPainter extends CustomPainter {
   const Structural2dPainter({
     required this.currentStorey,
     this.ghostStorey,
-    this.overheadStorey,
     this.hasBasement = false,
     this.foundationType = FoundationType.stripFooting,
     this.stripFoundations,
@@ -165,20 +163,7 @@ class Structural2dPainter extends CustomPainter {
       _drawGhostStorey(canvas, ghostStorey!);
     }
 
-    // 1b. Draw Overhead Slabs from the storey above (read-only ceiling underlay visible on the level below)
-    if (overheadStorey != null && overheadStorey!.slabs.isNotEmpty) {
-      for (int i = 0; i < overheadStorey!.slabs.length; i++) {
-        _drawSlab(
-          canvas,
-          overheadStorey!.slabs[i],
-          slabIndex: i,
-          isGhost: false,
-          isOverheadFromAbove: true,
-        );
-      }
-    }
-
-    // 2. The active storey owns its floor slabs; picking uses the same list.
+    // 2. The active storey owns its ceiling slabs and their openings.
     if (currentStorey.slabs.isNotEmpty) {
       for (int i = 0; i < currentStorey.slabs.length; i++) {
         _drawSlab(
@@ -186,7 +171,6 @@ class Structural2dPainter extends CustomPainter {
           currentStorey.slabs[i],
           slabIndex: i,
           isGhost: false,
-          isOverheadFromAbove: false,
         );
       }
     }
@@ -443,19 +427,15 @@ class Structural2dPainter extends CustomPainter {
     StructuralSlab slab,
     Color slabColor, {
     required bool isGhost,
-    bool isOverheadFromAbove = false,
   }) {
     if (isGhost || slab.polygon.length < 3) return;
 
     final centroidScene = cadToScene(slab.centroid);
-    final overheadElev = isOverheadFromAbove && overheadStorey != null
-        ? overheadStorey!.structuralElevationFor(slab)
-        : currentStorey.structuralElevationFor(slab);
+    final overheadElev = currentStorey.structuralElevationFor(slab);
     final int thickCm = (slab.thickness * 100).round();
 
     final sign = overheadElev > 0 ? '+' : (overheadElev == 0 ? '±' : '');
     final elevStr = '$sign${overheadElev.toStringAsFixed(2)}';
-    final tagStr = isOverheadFromAbove && l10n != null ? ' (${l10n!.overheadSlabTag})' : '';
 
     canvas.save();
     canvas.translate(centroidScene.dx, centroidScene.dy);
@@ -463,7 +443,7 @@ class Structural2dPainter extends CustomPainter {
 
     // Concise architectural section level marker (only elevation and thickness)
     final elevSpan = TextSpan(
-      text: '↑ $elevStr$tagStr',
+      text: '↑ $elevStr',
       style: const TextStyle(
         color: Colors.white,
         fontSize: 11.5,
@@ -552,11 +532,10 @@ class Structural2dPainter extends CustomPainter {
     StructuralSlab slab, {
     required int slabIndex,
     required bool isGhost,
-    bool isOverheadFromAbove = false,
   }) {
     if (slab.polygon.length < 3) return;
 
-    final isSelected = !isGhost && !isOverheadFromAbove && (slab.id == selectedSlabId);
+    final isSelected = !isGhost && (slab.id == selectedSlabId);
     List<Offset> polygon = slab.polygon;
     if (isSelected &&
         draggingSlabVertexIndex != null &&
@@ -588,36 +567,18 @@ class Structural2dPainter extends CustomPainter {
       }
     }
 
-    // Overhead slab from level above uses distinct violet/amethyst Color(0xFF7E57C2)
-    final slabColor = isOverheadFromAbove
-        ? const Color(0xFF7E57C2)
-        : _getSlabBaseColor(slab, slabIndex);
-
+    final slabColor = _getSlabBaseColor(slab, slabIndex);
     final fillPaint = Paint()
-      ..color = isOverheadFromAbove
-          ? const Color(0xFF7E57C2).withValues(alpha: 0.12)
-          : (isGhost
-              ? slabColor.withValues(alpha: 0.08)
-              : (isSelected
-                  ? slabColor.withValues(alpha: 0.35)
-                  : slabColor.withValues(alpha: 0.18)))
+      ..color = slabColor.withValues(alpha: isGhost ? .08 : isSelected ? .35 : .18)
       ..style = PaintingStyle.fill;
-
     final borderPaint = Paint()
-      ..color = isOverheadFromAbove
-          ? const Color(0xFFB39DDB)
-          : (isGhost
-              ? slabColor.withValues(alpha: 0.35)
-              : (isSelected ? Colors.white : slabColor))
+      ..color = isGhost ? slabColor.withValues(alpha: .35)
+          : isSelected ? Colors.white : slabColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isOverheadFromAbove
-          ? (1.5 / zoomScale)
-          : (isGhost
-              ? (1.0 / zoomScale)
-              : (isSelected ? (2.5 / zoomScale) : (1.8 / zoomScale)));
+      ..strokeWidth = (isGhost ? 1.0 : isSelected ? 2.5 : 1.8) / zoomScale;
 
     final bool isSlabTool = activeTool == StructuralDrawTool.slab;
-    if (isSlabTool || isOverheadFromAbove) {
+    if (isSlabTool) {
       canvas.drawPath(path, fillPaint);
     }
 
@@ -719,7 +680,6 @@ class Structural2dPainter extends CustomPainter {
         slab,
         slabColor,
         isGhost: isGhost,
-        isOverheadFromAbove: isOverheadFromAbove,
       );
     }
 

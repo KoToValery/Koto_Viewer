@@ -37,8 +37,12 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   late final target = TextEditingController(
     text: widget.options.targetSpacingM.toString(),
   );
+  late final maxWallLength = TextEditingController(
+    text: widget.options.effectiveMaxWallLengthM.toString(),
+  );
   late bool enforcePaired = widget.options.enforcePairedWalls;
   late bool generousDensity = widget.options.generousDensity;
+  late bool adaptiveSizes = widget.options.adaptiveSizes;
   late final List<(Offset, Offset)> effectiveClosureSegments =
       widget.closureSegments.isNotEmpty
       ? widget.closureSegments
@@ -59,6 +63,7 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   void dispose() {
     min.dispose();
     target.dispose();
+    maxWallLength.dispose();
     super.dispose();
   }
 
@@ -70,11 +75,14 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
       columnShape: o.columnShape,
       columnThicknessM: o.columnThicknessM,
       wallLengthM: o.wallLengthM,
+      maxWallLengthM:
+          double.tryParse(maxWallLength.text.replaceAll(',', '.')) ?? 0,
       wallThicknessM: o.wallThicknessM,
       columnWidthM: o.columnWidthM,
       columnDepthM: o.columnDepthM,
       enforcePairedWalls: enforcePaired,
       generousDensity: generousDensity,
+      adaptiveSizes: adaptiveSizes,
     );
     if (!options.valid) {
       error = true;
@@ -100,9 +108,13 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
       String position(Offset p) =>
           '${(p.dx / widget.scale / .05).round()},${(p.dy / widget.scale / .05).round()}';
       final ids = [
-        ...candidate.columns.map((c) => 'c:${position(c.center)}'),
+        ...candidate.columns.map(
+          (c) =>
+              'c:${position(c.center)}:${(c.width / widget.scale / .05).round()}:${(c.height / widget.scale / .05).round()}',
+        ),
         ...candidate.walls.map(
-          (w) => 'w:${position(w.start)}:${position(w.end)}',
+          (w) =>
+              'w:${position(w.start)}:${position(w.end)}:${(w.thickness / widget.scale / .05).round()}',
         ),
       ]..sort();
       if (!seenLayouts.add(ids.join('|'))) continue;
@@ -129,6 +141,18 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final p = proposal;
+    final sectionCounts = <String, int>{};
+    for (final c in p.columns) {
+      final section =
+          '${(c.width / widget.scale * 100).round()}×${(c.height / widget.scale * 100).round()} cm';
+      sectionCounts.update(section, (n) => n + 1, ifAbsent: () => 1);
+    }
+    final wallSections = <String, int>{};
+    for (final w in p.walls) {
+      final section =
+          '${(w.thickness / widget.scale * 100).round()} cm × ${(w.length / widget.scale).toStringAsFixed(2)} m';
+      wallSections.update(section, (n) => n + 1, ifAbsent: () => 1);
+    }
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 920),
@@ -143,83 +167,133 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
-              Text(l.schemeFresh),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  SizedBox(
-                    width: 180,
-                    child: TextField(
-                      controller: min,
-                      onChanged: (_) => setState(() {
-                        dirty = true;
-                        confirmed = false;
-                      }),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: l.schemeMinSpacing,
+              Text(
+                p.continuationSource == null
+                    ? l.schemeFresh
+                    : l.schemeContinueLower(p.continuationSource!),
+              ),
+              if ((p.rejectionReasons['continuity'] ?? 0) > 0)
+                Text(
+                  l.schemeContinuityReview,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              if (p.continuationSource == null) ...[
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    SizedBox(
+                      width: 180,
+                      child: TextField(
+                        controller: min,
+                        onChanged: (_) => setState(() {
+                          dirty = true;
+                          confirmed = false;
+                        }),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: l.schemeMinSpacing,
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(
-                    width: 180,
-                    child: TextField(
-                      controller: target,
-                      onChanged: (_) => setState(() {
-                        dirty = true;
-                        confirmed = false;
-                      }),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: l.schemeTargetSpacing,
+                    SizedBox(
+                      width: 180,
+                      child: TextField(
+                        controller: target,
+                        onChanged: (_) => setState(() {
+                          dirty = true;
+                          confirmed = false;
+                        }),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: l.schemeTargetSpacing,
+                        ),
                       ),
                     ),
-                  ),
-                  TextButton(
-                    key: const ValueKey('next-scheme'),
-                    onPressed: () => setState(rebuild),
-                    child: Text(l.schemeRebuild),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                value: enforcePaired,
-                onChanged: (v) => setState(() {
-                  enforcePaired = v;
-                  dirty = true;
-                  confirmed = false;
-                  rebuild();
-                }),
-                title: Text(l.schemePairedWalls),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                value: generousDensity,
-                onChanged: (v) => setState(() {
-                  generousDensity = v;
-                  dirty = true;
-                  confirmed = false;
-                  rebuild();
-                }),
-                title: Text(l.schemeGenerousDensity),
-              ),
+                    SizedBox(
+                      width: 180,
+                      child: TextField(
+                        key: const ValueKey('scheme-max-wall-length'),
+                        controller: maxWallLength,
+                        onChanged: (_) => setState(() {
+                          dirty = true;
+                          confirmed = false;
+                        }),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: l.schemeMaxWallLength,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      key: const ValueKey('next-scheme'),
+                      onPressed: () => setState(rebuild),
+                      child: Text(l.schemeRebuild),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  value: enforcePaired,
+                  onChanged: (v) => setState(() {
+                    enforcePaired = v;
+                    dirty = true;
+                    confirmed = false;
+                    rebuild();
+                  }),
+                  title: Text(l.schemePairedWalls),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  value: generousDensity,
+                  onChanged: (v) => setState(() {
+                    generousDensity = v;
+                    dirty = true;
+                    confirmed = false;
+                    rebuild();
+                  }),
+                  title: Text(l.schemeGenerousDensity),
+                ),
+                SwitchListTile(
+                  key: const ValueKey('adaptive-scheme-sizes'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  value: adaptiveSizes,
+                  onChanged: (v) => setState(() {
+                    adaptiveSizes = v;
+                    dirty = true;
+                    confirmed = false;
+                    rebuild();
+                  }),
+                  title: Text(l.schemeAdaptiveSizes),
+                ),
+              ],
               if (error)
                 Text(
                   l.schemeInvalidOptions,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               const SizedBox(height: 8),
-              Text('${l.schemeVariant}: $displayedVariant'),
+              if (p.continuationSource == null)
+                Text('${l.schemeVariant}: $displayedVariant'),
               Text('${p.columns.length} C · ${p.walls.length} W'),
+              if (sectionCounts.isNotEmpty)
+                Text(
+                  '${l.columns}: ${sectionCounts.entries.map((e) => "${e.key} (${e.value})").join(" · ")}',
+                ),
+              if (wallSections.isNotEmpty)
+                Text(
+                  '${l.schemeWallSections}: ${wallSections.entries.map((e) => "${e.key} (${e.value})").join(" · ")}',
+                ),
               if (noAlternative) Text(l.schemeNoAlternative),
               SizedBox(
                 height: 320,
@@ -245,12 +319,18 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
               if (widget.pairs.isEmpty) Text(l.schemeNoWalls),
               if (p.isEmpty) Text(l.schemeNoCandidates),
               if (p.limited) Text(l.schemeLimits),
+              if (p.continuationSource != null && p.uncoveredSamples > 0)
+                Text(
+                  l.schemeBlockedContinuations(p.uncoveredSamples),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               Text('${l.schemeUnresolved}: ${p.unresolvedRegions}'),
               Text('${l.schemeRejected}: ${p.rejectedCandidates}'),
-              Text(
-                '${l.schemeCoverage}: ${p.uncoveredSamples} · '
-                '${p.maxSupportDistanceM.isFinite ? p.maxSupportDistanceM.toStringAsFixed(2) : '—'} m',
-              ),
+              if (p.continuationSource == null)
+                Text(
+                  '${l.schemeCoverage}: ${p.uncoveredSamples} · '
+                  '${p.maxSupportDistanceM.isFinite ? p.maxSupportDistanceM.toStringAsFixed(2) : '—'} m',
+                ),
               Text(l.schemeEurocodeScope),
               Text(
                 p.maxSupportSpanM == null
@@ -266,6 +346,27 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
                 Text(
                   '${l.schemeOpeningFallback}: ${p.openingColumnIds.length}',
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              Text(
+                '${l.schemeWallDensity}: X ${p.wallRatioX.toStringAsFixed(2)}% · Y ${p.wallRatioY.toStringAsFixed(2)}%',
+              ),
+              if (p.wallDeficitXM2 > 1e-6 || p.wallDeficitYM2 > 1e-6)
+                Text(
+                  '${l.schemeWallDeficit}: X ${p.wallDeficitXM2.toStringAsFixed(2)} m² · Y ${p.wallDeficitYM2.toStringAsFixed(2)} m²',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              if (p.resizedColumnIds.isNotEmpty)
+                Text('${l.schemeResizedColumns}: ${p.resizedColumnIds.length}'),
+              if (p.columnSizingReviewIds.isNotEmpty)
+                Text(
+                  '${l.schemeSizingReview}: ${p.columnSizingReviewIds.length}',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              if (p.rejectionReasons.isNotEmpty)
+                Text(
+                  '${l.schemePlacementReasons}: ${l.schemeWallConstraint} ${p.rejectionReasons['wall'] ?? 0} · '
+                  '${l.schemeSlabConstraint} ${p.rejectionReasons['slab'] ?? 0} · '
+                  '${l.schemeSpacingConstraint} ${(p.rejectionReasons['spacing'] ?? 0) + (p.rejectionReasons['collision'] ?? 0)}',
                 ),
               Text(l.schemePreliminary),
               TextButton(
@@ -486,10 +587,18 @@ class _SchemePainter extends CustomPainter {
       )..layout();
       label.paint(canvas, screen((span.$1 + span.$2) / 2));
     }
-    for (final c in floor.columns) {
+    for (final c in floor.columns.where(
+      (c) =>
+          !proposal.replacesGeneratedSupports ||
+          !(c.generatedBy?.startsWith('initial-scheme') ?? false),
+    )) {
       draw(c.polygonVertices, Colors.grey, fill: true);
     }
-    for (final w in floor.shearWalls) {
+    for (final w in floor.shearWalls.where(
+      (w) =>
+          !proposal.replacesGeneratedSupports ||
+          !(w.generatedBy?.startsWith('initial-scheme') ?? false),
+    )) {
       draw(w.polygonVertices, Colors.grey, fill: true);
     }
     for (final c in proposal.columns) {

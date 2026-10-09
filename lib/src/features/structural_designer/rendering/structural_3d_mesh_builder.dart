@@ -23,12 +23,14 @@ class Structural3dMeshBuilder {
     final List<ElementMeshGroup> groups = [];
 
     for (int sIdx = 0; sIdx < project.storeys.length; sIdx++) {
-      final storey = project.storeys[sIdx];
+      final storey = project.resolveCeilingStorey(project.storeys[sIdx]);
       final bool isCurrentStorey =
           highlightStoreyIndex == null || highlightStoreyIndex == sIdx;
 
       final double zBase = storey.elevation * cadUnitsPerMeter;
-      final double zTop = (storey.elevation + storey.height - storey.floorFinishThickness) * cadUnitsPerMeter;
+      final double zTop =
+          (storey.elevation + storey.height - storey.floorFinishThickness) *
+          cadUnitsPerMeter;
       final List<Triangle3D> storeyTriangles = [];
 
       // 0. Extrude Ground Foundations (Strip footings or Mat) at elevation 0.00 if no basement
@@ -45,8 +47,12 @@ class Structural3dMeshBuilder {
               strip,
               zFoundBottom,
               zFoundTop,
-              topColor: isCurrentStorey ? const Color(0xFF607D8B) : const Color(0x66607D8B),
-              sideColor: isCurrentStorey ? const Color(0xFF455A64) : const Color(0x66455A64),
+              topColor: isCurrentStorey
+                  ? const Color(0xFF607D8B)
+                  : const Color(0x66607D8B),
+              sideColor: isCurrentStorey
+                  ? const Color(0xFF455A64)
+                  : const Color(0x66455A64),
             );
             storeyTriangles.addAll(fTris);
           }
@@ -57,13 +63,18 @@ class Structural3dMeshBuilder {
           );
           if (mat != null) {
             final double zFoundTop = zBase;
-            final double zFoundBottom = zBase - mat.thickness * cadUnitsPerMeter;
+            final double zFoundBottom =
+                zBase - mat.thickness * cadUnitsPerMeter;
             final fTris = _extrudePolygon(
               mat.polygon,
               zFoundBottom,
               zFoundTop,
-              topColor: isCurrentStorey ? const Color(0xFF607D8B) : const Color(0x66607D8B),
-              sideColor: isCurrentStorey ? const Color(0xFF455A64) : const Color(0x66455A64),
+              topColor: isCurrentStorey
+                  ? const Color(0xFF607D8B)
+                  : const Color(0x66607D8B),
+              sideColor: isCurrentStorey
+                  ? const Color(0xFF455A64)
+                  : const Color(0x66455A64),
             );
             storeyTriangles.addAll(fTris);
           }
@@ -73,7 +84,8 @@ class Structural3dMeshBuilder {
       // 1. Extrude Columns (with EC2 vertical capacity & EC8 floating column color tinting)
       for (final col in storey.columns) {
         final vCheck = verticalReport?.getCheckForColumn(col.id);
-        final bool isFloating = seismicReport?.isColumnFloating(col.id) ?? false;
+        final bool isFloating =
+            seismicReport?.isColumnFloating(col.id) ?? false;
         final Color topColor;
         final Color sideColor;
 
@@ -85,7 +97,8 @@ class Structural3dMeshBuilder {
           sideColor = isCurrentStorey
               ? const Color(0xFFAA00FF)
               : const Color(0x99AA00FF);
-        } else if (vCheck != null && vCheck.status == VerticalCapacityStatus.critical) {
+        } else if (vCheck != null &&
+            vCheck.status == VerticalCapacityStatus.critical) {
           // Red glowing alert for overloaded columns
           topColor = isCurrentStorey
               ? const Color(0xFFFF1744)
@@ -93,7 +106,8 @@ class Structural3dMeshBuilder {
           sideColor = isCurrentStorey
               ? const Color(0xFFD50000)
               : const Color(0x99D50000);
-        } else if (vCheck != null && vCheck.status == VerticalCapacityStatus.warning) {
+        } else if (vCheck != null &&
+            vCheck.status == VerticalCapacityStatus.warning) {
           // Amber/Orange alert for near-capacity columns
           topColor = isCurrentStorey
               ? const Color(0xFFFFD54F)
@@ -140,7 +154,7 @@ class Structural3dMeshBuilder {
       // 2b. Extrude Beams (reinforced concrete beams underneath the slab at ceiling level)
       for (final beam in storey.beams) {
         final double beamZTop = zTop;
-        final double beamZBottom = zTop - beam.depth;
+        final double beamZBottom = zTop - beam.depth * cadUnitsPerMeter;
         final beamTris = _extrudePolygon(
           beam.polygonVertices,
           beamZBottom,
@@ -173,11 +187,13 @@ class Structural3dMeshBuilder {
             ? Color(slab.colorValue!)
             : slab3dPalette[slabIdx % slab3dPalette.length];
 
-        final double slabZTop = storey.structuralElevationFor(slab) * cadUnitsPerMeter;
-        final double slabZBottom = storey.slabSoffitElevationFor(slab) * cadUnitsPerMeter;
+        final double slabZTop =
+            storey.structuralElevationFor(slab) * cadUnitsPerMeter;
+        final double slabZBottom =
+            storey.slabSoffitElevationFor(slab) * cadUnitsPerMeter;
 
-        final slabTris = _extrudePolygon(
-          slab.polygon,
+        final slabTris = _extrudeSlab(
+          slab,
           slabZBottom,
           slabZTop,
           topColor: isCurrentStorey
@@ -206,18 +222,82 @@ class Structural3dMeshBuilder {
       }
 
       triangles.addAll(storeyTriangles);
-      groups.add(ElementMeshGroup(
-        id: storey.id,
-        category: storey.name,
-        triangles: storeyTriangles,
-      ));
+      groups.add(
+        ElementMeshGroup(
+          id: storey.id,
+          category: storey.name,
+          triangles: storeyTriangles,
+        ),
+      );
     }
 
-    return Mesh3D(
-      name: project.title,
-      triangles: triangles,
-      groups: groups,
+    return Mesh3D(name: project.title, triangles: triangles, groups: groups);
+  }
+
+  /// Split the planar plate into horizontal trapezoids between ring vertices.
+  /// Even/odd crossings handle concave outlines and every opening without
+  /// drawing cap triangles across voids. Winding of the rings is irrelevant.
+  static List<Triangle3D> _extrudeSlab(
+    StructuralSlab slab,
+    double zMin,
+    double zMax, {
+    required Color topColor,
+    required Color sideColor,
+  }) {
+    final rings = [slab.polygon, ...slab.openings];
+    final tris = _extrudeSidesOnly(
+      slab.polygon,
+      zMin,
+      zMax,
+      sideColor: sideColor,
     );
+    final ys = rings.expand((r) => r.map((p) => p.dy)).toSet().toList()..sort();
+    for (var band = 0; band + 1 < ys.length; band++) {
+      final low = ys[band], high = ys[band + 1];
+      final mid = low + (high - low) / 2;
+      final edges = <(Offset, Offset)>[];
+      for (final ring in rings) {
+        for (var i = 0; i < ring.length; i++) {
+          final a = ring[i], b = ring[(i + 1) % ring.length];
+          if ((a.dy < mid && b.dy > mid) || (b.dy < mid && a.dy > mid)) {
+            edges.add((a, b));
+          }
+        }
+      }
+      double xAt((Offset, Offset) edge, double y) =>
+          edge.$1.dx +
+          (edge.$2.dx - edge.$1.dx) *
+              (y - edge.$1.dy) /
+              (edge.$2.dy - edge.$1.dy);
+      edges.sort((a, b) => xAt(a, mid).compareTo(xAt(b, mid)));
+      for (var i = 0; i + 1 < edges.length; i += 2) {
+        final poly = [
+          Offset(xAt(edges[i], low), low),
+          Offset(xAt(edges[i + 1], low), low),
+          Offset(xAt(edges[i + 1], high), high),
+          Offset(xAt(edges[i], high), high),
+        ];
+        for (final z in [zMax, zMin]) {
+          for (final vertices in [
+            [poly[0], poly[1], poly[2]],
+            [poly[0], poly[2], poly[3]],
+          ]) {
+            if (StructuralSlab.calculateArea(vertices) <= 0) continue;
+            final v = vertices.map((p) => Vector3(p.dx, p.dy, z)).toList();
+            tris.add(
+              Triangle3D(
+                v0: v[0],
+                v1: z == zMax ? v[1] : v[2],
+                v2: z == zMax ? v[2] : v[1],
+                color: z == zMax ? topColor : sideColor,
+                isDoubleSided: true,
+              ),
+            );
+          }
+        }
+      }
+    }
+    return tris;
   }
 
   /// Extrudes a 2D polygon in XY plane vertically between [zMin] and [zMax].
@@ -242,20 +322,24 @@ class Structural3dMeshBuilder {
       final v2 = Vector3(p2.dx, p2.dy, zMax);
       final v3 = Vector3(p1.dx, p1.dy, zMax);
 
-      tris.add(Triangle3D(
-        v0: v0,
-        v1: v1,
-        v2: v2,
-        color: sideColor,
-        isDoubleSided: true,
-      ));
-      tris.add(Triangle3D(
-        v0: v0,
-        v1: v2,
-        v2: v3,
-        color: sideColor,
-        isDoubleSided: true,
-      ));
+      tris.add(
+        Triangle3D(
+          v0: v0,
+          v1: v1,
+          v2: v2,
+          color: sideColor,
+          isDoubleSided: true,
+        ),
+      );
+      tris.add(
+        Triangle3D(
+          v0: v0,
+          v1: v2,
+          v2: v3,
+          color: sideColor,
+          isDoubleSided: true,
+        ),
+      );
     }
 
     // 2. Top and Bottom Caps (Simple Ear-clipping or Triangle Fan)
@@ -263,8 +347,11 @@ class Structural3dMeshBuilder {
     final bottomVerts = poly.map((p) => Vector3(p.dx, p.dy, zMin)).toList();
 
     final topTris = _triangulatePolygon(topVerts, topColor, isNormalUp: true);
-    final bottomTris =
-        _triangulatePolygon(bottomVerts, sideColor, isNormalUp: false);
+    final bottomTris = _triangulatePolygon(
+      bottomVerts,
+      sideColor,
+      isNormalUp: false,
+    );
 
     tris.addAll(topTris);
     tris.addAll(bottomTris);
@@ -288,21 +375,25 @@ class Structural3dMeshBuilder {
       final vB = verts[i + 1];
 
       if (isNormalUp) {
-        tris.add(Triangle3D(
-          v0: vRoot,
-          v1: vA,
-          v2: vB,
-          color: color,
-          isDoubleSided: true,
-        ));
+        tris.add(
+          Triangle3D(
+            v0: vRoot,
+            v1: vA,
+            v2: vB,
+            color: color,
+            isDoubleSided: true,
+          ),
+        );
       } else {
-        tris.add(Triangle3D(
-          v0: vRoot,
-          v1: vB,
-          v2: vA,
-          color: color,
-          isDoubleSided: true,
-        ));
+        tris.add(
+          Triangle3D(
+            v0: vRoot,
+            v1: vB,
+            v2: vA,
+            color: color,
+            isDoubleSided: true,
+          ),
+        );
       }
     }
 
@@ -329,20 +420,24 @@ class Structural3dMeshBuilder {
       final v2 = Vector3(p2.dx, p2.dy, zMax);
       final v3 = Vector3(p1.dx, p1.dy, zMax);
 
-      tris.add(Triangle3D(
-        v0: v0,
-        v1: v1,
-        v2: v2,
-        color: sideColor,
-        isDoubleSided: true,
-      ));
-      tris.add(Triangle3D(
-        v0: v0,
-        v1: v2,
-        v2: v3,
-        color: sideColor,
-        isDoubleSided: true,
-      ));
+      tris.add(
+        Triangle3D(
+          v0: v0,
+          v1: v1,
+          v2: v2,
+          color: sideColor,
+          isDoubleSided: true,
+        ),
+      );
+      tris.add(
+        Triangle3D(
+          v0: v0,
+          v1: v2,
+          v2: v3,
+          color: sideColor,
+          isDoubleSided: true,
+        ),
+      );
     }
     return tris;
   }

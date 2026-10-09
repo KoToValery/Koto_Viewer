@@ -96,7 +96,10 @@ class StructuralSchemeReadiness {
           !soffit.isFinite ||
           !slab.thickness.isFinite ||
           slab.thickness <= 0 ||
-          soffit <= active.elevation) {
+          slab.thickness + (slab.floorFinish ?? active.floorFinishThickness) >=
+              active.height ||
+          soffit <= active.elevation ||
+          top > active.elevation + active.height) {
         issues.add(SchemeReadinessIssue.invalidSlabLevel);
       }
       for (var i = 0; i < slab.openings.length; i++) {
@@ -112,7 +115,8 @@ class StructuralSchemeReadiness {
         );
       }
     }
-    if (!refs.any((r) => r.type == SlabOpeningType.staircase)) {
+    if (!project.storeys.any((s) => s.elevation < active.elevation - 1e-6) &&
+        !refs.any((r) => r.type == SlabOpeningType.staircase)) {
       issues.add(SchemeReadinessIssue.missingStaircase);
     }
     return StructuralSchemeReadiness(

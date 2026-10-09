@@ -1,9 +1,5 @@
-import 'dart:math' as math;
 import 'dart:ui';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
-import 'package:kotoview/src/features/dxf_viewer/rendering/dxf_snap_helper.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
 import 'package:kotoview/src/features/structural_designer/rendering/structural_2d_painter.dart';
 import 'package:kotoview/src/features/structural_designer/rendering/structural_pointer_painter.dart';
@@ -53,7 +49,7 @@ void main() {
       expect(wall.polygonVertices.length, equals(4));
     });
 
-    test('StructuralPointerPainter draws guideline stem to the top end of a column, not center', () {
+    test('StructuralPointerPainter paints the column insertion reference and pointer', () {
       const column = StructuralColumn(
         id: 'col_preview',
         center: Offset(100.0, 200.0),
@@ -77,7 +73,7 @@ void main() {
       expect(picture, isNotNull);
     });
 
-    test('StructuralPointerPainter draws guideline stem to the start of a shear wall, not center', () {
+    test('StructuralPointerPainter paints the wall insertion reference and pointer', () {
       final painter = StructuralPointerPainter(
         touchPos: const Offset(100.0, 300.0),
         targetPos: const Offset(100.0, 200.0),
@@ -95,8 +91,8 @@ void main() {
     });
   });
 
-  group('Storey Slab Level and Overhead Visibility Tests', () {
-    test('Slab structural elevation at level 0.00 is at level 0.00, not ceiling level 2.80', () {
+  group('Storey Ceiling Slab Level and Visibility Tests', () {
+    test('Slab structural elevation at level 0.00 is above level 0.00 at ceiling level 2.80', () {
       const storey0 = StoreyLevel(
         id: 'st_0',
         name: 'Партер (Кота ±0.00)',
@@ -116,16 +112,15 @@ void main() {
         thickness: 0.20,
       );
 
-      // Floor slab of storey 0: concrete top is 0.00 - 0.05 = -0.05
+      // Ceiling of storey 0: concrete top is 0.00 + 2.80 - 0.05 = 2.75
       final elev = storey0.structuralElevationFor(slab);
-      expect(elev, closeTo(-0.05, 1e-4));
-      expect(elev, isNot(closeTo(2.75, 1e-4))); // NOT the ceiling!
+      expect(elev, closeTo(2.75, 1e-4));
 
       final soffit = storey0.slabSoffitElevationFor(slab);
-      expect(soffit, closeTo(-0.25, 1e-4));
+      expect(soffit, closeTo(2.55, 1e-4));
     });
 
-    test('Slab structural elevation at level 2.80 is at level 2.80, not level 5.60', () {
+    test('Slab structural elevation at level 2.80 is above level 2.80 at ceiling level 5.60', () {
       const storey1 = StoreyLevel(
         id: 'st_1',
         name: 'Етаж 1 (Кота +2.80)',
@@ -146,11 +141,10 @@ void main() {
       );
 
       final elev = storey1.structuralElevationFor(slab);
-      expect(elev, closeTo(2.75, 1e-4));
-      expect(elev, isNot(closeTo(5.55, 1e-4)));
+      expect(elev, closeTo(5.55, 1e-4));
     });
 
-    test('Structural2dPainter paints overhead slabs from storey above cleanly and read-only', () {
+    test('Structural2dPainter paints the active ceiling slab cleanly', () {
       const slabFloor2 = StructuralSlab(
         id: 'slab_lvl2',
         polygon: [
@@ -167,7 +161,7 @@ void main() {
         name: 'Floor 1',
         elevation: 0.0,
         height: 2.80,
-        slabs: [],
+        slabs: [slabFloor2],
       );
 
       const storey2 = StoreyLevel(
@@ -178,9 +172,9 @@ void main() {
         slabs: [slabFloor2],
       );
 
+      expect(storey2.structuralElevationFor(slabFloor2), closeTo(5.55, 1e-4));
       final painter = Structural2dPainter(
         currentStorey: storey1,
-        overheadStorey: storey2, // Passed from storey directly above
         cadToScene: (pt) => pt * 20.0,
         cadScale: 1.0,
         zoomScale: 1.0,
