@@ -2137,6 +2137,40 @@ class StructuralProject {
   List<StoreyLevel> get ceilingStoreys =>
       storeys.map(resolveCeilingStorey).toList();
 
+  /// A floor plate is the ceiling owned by the nearest lower storey. Keep that
+  /// ownership for loads, openings and edits; views only reference the plate.
+  StoreyLevel? floorSlabStoreyFor(StoreyLevel storey) {
+    StoreyLevel? lower;
+    for (final candidate in storeys) {
+      if (candidate.elevation < storey.elevation - 1e-6 &&
+          (lower == null || candidate.elevation > lower.elevation)) {
+        lower = candidate;
+      }
+    }
+    if (lower == null) return null;
+    final owner = resolveCeilingStorey(lower);
+    final floorSlabs = owner.slabs.where((slab) {
+      final finishedLevel = owner.structuralElevationFor(slab) +
+          (slab.floorFinish ?? owner.floorFinishThickness);
+      return (finishedLevel - storey.elevation).abs() < .01;
+    }).toList();
+    return floorSlabs.isEmpty ? null : owner.copyWith(slabs: floorSlabs);
+  }
+
+  /// Drawing/export view only. These references must not be saved as an upper
+  /// storey's ceiling slabs or included twice in structural calculations.
+  StoreyLevel storeyPlanFor(StoreyLevel storey) {
+    final ceiling = resolveCeilingStorey(storey);
+    final floor = floorSlabStoreyFor(storey);
+    if (floor == null) return ceiling;
+    return ceiling.copyWith(slabs: [
+      ...ceiling.slabs,
+      for (final slab in floor.slabs)
+        if (!ceiling.slabs.any((s) => s.id == slab.id))
+          slab.copyWith(topElevation: floor.structuralElevationFor(slab)),
+    ]);
+  }
+
   /// Effective grid axes instances shared across the entire project.
   List<StructuralGridAxis> get effectiveGridAxes {
     if (gridAxes.isNotEmpty) return gridAxes;

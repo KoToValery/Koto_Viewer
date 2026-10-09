@@ -2459,5 +2459,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "bimFloorSlabReference": "Floor slab at {level} — ceiling of storey {owner}",
+  "@bimFloorSlabReference": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      },
+      "owner": {
+        "type": "String"
+      }
+    }
+  },
+  "bimEditFloorSlab": "Edit floor slab"
 }

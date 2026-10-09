@@ -68,7 +68,7 @@ class BimExportService {
     final structDxfFile =
         await StructuralPersistenceService.exportStoreyToDxfFile(
           storey: structural
-              .resolveCeilingStorey(structStorey)
+              .storeyPlanFor(structStorey)
               .copyWith(gridAxes: structural.effectiveGridAxes),
           baseName: outBaseName,
           cpRef: cpRef,

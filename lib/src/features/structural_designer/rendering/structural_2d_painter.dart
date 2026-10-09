@@ -14,6 +14,7 @@ import 'structural_overview_layout.dart';
 /// interactive drawing previews, and cantilever warning zones projected onto CAD scene coordinates.
 class Structural2dPainter extends CustomPainter {
   final StoreyLevel currentStorey;
+  final StoreyLevel? floorSlabStorey;
   final StoreyLevel? ghostStorey;
   final List<CantileverZone> cantileverZones;
   final VerticalCapacityReport? verticalReport;
@@ -87,6 +88,7 @@ class Structural2dPainter extends CustomPainter {
 
   const Structural2dPainter({
     required this.currentStorey,
+    this.floorSlabStorey,
     this.ghostStorey,
     this.hasBasement = false,
     this.foundationType = FoundationType.stripFooting,
@@ -169,6 +171,17 @@ class Structural2dPainter extends CustomPainter {
     // 1. Draw Ghost Storey (Trace Reference underlay) if enabled
     if (ghostStorey != null) {
       _drawGhostStorey(canvas, ghostStorey!);
+    }
+
+    // The lower storey's ceiling is also this storey's floor. Show it even
+    // with trace reference off, without making it an editable roof plate.
+    final floor = floorSlabStorey;
+    if (floor != null) {
+      for (var i = 0; i < floor.slabs.length; i++) {
+        _drawSlab(canvas, floor.slabs[i], slabIndex: i,
+          isGhost: currentStorey.slabs.isNotEmpty, readOnly: true,
+          levelOwner: floor, isFloor: true);
+      }
     }
 
     // 2. The active storey owns its ceiling slabs and their openings.
@@ -475,6 +488,7 @@ class Structural2dPainter extends CustomPainter {
 
   void _drawGhostStorey(Canvas canvas, StoreyLevel ghost) {
     for (int i = 0; i < ghost.slabs.length; i++) {
+      if (floorSlabStorey?.slabs.any((s) => s.id == ghost.slabs[i].id) == true) continue;
       _drawSlab(canvas, ghost.slabs[i], slabIndex: i, isGhost: true);
     }
     for (final beam in ghost.beams) {
@@ -558,11 +572,13 @@ class Structural2dPainter extends CustomPainter {
     StructuralSlab slab,
     Color slabColor, {
     required bool isGhost,
+    StoreyLevel? levelOwner,
+    bool isFloor = false,
   }) {
     if (isGhost || slab.polygon.length < 3) return;
 
     final centroidScene = cadToScene(slab.centroid);
-    final overheadElev = currentStorey.structuralElevationFor(slab);
+    final overheadElev = (levelOwner ?? currentStorey).structuralElevationFor(slab);
     final int thickCm = (slab.thickness * 100).round();
 
     final sign = overheadElev > 0 ? '+' : (overheadElev == 0 ? '±' : '');
@@ -574,7 +590,7 @@ class Structural2dPainter extends CustomPainter {
 
     // Concise architectural section level marker (only elevation and thickness)
     final elevSpan = TextSpan(
-      text: '↑ $elevStr',
+      text: '${isFloor ? '↓' : '↑'} $elevStr',
       style: const TextStyle(
         color: Colors.white,
         fontSize: 11.5,
@@ -663,10 +679,13 @@ class Structural2dPainter extends CustomPainter {
     StructuralSlab slab, {
     required int slabIndex,
     required bool isGhost,
+    bool readOnly = false,
+    StoreyLevel? levelOwner,
+    bool isFloor = false,
   }) {
     if (slab.polygon.length < 3) return;
 
-    final isSelected = !isGhost && (slab.id == selectedSlabId);
+    final isSelected = !readOnly && !isGhost && (slab.id == selectedSlabId);
     List<Offset> polygon = slab.polygon;
     if (isSelected &&
         draggingSlabVertexIndex != null &&
@@ -720,7 +739,7 @@ class Structural2dPainter extends CustomPainter {
     for (int oIdx = 0; oIdx < slab.openings.length; oIdx++) {
       final op = slab.openings[oIdx];
       if (op.length >= 3) {
-        final isOpSelected = !isGhost &&
+        final isOpSelected = !readOnly && !isGhost &&
             selectedOpening != null &&
             selectedOpening!.$1 == slab.id &&
             selectedOpening!.$2 == oIdx;
@@ -811,6 +830,8 @@ class Structural2dPainter extends CustomPainter {
         slab,
         slabColor,
         isGhost: isGhost,
+        levelOwner: levelOwner,
+        isFloor: isFloor,
       );
     }
 

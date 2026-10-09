@@ -3133,4 +3133,12 @@ class AppLocalizationsBg extends AppLocalizations {
   String bimUnderlayReviewNeeded(String levels) {
     return 'Променена подложка или подравняване на $levels. Запазените конструктивни елементи и отвори изискват преглед.';
   }
+
+  @override
+  String bimFloorSlabReference(String level, String owner) {
+    return 'Подова плоча на $level — таван на етажа $owner';
+  }
+
+  @override
+  String get bimEditFloorSlab => 'Редактирай плочата';
 }

@@ -5356,6 +5356,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Underlay or alignment changed at {levels}. Review the preserved structural elements and openings.'**
   String bimUnderlayReviewNeeded(String levels);
+
+  /// No description provided for @bimFloorSlabReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor slab at {level} — ceiling of storey {owner}'**
+  String bimFloorSlabReference(String level, String owner);
+
+  /// No description provided for @bimEditFloorSlab.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit floor slab'**
+  String get bimEditFloorSlab;
 }
 
 class _AppLocalizationsDelegate

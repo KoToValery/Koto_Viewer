@@ -7851,6 +7851,40 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
+  StoreyLevel? get _floorSlabStorey => widget.bimContext == null
+      ? null : _project.floorSlabStoreyFor(_project.activeStorey);
+
+  void _openFloorSlab() {
+    final floor = _floorSlabStorey;
+    if (floor == null) return;
+    final index = _project.storeys.indexWhere((s) => s.id == floor.id);
+    if (index < 0) return;
+    setState(() {
+      _project = _project.copyWith(activeStoreyIndex: index);
+      _selectedColumn = null;
+      _selectedShearWall = null;
+      _selectedBeam = null;
+      _selectedGridAxis = null;
+      _selectedOpening = null;
+      _isMovingOpening = false;
+      _slabStartCornerCad = null;
+      _openingStartCad = null;
+      _wallStartCad = null;
+      _beamStartCad = null;
+      _slabPointsCad.clear();
+      _openingPointsCad.clear();
+      _activeTool = StructuralDrawTool.slab;
+      _originalLayerVisibility.clear();
+      for (final entry in _document.layers.entries) {
+        _originalLayerVisibility[entry.key] = entry.value.isVisible;
+      }
+      if (_underlayFilterActive) _applyUnderlayFilter(true);
+      _runAnalysis();
+    });
+    _startSlabCorrection(floor.slabs.first);
+    _saveProject();
+  }
+
   // --- Storey Management Actions ---
 
   void _openStoreyManager() {
@@ -7864,6 +7898,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         onSelectStorey: (idx) {
           setState(() {
             _project = _project.copyWith(activeStoreyIndex: idx);
+            _editingSlab = null;
+            _initialSlabBeforeCorrection = null;
+            _initialSlabCorrectionProject = null;
+            _slabCorrectionUndoStack.clear();
+            _selectedOpening = null;
+            _isMovingOpening = false;
             _slabPointsCad.clear();
             _openingPointsCad.clear();
             _wallStartCad = null;
@@ -8366,6 +8406,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final floor = _floorSlabStorey;
     return Scaffold(
       backgroundColor: const Color(0xFF141414),
       appBar: AppBar(
@@ -8577,6 +8618,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               child: CustomPaint(
                                 painter: Structural2dPainter(
                                   currentStorey: _project.activeStorey,
+                                  floorSlabStorey: floor,
                                   ghostStorey: _project.ghostStorey,
                                   hasBasement: _project.hasBasement,
                                   foundationType: _project.foundationType,
@@ -8762,8 +8804,38 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                 ),
 
-              // 3. Trace Reference Status Pill (Top Center)
-              if (_project.ghostStorey != null)
+              // 3. Floor slab reference and trace status.
+              if (floor != null && _project.activeStorey.slabs.isEmpty)
+                Positioned(
+                  top: 12, left: 12, right: 12,
+                  child: Material(
+                    key: const ValueKey('bim-floor-slab-reference'),
+                    color: const Color(0xEE1C1C1E),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      child: Row(children: [
+                        const Icon(Icons.layers_outlined, color: Color(0xFF00B0FF), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(context.l10n.bimFloorSlabReference(
+                          _project.activeStorey.elevationLabel, floor.elevationLabel),
+                          style: const TextStyle(color: Colors.white, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          key: const ValueKey('bim-edit-floor-slab'),
+                          onPressed: _isPlacingWithHold || _isMovingColumn ||
+                              _isMovingShearWall || _isExtrudingEdge ||
+                              _slabPointsCad.isNotEmpty || _openingPointsCad.isNotEmpty ||
+                              _wallStartCad != null || _beamStartCad != null
+                              ? null : _openFloorSlab,
+                          child: Text(context.l10n.bimEditFloorSlab),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+              if (_project.ghostStorey != null &&
+                  (floor == null || _project.activeStorey.slabs.isNotEmpty))
                 Positioned(
                   top: 10,
                   left: 0,
@@ -9686,18 +9758,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        InkWell(
-                          onTap: _showCustomSlabDialog,
-                          child: Text(
-                            '↑ ${_project.activeStorey.structuralElevationFor(_editingSlab!).toStringAsFixed(3)} m · h=${(_editingSlab!.thickness * 100).toStringAsFixed(1)} cm',
-                            style: const TextStyle(
-                              color: Color(0xFFB388FF),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              decoration: TextDecoration.underline,
+                        Flexible(
+                          child: InkWell(
+                            onTap: _showCustomSlabDialog,
+                            child: Text(
+                              '↑ ${_project.activeStorey.structuralElevationFor(_editingSlab!).toStringAsFixed(3)} m · h=${(_editingSlab!.thickness * 100).toStringAsFixed(1)} cm',
+                              style: const TextStyle(
+                                color: Color(0xFFB388FF),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        ),
                         ),
                       ],
                     ),

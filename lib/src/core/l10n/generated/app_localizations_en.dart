@@ -3121,4 +3121,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String bimUnderlayReviewNeeded(String levels) {
     return 'Underlay or alignment changed at $levels. Review the preserved structural elements and openings.';
   }
+
+  @override
+  String bimFloorSlabReference(String level, String owner) {
+    return 'Floor slab at $level — ceiling of storey $owner';
+  }
+
+  @override
+  String get bimEditFloorSlab => 'Edit floor slab';
 }

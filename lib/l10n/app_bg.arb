@@ -965,5 +965,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "bimFloorSlabReference": "Подова плоча на {level} — таван на етажа {owner}",
+  "@bimFloorSlabReference": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      },
+      "owner": {
+        "type": "String"
+      }
+    }
+  },
+  "bimEditFloorSlab": "Редактирай плочата"
 }

@@ -94,12 +94,14 @@ class StoreyManagerSheet extends StatelessWidget {
                       const Icon(Icons.visibility_rounded,
                           size: 16, color: Color(0xFFFFB300)),
                       const SizedBox(width: 8),
-                      Text(
-                        context.l10n.traceReferenceTitle,
-                        style: const TextStyle(
-                          color: Color(0xFFFFB300),
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          context.l10n.traceReferenceTitle,
+                          style: const TextStyle(
+                            color: Color(0xFFFFB300),
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],

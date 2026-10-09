@@ -22,6 +22,10 @@ class Structural3dMeshBuilder {
     final List<Triangle3D> triangles = [];
     final List<ElementMeshGroup> groups = [];
 
+    final highlightedFloor = highlightStoreyIndex != null &&
+        highlightStoreyIndex >= 0 && highlightStoreyIndex < project.storeys.length
+        ? project.floorSlabStoreyFor(project.storeys[highlightStoreyIndex]) : null;
+
     for (int sIdx = 0; sIdx < project.storeys.length; sIdx++) {
       final storey = project.resolveCeilingStorey(project.storeys[sIdx]);
       final bool isCurrentStorey =
@@ -183,6 +187,9 @@ class Structural3dMeshBuilder {
 
       for (int slabIdx = 0; slabIdx < storey.slabs.length; slabIdx++) {
         final slab = storey.slabs[slabIdx];
+        final isHighlightedSlab = isCurrentStorey ||
+            (highlightedFloor?.id == storey.id &&
+              highlightedFloor!.slabs.any((s) => s.id == slab.id));
         final Color baseColor = slab.colorValue != null
             ? Color(slab.colorValue!)
             : slab3dPalette[slabIdx % slab3dPalette.length];
@@ -196,10 +203,10 @@ class Structural3dMeshBuilder {
           slab,
           slabZBottom,
           slabZTop,
-          topColor: isCurrentStorey
+          topColor: isHighlightedSlab
               ? baseColor
               : baseColor.withValues(alpha: 0.4),
-          sideColor: isCurrentStorey
+          sideColor: isHighlightedSlab
               ? baseColor.withValues(alpha: 0.8)
               : baseColor.withValues(alpha: 0.25),
         );
@@ -212,7 +219,7 @@ class Structural3dMeshBuilder {
               op,
               slabZBottom,
               slabZTop,
-              sideColor: isCurrentStorey
+              sideColor: isHighlightedSlab
                   ? const Color(0xFF78909C)
                   : const Color(0x6678909C),
             );
