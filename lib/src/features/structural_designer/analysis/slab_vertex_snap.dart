@@ -44,6 +44,9 @@ class SlabVertexSnap {
   }) {
     DxfSnapResult? result;
     var best = tolerance;
+    DxfSnapResult? boundaryFoot;
+    var footDistance = tolerance;
+    List<(Offset, Offset)> footGuides = [];
     List<(Offset, Offset)> guides = [];
     void offer(Offset point, List<(Offset, Offset)> lines) {
       final distance = (raw - point).distance;
@@ -73,13 +76,35 @@ class SlabVertexSnap {
     for (final (a, b) in edges) {
       final d = b - a;
       if (d.distanceSquared < 1e-12) continue;
+      final u = d / d.distance;
+      final fromPrevious = raw - previous;
+      for (final direction in [u, Offset(-u.dy, u.dx)]) {
+        final along =
+            fromPrevious.dx * direction.dx + fromPrevious.dy * direction.dy;
+        final tracked = previous + direction * along;
+        if ((tracked - previous).distance > tolerance) {
+          offer(tracked, [(a, b), (previous, tracked)]);
+        }
+      }
       final v = previous - a;
       final t = (v.dx * d.dx + v.dy * d.dy) / d.distanceSquared;
       if (t < 0 || t > 1) continue;
       final foot = a + d * t;
       if ((foot - previous).distance <= tolerance) continue;
-      offer(foot, [(a, b), (previous, foot)]);
+      final distance = (foot - raw).distance;
+      if (distance <= footDistance) {
+        footDistance = distance;
+        boundaryFoot = DxfSnapResult(
+          point: foot,
+          type: DxfSnapType.perpendicular,
+          distance: distance,
+        );
+        footGuides = [(a, b), (previous, foot)];
+      }
     }
-    return (snap: result, guides: guides);
+    // A witnessed wall/slab foot wins over free directional tracking nearby.
+    return boundaryFoot != null
+        ? (snap: boundaryFoot, guides: footGuides)
+        : (snap: result, guides: guides);
   }
 }

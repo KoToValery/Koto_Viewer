@@ -3276,4 +3276,107 @@ class AppLocalizationsBg extends AppLocalizations {
   String gridAxisSourceLevels(String levels) {
     return 'Коти: $levels';
   }
+
+  @override
+  String get staircaseSetupTitle => 'Стълбища по нива';
+
+  @override
+  String get staircaseSetupHint =>
+      'Задайте началото и последното ниво на пристигане на всяко стълбище. Очертайте зоната за преминаване по нивата и отвора в подовете на пристигане. Началният под и покривът могат да останат плътни.';
+
+  @override
+  String get staircaseNoStairs => 'Сградата няма стълбища';
+
+  @override
+  String get staircaseAdd => 'Добави стълбище';
+
+  @override
+  String get staircaseStart => 'Начално ниво';
+
+  @override
+  String get staircaseEnd => 'Последно ниво на пристигане';
+
+  @override
+  String get staircaseZone => 'Зона за преминаване';
+
+  @override
+  String get staircaseZoneHint =>
+      'Очертайте рамената, площадките и прохода. Полигонът запазва място за стълбата и не изрязва плочата. Затворете полигона, за да го запазите.';
+
+  @override
+  String get staircaseDrawZone => 'Очертай зона';
+
+  @override
+  String get staircaseDrawOpening => 'Очертай отвор в пода';
+
+  @override
+  String get staircaseDetect => 'Открий стълбище';
+
+  @override
+  String get staircaseReviewMissing =>
+      'Проверете нивата на стълбищата преди генериране на опори.';
+
+  @override
+  String get staircaseScopeMissing =>
+      'Проверете началото и последното ниво на пристигане.';
+
+  @override
+  String get staircaseZoneMissing =>
+      'Липсва или е невалидна зоната за преминаване';
+
+  @override
+  String get staircaseOpeningMissing =>
+      'Липсва съответстващ стълбищен отвор в пода на пристигане';
+
+  @override
+  String get staircaseOpeningReady => 'Отворът в пода е намерен';
+
+  @override
+  String get staircaseZoneReady => 'Зоната е очертана';
+
+  @override
+  String get staircaseDetectionTitle => 'Предложения за стълбище';
+
+  @override
+  String get staircaseDetectionHint =>
+      'Повтарящите се линии подсказват рамена, но не определят точния отвор в плочата. Прегледайте геометрията и очертайте отвора на етажа на пристигане.';
+
+  @override
+  String get staircaseDetectionEmpty =>
+      'Не е намерена надеждна поредица от стъпала. Очертайте зоната ръчно или проверете долния етаж.';
+
+  @override
+  String get staircaseUseZone => 'Приеми като зона за преминаване';
+
+  @override
+  String get staircaseDetectionPartial =>
+      'Предложение за рамо; проверете площадките и прохода';
+
+  @override
+  String get staircaseLimit =>
+      'Чертежът е твърде голям за пълно геометрично търсене. Използвайте ръчно очертаване.';
+
+  @override
+  String get staircaseInvalidZone =>
+      'Полигонът за преминаване е невалиден. Коригирайте точките.';
+
+  @override
+  String get staircaseWinder => 'Завиващо рамо';
+
+  @override
+  String staircaseEvidenceFromLevel(String level) {
+    return 'Стъпала от $level; съпоставете с този етаж.';
+  }
+
+  @override
+  String get staircaseSupportConflict =>
+      'Съществуващи опори навлизат в зоната на стълбата. Преместете ги или коригирайте зоната.';
+
+  @override
+  String staircaseCloseZone(int count) {
+    return 'Запази зоната ($count точки)';
+  }
+
+  @override
+  String get staircaseUseOpening => 'Прегледай контура на отвора';
 }

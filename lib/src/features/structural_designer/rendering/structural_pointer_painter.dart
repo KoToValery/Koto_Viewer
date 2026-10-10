@@ -309,7 +309,7 @@ class StructuralPointerPainter extends CustomPainter {
 
         final bool isClose =
             openingPoints!.length >= 3 &&
-            (effectiveTip - openingPoints!.first).distance <= 24.0;
+            (effectiveTip - openingPoints!.first).distance <= math.min(12.0, .10 * scale);
 
         if (isClose) {
           final closeLine = Paint()
@@ -685,6 +685,10 @@ class StructuralPointerPainter extends CustomPainter {
 
     const double s = 8.0;
     switch (type) {
+      case DxfSnapType.intersection:
+        canvas.drawLine(pos - const Offset(7, 7), pos + const Offset(7, 7), snapPaint);
+        canvas.drawLine(pos - const Offset(7, -7), pos + const Offset(7, -7), snapPaint);
+        break;
       case DxfSnapType.endpoint:
         canvas.drawRect(
           Rect.fromCenter(center: pos, width: s * 2, height: s * 2),

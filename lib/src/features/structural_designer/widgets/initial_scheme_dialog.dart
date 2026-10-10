@@ -13,6 +13,7 @@ import 'layout_assessment_summary.dart';
 
 class InitialSchemeDialog extends StatefulWidget {
   final StructuralProject project;
+  final StructuralProject? sourceProject;
   final List<WallPairCandidate> pairs;
   final List<(Offset, Offset)> closureSegments;
   final List<GeometricWindowOpening> wallOpenings;
@@ -21,6 +22,7 @@ class InitialSchemeDialog extends StatefulWidget {
   const InitialSchemeDialog({
     super.key,
     required this.project,
+    this.sourceProject,
     required this.pairs,
     this.closureSegments = const [],
     this.wallOpenings = const [],
@@ -111,6 +113,7 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
     for (var attempt = 0; attempt < 12; attempt++) {
       final candidate = InitialSchemeGenerator.generate(
         project: widget.project,
+        sourceProject: widget.sourceProject,
         wallPairs: widget.pairs,
         wallOpenings: widget.wallOpenings,
         scale: widget.scale,

@@ -49,6 +49,7 @@ void main() {
           storeys: [
             floor.copyWith(
               slabs: [edited],
+              staircaseZones:{'A':f.ring(2)},
               columns: [
                 const StructuralColumn(
                   id: 'c',
@@ -89,6 +90,7 @@ void main() {
           docs,
         );
         final next = moved.storeys.first;
+        expect(next.staircaseZones['A'],f.ring(2).map((p)=>p*ratio+shift).toList());
         expect(next.columns.single.center, const Offset(3, 3) * ratio + shift);
         expect(next.columns.single.width, .3 * ratio);
         expect(

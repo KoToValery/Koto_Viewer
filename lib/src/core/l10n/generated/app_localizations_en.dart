@@ -3263,4 +3263,106 @@ class AppLocalizationsEn extends AppLocalizations {
   String gridAxisSourceLevels(String levels) {
     return 'Levels: $levels';
   }
+
+  @override
+  String get staircaseSetupTitle => 'Staircases across levels';
+
+  @override
+  String get staircaseSetupHint =>
+      'Set the start and final arrival level of each staircase. Outline circulation space on every level and the actual opening on arrival floors. The starting floor and the roof may remain solid.';
+
+  @override
+  String get staircaseNoStairs => 'This building has no staircases';
+
+  @override
+  String get staircaseAdd => 'Add staircase';
+
+  @override
+  String get staircaseStart => 'Start level';
+
+  @override
+  String get staircaseEnd => 'Final arrival level';
+
+  @override
+  String get staircaseZone => 'Circulation zone';
+
+  @override
+  String get staircaseZoneHint =>
+      'Outline flights, landings and passage space. This polygon reserves space for stairs and does not cut the slab. Close the polygon to save.';
+
+  @override
+  String get staircaseDrawZone => 'Outline zone';
+
+  @override
+  String get staircaseDrawOpening => 'Outline floor opening';
+
+  @override
+  String get staircaseDetect => 'Find stair geometry';
+
+  @override
+  String get staircaseReviewMissing =>
+      'Review staircase levels before generating supports.';
+
+  @override
+  String get staircaseScopeMissing =>
+      'Check the start and final arrival levels.';
+
+  @override
+  String get staircaseZoneMissing => 'Missing or invalid circulation zone';
+
+  @override
+  String get staircaseOpeningMissing =>
+      'Missing matching staircase opening in the arrival floor';
+
+  @override
+  String get staircaseOpeningReady => 'Floor opening found';
+
+  @override
+  String get staircaseZoneReady => 'Zone outlined';
+
+  @override
+  String get staircaseDetectionTitle => 'Stair geometry proposals';
+
+  @override
+  String get staircaseDetectionHint =>
+      'Repeated strokes suggest flights, but do not establish the exact slab opening. Review the geometry and outline the opening on its arrival floor.';
+
+  @override
+  String get staircaseDetectionEmpty =>
+      'No reliable repeated tread pattern found. Outline the zone manually or inspect the floor below.';
+
+  @override
+  String get staircaseUseZone => 'Use as circulation zone';
+
+  @override
+  String get staircaseDetectionPartial =>
+      'Flight candidate; landing and passage space need review';
+
+  @override
+  String get staircaseLimit =>
+      'Drawing is too large for a complete geometry search. Use manual outlining.';
+
+  @override
+  String get staircaseInvalidZone =>
+      'The circulation polygon is invalid. Correct its points.';
+
+  @override
+  String get staircaseWinder => 'Winder flight';
+
+  @override
+  String staircaseEvidenceFromLevel(String level) {
+    return 'Flight evidence from $level; review against this floor.';
+  }
+
+  @override
+  String get staircaseSupportConflict =>
+      'Existing supports overlap the staircase zone. Reposition them or correct the zone.';
+
+  @override
+  String staircaseCloseZone(int count) {
+    return 'Save zone ($count points)';
+  }
+
+  @override
+  String get staircaseUseOpening => 'Review opening contour';
 }

@@ -11,6 +11,7 @@ import '../dxf_viewer/models/dxf_display_settings.dart';
 import '../dxf_viewer/models/dxf_models.dart';
 import '../dxf_viewer/rendering/dxf_painter.dart';
 import '../dxf_viewer/rendering/dxf_snap_helper.dart';
+import '../dxf_viewer/rendering/dxf_segment_snap.dart';
 import '../dxf_viewer/widgets/dxf_display_settings_sheet.dart';
 import 'analysis/cantilever_detector.dart';
 import 'analysis/seismic_analysis_calculator.dart';
@@ -47,6 +48,11 @@ import 'widgets/structural_scheme_readiness_dialog.dart';
 import 'widgets/initial_scheme_dialog.dart';
 import 'analysis/initial_scheme_generator.dart';
 import 'analysis/structural_scheme_readiness.dart';
+import 'analysis/staircase_inventory.dart';
+import 'analysis/staircase_geometry_detector.dart';
+import 'analysis/structural_underlay_source.dart';
+import 'widgets/staircase_setup_dialog.dart';
+import 'widgets/staircase_geometry_dialog.dart';
 import 'widgets/slab_edge_offset_dialog.dart';
 import 'widgets/storey_manager_sheet.dart';
 import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
@@ -129,12 +135,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Offset? _slabStartCornerCad;
   Offset? _openingStartCad;
   String _selectedOpeningPreset = 'shaft';
-  double _shaftWidthM = 0.40;
-  double _shaftHeightM = 0.60;
-  double _stairsWidthM = 2.40;
-  double _stairsHeightM = 4.50;
-  double _elevatorWidthM = 1.80;
-  double _elevatorHeightM = 2.00;
+  String? _staircaseZoneCoreId;
+  String? _staircaseZoneStoreyId;
   final List<Offset> _slabPointsCad = [];
   final List<Offset> _openingPointsCad = [];
 
@@ -2157,7 +2159,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       {bool allowTransfer = true}) {
     final result = SlabOpeningPlacement.apply(
       slabs: _project.activeStorey.slabs, polygon: newPoly,
-      scale: _cadUnitsPerMeter, replacing: oldKey, allowTransfer: allowTransfer);
+      scale: _cadUnitsPerMeter, replacing: oldKey, allowTransfer: allowTransfer,
+      floorOwnedOnly: widget.bimContext != null);
     return _applyOpeningPlacement(result);
   }
 
@@ -2179,35 +2182,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _selectedOpeningVertexIndex = null;
     });
     return true;
-  }
-
-  (double, double) _getOpeningPresetDimensions(String preset) {
-    if (preset == 'staircase') {
-      return (_stairsWidthM, _stairsHeightM);
-    }
-    if (preset == 'elevator') {
-      return (_elevatorWidthM, _elevatorHeightM);
-    }
-    return (_shaftWidthM, _shaftHeightM);
-  }
-
-  void _rotateActiveOpeningPreset() {
-    setState(() {
-      if (_selectedOpeningPreset == 'staircase') {
-        final temp = _stairsWidthM;
-        _stairsWidthM = _stairsHeightM;
-        _stairsHeightM = temp;
-      } else if (_selectedOpeningPreset == 'elevator') {
-        final temp = _elevatorWidthM;
-        _elevatorWidthM = _elevatorHeightM;
-        _elevatorHeightM = temp;
-      } else {
-        final temp = _shaftWidthM;
-        _shaftWidthM = _shaftHeightM;
-        _shaftHeightM = temp;
-      }
-    });
-    HapticFeedback.selectionClick();
   }
 
   SlabOpeningType _cycleOpeningType(SlabOpeningType current) {
@@ -3671,9 +3645,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final tolerance = _slabSnapTolerance();
     final candidates = <DxfSnapResult>[];
     final cad = DxfSnapHelper.findSnapPoint(document: _document,
-      cadPoint: raw, toleranceCad: tolerance, basePoint: previous);
+      cadPoint: raw, toleranceCad: tolerance, basePoint: previous,
+      includeIntersections: true);
     if (cad != null) candidates.add(cad);
-    final edges = <(Offset, Offset)>[];
+    final edges = <(Offset, Offset)>[
+      ...DxfSegmentSnap.nearby(document: _document, point: raw,
+          radius: math.max(.30 * _cadUnitsPerMeter, tolerance * 3), continuousOnly: true),
+      if (previous != null) ...DxfSegmentSnap.nearby(document: _document, point: previous,
+          radius: math.max(.30 * _cadUnitsPerMeter, tolerance * 3), continuousOnly: true),
+    ];
     for (final slab in _project.activeStorey.slabs) {
       for (var i = 0; i < slab.polygon.length; i++) {
         final a = slab.polygon[i], b = slab.polygon[(i + 1) % slab.polygon.length];
@@ -3696,7 +3676,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       raw: raw, previous: previous, edges: edges, tolerance: tolerance,
       incomingDirection: incomingDirection);
     // Preserve exact corners; perpendicular alignment beats nearest-edge snapping.
-    final exact = candidates.where((c) => c.type == DxfSnapType.endpoint).toList()
+    final exact = candidates.where((c) => c.type == DxfSnapType.endpoint || c.type == DxfSnapType.intersection).toList()
       ..sort((a, b) => a.distance.compareTo(b.distance));
     if (exact.isNotEmpty) {
       if (previous != null) _activeMagneticGuides = [(previous, exact.first.point)];
@@ -3710,6 +3690,26 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final result = candidates.firstOrNull;
     if (previous != null && result != null) _activeMagneticGuides = [(previous, result.point)];
     return result;
+  }
+
+  DxfSnapResult? _snapOpeningPoint(Offset raw) {
+    if (_snapEnabled && _openingPointsCad.length >= 3 &&
+        (raw-_openingPointsCad.first).distance <= _slabSnapTolerance()) {
+      _activeMagneticGuides = [(_openingPointsCad.last, _openingPointsCad.first)];
+      return DxfSnapResult(point: _openingPointsCad.first,
+        type: DxfSnapType.endpoint, distance: (raw-_openingPointsCad.first).distance);
+    }
+    return _snapSlabPoint(raw, previous: _openingPointsCad.lastOrNull,
+      incomingDirection: _openingPointsCad.length >= 2
+          ? _openingPointsCad.last - _openingPointsCad[_openingPointsCad.length-2] : null);
+  }
+
+  void _commitOpeningTap(Offset localPosition) {
+    // A quick touch tap uses its own location, never a stale held-pointer tip.
+    final raw = _screenToCad(localPosition);
+    final point = _snapOpeningPoint(raw)?.point ?? raw;
+    _currentCadCoord = point;
+    _commitPlacement(point);
   }
 
   void _updateSlabVertexDrag(Offset screenPos) {
@@ -4628,20 +4628,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
       } else if (_isMovingOpening) {
         // Multi-edge and multi-corner weighted snapping for openings (edges snap to axes/walls, corners to landmarks)
-        final List<Offset> cornerOffsets;
-        if (_isMovingOpening && _movingOpeningRelativeOffsets != null) {
-          cornerOffsets = _movingOpeningRelativeOffsets!;
-        } else {
-          final (dimW, dimH) = _getOpeningPresetDimensions(_selectedOpeningPreset);
-          final halfW = (dimW * _cadUnitsPerMeter) / 2.0;
-          final halfH = (dimH * _cadUnitsPerMeter) / 2.0;
-          cornerOffsets = [
-            Offset(-halfW, -halfH),
-            Offset(halfW, -halfH),
-            Offset(halfW, halfH),
-            Offset(-halfW, halfH),
-          ];
-        }
+        final cornerOffsets = _movingOpeningRelativeOffsets ?? const <Offset>[];
 
         // Calculate edge midpoints for edge-to-axis snapping
         final List<Offset> edgeOffsets = [];
@@ -4778,61 +4765,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
         _liveDimensionText = null;
       } else if (_activeTool == StructuralDrawTool.slabOpening) {
-        if (_selectedOpeningPreset == 'staircase' && _openingStartCad != null) {
-          snap = _findStructuralSnap(rawCad, toleranceCad) ??
-              DxfSnapHelper.findSnapPoint(
-                document: _document,
-                cadPoint: rawCad,
-                toleranceCad: toleranceCad,
-                allowNearest: false,
-              );
-          if (snap != null) {
-            effectiveCad = snap.point;
-            snappedScreen = _cadToScreen(snap.point);
-            _snappedScreenPositions = [snappedScreen];
-          } else {
-            _snappedScreenPositions = [];
-          }
-
-          final wM = (effectiveCad.dx - _openingStartCad!.dx).abs() / _cadUnitsPerMeter;
-          final hM = (effectiveCad.dy - _openingStartCad!.dy).abs() / _cadUnitsPerMeter;
-          _liveDimensionText = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
-        } else if (_openingPointsCad.length >= 3 &&
-            (rawCad - _openingPointsCad.first).distance <= toleranceCad) {
-          snap = DxfSnapResult(
-            point: _openingPointsCad.first,
-            type: DxfSnapType.endpoint,
-            distance: (rawCad - _openingPointsCad.first).distance,
-          );
-          effectiveCad = snap.point;
-          snappedScreen = _cadToScreen(snap.point);
-          _snappedScreenPositions = [snappedScreen];
-          final lenM = (effectiveCad - _openingPointsCad.last).distance / _cadUnitsPerMeter;
-          _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
-        } else {
-          snap = _findStructuralSnap(rawCad, toleranceCad) ??
-              DxfSnapHelper.findSnapPoint(
-                document: _document,
-                cadPoint: rawCad,
-                toleranceCad: toleranceCad,
-                allowNearest: false,
-              );
-
-          if (snap != null) {
-            effectiveCad = snap.point;
-            snappedScreen = _cadToScreen(snap.point);
-            _snappedScreenPositions = [snappedScreen];
-          } else {
-            _snappedScreenPositions = [];
-          }
-
-          if (_openingPointsCad.isNotEmpty) {
-            final lenM = (effectiveCad - _openingPointsCad.last).distance / _cadUnitsPerMeter;
-            _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
-          } else {
-            _liveDimensionText = null;
-          }
-        }
+        snap = _snapOpeningPoint(rawCad);
+        effectiveCad = snap?.point ?? rawCad;
+        snappedScreen = snap == null ? null : _cadToScreen(snap.point);
+        _snappedScreenPositions = snappedScreen == null ? [] : [snappedScreen];
+        _liveDimensionText = _openingPointsCad.isEmpty ? null
+            : '${((effectiveCad-_openingPointsCad.last).distance/_cadUnitsPerMeter).toStringAsFixed(2)} m';
       } else if (_activeTool == StructuralDrawTool.shearWall || _isMovingShearWall) {
         final wallL = (_isMovingShearWall && _selectedShearWall != null)
             ? _selectedShearWall!.length
@@ -5105,12 +5043,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       } else if (_activeTool == StructuralDrawTool.slab && _slabPointsCad.isNotEmpty) {
         final lenM = (rawCad - _slabPointsCad.last).distance / _cadUnitsPerMeter;
         _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
-      } else if (_activeTool == StructuralDrawTool.slabOpening &&
-          _selectedOpeningPreset == 'staircase' &&
-          _openingStartCad != null) {
-        final wM = (rawCad.dx - _openingStartCad!.dx).abs() / _cadUnitsPerMeter;
-        final hM = (rawCad.dy - _openingStartCad!.dy).abs() / _cadUnitsPerMeter;
-        _liveDimensionText = '${wM.toStringAsFixed(2)} x ${hM.toStringAsFixed(2)} m';
       } else if (_activeTool == StructuralDrawTool.slabOpening && _openingPointsCad.isNotEmpty) {
         final lenM = (rawCad - _openingPointsCad.last).distance / _cadUnitsPerMeter;
         _liveDimensionText = '${lenM.toStringAsFixed(2)} m';
@@ -5186,7 +5118,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               minDist = d;
               bestSnap = DxfSnapResult(
                 point: inter,
-                type: DxfSnapType.endpoint,
+                type: DxfSnapType.intersection,
                 distance: d,
               );
             }
@@ -5968,11 +5900,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _isMovingColumn = false;
       _isMovingShearWall = false;
       _isPlacingWithHold = true;
-      if (_activeTool == StructuralDrawTool.slabOpening &&
-          _selectedOpeningPreset == 'staircase' &&
-          _openingStartCad == null) {
-        _openingStartCad = _currentCadCoord ?? _screenToCad(details.localPosition);
-      }
+
     });
     _updatePointer(details.localPosition, isMouse: false);
   }
@@ -6327,8 +6255,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
     if (_activeTool == StructuralDrawTool.slabOpening &&
         (_openingPointsCad.isNotEmpty || _openingStartCad != null)) {
-      final cadPt = _currentCadCoord ?? _screenToCad(details.localPosition);
-      _commitPlacement(cadPt);
+      _commitOpeningTap(details.localPosition);
       return;
     }
     if (_activeTool == StructuralDrawTool.beam && _beamStartCad != null) {
@@ -6434,8 +6361,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           HapticFeedback.selectionClick();
           return;
         }
-        final cadPt = _currentCadCoord ?? _screenToCad(details.localPosition);
-        _commitPlacement(cadPt);
+        _commitOpeningTap(details.localPosition);
         return;
 
       case StructuralDrawTool.gridAxis:
@@ -6772,46 +6698,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         });
       }
     } else if (_activeTool == StructuralDrawTool.slabOpening) {
-      if (_selectedOpeningPreset == 'staircase') {
-        if (_openingStartCad == null) {
-          setState(() {
-            _openingStartCad = cadCoord;
-          });
-          HapticFeedback.lightImpact();
-        } else {
-          final c1 = _openingStartCad!;
-          final c2 = cadCoord;
-          final minX = math.min(c1.dx, c2.dx);
-          final maxX = math.max(c1.dx, c2.dx);
-          final minY = math.min(c1.dy, c2.dy);
-          final maxY = math.max(c1.dy, c2.dy);
-          final wCad = maxX - minX;
-          final hCad = maxY - minY;
-          if (wCad >= 0.20 * scale && hCad >= 0.20 * scale) {
-            final opPoly = [
-              Offset(minX, maxY),
-              Offset(maxX, maxY),
-              Offset(maxX, minY),
-              Offset(minX, minY),
-            ];
-            _addOpeningToSlab(opPoly, type: SlabOpeningType.staircase);
-            setState(() {
-              _openingStartCad = null;
-              _liveDimensionText = null;
-            });
-            HapticFeedback.heavyImpact();
-          } else {
-            HapticFeedback.vibrate();
-          }
-        }
-        return;
-      }
-
       if (_openingPointsCad.length >= 3) {
         final distToFirst = (cadCoord - _openingPointsCad.first).distance;
         final double fitScale = _getCadFitScale();
         final double currentScale = _transformController.value.getMaxScaleOnAxis();
-        final closeThresholdCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+        final closeThresholdCad = math.min(
+            12.0 / (fitScale * currentScale.clamp(0.001, 10000.0)), .10 * scale);
         if (distToFirst <= closeThresholdCad) {
           _closeOpeningPolygon();
           return;
@@ -6848,17 +6740,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
   }
 
-  void _addOpeningToSlab(List<Offset> opPoly,
+  bool _addOpeningToSlab(List<Offset> opPoly,
       {SlabOpeningType type = SlabOpeningType.shaft}) {
     final result = SlabOpeningPlacement.apply(
       slabs: _project.activeStorey.slabs, polygon: opPoly,
-      scale: _cadUnitsPerMeter, type: type);
-    if (_applyOpeningPlacement(result)) HapticFeedback.heavyImpact();
+      scale: _cadUnitsPerMeter, type: type,
+      floorOwnedOnly: widget.bimContext != null);
+    final accepted = _applyOpeningPlacement(result);
+    if (accepted) HapticFeedback.heavyImpact();
+    return accepted;
   }
 
 
   void _ensureSlabsPopulatedForActiveStorey() {
-    // Project source revisions and ceilings are synchronized by the BIM library.
+    // Project source revisions and owned floors are synchronized by the BIM library.
     if (widget.bimContext != null) return;
     final active = _project.activeStorey;
     if (active.slabs.isNotEmpty) return;
@@ -6921,8 +6816,85 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _saveProject();
   }
 
+  Future<void> _manageStaircases() async {
+    if(_isEditingSlab || _slabPointsCad.isNotEmpty || _openingPointsCad.isNotEmpty ||
+      _wallStartCad!=null || _beamStartCad!=null) {
+      await showDialog<void>(context:context,builder:(_)=>StructuralSchemeReadinessDialog(
+        project:_project.copyWith(storeys:_project.ceilingStoreys),scale:_cadUnitsPerMeter,editing:true));
+      return;
+    }
+    final result=await showDialog<StaircaseSetupResult>(context:context,builder:(_)=>
+      StaircaseSetupDialog(project:_project,scale:_cadUnitsPerMeter));
+    if(!mounted || result==null) return;
+    _pushUndo();
+    setState(()=>_project=result.project);
+    _saveProject();
+    if(result.action==StaircaseSetupAction.save) return;
+    final index=_project.storeys.indexWhere((s)=>s.id==result.storeyId);
+    if(index<0 || result.coreId==null) return;
+    setState(() {
+      _project=_project.copyWith(activeStoreyIndex:index);
+      _selectedColumn=null; _selectedShearWall=null; _selectedBeam=null;
+      _selectedOpening=null; _selectedGridAxis=null;
+      _editingSlab=null; _initialSlabBeforeCorrection=null;
+      _isMovingColumn=false; _isMovingShearWall=false; _isMovingOpening=false;
+      _slabPointsCad.clear(); _openingPointsCad.clear();
+      _wallStartCad=null; _beamStartCad=null; _openingStartCad=null;
+      _selectedOpeningPreset='staircase';
+      _activeTool=StructuralDrawTool.slabOpening;
+      _staircaseZoneCoreId=result.action==StaircaseSetupAction.opening ? null:result.coreId;
+      _staircaseZoneStoreyId=_staircaseZoneCoreId==null ? null:result.storeyId;
+      _activeMagneticGuides=[]; _liveDimensionText=null;
+      _runAnalysis();
+    });
+    if(result.action==StaircaseSetupAction.detect) {
+      final snapshot=_project;
+      final source=StructuralUnderlaySource.original(_document,metadata:BimUnderlayMetadata.read(_document));
+      var detected=StaircaseGeometryDetector.detect(source,_cadUnitsPerMeter,
+        region:_project.activeStorey.staircaseZones[result.coreId]);
+      String? referenceLevel;
+      if(detected.flights.isEmpty && !detected.limited && widget.bimContext!=null) {
+        final core=_project.staircases.firstWhere((c)=>c.id==result.coreId);
+        final levels=StaircaseInventory.levels(_project,core);
+        final current=levels.indexWhere((s)=>s.id==result.storeyId);
+        if(current>0) {
+          final lower=levels[current-1];
+          final saved=widget.bimContext!.underlaysByStorey[lower.id];
+          if(saved!=null) {
+            final evidence=StaircaseGeometryDetector.detect(StructuralUnderlaySource.original(
+              saved,metadata:BimUnderlayMetadata.read(saved)),_cadUnitsPerMeter,
+              region:lower.staircaseZones[result.coreId]);
+            if(evidence.flights.isNotEmpty && !evidence.limited) {
+              detected=StairGeometryResult(evidence.flights,detected.strokes,
+                boundaryStrokes:detected.boundaryStrokes);
+              referenceLevel=lower.elevationLabel;
+            }
+          }
+        }
+      }
+      final core=_project.staircases.firstWhere((c)=>c.id==result.coreId);
+      final selection=await showDialog<StaircaseGeometrySelection>(context:context,
+        builder:(_)=>StaircaseGeometryDialog(result:detected,referenceLevel:referenceLevel,
+          scale:_cadUnitsPerMeter,allowOpening:core.startStoreyId!=result.storeyId));
+      if(!mounted || !identical(snapshot,_project)) return;
+      if(selection!=null) { setState(() {
+        if(selection.isOpening) { _staircaseZoneCoreId=null;_staircaseZoneStoreyId=null; }
+        _openingPointsCad.addAll(selection.polygon);
+      }); }
+    }
+    if(!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content:Text(_staircaseZoneCoreId!=null ? context.l10n.staircaseZoneHint:
+        context.l10n.staircaseDrawOpening),duration:const Duration(seconds:8)));
+  }
+
   Future<void> _generateInitialScheme() async {
     final snapshot = _project;
+    if(widget.bimContext!=null &&
+      !StaircaseInventory.evaluate(snapshot,_cadUnitsPerMeter,requireReview:true).ready) {
+      await _manageStaircases();
+      return;
+    }
     final analysisSnapshot = snapshot.copyWith(storeys: snapshot.ceilingStoreys);
     final scale = _cadUnitsPerMeter;
     final editing = _isEditingSlab || _slabPointsCad.isNotEmpty ||
@@ -6938,6 +6910,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       context: context,
       builder: (_) => InitialSchemeDialog(
         project: analysisSnapshot,
+        sourceProject: snapshot,
         pairs: detection.selectedWallPairs,
         wallOpenings: GeometricWindowDetector.detect(_document, detection.selectedWallPairs, scale / 1000),
         closureSegments: detection.closureSegments,
@@ -7108,9 +7081,18 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         List.from(_openingPointsCad),
         minDistance: 0.005 * _cadUnitsPerMeter,
       );
-      if (cleanedPts.length >= 3) {
-        _addOpeningToSlab(cleanedPts, type: _currentOpeningType);
-      }
+      if(_staircaseZoneCoreId!=null) {
+        if(_staircaseZoneStoreyId!=_project.activeStorey.id ||
+          !StaircaseInventory.validZone(cleanedPts,_cadUnitsPerMeter)) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(context.l10n.staircaseInvalidZone)));
+          return;
+        }
+        _pushUndo();
+        _updateActiveStorey(_project.activeStorey.copyWith(staircaseZones:{
+          ..._project.activeStorey.staircaseZones,_staircaseZoneCoreId!:cleanedPts}));
+
+      } else if (cleanedPts.length < 3 ||
+          !_addOpeningToSlab(cleanedPts, type: _currentOpeningType)) { return; }
       setState(() {
         _openingPointsCad.clear();
         _openingStartCad = null;
@@ -7880,6 +7862,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (index < 0) return;
     setState(() {
       _project = _project.copyWith(activeStoreyIndex: index);
+      _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
       _selectedColumn = null;
       _selectedShearWall = null;
       _selectedBeam = null;
@@ -7917,6 +7900,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         onSelectStorey: (idx) {
           setState(() {
             _project = _project.copyWith(activeStoreyIndex: idx);
+            _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
             _editingSlab = null;
             _initialSlabBeforeCorrection = null;
             _initialSlabCorrectionProject = null;
@@ -8072,6 +8056,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final center = wall?.center ?? column!.center;
     setState(() {
       _project = _project.copyWith(activeStoreyIndex: index);
+      _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
       _selectedColumn = column;
       _selectedShearWall = wall;
       _selectedBeam = null;
@@ -8240,6 +8225,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           case 'auto_walls':
             _runManualAutoDetectWalls();
             break;
+          case 'staircases':
+            _manageStaircases();
+            break;
           case 'generate_scheme':
             _generateInitialScheme();
             break;
@@ -8255,6 +8243,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
       },
       itemBuilder: (context) => [
+        PopupMenuItem(value:'staircases',child:Text(context.l10n.staircaseSetupTitle)),
         if (_document.entities.isNotEmpty || widget.bimContext != null || BimUnderlayMetadata.read(_document) != null)
           PopupMenuItem(
             value: 'generate_slabs',
@@ -8896,6 +8885,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                 ),
 
+              if(_staircaseZoneCoreId!=null && _staircaseZoneStoreyId==_project.activeStorey.id)
+                Positioned(top:60,left:12,right:12,child:IgnorePointer(child:Material(
+                  color:const Color(0xEE173C39),borderRadius:BorderRadius.circular(8),
+                  child:Padding(padding:const EdgeInsets.all(8),child:Text(
+                    context.l10n.staircaseZoneHint,style:const TextStyle(color:Colors.white,fontSize:12)))))),
+
               // 3b. Grid Axis Offset Direction Drag Guide Banner
               if (_isOffsettingAxisWithDrag && _axisBeingOffset != null)
                 Positioned(
@@ -8994,6 +8989,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         onSelectTool: (tool) {
                           setState(() {
                             _activeTool = tool;
+                            _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
                             _selectedColumn = null;
                             _selectedShearWall = null;
                             _selectedBeam = null;
@@ -9063,14 +9059,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         onUpdateOpeningPreset: (preset) {
                           setState(() {
                             _selectedOpeningPreset = preset;
+                            _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
                             _openingPointsCad.clear();
                             _openingStartCad = null;
                             _liveDimensionText = null;
                           });
                         },
-                        onRotateOpening: _rotateActiveOpeningPreset,
                         hasOpeningStartCorner: _openingStartCad != null,
                         isDrawingOpening: _activeTool == StructuralDrawTool.slabOpening,
+                        isDrawingCirculationZone: _staircaseZoneCoreId!=null && _staircaseZoneStoreyId==_project.activeStorey.id,
                         openingPointCount: _openingPointsCad.length,
                         onCloseOpening: _closeOpeningPolygon,
                         onUndoOpeningPoint: () {
@@ -9081,6 +9078,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         },
                         onClearOpening: () {
                           setState(() {
+                            _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
                             _openingPointsCad.clear();
                             _openingStartCad = null;
                             _liveDimensionText = null;

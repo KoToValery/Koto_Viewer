@@ -3,6 +3,7 @@ import 'dart:ui';
 import '../models/structural_element.dart';
 import '../models/wall_axis_models.dart';
 import 'structural_scheme_readiness.dart';
+import 'staircase_inventory.dart';
 import 'slab_contact_geometry.dart';
 import 'slab_topology_analyzer.dart';
 import 'structural_polygon_distance.dart';
@@ -268,7 +269,8 @@ class InitialSchemeGenerator {
     List<GeometricWindowOpening> wallOpenings,
     double scale,
   ) {
-    final floor = project.activeStorey;
+    final floor = project.activeStorey.copyWith(
+      staircaseZones: project.staircaseZonesFor(project.activeStorey));
     final manual = floor.copyWith(
       columns: floor.columns
           .where((c) => !(c.generatedBy?.startsWith('initial-scheme') ?? false))
@@ -292,6 +294,9 @@ class InitialSchemeGenerator {
       ...manual.shearWalls.map((w) => w.polygonVertices),
     ];
     bool fits(List<Offset> poly, {bool allowOpening = false}) {
+      if (!SupportPlacementRules.circulationFits(poly, floor, scale)) {
+        reject('staircase'); return false;
+      }
       if (!domain.contains(poly, includeOpenings: allowOpening)) {
         reject('wall');
         return false;
@@ -429,13 +434,15 @@ class InitialSchemeGenerator {
 
   static InitialSchemeProposal generate({
     required StructuralProject project,
+    StructuralProject? sourceProject,
     required List<WallPairCandidate> wallPairs,
     required double scale,
     List<GeometricWindowOpening> wallOpenings = const [],
     InitialSchemeOptions options = const InitialSchemeOptions(),
     int variant = 0,
   }) {
-    if (!scale.isFinite ||
+    if (!StaircaseInventory.evaluate(sourceProject ?? project, scale).ready ||
+        !scale.isFinite ||
         scale <= 0 ||
         !options.valid ||
         !StructuralSchemeReadiness.evaluate(project, scale).geometryReady) {
@@ -511,7 +518,8 @@ class InitialSchemeGenerator {
         first.limitReasons.contains('input')) {
       return first;
     }
-    final floor = project.activeStorey;
+    final floor = project.activeStorey.copyWith(
+      staircaseZones: project.staircaseZonesFor(project.activeStorey));
     final evaluatedFirst = first
         .apply(floor)
         .copyWith(gridAxes: project.effectiveGridAxes);
@@ -749,7 +757,8 @@ class InitialSchemeGenerator {
         !StructuralSchemeReadiness.evaluate(project, scale).geometryReady) {
       return const InitialSchemeProposal();
     }
-    final floor = project.activeStorey;
+    final floor = project.activeStorey.copyWith(
+      staircaseZones: project.staircaseZonesFor(project.activeStorey));
     final lowerLevels =
         project.storeys
             .where((s) => s.elevation < floor.elevation - 1e-6)
@@ -898,6 +907,7 @@ class InitialSchemeGenerator {
     }
 
     bool slabFits(List<Offset> poly) =>
+        SupportPlacementRules.circulationFits(poly, floor, scale) &&
         regionOf(poly) >= 0 &&
         !floor.slabs.any(
           (s) => s.openings.any(

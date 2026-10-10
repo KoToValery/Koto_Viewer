@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'seismic_slab_load.dart';
+import 'staircase_core.dart';
+export 'staircase_core.dart';
 
 /// Supported geometric cross-section shapes for columns.
 enum ColumnShape {
@@ -1907,6 +1909,8 @@ class StoreyLevel {
   /// Owned slabs, including openings; isFloorSlab selects floor or legacy ceiling.
   final List<StructuralSlab> slabs;
   final List<StructuralGridAxis> gridAxes;
+  /// Confirmed circulation envelopes; these never cut concrete.
+  final Map<String, List<Offset>> staircaseZones;
 
   const StoreyLevel({
     required this.id,
@@ -1919,6 +1923,7 @@ class StoreyLevel {
     this.beams = const [],
     this.slabs = const [],
     this.gridAxes = const [],
+    this.staircaseZones = const {},
   });
 
   /// Formatted elevation string (e.g. ±0.00, +2.80, -2.80) to save space without long floor text labels.
@@ -1934,11 +1939,11 @@ class StoreyLevel {
       shearWalls.isNotEmpty ||
       beams.isNotEmpty ||
       slabs.isNotEmpty ||
-      gridAxes.isNotEmpty;
+      gridAxes.isNotEmpty || staircaseZones.isNotEmpty;
 
   /// Computes the structural elevation (Конструктивна кота) for [slab].
-  /// The working storey owns its ceiling, at the next level minus finish.
-  /// Loads, openings and supports on this storey all refer to that ceiling.
+  /// Floor-owned slabs use this level minus finish; saved legacy ceilings use
+  /// the next level. Structural support views reference the slab from below.
   double structuralElevationFor(StructuralSlab slab) {
     return slab.topElevation ??
         (elevation + (slab.isFloorSlab ? 0 : height) -
@@ -1993,6 +1998,7 @@ class StoreyLevel {
     List<StructuralBeam>? beams,
     List<StructuralSlab>? slabs,
     List<StructuralGridAxis>? gridAxes,
+    Map<String, List<Offset>>? staircaseZones,
   }) {
     return StoreyLevel(
       id: id ?? this.id,
@@ -2005,6 +2011,7 @@ class StoreyLevel {
       beams: beams ?? this.beams,
       slabs: slabs ?? this.slabs,
       gridAxes: gridAxes ?? this.gridAxes,
+      staircaseZones: staircaseZones ?? this.staircaseZones,
     );
   }
 
@@ -2019,11 +2026,16 @@ class StoreyLevel {
     'beams': beams.map((b) => b.toJson()).toList(),
     'slabs': slabs.map((s) => s.toJson()).toList(),
     'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
+    'staircaseZones': {for (final entry in staircaseZones.entries)
+      entry.key: entry.value.map((p) => {'x':p.dx, 'y':p.dy}).toList()},
   };
 
   factory StoreyLevel.fromJson(Map<String, dynamic> json) {
     return StoreyLevel(
       id: json['id'] as String,
+      staircaseZones: {for (final entry in (json['staircaseZones'] as Map? ?? {}).entries)
+        entry.key as String: [for (final p in entry.value as List)
+          Offset((p['x'] as num).toDouble(), (p['y'] as num).toDouble())]},
       name: json['name'] as String? ?? 'Storey',
       elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
       floorFinishThickness: (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
@@ -2099,6 +2111,9 @@ List<Offset> compute2DConvexHull(List<Offset> points) {
 /// Master project holding all storeys and analysis settings.
 class StructuralProject {
   final String title;
+  final List<StaircaseCore> staircases;
+  /// Explicit review also allows a building with no stairs.
+  final bool staircaseReviewComplete;
   final List<StoreyLevel> storeys;
   final int activeStoreyIndex;
   final GhostStoreyMode ghostMode;
@@ -2112,6 +2127,8 @@ class StructuralProject {
 
   const StructuralProject({
     this.title = 'Конструктивен Модел',
+    this.staircases = const [],
+    this.staircaseReviewComplete = false,
     this.storeys = const [
       StoreyLevel(
         id: 'storey_1',
@@ -2156,7 +2173,7 @@ class StructuralProject {
   StoreyLevel supportedStoreyFor(StoreyLevel storey) {
     final resolved = resolveCeilingStorey(storey);
     final upper = ceilingSlabStoreyFor(storey);
-    return resolved.copyWith(slabs: [
+    return resolved.copyWith(staircaseZones: staircaseZonesFor(storey), slabs: [
       for (final slab in resolved.slabs)
         if (!slab.isFloorSlab) slab,
       if (upper != null) for (final slab in upper.slabs)
@@ -2164,6 +2181,15 @@ class StructuralProject {
           topElevation: upper.structuralElevationFor(slab)),
     ]);
   }
+
+  /// Exclude stale polygons outside a core's explicitly confirmed scope.
+  Map<String,List<Offset>> staircaseZonesFor(StoreyLevel storey) => {
+    for(final core in staircases)
+      if(storeys.any((s)=>s.id==core.startStoreyId && s.elevation<=storey.elevation) &&
+         storeys.any((s)=>s.id==core.endStoreyId && s.elevation>=storey.elevation) &&
+         storey.staircaseZones.containsKey(core.id))
+        core.id:storey.staircaseZones[core.id]!,
+  };
 
   List<StoreyLevel> get ceilingStoreys => storeys.map(supportedStoreyFor).toList();
 
@@ -2391,6 +2417,8 @@ class StructuralProject {
 
   StructuralProject copyWith({
     String? title,
+    List<StaircaseCore>? staircases,
+    bool? staircaseReviewComplete,
     List<StoreyLevel>? storeys,
     int? activeStoreyIndex,
     GhostStoreyMode? ghostMode,
@@ -2404,6 +2432,8 @@ class StructuralProject {
   }) {
     return StructuralProject(
       title: title ?? this.title,
+      staircases: staircases ?? this.staircases,
+      staircaseReviewComplete: staircaseReviewComplete ?? this.staircaseReviewComplete,
       storeys: storeys ?? this.storeys,
       activeStoreyIndex: activeStoreyIndex ?? this.activeStoreyIndex,
       ghostMode: ghostMode ?? this.ghostMode,
@@ -2419,6 +2449,8 @@ class StructuralProject {
 
   Map<String, dynamic> toJson() => {
     'title': title,
+    'staircases': staircases.map((c) => c.toJson()).toList(),
+    'staircaseReviewComplete': staircaseReviewComplete,
     'storeys': storeys.map((s) => s.toJson()).toList(),
     'activeStoreyIndex': activeStoreyIndex,
     'ghostMode': ghostMode.name,
@@ -2434,6 +2466,9 @@ class StructuralProject {
   factory StructuralProject.fromJson(Map<String, dynamic> json) {
     return StructuralProject(
       title: json['title'] as String? ?? 'Конструктивен Модел',
+      staircases: [for (final c in json['staircases'] as List? ?? [])
+        StaircaseCore.fromJson(c as Map<String,dynamic>)],
+      staircaseReviewComplete: json['staircaseReviewComplete'] == true,
       storeys: (json['storeys'] as List<dynamic>?)
               ?.map((s) => StoreyLevel.fromJson(s as Map<String, dynamic>))
               .toList() ??

@@ -347,6 +347,7 @@ class _BimAlignmentScreenState extends State<BimAlignmentScreen>
       document: _currentDoc!,
       cadPoint: cadPt,
       toleranceCad: toleranceCad,
+      includeIntersections: true,
     );
 
     if (snap != null) {
@@ -1430,7 +1431,11 @@ class _ControlPointOverlayPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.8;
       switch (snapType) {
-        case DxfSnapType.endpoint:
+        case DxfSnapType.intersection:
+        canvas.drawLine(p - const Offset(7, 7), p + const Offset(7, 7), snapPaint);
+        canvas.drawLine(p - const Offset(7, -7), p + const Offset(7, -7), snapPaint);
+        break;
+      case DxfSnapType.endpoint:
           canvas.drawRect(
             Rect.fromCenter(center: p, width: 14, height: 14),
             snapPaint,

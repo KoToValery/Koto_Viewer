@@ -5602,6 +5602,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Levels: {levels}'**
   String gridAxisSourceLevels(String levels);
+
+  /// No description provided for @staircaseSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Staircases across levels'**
+  String get staircaseSetupTitle;
+
+  /// No description provided for @staircaseSetupHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the start and final arrival level of each staircase. Outline circulation space on every level and the actual opening on arrival floors. The starting floor and the roof may remain solid.'**
+  String get staircaseSetupHint;
+
+  /// No description provided for @staircaseNoStairs.
+  ///
+  /// In en, this message translates to:
+  /// **'This building has no staircases'**
+  String get staircaseNoStairs;
+
+  /// No description provided for @staircaseAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add staircase'**
+  String get staircaseAdd;
+
+  /// No description provided for @staircaseStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start level'**
+  String get staircaseStart;
+
+  /// No description provided for @staircaseEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Final arrival level'**
+  String get staircaseEnd;
+
+  /// No description provided for @staircaseZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Circulation zone'**
+  String get staircaseZone;
+
+  /// No description provided for @staircaseZoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Outline flights, landings and passage space. This polygon reserves space for stairs and does not cut the slab. Close the polygon to save.'**
+  String get staircaseZoneHint;
+
+  /// No description provided for @staircaseDrawZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Outline zone'**
+  String get staircaseDrawZone;
+
+  /// No description provided for @staircaseDrawOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Outline floor opening'**
+  String get staircaseDrawOpening;
+
+  /// No description provided for @staircaseDetect.
+  ///
+  /// In en, this message translates to:
+  /// **'Find stair geometry'**
+  String get staircaseDetect;
+
+  /// No description provided for @staircaseReviewMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Review staircase levels before generating supports.'**
+  String get staircaseReviewMissing;
+
+  /// No description provided for @staircaseScopeMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the start and final arrival levels.'**
+  String get staircaseScopeMissing;
+
+  /// No description provided for @staircaseZoneMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing or invalid circulation zone'**
+  String get staircaseZoneMissing;
+
+  /// No description provided for @staircaseOpeningMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing matching staircase opening in the arrival floor'**
+  String get staircaseOpeningMissing;
+
+  /// No description provided for @staircaseOpeningReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor opening found'**
+  String get staircaseOpeningReady;
+
+  /// No description provided for @staircaseZoneReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone outlined'**
+  String get staircaseZoneReady;
+
+  /// No description provided for @staircaseDetectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stair geometry proposals'**
+  String get staircaseDetectionTitle;
+
+  /// No description provided for @staircaseDetectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeated strokes suggest flights, but do not establish the exact slab opening. Review the geometry and outline the opening on its arrival floor.'**
+  String get staircaseDetectionHint;
+
+  /// No description provided for @staircaseDetectionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reliable repeated tread pattern found. Outline the zone manually or inspect the floor below.'**
+  String get staircaseDetectionEmpty;
+
+  /// No description provided for @staircaseUseZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Use as circulation zone'**
+  String get staircaseUseZone;
+
+  /// No description provided for @staircaseDetectionPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Flight candidate; landing and passage space need review'**
+  String get staircaseDetectionPartial;
+
+  /// No description provided for @staircaseLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing is too large for a complete geometry search. Use manual outlining.'**
+  String get staircaseLimit;
+
+  /// No description provided for @staircaseInvalidZone.
+  ///
+  /// In en, this message translates to:
+  /// **'The circulation polygon is invalid. Correct its points.'**
+  String get staircaseInvalidZone;
+
+  /// No description provided for @staircaseWinder.
+  ///
+  /// In en, this message translates to:
+  /// **'Winder flight'**
+  String get staircaseWinder;
+
+  /// No description provided for @staircaseEvidenceFromLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Flight evidence from {level}; review against this floor.'**
+  String staircaseEvidenceFromLevel(String level);
+
+  /// No description provided for @staircaseSupportConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing supports overlap the staircase zone. Reposition them or correct the zone.'**
+  String get staircaseSupportConflict;
+
+  /// No description provided for @staircaseCloseZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Save zone ({count} points)'**
+  String staircaseCloseZone(int count);
+
+  /// No description provided for @staircaseUseOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Review opening contour'**
+  String get staircaseUseOpening;
 }
 
 class _AppLocalizationsDelegate

@@ -29,8 +29,9 @@ class SlabOpeningPlacement {
     SlabOpeningType type = SlabOpeningType.shaft,
     (String, int)? replacing,
     bool allowTransfer = true,
+    bool floorOwnedOnly = false,
   }) {
-    if (slabs.isEmpty) {
+    if (!slabs.any((s) => !floorOwnedOnly || s.isFloorSlab)) {
       return const OpeningPlacementResult(OpeningPlacementIssue.missingSlab);
     }
     if (slabs.map((s) => s.id).toSet().length != slabs.length) {
@@ -47,11 +48,17 @@ class SlabOpeningPlacement {
           OpeningPlacementIssue.missingOpening,
         );
       }
+      if (floorOwnedOnly && !slabs[oldIndex].isFloorSlab) {
+        return const OpeningPlacementResult(
+          OpeningPlacementIssue.invalidGeometry,
+        );
+      }
       type = slabs[oldIndex].getOpeningType(replacing.$2);
       updated[oldIndex] = slabs[oldIndex].removeOpening(replacing.$2);
     }
     final owners = <int>[];
     for (var i = 0; i < slabs.length; i++) {
+      if (floorOwnedOnly && !slabs[i].isFloorSlab) continue;
       // Ignore existing holes only while resolving the outer-ring owner.
       final probe = slabs[i].copyWith(openings: [polygon]);
       if (SlabTopologyAnalyzer.analyze([probe], scale).issue ==

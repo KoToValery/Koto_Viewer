@@ -150,6 +150,10 @@ class DxfMeasurePointerPainter extends CustomPainter {
       ..isAntiAlias = true;
 
     switch (type) {
+      case DxfSnapType.intersection:
+        canvas.drawLine(pos - const Offset(7, 7), pos + const Offset(7, 7), snapLinePaint);
+        canvas.drawLine(pos - const Offset(7, -7), pos + const Offset(7, -7), snapLinePaint);
+        break;
       case DxfSnapType.endpoint:
       case DxfSnapType.point:
         // Diamond ◇
@@ -216,6 +220,9 @@ class DxfMeasurePointerPainter extends CustomPainter {
     String titleText = customTitle ?? (isSettingSecondPoint ? '2nd point' : '1st point');
     if (isSnapped && snapType != null) {
       switch (snapType!) {
+        case DxfSnapType.intersection:
+          titleText += ' • Intersection';
+          break;
         case DxfSnapType.endpoint:
           titleText += ' • Endpoint';
           break;

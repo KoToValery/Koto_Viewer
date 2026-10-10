@@ -53,6 +53,8 @@ class SupportLayoutOptimizer {
     double columnDepthM = .3,
     double columnThicknessM = .25,
   }) {
+    fixedFloor=fixedFloor.copyWith(staircaseZones:project.staircaseZonesFor(fixedFloor));
+    seeds=[for(final seed in seeds) seed.copyWith(staircaseZones:fixedFloor.staircaseZones)];
     final fixedIds = <String>{
       ...fixedFloor.columns.map((c) => c.id),
       ...fixedFloor.shearWalls.map((w) => w.id),

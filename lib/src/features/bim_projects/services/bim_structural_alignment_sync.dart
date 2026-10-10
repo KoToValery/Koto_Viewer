@@ -206,5 +206,7 @@ class _Delta {
         ),
     ],
     slabs: s.slabs.map(slab).toList(),
+    staircaseZones: {for (final e in s.staircaseZones.entries)
+      e.key: e.value.map(point).toList()},
   );
 }

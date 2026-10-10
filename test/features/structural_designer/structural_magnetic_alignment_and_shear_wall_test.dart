@@ -397,6 +397,7 @@ void main() {
         slabs: const [
           StructuralSlab(
             id: 'sl1',
+            isFloorSlab: true,
             thickness: 0.20,
             polygon: [
               Offset(0, 0),
@@ -417,6 +418,7 @@ void main() {
         slabs: const [
           StructuralSlab(
             id: 'sl2',
+            isFloorSlab: true,
             thickness: 0.20,
             polygon: [
               Offset(0, 0),

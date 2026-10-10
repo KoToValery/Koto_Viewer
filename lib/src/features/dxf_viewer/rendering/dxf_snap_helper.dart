@@ -2,10 +2,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/dxf_models.dart';
 import 'dxf_math.dart';
+import 'dxf_segment_snap.dart';
 
 /// Snap point type for CAD snapping.
 enum DxfSnapType {
   endpoint(label: 'Endpoint'),
+  intersection(label: 'Intersection'),
   midpoint(label: 'Midpoint'),
   center(label: 'Center'),
   nearest(label: 'Nearest'),
@@ -122,12 +124,15 @@ class DxfSnapHelper {
   ///
   /// When [basePoint] is provided (e.g. 1st measurement point P1), it searches for right-angle perpendicular
   /// projection points (90° perpendicular angle) onto all visible segments and curves.
+  /// [includeIntersections] prioritizes nearby crossings of visible straight CAD
+  /// segments for alignment and polygon tracing, including transformed blocks.
   static DxfSnapResult? findSnapPoint({
     required DxfDocument document,
     required Offset cadPoint,
     required double toleranceCad,
     Offset? basePoint,
     bool allowNearest = true,
+    bool includeIntersections = false,
   }) {
     if (toleranceCad <= 0) return null;
 
@@ -500,6 +505,15 @@ class DxfSnapHelper {
           testLandmark(entity.defPoint2!, DxfSnapType.endpoint);
         }
         testLandmark(entity.textPoint, DxfSnapType.point);
+      }
+    }
+
+    if (includeIntersections) {
+      final intersection = DxfSegmentSnap.nearestIntersection(
+        document: document, point: cadPoint, tolerance: toleranceCad);
+      if (intersection != null) {
+        return DxfSnapResult(point: intersection, type: DxfSnapType.intersection,
+          distance: (intersection-cadPoint).distance);
       }
     }
 

@@ -51,6 +51,8 @@ class StructuralGeometryUnits {
         ),
     ],
     gridAxes: s.gridAxes.map(axis).toList(),
+    staircaseZones: {for (final e in s.staircaseZones.entries)
+      e.key:e.value.map(toMetres).toList()},
   );
   StructuralProject project(StructuralProject p) => p.copyWith(
     storeys: p.storeys.map(floor).toList(),

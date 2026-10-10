@@ -2954,6 +2954,10 @@ class DxfPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     switch (snap.type) {
+      case DxfSnapType.intersection:
+        canvas.drawLine(pos - Offset(size, size), pos + Offset(size, size), markerPaint);
+        canvas.drawLine(pos - Offset(size, -size), pos + Offset(size, -size), markerPaint);
+        break;
       case DxfSnapType.endpoint:
       case DxfSnapType.point:
         // Diamond marker ◇

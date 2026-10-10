@@ -210,6 +210,17 @@ class Structural2dPainter extends CustomPainter {
       }
     }
 
+    // Circulation polygons are separate visual reservations, never slab holes.
+    for(final zone in currentStorey.staircaseZones.values) {
+      if(zone.length<3) continue;
+      final points=zone.map(cadToScene).toList();
+      final path=Path()..moveTo(points.first.dx,points.first.dy);
+      for(final p in points.skip(1)) { path.lineTo(p.dx,p.dy); } path.close();
+      canvas.drawPath(path,Paint()..color=const Color(0xFF80CBC4).withValues(alpha:.06));
+      canvas.drawPath(path,Paint()..color=const Color(0xFF80CBC4).withValues(alpha:.65)
+        ..style=PaintingStyle.stroke..strokeWidth=1/zoomScale);
+    }
+
     // 2b. Draw Active Storey Beams
     for (final beam in currentStorey.beams) {
       _drawBeam(canvas, beam, isGhost: false);
@@ -2171,7 +2182,7 @@ class Structural2dPainter extends CustomPainter {
         if (currentCursorCad != null) {
           final sCursor = cadToScene(currentCursorCad!);
           if (openingPointsInProgress.length >= 3 &&
-              (currentCursorCad! - openingPointsInProgress.first).distance < (28.0 / (cadScale * zoomScale))) {
+              (currentCursorCad! - openingPointsInProgress.first).distance < math.min(12.0 / (cadScale * zoomScale), .10 * cadUnitsPerMeter)) {
             isCloseSnap = true;
             final closeLinePaint = Paint()
               ..color = const Color(0xFF00E676)

@@ -20,13 +20,31 @@ import 'package:kotoview/src/features/structural_designer/structural_designer_sc
 import 'package:kotoview/src/features/structural_designer/widgets/storey_manager_sheet.dart';
 import 'features/bim_projects/bim_seed_lifecycle_test.dart' as fixtures;
 
+// These cases intentionally exercise saved legacy ceilings. New BIM seeds are
+// floor-owned now, so construct the legacy owner representation explicitly.
+StructuralProject legacyCeilings(StructuralProject seeded) => seeded.copyWith(
+  storeys: [
+    for (var i = 0; i < seeded.storeys.length; i++)
+      seeded.storeys[i].copyWith(
+        slabs: [
+          if (i + 1 < seeded.storeys.length)
+            for (final slab in seeded.storeys[i + 1].slabs)
+              slab.copyWith(
+                isFloorSlab: false,
+                topElevation: seeded.storeys[i + 1].structuralElevationFor(
+                  slab,
+                ),
+              ),
+        ],
+      ),
+  ],
+);
+
 StructuralProject twoLevels() {
   final p = fixtures.project([0, 2.8]);
-  return BimStructuralSeedSync.refresh(
-    p,
-    fixtures.model(p),
-    fixtures.docs(p),
-  ).$2.copyWith(activeStoreyIndex: 1);
+  return legacyCeilings(
+    BimStructuralSeedSync.refresh(p, fixtures.model(p), fixtures.docs(p)).$2,
+  ).copyWith(activeStoreyIndex: 1);
 }
 
 void main() {
@@ -59,11 +77,12 @@ void main() {
     'Floor lookup uses nearest lower elevation and never revives a missing plate',
     () {
       final p = fixtures.project([-3.2, 0, 2.8, 5.6]);
-      final (_, seeded) = BimStructuralSeedSync.refresh(
+      final (_, floorOwned) = BimStructuralSeedSync.refresh(
         p,
         fixtures.model(p),
         fixtures.docs(p),
       );
+      final seeded = legacyCeilings(floorOwned);
       final unordered = seeded.copyWith(
         storeys: seeded.storeys.reversed.toList(),
       );

@@ -73,6 +73,10 @@ class SupportPlacementRules {
         );
   }
 
+  static bool circulationFits(List<Offset> polygon, StoreyLevel floor, double scale) =>
+    !floor.staircaseZones.values.any((zone)=>
+      StructuralPolygonDistance.between(polygon,zone)<=1e-7*scale);
+
   static String? reason({
     required List<Offset> polygon,
     required Offset center,
@@ -86,6 +90,7 @@ class SupportPlacementRules {
     String? skipId,
     Offset? wallDirection,
   }) {
+    if (!circulationFits(polygon, floor, scale)) return 'staircase';
     if (!domain.contains(polygon, includeOpenings: includeOpenings)) {
       return 'wall';
     }
