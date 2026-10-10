@@ -38,11 +38,12 @@ class SlabPlanLabels {
     required Offset Function(Offset) project,
     double zoom = 1,
     String? selectedId,
+    bool showFloorSlabs = false,
   }) {
     final sources =
         <(StoreyLevel, StructuralSlab, bool, bool)>[
           for (final slab in current.slabs)
-            if (!slab.isFloorSlab) (current, slab, false, false),
+            if (!slab.isFloorSlab || showFloorSlabs) (current, slab, false, false),
           if (upper != null)
             for (final slab in upper.slabs) (upper, slab, true, false),
         ]..sort((a, b) {

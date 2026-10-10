@@ -85,9 +85,16 @@ class StructuralColumnDetector {
     DxfDocument document, {
     required List<WallPairCandidate> wallPairs,
     required double scale,
+    double? minLineweight,
   }) {
     if (!scale.isFinite || scale <= 0) return const [];
 
+    // The slab fallback calls this detector independently. Apply the same cut
+    // pen gate there too, so an empty column result cannot reintroduce treads.
+    final wallPen = wallPairs.fold<double>(0, (pen, pair) =>
+      math.max(pen, math.max(pair.segmentA.lineweight, pair.segmentB.lineweight)));
+    final minimumPen = minLineweight ??
+      (wallPen >= .35 ? .22 : wallPen >= .18 ? wallPen * .75 : 0);
     final candidates = <(List<Offset> poly, Rect bounds, String layer)>[];
 
     // Tolerance thresholds scaled to drawing units
@@ -145,11 +152,18 @@ class StructuralColumnDetector {
       candidates.add((poly, Rect.fromLTRB(minX, minY, maxX, maxY), layer));
     }
 
+    bool cutEntity(DxfEntity e, String layer) {
+      final own = e.lineWeight;
+      final pen = own != null && own >= 0 ? own :
+          document.layers[layer]?.effectiveLineweight ?? 0;
+      return pen + 1e-6 >= minimumPen;
+    }
+
     final entities = document.layoutEntities['Model'] ?? document.entities;
 
     // 1. Scan closed LWPOLYLINE and POLYLINE entities
     for (final e in entities) {
-      if (e.isPaperSpace) continue;
+      if (e.isPaperSpace || !cutEntity(e, e.layer)) continue;
       if (e is DxfLwPolyline && e.isClosed) {
         evaluateLoop(e.vertices.map((v) => Offset(v.x, v.y)).toList(), e.layer);
       } else if (e is DxfPolyline && e.isClosed) {
@@ -175,16 +189,18 @@ class StructuralColumnDetector {
       }
 
       for (final child in block.entities) {
+        final layer = child.layer == '0' || child.layer.isEmpty ? e.layer : child.layer;
+        if (!cutEntity(child, layer)) continue;
         if (child is DxfLwPolyline && child.isClosed) {
-          evaluateLoop(child.vertices.map((v) => transform(Offset(v.x, v.y))).toList(), e.layer);
+          evaluateLoop(child.vertices.map((v) => transform(Offset(v.x, v.y))).toList(), layer);
         } else if (child is DxfPolyline && child.isClosed) {
-          evaluateLoop(child.vertices.map((v) => transform(Offset(v.x, v.y))).toList(), e.layer);
+          evaluateLoop(child.vertices.map((v) => transform(Offset(v.x, v.y))).toList(), layer);
         }
       }
     }
 
     // 3. Assemble 4-line closed loops on column layers or where walls terminate
-    _assembleLineLoops(entities, evaluateLoop, scale);
+    _assembleLineLoops(entities.where((e) => cutEntity(e, e.layer)).toList(), evaluateLoop, scale);
 
     final confirmed = <DetectedStructuralColumn>[];
     final tol = 25.0 * scale; // 2.5 cm tolerance for wall contact

@@ -223,7 +223,7 @@ void main() {
     },
   );
   testWidgets(
-    'pressing an upper reference badge selects the actual upper slab and owner',
+    'floor editing hides the ceiling and keeps selection on the current owner',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       tester.view.physicalSize = const Size(1000, 900);
@@ -281,6 +281,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(painter().currentStorey.id, 'g');
       expect(painter().selectedSlabId, 'ground');
+      expect(painter().showFloorSlabs, isTrue);
+      expect(
+        SlabPlanLabels.layout(
+          current: painter().currentStorey,
+          project: painter().cadToScene,
+          showFloorSlabs: true,
+          selectedId: painter().selectedSlabId,
+        ).single.slab.id,
+        'ground',
+      );
       final upper = labels.firstWhere((l) => l.owner.id == 'f');
       await tester.tapAt(
         tester
@@ -288,10 +298,14 @@ void main() {
             .localToGlobal(upper.rect.center),
       );
       await tester.pumpAndSettle();
-      expect(painter().currentStorey.id, 'f');
-      expect(painter().selectedSlabId, 'upper');
+      expect(painter().currentStorey.id, 'g');
+      expect(painter().selectedSlabId, 'ground');
       expect(painter().currentStorey.slabs.single.isFloorSlab, isTrue);
-      expect(find.textContaining('2.800 m'), findsOneWidget);
+      expect(find.textContaining('2.800 m'), findsNothing);
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Save'));
+      await tester.pumpAndSettle();
+      expect(painter().showFloorSlabs, isFalse);
+      expect(painter().selectedSlabId, isNull);
       expect(tester.takeException(), isNull);
     },
   );

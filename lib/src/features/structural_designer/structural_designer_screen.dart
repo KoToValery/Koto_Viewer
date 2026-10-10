@@ -1,3 +1,4 @@
+import 'rendering/grid_axis_bubble_layout.dart';
 import 'analysis/staircase_automatic_openings.dart';
 import 'rendering/slab_plan_labels.dart';
 import 'analysis/geometric_window_detector.dart';
@@ -702,6 +703,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (!_showBimSlabs) return null;
     const double hitMarginScreen = 20.0;
     for (final slab in _project.activeStorey.slabs.reversed) {
+      if (widget.bimContext != null && slab.isFloorSlab && !_isEditingSlab) continue;
       for (int i = 0; i < slab.openings.length; i++) {
         final op = slab.openings[i];
         if (op.length < 3) continue;
@@ -770,6 +772,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   StructuralGridAxis? _hitTestGridAxis(Offset screenPos) {
     if (!_showBimAxes) return null;
+    final bubbles = GridAxisBubbleLayout.build(axes:_project.activeStorey.gridAxes,
+      project:_cadToScreen, zoom:1, labelScale:GridAxisBubbleLayout.textScale(_transformController.value.getMaxScaleOnAxis()), levels:(axis) {
+        final style=GridAxisPresentation.forStorey(axis,_project.activeStorey,_project.storeys);
+        return style.reference ? style.levels : ''; });
+    for (final axis in _project.activeStorey.gridAxes.reversed) {
+      for (final start in [true,false]) {
+        final point=bubbles[(axis.id,start)];
+        if(point!=null && (point-screenPos).distance<=12) return axis;
+      }
+    }
     const double hitMarginScreen = 24.0;
     for (final axis in _project.activeStorey.gridAxes.reversed) {
       final p1 = _cadToScreen(axis.start);
@@ -830,7 +842,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _slabBadgeOwnerId = null;
     if (_activeTool == StructuralDrawTool.slab) {
       final labels = SlabPlanLabels.layout(current:_project.activeStorey,
-        lower:_floorSlabStorey, upper:_ceilingSlabStorey, project:_cadToScreen,
+        lower:_floorSlabStorey, upper:_isEditingSlab ? null : _ceilingSlabStorey,
+        showFloorSlabs:_isEditingSlab, project:_cadToScreen,
         selectedId:_editingSlab?.id);
       for (final label in labels) {
         if (label.rect.contains(screenPos)) {
@@ -855,6 +868,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // 1. Prioritize boundary edge check (screen tolerance ~ 24px)
     const double edgeTolScreen = 24.0;
     for (final slab in active.slabs.reversed) {
+      if (widget.bimContext != null && slab.isFloorSlab && !_isEditingSlab) continue;
       final pts = slab.polygon.map(_cadToScreen).toList();
       for (int i = 0; i < pts.length; i++) {
         final p1 = pts[i];
@@ -869,6 +883,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // 2. Interior polygon test (only when in clear open floor area)
     final cadPt = _screenToCad(screenPos);
     for (final slab in active.slabs.reversed) {
+      if (widget.bimContext != null && slab.isFloorSlab && !_isEditingSlab) continue;
       if (slab.containsPoint(cadPt)) {
         return slab;
       }
@@ -896,6 +911,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (vIdx != null) return (_editingSlab!, vIdx);
     }
     for (final slab in _project.activeStorey.slabs) {
+      if (widget.bimContext != null && slab.isFloorSlab && !_isEditingSlab) continue;
       final vIdx = _hitTestSlabVertex(screenPos, slab);
       if (vIdx != null) return (slab, vIdx);
     }
@@ -8770,6 +8786,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                         ? const Color(0xFF92979C)
                                         : const Color(0xFF757A80),
                                     drawingStrokeWidthOverride: 0.8,
+                                    originalStyleLayers: _underlayFilterActive ? {
+                                      if (BimUnderlayMetadata.read(_document)?['wallLayer'] case final String layer) layer,
+                                      'WALLS_250',
+                                    } : const {},
                                     revision: _underlayRevision,
                                     entityFilter: (_underlayFilterActive && BimUnderlayMetadata.read(_document) == null)
                                         ? _filterUnderlayEntity
@@ -8784,6 +8804,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                 painter: Structural2dPainter(
                                   currentStorey: _project.activeStorey,
                                   showSlabs: _showBimSlabs,
+                                  showFloorSlabs: widget.bimContext == null || _isEditingSlab,
                                   showGridAxes: _showBimAxes,
                                   floorSlabStorey: floor,
                                   ceilingSlabStorey: ceiling,

@@ -277,6 +277,7 @@ class WallAxisDetector {
       document,
       wallPairs: allPairs,
       scale: scale,
+      minLineweight: maxDocLineweight >= .18 ? cutLwThreshold : 0,
     );
 
     // If any secondary group contains confirmed shear walls or column keywords, include its wall pairs
@@ -311,7 +312,10 @@ class WallAxisDetector {
           180.0,
           targetThicknessMm - thicknessToleranceMm,
         );
-        if (thicknessMm >= minStructuralMm) {
+        // A small square/shaft or jamb is not a building alignment.
+        // Keep its perimeter for topology, but require a real wall run for axes.
+        final minimumAxisRun = math.max(250 * scale, 1.5 * pair.perpendicularDistance);
+        if (thicknessMm >= minStructuralMm && pair.overlapLength + scale >= minimumAxisRun) {
           rawCenterlines.add((pair.centerlineStart, pair.centerlineEnd));
         }
         _collectWallContourWithEndCaps(
@@ -1922,6 +1926,7 @@ class WallAxisDetector {
         double curTMin = intervals.first.tMin;
         double curTMax = intervals.first.tMax;
         double curD = intervals.first.d;
+        double dominantLength = intervals.first.tMax - intervals.first.tMin;
 
         for (int i = 1; i < intervals.length; i++) {
           final next = intervals[i];
@@ -1930,7 +1935,8 @@ class WallAxisDetector {
           // If gap <= maxBridgeGapCad, bridge through the door/window opening!
           if (gap <= maxBridgeGapCad) {
             curTMax = math.max(curTMax, next.tMax);
-            curD = (curD + next.d) / 2.0;
+            final length = next.tMax - next.tMin;
+            if (length > dominantLength) { curD = next.d; dominantLength = length; }
           } else {
             // Commit previous segment
             bridgedAxes.add((
@@ -1946,6 +1952,7 @@ class WallAxisDetector {
             curTMin = next.tMin;
             curTMax = next.tMax;
             curD = next.d;
+            dominantLength = next.tMax - next.tMin;
           }
         }
 
@@ -2260,7 +2267,7 @@ class WallAxisDetector {
     List<WallPairCandidate> allPairs,
     WallPairCandidate currentPair,
   ) {
-    final searchRadius = wallThickness * 1.25;
+    final tolerance = wallThickness * .02;
 
     for (final other in allPairs) {
       if (identical(other, currentPair)) continue;
@@ -2273,7 +2280,7 @@ class WallAxisDetector {
         final p1 = other.centerlineStart;
         final p2 = other.centerlineEnd;
         final closest = _closestPointOnSegment(midPt, p1, p2);
-        if ((midPt - closest).distance <= searchRadius) {
+        if ((midPt - closest).distance <= other.perpendicularDistance / 2 + tolerance) {
           return true;
         }
       } else {

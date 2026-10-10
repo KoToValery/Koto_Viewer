@@ -147,6 +147,7 @@ class DxfPainter extends CustomPainter {
   final int revision;
   /// Optional presentation overrides; source geometry and layer styles stay intact.
   final Color? drawingColorOverride;
+  final Set<String> originalStyleLayers;
   /// Stroke width in screen pixels, independent of CAD lineweights and zoom.
   final double? drawingStrokeWidthOverride;
 
@@ -165,6 +166,7 @@ class DxfPainter extends CustomPainter {
     this.entityFilter,
     this.revision = 0,
     this.drawingColorOverride,
+    this.originalStyleLayers = const {},
     this.drawingStrokeWidthOverride,
   });
 
@@ -299,7 +301,7 @@ class DxfPainter extends CustomPainter {
             final layer = document.layers[mEntity.layer];
             if (layer != null && (!layer.isVisible || layer.isFrozen)) continue;
 
-            final color = drawingColorOverride ?? DxfColorTable.resolveColor(
+            final color = _colorOverrideFor(mEntity.layer) ?? DxfColorTable.resolveColor(
               colorIndex: mEntity.colorIndex,
               trueColor: mEntity.trueColor,
               layerColor: layer != null
@@ -396,7 +398,7 @@ class DxfPainter extends CustomPainter {
         }
 
         final bool isDarkForEntity = isPaperSpaceMode ? false : theme.isDark;
-        final color = drawingColorOverride ?? DxfColorTable.resolveColor(
+        final color = _colorOverrideFor(entity.layer) ?? DxfColorTable.resolveColor(
           colorIndex: entity.colorIndex,
           trueColor: entity.trueColor,
           layerColor: layer != null
@@ -686,10 +688,13 @@ class DxfPainter extends CustomPainter {
     }
   }
 
+  Color? _colorOverrideFor(String layer) =>
+      originalStyleLayers.contains(layer) ? null : drawingColorOverride;
+
   double _calcStrokeWidth(double? lineWeight, {DxfLayer? layer, bool isThick = false}) {
     final scale = currentScale.clamp(0.001, 10000.0);
 
-    if (drawingStrokeWidthOverride != null) {
+    if (drawingStrokeWidthOverride != null && !originalStyleLayers.contains(layer?.name)) {
       return drawingStrokeWidthOverride! / scale;
     }
 
@@ -2211,7 +2216,7 @@ class DxfPainter extends CustomPainter {
             final effectiveTrueColor = subpath.trueColor ?? insert.trueColor;
             final effectiveLineWeight = subpath.lineWeight ?? insert.lineWeight;
 
-            final childColor = drawingColorOverride ?? DxfColorTable.resolveColor(
+            final childColor = _colorOverrideFor(childLayer?.name ?? insert.layer) ?? DxfColorTable.resolveColor(
               colorIndex: effectiveColorIndex,
               trueColor: effectiveTrueColor,
               layerColor: childLayer != null
@@ -2256,7 +2261,7 @@ class DxfPainter extends CustomPainter {
             final childLayer = layers[child.layer];
             if (childLayer != null && (!childLayer.isVisible || childLayer.isFrozen)) continue;
 
-            final childColor = drawingColorOverride ?? DxfColorTable.resolveColor(
+            final childColor = _colorOverrideFor(childLayer?.name ?? insert.layer) ?? DxfColorTable.resolveColor(
               colorIndex: child.colorIndex ?? insert.colorIndex,
               trueColor: child.trueColor ?? insert.trueColor,
               layerColor: childLayer != null
@@ -2359,7 +2364,7 @@ class DxfPainter extends CustomPainter {
           entityPaint = paint;
         } else {
           final entityLayer = layers[entityToDraw.layer];
-          final textColor = drawingColorOverride ?? DxfColorTable.resolveColor(
+          final textColor = _colorOverrideFor(entityToDraw.layer) ?? DxfColorTable.resolveColor(
             colorIndex: entityToDraw.colorIndex,
             trueColor: entityToDraw.trueColor,
             layerColor: entityLayer != null
@@ -3713,7 +3718,8 @@ class DxfPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant DxfPainter oldDelegate) {
-    if (oldDelegate.drawingColorOverride != drawingColorOverride ||
+    if (oldDelegate.originalStyleLayers != originalStyleLayers ||
+        oldDelegate.drawingColorOverride != drawingColorOverride ||
         oldDelegate.drawingStrokeWidthOverride != drawingStrokeWidthOverride) {
       return true;
     }

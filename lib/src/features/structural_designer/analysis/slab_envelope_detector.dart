@@ -15,7 +15,7 @@ import 'geometric_window_detector.dart';
 /// Conservative preview only: enclosed free space is not proof of a slab.
 /// Coordinates remain in source CAD units, before project alignment.
 class SlabEnvelopeResult {
-  static const version = 9;
+  static const version = 10;
   final List<List<Offset>> contours;
   final List<String> diagnostics;
   final double cellSize;
