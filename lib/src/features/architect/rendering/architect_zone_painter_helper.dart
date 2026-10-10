@@ -17,6 +17,9 @@ class ArchitectZonePainterHelper {
     int? mergeCandidateIndex,
     List<Offset>? extrudePreviewPolygon,
     bool isExtrudeSelfIntersecting = false,
+    List<Offset>? editingPolygon,
+    bool isMoveWholeZoneMode = false,
+    double moveDistanceMeters = 0.0,
   }) {
     final activeStorey = project.activeStorey;
     if (activeStorey.zones.isEmpty) return;
@@ -33,6 +36,9 @@ class ArchitectZonePainterHelper {
         mergeCandidateIndex: isSelected ? mergeCandidateIndex : null,
         extrudePreviewPolygon: isSelected ? extrudePreviewPolygon : null,
         isExtrudeSelfIntersecting: isSelected ? isExtrudeSelfIntersecting : false,
+        editingPolygon: isSelected ? editingPolygon : null,
+        isMoveWholeZoneMode: isSelected ? isMoveWholeZoneMode : false,
+        moveDistanceMeters: isSelected ? moveDistanceMeters : 0.0,
       );
     }
   }
@@ -47,10 +53,15 @@ class ArchitectZonePainterHelper {
     int? mergeCandidateIndex,
     List<Offset>? extrudePreviewPolygon,
     bool isExtrudeSelfIntersecting = false,
+    List<Offset>? editingPolygon,
+    bool isMoveWholeZoneMode = false,
+    double moveDistanceMeters = 0.0,
   }) {
     final poly = extrudePreviewPolygon != null
         ? List<Offset>.from(extrudePreviewPolygon)
-        : List<Offset>.from(zone.polygon);
+        : (isSelected && editingPolygon != null
+            ? List<Offset>.from(editingPolygon)
+            : List<Offset>.from(zone.polygon));
     if (poly.length < 3) return;
 
     // If a vertex is currently being dragged, substitute its position for live preview
@@ -246,6 +257,20 @@ class ArchitectZonePainterHelper {
           vBorder,
         );
       }
+
+      // Vertex index number (1-based, GPS_Mapping style)
+      final tp = TextPainter(
+        text: TextSpan(
+          text: '${i + 1}',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 7.0 / zoomScale,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, v - Offset(tp.width / 2, tp.height / 2));
     }
   }
 
@@ -404,14 +429,46 @@ class ArchitectZonePainterHelper {
     bool isClosingSnap = false,
     bool isSelfIntersecting = false,
     String? closeLabel,
+    List<Offset> previewRectangle = const [],
   }) {
     if (points.isEmpty) return;
+
+    // 0. Quick rectangle mode preview
+    if (previewRectangle.length == 4) {
+      final rectPath = Path()..moveTo(previewRectangle[0].dx, previewRectangle[0].dy);
+      for (int i = 1; i < 4; i++) {
+        rectPath.lineTo(previewRectangle[i].dx, previewRectangle[i].dy);
+      }
+      rectPath.close();
+
+      canvas.drawPath(
+        rectPath,
+        Paint()
+          ..color = category.color.withValues(alpha: 0.22)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawPath(
+        rectPath,
+        Paint()
+          ..color = const Color(0xFF00E5FF)
+          ..strokeWidth = 2.0 / zoomScale
+          ..style = PaintingStyle.stroke,
+      );
+      for (int i = 0; i < 4; i++) {
+        final p1 = previewRectangle[i];
+        final p2 = previewRectangle[(i + 1) % 4];
+        final len = (p2 - p1).distance;
+        if (len > 0.3) {
+          _drawEdgeDimension(canvas, p1, p2, len, zoomScale);
+        }
+      }
+    }
 
     final candidate = candidatePoint;
     final allPoints = candidate != null ? [...points, candidate] : points;
 
     // 1. Polygon Fill preview if >= 3 points
-    if (allPoints.length >= 3) {
+    if (allPoints.length >= 3 && previewRectangle.isEmpty) {
       final fillPath = Path()..moveTo(allPoints.first.dx, allPoints.first.dy);
       for (int i = 1; i < allPoints.length; i++) {
         fillPath.lineTo(allPoints[i].dx, allPoints[i].dy);
@@ -444,7 +501,7 @@ class ArchitectZonePainterHelper {
     }
 
     // 3. Active rubber-band segment from last committed point to candidate
-    if (candidate != null && points.isNotEmpty) {
+    if (candidate != null && points.isNotEmpty && previewRectangle.isEmpty) {
       final lastPt = points.last;
       final rubberPaint = Paint()
         ..color = strokeColor
@@ -468,7 +525,7 @@ class ArchitectZonePainterHelper {
     }
 
     // 4. Extended orthogonal straightening guide line
-    if (orthoGuide != null) {
+    if (orthoGuide != null && previewRectangle.isEmpty) {
       final orthoPaint = Paint()
         ..color = const Color(0xFFFFD600).withValues(alpha: 0.85)
         ..strokeWidth = 1.2 / zoomScale
@@ -476,20 +533,33 @@ class ArchitectZonePainterHelper {
       _drawDashedLine(canvas, orthoGuide.$1, orthoGuide.$2, orthoPaint, zoomScale);
     }
 
-    // 5. Committed vertex nodes
-    final nodeRadius = 5.0 / zoomScale;
+    // 5. Committed vertex nodes (Numbered 1..N GPS_Mapping style)
+    final nodeRadius = 7.0 / zoomScale;
     final nodeFill = Paint()
-      ..color = Colors.white
+      ..color = const Color(0xFF161820)
       ..style = PaintingStyle.fill;
     final nodeBorder = Paint()
       ..color = const Color(0xFF00E5FF)
-      ..strokeWidth = 1.8 / zoomScale
+      ..strokeWidth = 1.6 / zoomScale
       ..style = PaintingStyle.stroke;
 
     for (int i = 0; i < points.length; i++) {
       final pt = points[i];
       canvas.drawCircle(pt, nodeRadius, nodeFill);
       canvas.drawCircle(pt, nodeRadius, nodeBorder);
+
+      final tp = TextPainter(
+        text: TextSpan(
+          text: '${i + 1}',
+          style: TextStyle(
+            color: const Color(0xFF00E5FF),
+            fontSize: 7.5 / zoomScale,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, pt - Offset(tp.width / 2, tp.height / 2));
     }
 
     // 6. First point closing target

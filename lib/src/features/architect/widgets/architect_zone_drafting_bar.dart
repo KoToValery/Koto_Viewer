@@ -125,6 +125,34 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
 
+                // Drafting Mode (Freeform vs 2-click Rectangle)
+                ChoiceChip(
+                  avatar: const Icon(Icons.polyline_rounded, size: 13),
+                  label: Text(
+                    l10n.architectZoneQuickPoly,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  selected: tool.draftMode == ArchitectZoneDraftMode.polyline,
+                  onSelected: (sel) {
+                    if (sel) tool.draftMode = ArchitectZoneDraftMode.polyline;
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 4),
+                ChoiceChip(
+                  avatar: const Icon(Icons.crop_square_rounded, size: 13),
+                  label: Text(
+                    l10n.architectZoneQuickRect,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  selected: tool.draftMode == ArchitectZoneDraftMode.rectangle,
+                  onSelected: (sel) {
+                    if (sel) tool.draftMode = ArchitectZoneDraftMode.rectangle;
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 8),
+
                 // Points count badge
                 _buildMetricChip(
                   icon: Icons.scatter_plot_rounded,

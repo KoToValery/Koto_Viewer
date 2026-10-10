@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../structural_designer/models/structural_element.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
+import 'architect_grid_axis_painter_helper.dart';
 import 'architect_zone_painter_helper.dart';
 
 enum ArchitectTool {
   select,
+  axis,
   zone,
   wall,
   door,
@@ -34,6 +37,18 @@ class Architect2dPainter extends CustomPainter {
   final double zoomScale;
   final Offset? cursorPosition;
 
+  // Dynamic Grid Axis state
+  final String? selectedAxisId;
+  final StructuralGridAxis? draggedAxisSnapshot;
+  final bool isDraggingAxisHandle;
+  final bool isMovingAxis;
+  final StructuralGridAxis? moveOriginalAxis;
+  final Offset? moveCurrentDelta;
+  final StructuralGridAxis? axisOffsetPreview;
+  final Offset? axisDraftStart;
+  final Offset? axisDraftEnd;
+  final String? axisDraftSnapLabel;
+
   // Point-by-point zone drafting
   final List<Offset> zoneDraftingPoints;
   final Offset? zoneDraftingCandidate;
@@ -51,6 +66,12 @@ class Architect2dPainter extends CustomPainter {
   final double? zoneExtrudeDistance;
   final bool isZoneExtrudeSelfIntersecting;
 
+  // Zone Editing and Fast Rectangle Preview
+  final List<Offset> zonePreviewRectangle;
+  final List<Offset>? zoneEditingPolygon;
+  final bool isMoveWholeZoneMode;
+  final double zoneMoveDistanceMeters;
+
   const Architect2dPainter({
     required this.project,
     required this.activeTool,
@@ -67,6 +88,16 @@ class Architect2dPainter extends CustomPainter {
     this.magneticGuides = const [],
     this.zoomScale = 1.0,
     this.cursorPosition,
+    this.selectedAxisId,
+    this.draggedAxisSnapshot,
+    this.isDraggingAxisHandle = false,
+    this.isMovingAxis = false,
+    this.moveOriginalAxis,
+    this.moveCurrentDelta,
+    this.axisOffsetPreview,
+    this.axisDraftStart,
+    this.axisDraftEnd,
+    this.axisDraftSnapLabel,
     this.zoneDraftingPoints = const [],
     this.zoneDraftingCandidate,
     this.zoneOrthoGuide,
@@ -80,6 +111,10 @@ class Architect2dPainter extends CustomPainter {
     this.zoneExtrudeNormal,
     this.zoneExtrudeDistance,
     this.isZoneExtrudeSelfIntersecting = false,
+    this.zonePreviewRectangle = const [],
+    this.zoneEditingPolygon,
+    this.isMoveWholeZoneMode = false,
+    this.zoneMoveDistanceMeters = 0.0,
   });
 
   @override
@@ -109,6 +144,9 @@ class Architect2dPainter extends CustomPainter {
       mergeCandidateIndex: mergeCandidateIndex,
       extrudePreviewPolygon: zoneExtrudePreviewPolygon,
       isExtrudeSelfIntersecting: isZoneExtrudeSelfIntersecting,
+      editingPolygon: zoneEditingPolygon,
+      isMoveWholeZoneMode: isMoveWholeZoneMode,
+      moveDistanceMeters: zoneMoveDistanceMeters,
     );
   }
 
@@ -125,6 +163,7 @@ class Architect2dPainter extends CustomPainter {
         isClosingSnap: isZoneClosingSnap,
         isSelfIntersecting: isZoneDraftingSelfIntersecting,
         closeLabel: zoneCloseLabel,
+        previewRectangle: zonePreviewRectangle,
       );
     }
   }
@@ -174,72 +213,21 @@ class Architect2dPainter extends CustomPainter {
   // ===========================================================================
 
   void _drawGridAxes(Canvas canvas) {
-    if (project.gridAxes.isEmpty) return;
-
-    final axisLinePaint = Paint()
-      ..color = const Color(0xFFC62828).withValues(alpha: 0.75)
-      ..strokeWidth = 1.0 / zoomScale
-      ..style = PaintingStyle.stroke;
-
-    final bubbleBg = Paint()
-      ..color = const Color(0xFF1C1C1E)
-      ..style = PaintingStyle.fill;
-
-    final bubbleBorder = Paint()
-      ..color = const Color(0xFFC62828)
-      ..strokeWidth = 1.2 / zoomScale
-      ..style = PaintingStyle.stroke;
-
-    final double bubbleR = 12.0 / zoomScale;
-
-    for (final axis in project.gridAxes) {
-      // Dash-dot architectural axis line
-      _drawDashDotLine(canvas, axis.start, axis.end, axisLinePaint);
-
-      // Bubble helper
-      void drawBubble(Offset center) {
-        canvas.drawCircle(center, bubbleR, bubbleBg);
-        canvas.drawCircle(center, bubbleR, bubbleBorder);
-
-        final tp = TextPainter(
-          text: TextSpan(
-            text: axis.name,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 10.5 / zoomScale,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
-      }
-
-      if (axis.bubbleAtStart) drawBubble(axis.start);
-      if (axis.bubbleAtEnd) drawBubble(axis.end);
-    }
-  }
-
-  void _drawDashDotLine(Canvas canvas, Offset p1, Offset p2, Paint paint) {
-    final d = p2 - p1;
-    final total = d.distance;
-    if (total < 1e-4) return;
-    final u = d / total;
-
-    final dash = 12.0 / zoomScale;
-    final gap = 4.0 / zoomScale;
-    final dot = 2.0 / zoomScale;
-
-    double cur = 0;
-    while (cur < total) {
-      final segEnd = (cur + dash).clamp(0.0, total);
-      canvas.drawLine(p1 + u * cur, p1 + u * segEnd, paint);
-      cur += dash + gap;
-      if (cur >= total) break;
-      final dotEnd = (cur + dot).clamp(0.0, total);
-      canvas.drawLine(p1 + u * cur, p1 + u * dotEnd, paint);
-      cur += dot + gap;
-    }
+    ArchitectGridAxisPainterHelper.drawAxes(
+      canvas: canvas,
+      project: project,
+      zoomScale: zoomScale,
+      selectedAxisId: selectedAxisId,
+      draggedAxisSnapshot: draggedAxisSnapshot,
+      isDraggingHandle: isDraggingAxisHandle,
+      isMovingAxis: isMovingAxis,
+      moveOriginalAxis: moveOriginalAxis,
+      moveCurrentDelta: moveCurrentDelta,
+      offsetPreview: axisOffsetPreview,
+      draftStart: axisDraftStart,
+      draftEnd: axisDraftEnd,
+      draftSnapLabel: axisDraftSnapLabel,
+    );
   }
 
   // ===========================================================================

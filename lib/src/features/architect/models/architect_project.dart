@@ -127,6 +127,10 @@ class ArchitectProject {
     return copyWith(storeys: updatedStoreys, updatedAt: DateTime.now());
   }
 
+  ArchitectProject copyWithGridAxes(List<StructuralGridAxis> newAxes) {
+    return copyWith(gridAxes: newAxes, updatedAt: DateTime.now());
+  }
+
   ArchitectProject copyWith({
     String? id,
     String? name,

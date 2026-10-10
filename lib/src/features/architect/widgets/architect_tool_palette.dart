@@ -98,6 +98,11 @@ class ArchitectToolPalette extends StatelessWidget {
                     label: l10n.architectToolSelect,
                   ),
                   _buildToolButton(
+                    tool: ArchitectTool.axis,
+                    icon: Icons.grid_on_rounded,
+                    label: l10n.architectToolAxis,
+                  ),
+                  _buildToolButton(
                     tool: ArchitectTool.zone,
                     icon: Icons.space_dashboard_rounded,
                     label: l10n.architectToolZone,

@@ -3578,6 +3578,50 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectDeleteZone => 'Изтрий зона';
 
   @override
+  String get architectZoneAutoAlign => 'Изправи ъгли (90°)';
+
+  @override
+  String get architectZoneUndoAlign => 'Откажи изправянето';
+
+  @override
+  String get architectZoneAutoAlignSuccess => 'Ъглите са изправени на 90°';
+
+  @override
+  String get architectZoneRotate => 'Ротация';
+
+  @override
+  String get architectZoneMove => 'Премести зона';
+
+  @override
+  String get architectZoneOffset => 'Отместване';
+
+  @override
+  String get architectZoneSave => 'Запази';
+
+  @override
+  String get architectZoneCancel => 'Откажи';
+
+  @override
+  String get architectZoneEditMode => 'Корекция на зона';
+
+  @override
+  String get architectZoneUndoAction => 'Отмени';
+
+  @override
+  String get architectZoneRedoAction => 'Повтори';
+
+  @override
+  String architectZoneMovedDistance(String dist) {
+    return 'Преместено: $dist м';
+  }
+
+  @override
+  String get architectZoneQuickRect => 'Правоъгълник';
+
+  @override
+  String get architectZoneQuickPoly => 'Свободен полигон';
+
+  @override
   String get staircaseAutoGenerate => 'Генерирай отвори за стълби';
 
   @override
@@ -3611,4 +3655,46 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get bimSupportSpacingAction => 'Разстояния';
+
+  @override
+  String get architectToolAxis => 'Оси';
+
+  @override
+  String get architectAxisDrawPrompt =>
+      'Докоснете начало и край за нова осова линия';
+
+  @override
+  String get architectAxesResequenced => 'Осите са преномерирани успешно';
+
+  @override
+  String get architectAxesAligned => 'Осите са подравнени';
+
+  @override
+  String get architectAxisAligned => 'Оста е подравнена спрямо успоредните оси';
+
+  @override
+  String architectAxisRenamed(String name) {
+    return 'Оста е преименувана на $name';
+  }
+
+  @override
+  String get resequenceGridAxesAction => 'Преномерирай осите';
+
+  @override
+  String get alignGridAxesAction => 'Подравни осите';
+
+  @override
+  String get alignGridAxisAction => 'Подравни';
+
+  @override
+  String get architectAxisOrientationV => 'Вертикална';
+
+  @override
+  String get architectAxisOrientationH => 'Хоризонтална';
+
+  @override
+  String get architectAxisDeleted => 'Оста е изтрита';
+
+  @override
+  String get architectAxisMoved => 'Оста е преместена';
 }

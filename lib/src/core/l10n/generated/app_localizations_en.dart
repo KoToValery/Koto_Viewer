@@ -3563,6 +3563,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectDeleteZone => 'Delete Zone';
 
   @override
+  String get architectZoneAutoAlign => 'Straighten Angles (90°)';
+
+  @override
+  String get architectZoneUndoAlign => 'Undo Straighten';
+
+  @override
+  String get architectZoneAutoAlignSuccess => 'Angles straightened to 90°';
+
+  @override
+  String get architectZoneRotate => 'Rotation';
+
+  @override
+  String get architectZoneMove => 'Move Zone';
+
+  @override
+  String get architectZoneOffset => 'Offset';
+
+  @override
+  String get architectZoneSave => 'Save';
+
+  @override
+  String get architectZoneCancel => 'Cancel';
+
+  @override
+  String get architectZoneEditMode => 'Zone Edit & Transform';
+
+  @override
+  String get architectZoneUndoAction => 'Undo';
+
+  @override
+  String get architectZoneRedoAction => 'Redo';
+
+  @override
+  String architectZoneMovedDistance(String dist) {
+    return 'Moved: $dist m';
+  }
+
+  @override
+  String get architectZoneQuickRect => 'Rectangle';
+
+  @override
+  String get architectZoneQuickPoly => 'Freeform';
+
+  @override
   String get staircaseAutoGenerate => 'Generate stair openings';
 
   @override
@@ -3596,4 +3640,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bimSupportSpacingAction => 'Spacing';
+
+  @override
+  String get architectToolAxis => 'Axes';
+
+  @override
+  String get architectAxisDrawPrompt =>
+      'Tap start and end points to draw an axis';
+
+  @override
+  String get architectAxesResequenced => 'Axes resequenced successfully';
+
+  @override
+  String get architectAxesAligned => 'Axes extents aligned';
+
+  @override
+  String get architectAxisAligned => 'Axis aligned with parallel axes';
+
+  @override
+  String architectAxisRenamed(String name) {
+    return 'Axis renamed to $name';
+  }
+
+  @override
+  String get resequenceGridAxesAction => 'Resequence Axes';
+
+  @override
+  String get alignGridAxesAction => 'Align All Axes';
+
+  @override
+  String get alignGridAxisAction => 'Align Extents';
+
+  @override
+  String get architectAxisOrientationV => 'Vertical';
+
+  @override
+  String get architectAxisOrientationH => 'Horizontal';
+
+  @override
+  String get architectAxisDeleted => 'Axis deleted';
+
+  @override
+  String get architectAxisMoved => 'Axis moved';
 }

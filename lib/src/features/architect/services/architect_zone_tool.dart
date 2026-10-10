@@ -11,15 +11,27 @@ import '../rendering/architect_zone_snap.dart';
 //    - ArchitectOrthoType
 //    - ArchitectOrthoSnapResult
 //    - ZoneDraftingPointStatus
+//    - ArchitectZoneDraftMode (polyline, rectangle)
 //
 // 2. === SECTION: GEOMETRY_AND_MATH_ENGINE ===
-//    - ArchitectZoneGeometry (intersections, area, normal, cleanPolygon, extrudeEdge, orthoSnap)
+//    - ArchitectZoneGeometry:
+//      * linesIntersect, segmentIntersectsChain, calculateArea, calculateCentroid
+//      * cleanPolygon (orphan/collinear point removal)
+//      * rotatePolygon, translatePolygon, offsetPolygon, rayIntersection
+//      * alignPolygonToNearest2D (GPS_Mapping 90°/5° squarify algorithm)
+//      * extrudeEdge (edge midpoint step/niche extrusion)
+//      * calculateOrthoSnap
 //
 // 3. === SECTION: ZONE_TOOL_CONTROLLER ===
-//    - ArchitectZoneTool (ChangeNotifier)
-//      * State & Getters: Drafting, Extrusion, Ergonomic Aliases
-//      * Drafting Methods (startDrafting, updateDraftingPointer, addDraftingPoint, commitDrafting)
-//      * Extrusion Methods (startExtrude, updateExtrudePointer, commitExtrude, cancelAll)
+//    - ArchitectZoneTool (ChangeNotifier):
+//      * Drafting State & Methods (zero-lag point-by-point, quick rectangle)
+//      * Edge Extrusion State & Methods
+//      * GPS_Mapping-style Zone Edit & Transform Mode:
+//        - autoAlignZone (90° squarify) & undoAutoAlignZone
+//        - rotation slider & ±15°/±90° steps
+//        - move whole zone mode
+//        - offset boundary expand/shrink
+//        - full undo/redo stack
 // =============================================================================
 
 // === SECTION: ORTHO_GUIDES_AND_STATUS_ENUMS ===
@@ -55,6 +67,12 @@ enum ZoneDraftingPointStatus {
   closeTarget,
   selfIntersects,
   tooClose,
+}
+
+/// Mode of zone creation: freeform point-by-point or 2-click rectangle.
+enum ArchitectZoneDraftMode {
+  polyline,
+  rectangle,
 }
 
 // === SECTION: GEOMETRY_AND_MATH_ENGINE ===
@@ -377,6 +395,277 @@ class ArchitectZoneGeometry {
       angleDeg: angleDeg,
     );
   }
+
+  /// Computes the arithmetic centroid (center of mass) of polygon vertices.
+  static Offset calculateCentroid(List<Offset> points) {
+    if (points.isEmpty) return Offset.zero;
+    double sumX = 0.0;
+    double sumY = 0.0;
+    for (final p in points) {
+      sumX += p.dx;
+      sumY += p.dy;
+    }
+    return Offset(sumX / points.length, sumY / points.length);
+  }
+
+  /// Rotates a list of [points] by [angleDeg] around [center] (defaults to centroid).
+  static List<Offset> rotatePolygon(
+    List<Offset> points,
+    double angleDeg, [
+    Offset? center,
+  ]) {
+    if (points.isEmpty || angleDeg.abs() < 1e-4) return points;
+    final c = center ?? calculateCentroid(points);
+    final rad = angleDeg * math.pi / 180.0;
+    final cosA = math.cos(rad);
+    final sinA = math.sin(rad);
+
+    return points.map((p) {
+      final dx = p.dx - c.dx;
+      final dy = p.dy - c.dy;
+      final rx = c.dx + dx * cosA - dy * sinA;
+      final ry = c.dy + dx * sinA + dy * cosA;
+      return Offset(rx, ry);
+    }).toList();
+  }
+
+  /// Translates all polygon vertices by [delta].
+  static List<Offset> translatePolygon(List<Offset> points, Offset delta) {
+    if (delta == Offset.zero || points.isEmpty) return points;
+    return points.map((p) => p + delta).toList();
+  }
+
+  /// Calculates intersection of two infinite rays in 2D Cartesian plane.
+  static Offset? rayIntersection(
+    Offset p1,
+    double angleDeg1,
+    Offset p2,
+    double angleDeg2,
+  ) {
+    final rad1 = angleDeg1 * math.pi / 180.0;
+    final rad2 = angleDeg2 * math.pi / 180.0;
+    final v1 = Offset(math.cos(rad1), math.sin(rad1));
+    final v2 = Offset(math.cos(rad2), math.sin(rad2));
+
+    final det = v1.dx * v2.dy - v1.dy * v2.dx;
+    if (det.abs() < 1e-4) return null;
+
+    final dp = p2 - p1;
+    final t = (dp.dx * v2.dy - dp.dy * v2.dx) / det;
+    return p1 + v1 * t;
+  }
+
+  /// Straightens polygon corners and wall alignments to exact 90° (and 45°/5°),
+  /// ported from the battle-tested GPS_Mapping alignment engine into 2D Cartesian space.
+  /// Rectangles become perfectly orthogonal; complex rooms snap corners to 90°.
+  /// Centroid is preserved to prevent spatial drift.
+  static List<Offset> alignPolygonToNearest2D(
+    List<Offset> points, {
+    bool isClosed = true,
+  }) {
+    if (points.length < 3) return List.from(points);
+
+    // 1. Specialized 4-point rectangle / square orthogonalizer
+    if (isClosed && points.length == 4) {
+      final p0 = points[0];
+      final p1 = points[1];
+      final p2 = points[2];
+      final p3 = points[3];
+
+      final v01 = p1 - p0;
+      double baseBearing = math.atan2(v01.dy, v01.dx) * 180.0 / math.pi;
+      if (baseBearing < 0) baseBearing += 360.0;
+
+      // Snap base orientation to nearest 90° or 5°
+      double nearest90 = (baseBearing / 90.0).round() * 90.0;
+      if (nearest90 >= 360.0) nearest90 -= 360.0;
+      double diff90 = (baseBearing - nearest90).abs();
+      if (diff90 > 180.0) diff90 = 360.0 - diff90;
+
+      if (diff90 <= 12.0) {
+        baseBearing = nearest90;
+      } else {
+        double nearest5 = (baseBearing / 5.0).round() * 5.0;
+        if (nearest5 >= 360.0) nearest5 -= 360.0;
+        double diff5 = (baseBearing - nearest5).abs();
+        if (diff5 > 180.0) diff5 = 360.0 - diff5;
+        if (diff5 <= 4.0) baseBearing = nearest5;
+      }
+
+      // Detect turning direction (CW vs CCW)
+      final cross = (p1.dx - p0.dx) * (p2.dy - p1.dy) - (p1.dy - p0.dy) * (p2.dx - p1.dx);
+      final turnAngle = cross < 0 ? -90.0 : 90.0;
+
+      final d01 = (p1 - p0).distance;
+      final d12 = (p2 - p1).distance;
+      final d23 = (p3 - p2).distance;
+      final d30 = (p0 - p3).distance;
+
+      // Average opposite lengths and round to clean 5 cm increments
+      double length = ((d01 + d23) / 2.0);
+      length = (length * 20.0).round() / 20.0;
+      if (length < 0.20) length = 0.20;
+
+      double width = ((d12 + d30) / 2.0);
+      width = (width * 20.0).round() / 20.0;
+      if (width < 0.20) width = 0.20;
+
+      final b1 = baseBearing;
+      final b2 = (b1 + turnAngle) % 360.0;
+      final b3 = (b2 + turnAngle) % 360.0;
+
+      Offset step(Offset from, double deg, double dist) {
+        final r = deg * math.pi / 180.0;
+        return from + Offset(math.cos(r) * dist, math.sin(r) * dist);
+      }
+
+      final ap0 = p0;
+      final ap1 = step(ap0, b1, length);
+      final ap2 = step(ap1, b2, width);
+      final ap3 = step(ap2, b3, length);
+
+      final origCenter = calculateCentroid(points);
+      final alignedCenter = calculateCentroid([ap0, ap1, ap2, ap3]);
+      final shift = origCenter - alignedCenter;
+
+      return [
+        ap0 + shift,
+        ap1 + shift,
+        ap2 + shift,
+        ap3 + shift,
+      ];
+    }
+
+    // 2. Multi-point polygon alignment (L-shaped, T-shaped, arbitrary polyline)
+    final aligned = <Offset>[points.first];
+    double? firstAlignedBearing;
+    double? prevAlignedBearing;
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final p1 = points[i];
+      final p2 = points[i + 1];
+
+      final delta = p2 - p1;
+      double dist = delta.distance;
+      dist = (dist * 20.0).round() / 20.0;
+      if (dist < 0.05) dist = 0.05;
+
+      double bearing = math.atan2(delta.dy, delta.dx) * 180.0 / math.pi;
+      if (bearing < 0) bearing += 360.0;
+
+      double targetAngle;
+      if (prevAlignedBearing == null) {
+        targetAngle = bearing;
+        double n90 = (targetAngle / 90.0).round() * 90.0;
+        if (n90 >= 360.0) n90 -= 360.0;
+        double d90 = (targetAngle - n90).abs();
+        if (d90 > 180.0) d90 = 360.0 - d90;
+
+        if (d90 <= 12.0) {
+          targetAngle = n90;
+        } else {
+          double n45 = (targetAngle / 45.0).round() * 45.0;
+          if (n45 >= 360.0) n45 -= 360.0;
+          double d45 = (targetAngle - n45).abs();
+          if (d45 > 180.0) d45 = 360.0 - d45;
+          if (d45 <= 6.0) targetAngle = n45;
+        }
+        firstAlignedBearing = targetAngle;
+      } else {
+        double relAngle = (bearing - prevAlignedBearing) % 360.0;
+        if (relAngle < 0) relAngle += 360.0;
+
+        double snappedRel = relAngle;
+        double n90 = (relAngle / 90.0).round() * 90.0;
+        double d90 = (relAngle - n90).abs();
+        if (d90 > 180.0) d90 = 360.0 - d90;
+
+        if (d90 <= 12.0) {
+          snappedRel = n90;
+        } else {
+          double n45 = (relAngle / 45.0).round() * 45.0;
+          double d45 = (relAngle - n45).abs();
+          if (d45 > 180.0) d45 = 360.0 - d45;
+          if (d45 <= 6.0) snappedRel = n45;
+        }
+        targetAngle = (prevAlignedBearing + snappedRel) % 360.0;
+      }
+
+      // Closing segment ray intersection for closed polygons
+      if (isClosed && points.length > 3 && i == points.length - 2 && firstAlignedBearing != null) {
+        final closingDelta = points.last - points.first;
+        double closingBearing = math.atan2(closingDelta.dy, closingDelta.dx) * 180.0 / math.pi;
+        if (closingBearing < 0) closingBearing += 360.0;
+
+        double relClosing = (closingBearing - firstAlignedBearing) % 360.0;
+        if (relClosing < 0) relClosing += 360.0;
+        double n90 = (relClosing / 90.0).round() * 90.0;
+        double d90 = (relClosing - n90).abs();
+        if (d90 > 180.0) d90 = 360.0 - d90;
+
+        double snappedRelClosing = d90 <= 12.0 ? n90 : relClosing;
+        double targetClosing = (firstAlignedBearing + snappedRelClosing) % 360.0;
+
+        final isect = rayIntersection(aligned.last, targetAngle, points.first, targetClosing);
+        if (isect != null && (isect - aligned.last).distance < dist * 2.5) {
+          aligned.add(isect);
+          prevAlignedBearing = targetAngle;
+          continue;
+        }
+      }
+
+      prevAlignedBearing = targetAngle;
+      final rad = targetAngle * math.pi / 180.0;
+      final nextPt = aligned.last + Offset(math.cos(rad) * dist, math.sin(rad) * dist);
+      aligned.add(nextPt);
+    }
+
+    if (isClosed && aligned.length >= 3) {
+      final origCenter = calculateCentroid(points);
+      final alignedCenter = calculateCentroid(aligned);
+      final shift = origCenter - alignedCenter;
+      return aligned.map((p) => p + shift).toList();
+    }
+    return aligned;
+  }
+
+  /// Offsets polygon boundary outward (positive distance) or inward (negative distance).
+  static List<Offset> offsetPolygon(List<Offset> polygon, double distance) {
+    final n = polygon.length;
+    if (n < 3 || distance.abs() < 1e-4) return polygon;
+
+    final normals = <Offset>[];
+    for (int i = 0; i < n; i++) {
+      normals.add(calculateOutwardNormal(polygon, i));
+    }
+
+    final newPts = <Offset>[];
+    for (int i = 0; i < n; i++) {
+      final prevEdge = (i - 1 + n) % n;
+      final currEdge = i;
+      final n1 = normals[prevEdge];
+      final n2 = normals[currEdge];
+
+      final pPrev = polygon[prevEdge] + n1 * distance;
+      final v1 = polygon[i] - polygon[prevEdge];
+      final pCurr = polygon[currEdge] + n2 * distance;
+      final v2 = polygon[(currEdge + 1) % n] - polygon[currEdge];
+
+      final det = v1.dx * v2.dy - v1.dy * v2.dx;
+      if (det.abs() > 1e-4) {
+        final dp = pCurr - pPrev;
+        final t = (dp.dx * v2.dy - dp.dy * v2.dx) / det;
+        newPts.add(pPrev + v1 * t);
+      } else {
+        newPts.add(polygon[i] + (n1 + n2) / 2.0 * distance);
+      }
+    }
+
+    if (hasSelfIntersections(newPts) || calculateArea(newPts) < 0.1) {
+      return polygon;
+    }
+    return newPts;
+  }
 }
 
 // === SECTION: ZONE_TOOL_CONTROLLER ===
@@ -385,6 +674,18 @@ class ArchitectZoneGeometry {
 /// Combines point-by-point polyline drafting, interactive edge midpoint extrusion,
 /// and geometric safety validations into a cohesive, single tool unit.
 class ArchitectZoneTool extends ChangeNotifier {
+  // ---------------------------------------------------------------------------
+  // Drafting Mode & Fast Rectangle State
+  // ---------------------------------------------------------------------------
+  ArchitectZoneDraftMode _draftMode = ArchitectZoneDraftMode.polyline;
+  ArchitectZoneDraftMode get draftMode => _draftMode;
+  set draftMode(ArchitectZoneDraftMode mode) {
+    if (_draftMode != mode) {
+      _draftMode = mode;
+      cancelDrafting();
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Drafting State (Point-by-point creation)
   // ---------------------------------------------------------------------------
@@ -396,6 +697,21 @@ class ArchitectZoneTool extends ChangeNotifier {
   List<(Offset, Offset)> _magneticGuides = [];
   bool _isClosingSnap = false;
   ZoneDraftingPointStatus _pointStatus = ZoneDraftingPointStatus.valid;
+
+  // ---------------------------------------------------------------------------
+  // GPS_Mapping-style Zone Edit & Transform State
+  // ---------------------------------------------------------------------------
+  ArchitectZone? _editingZone;
+  List<Offset>? _editingPolygon;
+  List<Offset>? _preAlignBackupPolygon;
+  final List<List<Offset>> _editUndoStack = [];
+  final List<List<Offset>> _editRedoStack = [];
+  double _editRotationSlider = 0.0;
+  double _lastAppliedRotationSlider = 0.0;
+  bool _isMoveWholeZoneMode = false;
+  Offset? _moveStartPoint;
+  List<Offset>? _moveStartPolygon;
+  double _moveDistanceMeters = 0.0;
 
   // ---------------------------------------------------------------------------
   // Edge Extrusion State (Midpoint handle drag)
@@ -418,8 +734,18 @@ class ArchitectZoneTool extends ChangeNotifier {
   int get draftPointCount => _draftPoints.length;
   int get pointCount => _draftPoints.length;
   bool get isDrafting => _draftPoints.isNotEmpty;
-  bool get isActive => isDrafting;
-  bool get canCloseDraft => _draftPoints.length >= 3;
+  bool get canCloseDraft {
+    if (_draftMode == ArchitectZoneDraftMode.rectangle) {
+      if (_draftPoints.length >= 3) return true;
+      if (_draftPoints.length == 1 && candidatePoint != null) {
+        final p0 = _draftPoints[0];
+        final p2 = candidatePoint!;
+        return (p2.dx - p0.dx).abs() >= 0.15 && (p2.dy - p0.dy).abs() >= 0.15;
+      }
+      return false;
+    }
+    return _draftPoints.length >= 3;
+  }
   bool get canClose => canCloseDraft;
   Offset? get candidatePoint => _snappedPoint ?? _candidatePoint;
   Offset? get rawCandidatePoint => _candidatePoint;
@@ -428,6 +754,19 @@ class ArchitectZoneTool extends ChangeNotifier {
   List<(Offset, Offset)> get magneticGuides => _magneticGuides;
   bool get isClosingSnap => _isClosingSnap;
   ZoneDraftingPointStatus get pointStatus => _pointStatus;
+
+  List<Offset> get previewRectangle {
+    if (_draftMode != ArchitectZoneDraftMode.rectangle ||
+        _draftPoints.length != 1 ||
+        candidatePoint == null) {
+      return const [];
+    }
+    final p0 = _draftPoints[0];
+    final p2 = candidatePoint!;
+    final p1 = Offset(p2.dx, p0.dy);
+    final p3 = Offset(p0.dx, p2.dy);
+    return [p0, p1, p2, p3];
+  }
 
   double? get activeSegmentLength {
     if (_draftPoints.isEmpty || candidatePoint == null) return null;
@@ -443,6 +782,11 @@ class ArchitectZoneTool extends ChangeNotifier {
 
   double get livePerimeter {
     if (_draftPoints.isEmpty) return 0.0;
+    if (_draftMode == ArchitectZoneDraftMode.rectangle && candidatePoint != null) {
+      final p0 = _draftPoints[0];
+      final p2 = candidatePoint!;
+      return 2.0 * ((p2.dx - p0.dx).abs() + (p2.dy - p0.dy).abs());
+    }
     double perim = 0.0;
     for (int i = 0; i < _draftPoints.length - 1; i++) {
       perim += (_draftPoints[i + 1] - _draftPoints[i]).distance;
@@ -457,7 +801,13 @@ class ArchitectZoneTool extends ChangeNotifier {
   }
 
   double get liveArea {
-    if (_draftPoints.length < 2 || candidatePoint == null) return 0.0;
+    if (_draftPoints.isEmpty || candidatePoint == null) return 0.0;
+    if (_draftMode == ArchitectZoneDraftMode.rectangle) {
+      final p0 = _draftPoints[0];
+      final p2 = candidatePoint!;
+      return (p2.dx - p0.dx).abs() * (p2.dy - p0.dy).abs();
+    }
+    if (_draftPoints.length < 2) return 0.0;
     final testPoly = [..._draftPoints, candidatePoint!];
     return ArchitectZoneGeometry.calculateArea(testPoly);
   }
@@ -481,8 +831,21 @@ class ArchitectZoneTool extends ChangeNotifier {
   Offset? get v2 => _extrudeV2;
   Offset? get extrudeMidInitial => _extrudeMidInitial;
 
+  // ---------------------------------------------------------------------------
+  // GPS_Mapping-style Edit & Transform Getters
+  // ---------------------------------------------------------------------------
+  bool get isEditingZone => _editingZone != null;
+  ArchitectZone? get editingZone => _editingZone;
+  List<Offset>? get editingPolygon => _editingPolygon;
+  bool get canUndoAutoAlign => _preAlignBackupPolygon != null;
+  bool get canUndoEdit => _editUndoStack.isNotEmpty;
+  bool get canRedoEdit => _editRedoStack.isNotEmpty;
+  double get editRotationSlider => _editRotationSlider;
+  bool get isMoveWholeZoneMode => _isMoveWholeZoneMode;
+  double get moveDistanceMeters => _moveDistanceMeters;
+
   /// General flag for whether tool has an active modal interaction.
-  bool get isInteracting => isDrafting || isExtruding;
+  bool get isInteracting => isDrafting || isExtruding || isMoveWholeZoneMode;
 
   // Convenient aliases
   void start(Offset startPoint) => startDrafting(startPoint);
@@ -529,6 +892,10 @@ class ArchitectZoneTool extends ChangeNotifier {
     required double currentScale,
   }) {
     if (!isDrafting) return;
+
+    if (_candidatePoint != null && (rawModelPoint - _candidatePoint!).distance < 0.02) {
+      return;
+    }
 
     _candidatePoint = rawModelPoint;
     final lastPoint = _draftPoints.last;
@@ -604,6 +971,23 @@ class ArchitectZoneTool extends ChangeNotifier {
       return true;
     }
 
+    if (_draftMode == ArchitectZoneDraftMode.rectangle && _draftPoints.length == 1) {
+      final p0 = _draftPoints[0];
+      final p2 = point;
+      if ((p2.dx - p0.dx).abs() < 0.1 || (p2.dy - p0.dy).abs() < 0.1) {
+        return false;
+      }
+      final p1 = Offset(p2.dx, p0.dy);
+      final p3 = Offset(p0.dx, p2.dy);
+      _draftPoints.clear();
+      _draftPoints.addAll([p0, p1, p2, p3]);
+      _candidatePoint = p2;
+      _snappedPoint = p2;
+      _pointStatus = ZoneDraftingPointStatus.valid;
+      notifyListeners();
+      return true;
+    }
+
     if (_draftPoints.length >= 3) {
       final distToStart = (point - _draftPoints.first).distance;
       if (_isClosingSnap || distToStart <= 0.35) {
@@ -666,6 +1050,19 @@ class ArchitectZoneTool extends ChangeNotifier {
     required ArchitectZoneCategory category,
     required String defaultName,
   }) {
+    if (_draftMode == ArchitectZoneDraftMode.rectangle &&
+        _draftPoints.length == 1 &&
+        candidatePoint != null) {
+      final p0 = _draftPoints[0];
+      final p2 = candidatePoint!;
+      if ((p2.dx - p0.dx).abs() >= 0.1 && (p2.dy - p0.dy).abs() >= 0.1) {
+        final p1 = Offset(p2.dx, p0.dy);
+        final p3 = Offset(p0.dx, p2.dy);
+        _draftPoints.clear();
+        _draftPoints.addAll([p0, p1, p2, p3]);
+      }
+    }
+
     if (_draftPoints.length < 3) return null;
 
     if (ArchitectZoneGeometry.segmentIntersectsChain(
@@ -804,9 +1201,209 @@ class ArchitectZoneTool extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cancels both drafting and extrusion operations.
+  // ---------------------------------------------------------------------------
+  // GPS_Mapping-style Zone Edit & Transform Methods
+  // ---------------------------------------------------------------------------
+
+  /// Initiates interactive edit mode for an existing zone.
+  void startEditingZone(ArchitectZone zone) {
+    cancelDrafting();
+    cancelExtrude();
+    _editingZone = zone;
+    _editingPolygon = List<Offset>.from(zone.polygon);
+    _preAlignBackupPolygon = null;
+    _editUndoStack.clear();
+    _editRedoStack.clear();
+    _editRotationSlider = 0.0;
+    _lastAppliedRotationSlider = 0.0;
+    _isMoveWholeZoneMode = false;
+    _moveStartPoint = null;
+    _moveStartPolygon = null;
+    _moveDistanceMeters = 0.0;
+    notifyListeners();
+  }
+
+  void _pushEditUndo() {
+    if (_editingPolygon == null) return;
+    _editUndoStack.add(List<Offset>.from(_editingPolygon!));
+    if (_editUndoStack.length > 25) {
+      _editUndoStack.removeAt(0);
+    }
+    _editRedoStack.clear();
+  }
+
+  void undoEditAction() {
+    if (_editUndoStack.isEmpty || _editingPolygon == null) return;
+    _editRedoStack.add(List<Offset>.from(_editingPolygon!));
+    _editingPolygon = _editUndoStack.removeLast();
+    _editRotationSlider = 0.0;
+    _lastAppliedRotationSlider = 0.0;
+    notifyListeners();
+  }
+
+  void redoEditAction() {
+    if (_editRedoStack.isEmpty || _editingPolygon == null) return;
+    _editUndoStack.add(List<Offset>.from(_editingPolygon!));
+    _editingPolygon = _editRedoStack.removeLast();
+    _editRotationSlider = 0.0;
+    _lastAppliedRotationSlider = 0.0;
+    notifyListeners();
+  }
+
+  /// Automatically squares all corners of the editing polygon to 90° (and closes at 90°),
+  /// preserving centroid and area scale (GPS_Mapping squarify algorithm).
+  bool autoAlignZone() {
+    if (_editingPolygon == null || _editingPolygon!.length < 3) return false;
+    final aligned = ArchitectZoneGeometry.alignPolygonToNearest2D(_editingPolygon!);
+    if (aligned.length != _editingPolygon!.length) return false;
+
+    bool changed = false;
+    for (int i = 0; i < aligned.length; i++) {
+      if ((aligned[i] - _editingPolygon![i]).distance > 0.005) {
+        changed = true;
+        break;
+      }
+    }
+    if (!changed) return false;
+
+    _pushEditUndo();
+    _preAlignBackupPolygon = List<Offset>.from(_editingPolygon!);
+    _editingPolygon = aligned;
+    notifyListeners();
+    return true;
+  }
+
+  /// Reverts the 90° straightening operation.
+  bool undoAutoAlignZone() {
+    if (_preAlignBackupPolygon == null || _editingPolygon == null) return false;
+    _pushEditUndo();
+    _editingPolygon = List<Offset>.from(_preAlignBackupPolygon!);
+    _preAlignBackupPolygon = null;
+    notifyListeners();
+    return true;
+  }
+
+  /// Live updates polygon rotation using centroid-based rotation matrix.
+  void setRotationSlider(double angleDeg) {
+    if (_editingPolygon == null) return;
+    final delta = angleDeg - _lastAppliedRotationSlider;
+    _editRotationSlider = angleDeg;
+    if (delta.abs() > 0.01) {
+      final centroid = ArchitectZoneGeometry.calculateCentroid(_editingPolygon!);
+      _editingPolygon = ArchitectZoneGeometry.rotatePolygon(_editingPolygon!, delta, centroid);
+      _lastAppliedRotationSlider = angleDeg;
+      notifyListeners();
+    }
+  }
+
+  /// Finalizes rotation slider drag gesture and creates an undo restore point.
+  void finishRotationSlider() {
+    if (_editingPolygon == null) return;
+    if (_lastAppliedRotationSlider.abs() > 0.1) {
+      _pushEditUndo();
+    }
+    _editRotationSlider = 0.0;
+    _lastAppliedRotationSlider = 0.0;
+    notifyListeners();
+  }
+
+  /// Incremental rotation step (e.g. ±15°, ±90°).
+  void applyRotationStep(double stepDeg) {
+    if (_editingPolygon == null) return;
+    _pushEditUndo();
+    final centroid = ArchitectZoneGeometry.calculateCentroid(_editingPolygon!);
+    _editingPolygon = ArchitectZoneGeometry.rotatePolygon(_editingPolygon!, stepDeg, centroid);
+    notifyListeners();
+  }
+
+  /// Boundary offset step (in meters, e.g. ±0.20m).
+  void applyOffsetStep(double distanceMeters) {
+    if (_editingPolygon == null) return;
+    _pushEditUndo();
+    _editingPolygon = ArchitectZoneGeometry.offsetPolygon(_editingPolygon!, distanceMeters);
+    notifyListeners();
+  }
+
+  /// Toggles whole zone translation drag mode.
+  void toggleMoveWholeZoneMode() {
+    _isMoveWholeZoneMode = !_isMoveWholeZoneMode;
+    _moveStartPoint = null;
+    _moveStartPolygon = null;
+    _moveDistanceMeters = 0.0;
+    notifyListeners();
+  }
+
+  void startMovingZone(Offset modelPoint) {
+    if (!_isMoveWholeZoneMode || _editingPolygon == null) return;
+    _moveStartPoint = modelPoint;
+    _moveStartPolygon = List<Offset>.from(_editingPolygon!);
+    _moveDistanceMeters = 0.0;
+  }
+
+  void updateMovingZone(Offset modelPoint) {
+    if (!_isMoveWholeZoneMode || _moveStartPoint == null || _moveStartPolygon == null) return;
+    final delta = modelPoint - _moveStartPoint!;
+    _moveDistanceMeters = delta.distance;
+    _editingPolygon = ArchitectZoneGeometry.translatePolygon(_moveStartPolygon!, delta);
+    notifyListeners();
+  }
+
+  void finishMovingZone() {
+    if (_moveStartPolygon != null && _editingPolygon != null) {
+      if (_moveDistanceMeters > 0.02) {
+        _editUndoStack.add(_moveStartPolygon!);
+        _editRedoStack.clear();
+      }
+    }
+    _moveStartPoint = null;
+    _moveStartPolygon = null;
+    _moveDistanceMeters = 0.0;
+    notifyListeners();
+  }
+
+  void dragEditingVertex(int index, Offset newPos) {
+    if (_editingPolygon == null || index < 0 || index >= _editingPolygon!.length) return;
+    _pushEditUndo();
+    _editingPolygon![index] = newPos;
+    notifyListeners();
+  }
+
+  /// Finalizes edit mode and returns the updated zone with cleaned polygon.
+  ArchitectZone? commitEditingZone() {
+    if (_editingZone == null || _editingPolygon == null) return null;
+    final cleaned = ArchitectZoneGeometry.cleanPolygon(
+      _editingPolygon!,
+      minDistance: 0.05,
+      minCollinearDistance: 0.02,
+    );
+    if (cleaned.length < 3 || ArchitectZoneGeometry.hasSelfIntersections(cleaned)) {
+      return null;
+    }
+    final updated = _editingZone!.copyWith(polygon: cleaned);
+    cancelEditingZone();
+    return updated;
+  }
+
+  /// Cancels edit mode without saving changes.
+  void cancelEditingZone() {
+    _editingZone = null;
+    _editingPolygon = null;
+    _preAlignBackupPolygon = null;
+    _editUndoStack.clear();
+    _editRedoStack.clear();
+    _editRotationSlider = 0.0;
+    _lastAppliedRotationSlider = 0.0;
+    _isMoveWholeZoneMode = false;
+    _moveStartPoint = null;
+    _moveStartPolygon = null;
+    _moveDistanceMeters = 0.0;
+    notifyListeners();
+  }
+
+  /// Cancels drafting, extrusion, and edit operations.
   void cancelAll() {
     cancelDrafting();
     cancelExtrude();
+    cancelEditingZone();
   }
 }

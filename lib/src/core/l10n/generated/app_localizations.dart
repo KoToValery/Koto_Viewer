@@ -6143,6 +6143,90 @@ abstract class AppLocalizations {
   /// **'Delete Zone'**
   String get architectDeleteZone;
 
+  /// Button to square corners to 90 degrees
+  ///
+  /// In en, this message translates to:
+  /// **'Straighten Angles (90°)'**
+  String get architectZoneAutoAlign;
+
+  /// Button to undo angle straightening
+  ///
+  /// In en, this message translates to:
+  /// **'Undo Straighten'**
+  String get architectZoneUndoAlign;
+
+  /// Snackbar when angles are straightened
+  ///
+  /// In en, this message translates to:
+  /// **'Angles straightened to 90°'**
+  String get architectZoneAutoAlignSuccess;
+
+  /// Rotation label
+  ///
+  /// In en, this message translates to:
+  /// **'Rotation'**
+  String get architectZoneRotate;
+
+  /// Button to enable moving whole zone
+  ///
+  /// In en, this message translates to:
+  /// **'Move Zone'**
+  String get architectZoneMove;
+
+  /// Offset label
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get architectZoneOffset;
+
+  /// Save zone button
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get architectZoneSave;
+
+  /// Cancel zone edit button
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get architectZoneCancel;
+
+  /// Title of zone edit mode
+  ///
+  /// In en, this message translates to:
+  /// **'Zone Edit & Transform'**
+  String get architectZoneEditMode;
+
+  /// Undo transformation button
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get architectZoneUndoAction;
+
+  /// Redo transformation button
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get architectZoneRedoAction;
+
+  /// Notification when zone is moved
+  ///
+  /// In en, this message translates to:
+  /// **'Moved: {dist} m'**
+  String architectZoneMovedDistance(String dist);
+
+  /// Quick rectangle mode button
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangle'**
+  String get architectZoneQuickRect;
+
+  /// Freeform polyline drafting mode button
+  ///
+  /// In en, this message translates to:
+  /// **'Freeform'**
+  String get architectZoneQuickPoly;
+
   /// No description provided for @staircaseAutoGenerate.
   ///
   /// In en, this message translates to:
@@ -6202,6 +6286,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Spacing'**
   String get bimSupportSpacingAction;
+
+  /// Architectural grid axes tool label
+  ///
+  /// In en, this message translates to:
+  /// **'Axes'**
+  String get architectToolAxis;
+
+  /// Prompt when drafting an axis
+  ///
+  /// In en, this message translates to:
+  /// **'Tap start and end points to draw an axis'**
+  String get architectAxisDrawPrompt;
+
+  /// Snackbar message when axes are renumbered
+  ///
+  /// In en, this message translates to:
+  /// **'Axes resequenced successfully'**
+  String get architectAxesResequenced;
+
+  /// Snackbar message when all axes are aligned
+  ///
+  /// In en, this message translates to:
+  /// **'Axes extents aligned'**
+  String get architectAxesAligned;
+
+  /// Snackbar message when an axis is aligned
+  ///
+  /// In en, this message translates to:
+  /// **'Axis aligned with parallel axes'**
+  String get architectAxisAligned;
+
+  /// No description provided for @architectAxisRenamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Axis renamed to {name}'**
+  String architectAxisRenamed(String name);
+
+  /// Button to auto-number all axes
+  ///
+  /// In en, this message translates to:
+  /// **'Resequence Axes'**
+  String get resequenceGridAxesAction;
+
+  /// Button to align all parallel axes extents
+  ///
+  /// In en, this message translates to:
+  /// **'Align All Axes'**
+  String get alignGridAxesAction;
+
+  /// Button to align single axis extents
+  ///
+  /// In en, this message translates to:
+  /// **'Align Extents'**
+  String get alignGridAxisAction;
+
+  /// Vertical axis orientation
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical'**
+  String get architectAxisOrientationV;
+
+  /// Horizontal axis orientation
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal'**
+  String get architectAxisOrientationH;
+
+  /// Snackbar when axis deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Axis deleted'**
+  String get architectAxisDeleted;
+
+  /// Snackbar when axis moved
+  ///
+  /// In en, this message translates to:
+  /// **'Axis moved'**
+  String get architectAxisMoved;
 }
 
 class _AppLocalizationsDelegate

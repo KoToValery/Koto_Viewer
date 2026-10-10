@@ -6,6 +6,7 @@ import '../../dxf_3d_viewer/rendering/cad_3d_camera.dart';
 
 import '../../dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
 import '../models/architect_door.dart';
+import '../models/architect_grid_axis.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_zone.dart';
@@ -13,7 +14,11 @@ import '../rendering/architect_2d_painter.dart';
 import '../rendering/architect_3d_builder.dart';
 import '../rendering/architect_snap_helper.dart';
 import '../rendering/architect_zone_snap.dart';
+import '../services/architect_grid_axis_tool.dart';
 import '../services/architect_zone_tool.dart';
+import '../widgets/architect_grid_axis_bar.dart';
+import '../widgets/architect_grid_axis_offset_dialog.dart';
+import '../widgets/architect_grid_axis_properties_card.dart';
 import '../widgets/architect_new_project_dialog.dart';
 import '../widgets/architect_storey_bar.dart';
 import '../widgets/architect_tool_palette.dart';
@@ -49,6 +54,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // Unified tool controller for zone drafting, edge extrusion, and geometry
   late final ArchitectZoneTool _zoneTool;
 
+  // Unified tool controller for dynamic grid axes
+  late final ArchitectGridAxisTool _axisTool;
+
   // Wall Drafting State
   double _wallThickness = 0.25; // 25 cm default
   WallDraftingMode _wallMode = WallDraftingMode.singleLine;
@@ -80,6 +88,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool get _isInteractingWithElement =>
       _zoneTool.isInteracting ||
+      _axisTool.isInteracting ||
       _draftStart != null ||
       _draggingVertexIndex != null ||
       _zoneMoveStartPoint != null;
@@ -94,6 +103,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         );
 
     _zoneTool = ArchitectZoneTool()
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
+
+    _axisTool = ArchitectGridAxisTool()
       ..addListener(() {
         if (mounted) setState(() {});
       });
@@ -119,6 +133,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   @override
   void dispose() {
     _zoneTool.dispose();
+    _axisTool.dispose();
     _transformController.dispose();
     super.dispose();
   }
@@ -191,6 +206,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _activeMagneticGuides = [];
         _activeSnapLabel = null;
       });
+      _zoneTool.startEditingZone(newZone);
 
       HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -225,6 +241,67 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerDown(Offset screenPos) {
     final rawModel = _screenToModel(screenPos);
 
+    // 0. If in offset drag mode:
+    if (_axisTool.isOffsettingWithDrag) {
+      _axisTool.updateOffsetDrag(rawModel);
+      return;
+    }
+
+    // 1. Grid Axis handle & body interactions in Axis or Select mode
+    if (_activeTool == ArchitectTool.axis || _activeTool == ArchitectTool.select) {
+      // 1a. Handle hit check (stretching axis extents)
+      final axisHandle = _axisTool.hitTestAxisHandle(
+        rawModel,
+        _project.gridAxes,
+        tolerance: 18.0 / _currentScale,
+      );
+      if (axisHandle != null) {
+        _axisTool.startHandleDrag(axisHandle.$1, axisHandle.$2);
+        setState(() {
+          _selectedZoneId = null;
+          _selectedElementId = null;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      }
+
+      // 1b. Axis body hit check (select or start move)
+      final hitAxis = _axisTool.hitTestAxis(
+        rawModel,
+        _project.gridAxes,
+        tolerance: 16.0 / _currentScale,
+      );
+      if (hitAxis != null) {
+        if (_axisTool.selectedAxisId == hitAxis.id) {
+          _axisTool.startMoving(hitAxis, rawModel);
+        } else {
+          _axisTool.selectAxis(hitAxis.id);
+        }
+        setState(() {
+          _selectedZoneId = null;
+          _selectedElementId = null;
+        });
+        HapticFeedback.selectionClick();
+        return;
+      }
+    }
+
+    // 2. In Axis tool, tapping empty space starts drafting a new axis
+    if (_activeTool == ArchitectTool.axis) {
+      final snap = ArchitectSnapHelper.snapFree(
+        rawPoint: rawModel,
+        project: _project,
+        tolerance: 14.0 / _currentScale,
+      );
+      _axisTool.startDrafting(snap.isSnapped ? snap.point : rawModel);
+      setState(() {
+        _selectedZoneId = null;
+        _selectedElementId = null;
+      });
+      HapticFeedback.lightImpact();
+      return;
+    }
+
     if (_activeTool == ArchitectTool.zone) {
       // 1. If currently in point-by-point drafting mode:
       if (_zoneTool.isDrafting) {
@@ -245,7 +322,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return;
       }
 
-      // 2. Check if a zone handle is hit on the selected zone
+      // 2. Whole zone move mode check
+      if (_zoneTool.isMoveWholeZoneMode && _selectedZone != null) {
+        _zoneTool.startMovingZone(rawModel);
+        return;
+      }
+
+      // 3. Check if a zone handle is hit on the selected zone
       final currentSelected = _selectedZone;
       if (currentSelected != null) {
         // Vertex handle check (drag existing vertex)
@@ -283,12 +366,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
       }
 
-      // 3. Check if tapped inside another zone to select it
+      // 4. Check if tapped inside another zone to select it
       final hitZone = _findZoneAt(rawModel);
       if (hitZone != null) {
+        _zoneTool.startEditingZone(hitZone);
         setState(() {
           _selectedZoneId = hitZone.id;
           _selectedElementId = null;
+          _axisTool.deselect();
         });
         HapticFeedback.selectionClick();
         return;
@@ -303,6 +388,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _zoneTool.startDrafting(snap.isSnapped ? snap.point : rawModel);
       setState(() {
         _selectedZoneId = null;
+        _axisTool.deselect();
       });
       HapticFeedback.mediumImpact();
       return;
@@ -345,9 +431,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       final hitZone = _findZoneAt(rawModel);
       if (hitZone != null) {
+        _zoneTool.startEditingZone(hitZone);
         setState(() {
           _selectedZoneId = hitZone.id;
           _selectedElementId = null;
+          _axisTool.deselect();
         });
         HapticFeedback.selectionClick();
         return;
@@ -379,6 +467,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _onPointerMove(Offset screenPos) {
     final rawModel = _screenToModel(screenPos);
+
+    // 0. Axis offset drag preview
+    if (_axisTool.isOffsettingWithDrag) {
+      _axisTool.updateOffsetDrag(rawModel);
+      return;
+    }
+
+    // 0b. Axis handle stretching
+    if (_axisTool.isDraggingHandle) {
+      _axisTool.updateHandleDrag(rawModel, _project.gridAxes, _currentScale);
+      return;
+    }
+
+    // 0c. Axis body moving
+    if (_axisTool.isMovingAxis) {
+      _axisTool.updateMoving(rawModel, _project.gridAxes, _currentScale);
+      return;
+    }
+
+    // 0d. Axis drafting
+    if (_activeTool == ArchitectTool.axis && _axisTool.isDrafting) {
+      _axisTool.updateDrafting(rawModel, _project, _currentScale);
+      return;
+    }
 
     // 1. Point-by-point zone drafting preview
     if (_activeTool == ArchitectTool.zone && _zoneTool.isDrafting) {
@@ -414,7 +526,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 4. Moving whole zone
+    // 4. Moving whole zone (GPS_Mapping mode or legacy drag)
+    if (_zoneTool.isMoveWholeZoneMode && _zoneTool.isEditingZone) {
+      _zoneTool.updateMovingZone(rawModel);
+      return;
+    }
     if (_zoneMoveStartPoint != null && _zoneMoveOriginalPolygon != null && _selectedZone != null) {
       final delta = rawModel - _zoneMoveStartPoint!;
       final translated = _zoneMoveOriginalPolygon!.map((p) => p + delta).toList();
@@ -439,6 +555,64 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _onPointerUp(Offset screenPos) {
     final l10n = context.l10n;
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+
+    // 0. Commit axis offset drag
+    if (_axisTool.isOffsettingWithDrag && _axisTool.axisBeingOffset != null) {
+      final origAxis = _axisTool.axisBeingOffset!;
+      final dist = _axisTool.offsetDistanceMeters;
+      final sign = _axisTool.currentOffsetSign;
+      final (updatedProj, newAxis) = _axisTool.applyOffset(
+        project: _project,
+        originalAxis: origAxis,
+        distanceMeters: dist,
+        directionSign: sign,
+        isBulgarian: isBg,
+      );
+      setState(() {
+        _project = updatedProj;
+      });
+      HapticFeedback.mediumImpact();
+      _promptDeletePreviousAxis(origAxis);
+      return;
+    }
+
+    // 0b. Commit axis handle drag
+    if (_axisTool.isDraggingHandle) {
+      final updatedProj = _axisTool.commitHandleDrag(_project, isBg);
+      if (updatedProj != null) {
+        setState(() => _project = updatedProj);
+        HapticFeedback.lightImpact();
+      }
+      return;
+    }
+
+    // 0c. Commit axis moving
+    if (_axisTool.isMovingAxis) {
+      final updatedProj = _axisTool.commitMoving(_project, isBg);
+      if (updatedProj != null) {
+        setState(() => _project = updatedProj);
+        HapticFeedback.mediumImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.architectAxisMoved),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+      return;
+    }
+
+    // 0d. Commit axis drafting
+    if (_activeTool == ArchitectTool.axis && _axisTool.isDrafting) {
+      final result = _axisTool.commitDrafting(project: _project, isBulgarian: isBg);
+      if (result != null) {
+        final (updatedProj, newAxis) = result;
+        setState(() => _project = updatedProj);
+        HapticFeedback.mediumImpact();
+      }
+      return;
+    }
 
     // 1. Edge extrusion commit
     if (_zoneTool.isExtruding) {
@@ -515,7 +689,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 3. Commit whole zone move
+    // 3. Commit whole zone move (GPS_Mapping mode or legacy drag)
+    if (_zoneTool.isMoveWholeZoneMode && _zoneTool.isEditingZone) {
+      _zoneTool.finishMovingZone();
+      final updated = _zoneTool.commitEditingZone();
+      if (updated != null) {
+        _updateZone(updated);
+        _zoneTool.startEditingZone(updated);
+      }
+      return;
+    }
     if (_zoneMoveStartPoint != null) {
       setState(() {
         _zoneMoveStartPoint = null;
@@ -549,6 +732,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         activeStorey.copyWith(zones: updatedZones),
       );
     });
+    if (_zoneTool.editingZone?.id == updated.id) {
+      _zoneTool.startEditingZone(updated);
+    }
   }
 
   void _deleteSelectedZone() {
@@ -557,6 +743,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final updatedZones = activeStorey.zones
         .where((z) => z.id != _selectedZoneId)
         .toList();
+    _zoneTool.cancelEditingZone();
     setState(() {
       _project = _project.updateActiveStorey(
         activeStorey.copyWith(zones: updatedZones),
@@ -671,6 +858,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         setState(() {
           _selectedElementId = wall.id;
           _selectedZoneId = null;
+          _axisTool.deselect();
         });
         return;
       }
@@ -679,6 +867,122 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _selectedElementId = null;
       _selectedZoneId = null;
     });
+    _axisTool.deselect();
+  }
+
+  // ===========================================================================
+  // DYNAMIC GRID AXES ACTIONS
+  // ===========================================================================
+
+  void _handleAxisOffset(StructuralGridAxis axis) {
+    showArchitectGridAxisOffsetDialog(
+      context: context,
+      axis: axis,
+      initialDistance: _axisTool.offsetDistanceMeters,
+      onApplyOffset: (distance, directionSign) {
+        final isBg = Localizations.localeOf(context).languageCode == 'bg';
+        final (updatedProj, newAxis) = _axisTool.applyOffset(
+          project: _project,
+          originalAxis: axis,
+          distanceMeters: distance,
+          directionSign: directionSign,
+          isBulgarian: isBg,
+        );
+        setState(() {
+          _project = updatedProj;
+        });
+        HapticFeedback.mediumImpact();
+        _promptDeletePreviousAxis(axis);
+      },
+      onStartDragMode: (distance) {
+        _axisTool.startOffsetDrag(axis, distance);
+      },
+    );
+  }
+
+  void _promptDeletePreviousAxis(StructuralGridAxis previousAxis) async {
+    final shouldDelete = await promptDeletePreviousAxisDialog(
+      context: context,
+      previousAxis: previousAxis,
+    );
+    if (shouldDelete && mounted) {
+      final isBg = Localizations.localeOf(context).languageCode == 'bg';
+      final updatedProj = _axisTool.deleteAxisById(_project, previousAxis.id, isBg);
+      setState(() => _project = updatedProj);
+      HapticFeedback.lightImpact();
+    }
+  }
+
+  void _handleAxisAlign(StructuralGridAxis axis) {
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+    final updatedProj = _axisTool.alignSelectedAxis(_project, isBg);
+    setState(() => _project = updatedProj);
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.architectAxisAligned),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _handleAlignAllAxes() {
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+    final updatedProj = _axisTool.alignAllAxes(_project, isBg);
+    setState(() => _project = updatedProj);
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.architectAxesAligned),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _handleResequenceAxes() {
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+    final updatedProj = _axisTool.resequenceAllAxes(_project, isBg);
+    setState(() => _project = updatedProj);
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.architectAxesResequenced),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _handleAxisRename(StructuralGridAxis axis) {
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+    final updatedProj = _axisTool.renameSelectedAxis(_project, isBg);
+    if (updatedProj != null) {
+      setState(() => _project = updatedProj);
+      final updatedAxis = _axisTool.getSelectedAxis(updatedProj);
+      HapticFeedback.selectionClick();
+      if (updatedAxis != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.architectAxisRenamed(updatedAxis.name)),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleAxisDelete(StructuralGridAxis axis) {
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
+    final updatedProj = _axisTool.deleteSelectedAxis(_project, isBg);
+    if (updatedProj != null) {
+      setState(() => _project = updatedProj);
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.architectAxisDeleted),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   // ===========================================================================
@@ -784,6 +1088,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           setState(() => _zoneTool.cancelDrafting()),
                     ),
                   ),
+                if (_activeTool == ArchitectTool.axis && !_is3DView)
+                  Positioned(
+                    top: 10,
+                    left: 0,
+                    right: 0,
+                    child: ArchitectGridAxisBar(
+                      tool: _axisTool,
+                      axisCount: _project.gridAxes.length,
+                      onResequence: _handleResequenceAxes,
+                      onAlignAll: _handleAlignAllAxes,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -792,9 +1108,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           if (_selectedZone != null && !_is3DView)
             ArchitectZonePropertiesCard(
               zone: _selectedZone!,
+              tool: _zoneTool,
               onZoneUpdated: _updateZone,
               onDeleteZone: _deleteSelectedZone,
-              onClose: () => setState(() => _selectedZoneId = null),
+              onClose: () {
+                _zoneTool.cancelEditingZone();
+                setState(() => _selectedZoneId = null);
+              },
+            ),
+
+          // Floating Axis Property Inspector Card if an axis is selected
+          if (_axisTool.selectedAxisId != null && !_is3DView)
+            Builder(
+              builder: (ctx) {
+                final selectedAxis = _axisTool.getSelectedAxis(_project);
+                if (selectedAxis == null) return const SizedBox.shrink();
+                return ArchitectGridAxisPropertiesCard(
+                  axis: selectedAxis,
+                  onOffset: () => _handleAxisOffset(selectedAxis),
+                  onAlign: () => _handleAxisAlign(selectedAxis),
+                  onRename: () => _handleAxisRename(selectedAxis),
+                  onDelete: () => _handleAxisDelete(selectedAxis),
+                  onClose: () => _axisTool.deselect(),
+                );
+              },
             ),
 
           // Bottom Responsive Tool Palette
@@ -803,6 +1140,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               activeTool: _activeTool,
               onToolChanged: (tool) => setState(() {
                 _zoneTool.cancelAll();
+                _axisTool.cancelAll();
                 _activeTool = tool;
                 _draftStart = null;
                 _draftEnd = null;
@@ -842,17 +1180,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Widget _build2DCanvas() {
     return MouseRegion(
       onHover: (event) {
-        if (_zoneTool.isDrafting) {
+        if (_zoneTool.isDrafting ||
+            (_activeTool == ArchitectTool.axis && _axisTool.isDrafting)) {
           _onPointerMove(event.localPosition);
         }
       },
       child: GestureDetector(
         onTapDown: (details) => _onPointerDown(details.localPosition),
-        onPanStart: (details) {
-          if (!_zoneTool.isDrafting) {
-            _onPointerDown(details.localPosition);
-          }
-        },
+        onTapUp: (details) => _onPointerUp(details.localPosition),
         onPanUpdate: (details) => _onPointerMove(details.localPosition),
         onPanEnd: (details) => _onPointerUp(details.localPosition),
         child: InteractiveViewer(
@@ -876,6 +1211,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 draggingVertexIndex: _draggingVertexIndex,
                 draggingVertexPoint: _draggingVertexPoint,
                 mergeCandidateIndex: _mergeCandidateIndex,
+                selectedAxisId: _axisTool.selectedAxisId,
+                draggedAxisSnapshot: _axisTool.draggedAxisSnapshot,
+                isDraggingAxisHandle: _axisTool.isDraggingHandle,
+                isMovingAxis: _axisTool.isMovingAxis,
+                moveOriginalAxis: _axisTool.moveOriginalAxis,
+                moveCurrentDelta: _axisTool.moveCurrentDelta,
+                axisOffsetPreview: _axisTool.getOffsetPreview(
+                  Localizations.localeOf(context).languageCode == 'bg',
+                ),
+                axisDraftStart: _axisTool.draftStart,
+                axisDraftEnd: _axisTool.draftEnd,
+                axisDraftSnapLabel: _axisTool.draftSnapLabel,
                 magneticGuides: _zoneTool.isDrafting
                     ? _zoneTool.magneticGuides
                     : _activeMagneticGuides,
@@ -897,6 +1244,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 zoneExtrudeDistance: _zoneTool.extrudeDistance,
                 isZoneExtrudeSelfIntersecting:
                     _zoneTool.isExtrudeSelfIntersecting,
+                zonePreviewRectangle: _zoneTool.previewRectangle,
+                zoneEditingPolygon: _zoneTool.editingPolygon,
+                isMoveWholeZoneMode: _zoneTool.isMoveWholeZoneMode,
+                zoneMoveDistanceMeters: _zoneTool.moveDistanceMeters,
               ),
             ),
           ),

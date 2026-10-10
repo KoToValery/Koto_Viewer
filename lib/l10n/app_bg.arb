@@ -1137,6 +1137,23 @@
   "architectZoneAreaLabel": "Площ",
   "architectZonePerimeterLabel": "Периметър",
   "architectDeleteZone": "Изтрий зона",
+  "architectZoneAutoAlign": "Изправи ъгли (90°)",
+  "architectZoneUndoAlign": "Откажи изправянето",
+  "architectZoneAutoAlignSuccess": "Ъглите са изправени на 90°",
+  "architectZoneRotate": "Ротация",
+  "architectZoneMove": "Премести зона",
+  "architectZoneOffset": "Отместване",
+  "architectZoneSave": "Запази",
+  "architectZoneCancel": "Откажи",
+  "architectZoneEditMode": "Корекция на зона",
+  "architectZoneUndoAction": "Отмени",
+  "architectZoneRedoAction": "Повтори",
+  "architectZoneMovedDistance": "Преместено: {dist} м",
+  "@architectZoneMovedDistance": {
+    "placeholders": { "dist": { "type": "String" } }
+  },
+  "architectZoneQuickRect": "Правоъгълник",
+  "architectZoneQuickPoly": "Свободен полигон",
   "staircaseAutoGenerate": "Генерирай отвори за стълби",
   "staircaseAutoAdded": "Добавени отвори за стълби: {count}",
   "@staircaseAutoAdded": {
@@ -1160,5 +1177,23 @@
   "bimToolGroupStructure": "Конструкция",
   "bimToolGroupChecks": "Проверки",
   "bimGenerateSupportsAction": "Генерирай колони и шайби",
-  "bimSupportSpacingAction": "Разстояния"
+  "bimSupportSpacingAction": "Разстояния",
+  "architectToolAxis": "Оси",
+  "architectAxisDrawPrompt": "Докоснете начало и край за нова осова линия",
+  "architectAxesResequenced": "Осите са преномерирани успешно",
+  "architectAxesAligned": "Осите са подравнени",
+  "architectAxisAligned": "Оста е подравнена спрямо успоредните оси",
+  "architectAxisRenamed": "Оста е преименувана на {name}",
+  "@architectAxisRenamed": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "resequenceGridAxesAction": "Преномерирай осите",
+  "alignGridAxesAction": "Подравни осите",
+  "alignGridAxisAction": "Подравни",
+  "architectAxisOrientationV": "Вертикална",
+  "architectAxisOrientationH": "Хоризонтална",
+  "architectAxisDeleted": "Оста е изтрита",
+  "architectAxisMoved": "Оста е преместена"
 }
