@@ -2945,7 +2945,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get schemeVariantLong => 'Variant 2 · along long walls';
 
   @override
-  String get schemeMinSpacing => 'Minimum spacing (m)';
+  String get schemeMinSpacing => 'Minimum column spacing (m)';
 
   @override
   String get schemeTargetSpacing => 'Target spacing (m)';
@@ -2999,8 +2999,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'The project changed. Open a new preview before accepting.';
 
   @override
-  String get schemeComparison =>
-      'Compare variants · eX/eY (m) · floating columns';
+  String get schemeComparison => 'Before → after';
 
   @override
   String get schemeFresh =>
@@ -3129,4 +3128,139 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bimEditFloorSlab => 'Edit floor slab';
+
+  @override
+  String schemeSearchSummary(int layouts, int changes, int evaluations) {
+    return 'Compared layouts: $layouts · accepted changes: $changes · evaluations: $evaluations';
+  }
+
+  @override
+  String schemeFieldSummary(int count, int review) {
+    return 'Closed fields: $count · for review: $review';
+  }
+
+  @override
+  String get schemeUnresolvedFieldArea =>
+      'Area with undetermined field support';
+
+  @override
+  String get schemeOpeningSupportReview =>
+      'Support around openings: points for review';
+
+  @override
+  String get schemeBoundarySupportReview =>
+      'Cantilever or undetermined edge support';
+
+  @override
+  String get schemeContinuityIssues => 'Vertical continuity issues';
+
+  @override
+  String get schemeConcreteVolume => 'Support concrete volume';
+
+  @override
+  String get schemeBalanceIndex =>
+      'Preliminary torsion index (lower is better)';
+
+  @override
+  String get schemeNoWallConstraint => 'No suitable wall';
+
+  @override
+  String get schemeCollisionConstraint => 'Section collision';
+
+  @override
+  String get schemeColumnSpacingConstraint => 'Column spacing';
+
+  @override
+  String get schemeWallSpacingConstraint => 'Wall spacing';
+
+  @override
+  String get schemeBudgetConstraint => 'Placement budget';
+
+  @override
+  String get schemeLimitInput => 'Input size limit';
+
+  @override
+  String get schemeLimitSampling => 'Sampling limit';
+
+  @override
+  String get schemeLimitJunctions => 'Wall junction limit';
+
+  @override
+  String get schemeLimitElements => 'Support count limit';
+
+  @override
+  String get schemeLimitFields => 'Field topology limit';
+
+  @override
+  String get schemeLimitOptimization =>
+      'Local search budget reached; optimality is not established';
+
+  @override
+  String get schemeStageCore => 'Core';
+
+  @override
+  String get schemeStageWalls => 'Distributed walls';
+
+  @override
+  String get schemeStageColumns => 'Column nodes';
+
+  @override
+  String get schemeStageCoverage => 'Coverage';
+
+  @override
+  String get schemeStageRepair => 'Span repair';
+
+  @override
+  String get schemeStageOpenings => 'Architectural opening review';
+
+  @override
+  String get schemePunchingGeometryReview =>
+      'Punching support geometry or beam load transfer needs review';
+
+  @override
+  String get schemeInteriorColumn => 'Interior column';
+
+  @override
+  String get schemeEdgeColumn => 'Edge column';
+
+  @override
+  String get schemeCornerColumn => 'Corner column';
+
+  @override
+  String get schemeUnknownColumnPosition => 'Undetermined column position';
+
+  @override
+  String get schemeSearchNoImprovement =>
+      'The search retained the best assessed seed';
+
+  @override
+  String get schemeMinWallSpacing => 'Minimum parallel wall spacing (m)';
+
+  @override
+  String get schemeUnavailableChecks => 'Undetermined checks';
+
+  @override
+  String get schemeSeedDensityConstraint => 'Skipped in the sparse seed';
+
+  @override
+  String get floorSlabTitle => 'Floor slab at this level';
+
+  @override
+  String floorSlabContext(String level) {
+    return 'Floor of level $level · edit on its own plan';
+  }
+
+  @override
+  String get floorSlabLevelHint =>
+      'The slab belongs to this level and is shown as the ceiling on the immediately lower level.';
+
+  @override
+  String bimCeilingSlabReference(String owner) {
+    return 'Ceiling slab · floor of level $owner';
+  }
+
+  @override
+  String gridAxisSourceLevels(String levels) {
+    return 'Levels: $levels';
+  }
 }

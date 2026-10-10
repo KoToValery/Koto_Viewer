@@ -7,6 +7,7 @@ import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
 import 'package:kotoview/src/features/structural_designer/models/wall_axis_models.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/initial_scheme_generator.dart';
+import 'package:kotoview/src/features/structural_designer/analysis/support_layout_evaluator.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/slab_contact_geometry.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/structural_polygon_distance.dart';
 import 'package:kotoview/src/features/structural_designer/widgets/initial_scheme_dialog.dart';
@@ -139,10 +140,15 @@ void main() {
             greaterThan(0),
           );
         }
-        final centers = [
-          ...result.columns.map((c) => c.center),
-          ...result.walls.map((w) => w.center),
-        ];
+        for (var i = 0; i < polys.length; i++) {
+          for (var j = 0; j < i; j++) {
+            expect(
+              StructuralPolygonDistance.between(polys[i], polys[j]),
+              greaterThanOrEqualTo(.05 - 1e-8),
+            );
+          }
+        }
+        final centers = result.columns.map((c) => c.center).toList();
         for (var i = 0; i < centers.length; i++) {
           for (var j = 0; j < i; j++) {
             expect(
@@ -182,7 +188,21 @@ void main() {
       wallPairs: runs,
       scale: 1,
     );
-    expect(next.isEmpty, isTrue);
+    final repeated = next.apply(applied);
+    for (final old in applied.columns) {
+      expect(repeated.columns.firstWhere((c) => c.id == old.id), same(old));
+    }
+    for (final old in applied.shearWalls) {
+      expect(repeated.shearWalls.firstWhere((w) => w.id == old.id), same(old));
+    }
+    if (!next.isEmpty) {
+      final original = SupportLayoutEvaluator.evaluate(
+        p.copyWith(storeys: [applied]),
+        applied.copyWith(gridAxes: p.effectiveGridAxes),
+        1,
+      );
+      expect(next.assessment!.compareTo(original), lessThan(0));
+    }
     final edited = applied.columns.first.copyWith(
       width: .45,
       name: 'manual edit',
@@ -387,7 +407,21 @@ void main() {
         wallPairs: runs,
         scale: 1,
       );
-      expect(r.walls.length, 4);
+      expect(r.walls.length, greaterThanOrEqualTo(4));
+      for (final run in runs) {
+        expect(
+          r.walls.any(
+            (w) =>
+                StructuralPolygonDistance.pointToSegment(
+                  w.center,
+                  run.centerlineStart,
+                  run.centerlineEnd,
+                ) <
+                1e-7,
+          ),
+          isTrue,
+        );
+      }
       for (final w in r.walls) {
         expect(
           StructuralPolygonDistance.between(

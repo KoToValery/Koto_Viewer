@@ -16,14 +16,18 @@ import 'analysis/cantilever_detector.dart';
 import 'analysis/seismic_analysis_calculator.dart';
 import 'analysis/structural_underlay_filter.dart';
 import 'analysis/vertical_capacity_calculator.dart';
+import 'analysis/support_layout_evaluator.dart';
 import 'analysis/support_span_feedback_cache.dart';
 import 'analysis/slab_parallel_alignment_helper.dart';
 import 'analysis/slab_seed_generator.dart';
+import 'analysis/slab_vertex_snap.dart';
 import 'analysis/slab_envelope_detector.dart';
 import 'analysis/slab_projection_detector.dart';
 import 'analysis/structural_magnetic_alignment_helper.dart';
 import 'analysis/structural_pointer_interaction.dart';
 import 'analysis/wall_axis_detector.dart';
+import 'analysis/project_grid_axes.dart';
+import 'rendering/grid_axis_presentation.dart';
 import 'models/cantilever_analysis_models.dart';
 import 'models/seismic_analysis_models.dart';
 import 'models/structural_element.dart';
@@ -2260,9 +2264,24 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return null;
   }
 
+  StructuralGridAxis? _findProjectAxis(StructuralGridAxis axis) =>
+      _project.effectiveGridAxes.where((a)=>a.id==axis.id).firstOrNull ??
+      _project.effectiveGridAxes.where((a)=>ProjectGridAxes.sameAlignment(a,axis,_cadUnitsPerMeter)).firstOrNull;
+
   void _updateProjectGridAxes(List<StructuralGridAxis> newAxes) {
+    if (widget.bimContext != null) {
+      final ids=_project.effectiveGridAxes.map((a)=>a.id).toSet();
+      newAxes=[for(final a in newAxes) ids.contains(a.id) ? a : a.copyWith(sourceStoreyIds:[_project.activeStorey.id])];
+    }
+    final previous={for(final a in _project.effectiveGridAxes) a.id:a};
+    final changed=newAxes.where((a)=>previous[a.id]==null || previous[a.id]!.start!=a.start || previous[a.id]!.end!=a.end);
+    if (changed.any((axis)=>newAxes.any((a)=>a.id!=axis.id && ProjectGridAxes.sameAlignment(a,axis,_cadUnitsPerMeter)))) {
+      newAxes=ProjectGridAxes.merge(newAxes,_cadUnitsPerMeter,
+        isBulgarian:Localizations.localeOf(context).languageCode=='bg');
+    }
     setState(() {
       _project = _project.copyWithGridAxes(newAxes);
+      if (_selectedGridAxis!=null) _selectedGridAxis=_findProjectAxis(_selectedGridAxis!);
     });
     _saveProject();
   }
@@ -2280,7 +2299,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _renameSelectedGridAxis() {
     if (_selectedGridAxis == null) return;
-    final nextName = _getNextAxisName(_selectedGridAxis!.name);
+    var nextName = _getNextAxisName(_selectedGridAxis!.name);
+    final used=_project.effectiveGridAxes.where((a)=>a.id!=_selectedGridAxis!.id).map((a)=>a.name).toSet();
+    while (used.contains(nextName)) { nextName=_getNextAxisName(nextName); }
     _pushUndo();
     final updated = _selectedGridAxis!.copyWith(name: nextName);
     final axes = _project.effectiveGridAxes.map((a) => a.id == updated.id ? updated : a).toList();
@@ -2448,7 +2469,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _updateProjectGridAxes(updatedAxes);
 
     setState(() {
-      _selectedGridAxis = newAxis;
+      _selectedGridAxis = _findProjectAxis(newAxis);
       _isOffsettingAxisWithDrag = false;
       _axisBeingOffset = null;
     });
@@ -3533,6 +3554,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _draggingSlabVertexIndex = null;
       _draggingSlabVertexCad = null;
       _mergeCandidateSlabVertexIndex = null;
+      _activeMagneticGuides = [];
       _midpointTouchDownPos = null;
     });
     HapticFeedback.selectionClick();
@@ -3585,6 +3607,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _draggingSlabVertexIndex = null;
       _draggingSlabVertexCad = null;
       _mergeCandidateSlabVertexIndex = null;
+      _activeMagneticGuides = [];
       _midpointTouchDownPos = null;
     });
     HapticFeedback.selectionClick();
@@ -3602,6 +3625,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _draggingSlabVertexIndex = null;
       _draggingSlabVertexCad = null;
       _mergeCandidateSlabVertexIndex = null;
+      _activeMagneticGuides = [];
       _midpointTouchDownPos = null;
       _runAnalysis();
     });
@@ -3622,6 +3646,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _draggingSlabVertexIndex = null;
       _draggingSlabVertexCad = null;
       _mergeCandidateSlabVertexIndex = null;
+      _activeMagneticGuides = [];
       _midpointTouchDownPos = null;
     });
     HapticFeedback.heavyImpact();
@@ -3629,9 +3654,62 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   StructuralSlab _cleanSlabPolygon(StructuralSlab slab) {
     if (slab.polygon.length <= 3) return slab;
-    final minDistanceCad = 0.05 * _cadUnitsPerMeter;
+    final minDistanceCad = 0.005 * _cadUnitsPerMeter;
     final cleaned = StructuralSlab.cleanPolygon(slab.polygon, minDistance: minDistanceCad);
     return slab.copyWith(polygon: cleaned);
+  }
+
+  double _slabSnapTolerance({bool merge = false}) => SlabVertexSnap.tolerance(
+    _getCadFitScale() * _transformController.value.getMaxScaleOnAxis(),
+    _cadUnitsPerMeter,
+    isMouse: _activePointerKind == PointerDeviceKind.mouse, merge: merge);
+
+  DxfSnapResult? _snapSlabPoint(Offset raw, {Offset? previous,
+      Offset? incomingDirection, String? excludedSlabId, int? excludedVertex}) {
+    _activeMagneticGuides = [];
+    if (!_snapEnabled) return null;
+    final tolerance = _slabSnapTolerance();
+    final candidates = <DxfSnapResult>[];
+    final cad = DxfSnapHelper.findSnapPoint(document: _document,
+      cadPoint: raw, toleranceCad: tolerance, basePoint: previous);
+    if (cad != null) candidates.add(cad);
+    final edges = <(Offset, Offset)>[];
+    for (final slab in _project.activeStorey.slabs) {
+      for (var i = 0; i < slab.polygon.length; i++) {
+        final a = slab.polygon[i], b = slab.polygon[(i + 1) % slab.polygon.length];
+        if (slab.id == excludedSlabId && i == excludedVertex) { continue; }
+        final distance = (raw - a).distance;
+        if (distance <= tolerance) { candidates.add(DxfSnapResult(
+          point: a, type: DxfSnapType.endpoint, distance: distance)); }
+        if (slab.id == excludedSlabId &&
+            (i + 1) % slab.polygon.length == excludedVertex) { continue; }
+        edges.add((a, b));
+        final point = DxfSnapHelper.closestPointOnSegment(raw, a, b);
+        if ((raw - point).distance <= tolerance) { candidates.add(DxfSnapResult(
+          point: point, type: DxfSnapType.nearest, distance: (raw - point).distance)); }
+      }
+    }
+    final structural = _findStructuralSnap(raw, tolerance,
+        excludedSlabId: excludedSlabId);
+    if (structural != null) { candidates.add(structural); }
+    final alignment = previous == null ? null : SlabVertexSnap.align(
+      raw: raw, previous: previous, edges: edges, tolerance: tolerance,
+      incomingDirection: incomingDirection);
+    // Preserve exact corners; perpendicular alignment beats nearest-edge snapping.
+    final exact = candidates.where((c) => c.type == DxfSnapType.endpoint).toList()
+      ..sort((a, b) => a.distance.compareTo(b.distance));
+    if (exact.isNotEmpty) {
+      if (previous != null) _activeMagneticGuides = [(previous, exact.first.point)];
+      return exact.first;
+    }
+    if (alignment?.snap != null) {
+      _activeMagneticGuides = alignment!.guides;
+      return alignment.snap;
+    }
+    candidates.sort((a, b) => a.distance.compareTo(b.distance));
+    final result = candidates.firstOrNull;
+    if (previous != null && result != null) _activeMagneticGuides = [(previous, result.point)];
+    return result;
   }
 
   void _updateSlabVertexDrag(Offset screenPos) {
@@ -3642,53 +3720,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final targetScreenPos = isMouse ? screenPos : (screenPos - Offset(0, offsetAboveFinger));
 
     final rawCad = _screenToCad(targetScreenPos);
-    DxfSnapResult? snap;
-    if (_snapEnabled) {
-      final double fitScale = _getCadFitScale();
-      final double currentScale = _transformController.value.getMaxScaleOnAxis();
-      final double toleranceCad =
-          24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
-      snap = DxfSnapHelper.findSnapPoint(
-        document: _document,
-        cadPoint: rawCad,
-        toleranceCad: toleranceCad,
-      );
-      snap ??= _findStructuralSnap(rawCad, toleranceCad);
-    }
-    Offset effectiveCad = snap?.point ?? rawCad;
-
-    // Check snap-to-merge with ANY other vertex in the slab polygon
     final polygon = _editingSlab!.polygon;
     final count = polygon.length;
     final idx = _draggingSlabVertexIndex!;
-
-    // Generous adaptive merge snap radius (48px touch / 36px mouse, 0.35m CAD)
-    final double mergeSnapRadiusScreen = isMouse ? 36.0 : 48.0;
-    final double mergeSnapCadDist = 0.35 * _cadUnitsPerMeter;
-
-    int? bestCandidate;
-    double bestDist = double.infinity;
-
-    for (int j = 0; j < count; j++) {
-      if (j == idx) continue;
-      final sPt = _cadToScreen(polygon[j]);
-      final screenDist = (targetScreenPos - sPt).distance;
-      final cadDist = (effectiveCad - polygon[j]).distance;
-
-      // Bonus radius for immediate adjacent neighbors (makes edge collapse very easy)
-      final bool isAdjacent = (j == (idx - 1 + count) % count) || (j == (idx + 1) % count);
-      final double effectiveScreenRadius =
-          isAdjacent ? mergeSnapRadiusScreen * 1.35 : mergeSnapRadiusScreen;
-      final double effectiveCadRadius =
-          isAdjacent ? mergeSnapCadDist * 1.35 : mergeSnapCadDist;
-
-      if (screenDist <= effectiveScreenRadius || cadDist <= effectiveCadRadius) {
-        final double distScore = isAdjacent ? screenDist * 0.75 : screenDist;
-        if (distScore < bestDist) {
-          bestDist = distScore;
-          bestCandidate = j;
-        }
-      }
+    final previous = polygon[(idx - 1 + count) % count];
+    DxfSnapResult? snap = _snapSlabPoint(rawCad, previous: previous,
+      incomingDirection: previous - polygon[(idx - 2 + count) % count],
+      excludedSlabId: _editingSlab!.id, excludedVertex: idx);
+    Offset effectiveCad = snap?.point ?? rawCad;
+    final bestCandidate = _snapEnabled ? SlabVertexSnap.mergeCandidate(
+      rawCad, polygon, idx, _slabSnapTolerance(merge: true)) : null;
+    if (bestCandidate == null && snap != null && polygon.asMap().entries.any(
+        (e) => e.key != idx && (e.value - snap!.point).distance < 1e-8)) {
+      snap = null;
+      effectiveCad = rawCad;
+      _activeMagneticGuides = [];
     }
 
     if (bestCandidate != null) {
@@ -3728,48 +3774,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final targetScreenPos = isMouse ? screenPos : (screenPos - Offset(0, offsetAboveFinger));
 
     final rawCad = _screenToCad(targetScreenPos);
-    DxfSnapResult? snap;
-    if (_snapEnabled) {
-      final double fitScale = _getCadFitScale();
-      final double currentScale = _transformController.value.getMaxScaleOnAxis();
-      final double toleranceCad =
-          24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
-      snap = DxfSnapHelper.findSnapPoint(
-        document: _document,
-        cadPoint: rawCad,
-        toleranceCad: toleranceCad,
-      );
-      snap ??= _findStructuralSnap(rawCad, toleranceCad);
-    }
+    final previous = op[(idx - 1 + op.length) % op.length];
+    DxfSnapResult? snap = _snapSlabPoint(rawCad, previous: previous,
+      incomingDirection: previous - op[(idx - 2 + op.length) % op.length]);
     Offset effectiveCad = snap?.point ?? rawCad;
-
-    // Check snap-to-merge with ANY other vertex in the opening polygon
-    final double mergeSnapRadiusScreen = isMouse ? 36.0 : 48.0;
-    final double mergeSnapCadDist = 0.35 * _cadUnitsPerMeter;
-
-    int? bestCandidate;
-    double bestDist = double.infinity;
-
-    for (int j = 0; j < op.length; j++) {
-      if (j == idx) continue;
-      final sPt = _cadToScreen(op[j]);
-      final screenDist = (targetScreenPos - sPt).distance;
-      final cadDist = (effectiveCad - op[j]).distance;
-
-      final bool isAdjacent = (j == (idx - 1 + op.length) % op.length) || (j == (idx + 1) % op.length);
-      final double effectiveScreenRadius =
-          isAdjacent ? mergeSnapRadiusScreen * 1.35 : mergeSnapRadiusScreen;
-      final double effectiveCadRadius =
-          isAdjacent ? mergeSnapCadDist * 1.35 : mergeSnapCadDist;
-
-      if (screenDist <= effectiveScreenRadius || cadDist <= effectiveCadRadius) {
-        final double distScore = isAdjacent ? screenDist * 0.75 : screenDist;
-        if (distScore < bestDist) {
-          bestDist = distScore;
-          bestCandidate = j;
-        }
-      }
-    }
+    final bestCandidate = _snapEnabled ? SlabVertexSnap.mergeCandidate(
+      rawCad, op, idx, _slabSnapTolerance(merge: true)) : null;
 
     if (bestCandidate != null) {
       effectiveCad = op[bestCandidate];
@@ -3841,6 +3851,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _draggingSlabVertexIndex = null;
           _draggingSlabVertexCad = null;
           _mergeCandidateSlabVertexIndex = null;
+          _activeMagneticGuides = [];
         });
       }
       if (_activeOpeningGrip != null) {
@@ -3856,6 +3867,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _draggingOpeningVertexIndex = null;
           _draggingOpeningVertexCad = null;
           _mergeCandidateOpeningVertexIndex = null;
+          _activeMagneticGuides = [];
         });
       }
       return;
@@ -3872,6 +3884,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _draggingSlabVertexIndex = vIdx;
           _draggingSlabVertexCad = _editingSlab!.polygon[vIdx];
           _mergeCandidateSlabVertexIndex = null;
+          _activeMagneticGuides = [];
         });
         HapticFeedback.selectionClick();
         return;
@@ -3963,6 +3976,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               _draggingOpeningVertexIndex = vIdx;
               _draggingOpeningVertexCad = op[vIdx];
               _mergeCandidateOpeningVertexIndex = null;
+              _activeMagneticGuides = [];
             });
             HapticFeedback.selectionClick();
             return;
@@ -4249,7 +4263,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }).toList();
       _updateProjectGridAxes(axes);
       setState(() {
-        _selectedGridAxis = updatedAxis;
+        _selectedGridAxis = _findProjectAxis(updatedAxis);
       });
       return;
     }
@@ -4350,9 +4364,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final disp = rawCad - grip.midpoint;
     final rawD = disp.dx * grip.normal.dx + disp.dy * grip.normal.dy;
 
-    final double fitScale = _getCadFitScale();
-    final double currentScale = _transformController.value.getMaxScaleOnAxis();
-    final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+    final double toleranceCad = _slabSnapTolerance();
 
     SlabParallelAlignmentResult? parallelSnap;
     if (_snapEnabled) {
@@ -4402,7 +4414,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final previewSlab = active.slabs[slabIdx].dynamicPullEdge(
         edgeIndex: grip.edgeIndex,
         distance: effectiveD,
-        minDistanceCad: 0.05 * _cadUnitsPerMeter,
+        minDistanceCad: 0.005 * _cadUnitsPerMeter,
       );
       previewPoly = previewSlab.polygon;
     }
@@ -4422,9 +4434,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final disp = rawCad - grip.midpoint;
     final rawD = disp.dx * grip.normal.dx + disp.dy * grip.normal.dy;
 
-    final double fitScale = _getCadFitScale();
-    final double currentScale = _transformController.value.getMaxScaleOnAxis();
-    final double toleranceCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+    final double toleranceCad = _slabSnapTolerance();
 
     double effectiveD = rawD;
     if (_snapEnabled) {
@@ -4449,7 +4459,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           openingIndex: opIdx,
           edgeIndex: grip.edgeIndex,
           distance: effectiveD,
-          minDistanceCad: 0.05 * _cadUnitsPerMeter,
+          minDistanceCad: 0.005 * _cadUnitsPerMeter,
         );
         if (opIdx < previewSlab.openings.length) {
           previewPoly = previewSlab.openings[opIdx];
@@ -4999,20 +5009,17 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _liveDimensionText = null;
       } else if (_activeTool == StructuralDrawTool.slab) {
         if (_slabPointsCad.length >= 3 &&
-            (rawCad - _slabPointsCad.first).distance <= toleranceCad) {
+            (rawCad - _slabPointsCad.first).distance <= _slabSnapTolerance(merge: true)) {
           snap = DxfSnapResult(
             point: _slabPointsCad.first,
             type: DxfSnapType.endpoint,
             distance: (rawCad - _slabPointsCad.first).distance,
           );
         } else {
-          snap = _findStructuralSnap(rawCad, toleranceCad) ??
-              DxfSnapHelper.findSnapPoint(
-                document: _document,
-                cadPoint: rawCad,
-                toleranceCad: toleranceCad,
-                allowNearest: false,
-              );
+          snap = _snapSlabPoint(rawCad,
+            previous: _slabPointsCad.lastOrNull,
+            incomingDirection: _slabPointsCad.length >= 2
+              ? _slabPointsCad.last - _slabPointsCad[_slabPointsCad.length - 2] : null);
         }
 
         if (snap != null) {
@@ -5159,7 +5166,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return null;
   }
 
-  DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad, {bool cornersOnly = false}) {
+  DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad, {bool cornersOnly = false, String? excludedSlabId}) {
     double minDist = toleranceCad;
     DxfSnapResult? bestSnap;
 
@@ -5294,6 +5301,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
       // 6. Slab polygon vertices and edge midpoints
       for (final slab in s.slabs) {
+        if (slab.id == excludedSlabId) continue;
         for (final v in slab.polygon) {
           final d = (cadPt - v).distance;
           if (d < minDist) {
@@ -5398,7 +5406,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final updated = _editingSlab!.mergeVertices(
           fromIndex: idx,
           toIndex: candidate,
-          minDistanceCad: 0.05 * _cadUnitsPerMeter,
+          minDistanceCad: 0.005 * _cadUnitsPerMeter,
         );
         if (updated != null) {
           final cleaned = _cleanSlabPolygon(updated);
@@ -5415,7 +5423,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       } else if (_draggingSlabVertexCad != null) {
         final testPts = List<Offset>.from(_editingSlab!.polygon);
         testPts[idx] = _draggingSlabVertexCad!;
-        final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.05 * _cadUnitsPerMeter);
+        final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
         if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
           _pushSlabCorrectionUndo();
           final updated = _editingSlab!.copyWith(polygon: cleanedPts);
@@ -5437,6 +5445,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingSlabVertexIndex = null;
         _draggingSlabVertexCad = null;
         _mergeCandidateSlabVertexIndex = null;
+        _activeMagneticGuides = [];
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
@@ -5462,7 +5471,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               openingIndex: opIdx,
               fromIndex: idx,
               toIndex: candidate,
-              minDistanceCad: 0.05 * _cadUnitsPerMeter,
+              minDistanceCad: 0.005 * _cadUnitsPerMeter,
             ) ?? slab.removeOpeningVertex(opIdx, idx);
             if (updatedSlab != null && _updateOpeningInStorey(
                 (slabId, opIdx), updatedSlab.openings[opIdx], allowTransfer: false)) {
@@ -5477,7 +5486,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           } else if (_draggingOpeningVertexCad != null) {
             final testPts = List<Offset>.from(op);
             testPts[idx] = _draggingOpeningVertexCad!;
-            final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.05 * _cadUnitsPerMeter);
+            final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
             if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
               _updateOpeningInStorey((slabId, opIdx), cleanedPts, allowTransfer: false);
               HapticFeedback.mediumImpact();
@@ -5494,6 +5503,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingOpeningVertexIndex = null;
         _draggingOpeningVertexCad = null;
         _mergeCandidateOpeningVertexIndex = null;
+        _activeMagneticGuides = [];
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
@@ -5742,6 +5752,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _draggingSlabVertexIndex = null;
       _draggingSlabVertexCad = null;
       _mergeCandidateSlabVertexIndex = null;
+      _activeMagneticGuides = [];
       _touchScreenPos = null;
       _targetScreenPos = null;
       _snappedScreenPos = null;
@@ -5880,6 +5891,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingSlabVertexIndex = vIdx;
         _draggingSlabVertexCad = hitSlab.polygon[vIdx];
         _mergeCandidateSlabVertexIndex = null;
+        _activeMagneticGuides = [];
       });
       HapticFeedback.heavyImpact();
       return;
@@ -5911,6 +5923,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             _draggingOpeningVertexIndex = vIdx;
             _draggingOpeningVertexCad = op[vIdx];
             _mergeCandidateOpeningVertexIndex = null;
+            _activeMagneticGuides = [];
           });
           return;
         }
@@ -5979,7 +5992,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       }).toList();
       _updateProjectGridAxes(axes);
       setState(() {
-        _selectedGridAxis = updatedAxis;
+        _selectedGridAxis = _findProjectAxis(updatedAxis);
       });
       return;
     }
@@ -6039,7 +6052,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final updated = _editingSlab!.mergeVertices(
           fromIndex: idx,
           toIndex: candidate,
-          minDistanceCad: 0.05 * _cadUnitsPerMeter,
+          minDistanceCad: 0.005 * _cadUnitsPerMeter,
         );
         if (updated != null) {
           final cleaned = _cleanSlabPolygon(updated);
@@ -6051,7 +6064,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       } else if (_draggingSlabVertexCad != null) {
         final testPts = List<Offset>.from(_editingSlab!.polygon);
         testPts[idx] = _draggingSlabVertexCad!;
-        final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.05 * _cadUnitsPerMeter);
+        final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
         if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
           _pushSlabCorrectionUndo();
           final updated = _editingSlab!.copyWith(polygon: cleanedPts);
@@ -6073,6 +6086,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingSlabVertexIndex = null;
         _draggingSlabVertexCad = null;
         _mergeCandidateSlabVertexIndex = null;
+        _activeMagneticGuides = [];
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
@@ -6093,7 +6107,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             openingIndex: opIdx,
             fromIndex: idx,
             toIndex: candidate,
-            minDistanceCad: 0.05 * _cadUnitsPerMeter,
+            minDistanceCad: 0.005 * _cadUnitsPerMeter,
           );
           if (updatedSlab != null) {
             _updateOpeningInStorey((slabId, opIdx), updatedSlab.openings[opIdx], allowTransfer: false);
@@ -6103,7 +6117,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         } else if (_draggingOpeningVertexCad != null) {
           final testPts = List<Offset>.from(active.slabs[slabIdx].openings[opIdx]);
           testPts[idx] = _draggingOpeningVertexCad!;
-          final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.05 * _cadUnitsPerMeter);
+          final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
           if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
             _updateOpeningInStorey((slabId, opIdx), cleanedPts, allowTransfer: false);
             _saveProject();
@@ -6115,6 +6129,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingOpeningVertexIndex = null;
         _draggingOpeningVertexCad = null;
         _mergeCandidateOpeningVertexIndex = null;
+        _activeMagneticGuides = [];
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
@@ -6245,6 +6260,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingSlabVertexIndex = null;
         _draggingSlabVertexCad = null;
         _mergeCandidateSlabVertexIndex = null;
+        _activeMagneticGuides = [];
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
@@ -6257,6 +6273,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _draggingOpeningVertexIndex = null;
         _draggingOpeningVertexCad = null;
         _mergeCandidateOpeningVertexIndex = null;
+        _activeMagneticGuides = [];
         _touchScreenPos = null;
         _targetScreenPos = null;
         _snappedScreenPos = null;
@@ -6678,7 +6695,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               _firstWallEdgeStartCad = null;
               _firstWallEdgeEndCad = null;
               _currentAxisName = _getNextAxisName(axis.name);
-              _selectedGridAxis = axis;
+              _selectedGridAxis = _findProjectAxis(axis);
             });
             HapticFeedback.mediumImpact();
           }
@@ -6703,11 +6720,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _updateActiveStorey(updatedStorey);
       HapticFeedback.mediumImpact();
     } else if (_activeTool == StructuralDrawTool.slab) {
+      if (!_isPlacingWithHold) {
+        cadCoord = _snapSlabPoint(cadCoord, previous: _slabPointsCad.lastOrNull,
+          incomingDirection: _slabPointsCad.length >= 2
+            ? _slabPointsCad.last - _slabPointsCad[_slabPointsCad.length - 2] : null)?.point ?? cadCoord;
+      }
       if (_slabPointsCad.length >= 3) {
         final distToFirst = (cadCoord - _slabPointsCad.first).distance;
-        final double fitScale = _getCadFitScale();
-        final double currentScale = _transformController.value.getMaxScaleOnAxis();
-        final closeThresholdCad = 24.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
+        final closeThresholdCad = _slabSnapTolerance(merge: true);
         if (distToFirst <= closeThresholdCad) {
           _closeSlabPolygon();
           return;
@@ -6902,20 +6922,21 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   Future<void> _generateInitialScheme() async {
     final snapshot = _project;
+    final analysisSnapshot = snapshot.copyWith(storeys: snapshot.ceilingStoreys);
     final scale = _cadUnitsPerMeter;
     final editing = _isEditingSlab || _slabPointsCad.isNotEmpty ||
         _openingPointsCad.isNotEmpty || _openingStartCad != null ||
         _wallStartCad != null || _beamStartCad != null;
-    if (!StructuralSchemeReadiness.evaluate(snapshot, scale, editing: editing).geometryReady) {
+    if (!StructuralSchemeReadiness.evaluate(analysisSnapshot, scale, editing: editing).geometryReady) {
       await showDialog<void>(context: context, builder: (_) =>
-        StructuralSchemeReadinessDialog(project: snapshot, scale: scale, editing: editing));
+        StructuralSchemeReadinessDialog(project: analysisSnapshot, scale: scale, editing: editing));
       return;
     }
     final detection = WallAxisDetector.detect(_document, forceScaleFactor: scale / 1000);
     final proposal = await showDialog<InitialSchemeProposal>(
       context: context,
       builder: (_) => InitialSchemeDialog(
-        project: snapshot,
+        project: analysisSnapshot,
         pairs: detection.selectedWallPairs,
         wallOpenings: GeometricWindowDetector.detect(_document, detection.selectedWallPairs, scale / 1000),
         closureSegments: detection.closureSegments,
@@ -7054,11 +7075,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final active = _project.activeStorey;
       final cleanedPts = StructuralSlab.cleanPolygon(
         List.from(_slabPointsCad),
-        minDistance: 0.05 * _cadUnitsPerMeter,
+        minDistance: 0.005 * _cadUnitsPerMeter,
       );
       if (cleanedPts.length >= 3) {
         final newSlab = StructuralSlab(
           id: 'slab_${DateTime.now().millisecondsSinceEpoch}',
+          isFloorSlab: widget.bimContext != null,
           polygon: cleanedPts,
           thickness: _currentSlabThickness,
           colorValue: Structural2dPainter.slabPalette[
@@ -7070,7 +7092,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _updateActiveStorey(updatedStorey);
       }
 
-      setState(() => _slabPointsCad.clear());
+      setState(() {
+        _slabPointsCad.clear();
+        _activeMagneticGuides = [];
+      });
       HapticFeedback.heavyImpact();
     }
   }
@@ -7079,7 +7104,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_openingPointsCad.length >= 3) {
       final cleanedPts = StructuralSlab.cleanPolygon(
         List.from(_openingPointsCad),
-        minDistance: 0.05 * _cadUnitsPerMeter,
+        minDistance: 0.005 * _cadUnitsPerMeter,
       );
       if (cleanedPts.length >= 3) {
         _addOpeningToSlab(cleanedPts, type: _currentOpeningType);
@@ -7426,23 +7451,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       scale: result.detectedScale,
     );
 
-    // Merge with existing axes, avoiding duplicates along the same alignment
-    final combined = <StructuralGridAxis>[..._project.effectiveGridAxes];
-    final dupToleranceCad = 100.0 * result.detectedScale;
-    for (final newAxis in newGridAxes) {
-      final isDup = combined.any((existing) =>
-          existing.isParallelTo(newAxis, toleranceRad: 0.05) &&
-          existing.distanceToSegment((newAxis.start + newAxis.end) / 2.0) <= dupToleranceCad);
-      if (!isDup) {
-        combined.add(newAxis);
-      }
-    }
-
-    // Sequence all axes neatly (numbers for vertical, letters for horizontal)
-    final updatedAxes = resequenceGridAxes(
-      combined,
-      isBulgarian: isBg,
-    );
+    final updatedAxes=ProjectGridAxes.merge([
+      ..._project.effectiveGridAxes,
+      for(final a in newGridAxes) a.copyWith(sourceStoreyIds:
+        widget.bimContext==null ? const [] : [_project.activeStorey.id]),
+    ],_cadUnitsPerMeter,isBulgarian:isBg);
     _updateProjectGridAxes(updatedAxes);
 
     // Automatically generate initial dynamic slabs in the same step if none exist
@@ -7854,8 +7867,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StoreyLevel? get _floorSlabStorey => widget.bimContext == null
       ? null : _project.floorSlabStoreyFor(_project.activeStorey);
 
+  StoreyLevel? get _ceilingSlabStorey => widget.bimContext == null
+      ? null : _project.ceilingSlabStoreyFor(_project.activeStorey);
+
   void _openFloorSlab() {
-    final floor = _floorSlabStorey;
+    final floor = _ceilingSlabStorey ?? _floorSlabStorey;
     if (floor == null) return;
     final index = _project.storeys.indexWhere((s) => s.id == floor.id);
     if (index < 0) return;
@@ -8011,11 +8027,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _openVerticalCapacityReport() {
+    final assessments={for(final floor in _project.ceilingStoreys) floor.id:
+      SupportLayoutEvaluator.evaluate(_project,floor.copyWith(gridAxes:_project.effectiveGridAxes),_cadUnitsPerMeter)};
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => VerticalCapacitySheet(report: _verticalCapacityReport),
+      builder: (ctx) => VerticalCapacitySheet(report: _verticalCapacityReport,assessments:assessments),
     );
   }
 
@@ -8407,6 +8425,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   @override
   Widget build(BuildContext context) {
     final floor = _floorSlabStorey;
+    final ceiling = _ceilingSlabStorey;
+    final reference = ceiling ?? floor;
     return Scaffold(
       backgroundColor: const Color(0xFF141414),
       appBar: AppBar(
@@ -8560,9 +8580,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             _draggingSlabVertexIndex = null;
                             _draggingSlabVertexCad = null;
                             _mergeCandidateSlabVertexIndex = null;
+                            _activeMagneticGuides = [];
                             _draggingOpeningVertexIndex = null;
                             _draggingOpeningVertexCad = null;
                             _mergeCandidateOpeningVertexIndex = null;
+                            _activeMagneticGuides = [];
                             _activeOpeningGrip = null;
                             _previewOpeningOffsetPolygon = null;
                             _touchScreenPos = null;
@@ -8619,6 +8641,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                 painter: Structural2dPainter(
                                   currentStorey: _project.activeStorey,
                                   floorSlabStorey: floor,
+                                  ceilingSlabStorey: ceiling,
                                   ghostStorey: _project.ghostStorey,
                                   hasBasement: _project.hasBasement,
                                   foundationType: _project.foundationType,
@@ -8685,6 +8708,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   selectedShearWallId: _selectedShearWall?.id,
                                   selectedBeamId: _selectedBeam?.id,
                                   selectedGridAxisId: _selectedGridAxis?.id,
+                                  gridAxisStoreys: _project.storeys,
                                   axisOffsetPreview: _getAxisOffsetPreview(),
                                   columnOffsetPreview: _getColumnOffsetPreview(),
                                   firstWallEdgeStartCad: _firstWallEdgeStartCad,
@@ -8754,13 +8778,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   _targetScreenPos != null)
                 Positioned.fill(
                   child: IgnorePointer(
-                    child: CustomPaint(
+                    child: StructuralPointerOverlay(
                       painter: StructuralPointerPainter(
                         touchPos: _touchScreenPos!,
                         targetPos: _targetScreenPos!,
                         placementPos: _currentCadCoord != null ? _cadToScreen(_currentCadCoord!) : null,
                         previewElementPolygon: _pointerElementPolygon(),
                         showDetailLoupe: _activePointerKind != PointerDeviceKind.mouse && (_isMovingColumn || _isMovingShearWall),
+                        loupeHasScene: true,
                         snappedPos: _snappedScreenPos,
                         snappedPositions: _snappedScreenPositions,
                         snapType: _activeSnap?.type,
@@ -8805,7 +8830,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 ),
 
               // 3. Floor slab reference and trace status.
-              if (floor != null && _project.activeStorey.slabs.isEmpty)
+              if (reference != null && (ceiling != null || _project.activeStorey.slabs.isEmpty))
                 Positioned(
                   top: 12, left: 12, right: 12,
                   child: Material(
@@ -8817,8 +8842,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       child: Row(children: [
                         const Icon(Icons.layers_outlined, color: Color(0xFF00B0FF), size: 18),
                         const SizedBox(width: 8),
-                        Expanded(child: Text(context.l10n.bimFloorSlabReference(
-                          _project.activeStorey.elevationLabel, floor.elevationLabel),
+                        Expanded(child: Text(ceiling != null
+                          ? context.l10n.bimCeilingSlabReference(ceiling.elevationLabel)
+                          : context.l10n.bimFloorSlabReference(
+                            _project.activeStorey.elevationLabel, reference.elevationLabel),
                           style: const TextStyle(color: Colors.white, fontSize: 12))),
                         const SizedBox(width: 8),
                         TextButton(
@@ -9459,10 +9486,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       ]);
     } else if (_selectedGridAxis != null) {
       final axis = _selectedGridAxis!;
-      primaryColor = const Color(0xFFFF453A);
+      final presentation=GridAxisPresentation.forStorey(axis,_project.activeStorey,_project.storeys);
+      primaryColor=presentation.reference ? presentation.color.withValues(alpha:1) : const Color(0xFFFF453A);
       final double lenM = axis.length / _cadUnitsPerMeter;
       title = context.l10n.gridAxisTitle(axis.name);
-      subtitle = 'L = ${lenM.toStringAsFixed(2)} m';
+      subtitle = 'L = ${lenM.toStringAsFixed(2)} m${presentation.levels.isEmpty ? '' : ' · ${context.l10n.gridAxisSourceLevels(presentation.levels)}'}';
       onDeselect = () => setState(() => _selectedGridAxis = null);
       onRename = _renameSelectedGridAxis;
 

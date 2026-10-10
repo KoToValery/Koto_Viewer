@@ -463,9 +463,9 @@ void main() {
       final check = report.columnChecks.firstWhere((c) => c.columnId == 'col_beam_supported');
 
       expect(check.hasConnectedBeams, true);
-      expect(check.punchingUtilization, 0.0);
-      expect(check.isPunchingCritical, false);
-      expect(report.punchingRiskCount, 0);
+      expect(check.punchingUtilization,greaterThan(0));
+      expect(check.punchingRequiresReview,isTrue);
+      expect(check.isPunchingCritical,check.punchingUtilization>1);
     });
 
     test('Test 9: Tributary area hierarchy accurately differentiates corner, edge, and interior columns', () {

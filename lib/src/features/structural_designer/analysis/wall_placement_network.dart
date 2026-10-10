@@ -74,17 +74,11 @@ class WallPlacementNetwork {
       if (core.isEmpty) continue;
       final distances = [
         for (final wall in walls)
-          core
-              .map(
-                (p) =>
-                    StructuralPolygonDistance.pointToSegment(
-                      p,
-                      wall.start,
-                      wall.end,
-                    ) /
-                    scale,
-              )
-              .reduce(math.min),
+          StructuralPolygonDistance.between(
+                core,
+                polygons[walls.indexOf(wall)],
+              ) /
+              scale,
       ];
       final nearest = distances.reduce(math.min);
       for (var i = 0; i < walls.length; i++) {

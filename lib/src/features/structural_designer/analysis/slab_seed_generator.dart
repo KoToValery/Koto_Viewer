@@ -3,6 +3,12 @@ import 'dart:ui';
 
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/structural_element.dart';
+import '../models/slab_topology.dart';
+import 'slab_topology_analyzer.dart';
+import 'slab_envelope_detector.dart';
+import 'slab_projection_detector.dart';
+import 'wall_axis_detector.dart';
+import 'structural_underlay_source.dart';
 
 /// Explicit, one-shot generation. Existing generated slabs are never replaced.
 class SlabSeedGenerator {
@@ -22,6 +28,41 @@ class SlabSeedGenerator {
         !unitsPerMeter.isFinite ||
         unitsPerMeter <= 0) {
       return [];
+    }
+    // An already-open legacy project may still have an empty v4 envelope.
+    // Rebuild from original underlay geometry in its current project coordinates;
+    // exclude generated branches so they cannot vote twice in wall detection.
+    final cached = metadata['slabEnvelope'] as Map?;
+    if ((cached?['contours'] as List? ?? []).isEmpty &&
+        ((cached?['version'] as num?)?.toInt() ?? 0) < 5) {
+      final original = StructuralUnderlaySource.original(
+        document,
+        metadata: metadata,
+      );
+      final detected = WallAxisDetector.detect(
+        original,
+        forceScaleFactor: unitsPerMeter / 1000,
+      );
+      final fresh = SlabEnvelopeDetector.detect(detected, document: original);
+      if (fresh.contours.isNotEmpty) {
+        metadata = {
+          ...metadata,
+          'sourceToProject': null,
+          'slabEnvelope': fresh.toJson(),
+          'slabProjections': SlabProjectionDetector.detect(
+            original,
+            fresh,
+            detected.detectedScale,
+            wallLayers: detected.selectedWallPairs
+                .expand((p) => [p.segmentA.sourceLayer, p.segmentB.sourceLayer])
+                .toSet(),
+          ).map((p) => p.toJson()).toList(),
+        };
+        wallReferences = [
+          ...detected.wallContourSegments,
+          ...detected.closureSegments,
+        ];
+      }
     }
     final transform = metadata['sourceToProject'] as Map?;
     final scale = (transform?['scale'] as num?)?.toDouble() ?? 1;
@@ -56,7 +97,11 @@ class SlabSeedGenerator {
     final contours = envelope?['contours'] as List? ?? [];
     for (var i = 0; i < contours.length; i++) {
       final polygon = snap(read(contours[i]), walls, tolerance, epsilon);
-      if (polygon != null) {
+      if (polygon != null &&
+          SlabTopologyAnalyzer.analyze([
+                StructuralSlab(id: 'candidate', polygon: polygon),
+              ], unitsPerMeter).issue ==
+              SlabTopologyIssue.none) {
         result.add(
           StructuralSlab(
             id: '${idPrefix}main_$i',
@@ -163,7 +208,9 @@ class SlabSeedGenerator {
         if (length <= epsilon) continue;
         final axis = (d - c) / length;
         // At most five degrees, and both endpoints within the strict 20 mm band.
-        if (_cross(direction, axis).abs() > math.sin(5.0 * math.pi / 180.0)) continue;
+        if (_cross(direction, axis).abs() > math.sin(5.0 * math.pi / 180.0)) {
+          continue;
+        }
         final distance = math.max(
           _cross(a - c, axis).abs(),
           _cross(b - c, axis).abs(),

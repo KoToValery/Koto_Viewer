@@ -4,6 +4,7 @@ import 'dart:ui';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/wall_axis_models.dart';
 import 'structural_column_detector.dart';
+import 'structural_underlay_source.dart';
 
 /// Represents a geometrically identified window, vitrina, or door opening
 /// located strictly between structural wall jambs or columns.
@@ -76,7 +77,9 @@ class GeometricWindowDetector {
     if (wallPairs.isEmpty || !scale.isFinite || scale <= 0) return const [];
 
     // Step 1: Collect all straight entity strokes from the document (lines, polylines, blocks)
-    final allStrokes = _extractDocStrokes(doc);
+    final allStrokes = _extractDocStrokes(
+      StructuralUnderlaySource.original(doc),
+    );
     if (allStrokes.isEmpty) return const [];
 
     // Filter out strokes that coincide with structural wall faces
@@ -184,8 +187,10 @@ class GeometricWindowDetector {
 
         // Check lateral offset between the two jamb centers
         final n = Offset(-u.dy, u.dx);
-        final lateralOffset = ((jB.center - jA.center).dx * n.dx +
-                               (jB.center - jA.center).dy * n.dy).abs();
+        final lateralOffset =
+            ((jB.center - jA.center).dx * n.dx +
+                    (jB.center - jA.center).dy * n.dy)
+                .abs();
         final maxThickness = math.max(jA.thickness, jB.thickness);
         if (lateralOffset > maxThickness * 0.85 + 50 * scale) continue;
 
@@ -205,27 +210,39 @@ class GeometricWindowDetector {
 
         // Intervening obstacle check: ensure no intermediate wall or column sits between jA and jB in this corridor
         bool hasInterveningObstacle = false;
-        final corridorBounds = Rect.fromPoints(jA.center, jB.center).inflate(maxThickness);
+        final corridorBounds = Rect.fromPoints(
+          jA.center,
+          jB.center,
+        ).inflate(maxThickness);
         for (int k = 0; k < wallPairs.length; k++) {
           if (k == i || k == j) continue;
           final otherWall = wallPairs[k];
-          final wRect = Rect.fromPoints(otherWall.centerlineStart, otherWall.centerlineEnd)
-              .inflate(otherWall.perpendicularDistance / 2.0);
+          final wRect = Rect.fromPoints(
+            otherWall.centerlineStart,
+            otherWall.centerlineEnd,
+          ).inflate(otherWall.perpendicularDistance / 2.0);
           if (!corridorBounds.overlaps(wRect)) continue;
 
-          final t1 = (otherWall.centerlineStart - jA.center).dx * u.dx +
-                     (otherWall.centerlineStart - jA.center).dy * u.dy;
-          final t2 = (otherWall.centerlineEnd - jA.center).dx * u.dx +
-                     (otherWall.centerlineEnd - jA.center).dy * u.dy;
+          final t1 =
+              (otherWall.centerlineStart - jA.center).dx * u.dx +
+              (otherWall.centerlineStart - jA.center).dy * u.dy;
+          final t2 =
+              (otherWall.centerlineEnd - jA.center).dx * u.dx +
+              (otherWall.centerlineEnd - jA.center).dy * u.dy;
           final tMin = math.min(t1, t2);
           final tMax = math.max(t1, t2);
 
           if (tMax > 50.0 * scale && tMin < spanDist - 50.0 * scale) {
-            final d1 = ((otherWall.centerlineStart - jA.center).dx * n.dx +
-                        (otherWall.centerlineStart - jA.center).dy * n.dy).abs();
-            final d2 = ((otherWall.centerlineEnd - jA.center).dx * n.dx +
-                        (otherWall.centerlineEnd - jA.center).dy * n.dy).abs();
-            if (math.min(d1, d2) <= maxThickness * 0.85 + otherWall.perpendicularDistance / 2.0) {
+            final d1 =
+                ((otherWall.centerlineStart - jA.center).dx * n.dx +
+                        (otherWall.centerlineStart - jA.center).dy * n.dy)
+                    .abs();
+            final d2 =
+                ((otherWall.centerlineEnd - jA.center).dx * n.dx +
+                        (otherWall.centerlineEnd - jA.center).dy * n.dy)
+                    .abs();
+            if (math.min(d1, d2) <=
+                maxThickness * 0.85 + otherWall.perpendicularDistance / 2.0) {
               hasInterveningObstacle = true;
               break;
             }
@@ -236,11 +253,14 @@ class GeometricWindowDetector {
         for (final col in columns) {
           if (!corridorBounds.overlaps(col.bounds)) continue;
           final colCenter = col.bounds.center;
-          final tCol = (colCenter - jA.center).dx * u.dx +
-                       (colCenter - jA.center).dy * u.dy;
+          final tCol =
+              (colCenter - jA.center).dx * u.dx +
+              (colCenter - jA.center).dy * u.dy;
           if (tCol > 50.0 * scale && tCol < spanDist - 50.0 * scale) {
-            final dCol = ((colCenter - jA.center).dx * n.dx +
-                          (colCenter - jA.center).dy * n.dy).abs();
+            final dCol =
+                ((colCenter - jA.center).dx * n.dx +
+                        (colCenter - jA.center).dy * n.dy)
+                    .abs();
             final colRadius = math.max(col.width, col.height) / 2.0;
             if (dCol <= maxThickness * 0.85 + colRadius) {
               hasInterveningObstacle = true;
@@ -290,18 +310,25 @@ class GeometricWindowDetector {
     }
     // Orient uWall from startJamb towards endJamb
     if ((endJamb.center - startJamb.center).dx * uWall.dx +
-        (endJamb.center - startJamb.center).dy * uWall.dy < 0) {
+            (endJamb.center - startJamb.center).dy * uWall.dy <
+        0) {
       uWall = -uWall;
     }
     final nWall = Offset(-uWall.dy, uWall.dx);
 
     final corridorThickness = math.max(startJamb.thickness, endJamb.thickness);
-    final halfCorridor = corridorThickness / 2.0 + 120.0 * scale; // Include sill/frame margin
+    final halfCorridor =
+        corridorThickness / 2.0 + 120.0 * scale; // Include sill/frame margin
 
-    double dotU(Offset p) => (p - startJamb.center).dx * uWall.dx + (p - startJamb.center).dy * uWall.dy;
-    double dotN(Offset p) => (p - startJamb.center).dx * nWall.dx + (p - startJamb.center).dy * nWall.dy;
+    double dotU(Offset p) =>
+        (p - startJamb.center).dx * uWall.dx +
+        (p - startJamb.center).dy * uWall.dy;
+    double dotN(Offset p) =>
+        (p - startJamb.center).dx * nWall.dx +
+        (p - startJamb.center).dy * nWall.dy;
 
-    final longitudinalSpans = <(double, double, double)>[]; // (tMin, tMax, lateralOffset)
+    final longitudinalSpans =
+        <(double, double, double)>[]; // (tMin, tMax, lateralOffset)
     int transverseMullionCount = 0;
     bool hasDimensionMarker = false;
 
@@ -397,8 +424,12 @@ class GeometricWindowDetector {
     // 4. Longitudinal coverage >= 25% PLUS opening dimension witness line / marker
     final evidence = <String>[];
     if (hasParallelPair) evidence.add('parallelFrameOrGlazingPair');
-    if (coverageRatio >= 0.30) evidence.add('longitudinalCoverage_${(coverageRatio * 100).toInt()}%');
-    if (transverseMullionCount > 0) evidence.add('transverseMullions_$transverseMullionCount');
+    if (coverageRatio >= 0.30) {
+      evidence.add('longitudinalCoverage_${(coverageRatio * 100).toInt()}%');
+    }
+    if (transverseMullionCount > 0) {
+      evidence.add('transverseMullions_$transverseMullionCount');
+    }
     if (hasDimensionMarker) evidence.add('dimensionMarker');
 
     final bool isConfirmedWindow;
@@ -528,11 +559,19 @@ class GeometricWindowDetector {
       if (dot <= 0.22) {
         final d1 = (other.centerlineStart - center).distance;
         final d2 = (other.centerlineEnd - center).distance;
-        final dMid = _closestPointOnSegment(center, other.centerlineStart, other.centerlineEnd);
-        if (math.min(d1, d2) <= searchRadius || (center - dMid).distance <= searchRadius) {
-          final otherLen = (other.centerlineEnd - other.centerlineStart).distance;
+        final dMid = _closestPointOnSegment(
+          center,
+          other.centerlineStart,
+          other.centerlineEnd,
+        );
+        if (math.min(d1, d2) <= searchRadius ||
+            (center - dMid).distance <= searchRadius) {
+          final otherLen =
+              (other.centerlineEnd - other.centerlineStart).distance;
           if (otherLen >= 400.0 * scale) {
-            final farEnd = d1 > d2 ? other.centerlineStart : other.centerlineEnd;
+            final farEnd = d1 > d2
+                ? other.centerlineStart
+                : other.centerlineEnd;
             final vec = farEnd - center;
             if (vec.distance > 1e-4) {
               return vec / vec.distance;
@@ -554,13 +593,14 @@ class GeometricWindowDetector {
     required double scale,
   }) {
     return perpendicularReturnDirection(
-      center: center,
-      wallDir: wallDir,
-      wallThickness: wallThickness,
-      wallPairs: wallPairs,
-      excludeWallIndex: excludeWallIndex,
-      scale: scale,
-    ) != null;
+          center: center,
+          wallDir: wallDir,
+          wallThickness: wallThickness,
+          wallPairs: wallPairs,
+          excludeWallIndex: excludeWallIndex,
+          scale: scale,
+        ) !=
+        null;
   }
 
   /// Checks whether two jambs across an opening span the mouth of an inward architectural recess,

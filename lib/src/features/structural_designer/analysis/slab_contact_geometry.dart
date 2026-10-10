@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import '../models/structural_element.dart';
+import 'slab_topology_analyzer.dart';
+import 'structural_polygon_distance.dart';
 
 class SlabContactMeasure {
   final double areaM2;
@@ -93,6 +95,41 @@ class SlabContactGeometry {
             (column.thickness <= 0 ||
                 column.thickness >= math.min(column.width, column.height)))) {
       return null;
+    }
+    // A full circle strictly inside one valid plate has exact area/centroid.
+    // Reserve polygon sweeping and bracketing for partial/ambiguous contact.
+    if (column.shape == ColumnShape.circular &&
+        slabs.length == 1 &&
+        scale.isFinite &&
+        scale > 0 &&
+        column.width.isFinite &&
+        SlabTopologyAnalyzer.analyze(slabs, scale).allowsSingleDiaphragm) {
+      final slab = slabs.single, radius = column.width / 2;
+      final rings = [slab.polygon, ...slab.openings];
+      final contained =
+          StructuralPolygonDistance.inside(column.center, slab.polygon) &&
+          !slab.openings.any(
+            (h) => StructuralPolygonDistance.inside(column.center, h),
+          ) &&
+          rings.every(
+            (ring) => List.generate(
+              ring.length,
+              (i) =>
+                  StructuralPolygonDistance.pointToSegment(
+                    column.center,
+                    ring[i],
+                    ring[(i + 1) % ring.length],
+                  ) >
+                  radius + 1e-8 * scale,
+            ).every((v) => v),
+          );
+      if (contained) {
+        return SlabContactMeasure(
+          math.pi * radius * radius / (scale * scale),
+          2 * radius / scale,
+          column.center,
+        );
+      }
     }
     final result = measure(columnFootprint(column), slabs, scale);
     if (result == null ||

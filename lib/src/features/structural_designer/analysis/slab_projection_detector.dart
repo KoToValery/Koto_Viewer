@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'drawing_frame_detector.dart';
 import 'dart:ui';
 import '../../dxf_viewer/models/dxf_models.dart';
 import 'slab_envelope_detector.dart';
@@ -343,6 +344,7 @@ class SlabProjectionDetector {
     Set<String> wallLayers = const {},
   }) {
     if (envelope.contours.isEmpty || scale <= 0 || !scale.isFinite) return [];
+    doc = DrawingFrameDetector.withoutFrames(doc);
     final byLayer = <String, List<(Offset, Offset)>>{};
     bool outside(Offset p) => !envelope.contours.any((r) => _inside(p, r));
     double distance(Offset p) =>

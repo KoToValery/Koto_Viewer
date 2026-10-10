@@ -1,5 +1,7 @@
 # Initial structural scheme generation — 2026-10-08
 
+Current implementation and measured comparisons: [Support placement update — 2026-10-10](bim_support_placement_optimization_2026_10_10.md).
+
 The generator now keeps one preview and searches for a distinct next proposal on each press of **Next variant**. It uses a deterministic variant phase, ignores layout differences below 5 cm for duplicate detection, and searches at most twelve candidates per press. Changing spacing restarts the search. Existing and accepted elements remain fixed; only accepting the preview appends new native objects, using the existing Undo transaction.
 
 ## Placement order
@@ -10,7 +12,7 @@ The generator now keeps one preview and searches for a distinct next proposal on
 4. Sample solid wall runs and explicit axes for intermediate column candidates.
 5. Repair coverage near slab boundaries/openings, inside slab fields, then at remaining distant candidates.
 
-Every accepted section must fit the slab, avoid slab openings and occupied sections, and respect configured minimum center spacing. Detected collinear wall gaps remain excluded. Explicit axes may place columns without detected walls; they never justify shear walls. Undetected doors and architectural objects are not proven clear by an axis.
+Every accepted section must fit the slab, avoid slab openings and occupied sections, and respect the separate column and parallel-wall spacing rules. Detected collinear wall gaps remain excluded. Explicit axes guide alignment; a generated section still requires an admissible detected wall strip. Undetected doors and architectural objects are not proven clear by an axis.
 
 Coverage uses the nearest support footprint **within the same slab region**. Red samples exceed half the configured target spacing. This is a placement heuristic, not an effective span or cantilever calculation. Missing architectural/axis candidates leave visible residual gaps; the algorithm does not silently certify them. Sampling and element limits remain visible in the preview.
 

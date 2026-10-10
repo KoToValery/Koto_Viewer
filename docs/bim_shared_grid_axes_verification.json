@@ -1,0 +1,332 @@
+{
+  "beforeMasterCount": 18,
+  "sourceCounts": [
+    11,
+    11
+  ],
+  "afterMasterCount": 18,
+  "floorViews": [
+    {
+      "level": "±0.00",
+      "local": 11,
+      "references": 7
+    },
+    {
+      "level": "+2.80",
+      "local": 11,
+      "references": 7
+    }
+  ],
+  "axes": [
+    {
+      "id": "bim_axis_storey_2_axis_auto_8_1791616491403",
+      "name": "A",
+      "start": {
+        "dx": -1154.82719162396,
+        "dy": -451.3462960416975
+      },
+      "end": {
+        "dx": 95.17280785052435,
+        "dy": -451.3462960416975
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_1_1791616478547",
+      "name": "B",
+      "start": {
+        "dx": -1154.8271756523313,
+        "dy": -391.34629788963804
+      },
+      "end": {
+        "dx": -64.82717394201472,
+        "dy": -391.34629788963804
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_2_1791616478550",
+      "name": "C",
+      "start": {
+        "dx": -1154.82719162396,
+        "dy": -321.3462974551694
+      },
+      "end": {
+        "dx": 95.17280785052435,
+        "dy": -321.3462974551694
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1",
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_3_1791616478550",
+      "name": "D",
+      "start": {
+        "dx": -1154.82719162396,
+        "dy": 208.6339978724732
+      },
+      "end": {
+        "dx": 95.17280785052435,
+        "dy": 208.6339978724732
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1",
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_4_1791616478550",
+      "name": "E",
+      "start": {
+        "dx": -1154.82719162396,
+        "dy": 428.6537026209245
+      },
+      "end": {
+        "dx": 95.17280785052435,
+        "dy": 428.6537026209245
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1",
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_5_1791616478550",
+      "name": "F",
+      "start": {
+        "dx": -1154.8271756523313,
+        "dy": 577.4037023059398
+      },
+      "end": {
+        "dx": -64.82717394201472,
+        "dy": 577.4037023059398
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_11_1791616478551",
+      "name": "1",
+      "start": {
+        "dx": -1034.8271756523313,
+        "dy": -571.3462960416974
+      },
+      "end": {
+        "dx": -1034.8271756523313,
+        "dy": 697.40370230594
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1",
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_2_axis_auto_6_1791616491403",
+      "name": "2",
+      "start": {
+        "dx": -954.8271924763039,
+        "dy": -571.3462960416974
+      },
+      "end": {
+        "dx": -954.8271924763039,
+        "dy": 548.6537041287346
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_10_1791616478551",
+      "name": "3",
+      "start": {
+        "dx": -789.8271763087653,
+        "dy": -511.34629788963804
+      },
+      "end": {
+        "dx": -789.8271763087653,
+        "dy": 697.4037023059398
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_9_1791616478551",
+      "name": "4",
+      "start": {
+        "dx": -764.8271763087655,
+        "dy": -511.34629788963804
+      },
+      "end": {
+        "dx": -764.8271763087655,
+        "dy": 697.4037023059398
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_2_axis_auto_5_1791616491403",
+      "name": "5",
+      "start": {
+        "dx": -684.82719254597,
+        "dy": -571.3462960416975
+      },
+      "end": {
+        "dx": -684.82719254597,
+        "dy": 548.6537041287345
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_8_1791616478551",
+      "name": "6",
+      "start": {
+        "dx": -635.4521763087653,
+        "dy": -511.34629788963804
+      },
+      "end": {
+        "dx": -635.4521763087653,
+        "dy": 697.4037023059398
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_2_axis_auto_4_1791616491403",
+      "name": "7",
+      "start": {
+        "dx": -555.3730665755882,
+        "dy": -571.3462960416975
+      },
+      "end": {
+        "dx": -555.3730665755882,
+        "dy": 548.6537041287345
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_7_1791616478551",
+      "name": "8",
+      "start": {
+        "dx": -434.8271763087657,
+        "dy": -511.3462978896381
+      },
+      "end": {
+        "dx": -434.82717630876556,
+        "dy": 697.4037023059396
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_2_axis_auto_3_1791616491403",
+      "name": "9",
+      "start": {
+        "dx": -354.827192462151,
+        "dy": -571.3462960416975
+      },
+      "end": {
+        "dx": -354.8271924621509,
+        "dy": 548.6537041287345
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_1_axis_auto_6_1791616478551",
+      "name": "10",
+      "start": {
+        "dx": -184.8271739420149,
+        "dy": -511.3462978896381
+      },
+      "end": {
+        "dx": -184.8271739420148,
+        "dy": 697.4037023059396
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_1"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_2_axis_auto_2_1791616491403",
+      "name": "11",
+      "start": {
+        "dx": -104.82719236381234,
+        "dy": -571.3462960416975
+      },
+      "end": {
+        "dx": -104.82719236381229,
+        "dy": 548.6537041287345
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_2"
+      ]
+    },
+    {
+      "id": "bim_axis_storey_2_axis_auto_1_1791616491402",
+      "name": "12",
+      "start": {
+        "dx": -24.827192149475692,
+        "dy": -571.3462960416975
+      },
+      "end": {
+        "dx": -24.827192149475636,
+        "dy": 548.6537041287345
+      },
+      "bubbleAtStart": true,
+      "bubbleAtEnd": true,
+      "sourceStoreyIds": [
+        "storey_2"
+      ]
+    }
+  ]
+}

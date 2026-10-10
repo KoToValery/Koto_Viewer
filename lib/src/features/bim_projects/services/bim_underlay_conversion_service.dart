@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import '../../structural_designer/analysis/drawing_frame_detector.dart';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -42,7 +43,7 @@ class BimConversionResult {
 /// Metadata travels with the binary document, including empty analysis results.
 class BimUnderlayMetadata {
   static const key = r'$KOTO_BIM_UNDERLAY';
-  static const version = 2;
+  static const version = 3;
 
   static Map<String, dynamic>? read(DxfDocument doc) {
     final raw = doc.headerVars[key];
@@ -50,7 +51,9 @@ class BimUnderlayMetadata {
     try {
       final value = jsonDecode(raw);
       if (value is Map<String, dynamic> &&
-          (value['version'] == version || value['version'] == 1) &&
+          (value['version'] == version ||
+              value['version'] == 2 ||
+              value['version'] == 1) &&
           value['complete'] == true) {
         return value;
       }
@@ -216,10 +219,12 @@ DxfDocument _analyse(DxfDocument doc) {
 
   final walls = unique('BIM_Walls', doc.layers.keys);
   final slabs = unique('BIM_Slabs', doc.layers.keys);
-  final detected = WallAxisDetector.detect(doc);
-  final envelope = SlabEnvelopeDetector.detect(detected, document: doc);
+  final frames = DrawingFrameDetector.documentFrames(doc);
+  final analysisDoc = DrawingFrameDetector.withoutFrames(doc);
+  final detected = WallAxisDetector.detect(analysisDoc);
+  final envelope = SlabEnvelopeDetector.detect(detected, document: analysisDoc);
   final projections = SlabProjectionDetector.detect(
-    doc,
+    analysisDoc,
     envelope,
     detected.detectedScale,
     wallLayers: detected.selectedWallPairs
@@ -280,6 +285,7 @@ DxfDocument _analyse(DxfDocument doc) {
   }
   // Clone only slab branches, keeping INSERT transforms and original definitions.
   DxfEntity? slabCopy(DxfEntity entity, bool inherited, Set<String> stack) {
+    if (frames.contains(entity)) return null;
     final selected = inherited || slabLayers.contains(entity.layer);
     if (entity is DxfInsert) {
       if (stack.contains(entity.blockName)) {

@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'drawing_frame_detector.dart';
+import 'structural_underlay_source.dart';
 import 'package:flutter/material.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/structural_element.dart';
@@ -21,11 +23,14 @@ class WallAxisDetector {
 
   /// Default wall thickness in millimeters (standard European masonry wall: 25 cm).
   static const double defaultWallThicknessMm = 250.0;
+
   /// Generous tolerance (+-55 mm) to comfortably handle 20 cm concrete walls (шайби),
   /// 24-25 cm masonry (четворка/Porotherm), and 30 cm walls with plaster.
   static const double defaultThicknessToleranceMm = 55.0;
+
   /// Partition wall thickness in millimeters (standard European interior wall: 12 cm).
   static const double partitionWallThicknessMm = 120.0;
+
   /// Tolerance for partition walls (+-35 mm: 85 mm to 155 mm).
   static const double partitionThicknessToleranceMm = 35.0;
   static const double defaultMinOverlapMm = 50.0; // 5 cm min overlap
@@ -42,6 +47,7 @@ class WallAxisDetector {
     double cornerSnapRadiusMm = defaultCornerSnapRadiusMm,
     double? forceScaleFactor,
   }) {
+    document = StructuralUnderlaySource.original(document);
     // Step 1: Extract all straight segments partitioned by Layer (including blocks)
     final segmentsByLayer = _extractSegments(document);
     if (segmentsByLayer.isEmpty) {
@@ -50,7 +56,10 @@ class WallAxisDetector {
 
     // Step 2: Determine unit scale factor (CAD units per mm)
     final ({double scale, String unitName}) scaleInfo = forceScaleFactor != null
-        ? (scale: forceScaleFactor, unitName: _getUnitNameFromScale(forceScaleFactor))
+        ? (
+            scale: forceScaleFactor,
+            unitName: _getUnitNameFromScale(forceScaleFactor),
+          )
         : _autoDetectScale(
             document,
             segmentsByLayer,
@@ -78,14 +87,18 @@ class WallAxisDetector {
         }
       }
     }
-    final cutLwThreshold = maxDocLineweight >= 0.35 ? 0.22 : (maxDocLineweight - 0.07);
+    final cutLwThreshold = maxDocLineweight >= 0.35
+        ? 0.22
+        : (maxDocLineweight - 0.07);
 
     final List<LayerColorGroupResult> evaluatedGroups = [];
 
     for (final entry in segmentsByLayer.entries) {
       var segments = entry.value;
       if (maxDocLineweight >= 0.25) {
-        segments = segments.where((s) => s.lineweight >= cutLwThreshold).toList();
+        segments = segments
+            .where((s) => s.lineweight >= cutLwThreshold)
+            .toList();
       }
       if (segments.length < 2) continue;
 
@@ -116,11 +129,17 @@ class WallAxisDetector {
       // Avoid duplicate pairs if tolerances overlap
       final pairs = <WallPairCandidate>[...pairs25];
       for (final p12 in pairs12) {
-        final isDup = pairs.any((p) =>
-            ((p.centerlineStart - p12.centerlineStart).distance < toleranceCad &&
-             (p.centerlineEnd - p12.centerlineEnd).distance < toleranceCad) ||
-            ((p.centerlineStart - p12.centerlineEnd).distance < toleranceCad &&
-             (p.centerlineEnd - p12.centerlineStart).distance < toleranceCad));
+        final isDup = pairs.any(
+          (p) =>
+              ((p.centerlineStart - p12.centerlineStart).distance <
+                      toleranceCad &&
+                  (p.centerlineEnd - p12.centerlineEnd).distance <
+                      toleranceCad) ||
+              ((p.centerlineStart - p12.centerlineEnd).distance <
+                      toleranceCad &&
+                  (p.centerlineEnd - p12.centerlineStart).distance <
+                      toleranceCad),
+        );
         if (!isDup) {
           pairs.add(p12);
         }
@@ -159,28 +178,41 @@ class WallAxisDetector {
               final d2 = (p1.centerlineStart - p2.centerlineEnd).distance;
               final d3 = (p1.centerlineEnd - p2.centerlineStart).distance;
               final d4 = (p1.centerlineEnd - p2.centerlineEnd).distance;
-              if (d1 <= snapRadiusCad || d2 <= snapRadiusCad || d3 <= snapRadiusCad || d4 <= snapRadiusCad) {
+              if (d1 <= snapRadiusCad ||
+                  d2 <= snapRadiusCad ||
+                  d3 <= snapRadiusCad ||
+                  d4 <= snapRadiusCad) {
                 cornerConnections++;
                 break;
               }
             }
           }
         }
-        final connRatio = pairs.isNotEmpty ? (cornerConnections / pairs.length) : 0.0;
+        final connRatio = pairs.isNotEmpty
+            ? (cornerConnections / pairs.length)
+            : 0.0;
         final networkBonus = 1.0 + (connRatio * 1.5);
 
         // Check soft keywords (title block, sheet border, furniture, hatch -> penalty)
         double keywordMultiplier = 1.0;
         final lowerName = layerName.toLowerCase();
         if (_isClutterOrBorderLayer(lowerName)) {
-          keywordMultiplier = 0.1; // Soft penalty for title block, format, borders
+          keywordMultiplier =
+              0.1; // Soft penalty for title block, format, borders
         }
 
         // Score: combines total length, pair count diversity, layout quality, and topological connectivity
         final pairFactor = 1.0 + math.sqrt(pairs.length);
-        final score = totalOverlap * pairFactor * layoutBonus * networkBonus * keywordMultiplier;
+        final score =
+            totalOverlap *
+            pairFactor *
+            layoutBonus *
+            networkBonus *
+            keywordMultiplier;
 
-        final avgLw = segments.fold<double>(0.0, (sum, s) => sum + s.lineweight) / segments.length;
+        final avgLw =
+            segments.fold<double>(0.0, (sum, s) => sum + s.lineweight) /
+            segments.length;
         evaluatedGroups.add(
           LayerColorGroupResult(
             layerName: layerName,
@@ -251,9 +283,14 @@ class WallAxisDetector {
     for (int i = 1; i < evaluatedGroups.length; i++) {
       final g = evaluatedGroups[i];
       if (activeGroups.contains(g)) continue;
-      final isShearOrCol = StructuralColumnDetector.matchesColumnKeyword(g.layerName) ||
-          detectedColumns.any((c) => c.sourceLayer == g.layerName && c.isShearWall);
-      if (isShearOrCol && g.pairCount >= 1 && !_isClutterOrBorderLayer(g.layerName.toLowerCase())) {
+      final isShearOrCol =
+          StructuralColumnDetector.matchesColumnKeyword(g.layerName) ||
+          detectedColumns.any(
+            (c) => c.sourceLayer == g.layerName && c.isShearWall,
+          );
+      if (isShearOrCol &&
+          g.pairCount >= 1 &&
+          !_isClutterOrBorderLayer(g.layerName.toLowerCase())) {
         activeGroups.add(g);
         allPairs.addAll(g.wallPairs);
       }
@@ -270,7 +307,10 @@ class WallAxisDetector {
         // 12 cm partition walls (преградни стени) are kept for wall contours, room detection, and slab boundaries,
         // but must NOT generate dynamic structural grid axes.
         final thicknessMm = pair.perpendicularDistance / scale;
-        final minStructuralMm = math.min(180.0, targetThicknessMm - thicknessToleranceMm);
+        final minStructuralMm = math.min(
+          180.0,
+          targetThicknessMm - thicknessToleranceMm,
+        );
         if (thicknessMm >= minStructuralMm) {
           rawCenterlines.add((pair.centerlineStart, pair.centerlineEnd));
         }
@@ -279,6 +319,7 @@ class WallAxisDetector {
           allPairs,
           wallContourSegments,
           closureSegments,
+          scale,
         );
       }
     }
@@ -286,8 +327,20 @@ class WallAxisDetector {
     // Add perimeter faces of all detected columns and shear walls to wall contour & closure
     for (final col in detectedColumns) {
       for (final seg in col.boundarySegments) {
-        _addSegmentUnique(wallContourSegments, seg.$1, seg.$2);
-        _addSegmentUnique(closureSegments, seg.$1, seg.$2);
+        _addSegmentUnique(
+          wallContourSegments,
+          seg.$1,
+          seg.$2,
+          tol: 5 * scale,
+          minLength: scale,
+        );
+        _addSegmentUnique(
+          closureSegments,
+          seg.$1,
+          seg.$2,
+          tol: 5 * scale,
+          minLength: scale,
+        );
       }
     }
 
@@ -403,7 +456,8 @@ class WallAxisDetector {
 
       // Snap near horizontal / vertical to exact 0.0 and pi/2
       const snapThreshold = 8.0 * math.pi / 180.0;
-      if (refAngle < snapThreshold || (refAngle - math.pi).abs() < snapThreshold) {
+      if (refAngle < snapThreshold ||
+          (refAngle - math.pi).abs() < snapThreshold) {
         refAngle = 0.0;
       } else if ((refAngle - math.pi / 2.0).abs() < snapThreshold) {
         refAngle = math.pi / 2.0;
@@ -428,12 +482,28 @@ class WallAxisDetector {
         final t1 = line.$1.dx * cosA + line.$1.dy * sinA;
         final t2 = line.$2.dx * cosA + line.$2.dy * sinA;
         final len = (line.$2 - line.$1).distance;
-        return (line: line, d: d, length: len, tMin: math.min(t1, t2), tMax: math.max(t1, t2));
-      }).toList()
-        ..sort((a, b) => a.d.compareTo(b.d));
+        return (
+          line: line,
+          d: d,
+          length: len,
+          tMin: math.min(t1, t2),
+          tMax: math.max(t1, t2),
+        );
+      }).toList()..sort((a, b) => a.d.compareTo(b.d));
 
       // Cluster collinear lines along the same alignment
-      final initialClusters = <List<({(Offset, Offset) line, double d, double length, double tMin, double tMax})>>[];
+      final initialClusters =
+          <
+            List<
+              ({
+                (Offset, Offset) line,
+                double d,
+                double length,
+                double tMin,
+                double tMax,
+              })
+            >
+          >[];
       var curCluster = [withD.first];
       double clusterBaseD = withD.first.d;
       for (int i = 1; i < withD.length; i++) {
@@ -448,15 +518,28 @@ class WallAxisDetector {
       initialClusters.add(curCluster);
 
       // Merge clusters whose weighted average offsets are within collinearTolCad
-      final clusters = <List<({(Offset, Offset) line, double d, double length, double tMin, double tMax})>>[];
+      final clusters =
+          <
+            List<
+              ({
+                (Offset, Offset) line,
+                double d,
+                double length,
+                double tMin,
+                double tMax,
+              })
+            >
+          >[];
       for (final c in initialClusters) {
         if (clusters.isEmpty) {
           clusters.add(c);
         } else {
           final prev = clusters.last;
-          final prevAvgD = prev.fold<double>(0.0, (sum, it) => sum + it.d * it.length) /
+          final prevAvgD =
+              prev.fold<double>(0.0, (sum, it) => sum + it.d * it.length) /
               prev.fold<double>(0.0, (sum, it) => sum + it.length);
-          final curAvgD = c.fold<double>(0.0, (sum, it) => sum + it.d * it.length) /
+          final curAvgD =
+              c.fold<double>(0.0, (sum, it) => sum + it.d * it.length) /
               c.fold<double>(0.0, (sum, it) => sum + it.length);
           if ((curAvgD - prevAvgD).abs() <= collinearTolCad) {
             prev.addAll(c);
@@ -479,8 +562,11 @@ class WallAxisDetector {
           clusterMaxT = math.max(clusterMaxT, item.tMax);
         }
 
-        final isOrthogonal = refAngle == 0.0 || (refAngle - math.pi / 2.0).abs() < 1e-4;
-        final minReqLength = isOrthogonal ? minTotalWallLengthCad : math.max(minTotalWallLengthCad, 1500.0 * scale);
+        final isOrthogonal =
+            refAngle == 0.0 || (refAngle - math.pi / 2.0).abs() < 1e-4;
+        final minReqLength = isOrthogonal
+            ? minTotalWallLengthCad
+            : math.max(minTotalWallLengthCad, 1500.0 * scale);
         // Filter out tiny artifacts below minimum wall length
         if (totalLen < minReqLength && minReqLength > 0) {
           continue;
@@ -588,8 +674,12 @@ class WallAxisDetector {
     // 4b. Inject transverse closing caps directly into the ORIGINAL wall layer
     // (e.g. 'стени'), so walls are closed when viewing the architectural underlay!
     final origWallLayer = result.bestGroup?.layerName;
-    if (origWallLayer != null && origWallLayer != wallLayerName && document.layers.containsKey(origWallLayer)) {
-      final caps = result.closureSegments.isNotEmpty ? result.closureSegments : result.wallContourSegments;
+    if (origWallLayer != null &&
+        origWallLayer != wallLayerName &&
+        document.layers.containsKey(origWallLayer)) {
+      final caps = result.closureSegments.isNotEmpty
+          ? result.closureSegments
+          : result.wallContourSegments;
       for (final cap in caps) {
         bool exists = false;
         for (final e in document.entities) {
@@ -648,10 +738,24 @@ class WallAxisDetector {
   }) {
     bool isAxisLayer(String name) {
       final n = name.trim().toLowerCase();
-      if (axisLayerName.isNotEmpty && n == axisLayerName.toLowerCase()) return true;
-      const keywords = ['axis', 'axes', 'grid', 'grids', 'grid_axes', 'gridaxes', 'оси', 'ос'];
+      if (axisLayerName.isNotEmpty && n == axisLayerName.toLowerCase()) {
+        return true;
+      }
+      const keywords = [
+        'axis',
+        'axes',
+        'grid',
+        'grids',
+        'grid_axes',
+        'gridaxes',
+        'оси',
+        'ос',
+      ];
       for (final kw in keywords) {
-        if (n == kw || n.startsWith('${kw}_') || n.startsWith('$kw-') || n.endsWith('_$kw')) {
+        if (n == kw ||
+            n.startsWith('${kw}_') ||
+            n.startsWith('$kw-') ||
+            n.endsWith('_$kw')) {
           return true;
         }
       }
@@ -681,10 +785,12 @@ class WallAxisDetector {
     final clusters = <List<DxfLine>>[];
     for (final line in axisLines) {
       bool added = false;
-      final isHoriz = (line.p2.dy - line.p1.dy).abs() < (line.p2.dx - line.p1.dx).abs();
+      final isHoriz =
+          (line.p2.dy - line.p1.dy).abs() < (line.p2.dx - line.p1.dx).abs();
       for (final cluster in clusters) {
         final c0 = cluster.first;
-        final cHoriz = (c0.p2.dy - c0.p1.dy).abs() < (c0.p2.dx - c0.p1.dx).abs();
+        final cHoriz =
+            (c0.p2.dy - c0.p1.dy).abs() < (c0.p2.dx - c0.p1.dx).abs();
         if (isHoriz == cHoriz) {
           if (isHoriz) {
             final y0 = (c0.p1.dy + c0.p2.dy) / 2.0;
@@ -714,8 +820,12 @@ class WallAxisDetector {
 
     for (final cluster in clusters) {
       autoIdx++;
-      final isHoriz = (cluster.first.p2.dy - cluster.first.p1.dy).abs() < (cluster.first.p2.dx - cluster.first.p1.dx).abs();
-      double minCoord = double.infinity, maxCoord = -double.infinity, fixedCoord = 0;
+      final isHoriz =
+          (cluster.first.p2.dy - cluster.first.p1.dy).abs() <
+          (cluster.first.p2.dx - cluster.first.p1.dx).abs();
+      double minCoord = double.infinity,
+          maxCoord = -double.infinity,
+          fixedCoord = 0;
       for (final l in cluster) {
         if (isHoriz) {
           minCoord = math.min(minCoord, math.min(l.p1.dx, l.p2.dx));
@@ -728,8 +838,12 @@ class WallAxisDetector {
         }
       }
       fixedCoord /= cluster.length;
-      final pStart = isHoriz ? Offset(minCoord, fixedCoord) : Offset(fixedCoord, minCoord);
-      final pEnd = isHoriz ? Offset(maxCoord, fixedCoord) : Offset(fixedCoord, maxCoord);
+      final pStart = isHoriz
+          ? Offset(minCoord, fixedCoord)
+          : Offset(fixedCoord, minCoord);
+      final pEnd = isHoriz
+          ? Offset(maxCoord, fixedCoord)
+          : Offset(fixedCoord, maxCoord);
 
       String name = '$autoIdx';
       double bestDist = double.infinity;
@@ -755,10 +869,32 @@ class WallAxisDetector {
     }
 
     if (foundAnyDrawingLabel) {
-      final verticalAxes = rawAxes.where((a) => (a.end.dx - a.start.dx).abs() <= (a.end.dy - a.start.dy).abs()).toList()
-        ..sort((a, b) => ((a.start.dx + a.end.dx) / 2.0).compareTo((b.start.dx + b.end.dx) / 2.0));
-      final horizontalAxes = rawAxes.where((a) => (a.end.dx - a.start.dx).abs() > (a.end.dy - a.start.dy).abs()).toList()
-        ..sort((a, b) => ((b.start.dy + b.end.dy) / 2.0).compareTo((a.start.dy + a.end.dy) / 2.0));
+      final verticalAxes =
+          rawAxes
+              .where(
+                (a) =>
+                    (a.end.dx - a.start.dx).abs() <=
+                    (a.end.dy - a.start.dy).abs(),
+              )
+              .toList()
+            ..sort(
+              (a, b) => ((a.start.dx + a.end.dx) / 2.0).compareTo(
+                (b.start.dx + b.end.dx) / 2.0,
+              ),
+            );
+      final horizontalAxes =
+          rawAxes
+              .where(
+                (a) =>
+                    (a.end.dx - a.start.dx).abs() >
+                    (a.end.dy - a.start.dy).abs(),
+              )
+              .toList()
+            ..sort(
+              (a, b) => ((b.start.dy + b.end.dy) / 2.0).compareTo(
+                (a.start.dy + a.end.dy) / 2.0,
+              ),
+            );
       return [...verticalAxes, ...horizontalAxes];
     }
 
@@ -769,18 +905,80 @@ class WallAxisDetector {
 
   static bool _isClutterOrBorderLayer(String lowerName) {
     const clutter = [
-      'антетка', 'antetka', 'рамка', 'ramka', 'border', 'title',
-      'sheet', 'лист', 'format', 'формат', 'stamp', 'печат',
-      'defpoints', 'dim', 'размер', 'размери', 'hatch', 'штрих', 'щрих',
-      'furn', 'мебел', 'обзавеждане', 'interior',
-      'text', 'текст', 'надпис', 'надписи',
-      'линии', 'линия', 'lines', 'line',
-      'стълби', 'стълба', 'стълбище', 'stairs', 'stair', 'staircase', 'steps',
-      'парапет', 'парапети', 'railing', 'railings', 'balustrade', 'handrail',
-      'котировки', 'котировка', 'коти', 'кота', 'elev', 'elevation', 'разрези', 'разрез', 'section', 'sections',
-      'изолац', 'изолация', 'insul', 'insulation', 'xps', 'eps', 'стиропор', 'вата', 'термо',
-      'таблица', 'таблици', 'table', 'подпис', 'подписи', 'sign',
-      'сан', 'plumb', 'санитария', 'elec', 'ел',
+      'антетка',
+      'antetka',
+      'рамка',
+      'ramka',
+      'border',
+      'title',
+      'sheet',
+      'лист',
+      'format',
+      'формат',
+      'stamp',
+      'печат',
+      'defpoints',
+      'dim',
+      'размер',
+      'размери',
+      'hatch',
+      'штрих',
+      'щрих',
+      'furn',
+      'мебел',
+      'обзавеждане',
+      'interior',
+      'text',
+      'текст',
+      'надпис',
+      'надписи',
+      'линии',
+      'линия',
+      'lines',
+      'line',
+      'стълби',
+      'стълба',
+      'стълбище',
+      'stairs',
+      'stair',
+      'staircase',
+      'steps',
+      'парапет',
+      'парапети',
+      'railing',
+      'railings',
+      'balustrade',
+      'handrail',
+      'котировки',
+      'котировка',
+      'коти',
+      'кота',
+      'elev',
+      'elevation',
+      'разрези',
+      'разрез',
+      'section',
+      'sections',
+      'изолац',
+      'изолация',
+      'insul',
+      'insulation',
+      'xps',
+      'eps',
+      'стиропор',
+      'вата',
+      'термо',
+      'таблица',
+      'таблици',
+      'table',
+      'подпис',
+      'подписи',
+      'sign',
+      'сан',
+      'plumb',
+      'санитария',
+      'elec',
+      'ел',
     ];
     for (final kw in clutter) {
       if (lowerName.contains(kw)) return true;
@@ -799,7 +997,8 @@ class WallAxisDetector {
 
     // 1. Same layer with a different color (e.g. orange EPS lines drawn on layer "стени"):
     // In CAD standards, secondary accent colors on the primary wall layer represent insulation/finishes.
-    final sameLayer = candidate.layerName.toLowerCase() == primary.layerName.toLowerCase() &&
+    final sameLayer =
+        candidate.layerName.toLowerCase() == primary.layerName.toLowerCase() &&
         candidate.colorIndex != primary.colorIndex;
 
     int adjacentStripCount = 0;
@@ -814,8 +1013,11 @@ class WallAxisDetector {
       final candMid = (candPair.centerlineStart + candPair.centerlineEnd) / 2.0;
       final candD = candMid.dx * n.dx + candMid.dy * n.dy;
 
-      final candT1 = candPair.centerlineStart.dx * u.dx + candPair.centerlineStart.dy * u.dy;
-      final candT2 = candPair.centerlineEnd.dx * u.dx + candPair.centerlineEnd.dy * u.dy;
+      final candT1 =
+          candPair.centerlineStart.dx * u.dx +
+          candPair.centerlineStart.dy * u.dy;
+      final candT2 =
+          candPair.centerlineEnd.dx * u.dx + candPair.centerlineEnd.dy * u.dy;
       final candTMin = math.min(candT1, candT2);
       final candTMax = math.max(candT1, candT2);
 
@@ -826,17 +1028,23 @@ class WallAxisDetector {
         if (diff > 90.0) diff = (180.0 - diff).abs();
 
         if (diff <= 10.0) {
-          final primMid = (primPair.centerlineStart + primPair.centerlineEnd) / 2.0;
+          final primMid =
+              (primPair.centerlineStart + primPair.centerlineEnd) / 2.0;
           final primD = primMid.dx * n.dx + primMid.dy * n.dy;
           final perpDist = (candD - primD).abs();
 
           if (perpDist <= maxOffsetCad) {
-            final primT1 = primPair.centerlineStart.dx * u.dx + primPair.centerlineStart.dy * u.dy;
-            final primT2 = primPair.centerlineEnd.dx * u.dx + primPair.centerlineEnd.dy * u.dy;
+            final primT1 =
+                primPair.centerlineStart.dx * u.dx +
+                primPair.centerlineStart.dy * u.dy;
+            final primT2 =
+                primPair.centerlineEnd.dx * u.dx +
+                primPair.centerlineEnd.dy * u.dy;
             final primTMin = math.min(primT1, primT2);
             final primTMax = math.max(primT1, primT2);
 
-            final overlap = math.min(candTMax, primTMax) - math.max(candTMin, primTMin);
+            final overlap =
+                math.min(candTMax, primTMax) - math.max(candTMin, primTMin);
             if (overlap > -50.0 * scale) {
               adjacentStripCount++;
               break;
@@ -854,8 +1062,13 @@ class WallAxisDetector {
     }
 
     // If on a different layer, but >= 50% of pairs are thin strips running adjacent to primary walls
-    final avgThicknessMm = candidate.wallPairs.fold<double>(0.0, (sum, p) => sum + p.perpendicularDistance) /
-        candidate.wallPairs.length / scale;
+    final avgThicknessMm =
+        candidate.wallPairs.fold<double>(
+          0.0,
+          (sum, p) => sum + p.perpendicularDistance,
+        ) /
+        candidate.wallPairs.length /
+        scale;
     if (avgThicknessMm <= 160.0 && adjacentRatio >= 0.50) {
       return true;
     }
@@ -871,12 +1084,14 @@ class WallAxisDetector {
   }
 
   @visibleForTesting
-  static Map<String, List<WallSegment>> extractSegmentsForTesting(DxfDocument document) =>
-      _extractSegments(document);
+  static Map<String, List<WallSegment>> extractSegmentsForTesting(
+    DxfDocument document,
+  ) => _extractSegments(document);
 
   /// Extracts straight segments from document, grouped primarily by Layer.
   /// Unpacks block references (INSERT) to ensure block geometry is fully captured.
   static Map<String, List<WallSegment>> _extractSegments(DxfDocument document) {
+    document = DrawingFrameDetector.withoutFrames(document);
     final segmentsByLayer = <String, List<WallSegment>>{};
     final entities = document.layoutEntities['Model'] ?? document.entities;
 
@@ -899,14 +1114,18 @@ class WallAxisDetector {
     Map<String, List<WallSegment>> map,
   ) {
     final layerObj = document.layers[entity.layer];
-    final resolvedColorIndex = (entity.colorIndex != null &&
+    final resolvedColorIndex =
+        (entity.colorIndex != null &&
             entity.colorIndex != 256 &&
             entity.colorIndex != 0)
         ? entity.colorIndex
         : layerObj?.colorIndex ?? 7;
     final resolvedTrueColor = entity.trueColor ?? layerObj?.trueColor;
-    final double layerLw = layerObj?.effectiveLineweight ?? (layerObj?.isThick == true ? 0.70 : 0.0);
-    final resolvedLineweight = (entity.lineWeight != null && entity.lineWeight! > 0)
+    final double layerLw =
+        layerObj?.effectiveLineweight ??
+        (layerObj?.isThick == true ? 0.70 : 0.0);
+    final resolvedLineweight =
+        (entity.lineWeight != null && entity.lineWeight! > 0)
         ? entity.lineWeight!
         : layerLw;
 
@@ -1028,14 +1247,19 @@ class WallAxisDetector {
           : child.layer;
 
       final layerObj = document.layers[effectiveLayer];
-      final resolvedColor = child.colorIndex ?? insert.colorIndex ?? layerObj?.colorIndex ?? 7;
-      final resolvedTrueColor = child.trueColor ?? insert.trueColor ?? layerObj?.trueColor;
-      final double layerLw = layerObj?.effectiveLineweight ?? (layerObj?.isThick == true ? 0.70 : 0.0);
-      final resolvedLineweight = (child.lineWeight != null && child.lineWeight! > 0)
+      final resolvedColor =
+          child.colorIndex ?? insert.colorIndex ?? layerObj?.colorIndex ?? 7;
+      final resolvedTrueColor =
+          child.trueColor ?? insert.trueColor ?? layerObj?.trueColor;
+      final double layerLw =
+          layerObj?.effectiveLineweight ??
+          (layerObj?.isThick == true ? 0.70 : 0.0);
+      final resolvedLineweight =
+          (child.lineWeight != null && child.lineWeight! > 0)
           ? child.lineWeight!
           : (insert.lineWeight != null && insert.lineWeight! > 0)
-              ? insert.lineWeight!
-              : layerLw;
+          ? insert.lineWeight!
+          : layerLw;
 
       if (child is DxfLine) {
         _addSegmentIfValid(
@@ -1065,7 +1289,9 @@ class WallAxisDetector {
               );
             }
           }
-          if (child.isClosed && vertices.length > 2 && vertices.last.bulge.abs() < 1e-5) {
+          if (child.isClosed &&
+              vertices.length > 2 &&
+              vertices.last.bulge.abs() < 1e-5) {
             _addSegmentIfValid(
               map,
               transform(Offset(vertices.last.x, vertices.last.y)),
@@ -1182,7 +1408,9 @@ class WallAxisDetector {
         final segments = entry.value;
         if (segments.length < 2) continue;
         final firstSeg = segments.first;
-        if (_isClutterOrBorderLayer(firstSeg.sourceLayer.toLowerCase())) continue;
+        if (_isClutterOrBorderLayer(firstSeg.sourceLayer.toLowerCase())) {
+          continue;
+        }
 
         final pairs = _findParallelPairs(
           segments,
@@ -1209,8 +1437,7 @@ class WallAxisDetector {
   static List<WallSegment> mergeCollinearSegmentsForTesting(
     List<WallSegment> segments,
     double toleranceCad,
-  ) =>
-      _mergeCollinearSegments(segments, toleranceCad);
+  ) => _mergeCollinearSegments(segments, toleranceCad);
 
   @visibleForTesting
   static List<WallPairCandidate> findParallelPairsForTesting(
@@ -1220,23 +1447,21 @@ class WallAxisDetector {
     double minOverlapCad, {
     Rect? documentBounds,
     bool checkIntermediate = true,
-  }) =>
-      _findParallelPairs(
-        segments,
-        targetDistanceCad,
-        toleranceCad,
-        minOverlapCad,
-        documentBounds: documentBounds,
-        checkIntermediate: checkIntermediate,
-      );
+  }) => _findParallelPairs(
+    segments,
+    targetDistanceCad,
+    toleranceCad,
+    minOverlapCad,
+    documentBounds: documentBounds,
+    checkIntermediate: checkIntermediate,
+  );
 
   @visibleForTesting
   static List<(Offset, Offset)> bridgeOpeningsForTesting(
     List<(Offset, Offset)> rawAxes,
     double maxBridgeGapCad,
     double toleranceCad,
-  ) =>
-      _bridgeOpenings(rawAxes, maxBridgeGapCad, toleranceCad);
+  ) => _bridgeOpenings(rawAxes, maxBridgeGapCad, toleranceCad);
 
   /// Merges touching or overlapping collinear segments in the same layer.
   static List<WallSegment> _mergeCollinearSegments(
@@ -1302,8 +1527,7 @@ class WallAxisDetector {
           final mid = (s.start + s.end) / 2.0;
           final d = -mid.dx * sinA + mid.dy * cosA;
           return (tMin: math.min(t1, t2), tMax: math.max(t1, t2), d: d, seg: s);
-        }).toList()
-          ..sort((a, b) => a.tMin.compareTo(b.tMin));
+        }).toList()..sort((a, b) => a.tMin.compareTo(b.tMin));
 
         double curTMin = intervals.first.tMin;
         double curTMax = intervals.first.tMax;
@@ -1427,14 +1651,8 @@ class WallAxisDetector {
         final d = -mid.dx * sinA + mid.dy * cosA;
         final t1 = s.start.dx * cosA + s.start.dy * sinA;
         final t2 = s.end.dx * cosA + s.end.dy * sinA;
-        return (
-          seg: s,
-          d: d,
-          tMin: math.min(t1, t2),
-          tMax: math.max(t1, t2),
-        );
-      }).toList()
-        ..sort((a, b) => a.d.compareTo(b.d));
+        return (seg: s, d: d, tMin: math.min(t1, t2), tMax: math.max(t1, t2));
+      }).toList()..sort((a, b) => a.d.compareTo(b.d));
 
       final n = projected.length;
       for (int i = 0; i < n; i++) {
@@ -1491,7 +1709,8 @@ class WallAxisDetector {
               for (int k = i + 1; k < j; k++) {
                 final sk = projected[k];
                 if (sk.d > s1.d + margin && sk.d < s2.d - margin) {
-                  final kOverlap = math.min(tEnd, sk.tMax) - math.max(tStart, sk.tMin);
+                  final kOverlap =
+                      math.min(tEnd, sk.tMax) - math.max(tStart, sk.tMin);
                   if (kOverlap >= math.min(minOverlapCad * 0.35, dist * 0.20)) {
                     hasIntermediate = true;
                     break;
@@ -1536,14 +1755,20 @@ class WallAxisDetector {
     if (pairs.length > 2) {
       final partnersMap = <WallSegment, List<double>>{};
       for (final p in pairs) {
-        partnersMap.putIfAbsent(p.segmentA, () => []).add(p.perpendicularDistance);
-        partnersMap.putIfAbsent(p.segmentB, () => []).add(-p.perpendicularDistance);
+        partnersMap
+            .putIfAbsent(p.segmentA, () => [])
+            .add(p.perpendicularDistance);
+        partnersMap
+            .putIfAbsent(p.segmentB, () => [])
+            .add(-p.perpendicularDistance);
       }
       pairs.removeWhere((p) {
         final aPartners = partnersMap[p.segmentA] ?? [];
         final bPartners = partnersMap[p.segmentB] ?? [];
-        final aHasBoth = aPartners.any((d) => d > 0) && aPartners.any((d) => d < 0);
-        final bHasBoth = bPartners.any((d) => d > 0) && bPartners.any((d) => d < 0);
+        final aHasBoth =
+            aPartners.any((d) => d > 0) && aPartners.any((d) => d < 0);
+        final bHasBoth =
+            bPartners.any((d) => d > 0) && bPartners.any((d) => d < 0);
         return aHasBoth && bHasBoth;
       });
     }
@@ -1562,19 +1787,27 @@ class WallAxisDetector {
     final double docWidth = docBounds.width.abs();
     final double docHeight = docBounds.height.abs();
     // A drawing must be significantly larger than a single wall to have sheet margins
-    if (docWidth < targetDistCad * 8 || docHeight < targetDistCad * 8) return false;
+    if (docWidth < targetDistCad * 8 || docHeight < targetDistCad * 8) {
+      return false;
+    }
 
     final double deg = s.angleRad * 180.0 / math.pi;
     if (deg < 15.0 || deg > 165.0) {
       if (s.length >= docWidth * 0.60) {
         final double midY = (s.start.dy + s.end.dy) / 2.0;
-        final double dEdge = math.min((midY - docBounds.top).abs(), (midY - docBounds.bottom).abs());
+        final double dEdge = math.min(
+          (midY - docBounds.top).abs(),
+          (midY - docBounds.bottom).abs(),
+        );
         if (dEdge <= docHeight * 0.06) return true;
       }
     } else if (deg > 75.0 && deg < 105.0) {
       if (s.length >= docHeight * 0.60) {
         final double midX = (s.start.dx + s.end.dx) / 2.0;
-        final double dEdge = math.min((midX - docBounds.left).abs(), (midX - docBounds.right).abs());
+        final double dEdge = math.min(
+          (midX - docBounds.left).abs(),
+          (midX - docBounds.right).abs(),
+        );
         if (dEdge <= docWidth * 0.06) return true;
       }
     }
@@ -1673,8 +1906,7 @@ class WallAxisDetector {
           final mid = (s.start + s.end) / 2.0;
           final d = -mid.dx * sinA + mid.dy * cosA;
           return (tMin: math.min(t1, t2), tMax: math.max(t1, t2), d: d, seg: s);
-        }).toList()
-          ..sort((a, b) => a.tMin.compareTo(b.tMin));
+        }).toList()..sort((a, b) => a.tMin.compareTo(b.tMin));
 
         double curTMin = intervals.first.tMin;
         double curTMax = intervals.first.tMax;
@@ -1690,12 +1922,16 @@ class WallAxisDetector {
             curD = (curD + next.d) / 2.0;
           } else {
             // Commit previous segment
-            bridgedAxes.add(
-              (
-                Offset(curTMin * cosA - curD * sinA, curTMin * sinA + curD * cosA),
-                Offset(curTMax * cosA - curD * sinA, curTMax * sinA + curD * cosA),
+            bridgedAxes.add((
+              Offset(
+                curTMin * cosA - curD * sinA,
+                curTMin * sinA + curD * cosA,
               ),
-            );
+              Offset(
+                curTMax * cosA - curD * sinA,
+                curTMax * sinA + curD * cosA,
+              ),
+            ));
             curTMin = next.tMin;
             curTMax = next.tMax;
             curD = next.d;
@@ -1703,12 +1939,10 @@ class WallAxisDetector {
         }
 
         // Commit trailing segment
-        bridgedAxes.add(
-          (
-            Offset(curTMin * cosA - curD * sinA, curTMin * sinA + curD * cosA),
-            Offset(curTMax * cosA - curD * sinA, curTMax * sinA + curD * cosA),
-          ),
-        );
+        bridgedAxes.add((
+          Offset(curTMin * cosA - curD * sinA, curTMin * sinA + curD * cosA),
+          Offset(curTMax * cosA - curD * sinA, curTMax * sinA + curD * cosA),
+        ));
       }
     }
 
@@ -1784,15 +2018,13 @@ class WallAxisDetector {
           if (lenSq < 1e-6) return;
 
           final double t =
-              (((pt.dx - b.p1.dx) * abX + (pt.dy - b.p1.dy) * abY) / lenSq).clamp(0.0, 1.0);
+              (((pt.dx - b.p1.dx) * abX + (pt.dy - b.p1.dy) * abY) / lenSq)
+                  .clamp(0.0, 1.0);
           final Offset proj = Offset(b.p1.dx + t * abX, b.p1.dy + t * abY);
           final double dist = (pt - proj).distance;
 
           if (dist <= snapRadiusCad && t > 0.05 && t < 0.95) {
-            lines[i] = (
-              p1: isStart ? proj : a.p1,
-              p2: isStart ? a.p2 : proj,
-            );
+            lines[i] = (p1: isStart ? proj : a.p1, p2: isStart ? a.p2 : proj);
           }
         }
 
@@ -1824,11 +2056,20 @@ class WallAxisDetector {
   }
 
   /// Computes transverse closing end caps (jamb lines) for a given list of wall pair candidates.
-  static List<(Offset, Offset)> computeClosureSegmentsForPairs(List<WallPairCandidate> pairs) {
+  static List<(Offset, Offset)> computeClosureSegmentsForPairs(
+    List<WallPairCandidate> pairs, {
+    double cadUnitsPerMillimetre = 1,
+  }) {
     final closures = <(Offset, Offset)>[];
     final dummyContours = <(Offset, Offset)>[];
     for (final pair in pairs) {
-      _collectWallContourWithEndCaps(pair, pairs, dummyContours, closures);
+      _collectWallContourWithEndCaps(
+        pair,
+        pairs,
+        dummyContours,
+        closures,
+        cadUnitsPerMillimetre,
+      );
     }
     return closures;
   }
@@ -1840,6 +2081,7 @@ class WallAxisDetector {
     List<WallPairCandidate> allPairs,
     List<(Offset, Offset)> wallContourSegments, [
     List<(Offset, Offset)>? closureSegments,
+    double scale = 1,
   ]) {
     final sA = pair.segmentA;
     final sB = pair.segmentB;
@@ -1872,14 +2114,32 @@ class WallAxisDetector {
 
     if (tEnd <= tStart) {
       // Degenerate/no overlap, preserve original segments
-      _addSegmentUnique(wallContourSegments, sA.start, sA.end);
-      _addSegmentUnique(wallContourSegments, sB.start, sB.end);
+      _addSegmentUnique(
+        wallContourSegments,
+        sA.start,
+        sA.end,
+        tol: 5 * scale,
+        minLength: scale,
+      );
+      _addSegmentUnique(
+        wallContourSegments,
+        sB.start,
+        sB.end,
+        tol: 5 * scale,
+        minLength: scale,
+      );
       return;
     }
 
     // Perpendicular face points at the start of the mutual overlap
-    final pAStart = Offset(tStart * cosA - dA * sinA, tStart * sinA + dA * cosA);
-    final pBStart = Offset(tStart * cosA - dB * sinA, tStart * sinA + dB * cosA);
+    final pAStart = Offset(
+      tStart * cosA - dA * sinA,
+      tStart * sinA + dA * cosA,
+    );
+    final pBStart = Offset(
+      tStart * cosA - dB * sinA,
+      tStart * sinA + dB * cosA,
+    );
     final midStart = (pAStart + pBStart) / 2.0;
 
     // Perpendicular face points at the end of the mutual overlap
@@ -1890,15 +2150,33 @@ class WallAxisDetector {
     final wallThickness = pair.perpendicularDistance;
 
     // Check if start is an open jamb/opening or a corner/junction
-    final bool isStartCorner = _isCornerOrJunction(midStart, u, wallThickness, allPairs, pair);
+    final bool isStartCorner = _isCornerOrJunction(
+      midStart,
+      u,
+      wallThickness,
+      allPairs,
+      pair,
+    );
     final Offset faceAStart;
     final Offset faceBStart;
 
     if (!isStartCorner) {
       // Open end (door/window opening or free wall end): close with transverse cap
-      _addSegmentUnique(wallContourSegments, pAStart, pBStart);
+      _addSegmentUnique(
+        wallContourSegments,
+        pAStart,
+        pBStart,
+        tol: 5 * scale,
+        minLength: scale,
+      );
       if (closureSegments != null) {
-        _addSegmentUnique(closureSegments, pAStart, pBStart);
+        _addSegmentUnique(
+          closureSegments,
+          pAStart,
+          pBStart,
+          tol: 5 * scale,
+          minLength: scale,
+        );
       }
       faceAStart = pAStart;
       faceBStart = pBStart;
@@ -1909,15 +2187,33 @@ class WallAxisDetector {
     }
 
     // Check if end is an open jamb/opening or a corner/junction
-    final bool isEndCorner = _isCornerOrJunction(midEnd, u, wallThickness, allPairs, pair);
+    final bool isEndCorner = _isCornerOrJunction(
+      midEnd,
+      u,
+      wallThickness,
+      allPairs,
+      pair,
+    );
     final Offset faceAEnd;
     final Offset faceBEnd;
 
     if (!isEndCorner) {
       // Open end (door/window opening or free wall end): close with transverse cap
-      _addSegmentUnique(wallContourSegments, pAEnd, pBEnd);
+      _addSegmentUnique(
+        wallContourSegments,
+        pAEnd,
+        pBEnd,
+        tol: 5 * scale,
+        minLength: scale,
+      );
       if (closureSegments != null) {
-        _addSegmentUnique(closureSegments, pAEnd, pBEnd);
+        _addSegmentUnique(
+          closureSegments,
+          pAEnd,
+          pBEnd,
+          tol: 5 * scale,
+          minLength: scale,
+        );
       }
       faceAEnd = pAEnd;
       faceBEnd = pBEnd;
@@ -1928,8 +2224,20 @@ class WallAxisDetector {
     }
 
     // Add longitudinal wall face segments
-    _addSegmentUnique(wallContourSegments, faceAStart, faceAEnd);
-    _addSegmentUnique(wallContourSegments, faceBStart, faceBEnd);
+    _addSegmentUnique(
+      wallContourSegments,
+      faceAStart,
+      faceAEnd,
+      tol: 5 * scale,
+      minLength: scale,
+    );
+    _addSegmentUnique(
+      wallContourSegments,
+      faceBStart,
+      faceBEnd,
+      tol: 5 * scale,
+      minLength: scale,
+    );
   }
 
   /// Determines whether [midPt] of a wall pair connects to an intersecting or continuing wall
@@ -1979,17 +2287,22 @@ class WallAxisDetector {
     return a + ab * clampedT;
   }
 
-  /// Adds a segment to [list] if it is not degenerate and does not already exist within [tol].
+  /// Tolerances are supplied in CAD units by the detected CAD/mm scale. A
+  /// fixed 5 CAD units would merge both faces of a wall in metre drawings.
+  /// Adds a non-degenerate segment unless it already exists within [tol].
   static void _addSegmentUnique(
     List<(Offset, Offset)> list,
     Offset p1,
     Offset p2, {
     double tol = 5.0,
+    double minLength = 1.0,
   }) {
-    if ((p2 - p1).distance < 1.0) return;
+    if ((p2 - p1).distance < minLength) return;
     for (final existing in list) {
-      if (((existing.$1 - p1).distance <= tol && (existing.$2 - p2).distance <= tol) ||
-          ((existing.$1 - p2).distance <= tol && (existing.$2 - p1).distance <= tol)) {
+      if (((existing.$1 - p1).distance <= tol &&
+              (existing.$2 - p2).distance <= tol) ||
+          ((existing.$1 - p2).distance <= tol &&
+              (existing.$2 - p1).distance <= tol)) {
         return;
       }
     }

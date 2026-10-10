@@ -48,13 +48,15 @@ class _SlabLevelDialogState extends State<SlabLevelDialog> {
             widget.slab.copyWith(clearTopElevation: true),
           );
     return AlertDialog(
-      title: Text(context.l10n.ceilingSlabTitle),
+      title: Text(widget.slab.isFloorSlab ? context.l10n.floorSlabTitle : context.l10n.ceilingSlabTitle),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(context.l10n.ceilingSlabContext(widget.storey.elevationLabel)),
+            Text(widget.slab.isFloorSlab
+              ? context.l10n.floorSlabContext(widget.storey.elevationLabel)
+              : context.l10n.ceilingSlabContext(widget.storey.elevationLabel)),
             const SizedBox(height: 12),
             TextField(
               key: const ValueKey('ceiling-thickness'),
@@ -104,7 +106,7 @@ class _SlabLevelDialogState extends State<SlabLevelDialog> {
                 (z - h).isFinite ? (z - h).toStringAsFixed(3) : '—',
               ),
             ),
-            Text(context.l10n.ceilingSlabLevelHint),
+            Text(widget.slab.isFloorSlab ? context.l10n.floorSlabLevelHint : context.l10n.ceilingSlabLevelHint),
             if (error)
               Text(
                 context.l10n.ceilingSlabInvalid,

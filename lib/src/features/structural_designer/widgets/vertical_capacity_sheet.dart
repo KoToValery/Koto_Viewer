@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/vertical_capacity_models.dart';
+import '../analysis/support_layout_evaluator.dart';
+import '../analysis/slab_boundary_geometry.dart';
+import 'layout_assessment_summary.dart';
 
 /// Modal bottom sheet presenting a comprehensive Eurocode 2 (EC2) vertical gravitational
 /// capacity report covering column axial crushing, punching shear, slab span-to-depth deflection,
 /// and foundation soil pressure.
 class VerticalCapacitySheet extends StatefulWidget {
   final VerticalCapacityReport report;
+  final Map<String, SupportLayoutAssessment> assessments;
 
-  const VerticalCapacitySheet({super.key, required this.report});
+  const VerticalCapacitySheet({super.key, required this.report,
+    this.assessments = const {},
+  });
 
   @override
   State<VerticalCapacitySheet> createState() => _VerticalCapacitySheetState();
@@ -366,8 +372,9 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
             ratio: col.punchingUtilization,
             color: col.isPunchingCritical
                 ? const Color(0xFFFF1744)
-                : (col.punchingUtilization > 0.85
-                    ? const Color(0xFFFFB300)
+                : ((col.punchingUtilization > 0.85 ||
+                          col.punchingRequiresReview)
+                      ? const Color(0xFFFFB300)
                     : const Color(0xFF00E676)),
           ),
           const SizedBox(height: 10),
@@ -403,6 +410,21 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 ),
               ],
             ),
+          ),
+
+          Text(
+            '${switch (col.punchingPosition) {
+              PunchingSupportPosition.interior => context.l10n.schemeInteriorColumn,
+              PunchingSupportPosition.edge => context.l10n.schemeEdgeColumn,
+              PunchingSupportPosition.corner => context.l10n.schemeCornerColumn,
+              PunchingSupportPosition.undetermined => context.l10n.schemeUnknownColumnPosition,
+            }} · β ${col.punchingBeta.toStringAsFixed(2)}',
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+          if (col.punchingRequiresReview)
+            Text(
+              context.l10n.schemePunchingGeometryReview,
+              style: const TextStyle(color: Colors.amber, fontSize: 11),
           ),
 
           // Optional Punching Warning
@@ -508,8 +530,16 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, idx) {
         final slab = report.slabChecks[idx];
-        final bool isSafe = slab.isDeflectionSafe;
-        final color = !slab.isSpanDetermined ? Colors.amber : isSafe ? const Color(0xFF00E676) : const Color(0xFFFF1744);
+        final assessment = widget.assessments[slab.storeyId];
+        final unresolved =
+            assessment != null &&
+            (assessment.topology.invalidGeometry ||
+                assessment.topology.limited ||
+                assessment.topology.unresolvedAreaM2 > 1e-6 ||
+                assessment.topology.fields.any((f) => f.requiresReview));
+        final bool isSafe = slab.isDeflectionSafe && !unresolved;
+        final color = (!slab.isSpanDetermined || unresolved)
+            ? Colors.amber : isSafe ? const Color(0xFF00E676) : const Color(0xFFFF1744);
 
         return Container(
           padding: const EdgeInsets.all(12),
@@ -546,7 +576,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                       border: Border.all(color: color),
                     ),
                     child: Text(
-                      !slab.isSpanDetermined ? context.l10n.schemeSpanUnknown : isSafe ? context.l10n.verticalSlabStatusOk : context.l10n.verticalSlabStatusEnlarge,
+                      (!slab.isSpanDetermined || unresolved)
+                          ? context.l10n.schemeSpanUnknown : isSafe ? context.l10n.verticalSlabStatusOk : context.l10n.verticalSlabStatusEnlarge,
                       style: TextStyle(
                         color: color,
                         fontSize: 10,
@@ -577,6 +608,10 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 ],
               ),
               const SizedBox(height: 10),
+              if (widget.assessments[slab.storeyId] != null)
+                LayoutAssessmentSummary(
+                  assessment: widget.assessments[slab.storeyId]!,
+                ),
 
               Container(
                 padding: const EdgeInsets.all(10),

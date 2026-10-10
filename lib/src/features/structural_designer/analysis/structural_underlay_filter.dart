@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'drawing_frame_detector.dart';
 import 'dart:ui';
 import '../../dxf_viewer/models/dxf_models.dart';
 import 'wall_axis_detector.dart';
@@ -208,10 +209,12 @@ class StructuralUnderlayFilter {
     Iterable<DxfEntity>? entities,
     Map<String, DxfBlock>? blocks,
   }) {
+    final frames = DrawingFrameDetector.documentFrames(document);
     final entityCounts = <String, int>{};
     final entitiesByLayer = <String, List<DxfEntity>>{};
     final allEntities = entities ?? document.entities;
     for (final e in allEntities) {
+      if (e.isPaperSpace || frames.contains(e)) continue;
       final name = e.layer.trim();
       entityCounts[name] = (entityCounts[name] ?? 0) + 1;
       entitiesByLayer.putIfAbsent(name, () => []).add(e);
@@ -219,6 +222,7 @@ class StructuralUnderlayFilter {
     final allBlocks = blocks ?? document.blocks;
     for (final b in allBlocks.values) {
       for (final e in b.entities) {
+        if (frames.contains(e)) continue;
         final name = e.layer.trim();
         entityCounts[name] = (entityCounts[name] ?? 0) + 1;
         entitiesByLayer.putIfAbsent(name, () => []).add(e);
@@ -236,6 +240,7 @@ class StructuralUnderlayFilter {
       // 1. Geometric detection: check if layer contains closed polyline or line loops
       // with architectural slab dimensions (W >= 1000mm, H >= 1000mm, Area >= 1.0 m²).
       bool hasGeometricSlab = false;
+      if (isNegativeKeyword(layer.name)) continue;
       for (final e in layerEntities) {
         if (e is DxfLwPolyline && e.isClosed && e.vertices.length >= 3) {
           final pts = e.vertices.map((v) => Offset(v.x, v.y)).toList();

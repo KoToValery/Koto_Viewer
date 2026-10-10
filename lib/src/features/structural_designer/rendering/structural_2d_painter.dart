@@ -7,6 +7,7 @@ import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 import 'structural_pointer_painter.dart';
+import 'grid_axis_presentation.dart';
 import 'support_span_overlay_layout.dart';
 import 'structural_overview_layout.dart';
 
@@ -14,7 +15,9 @@ import 'structural_overview_layout.dart';
 /// interactive drawing previews, and cantilever warning zones projected onto CAD scene coordinates.
 class Structural2dPainter extends CustomPainter {
   final StoreyLevel currentStorey;
+  final List<StoreyLevel> gridAxisStoreys;
   final StoreyLevel? floorSlabStorey;
+  final StoreyLevel? ceilingSlabStorey;
   final StoreyLevel? ghostStorey;
   final List<CantileverZone> cantileverZones;
   final VerticalCapacityReport? verticalReport;
@@ -88,7 +91,9 @@ class Structural2dPainter extends CustomPainter {
 
   const Structural2dPainter({
     required this.currentStorey,
+    this.gridAxisStoreys = const [],
     this.floorSlabStorey,
+    this.ceilingSlabStorey,
     this.ghostStorey,
     this.hasBasement = false,
     this.foundationType = FoundationType.stripFooting,
@@ -184,7 +189,16 @@ class Structural2dPainter extends CustomPainter {
       }
     }
 
-    // 2. The active storey owns its ceiling slabs and their openings.
+    // Floor slabs drawn on the higher level are the ceiling of this plan.
+    final ceiling = ceilingSlabStorey;
+    if (ceiling != null) {
+      for (var i = 0; i < ceiling.slabs.length; i++) {
+        _drawSlab(canvas, ceiling.slabs[i], slabIndex: i, isGhost: false,
+          readOnly: true, levelOwner: ceiling);
+      }
+    }
+
+    // 2. Slabs owned by this drawing remain available for editing.
     if (currentStorey.slabs.isNotEmpty) {
       for (int i = 0; i < currentStorey.slabs.length; i++) {
         _drawSlab(
@@ -202,8 +216,9 @@ class Structural2dPainter extends CustomPainter {
     }
 
     // 2c. Draw Active Storey Grid Axes
+    final axisBubbles=_gridAxisBubbleCenters();
     for (final axis in currentStorey.gridAxes) {
-      _drawGridAxis(canvas, axis, isGhost: false);
+      _drawGridAxis(canvas, axis, isGhost: false, bubbleCenters:axisBubbles);
     }
 
     // 2d. Draw Grid Axis Offset Preview (Live duplication guidance)
@@ -488,14 +503,19 @@ class Structural2dPainter extends CustomPainter {
 
   void _drawGhostStorey(Canvas canvas, StoreyLevel ghost) {
     for (int i = 0; i < ghost.slabs.length; i++) {
-      if (floorSlabStorey?.slabs.any((s) => s.id == ghost.slabs[i].id) == true) continue;
+      if (floorSlabStorey?.slabs.any((s) => s.id == ghost.slabs[i].id) == true ||
+          ceilingSlabStorey?.slabs.any((s) => s.id == ghost.slabs[i].id) == true) {
+        continue;
+      }
       _drawSlab(canvas, ghost.slabs[i], slabIndex: i, isGhost: true);
     }
     for (final beam in ghost.beams) {
       _drawBeam(canvas, beam, isGhost: true);
     }
     for (final axis in ghost.gridAxes) {
-      _drawGridAxis(canvas, axis, isGhost: true);
+      if (!currentStorey.gridAxes.any((a) => a.id == axis.id)) {
+        _drawGridAxis(canvas, axis, isGhost: true);
+      }
     }
     for (final wall in ghost.shearWalls) {
       _drawShearWall(canvas, wall, isGhost: true);
@@ -590,7 +610,7 @@ class Structural2dPainter extends CustomPainter {
 
     // Concise architectural section level marker (only elevation and thickness)
     final elevSpan = TextSpan(
-      text: '${isFloor ? '↓' : '↑'} $elevStr',
+      text: '${isFloor || (slab.isFloorSlab && levelOwner == null) ? '↓' : '↑'} $elevStr',
       style: const TextStyle(
         color: Colors.white,
         fontSize: 11.5,
@@ -1473,27 +1493,64 @@ class Structural2dPainter extends CustomPainter {
     }
   }
 
-  void _drawGridAxis(Canvas canvas, StructuralGridAxis axis, {required bool isGhost, bool isPreview = false}) {
+  Map<(String,bool),Offset> _gridAxisBubbleCenters() {
+    final result=<(String,bool),Offset>{}, occupied=<Rect>[];
+    for(final axis in currentStorey.gridAxes) {
+      final style=GridAxisPresentation.forStorey(axis,currentStorey,gridAxisStoreys);
+      final label=TextPainter(text:TextSpan(text:axis.name,style:const TextStyle(
+        fontSize:11,fontWeight:FontWeight.bold)),textDirection:TextDirection.ltr)..layout();
+      final radius=math.max(8.0,math.max(label.width,label.height)/2+1.8);
+      final levels=TextPainter(text:TextSpan(text:style.reference ? style.levels : '',
+        style:const TextStyle(fontSize:9)),textDirection:TextDirection.ltr)..layout();
+      final width=math.max(radius,levels.width/2)+3;
+      final bottom=radius+(style.reference && style.levels.isNotEmpty ? levels.height+3 : 0)+3;
+      final start=cadToScene(axis.start), end=cadToScene(axis.end), v=end-start;
+      if (v.distance<=0) continue;
+      for(final atStart in [if(axis.bubbleAtStart) true,if(axis.bubbleAtEnd) false]) {
+        final base=atStart ? start : end, direction=(atStart ? -v : v)/v.distance;
+        var center=base;
+        for(var step=0;step<24;step++) {
+          final rect=Rect.fromLTRB(center.dx-width/zoomScale,center.dy-(radius+3)/zoomScale,
+            center.dx+width/zoomScale,center.dy+bottom/zoomScale);
+          if (!occupied.any((r)=>r.overlaps(rect)) || step==23) {
+            occupied.add(rect);break;
+          }
+          center=base+direction*((step+1)*24/zoomScale);
+        }
+        result[(axis.id,atStart)]=center;
+      }
+    }
+    return result;
+  }
+
+  void _drawGridAxis(Canvas canvas, StructuralGridAxis axis, {required bool isGhost, bool isPreview = false, Map<(String,bool),Offset>? bubbleCenters}) {
     final p1 = cadToScene(axis.start);
     final p2 = cadToScene(axis.end);
     final isSelected = !isGhost && !isPreview && (axis.id == selectedGridAxisId);
 
+    final presentation=GridAxisPresentation.forStorey(axis,currentStorey,gridAxisStoreys);
+    final reference=!isGhost && !isPreview && presentation.reference;
+    final color=isSelected ? const Color(0xFFFF9F0A) : presentation.color;
     final axisPaint = Paint()
       ..color = isGhost
           ? const Color(0x66FF453A)
           : isPreview
               ? const Color(0xFF00E5FF)
-              : (isSelected ? const Color(0xFFFF9F0A) : const Color(0xFFFF453A))
+              : color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (isSelected || isPreview ? 2.5 : 1.5) / zoomScale;
+      ..strokeWidth = (isSelected || isPreview ? 2.5 : reference ? 1.0 : 1.5) / zoomScale;
 
     _drawDashDotLine(canvas, p1, p2, axisPaint);
 
+    final endBubble=bubbleCenters?[(axis.id,false)] ?? p2;
+    final startBubble=bubbleCenters?[(axis.id,true)] ?? p1;
+    if (endBubble!=p2) _drawDashDotLine(canvas,p2,endBubble,axisPaint);
+    if (startBubble!=p1) _drawDashDotLine(canvas,p1,startBubble,axisPaint);
     if (axis.bubbleAtEnd) {
-      _drawAxisBubble(canvas, p2, axis.direction, axis.name, isSelected: isSelected || isPreview, isGhost: isGhost);
+      _drawAxisBubble(canvas, endBubble, axis.direction, axis.name, isSelected: isSelected || isPreview, isGhost: isGhost, axisColor: reference ? color : null, levels: reference ? presentation.levels : null);
     }
     if (axis.bubbleAtStart) {
-      _drawAxisBubble(canvas, p1, -axis.direction, axis.name, isSelected: isSelected || isPreview, isGhost: isGhost);
+      _drawAxisBubble(canvas, startBubble, -axis.direction, axis.name, isSelected: isSelected || isPreview, isGhost: isGhost, axisColor: reference ? color : null, levels: reference ? presentation.levels : null);
     }
 
     if (isSelected) {
@@ -1521,6 +1578,8 @@ class Structural2dPainter extends CustomPainter {
     String label, {
     required bool isSelected,
     required bool isGhost,
+    Color? axisColor,
+    String? levels,
   }) {
     canvas.save();
     canvas.translate(center.dx, center.dy);
@@ -1529,7 +1588,7 @@ class Structural2dPainter extends CustomPainter {
     final textSpan = TextSpan(
       text: label,
       style: TextStyle(
-        color: isGhost ? const Color(0xAAFFFFFF) : Colors.white,
+        color: axisColor != null && !isSelected ? axisColor.withValues(alpha:.8) : isGhost ? const Color(0xAAFFFFFF) : Colors.white,
         fontSize: 11.0,
         fontWeight: FontWeight.bold,
       ),
@@ -1548,9 +1607,9 @@ class Structural2dPainter extends CustomPainter {
     final borderPaint = Paint()
       ..color = isGhost
           ? const Color(0x66FF453A)
-          : (isSelected ? const Color(0xFFFF9F0A) : const Color(0xFFFF453A))
+          : (isSelected ? const Color(0xFFFF9F0A) : axisColor ?? const Color(0xFFFF453A))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isSelected ? 2.0 : 1.4;
+      ..strokeWidth = isSelected ? 2.0 : axisColor != null ? 1.0 : 1.4;
 
     canvas.drawCircle(Offset.zero, radius, bgPaint);
     canvas.drawCircle(Offset.zero, radius, borderPaint);
@@ -1560,6 +1619,11 @@ class Structural2dPainter extends CustomPainter {
       -textPainter.height / 2.0,
     );
     textPainter.paint(canvas, textOffset);
+    if (levels!=null && levels.isNotEmpty) {
+      final source=TextPainter(text:TextSpan(text:levels,style:TextStyle(
+        fontSize:9,color:(axisColor ?? Colors.white70).withValues(alpha:.6))),textDirection:TextDirection.ltr)..layout();
+      source.paint(canvas,Offset(-source.width/2,radius+3));
+    }
     canvas.restore();
   }
 

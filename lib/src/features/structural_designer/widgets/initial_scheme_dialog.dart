@@ -9,6 +9,7 @@ import '../analysis/seismic_analysis_calculator.dart';
 import '../analysis/wall_axis_detector.dart';
 import '../analysis/geometric_window_detector.dart';
 import 'seismic_analysis_sheet.dart';
+import 'layout_assessment_summary.dart';
 
 class InitialSchemeDialog extends StatefulWidget {
   final StructuralProject project;
@@ -34,6 +35,9 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   late final min = TextEditingController(
     text: widget.options.minSpacingM.toString(),
   );
+  late final wallMin = TextEditingController(
+    text: widget.options.minWallSpacingM.toString(),
+  );
   late final target = TextEditingController(
     text: widget.options.targetSpacingM.toString(),
   );
@@ -46,7 +50,10 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   late final List<(Offset, Offset)> effectiveClosureSegments =
       widget.closureSegments.isNotEmpty
       ? widget.closureSegments
-      : WallAxisDetector.computeClosureSegmentsForPairs(widget.pairs);
+      : WallAxisDetector.computeClosureSegmentsForPairs(
+          widget.pairs,
+          cadUnitsPerMillimetre: widget.scale / 1000,
+        );
   InitialSchemeProposal proposal = const InitialSchemeProposal();
   SeismicAnalysisReport report = SeismicAnalysisReport.empty;
   final seenLayouts = <String>{};
@@ -62,6 +69,7 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
   @override
   void dispose() {
     min.dispose();
+    wallMin.dispose();
     target.dispose();
     maxWallLength.dispose();
     super.dispose();
@@ -71,6 +79,7 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
     final o = widget.options;
     final options = InitialSchemeOptions(
       minSpacingM: double.tryParse(min.text.replaceAll(',', '.')) ?? 0,
+      minWallSpacingM: double.tryParse(wallMin.text.replaceAll(',', '.')) ?? 0,
       targetSpacingM: double.tryParse(target.text.replaceAll(',', '.')) ?? 0,
       columnShape: o.columnShape,
       columnThicknessM: o.columnThicknessM,
@@ -83,6 +92,10 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
       enforcePairedWalls: enforcePaired,
       generousDensity: generousDensity,
       adaptiveSizes: adaptiveSizes,
+      optimizeLayout: o.optimizeLayout,
+      searchVariants: o.searchVariants,
+      placementAttemptsPerStage: o.placementAttemptsPerStage,
+      maxSearchEvaluations: o.maxSearchEvaluations,
     );
     if (!options.valid) {
       error = true;
@@ -201,6 +214,23 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
                     SizedBox(
                       width: 180,
                       child: TextField(
+                        key: const ValueKey('scheme-min-wall-spacing'),
+                        controller: wallMin,
+                        onChanged: (_) => setState(() {
+                          dirty = true;
+                          confirmed = false;
+                        }),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: l.schemeMinWallSpacing,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 180,
+                      child: TextField(
                         controller: target,
                         onChanged: (_) => setState(() {
                           dirty = true;
@@ -286,6 +316,19 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
               if (p.continuationSource == null)
                 Text('${l.schemeVariant}: $displayedVariant'),
               Text('${p.columns.length} C · ${p.walls.length} W'),
+              if (p.continuationSource == null)
+                Text(
+                  l.schemeSearchSummary(
+                    p.searchedLayouts,
+                    p.optimizationChanges,
+                    p.optimizationEvaluations,
+                  ),
+                ),
+              if (p.assessment != null)
+                LayoutAssessmentSummary(
+                  assessment: p.assessment!,
+                  before: p.initialAssessment,
+                ),
               if (sectionCounts.isNotEmpty)
                 Text(
                   '${l.columns}: ${sectionCounts.entries.map((e) => "${e.key} (${e.value})").join(" · ")}',
@@ -319,6 +362,30 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
               if (widget.pairs.isEmpty) Text(l.schemeNoWalls),
               if (p.isEmpty) Text(l.schemeNoCandidates),
               if (p.limited) Text(l.schemeLimits),
+              if (p.limitReasons.isNotEmpty) ...[
+                for (final reason in p.limitReasons)
+                  Text(switch (reason) {
+                    'input' => l.schemeLimitInput,
+                    'sampling' => l.schemeLimitSampling,
+                    'elements' => l.schemeLimitElements,
+                    'junctions' => l.schemeLimitJunctions,
+                    'fields' => l.schemeLimitFields,
+                    'optimization' => l.schemeLimitOptimization,
+                    'placement:core' =>
+                      '${l.schemeBudgetConstraint}: ${l.schemeStageCore}',
+                    'placement:walls' =>
+                      '${l.schemeBudgetConstraint}: ${l.schemeStageWalls}',
+                    'placement:columns' =>
+                      '${l.schemeBudgetConstraint}: ${l.schemeStageColumns}',
+                    'placement:coverage' =>
+                      '${l.schemeBudgetConstraint}: ${l.schemeStageCoverage}',
+                    'placement:repair' =>
+                      '${l.schemeBudgetConstraint}: ${l.schemeStageRepair}',
+                    'placement:openings' =>
+                      '${l.schemeBudgetConstraint}: ${l.schemeStageOpenings}',
+                    _ => l.schemeLimits,
+                  }),
+              ],
               if (p.continuationSource != null && p.uncoveredSamples > 0)
                 Text(
                   l.schemeBlockedContinuations(p.uncoveredSamples),
@@ -365,8 +432,13 @@ class _InitialSchemeDialogState extends State<InitialSchemeDialog> {
               if (p.rejectionReasons.isNotEmpty)
                 Text(
                   '${l.schemePlacementReasons}: ${l.schemeWallConstraint} ${p.rejectionReasons['wall'] ?? 0} · '
+                  '${l.schemeNoWallConstraint} ${p.rejectionReasons['no-wall'] ?? 0} · '
                   '${l.schemeSlabConstraint} ${p.rejectionReasons['slab'] ?? 0} · '
-                  '${l.schemeSpacingConstraint} ${(p.rejectionReasons['spacing'] ?? 0) + (p.rejectionReasons['collision'] ?? 0)}',
+                  '${l.schemeColumnSpacingConstraint} ${p.rejectionReasons['column-spacing'] ?? 0} · '
+                  '${l.schemeWallSpacingConstraint} ${p.rejectionReasons['wall-spacing'] ?? 0} · '
+                  '${l.schemeCollisionConstraint} ${p.rejectionReasons['collision'] ?? 0} · '
+                  '${l.schemeSeedDensityConstraint} ${p.rejectionReasons['seed-density'] ?? 0} · '
+                  '${l.schemeBudgetConstraint} ${p.rejectionReasons['budget'] ?? 0}',
                 ),
               Text(l.schemePreliminary),
               TextButton(
@@ -554,6 +626,28 @@ class _SchemePainter extends CustomPainter {
       canvas.drawLine(screen(cap.$1), screen(cap.$2), wallLinePaint);
     }
 
+    for (final field in proposal.assessment?.topology.fields ?? []) {
+      draw(
+        field.polygon,
+        (field.requiresReview || field.utilization > 1
+                ? Colors.orange
+                : Colors.teal)
+            .withValues(alpha: .12),
+        fill: true,
+      );
+    }
+    for (final point in proposal.assessment?.openings ?? []) {
+      if (point.requiresReview) {
+        canvas.drawCircle(
+          screen(point.point),
+          4,
+          Paint()
+            ..color = Colors.red
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
+      }
+    }
     // 2. Draw Floor Slabs & Openings
     for (final s in floor.slabs) {
       draw(s.polygon, Colors.blue);

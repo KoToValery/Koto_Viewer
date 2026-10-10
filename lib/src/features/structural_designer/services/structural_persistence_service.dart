@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/structural_element.dart';
+import '../rendering/grid_axis_presentation.dart';
 
 /// Service responsible for persisting and exporting BiM structural models
 /// associated with CAD/DXF drawings.
@@ -136,6 +137,7 @@ class StructuralPersistenceService {
     double cadUnitsPerMeter = 1.0,
     Directory? outputDirectory,
     String axisLayerName = 'S-AXIS',
+    List<StoreyLevel> gridAxisStoreys = const [],
   }) async {
     final dir = outputDirectory ?? await getTemporaryDirectory();
     final cleanName = baseName.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
@@ -159,14 +161,44 @@ class StructuralPersistenceService {
       '0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0.0',
     );
     sb.writeln(
-      '0\nLTYPE\n2\nBIM_AXIS_DASHED\n70\n0\n3\nBIM axis\n72\n65\n73\n2',
+      '0\nLTYPE\n2\nBIM_AXIS_DASHED\n70\n0\n3\nBIM axis dash-dot\n72\n65\n73\n4',
     );
     sb.writeln(
-      '40\n${0.75 * localUnitsPerMeter}\n49\n${0.5 * localUnitsPerMeter}\n74\n0\n49\n${-0.25 * localUnitsPerMeter}\n74\n0',
+      '40\n${0.75 * localUnitsPerMeter}\n49\n${0.5 * localUnitsPerMeter}\n74\n0\n49\n${-0.125 * localUnitsPerMeter}\n74\n0\n49\n0.0\n74\n0\n49\n${-0.125 * localUnitsPerMeter}\n74\n0',
     );
-    sb.writeln('0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n5');
-    void writeLayer(String name, int color) {
+    final references = <String, (String, int, String)>{};
+    final ordered = [...gridAxisStoreys]
+      ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    for (final axis in storey.gridAxes) {
+      final presentation = GridAxisPresentation.forStorey(
+        axis,
+        storey,
+        gridAxisStoreys,
+      );
+      if (!presentation.reference) continue;
+      final source =
+          ordered
+              .where((s) => axis.sourceStoreyIds.contains(s.id))
+              .firstOrNull
+              ?.id ??
+          axis.sourceStoreyIds.first;
+      final layer =
+          '${axisLayerName}_REF_${source.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}';
+      final color =
+          Color.alphaBlend(
+            presentation.color,
+            const Color(0xFFFFFFFF),
+          ).toARGB32() &
+          0xFFFFFF;
+      references[axis.id] = (layer, color, presentation.levels);
+    }
+    final referenceLayers = {for (final r in references.values) r.$1: r.$2};
+    sb.writeln(
+      '0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n${5 + referenceLayers.length}',
+    );
+    void writeLayer(String name, int color, {int? trueColor}) {
       sb.writeln('0\nLAYER\n2\n$name\n70\n0\n62\n$color\n6\nCONTINUOUS');
+      if (trueColor != null) sb.writeln('420\n$trueColor');
     }
 
     writeLayer('S-COL', 2); // Yellow
@@ -174,6 +206,9 @@ class StructuralPersistenceService {
     writeLayer('S-BEAM', 4); // Cyan
     writeLayer('S-SLAB', 3); // Green
     writeLayer(axisLayerName, 6); // Magenta
+    for (final entry in referenceLayers.entries) {
+      writeLayer(entry.key, 8, trueColor: entry.value);
+    }
     sb.writeln('0\nENDTAB\n0\nENDSEC');
 
     // 3. DXF Entities
@@ -193,6 +228,7 @@ class StructuralPersistenceService {
       toLocal,
       axisLayerName: axisLayerName,
       axisLineType: 'BIM_AXIS_DASHED',
+      axisReferences: references,
     );
 
     sb.writeln('0\nENDSEC\n0\nEOF');
@@ -208,6 +244,7 @@ class StructuralPersistenceService {
     Offset Function(Offset) tr, {
     String axisLayerName = 'S-AXIS',
     String? axisLineType,
+    Map<String, (String, int, String)> axisReferences = const {},
   }) {
     // Columns
     for (final col in storey.columns) {
@@ -280,33 +317,66 @@ class StructuralPersistenceService {
     for (final axis in storey.gridAxes) {
       final s = tr(axis.start);
       final e = tr(axis.end);
-      sb.writeln('0\nLINE\n8\n$axisLayerName\n62\n6');
+      final reference = axisReferences[axis.id];
+      final layer = reference?.$1 ?? axisLayerName;
+      sb.writeln('0\nLINE\n8\n$layer\n62\n${reference == null ? 6 : 256}');
+      if (reference != null) sb.writeln('420\n${reference.$2}');
       if (axisLineType != null) sb.writeln('6\n$axisLineType');
+      sb.writeln('370\n${reference == null ? 15 : 9}');
       sb.writeln('10\n${s.dx}\n20\n${s.dy}\n30\n0.0');
       sb.writeln('11\n${e.dx}\n21\n${e.dy}\n31\n0.0');
 
       final bubbleRadius = 0.40 * cadUnitsPerMeter;
       if (axis.bubbleAtStart) {
-        _writeCircle(sb, s.dx, s.dy, bubbleRadius, axisLayerName);
+        _writeCircle(
+          sb,
+          s.dx,
+          s.dy,
+          bubbleRadius,
+          layer,
+          color: reference == null ? 6 : 256,
+        );
         _writeText(
           sb,
           axis.name,
           s.dx,
           s.dy,
           0.30 * cadUnitsPerMeter,
-          axisLayerName,
+          layer,
+          color: reference == null ? 7 : 256,
         );
       }
       if (axis.bubbleAtEnd) {
-        _writeCircle(sb, e.dx, e.dy, bubbleRadius, axisLayerName);
+        _writeCircle(
+          sb,
+          e.dx,
+          e.dy,
+          bubbleRadius,
+          layer,
+          color: reference == null ? 6 : 256,
+        );
         _writeText(
           sb,
           axis.name,
           e.dx,
           e.dy,
           0.30 * cadUnitsPerMeter,
-          axisLayerName,
+          layer,
+          color: reference == null ? 7 : 256,
         );
+      }
+      if (reference != null && reference.$3.isNotEmpty) {
+        for (final p in [if (axis.bubbleAtStart) s, if (axis.bubbleAtEnd) e]) {
+          _writeText(
+            sb,
+            reference.$3,
+            p.dx,
+            p.dy - .7 * cadUnitsPerMeter,
+            .2 * cadUnitsPerMeter,
+            layer,
+            color: 256,
+          );
+        }
       }
     }
   }
@@ -335,9 +405,10 @@ class StructuralPersistenceService {
     double x,
     double y,
     double height,
-    String layer,
-  ) {
-    sb.writeln('0\nTEXT\n8\n$layer\n62\n7');
+    String layer, {
+    int color = 7,
+  }) {
+    sb.writeln('0\nTEXT\n8\n$layer\n62\n$color');
     sb.writeln('10\n$x\n20\n$y\n30\n0.0');
     sb.writeln('40\n$height\n1\n$text\n72\n1\n73\n2'); // Centered
     sb.writeln('11\n$x\n21\n$y\n31\n0.0');
@@ -348,9 +419,10 @@ class StructuralPersistenceService {
     double cx,
     double cy,
     double radius,
-    String layer,
-  ) {
-    sb.writeln('0\nCIRCLE\n8\n$layer\n62\n6');
+    String layer, {
+    int color = 6,
+  }) {
+    sb.writeln('0\nCIRCLE\n8\n$layer\n62\n$color');
     sb.writeln('10\n$cx\n20\n$cy\n30\n0.0\n40\n$radius');
   }
 }

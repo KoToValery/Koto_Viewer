@@ -1,3 +1,4 @@
+import '../analysis/slab_boundary_geometry.dart';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import 'structural_element.dart';
@@ -66,6 +67,12 @@ class ColumnVerticalCheck {
 
   /// Punching shear utilization v_Ed / v_Rd,c.
   final double punchingUtilization;
+  final PunchingSupportPosition punchingPosition;
+  final double punchingBeta;
+
+  /// Free opening boundaries and unsupported sections need a control-perimeter
+  /// calculation beyond this preliminary rectangular-section approximation.
+  final bool punchingRequiresReview;
 
   /// Overall safety status (safe, warning, or critical).
   final VerticalCapacityStatus status;
@@ -110,15 +117,28 @@ class ColumnVerticalCheck {
     required this.architectRecommendation,
     this.punchingRecommendation,
     this.hasConnectedBeams = false,
+    this.punchingPosition = PunchingSupportPosition.undetermined,
+    this.punchingBeta = 1.5,
+    this.punchingRequiresReview = false,
     this.recommendedPunchingSlabThicknessCm = 20,
   });
 
   bool get isAxiallyOverloaded => axialUtilization > 1.0;
-  bool get isPunchingCritical => !hasConnectedBeams && punchingUtilization > 1.0;
+  bool get isPunchingCritical => punchingUtilization > 1.0;
   bool get hasWarning => status == VerticalCapacityStatus.warning;
   bool get hasCritical => status == VerticalCapacityStatus.critical;
 
   String localizedRecommendation(AppLocalizations l10n) {
+    if (!isAxiallyOverloaded && punchingRequiresReview) {
+      return l10n.schemePunchingGeometryReview;
+    }
+    if (!isAxiallyOverloaded && isPunchingCritical) {
+      return l10n.verticalRecPunchingRisk(
+        columnName, punchingShearStressVedMpa.toStringAsFixed(2),
+        punchingShearResistanceVrdMpa.toStringAsFixed(2),
+        recommendedPunchingSlabThicknessCm,
+      );
+    }
     final int curWCm = (widthM * 100).round();
     final int curHCm = (heightM * 100).round();
     final int util = (axialUtilization * 100).round();
@@ -154,8 +174,8 @@ class ColumnVerticalCheck {
   }
 
   String? localizedPunchingRecommendation(AppLocalizations l10n) {
-    if (hasConnectedBeams) {
-      return l10n.verticalRecPunchingProtectedByBeams(columnName);
+    if (punchingRequiresReview) {
+      return l10n.schemePunchingGeometryReview;
     }
     if (punchingRecommendation == null) return null;
     return l10n.verticalRecPunchingRisk(

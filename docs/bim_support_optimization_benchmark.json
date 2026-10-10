@@ -1,0 +1,143 @@
+{
+  "scope": "Preliminary geometric/elastic screening; synthetic cases, not an actual building verification",
+  "cases": [
+    {
+      "name": "orthogonal",
+      "source": "synthetic regression geometry",
+      "before": {
+        "supportCount": 22,
+        "balanceAvailable": true,
+        "concreteVolumeM3": 19.499999999999996,
+        "maxSpanM": 6.01592937541657,
+        "fields": 4,
+        "problematicFields": 4,
+        "unresolvedAreaM2": 222.4125,
+        "openingReviews": 5,
+        "boundaryReviews": 4,
+        "continuityIssues": 0,
+        "unavailableChecks": 0,
+        "columnIssues": 1,
+        "structuralPenalty": 7.373628053555118,
+        "balancePenalty": 0.30756137196330263,
+        "balanceTargetPenalty": 0.06611753803124001
+      },
+      "after": {
+        "supportCount": 22,
+        "balanceAvailable": true,
+        "concreteVolumeM3": 20.025,
+        "maxSpanM": 6.080213330190397,
+        "fields": 7,
+        "problematicFields": 7,
+        "unresolvedAreaM2": 166.03125,
+        "openingReviews": 5,
+        "boundaryReviews": 4,
+        "continuityIssues": 0,
+        "unavailableChecks": 0,
+        "columnIssues": 0,
+        "structuralPenalty": 9.399134739438935,
+        "balancePenalty": 0.31024407623362615,
+        "balanceTargetPenalty": 0.06765597284998001
+      },
+      "generationMs": 902,
+      "seedLayouts": 3,
+      "localEvaluations": 64,
+      "acceptedChanges": 3,
+      "limits": [
+        "optimization"
+      ],
+      "comparedToOldLayout": -1
+    },
+    {
+      "name": "rotated",
+      "source": "synthetic regression geometry",
+      "before": {
+        "supportCount": 23,
+        "balanceAvailable": true,
+        "concreteVolumeM3": 18.750000000818737,
+        "maxSpanM": 6.3949320760986215,
+        "fields": 2,
+        "problematicFields": 2,
+        "unresolvedAreaM2": 239.23124999407145,
+        "openingReviews": 5,
+        "boundaryReviews": 4,
+        "continuityIssues": 0,
+        "unavailableChecks": 0,
+        "columnIssues": 1,
+        "structuralPenalty": 7.142549643927428,
+        "balancePenalty": 0.2253184240988409,
+        "balanceTargetPenalty": 0.028247847486975373
+      },
+      "after": {
+        "supportCount": 23,
+        "balanceAvailable": true,
+        "concreteVolumeM3": 17.54999999913174,
+        "maxSpanM": 6.67363120926137,
+        "fields": 6,
+        "problematicFields": 5,
+        "unresolvedAreaM2": 182.50307941655666,
+        "openingReviews": 6,
+        "boundaryReviews": 4,
+        "continuityIssues": 0,
+        "unavailableChecks": 0,
+        "columnIssues": 0,
+        "structuralPenalty": 9.344117079000547,
+        "balancePenalty": 0.05234053681713901,
+        "balanceTargetPenalty": 0.0
+      },
+      "generationMs": 779,
+      "seedLayouts": 3,
+      "localEvaluations": 64,
+      "acceptedChanges": 3,
+      "limits": [
+        "optimization"
+      ],
+      "comparedToOldLayout": -1
+    },
+    {
+      "name": "core-only",
+      "source": "synthetic regression geometry",
+      "before": {
+        "supportCount": 4,
+        "balanceAvailable": true,
+        "concreteVolumeM3": 7.5,
+        "maxSpanM": 1.0511898020814328,
+        "fields": 0,
+        "problematicFields": 0,
+        "unresolvedAreaM2": 312.0,
+        "openingReviews": 0,
+        "boundaryReviews": 4,
+        "continuityIssues": 0,
+        "unavailableChecks": 2,
+        "columnIssues": 0,
+        "structuralPenalty": 20.39615703123421,
+        "balancePenalty": 6.625802472948068,
+        "balanceTargetPenalty": 6.284161164574758
+      },
+      "after": {
+        "supportCount": 4,
+        "balanceAvailable": true,
+        "concreteVolumeM3": 7.2749999999999995,
+        "maxSpanM": 1.1510864433221342,
+        "fields": 0,
+        "problematicFields": 0,
+        "unresolvedAreaM2": 312.0,
+        "openingReviews": 0,
+        "boundaryReviews": 4,
+        "continuityIssues": 0,
+        "unavailableChecks": 2,
+        "columnIssues": 0,
+        "structuralPenalty": 20.39615703123421,
+        "balancePenalty": 6.132882019903197,
+        "balanceTargetPenalty": 5.836655244946893
+      },
+      "generationMs": 220,
+      "seedLayouts": 3,
+      "localEvaluations": 64,
+      "acceptedChanges": 3,
+      "limits": [
+        "optimization"
+      ],
+      "comparedToOldLayout": -1
+    }
+  ]
+}

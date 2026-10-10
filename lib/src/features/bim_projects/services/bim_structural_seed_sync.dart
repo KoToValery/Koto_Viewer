@@ -8,6 +8,8 @@ import '../../structural_designer/rendering/structural_2d_painter.dart';
 import '../models/bim_work_project.dart';
 import 'bim_underlay_conversion_service.dart';
 import 'bim_underlay_loader.dart';
+import 'bim_grid_axis_sync.dart';
+import '../../structural_designer/analysis/project_grid_axes.dart';
 
 /// Source revisions and alignment are independent from manual structural edits.
 /// Store the last generated geometry to distinguish untouched seeds from edits.
@@ -19,15 +21,15 @@ class BimStructuralSeedSync {
   ) {
     final updated = <StoreyLevel>[];
     final underlays = <BimStoreyUnderlay>[];
-    var axes = structural.effectiveGridAxes
-        .where(
-          (a) =>
-              !a.id.startsWith('bim_axis_') ||
-              project.storeys.any(
-                (s) => a.id.startsWith('bim_axis_${s.storeyId}_'),
-              ),
-        )
-        .toList();
+    final units =
+        project.structuralUnitsPerMeter ??
+        (documents.isEmpty
+            ? 1.0
+            : BimUnderlayLoader.computeUnitsPerMeter(
+                documents.values.first,
+                documents.values.first.bounds,
+              ));
+    final axes = BimGridAxisSync.refresh(project, structural, documents, units);
     bool equal(Object? a, Object? b) => jsonEncode(a) == jsonEncode(b);
     for (final source in project.sortedStoreysByElevation) {
       final floor =
@@ -190,93 +192,55 @@ class BimStructuralSeedSync {
           }
         }
       }
-      final oldAxes = {
-        for (final raw in (old?['axes'] as List? ?? []))
-          (raw as Map)['id'] as String: Map<String, dynamic>.from(raw),
-      };
-      final oldOwners = Map<String, dynamic>.from(
-        old?['axisOwners'] as Map? ?? {},
-      );
-      final desired = BimUnderlayMetadata.axes(doc)
-          .map((a) => a.copyWith(id: 'bim_axis_${source.storeyId}_${a.id}'))
-          .toList();
-      if (!project.axisSeedsConsumed ||
-          old != null ||
-          source.processing['seedImportPending'] == true) {
-        for (final entry in oldAxes.entries) {
-          final current = axes.where((a) => a.id == entry.key).firstOrNull;
-          if (current != null && equal(current.toJson(), entry.value)) {
-            axes.removeWhere((a) => a.id == entry.key);
-          }
-        }
-        for (final seed in desired) {
-          final current = axes.where((a) => a.id == seed.id).firstOrNull;
-          if (current != null) {
-            if (oldAxes.containsKey(seed.id)) review = true;
-            continue;
-          }
-          final original = structural.effectiveGridAxes
-              .where((a) => a.id == seed.id)
-              .firstOrNull;
-          final ownerId = oldOwners[seed.id] as String? ?? seed.id;
-          final ownerFloorExists = project.storeys.any(
-            (s) => ownerId.startsWith('bim_axis_${s.storeyId}_'),
-          );
-          final ownerExists = structural.effectiveGridAxes.any(
-            (a) => a.id == ownerId,
-          );
-          if (oldAxes.containsKey(seed.id) &&
-              original == null &&
-              ownerFloorExists &&
-              !ownerExists) {
-            continue;
-          }
-          if (axes.any(
-            (a) =>
-                a.isParallelTo(seed, toleranceRad: .05) &&
-                a.distanceToSegment((seed.start + seed.end) / 2) <= .15 * scale,
-          )) {
-            continue;
-          }
-          axes.add(seed);
-        }
-      }
       final processing = Map<String, dynamic>.of(source.processing)
         ..remove('seedImportPending');
       processing['structuralSeeds'] = {
         'key': key,
         'higher': higher?.storeyId,
         'slabs': snapshots,
-        'axes': desired.map((a) => a.toJson()).toList(),
-        'axisOwners': {
-          for (final seed in desired)
-            seed.id:
-                axes
-                    .where(
-                      (a) =>
-                          a.id == seed.id ||
-                          (a.isParallelTo(seed, toleranceRad: .05) &&
-                              a.distanceToSegment(
-                                    (seed.start + seed.end) / 2,
-                                  ) <=
-                                  .15 * scale),
-                    )
-                    .firstOrNull
-                    ?.id ??
-                oldOwners[seed.id] ??
-                seed.id,
-        },
+        'axisOwners': old?['axisOwners'] ?? {},
       };
       processing['structuralReviewRequired'] = review;
       underlays.add(source.copyWith(processing: processing));
       updated.add(floor.copyWith(slabs: pending));
     }
-    // Drop only axes whose owning floor was removed; manual/master axes remain.
-    final validIds = project.storeys.map((s) => s.storeyId).toSet();
-    for (final removed in structural.storeys.where(
-      (s) => !validIds.contains(s.id),
-    )) {
-      axes.removeWhere((a) => a.id.startsWith('bim_axis_${removed.id}_'));
+    // Axis origins and owner mappings refresh even when slab processing is
+    // cached. Numbers are global; source snapshots keep deletion tombstones.
+    for (var i = 0; i < underlays.length; i++) {
+      final source = underlays[i], doc = documents[source.storeyId];
+      if (doc == null || BimUnderlayMetadata.read(doc) == null) continue;
+      final desired = BimUnderlayMetadata.axes(doc)
+          .map(
+            (a) => a.copyWith(
+              id: 'bim_axis_${source.storeyId}_${a.id}',
+              sourceStoreyIds: [source.storeyId],
+            ),
+          )
+          .toList();
+      final processing = Map<String, dynamic>.from(source.processing);
+      final seeds = Map<String, dynamic>.from(
+        processing['structuralSeeds'] as Map? ?? {},
+      );
+      final oldOwners = seeds['axisOwners'] as Map? ?? {};
+      seeds['axes'] = desired.map((a) => a.toJson()).toList();
+      seeds['axisOwners'] = {
+        for (final seed in desired)
+          seed.id:
+              axes
+                  .where((a) => ProjectGridAxes.sameAlignment(a, seed, units))
+                  .firstOrNull
+                  ?.id ??
+              oldOwners[seed.id] ??
+              seed.id,
+      };
+      seeds['axisMasterSnapshots'] = BimGridAxisSync.masterSnapshots(
+        project,
+        structural,
+        axes,
+        units,
+      ).map((a) => a.toJson()).toList();
+      processing['structuralSeeds'] = seeds;
+      underlays[i] = source.copyWith(processing: processing);
     }
     final active = updated.indexWhere(
       (s) => s.id == structural.activeStorey.id,

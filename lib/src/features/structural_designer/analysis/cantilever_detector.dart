@@ -69,6 +69,7 @@ class CantileverDetector {
     StructuralProject project, {
     double cadUnitsPerMeter = 1.0,
   }) {
+    project = project.copyWith(storeys: project.ceilingStoreys);
     final List<CantileverZone> allZones = [];
 
     for (int sIdx = 0; sIdx < project.storeys.length; sIdx++) {

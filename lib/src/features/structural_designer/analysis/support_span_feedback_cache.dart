@@ -40,7 +40,7 @@ class SupportSpanFeedbackCache {
             ),
     );
     if (key == _key) return _checks;
-    final current = project.activeStorey;
+    final current = project.supportedStoreyFor(project.activeStorey);
     final floor = current.copyWith(
       gridAxes: project.effectiveGridAxes,
       columns: previewColumn == null

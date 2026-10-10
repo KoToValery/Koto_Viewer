@@ -52,14 +52,23 @@ class BimUnderlayLoader {
     final rawDocs = <String, DxfDocument>{};
 
     project = await lib.prepareUnderlays(project, loadedDocuments: rawDocs);
+    return alignDocuments(project: project, rawDocuments: rawDocs);
+  }
 
+  /// Read-only alignment of an already captured revision, also used by export.
+  /// Unlike loadAndAlign this does not migrate or publish library files.
+  static LoadedBimUnderlays alignDocuments({
+    required BimWorkProject project,
+    required Map<String, DxfDocument> rawDocuments,
+  }) {
+    final rawDocs = rawDocuments;
     if (rawDocs.isEmpty) {
       const defaultBounds = Rect.fromLTWH(0, 0, 100, 100);
-      return const LoadedBimUnderlays(
-        underlaysByStorey: {},
+      return LoadedBimUnderlays(
+        underlaysByStorey: const {},
         projectBounds: defaultBounds,
-        referenceControlPoint: Offset.zero,
-        cadUnitsPerMeter: 1.0,
+        referenceControlPoint: project.structuralOrigin ?? Offset.zero,
+        cadUnitsPerMeter: project.structuralUnitsPerMeter ?? 1.0,
       );
     }
 

@@ -1,0 +1,91 @@
+{
+  "source": "test_BimPackage.zip; preserved KCAD architecture, centimetres; preliminary geometry only",
+  "method": "Same 3 geometry-only seed layouts and evaluator; no staircase supplied. Production readiness requirement unchanged.",
+  "detectedWallPairs": {
+    "before": [
+      98,
+      116
+    ],
+    "after": [
+      48,
+      57
+    ]
+  },
+  "ground": {
+    "before": {
+      "metrics": {
+        "supportCount": 16,
+        "balanceAvailable": true,
+        "concreteVolumeM3": 8.021998290599997,
+        "maxSpanM": 2.3000000000000003,
+        "fields": 0,
+        "problematicFields": 0,
+        "unresolvedAreaM2": 23.488749795499633,
+        "openingReviews": 0,
+        "boundaryReviews": 36,
+        "continuityIssues": 0,
+        "unavailableChecks": 32,
+        "columnIssues": 12,
+        "structuralPenalty": 5.031640434230014,
+        "balancePenalty": 0.6034303074567324,
+        "balanceTargetPenalty": 0.27653756450782574
+      },
+      "evaluations": 40,
+      "operations": {
+        "seeds": 3,
+        "remove": 7,
+        "move-wall": 7,
+        "resize-wall": 7,
+        "move-column": 7,
+        "resize-column": 7,
+        "add-column": 1,
+        "paired-walls": 1
+      },
+      "generationMs": 1029
+    },
+    "after": {
+      "metrics": {
+        "supportCount": 17,
+        "balanceAvailable": true,
+        "concreteVolumeM3": 8.581998290599998,
+        "maxSpanM": 2.3000000000000003,
+        "fields": 0,
+        "problematicFields": 0,
+        "unresolvedAreaM2": 23.488749795499633,
+        "openingReviews": 0,
+        "boundaryReviews": 36,
+        "continuityIssues": 0,
+        "unavailableChecks": 31,
+        "columnIssues": 12,
+        "structuralPenalty": 5.055324226298479,
+        "balancePenalty": 0.4962491804032735,
+        "balanceTargetPenalty": 0.16029018153582122
+      },
+      "evaluations": 64,
+      "operations": {
+        "seeds": 3,
+        "remove": 13,
+        "move-wall": 10,
+        "resize-wall": 13,
+        "move-column": 12,
+        "resize-column": 7,
+        "add-column": 1,
+        "add-wall": 4,
+        "paired-walls": 1
+      },
+      "generationMs": 1346
+    }
+  },
+  "upper": {
+    "columns": 2,
+    "walls": 1,
+    "rejected": {
+      "wall": 14
+    }
+  },
+  "limitations": [
+    "Partial slab preview, unresolved area unchanged; no closed support fields established.",
+    "Ground-storey generation in the app still requires a staircase opening.",
+    "14 lower supports conflict with upper architecture and remain reported for review."
+  ]
+}

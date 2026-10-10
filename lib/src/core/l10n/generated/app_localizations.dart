@@ -5072,7 +5072,7 @@ abstract class AppLocalizations {
   /// No description provided for @schemeMinSpacing.
   ///
   /// In en, this message translates to:
-  /// **'Minimum spacing (m)'**
+  /// **'Minimum column spacing (m)'**
   String get schemeMinSpacing;
 
   /// No description provided for @schemeTargetSpacing.
@@ -5162,7 +5162,7 @@ abstract class AppLocalizations {
   /// No description provided for @schemeComparison.
   ///
   /// In en, this message translates to:
-  /// **'Compare variants · eX/eY (m) · floating columns'**
+  /// **'Before → after'**
   String get schemeComparison;
 
   /// No description provided for @schemeFresh.
@@ -5368,6 +5368,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit floor slab'**
   String get bimEditFloorSlab;
+
+  /// No description provided for @schemeSearchSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Compared layouts: {layouts} · accepted changes: {changes} · evaluations: {evaluations}'**
+  String schemeSearchSummary(int layouts, int changes, int evaluations);
+
+  /// No description provided for @schemeFieldSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed fields: {count} · for review: {review}'**
+  String schemeFieldSummary(int count, int review);
+
+  /// No description provided for @schemeUnresolvedFieldArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Area with undetermined field support'**
+  String get schemeUnresolvedFieldArea;
+
+  /// No description provided for @schemeOpeningSupportReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Support around openings: points for review'**
+  String get schemeOpeningSupportReview;
+
+  /// No description provided for @schemeBoundarySupportReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Cantilever or undetermined edge support'**
+  String get schemeBoundarySupportReview;
+
+  /// No description provided for @schemeContinuityIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical continuity issues'**
+  String get schemeContinuityIssues;
+
+  /// No description provided for @schemeConcreteVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Support concrete volume'**
+  String get schemeConcreteVolume;
+
+  /// No description provided for @schemeBalanceIndex.
+  ///
+  /// In en, this message translates to:
+  /// **'Preliminary torsion index (lower is better)'**
+  String get schemeBalanceIndex;
+
+  /// No description provided for @schemeNoWallConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'No suitable wall'**
+  String get schemeNoWallConstraint;
+
+  /// No description provided for @schemeCollisionConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Section collision'**
+  String get schemeCollisionConstraint;
+
+  /// No description provided for @schemeColumnSpacingConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Column spacing'**
+  String get schemeColumnSpacingConstraint;
+
+  /// No description provided for @schemeWallSpacingConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall spacing'**
+  String get schemeWallSpacingConstraint;
+
+  /// No description provided for @schemeBudgetConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Placement budget'**
+  String get schemeBudgetConstraint;
+
+  /// No description provided for @schemeLimitInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Input size limit'**
+  String get schemeLimitInput;
+
+  /// No description provided for @schemeLimitSampling.
+  ///
+  /// In en, this message translates to:
+  /// **'Sampling limit'**
+  String get schemeLimitSampling;
+
+  /// No description provided for @schemeLimitJunctions.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall junction limit'**
+  String get schemeLimitJunctions;
+
+  /// No description provided for @schemeLimitElements.
+  ///
+  /// In en, this message translates to:
+  /// **'Support count limit'**
+  String get schemeLimitElements;
+
+  /// No description provided for @schemeLimitFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Field topology limit'**
+  String get schemeLimitFields;
+
+  /// No description provided for @schemeLimitOptimization.
+  ///
+  /// In en, this message translates to:
+  /// **'Local search budget reached; optimality is not established'**
+  String get schemeLimitOptimization;
+
+  /// No description provided for @schemeStageCore.
+  ///
+  /// In en, this message translates to:
+  /// **'Core'**
+  String get schemeStageCore;
+
+  /// No description provided for @schemeStageWalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Distributed walls'**
+  String get schemeStageWalls;
+
+  /// No description provided for @schemeStageColumns.
+  ///
+  /// In en, this message translates to:
+  /// **'Column nodes'**
+  String get schemeStageColumns;
+
+  /// No description provided for @schemeStageCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Coverage'**
+  String get schemeStageCoverage;
+
+  /// No description provided for @schemeStageRepair.
+  ///
+  /// In en, this message translates to:
+  /// **'Span repair'**
+  String get schemeStageRepair;
+
+  /// No description provided for @schemeStageOpenings.
+  ///
+  /// In en, this message translates to:
+  /// **'Architectural opening review'**
+  String get schemeStageOpenings;
+
+  /// No description provided for @schemePunchingGeometryReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Punching support geometry or beam load transfer needs review'**
+  String get schemePunchingGeometryReview;
+
+  /// No description provided for @schemeInteriorColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Interior column'**
+  String get schemeInteriorColumn;
+
+  /// No description provided for @schemeEdgeColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Edge column'**
+  String get schemeEdgeColumn;
+
+  /// No description provided for @schemeCornerColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Corner column'**
+  String get schemeCornerColumn;
+
+  /// No description provided for @schemeUnknownColumnPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Undetermined column position'**
+  String get schemeUnknownColumnPosition;
+
+  /// No description provided for @schemeSearchNoImprovement.
+  ///
+  /// In en, this message translates to:
+  /// **'The search retained the best assessed seed'**
+  String get schemeSearchNoImprovement;
+
+  /// No description provided for @schemeMinWallSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum parallel wall spacing (m)'**
+  String get schemeMinWallSpacing;
+
+  /// No description provided for @schemeUnavailableChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Undetermined checks'**
+  String get schemeUnavailableChecks;
+
+  /// No description provided for @schemeSeedDensityConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped in the sparse seed'**
+  String get schemeSeedDensityConstraint;
+
+  /// No description provided for @floorSlabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor slab at this level'**
+  String get floorSlabTitle;
+
+  /// No description provided for @floorSlabContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor of level {level} · edit on its own plan'**
+  String floorSlabContext(String level);
+
+  /// No description provided for @floorSlabLevelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The slab belongs to this level and is shown as the ceiling on the immediately lower level.'**
+  String get floorSlabLevelHint;
+
+  /// No description provided for @bimCeilingSlabReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Ceiling slab · floor of level {owner}'**
+  String bimCeilingSlabReference(String owner);
+
+  /// No description provided for @gridAxisSourceLevels.
+  ///
+  /// In en, this message translates to:
+  /// **'Levels: {levels}'**
+  String gridAxisSourceLevels(String levels);
 }
 
 class _AppLocalizationsDelegate

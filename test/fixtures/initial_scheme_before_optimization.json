@@ -1,0 +1,1359 @@
+[
+  {
+    "name": "orthogonal",
+    "project": {
+      "title": "Конструктивен Модел",
+      "storeys": [
+        {
+          "id": "f",
+          "name": "f",
+          "elevation": 0.0,
+          "floorFinishThickness": 0.05,
+          "height": 3.0,
+          "columns": [],
+          "shearWalls": [],
+          "beams": [],
+          "slabs": [
+            {
+              "id": "s",
+              "polygon": [
+                {
+                  "dx": 0.0,
+                  "dy": 0.0
+                },
+                {
+                  "dx": 20.0,
+                  "dy": 0.0
+                },
+                {
+                  "dx": 20.0,
+                  "dy": 16.0
+                },
+                {
+                  "dx": 0.0,
+                  "dy": 16.0
+                }
+              ],
+              "openings": [
+                [
+                  {
+                    "dx": 7.0,
+                    "dy": 6.0
+                  },
+                  {
+                    "dx": 9.0,
+                    "dy": 6.0
+                  },
+                  {
+                    "dx": 9.0,
+                    "dy": 10.0
+                  },
+                  {
+                    "dx": 7.0,
+                    "dy": 10.0
+                  }
+                ]
+              ],
+              "openingTypes": [
+                "staircase"
+              ],
+              "thickness": 0.2,
+              "floorFinish": null,
+              "colorValue": null
+            }
+          ],
+          "gridAxes": [
+            {
+              "id": "x",
+              "name": "1",
+              "start": {
+                "dx": 2.0,
+                "dy": 0.0
+              },
+              "end": {
+                "dx": 2.0,
+                "dy": 16.0
+              },
+              "bubbleAtStart": true,
+              "bubbleAtEnd": true
+            },
+            {
+              "id": "y",
+              "name": "A",
+              "start": {
+                "dx": 0.0,
+                "dy": 8.0
+              },
+              "end": {
+                "dx": 20.0,
+                "dy": 8.0
+              },
+              "bubbleAtStart": true,
+              "bubbleAtEnd": true
+            }
+          ]
+        }
+      ],
+      "activeStoreyIndex": 0,
+      "ghostMode": "none",
+      "gridAxes": [],
+      "foundationType": "stripFooting",
+      "concreteGrade": "C25/30",
+      "concreteE": 31000.0,
+      "deadLoadSuperimposed": 1.5,
+      "liveLoad": 2.0,
+      "facadeWallLoad": 3.5
+    },
+    "layout": {
+      "id": "f",
+      "name": "f",
+      "elevation": 0.0,
+      "floorFinishThickness": 0.05,
+      "height": 3.0,
+      "columns": [
+        {
+          "id": "scheme:f:c:10.0000,10.0000",
+          "name": "C1",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 10.0,
+            "dy": 10.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 3.141592653589793,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:5.0219,2.0000",
+          "name": "C2",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 5.021875,
+            "dy": 2.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 1.5707963267948966,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:7.2344,2.0000",
+          "name": "C3",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 7.234375,
+            "dy": 2.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 1.5707963267948966,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:13.8719,2.0000",
+          "name": "C4",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 13.871875,
+            "dy": 2.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 1.5707963267948966,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:13.8719,14.0000",
+          "name": "C5",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 13.871875,
+            "dy": 14.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 1.5707963267948966,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:7.2344,14.0000",
+          "name": "C6",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 7.234375,
+            "dy": 14.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 1.5707963267948966,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:2.0000,10.8036",
+          "name": "C7",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 2.0,
+            "dy": 10.803571428571429
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 3.141592653589793,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:2.0000,5.1458",
+          "name": "C8",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 2.0,
+            "dy": 5.145833333333334
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 3.141592653589793,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:5.0219,8.0000",
+          "name": "C9",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 5.021875,
+            "dy": 8.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 1.5707963267948966,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:18.0000,5.1458",
+          "name": "C10",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 18.0,
+            "dy": 5.145833333333334
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 3.141592653589793,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:14.3094,8.0000",
+          "name": "C11",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 14.309375,
+            "dy": 8.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 1.5707963267948966,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:18.0000,10.0000",
+          "name": "C12",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 18.0,
+            "dy": 10.0
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 3.141592653589793,
+          "thickness": 0.25,
+          "isMirrored": false
+        }
+      ],
+      "shearWalls": [
+        {
+          "id": "scheme:f:w:10.0000,6.0000",
+          "name": "W1",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 10.0,
+            "dy": 4.750000000000002
+          },
+          "end": {
+            "dx": 10.0,
+            "dy": 7.249999999999998
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:10.0000,8.0000",
+          "name": "W2",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 9.049999999999997,
+            "dy": 8.0
+          },
+          "end": {
+            "dx": 10.950000000000003,
+            "dy": 8.0
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:10.0000,14.0000",
+          "name": "W3",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 8.75,
+            "dy": 14.0
+          },
+          "end": {
+            "dx": 11.25,
+            "dy": 14.0
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:10.0000,2.0000",
+          "name": "W4",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 8.75,
+            "dy": 2.0
+          },
+          "end": {
+            "dx": 11.25,
+            "dy": 2.0
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:18.0000,8.0000",
+          "name": "W5",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 18.0,
+            "dy": 7.25
+          },
+          "end": {
+            "dx": 18.0,
+            "dy": 8.75
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:2.0000,8.0000",
+          "name": "W6",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 2.0,
+            "dy": 7.25
+          },
+          "end": {
+            "dx": 2.0,
+            "dy": 8.75
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:2.2500,14.0000",
+          "name": "W7",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 1.0,
+            "dy": 14.0
+          },
+          "end": {
+            "dx": 3.5,
+            "dy": 14.0
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:18.0000,2.2500",
+          "name": "W8",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 18.0,
+            "dy": 1.0
+          },
+          "end": {
+            "dx": 18.0,
+            "dy": 3.5
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:18.0000,13.7500",
+          "name": "W9",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 18.0,
+            "dy": 12.5
+          },
+          "end": {
+            "dx": 18.0,
+            "dy": 15.0
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:2.2500,2.0000",
+          "name": "W10",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 1.0,
+            "dy": 2.0
+          },
+          "end": {
+            "dx": 3.5,
+            "dy": 2.0
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        }
+      ],
+      "beams": [],
+      "slabs": [
+        {
+          "id": "s",
+          "polygon": [
+            {
+              "dx": 0.0,
+              "dy": 0.0
+            },
+            {
+              "dx": 20.0,
+              "dy": 0.0
+            },
+            {
+              "dx": 20.0,
+              "dy": 16.0
+            },
+            {
+              "dx": 0.0,
+              "dy": 16.0
+            }
+          ],
+          "openings": [
+            [
+              {
+                "dx": 7.0,
+                "dy": 6.0
+              },
+              {
+                "dx": 9.0,
+                "dy": 6.0
+              },
+              {
+                "dx": 9.0,
+                "dy": 10.0
+              },
+              {
+                "dx": 7.0,
+                "dy": 10.0
+              }
+            ]
+          ],
+          "openingTypes": [
+            "staircase"
+          ],
+          "thickness": 0.2,
+          "floorFinish": null,
+          "colorValue": null
+        }
+      ],
+      "gridAxes": [
+        {
+          "id": "x",
+          "name": "1",
+          "start": {
+            "dx": 2.0,
+            "dy": 0.0
+          },
+          "end": {
+            "dx": 2.0,
+            "dy": 16.0
+          },
+          "bubbleAtStart": true,
+          "bubbleAtEnd": true
+        },
+        {
+          "id": "y",
+          "name": "A",
+          "start": {
+            "dx": 0.0,
+            "dy": 8.0
+          },
+          "end": {
+            "dx": 20.0,
+            "dy": 8.0
+          },
+          "bubbleAtStart": true,
+          "bubbleAtEnd": true
+        }
+      ]
+    },
+    "span": 6.01592937541657,
+    "columns": 12,
+    "walls": 10
+  },
+  {
+    "name": "rotated",
+    "project": {
+      "title": "Конструктивен Модел",
+      "storeys": [
+        {
+          "id": "f",
+          "name": "f",
+          "elevation": 0.0,
+          "floorFinishThickness": 0.05,
+          "height": 3.0,
+          "columns": [],
+          "shearWalls": [],
+          "beams": [],
+          "slabs": [
+            {
+              "id": "s",
+              "polygon": [
+                {
+                  "dx": 0.0,
+                  "dy": 0.0
+                },
+                {
+                  "dx": 18.1793149934977,
+                  "dy": 8.337416048584215
+                },
+                {
+                  "dx": 11.50938215463033,
+                  "dy": 22.880868043382378
+                },
+                {
+                  "dx": -6.669932838867372,
+                  "dy": 14.543451994798161
+                }
+              ],
+              "openings": [
+                [
+                  {
+                    "dx": 3.861535433148931,
+                    "dy": 8.371890115053786
+                  },
+                  {
+                    "dx": 5.6794669324987,
+                    "dy": 9.205631719912208
+                  },
+                  {
+                    "dx": 4.011983722781857,
+                    "dy": 12.841494718611749
+                  },
+                  {
+                    "dx": 2.194052223432088,
+                    "dy": 12.007753113753326
+                  }
+                ]
+              ],
+              "openingTypes": [
+                "staircase"
+              ],
+              "thickness": 0.2,
+              "floorFinish": null,
+              "colorValue": null
+            }
+          ],
+          "gridAxes": [
+            {
+              "id": "x",
+              "name": "1",
+              "start": {
+                "dx": 1.8179314993497702,
+                "dy": 0.8337416048584215
+              },
+              "end": {
+                "dx": -4.852001339517602,
+                "dy": 15.377193599656582
+              },
+              "bubbleAtStart": true,
+              "bubbleAtEnd": true
+            },
+            {
+              "id": "y",
+              "name": "A",
+              "start": {
+                "dx": -3.334966419433686,
+                "dy": 7.271725997399081
+              },
+              "end": {
+                "dx": 14.844348574064016,
+                "dy": 15.609142045983296
+              },
+              "bubbleAtStart": true,
+              "bubbleAtEnd": true
+            }
+          ]
+        }
+      ],
+      "activeStoreyIndex": 0,
+      "ghostMode": "none",
+      "gridAxes": [],
+      "foundationType": "stripFooting",
+      "concreteGrade": "C25/30",
+      "concreteE": 31000.0,
+      "deadLoadSuperimposed": 1.5,
+      "liveLoad": 2.0,
+      "facadeWallLoad": 3.5
+    },
+    "layout": {
+      "id": "f",
+      "name": "f",
+      "elevation": 0.0,
+      "floorFinishThickness": 0.05,
+      "height": 3.0,
+      "columns": [
+        {
+          "id": "scheme:f:c:4.9209,13.2584",
+          "name": "C1",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 4.920949472456742,
+            "dy": 13.258365521040961
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 0.42999999999999994,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:3.7310,3.9114",
+          "name": "C2",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 3.730970769290143,
+            "dy": 3.9114045602989633
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 2.0007963267948967,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:5.7421,4.8337",
+          "name": "C3",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 5.742057490445826,
+            "dy": 4.833731210673593
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 2.0007963267948967,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:11.7753,7.6007",
+          "name": "C4",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 11.775317653912877,
+            "dy": 7.600711161797479
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 2.0007963267948967,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:14.6922,11.1433",
+          "name": "C5",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 14.692163322754299,
+            "dy": 11.143324799715645
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 0.43000000000000016,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:11.8366,17.3697",
+          "name": "C6",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 11.836598326114204,
+            "dy": 17.369740184988608
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 0.43000000000000016,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:6.7729,18.5083",
+          "name": "C7",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 6.7728680247623485,
+            "dy": 18.508300157896098
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 2.0007963267948963,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:0.7396,15.7413",
+          "name": "C8",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 0.7396078612953003,
+            "dy": 15.741320206772214
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 2.0007963267948963,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:-1.2715,14.8190",
+          "name": "C9",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": -1.2714788598603852,
+            "dy": 14.818993556397585
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 2.0007963267948963,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:0.1487,4.4734",
+          "name": "C10",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 0.14871132795614006,
+            "dy": 4.4733919608482715
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 0.42999999999999994,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:1.2297,9.3652",
+          "name": "C11",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 1.229745954714879,
+            "dy": 9.365199058348274
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 2.0007963267948967,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:9.2741,13.0545",
+          "name": "C12",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": 9.274092839337616,
+            "dy": 13.05450565984679
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 2.0007963267948967,
+          "thickness": 0.25,
+          "isMirrored": false
+        },
+        {
+          "id": "scheme:f:c:-2.7069,10.6998",
+          "name": "C13",
+          "generatedBy": "initial-scheme-v1",
+          "center": {
+            "dx": -2.706853668683954,
+            "dy": 10.699807346121236
+          },
+          "shape": "rectangular",
+          "width": 0.25,
+          "height": 0.3,
+          "rotationRad": 0.42999999999999994,
+          "thickness": 0.25,
+          "isMirrored": false
+        }
+      ],
+      "shearWalls": [
+        {
+          "id": "scheme:f:w:6.5884,9.6225",
+          "name": "W1",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 6.0673441791370735,
+            "dy": 10.758709709435022
+          },
+          "end": {
+            "dx": 7.109521185210097,
+            "dy": 8.486295335247819
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:5.7547,11.4404",
+          "name": "W2",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 5.072966765059001,
+            "dy": 11.12778091986928
+          },
+          "end": {
+            "dx": 6.436415389571329,
+            "dy": 11.753087123513097
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:3.2535,16.8942",
+          "name": "W3",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 2.117259075646295,
+            "dy": 16.373140016703985
+          },
+          "end": {
+            "dx": 4.3896734498335075,
+            "dy": 17.41531702277701
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:8.2559,5.9866",
+          "name": "W4",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 7.119708704796825,
+            "dy": 5.465551020605365
+          },
+          "end": {
+            "dx": 9.392123078984039,
+            "dy": 6.507728026678392
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:13.0264,14.7754",
+          "name": "W5",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 12.692920432770876,
+            "dy": 15.50257304086478
+          },
+          "end": {
+            "dx": 13.359913716657612,
+            "dy": 14.048227841384966
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:-1.5170,8.1055",
+          "name": "W6",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": -1.829688021905824,
+            "dy": 8.787191914513665
+          },
+          "end": {
+            "dx": -1.2043818182620079,
+            "dy": 7.423743290001338
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:1.2114,2.7559",
+          "name": "W7",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 0.07522414481646367,
+            "dy": 2.234802301778981
+          },
+          "end": {
+            "dx": 2.347638519003677,
+            "dy": 3.276979307852008
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:15.3004,9.2174",
+          "name": "W8",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 14.164193264777182,
+            "dy": 8.69629973943175
+          },
+          "end": {
+            "dx": 16.436607638964396,
+            "dy": 9.738476745504775
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:-3.9140,13.3320",
+          "name": "W9",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": -4.4351305370883916,
+            "dy": 14.468227849981698
+          },
+          "end": {
+            "dx": -3.3929535310153645,
+            "dy": 12.195813475794484
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:10.4210,20.4564",
+          "name": "W10",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 10.108321457709767,
+            "dy": 21.13816068884907
+          },
+          "end": {
+            "dx": 10.733627661353584,
+            "dy": 19.77471206433674
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        }
+      ],
+      "beams": [],
+      "slabs": [
+        {
+          "id": "s",
+          "polygon": [
+            {
+              "dx": 0.0,
+              "dy": 0.0
+            },
+            {
+              "dx": 18.1793149934977,
+              "dy": 8.337416048584215
+            },
+            {
+              "dx": 11.50938215463033,
+              "dy": 22.880868043382378
+            },
+            {
+              "dx": -6.669932838867372,
+              "dy": 14.543451994798161
+            }
+          ],
+          "openings": [
+            [
+              {
+                "dx": 3.861535433148931,
+                "dy": 8.371890115053786
+              },
+              {
+                "dx": 5.6794669324987,
+                "dy": 9.205631719912208
+              },
+              {
+                "dx": 4.011983722781857,
+                "dy": 12.841494718611749
+              },
+              {
+                "dx": 2.194052223432088,
+                "dy": 12.007753113753326
+              }
+            ]
+          ],
+          "openingTypes": [
+            "staircase"
+          ],
+          "thickness": 0.2,
+          "floorFinish": null,
+          "colorValue": null
+        }
+      ],
+      "gridAxes": [
+        {
+          "id": "x",
+          "name": "1",
+          "start": {
+            "dx": 1.8179314993497702,
+            "dy": 0.8337416048584215
+          },
+          "end": {
+            "dx": -4.852001339517602,
+            "dy": 15.377193599656582
+          },
+          "bubbleAtStart": true,
+          "bubbleAtEnd": true
+        },
+        {
+          "id": "y",
+          "name": "A",
+          "start": {
+            "dx": -3.334966419433686,
+            "dy": 7.271725997399081
+          },
+          "end": {
+            "dx": 14.844348574064016,
+            "dy": 15.609142045983296
+          },
+          "bubbleAtStart": true,
+          "bubbleAtEnd": true
+        }
+      ]
+    },
+    "span": 6.39493207547977,
+    "columns": 13,
+    "walls": 10
+  },
+  {
+    "name": "core-only",
+    "project": {
+      "title": "Конструктивен Модел",
+      "storeys": [
+        {
+          "id": "f",
+          "name": "f",
+          "elevation": 0.0,
+          "floorFinishThickness": 0.05,
+          "height": 3.0,
+          "columns": [],
+          "shearWalls": [],
+          "beams": [],
+          "slabs": [
+            {
+              "id": "s",
+              "polygon": [
+                {
+                  "dx": 0.0,
+                  "dy": 0.0
+                },
+                {
+                  "dx": 20.0,
+                  "dy": 0.0
+                },
+                {
+                  "dx": 20.0,
+                  "dy": 16.0
+                },
+                {
+                  "dx": 0.0,
+                  "dy": 16.0
+                }
+              ],
+              "openings": [
+                [
+                  {
+                    "dx": 7.0,
+                    "dy": 6.0
+                  },
+                  {
+                    "dx": 9.0,
+                    "dy": 6.0
+                  },
+                  {
+                    "dx": 9.0,
+                    "dy": 10.0
+                  },
+                  {
+                    "dx": 7.0,
+                    "dy": 10.0
+                  }
+                ]
+              ],
+              "openingTypes": [
+                "staircase"
+              ],
+              "thickness": 0.2,
+              "floorFinish": null,
+              "colorValue": null
+            }
+          ],
+          "gridAxes": [
+            {
+              "id": "x",
+              "name": "1",
+              "start": {
+                "dx": 2.0,
+                "dy": 0.0
+              },
+              "end": {
+                "dx": 2.0,
+                "dy": 16.0
+              },
+              "bubbleAtStart": true,
+              "bubbleAtEnd": true
+            },
+            {
+              "id": "y",
+              "name": "A",
+              "start": {
+                "dx": 0.0,
+                "dy": 8.0
+              },
+              "end": {
+                "dx": 20.0,
+                "dy": 8.0
+              },
+              "bubbleAtStart": true,
+              "bubbleAtEnd": true
+            }
+          ]
+        }
+      ],
+      "activeStoreyIndex": 0,
+      "ghostMode": "none",
+      "gridAxes": [],
+      "foundationType": "stripFooting",
+      "concreteGrade": "C25/30",
+      "concreteE": 31000.0,
+      "deadLoadSuperimposed": 1.5,
+      "liveLoad": 2.0,
+      "facadeWallLoad": 3.5
+    },
+    "layout": {
+      "id": "f",
+      "name": "f",
+      "elevation": 0.0,
+      "floorFinishThickness": 0.05,
+      "height": 3.0,
+      "columns": [],
+      "shearWalls": [
+        {
+          "id": "scheme:f:w:8.0000,5.7000",
+          "name": "W1",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 6.75,
+            "dy": 5.7
+          },
+          "end": {
+            "dx": 9.25,
+            "dy": 5.7
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:6.7000,8.0000",
+          "name": "W2",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 6.7,
+            "dy": 6.75
+          },
+          "end": {
+            "dx": 6.7,
+            "dy": 9.25
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:8.0000,10.3000",
+          "name": "W3",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 6.75,
+            "dy": 10.3
+          },
+          "end": {
+            "dx": 9.25,
+            "dy": 10.3
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        },
+        {
+          "id": "scheme:f:w:9.3000,8.0000",
+          "name": "W4",
+          "generatedBy": "initial-scheme-v1",
+          "start": {
+            "dx": 9.3,
+            "dy": 6.75
+          },
+          "end": {
+            "dx": 9.3,
+            "dy": 9.25
+          },
+          "thickness": 0.25,
+          "isFlipped": false,
+          "referenceLine": "center"
+        }
+      ],
+      "beams": [],
+      "slabs": [
+        {
+          "id": "s",
+          "polygon": [
+            {
+              "dx": 0.0,
+              "dy": 0.0
+            },
+            {
+              "dx": 20.0,
+              "dy": 0.0
+            },
+            {
+              "dx": 20.0,
+              "dy": 16.0
+            },
+            {
+              "dx": 0.0,
+              "dy": 16.0
+            }
+          ],
+          "openings": [
+            [
+              {
+                "dx": 7.0,
+                "dy": 6.0
+              },
+              {
+                "dx": 9.0,
+                "dy": 6.0
+              },
+              {
+                "dx": 9.0,
+                "dy": 10.0
+              },
+              {
+                "dx": 7.0,
+                "dy": 10.0
+              }
+            ]
+          ],
+          "openingTypes": [
+            "staircase"
+          ],
+          "thickness": 0.2,
+          "floorFinish": null,
+          "colorValue": null
+        }
+      ],
+      "gridAxes": [
+        {
+          "id": "x",
+          "name": "1",
+          "start": {
+            "dx": 2.0,
+            "dy": 0.0
+          },
+          "end": {
+            "dx": 2.0,
+            "dy": 16.0
+          },
+          "bubbleAtStart": true,
+          "bubbleAtEnd": true
+        },
+        {
+          "id": "y",
+          "name": "A",
+          "start": {
+            "dx": 0.0,
+            "dy": 8.0
+          },
+          "end": {
+            "dx": 20.0,
+            "dy": 8.0
+          },
+          "bubbleAtStart": true,
+          "bubbleAtEnd": true
+        }
+      ]
+    },
+    "columns": 0,
+    "walls": 4
+  }
+]

@@ -2955,7 +2955,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get schemeVariantLong => 'Вариант 2 · по дългите стени';
 
   @override
-  String get schemeMinSpacing => 'Минимална стъпка (m)';
+  String get schemeMinSpacing => 'Мин. стъпка между колони (m)';
 
   @override
   String get schemeTargetSpacing => 'Целева стъпка (m)';
@@ -3008,8 +3008,7 @@ class AppLocalizationsBg extends AppLocalizations {
       'Проектът е променен. Отворете нов преглед преди приемане.';
 
   @override
-  String get schemeComparison =>
-      'Сравнение на вариантите · eX/eY (m) · насадени колони';
+  String get schemeComparison => 'Преди → след';
 
   @override
   String get schemeFresh =>
@@ -3141,4 +3140,140 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get bimEditFloorSlab => 'Редактирай плочата';
+
+  @override
+  String schemeSearchSummary(int layouts, int changes, int evaluations) {
+    return 'Сравнени схеми: $layouts · приети промени: $changes · оценки: $evaluations';
+  }
+
+  @override
+  String schemeFieldSummary(int count, int review) {
+    return 'Затворени полета: $count · за преглед: $review';
+  }
+
+  @override
+  String get schemeUnresolvedFieldArea =>
+      'Площ с неустановено подпиране на полетата';
+
+  @override
+  String get schemeOpeningSupportReview =>
+      'Подпиране около отвори: точки за преглед';
+
+  @override
+  String get schemeBoundarySupportReview =>
+      'Конзоли или неустановено подпиране по ръба';
+
+  @override
+  String get schemeContinuityIssues => 'Проблеми с вертикалната непрекъснатост';
+
+  @override
+  String get schemeConcreteVolume => 'Обем бетон на опорите';
+
+  @override
+  String get schemeBalanceIndex =>
+      'Предварителен индекс за усукване (по-нисък е по-добре)';
+
+  @override
+  String get schemeNoWallConstraint => 'Няма подходяща стена';
+
+  @override
+  String get schemeCollisionConstraint => 'Колизия на сечения';
+
+  @override
+  String get schemeColumnSpacingConstraint => 'Стъпка между колони';
+
+  @override
+  String get schemeWallSpacingConstraint => 'Стъпка между шайби';
+
+  @override
+  String get schemeBudgetConstraint => 'Бюджет за разполагане';
+
+  @override
+  String get schemeLimitInput => 'Лимит на входните данни';
+
+  @override
+  String get schemeLimitSampling => 'Лимит на геометричните проби';
+
+  @override
+  String get schemeLimitJunctions => 'Лимит на стенните възли';
+
+  @override
+  String get schemeLimitElements => 'Лимит на броя опори';
+
+  @override
+  String get schemeLimitFields => 'Лимит на топологията на полетата';
+
+  @override
+  String get schemeLimitOptimization =>
+      'Достигнат е бюджетът за локално търсене; оптималност не е установена';
+
+  @override
+  String get schemeStageCore => 'Ядро';
+
+  @override
+  String get schemeStageWalls => 'Разпределени шайби';
+
+  @override
+  String get schemeStageColumns => 'Колонни възли';
+
+  @override
+  String get schemeStageCoverage => 'Покритие';
+
+  @override
+  String get schemeStageRepair => 'Поправка на полетата';
+
+  @override
+  String get schemeStageOpenings => 'Преглед на архитектурните отвори';
+
+  @override
+  String get schemePunchingGeometryReview =>
+      'Геометрията за продънване или прехвърлянето на товара към гредите изисква преглед';
+
+  @override
+  String get schemeInteriorColumn => 'Вътрешна колона';
+
+  @override
+  String get schemeEdgeColumn => 'Крайна колона';
+
+  @override
+  String get schemeCornerColumn => 'Ъглова колона';
+
+  @override
+  String get schemeUnknownColumnPosition =>
+      'Неустановено положение на колоната';
+
+  @override
+  String get schemeSearchNoImprovement =>
+      'Търсенето запази най-добрия оценен начален вариант';
+
+  @override
+  String get schemeMinWallSpacing => 'Мин. стъпка между успоредни шайби (m)';
+
+  @override
+  String get schemeUnavailableChecks => 'Неустановени проверки';
+
+  @override
+  String get schemeSeedDensityConstraint => 'Пропуснати в по-редкия вариант';
+
+  @override
+  String get floorSlabTitle => 'Подова плоча на тази кота';
+
+  @override
+  String floorSlabContext(String level) {
+    return 'Под на кота $level · редакция на нейната кота';
+  }
+
+  @override
+  String get floorSlabLevelHint =>
+      'Плочата принадлежи на тази кота и се показва като таван на непосредствено по-ниската кота.';
+
+  @override
+  String bimCeilingSlabReference(String owner) {
+    return 'Таванна плоча · под на кота $owner';
+  }
+
+  @override
+  String gridAxisSourceLevels(String levels) {
+    return 'Коти: $levels';
+  }
 }

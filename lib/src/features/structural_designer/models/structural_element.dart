@@ -486,6 +486,9 @@ class StructuralGridAxis {
   final Offset end;
   final bool bubbleAtStart;
   final bool bubbleAtEnd;
+  /// Empty means a legacy/project-wide axis. Otherwise these floors supplied
+  /// this shared alignment; the axis is a reference on every other floor.
+  final List<String> sourceStoreyIds;
 
   const StructuralGridAxis({
     required this.id,
@@ -494,6 +497,7 @@ class StructuralGridAxis {
     required this.end,
     this.bubbleAtStart = true,
     this.bubbleAtEnd = true,
+    this.sourceStoreyIds = const [],
   });
 
   double get length {
@@ -649,6 +653,7 @@ class StructuralGridAxis {
     Offset? end,
     bool? bubbleAtStart,
     bool? bubbleAtEnd,
+    List<String>? sourceStoreyIds,
   }) {
     return StructuralGridAxis(
       id: id ?? this.id,
@@ -657,6 +662,7 @@ class StructuralGridAxis {
       end: end ?? this.end,
       bubbleAtStart: bubbleAtStart ?? this.bubbleAtStart,
       bubbleAtEnd: bubbleAtEnd ?? this.bubbleAtEnd,
+      sourceStoreyIds: sourceStoreyIds ?? this.sourceStoreyIds,
     );
   }
 
@@ -667,6 +673,7 @@ class StructuralGridAxis {
     'end': {'dx': end.dx, 'dy': end.dy},
     'bubbleAtStart': bubbleAtStart,
     'bubbleAtEnd': bubbleAtEnd,
+    if (sourceStoreyIds.isNotEmpty) 'sourceStoreyIds': sourceStoreyIds,
   };
 
   factory StructuralGridAxis.fromJson(Map<String, dynamic> json) {
@@ -683,6 +690,7 @@ class StructuralGridAxis {
       ),
       bubbleAtStart: json['bubbleAtStart'] as bool? ?? true,
       bubbleAtEnd: json['bubbleAtEnd'] as bool? ?? true,
+      sourceStoreyIds: (json['sourceStoreyIds'] as List? ?? []).whereType<String>().toList(),
     );
   }
 }
@@ -752,8 +760,11 @@ class StructuralSlab {
   final List<List<Offset>> openings; // Staircase, elevator, shaft cutouts
   final List<SlabOpeningType>? openingTypes; // Typed categorization of openings
   final double thickness; // in meters (default 0.20)
-  /// Absolute top-of-concrete elevation in metres; null derives the ceiling.
+  /// Absolute top-of-concrete elevation; null derives the floor or legacy ceiling.
   final double? topElevation;
+  /// New BIM slabs belong to the floor plan on which they were drawn.
+  /// False preserves legacy ceiling ownership in existing projects.
+  final bool isFloorSlab;
   final SeismicSlabLoad? seismicLoad;
 
   SeismicSlabLoad effectiveSeismicLoad(StructuralProject project) => seismicLoad ??
@@ -769,6 +780,7 @@ class StructuralSlab {
     this.openingTypes,
     this.thickness = 0.20,
     this.topElevation,
+    this.isFloorSlab = false,
     this.seismicLoad,
     this.floorFinish,
     this.colorValue,
@@ -1804,6 +1816,7 @@ class StructuralSlab {
     bool clearSeismicLoad = false,
     double? topElevation,
     bool clearTopElevation = false,
+    bool? isFloorSlab,
   }) {
     return StructuralSlab(
       id: id ?? this.id,
@@ -1812,6 +1825,7 @@ class StructuralSlab {
       openingTypes: openingTypes ?? this.openingTypes,
       thickness: thickness ?? this.thickness,
       topElevation: clearTopElevation ? null : topElevation ?? this.topElevation,
+      isFloorSlab: isFloorSlab ?? this.isFloorSlab,
       floorFinish: floorFinish ?? this.floorFinish,
       colorValue: colorValue ?? this.colorValue,
       seismicLoad: clearSeismicLoad ? null : seismicLoad ?? this.seismicLoad,
@@ -1825,6 +1839,7 @@ class StructuralSlab {
     if (openingTypes != null) 'openingTypes': openingTypes!.map((t) => t.name).toList(),
     'thickness': thickness,
     if (topElevation != null) 'topElevation': topElevation,
+    if (isFloorSlab) 'isFloorSlab': true,
     'floorFinish': floorFinish,
     if (seismicLoad != null) 'seismicLoad': seismicLoad!.toJson(),
     'colorValue': colorValue,
@@ -1851,6 +1866,7 @@ class StructuralSlab {
           .toList(),
       thickness: (json['thickness'] as num?)?.toDouble() ?? 0.20,
       topElevation: (json['topElevation'] as num?)?.toDouble(),
+      isFloorSlab: json['isFloorSlab'] == true,
       floorFinish: (json['floorFinish'] as num?)?.toDouble(),
       seismicLoad: json['seismicLoad'] is Map
           ? SeismicSlabLoad.fromJson(Map<String, dynamic>.from(json['seismicLoad'] as Map)) : null,
@@ -1888,7 +1904,7 @@ class StoreyLevel {
   final List<StructuralColumn> columns;
   final List<StructuralShearWall> shearWalls;
   final List<StructuralBeam> beams;
-  /// Ceiling slabs above this storey, including their stair/shaft openings.
+  /// Owned slabs, including openings; isFloorSlab selects floor or legacy ceiling.
   final List<StructuralSlab> slabs;
   final List<StructuralGridAxis> gridAxes;
 
@@ -1925,7 +1941,8 @@ class StoreyLevel {
   /// Loads, openings and supports on this storey all refer to that ceiling.
   double structuralElevationFor(StructuralSlab slab) {
     return slab.topElevation ??
-        (elevation + height - (slab.floorFinish ?? floorFinishThickness));
+        (elevation + (slab.isFloorSlab ? 0 : height) -
+            (slab.floorFinish ?? floorFinishThickness));
   }
 
   /// Absolute elevation of the underside of [slab] concrete in metres.
@@ -2134,8 +2151,36 @@ class StructuralProject {
         : storey.copyWith(height: next.elevation - storey.elevation);
   }
 
-  List<StoreyLevel> get ceilingStoreys =>
-      storeys.map(resolveCeilingStorey).toList();
+  /// Read-only structural view: floor-owned slabs load the supports below them.
+  /// Transient copies carry absolute concrete levels and never enter persistence.
+  StoreyLevel supportedStoreyFor(StoreyLevel storey) {
+    final resolved = resolveCeilingStorey(storey);
+    final upper = ceilingSlabStoreyFor(storey);
+    return resolved.copyWith(slabs: [
+      for (final slab in resolved.slabs)
+        if (!slab.isFloorSlab) slab,
+      if (upper != null) for (final slab in upper.slabs)
+        slab.copyWith(isFloorSlab: false,
+          topElevation: upper.structuralElevationFor(slab)),
+    ]);
+  }
+
+  List<StoreyLevel> get ceilingStoreys => storeys.map(supportedStoreyFor).toList();
+
+  /// All floor-owned slabs of the immediate higher level, including openings.
+  /// This owner remains the destination for editing, even if levels are unsorted.
+  StoreyLevel? ceilingSlabStoreyFor(StoreyLevel storey) {
+    StoreyLevel? next;
+    for (final candidate in storeys) {
+      if (candidate.elevation > storey.elevation + 1e-6 &&
+          (next == null || candidate.elevation < next.elevation)) {
+        next = candidate;
+      }
+    }
+    if (next == null) return null;
+    final slabs = next.slabs.where((s) => s.isFloorSlab).toList();
+    return slabs.isEmpty ? null : next.copyWith(slabs: slabs);
+  }
 
   /// A floor plate is the ceiling owned by the nearest lower storey. Keep that
   /// ownership for loads, openings and edits; views only reference the plate.
@@ -2150,6 +2195,7 @@ class StructuralProject {
     if (lower == null) return null;
     final owner = resolveCeilingStorey(lower);
     final floorSlabs = owner.slabs.where((slab) {
+      if (slab.isFloorSlab) return false;
       final finishedLevel = owner.structuralElevationFor(slab) +
           (slab.floorFinish ?? owner.floorFinishThickness);
       return (finishedLevel - storey.elevation).abs() < .01;
@@ -2160,7 +2206,7 @@ class StructuralProject {
   /// Drawing/export view only. These references must not be saved as an upper
   /// storey's ceiling slabs or included twice in structural calculations.
   StoreyLevel storeyPlanFor(StoreyLevel storey) {
-    final ceiling = resolveCeilingStorey(storey);
+    final ceiling = supportedStoreyFor(storey);
     final floor = floorSlabStoreyFor(storey);
     if (floor == null) return ceiling;
     return ceiling.copyWith(slabs: [
@@ -2522,6 +2568,7 @@ List<StructuralGridAxis> resequenceGridAxes(
   }
 
   final result = <StructuralGridAxis>[];
+  var numberIndex = 0, letterIndex = 0;
 
   for (int gIdx = 0; gIdx < groups.length; gIdx++) {
     final group = groups[gIdx];
@@ -2554,9 +2601,10 @@ List<StructuralGridAxis> resequenceGridAxes(
     }
 
     for (int i = 0; i < group.length; i++) {
+      final index = useNumbers ? numberIndex++ : letterIndex++;
       final newName = useNumbers
-          ? '${i + 1}'
-          : (i < letters.length ? letters[i] : '${letters[i % letters.length]}${(i ~/ letters.length) + 1}');
+          ? '${index + 1}'
+          : (index < letters.length ? letters[index] : '${letters[index % letters.length]}${(index ~/ letters.length) + 1}');
       result.add(group[i].copyWith(name: newName));
     }
   }

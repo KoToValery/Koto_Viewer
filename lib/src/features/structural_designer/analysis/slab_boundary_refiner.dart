@@ -17,8 +17,9 @@ class SlabBoundaryRefiner {
     List<Offset> raster,
     List<List<Offset>> footprints,
     double cell,
-    double scale,
-  ) {
+    double scale, {
+    Set<String>? diagnostics,
+  }) {
     final edges = <(Offset, Offset)>[];
     for (final polygon in footprints) {
       for (var i = 0; i < polygon.length; i++) {
@@ -97,7 +98,7 @@ class SlabBoundaryRefiner {
       }
     }
     if (runs.length < 3 || runs.length > 2000) return null;
-    final result = <Offset>[];
+    var result = <Offset>[];
     for (var i = 0; i < runs.length; i++) {
       final previous = edges[runs[(i + runs.length - 1) % runs.length].$1],
           current = edges[runs[i].$1];
@@ -106,25 +107,127 @@ class SlabBoundaryRefiner {
       if (denominator.abs() < 1e-9 * u.distance * v.distance) return null;
       final intersection =
           previous.$1 + u * (_cross(current.$1 - previous.$1, v) / denominator);
-      if ((intersection - raster[runs[i].$2]).distance > 3 * cell) return null;
+      // A raster run starts where nearest-face ownership changes, not at
+      // the exact corner. At a mitre this transition is farther from the
+      // intersection than at a right angle. Bound by the intersection angle
+      // and still require the corner to lie close to the local raster boundary.
+      final cosine =
+          (u.dx * v.dx + u.dy * v.dy).abs() / (u.distance * v.distance);
+      final sinHalf = math.sqrt((1 - cosine.clamp(0.0, 1.0)) / 2);
+      final allowance = math.min(
+        10 * cell,
+        math.max(3 * cell, 2 * cell / sinHalf),
+      );
+      final transition = runs[i].$2;
+      if ((intersection - raster[transition]).distance > allowance) return null;
+      final reach = (allowance / cell).ceil() + 2;
+      var boundaryDistance = double.infinity;
+      for (var k = -reach; k <= reach; k++) {
+        final index = (transition + k) % raster.length;
+        boundaryDistance = math.min(
+          boundaryDistance,
+          _distance(
+            intersection,
+            raster[index],
+            raster[(index + 1) % raster.length],
+          ),
+        );
+      }
+      if (boundaryDistance > allowance) return null;
       result.add(intersection);
     }
-    // Reject collapsed edges and new intersections rather than emit a shifted
-    // or topologically different approximation.
+    // Cell padding can attach an exterior column or wall spur at one vertex.
+    // Keep the actual slab region, excluding only a sub-minimum lobe whose
+    // exact source boundary has a point contact. Larger contacts stay unresolved.
+    // Coincident intersections can arise from quantized KCAD support lines.
+    // Remove only numerically zero-length edges before checking topology.
+    final epsilon = .00001 * scale;
+    final cleaned = <Offset>[];
+    for (final p in result) {
+      if (cleaned.isEmpty || (p - cleaned.last).distance > epsilon) {
+        cleaned.add(p);
+      }
+    }
+    if (cleaned.length > 1 &&
+        (cleaned.first - cleaned.last).distance <= epsilon) {
+      cleaned.removeLast();
+    }
+    final pruned = _removePointContactArtifacts(cleaned, scale);
+    if (pruned == null) return null;
+    if (pruned.length != cleaned.length) {
+      diagnostics?.add('discardedPointContactArtifacts');
+    }
+    result = pruned;
+    return _simple(result, scale) ? result : null;
+  }
+
+  static double _area(List<Offset> ring) {
+    var sum = 0.0;
+    for (var i = 0; i < ring.length; i++) {
+      sum += _cross(
+        ring[i] - ring.first,
+        ring[(i + 1) % ring.length] - ring.first,
+      );
+    }
+    return sum.abs() / 2;
+  }
+
+  static List<Offset>? _removePointContactArtifacts(
+    List<Offset> ring,
+    double scale,
+  ) {
+    final epsilon = .00001 * scale;
+    var result = ring;
+    while (true) {
+      var changed = false;
+      for (var i = 0; i < result.length && !changed; i++) {
+        for (var j = i + 2; j < result.length; j++) {
+          if (i == 0 && j == result.length - 1) continue;
+          if ((result[i] - result[j]).distance > epsilon) continue;
+          final a = result.sublist(i, j);
+          final b = [...result.sublist(j), ...result.sublist(0, i)];
+          if (a.length < 3 || b.length < 3) return null;
+          final areaA = _area(a), areaB = _area(b);
+          // Match the raster stage's 1 m² minimum enclosed region.
+          if (math.min(areaA, areaB) >= 1000000 * scale * scale) return null;
+          result = areaA > areaB ? a : b;
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) return result;
+    }
+  }
+
+  static bool _simple(List<Offset> result, double scale) {
+    final epsilon = .00001 * scale;
+    if (result.length < 3 || _area(result) <= epsilon * epsilon) return false;
     for (var i = 0; i < result.length; i++) {
       final a = result[i], b = result[(i + 1) % result.length], u = b - a;
-      if (u.distance < 0.01 * scale) return null;
+      final next = result[(i + 2) % result.length];
+      if (u.distance < epsilon ||
+          _distance(next, a, b) <= epsilon ||
+          _distance(a, b, next) <= epsilon) {
+        return false;
+      }
       for (var j = i + 2; j < result.length; j++) {
         if (i == 0 && j == result.length - 1) continue;
-        final c = result[j],
-            v = result[(j + 1) % result.length] - c,
-            denominator = _cross(u, v);
+        final c = result[j], d = result[(j + 1) % result.length], v = d - c;
+        if ([
+          _distance(a, c, d),
+          _distance(b, c, d),
+          _distance(c, a, b),
+          _distance(d, a, b),
+        ].any((d) => d <= epsilon)) {
+          return false;
+        }
+        final denominator = _cross(u, v);
         if (denominator.abs() < 1e-9 * u.distance * v.distance) continue;
         final t = _cross(c - a, v) / denominator,
             s = _cross(c - a, u) / denominator;
-        if (t > 1e-8 && t < 1 - 1e-8 && s > 1e-8 && s < 1 - 1e-8) return null;
+        if (t >= 0 && t <= 1 && s >= 0 && s <= 1) return false;
       }
     }
-    return result;
+    return true;
   }
 }

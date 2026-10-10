@@ -32,7 +32,7 @@ class SlabEnvelopeResult {
   });
 
   Map<String, dynamic> toJson() => {
-    'version': 4,
+    'version': 5,
     'status': contours.isEmpty ? 'unresolved' : 'needsReview',
     'coordinateSpace': 'sourceCad',
     'cellSize': cellSize,
@@ -74,10 +74,19 @@ class SlabEnvelopeDetector {
     final columns = walls.detectedColumns.isNotEmpty
         ? walls.detectedColumns
         : (document != null
-            ? StructuralColumnDetector.detect(document, wallPairs: pairs, scale: scale)
-            : const <DetectedStructuralColumn>[]);
+              ? StructuralColumnDetector.detect(
+                  document,
+                  wallPairs: pairs,
+                  scale: scale,
+                )
+              : const <DetectedStructuralColumn>[]);
     final windowOpenings = document != null
-        ? GeometricWindowDetector.detect(document, pairs, scale, columns: columns)
+        ? GeometricWindowDetector.detect(
+            document,
+            pairs,
+            scale,
+            columns: columns,
+          )
         : const <GeometricWindowOpening>[];
     final partition = SlabWallRegions.build(
       pairs,
@@ -103,18 +112,38 @@ class SlabEnvelopeDetector {
       var rMinX = double.infinity, rMaxX = -double.infinity;
       var rMinY = double.infinity, rMaxY = -double.infinity;
       for (final w in region) {
-        rMinX = math.min(rMinX, math.min(w.centerlineStart.dx, w.centerlineEnd.dx));
-        rMaxX = math.max(rMaxX, math.max(w.centerlineStart.dx, w.centerlineEnd.dx));
-        rMinY = math.min(rMinY, math.min(w.centerlineStart.dy, w.centerlineEnd.dy));
-        rMaxY = math.max(rMaxY, math.max(w.centerlineStart.dy, w.centerlineEnd.dy));
+        rMinX = math.min(
+          rMinX,
+          math.min(w.centerlineStart.dx, w.centerlineEnd.dx),
+        );
+        rMaxX = math.max(
+          rMaxX,
+          math.max(w.centerlineStart.dx, w.centerlineEnd.dx),
+        );
+        rMinY = math.min(
+          rMinY,
+          math.min(w.centerlineStart.dy, w.centerlineEnd.dy),
+        );
+        rMaxY = math.max(
+          rMaxY,
+          math.max(w.centerlineStart.dy, w.centerlineEnd.dy),
+        );
       }
-      final regionBounds = Rect.fromLTRB(rMinX, rMinY, rMaxX, rMaxY).inflate(100.0 * scale);
+      final regionBounds = Rect.fromLTRB(
+        rMinX,
+        rMinY,
+        rMaxX,
+        rMaxY,
+      ).inflate(100.0 * scale);
       final regionColumns = columns
           .where((c) => regionBounds.overlaps(c.bounds))
           .map((c) => c.polygon)
           .toList();
       final regionWindows = windowOpenings
-          .where((w) => regionBounds.contains(w.start) || regionBounds.contains(w.end))
+          .where(
+            (w) =>
+                regionBounds.contains(w.start) || regionBounds.contains(w.end),
+          )
           .map((w) => w.barrierPolygon)
           .toList();
       final extraObstacles = [...regionColumns, ...regionWindows];
@@ -429,6 +458,7 @@ class SlabEnvelopeDetector {
     }
     final contours = <List<Offset>>[];
     var refinementFailures = 0;
+    final refinementDiagnostics = <String>{};
     while (edges.isNotEmpty) {
       final start = edges.keys.first;
       var current = start;
@@ -462,6 +492,7 @@ class SlabEnvelopeDetector {
           footprints,
           cell,
           scale,
+          diagnostics: refinementDiagnostics,
         );
         if (refined == null) {
           refinementFailures++;
@@ -474,6 +505,7 @@ class SlabEnvelopeDetector {
       contours,
       [
         'sourceAlignedBoundary',
+        ...refinementDiagnostics,
         if (refinementFailures > 0) 'boundaryRefinementFailed',
         'courtyardsAndSlabOpeningsUnclassified',
         'remainingGapsMayLeak',

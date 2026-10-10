@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/structural_element.dart';
+import 'slab_boundary_geometry.dart';
+import 'slab_contact_geometry.dart';
 import '../models/vertical_capacity_models.dart';
 import 'structural_polygon_distance.dart';
 
@@ -386,7 +388,9 @@ class VerticalCapacityCalculator {
     cuts.sort();
     bool onEdge(Offset p,List<Offset> ring) {
       for(var i=0;i<ring.length;i++) {
-        if(StructuralPolygonDistance.pointToSegment(p,ring[i],ring[(i+1)%ring.length])<=1e-7*scale) return true;
+        if(StructuralPolygonDistance.pointToSegment(p,ring[i],ring[(i+1)%ring.length])<=1e-7*scale) {
+          return true;
+        }
       }
       return false;
     }
@@ -715,7 +719,13 @@ class VerticalCapacityCalculator {
         thicknessM:h,allowableSpanM:h.isFinite ? (h-.03)*(hasBeam ? 28 : 22) : double.nan,
         slabIds:List.unmodifiable(slabs.map((s)=>s.id)),hasBeams:hasBeam));
     }
-    checks.sort((a,b)=>b.utilization.compareTo(a.utilization));
+    checks.sort((a,b) {
+      final delta = b.utilization - a.utilization;
+      if (delta.isFinite && delta.abs() > 1e-8) return delta.sign.toInt();
+      final aa = [point(a.segment.$1), point(a.segment.$2)]..sort();
+      final bb = [point(b.segment.$1), point(b.segment.$2)]..sort();
+      return aa.join(':').compareTo(bb.join(':'));
+    });
     return List.unmodifiable(checks);
   }
 
@@ -874,6 +884,7 @@ class VerticalCapacityCalculator {
       double acM2,
       double aTribM2,
       double floorShearKn,
+      double localSlabThicknessM,
       double colSelfWeightKn,
       double singleNedKn,
       bool hasConnectedBeams,
@@ -887,6 +898,7 @@ class VerticalCapacityCalculator {
         double acM2,
         double aTribM2,
         double floorShearKn,
+        double localSlabThicknessM,
         double colSelfWeightKn,
         double singleNedKn,
         bool hasConnectedBeams,
@@ -900,7 +912,22 @@ class VerticalCapacityCalculator {
           scale: scale,
           totalFloorAreaM2: totalFootprintAreaM2,
         );
-        final double floorShearKn = floorWd * aTribM2;
+        final touched = storey.slabs
+            .where(
+              (s) =>
+                  (SlabContactGeometry.columnContact(col, [s], scale)?.areaM2 ??
+                      0) >
+                  1e-10,
+            )
+            .toList();
+        final localSlabThicknessM = touched.isEmpty
+            ? storeySlabThicknessM[sIdx]
+            : touched.map((s) => s.thickness).reduce(math.min);
+        final localFloorWd = touched.isEmpty
+            ? floorWd
+            : 1.35 * (25 * localSlabThicknessM + project.deadLoadSuperimposed) +
+                  1.5 * project.liveLoad;
+        final double floorShearKn = localFloorWd * aTribM2;
         final double colSelfWeightKn = 25.0 * acM2 * storey.height * 1.35;
         final double singleNedKn = floorShearKn + colSelfWeightKn;
 
@@ -919,6 +946,7 @@ class VerticalCapacityCalculator {
           acM2: acM2,
           aTribM2: aTribM2,
           floorShearKn: floorShearKn,
+          localSlabThicknessM: localSlabThicknessM,
           colSelfWeightKn: colSelfWeightKn,
           singleNedKn: singleNedKn,
           hasConnectedBeams: connectedBeams,
@@ -974,8 +1002,8 @@ class VerticalCapacityCalculator {
     // 6. Comprehensive EC2 axial compression & punching checks for all columns
     for (int sIdx = 0; sIdx < numStoreys; sIdx++) {
       final storey = project.storeys[sIdx];
-      final double hSlab = storeySlabThicknessM[sIdx];
       final currentCols = storeyColumnData[sIdx];
+      final boundaries = SlabBoundaryGeometry.exposedEdges(storey.slabs, scale);
       final currentAcc = accumulatedByStorey[sIdx]!;
 
       for (int cIdx = 0; cIdx < currentCols.length; cIdx++) {
@@ -996,35 +1024,30 @@ class VerticalCapacityCalculator {
         if (axialUtil > maxAxialUtil) maxAxialUtil = axialUtil;
 
         // Punching shear at slab-column connection (EC2 §6.4)
-        // If column has connected beams framing into it, punching shear failure is relieved by beam shear
-        final double dEffM = math.max(0.12, hSlab - 0.03);
+        // Beam load transfer needs review; mere proximity does not suppress punching.
+        final double dEffM = math.max(0.01, colData.localSlabThicknessM - 0.03);
         final double colWM = col.width / scale;
         final double colHM = col.height / scale;
 
-        double distToEdgeM = 3.0;
-        if (storey.slabs.isNotEmpty) {
-          for (final slab in storey.slabs) {
-            for (final grip in slab.edgeGrips) {
-              final d = (col.center - grip.midpoint).distance / scale;
-              if (d < distToEdgeM) distToEdgeM = d;
-            }
-          }
-        }
-
-        final double betaPunching;
+        final position = SlabBoundaryGeometry.classify(
+          col,
+          storey.slabs,
+          scale,
+          dEffM,
+          boundaries: boundaries,
+        );
+        final betaPunching = position.beta;
         final double u1PerimeterM;
-        if (distToEdgeM < dEffM) {
-          // Corner column
-          betaPunching = 1.50;
-          u1PerimeterM = colWM + colHM + (math.pi / 2.0) * (2.0 * dEffM);
-        } else if (distToEdgeM < 2.0 * dEffM) {
-          // Edge column
-          betaPunching = 1.40;
-          u1PerimeterM = 2.0 * colWM + colHM + math.pi * (2.0 * dEffM);
-        } else {
-          // Interior column
-          betaPunching = 1.15;
-          u1PerimeterM = 2.0 * (colWM + colHM) + 2.0 * math.pi * (2.0 * dEffM);
+        switch (position.position) {
+          case PunchingSupportPosition.corner:
+          case PunchingSupportPosition.undetermined:
+            u1PerimeterM = colWM + colHM + math.pi * dEffM;
+          case PunchingSupportPosition.edge:
+            u1PerimeterM = 2 * colWM + colHM + 2 * math.pi * dEffM;
+          case PunchingSupportPosition.interior:
+            u1PerimeterM = col.shape == ColumnShape.circular
+                ? math.pi * (colWM + 4 * dEffM)
+                : 2 * (colWM + colHM) + 4 * math.pi * dEffM;
         }
 
         // Punching shear stress v_Ed in MPa
@@ -1039,9 +1062,16 @@ class VerticalCapacityCalculator {
         final double vMin = 0.035 * math.pow(kSize, 1.5) * math.sqrt(fck);
         vrdcMpa = math.max(vrdcMpa, vMin);
 
-        final double punchingUtil = colData.hasConnectedBeams
-            ? 0.0
-            : (vrdcMpa > 0 ? (vedMpa / vrdcMpa) : 1.0);
+        // Beam presence alone does not establish the slab-to-beam load path.
+        final double punchingUtil = vrdcMpa > 0 ? vedMpa / vrdcMpa : 1.0;
+        final punchingReview =
+            position.nearOpening ||
+            // Edge/corner perimeters also need their actual boundary clipping.
+            position.position != PunchingSupportPosition.interior ||
+            col.shape != ColumnShape.rectangular ||
+            colData.hasConnectedBeams ||
+            !colData.localSlabThicknessM.isFinite ||
+            colData.localSlabThicknessM <= .03;
         if (punchingUtil > maxPunchingUtil) maxPunchingUtil = punchingUtil;
 
         // Overall status for this column
@@ -1049,7 +1079,7 @@ class VerticalCapacityCalculator {
         if (axialUtil > 1.0 || punchingUtil > 1.0) {
           status = VerticalCapacityStatus.critical;
           criticalCount++;
-        } else if (axialUtil > 0.80 || punchingUtil > 0.85) {
+        } else if (axialUtil > 0.80 || punchingUtil > 0.85 || punchingReview) {
           status = VerticalCapacityStatus.warning;
           warningCount++;
         } else {
@@ -1082,7 +1112,7 @@ class VerticalCapacityCalculator {
           rec = 'Колона $colName (${curWCm}x$curHCm cm) в ${storey.name} поема $storeysAbove етажа напълно безопасно (${(axialUtil * 100).round()}%).';
         }
 
-        final int recSlabH = (hSlab * 100).round() + 4;
+        final int recSlabH = (colData.localSlabThicknessM * 100).round() + 4;
         String? punchRec;
         if (colData.hasConnectedBeams) {
           punchRec = null;
@@ -1107,6 +1137,9 @@ class VerticalCapacityCalculator {
           floorShearForceVedKn: colData.floorShearKn,
           axialCapacityNrdKn: nrdKn,
           axialUtilization: axialUtil,
+          punchingPosition: position.position,
+          punchingBeta: betaPunching,
+          punchingRequiresReview: punchingReview,
           punchingShearStressVedMpa: vedMpa,
           punchingShearResistanceVrdMpa: vrdcMpa,
           punchingUtilization: punchingUtil,
