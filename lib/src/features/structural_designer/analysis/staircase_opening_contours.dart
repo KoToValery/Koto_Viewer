@@ -9,6 +9,44 @@ import 'slab_contact_geometry.dart';
 /// Observed closed CAD faces near flights, without inventing a closing edge.
 /// A proposal may be a room or another outline: confirmation remains mandatory.
 class StaircaseOpeningContours {
+  /// Search around every part of a staircase. A larger family search window
+  /// can join a neighbouring room into the CAD graph; retain the observed
+  /// bounded faces found around its individual flights as well.
+  static List<List<Offset>> findAssembly(
+    StairGeometryResult evidence,
+    List<StairFlightCandidate> flights,
+    double scale,
+  ) {
+    if (flights.isEmpty) return [];
+    final whole = StairFlightCandidate(
+      polygon: compute2DConvexHull(flights.expand((f) => f.polygon).toList()),
+      treads: flights.expand((f) => f.treads).toList(),
+      boundarySides: 0,
+      spacingM: 0,
+    );
+    final result = <List<Offset>>[], seen = <String>{};
+    for (final flight in [whole, ...flights]) {
+      for (final contour in find(evidence, flight, scale)) {
+        final points = [
+          for (final p in contour)
+            '${(p.dx / scale * 1000).round()},${(p.dy / scale * 1000).round()}',
+        ];
+        var start = 0;
+        for (var i = 1; i < points.length; i++) {
+          if (points[i].compareTo(points[start]) < 0) start = i;
+        }
+        final key = [...points.skip(start), ...points.take(start)].join('/');
+        if (seen.add(key)) result.add(contour);
+      }
+    }
+    result.sort(
+      (a, b) => StructuralSlab.calculateArea(
+        a,
+      ).compareTo(StructuralSlab.calculateArea(b)),
+    );
+    return result.take(8).toList();
+  }
+
   static List<List<Offset>> find(
     StairGeometryResult evidence,
     StairFlightCandidate flight,

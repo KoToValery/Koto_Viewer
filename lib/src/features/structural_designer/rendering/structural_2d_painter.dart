@@ -7,6 +7,7 @@ import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 import 'structural_pointer_painter.dart';
+import 'slab_plan_labels.dart';
 import 'grid_axis_presentation.dart';
 import 'support_span_overlay_layout.dart';
 import 'structural_overview_layout.dart';
@@ -305,6 +306,7 @@ class Structural2dPainter extends CustomPainter {
       );
     }
     _drawSupportOverviewLabels(canvas, overview);
+    if (activeTool == StructuralDrawTool.slab) _drawSlabLabels(canvas);
   }
 
   void _drawMeasurementLine(Canvas canvas, Offset p1Cad, Offset p2Cad, String label, {Color color = const Color(0xFFFF5252)}) {
@@ -598,111 +600,36 @@ class Structural2dPainter extends CustomPainter {
     }
   }
 
-  void _drawSlabLevelMarker(
-    Canvas canvas,
-    StructuralSlab slab,
-    Color slabColor, {
-    required bool isGhost,
-    StoreyLevel? levelOwner,
-    bool isFloor = false,
-  }) {
-    if (isGhost || slab.polygon.length < 3) return;
-
-    final centroidScene = cadToScene(slab.centroid);
-    final overheadElev = (levelOwner ?? currentStorey).structuralElevationFor(slab);
-    final int thickCm = (slab.thickness * 100).round();
-
-    final sign = overheadElev > 0 ? '+' : (overheadElev == 0 ? '±' : '');
-    final elevStr = '$sign${overheadElev.toStringAsFixed(2)}';
-
-    canvas.save();
-    canvas.translate(centroidScene.dx, centroidScene.dy);
-    canvas.scale(1.0 / zoomScale);
-
-    // Concise architectural section level marker (only elevation and thickness)
-    final elevSpan = TextSpan(
-      text: '${isFloor || (slab.isFloorSlab && levelOwner == null) ? '↓' : '↑'} $elevStr',
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 11.5,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 0.3,
-      ),
-    );
-    final elevPainter = TextPainter(
-      text: elevSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final subSpan = TextSpan(
-      text: 'd = $thickCm cm',
-      style: TextStyle(
-        color: slabColor.withValues(alpha: 0.95),
-        fontSize: 9.5,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-    final subPainter = TextPainter(
-      text: subSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final contentWidth = math.max(elevPainter.width, subPainter.width) + 24.0;
-    final badgeWidth = contentWidth + 14.0;
-    final badgeHeight = elevPainter.height + subPainter.height + 12.0;
-    final badgeRect = Rect.fromCenter(
-      center: Offset.zero,
-      width: badgeWidth,
-      height: badgeHeight,
-    );
-
-    final bgPaint = Paint()
-      ..color = const Color(0xF0181A22)
-      ..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..color = slabColor.withValues(alpha: 0.75)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    final rrect = RRect.fromRectAndRadius(badgeRect, const Radius.circular(5.0));
-    canvas.drawRRect(rrect, bgPaint);
-    canvas.drawRRect(rrect, borderPaint);
-
-    // Section Triangle & Shelf Line
-    final shelfY = -badgeHeight / 2.0 + elevPainter.height + 4.0;
-    final shelfStartX = -badgeWidth / 2.0 + 8.0;
-    final shelfEndX = badgeWidth / 2.0 - 8.0;
-
-    final shelfPaint = Paint()
-      ..color = Colors.white70
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    canvas.drawLine(Offset(shelfStartX, shelfY), Offset(shelfEndX, shelfY), shelfPaint);
-
-    // Downward structural level triangle \/ touching shelf line
-    final triPath = Path()
-      ..moveTo(shelfStartX + 2.0, shelfY - 7.0)
-      ..lineTo(shelfStartX + 10.0, shelfY - 7.0)
-      ..lineTo(shelfStartX + 6.0, shelfY)
-      ..close();
-    final triPaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(triPath, triPaint);
-
-    // Elevation text above shelf
-    elevPainter.paint(
-      canvas,
-      Offset(shelfStartX + 14.0, shelfY - elevPainter.height - 1.0),
-    );
-
-    // Thickness text below shelf
-    subPainter.paint(
-      canvas,
-      Offset(shelfStartX + 14.0, shelfY + 2.0),
-    );
-
-    canvas.restore();
+  void _drawSlabLabels(Canvas canvas) {
+    final labels = SlabPlanLabels.layout(current:currentStorey, lower:floorSlabStorey,
+      upper:ceilingSlabStorey, project:cadToScene, zoom:zoomScale, selectedId:selectedSlabId);
+    String level(double z) => '${z > 0 ? '+' : z == 0 ? '±' : ''}${z.toStringAsFixed(2)}';
+    for (final label in labels.reversed) {
+      final slab = label.slab;
+      final selected = !label.reference && slab.id == selectedSlabId;
+      final index = label.owner.slabs.indexOf(slab);
+      final color = _getSlabBaseColor(slab, index).withValues(alpha:label.reference ? .6 : 1);
+      if ((label.rect.center - label.anchor).distance > 1 / zoomScale) {
+        canvas.drawLine(label.anchor, label.rect.center, Paint()..color=color..strokeWidth=1 / zoomScale);
+      }
+      canvas.save();
+      canvas.translate(label.rect.center.dx, label.rect.center.dy);
+      canvas.scale(1 / zoomScale);
+      final rect = Rect.fromCenter(center:Offset.zero, width:126, height:52);
+      final rounded = RRect.fromRectAndRadius(rect, const Radius.circular(5));
+      canvas.drawRRect(rounded, Paint()..color=const Color(0xF0181A22));
+      canvas.drawRRect(rounded, Paint()..color=selected ? Colors.white : color
+        ..style=PaintingStyle.stroke..strokeWidth=selected ? 2 : 1);
+      final concrete = label.owner.structuralElevationFor(slab);
+      final ownerText = l10n?.localeName == 'bg' ? 'Етаж' : 'Level';
+      final text = TextPainter(text:TextSpan(children:[
+        TextSpan(text:'$ownerText ${level(label.owner.elevation)}\n', style:TextStyle(color: selected ? Colors.white : Colors.white70, fontSize:10)),
+        TextSpan(text:'${label.floor ? '↓' : '↑'} ${level(concrete)}\n', style:const TextStyle(color:Colors.white,fontSize:11.5,fontWeight:FontWeight.bold)),
+        TextSpan(text:'d = ${(slab.thickness * 100).round()} cm', style:TextStyle(color:color,fontSize:9.5)),
+      ]),textDirection:TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:120);
+      text.paint(canvas, Offset(-text.width / 2,-text.height / 2));
+      canvas.restore();
+    }
   }
 
   void _drawSlab(
@@ -852,18 +779,6 @@ class Structural2dPainter extends CustomPainter {
           }
         }
       }
-    }
-
-    // Central structural elevation marker (concise elevation marker)
-    if (isSlabTool) {
-      _drawSlabLevelMarker(
-        canvas,
-        slab,
-        slabColor,
-        isGhost: isGhost,
-        levelOwner: levelOwner,
-        isFloor: isFloor,
-      );
     }
 
     // Draw corner vertex handles and midpoint edge grips ONLY when the slab tool is active AND this slab is selected

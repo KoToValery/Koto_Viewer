@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/staircase_geometry_detector.dart';
+import 'package:kotoview/src/features/structural_designer/analysis/staircase_assemblies.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/staircase_opening_contours.dart';
 import 'package:kotoview/src/features/structural_designer/widgets/staircase_geometry_dialog.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -220,11 +221,23 @@ void main() {
             100,
           );
       final ground = detect('revision_VNIEJI');
-      expect(ground.flights.map((f) => f.treads.length).toSet(), {5, 6});
       expect(
-        ground.flights.every((f) => (f.spacingM - .28).abs() < 1e-8),
+        ground.flights
+            .where((f) => !f.isWinder)
+            .map((f) => f.treads.length)
+            .toSet(),
+        {5, 6},
+      );
+      expect(
+        ground.flights
+            .where((f) => !f.isWinder)
+            .every((f) => (f.spacingM - .28).abs() < 1e-8),
         isTrue,
       );
+      expect(ground.flights.where((f) => f.isWinder).length, 2);
+      final groups = StaircaseAssembly.group(ground.flights, 100);
+      expect(groups, hasLength(1));
+      expect(groups.single.flights.where((f) => !f.isWinder), hasLength(2));
       final upper = detect('revision_ZTRFQO');
       expect(upper.flights, isEmpty);
       final linked = StairGeometryResult(
@@ -233,7 +246,19 @@ void main() {
         boundaryStrokes: upper.boundaryStrokes,
       );
       expect(
-        StaircaseOpeningContours.find(linked, linked.flights.first, 100),
+        StaircaseOpeningContours.findAssembly(
+          linked,
+          groups.single.flights,
+          100,
+        ),
+        hasLength(1),
+      );
+      expect(
+        StaircaseOpeningContours.find(
+          linked,
+          linked.flights.firstWhere((f) => !f.isWinder),
+          100,
+        ),
         isNotEmpty,
       );
     },

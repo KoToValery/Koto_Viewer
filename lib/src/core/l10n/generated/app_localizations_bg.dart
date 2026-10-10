@@ -3379,4 +3379,9 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get staircaseUseOpening => 'Прегледай контура на отвора';
+
+  @override
+  String staircaseArms(int count) {
+    return '$count рамена';
+  }
 }

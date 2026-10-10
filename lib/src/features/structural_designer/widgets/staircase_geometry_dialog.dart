@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../analysis/staircase_geometry_detector.dart';
 import '../analysis/staircase_opening_contours.dart';
+import '../analysis/staircase_assemblies.dart';
 
 class StaircaseGeometrySelection {
   final List<Offset> polygon;
@@ -34,13 +35,26 @@ class _StaircaseGeometryDialogState extends State<StaircaseGeometryDialog> {
   final Map<int, List<List<Offset>>> contoursByFlight = {};
   @override
   Widget build(BuildContext context) {
-    final l = context.l10n, flights = widget.result.flights;
+    final l = context.l10n;
+    final assemblies = StaircaseAssembly.group(
+      widget.result.flights,
+      widget.scale,
+    );
+    final flights = [
+      for (final a in assemblies)
+        StairFlightCandidate(
+          polygon: a.circulation,
+          treads: a.flights.expand((f) => f.treads).toList(),
+          boundarySides: 0,
+          spacingM: 0,
+        ),
+    ];
     final contours = widget.allowOpening && flights.isNotEmpty
         ? contoursByFlight.putIfAbsent(
             selected,
-            () => StaircaseOpeningContours.find(
+            () => StaircaseOpeningContours.findAssembly(
               widget.result,
-              flights[selected],
+              assemblies[selected].flights,
               widget.scale,
             ),
           )
@@ -76,9 +90,8 @@ class _StaircaseGeometryDialogState extends State<StaircaseGeometryDialog> {
                       DropdownMenuItem(
                         value: i,
                         child: Text(
-                          flights[i].isWinder
-                              ? '${i + 1} · ${l.staircaseWinder}'
-                              : '${i + 1} · ${flights[i].treads.length} × ${(flights[i].spacingM * 100).toStringAsFixed(0)} cm',
+                          '${i + 1} · ${l.staircaseArms(assemblies[i].flights.where((f) => !f.isWinder).length)}'
+                          '${assemblies[i].flights.any((f) => f.isWinder) ? ' · ${l.staircaseWinder}' : ''}',
                         ),
                       ),
                   ],

@@ -7,6 +7,7 @@ import 'slab_wall_regions.dart';
 import 'slab_boundary_refiner.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import 'slab_opening_evidence.dart';
+import 'slab_wall_support_filter.dart';
 import 'structural_column_detector.dart';
 
 import 'geometric_window_detector.dart';
@@ -14,7 +15,7 @@ import 'geometric_window_detector.dart';
 /// Conservative preview only: enclosed free space is not proof of a slab.
 /// Coordinates remain in source CAD units, before project alignment.
 class SlabEnvelopeResult {
-  static const version = 8;
+  static const version = 9;
   final List<List<Offset>> contours;
   final List<String> diagnostics;
   final double cellSize;
@@ -56,7 +57,7 @@ class SlabEnvelopeDetector {
     DxfDocument? document,
   }) {
     final scale = walls.detectedScale;
-    final pairs = walls.selectedWallPairs;
+    final pairs = SlabWallSupportFilter.clean(walls.selectedWallPairs, scale);
     SlabEnvelopeResult empty(String reason) =>
         SlabEnvelopeResult(const [], [reason], 0, 0);
     if (!scale.isFinite || scale <= 0) return empty('invalidScale');
@@ -102,7 +103,10 @@ class SlabEnvelopeDetector {
     final contours = <List<Offset>>[];
     final gaps = <SlabGapHypothesis>[];
     final reports = <Map<String, dynamic>>[];
-    final diagnostics = <String>{};
+    final diagnostics = <String>{
+      if (pairs.length < walls.selectedWallPairs.length)
+        'ignoredUnsupportedParallelFragments',
+    };
     var cell = 0.0, enclosed = 0;
     for (var i = 0; i < partition.regions.length; i++) {
       // Bound total raster work as well as individual grid size.

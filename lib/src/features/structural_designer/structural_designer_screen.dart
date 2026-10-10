@@ -1,3 +1,4 @@
+import 'rendering/slab_plan_labels.dart';
 import 'analysis/geometric_window_detector.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -812,9 +813,26 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return null;
   }
 
+  String? _slabBadgeOwnerId;
+  bool _slabBadgeSelectionHandled = false;
   StructuralSlab? _hitTestSlab(Offset screenPos) {
     if (_activeTool != StructuralDrawTool.slab && _activeTool != StructuralDrawTool.select) {
       return null;
+    }
+    _slabBadgeOwnerId = null;
+    if (_activeTool == StructuralDrawTool.slab) {
+      final labels = SlabPlanLabels.layout(current:_project.activeStorey,
+        lower:_floorSlabStorey, upper:_ceilingSlabStorey, project:_cadToScreen,
+        selectedId:_editingSlab?.id);
+      for (final label in labels) {
+        if (label.rect.contains(screenPos)) {
+          _slabBadgeSelectionHandled = true;
+          _slabBadgeOwnerId = label.owner.id == _project.activeStorey.id ? null : label.owner.id;
+          // Ceiling references carry transformed flags; edit the persisted slab.
+          return _project.storeys.firstWhere((s) => s.id == label.owner.id).slabs
+            .firstWhere((s) => s.id == label.slab.id);
+        }
+      }
     }
     // If user tapped on or near any compact structural element, NEVER select slab!
     if (_hitTestColumn(screenPos) != null ||
@@ -3511,7 +3529,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   // --- Slab Correction Methods (Kotocadastre Object Correction Workflow) ---
 
   void _startSlabCorrection(StructuralSlab slab) {
+    final ownerId = _slabBadgeOwnerId;
+    _slabBadgeOwnerId = null;
     setState(() {
+      if (ownerId != null) {
+        final index = _project.storeys.indexWhere((s) => s.id == ownerId);
+        if (index >= 0 && index != _project.activeStoreyIndex) {
+          _project = _project.copyWith(activeStoreyIndex:index);
+          _staircaseZoneCoreId = null; _staircaseZoneStoreyId = null;
+          _selectedBeam = null; _selectedGridAxis = null; _selectedOpening = null;
+          _originalLayerVisibility.clear();
+          for (final entry in _document.layers.entries) {
+            _originalLayerVisibility[entry.key] = entry.value.isVisible;
+          }
+          if (_underlayFilterActive) _applyUnderlayFilter(true);
+          _runAnalysis();
+        }
+      }
       _selectedColumn = null;
       _isMovingColumn = false;
       _selectedShearWall = null;
@@ -3805,6 +3839,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
+    _slabBadgeSelectionHandled = false;
     _activePointersCount++;
     _activePointerKind = event.kind;
     if (_activePointersCount > 1) {
@@ -6241,6 +6276,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleTapUp(TapUpDetails details) {
+    // Pointer-down may navigate to the badge owner and rearrange its labels.
+    // The same tap must not select the next storey's newly positioned badge.
+    if (_slabBadgeSelectionHandled) {
+      _slabBadgeSelectionHandled = false;
+      return;
+    }
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_activeTool == StructuralDrawTool.layers) {
       _handleLayerContextAtPoint(details.localPosition);
@@ -6850,8 +6891,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if(result.action==StaircaseSetupAction.detect) {
       final snapshot=_project;
       final source=StructuralUnderlaySource.original(_document,metadata:BimUnderlayMetadata.read(_document));
-      var detected=StaircaseGeometryDetector.detect(source,_cadUnitsPerMeter,
-        region:_project.activeStorey.staircaseZones[result.coreId]);
+      var detected=StaircaseGeometryDetector.detect(source,_cadUnitsPerMeter);
       String? referenceLevel;
       if(detected.flights.isEmpty && !detected.limited && widget.bimContext!=null) {
         final core=_project.staircases.firstWhere((c)=>c.id==result.coreId);
@@ -6862,8 +6902,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           final saved=widget.bimContext!.underlaysByStorey[lower.id];
           if(saved!=null) {
             final evidence=StaircaseGeometryDetector.detect(StructuralUnderlaySource.original(
-              saved,metadata:BimUnderlayMetadata.read(saved)),_cadUnitsPerMeter,
-              region:lower.staircaseZones[result.coreId]);
+              saved,metadata:BimUnderlayMetadata.read(saved)),_cadUnitsPerMeter);
             if(evidence.flights.isNotEmpty && !evidence.limited) {
               detected=StairGeometryResult(evidence.flights,detected.strokes,
                 boundaryStrokes:detected.boundaryStrokes);

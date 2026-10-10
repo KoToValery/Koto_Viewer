@@ -3365,4 +3365,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get staircaseUseOpening => 'Review opening contour';
+
+  @override
+  String staircaseArms(int count) {
+    return '$count flights';
+  }
 }

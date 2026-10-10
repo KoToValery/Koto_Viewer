@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/structural_element.dart' show compute2DConvexHull;
+import 'structural_polygon_distance.dart';
 
 class StairFlightCandidate {
   final List<Offset> polygon;
@@ -125,7 +126,13 @@ class StaircaseGeometryDetector {
         region.map((p) => p.dy).reduce(math.max),
       ).inflate(.5 * scale);
     }
+    final candidateKeys = <String>{};
+    String pointKey(Offset p) =>
+        '${(p.dx / scale * 2000).round()},${(p.dy / scale * 2000).round()}';
     final candidates = strokes.where((s) {
+      final a = pointKey(s.$1), b = pointKey(s.$2);
+      final key = a.compareTo(b) < 0 ? '$a/$b' : '$b/$a';
+      if (!candidateKeys.add(key)) return false;
       final len = (s.$2 - s.$1).distance / scale;
       return len >= .55 &&
           len <= 2.2 &&
@@ -240,72 +247,146 @@ class StaircaseGeometryDetector {
     // Winder risers share a local corner rather than a parallel direction.
     // Full radial decorations and densely spaced railing profiles are excluded.
     final fanCenters = <Offset>[];
-    for (final seed in candidates) {
-      for (final pole in [seed.$1, seed.$2]) {
-        if (fanCenters.any((p) => (p - pole).distance < .04 * scale)) continue;
-        fanCenters.add(pole);
-        final rays = <(double, (Offset, Offset), Offset)>[];
-        for (final segment in candidates) {
-          final a = (segment.$1 - pole).distance,
-              b = (segment.$2 - pole).distance;
-          if (math.min(a, b) > .04 * scale) continue;
-          final end = a < b ? segment.$2 : segment.$1;
-          final delta = end - pole;
-          rays.add((math.atan2(delta.dy, delta.dx), segment, end));
-        }
-        if (rays.length < 4 || rays.length > 12) continue;
-        rays.sort((a, b) => a.$1.compareTo(b.$1));
-        var largestGap = -1.0, breakAt = 0;
-        for (var i = 0; i < rays.length; i++) {
-          final next = (i + 1) % rays.length;
-          final gap =
-              rays[next].$1 - rays[i].$1 + (next == 0 ? 2 * math.pi : 0);
-          if (gap > largestGap) {
-            largestGap = gap;
-            breakAt = next;
-          }
-        }
-        final span = 2 * math.pi - largestGap;
-        if (span < .5 || span > 1.85) continue;
-        final ordered = [...rays.skip(breakAt), ...rays.take(breakAt)];
-        final angles = <double>[];
-        for (var i = 1; i < ordered.length; i++) {
-          var gap = ordered[i].$1 - ordered[i - 1].$1;
-          if (gap < 0) gap += 2 * math.pi;
-          angles.add(gap);
-        }
-        final mean = span / angles.length;
-        if (angles.any(
-          (g) => g < .12 || g > .6 || (g - mean).abs() > mean * .3,
-        )) {
+    final poles = [
+      for (final seed in candidates) ...[seed.$1, seed.$2],
+    ];
+    final neighbours = candidates
+        .where(
+          (s) => flights.any(
+            (f) =>
+                StructuralPolygonDistance.pointToSegment(
+                      (s.$1 + s.$2) / 2,
+                      f.polygon[0],
+                      f.polygon[1],
+                    ) <
+                    1.5 * scale ||
+                f.polygon.any(
+                  (p) =>
+                      (p - s.$1).distance < .6 * scale ||
+                      (p - s.$2).distance < .6 * scale,
+                ),
+          ),
+        )
+        .take(200)
+        .toList();
+    double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
+    for (var i = 0; i < neighbours.length; i++) {
+      for (var j = i + 1; j < neighbours.length; j++) {
+        final a = neighbours[i],
+            b = neighbours[j],
+            u = a.$2 - a.$1,
+            v = b.$2 - b.$1;
+        final den = cross(u, v);
+        if (den.abs() < .15 * u.distance * v.distance) continue;
+        final pole = a.$1 + u * (cross(b.$1 - a.$1, v) / den);
+        if (math.min((pole - a.$1).distance, (pole - a.$2).distance) >
+                .32 * scale ||
+            math.min((pole - b.$1).distance, (pole - b.$2).distance) >
+                .32 * scale) {
           continue;
         }
-        final reach = ordered
-            .map((r) => (r.$3 - pole).distance)
-            .reduce(math.max);
-        if (reach * mean / scale < .16 || reach * mean / scale > .8) continue;
-        final polygon = compute2DConvexHull([
-          pole,
-          ...ordered.map((r) => r.$3),
-        ]);
-        if (polygon.length < 3) continue;
-        flights.add(
-          StairFlightCandidate(
-            polygon: polygon,
-            treads: ordered.map((r) => r.$2).toList(),
-            boundarySides: 0,
-            spacingM: reach * mean / scale,
-            isWinder: true,
-          ),
-        );
-        if (flights.length >= 64) {
-          return StairGeometryResult(
-            flights,
-            strokes,
-            limited: true,
-            boundaryStrokes: boundaries,
-          );
+        poles.add(pole);
+      }
+    }
+    for (final pole in poles) {
+      if (fanCenters.any((p) => (p - pole).distance < .04 * scale)) continue;
+      fanCenters.add(pole);
+      final rays = <(double, (Offset, Offset), Offset)>[];
+      for (final segment in candidates) {
+        final a = (segment.$1 - pole).distance,
+            b = (segment.$2 - pole).distance;
+        if (math.min(a, b) > .32 * scale) continue;
+        if (StructuralPolygonDistance.pointToSegment(
+              pole,
+              segment.$1,
+              segment.$2,
+            ) >
+            .32 * scale) {
+          continue;
         }
+        final direction = segment.$2 - segment.$1;
+        if (cross(segment.$1 - pole, direction).abs() / direction.distance >
+            .02 * scale) {
+          continue;
+        }
+        final end = a < b ? segment.$2 : segment.$1;
+        final delta = end - pole;
+        rays.add((math.atan2(delta.dy, delta.dx), segment, end));
+      }
+      rays.sort((a, b) => a.$1.compareTo(b.$1));
+      final uniqueRays = <(double, (Offset, Offset), Offset)>[];
+      for (final ray in rays) {
+        if (uniqueRays.isNotEmpty &&
+            (ray.$1 - uniqueRays.last.$1).abs() < .04) {
+          if ((ray.$3 - pole).distance > (uniqueRays.last.$3 - pole).distance) {
+            uniqueRays[uniqueRays.length - 1] = ray;
+          }
+        } else {
+          uniqueRays.add(ray);
+        }
+      }
+      rays
+        ..clear()
+        ..addAll(uniqueRays);
+      final attachedToFlight = flights.any(
+        (f) =>
+            !f.isWinder &&
+            List.generate(
+              f.polygon.length,
+              (i) => StructuralPolygonDistance.pointToSegment(
+                pole,
+                f.polygon[i],
+                f.polygon[(i + 1) % f.polygon.length],
+              ),
+            ).any((d) => d <= .65 * scale),
+      );
+      if (rays.length < (attachedToFlight ? 3 : 4) || rays.length > 12) {
+        continue;
+      }
+      var largestGap = -1.0, breakAt = 0;
+      for (var i = 0; i < rays.length; i++) {
+        final next = (i + 1) % rays.length;
+        final gap = rays[next].$1 - rays[i].$1 + (next == 0 ? 2 * math.pi : 0);
+        if (gap > largestGap) {
+          largestGap = gap;
+          breakAt = next;
+        }
+      }
+      final span = 2 * math.pi - largestGap;
+      if (span < .5 || span > 1.85) continue;
+      final ordered = [...rays.skip(breakAt), ...rays.take(breakAt)];
+      final angles = <double>[];
+      for (var i = 1; i < ordered.length; i++) {
+        var gap = ordered[i].$1 - ordered[i - 1].$1;
+        if (gap < 0) gap += 2 * math.pi;
+        angles.add(gap);
+      }
+      final mean = span / angles.length;
+      if (angles.any(
+        (g) => g < .12 || g > .6 || (g - mean).abs() > mean * .3,
+      )) {
+        continue;
+      }
+      final reach = ordered.map((r) => (r.$3 - pole).distance).reduce(math.max);
+      if (reach * mean / scale < .16 || reach * mean / scale > .8) continue;
+      final polygon = compute2DConvexHull([pole, ...ordered.map((r) => r.$3)]);
+      if (polygon.length < 3) continue;
+      flights.add(
+        StairFlightCandidate(
+          polygon: polygon,
+          treads: ordered.map((r) => r.$2).toList(),
+          boundarySides: 0,
+          spacingM: reach * mean / scale,
+          isWinder: true,
+        ),
+      );
+      if (flights.length >= 64) {
+        return StairGeometryResult(
+          flights,
+          strokes,
+          limited: true,
+          boundaryStrokes: boundaries,
+        );
       }
     }
     // Stable spatial order, independent of source entity insertion order.

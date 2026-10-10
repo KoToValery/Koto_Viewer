@@ -142,7 +142,7 @@ void main() {
       );
       expect(
         StaircaseInventory.evaluate(p, 1).gaps.single.requirement,
-        StaircaseRequirement.opening,
+        StaircaseRequirement.circulation,
       );
     },
   );

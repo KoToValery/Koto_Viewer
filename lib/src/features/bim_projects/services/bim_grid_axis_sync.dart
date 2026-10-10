@@ -129,7 +129,15 @@ class BimGridAxisSync {
       }
     }
     final bg = original.any((a) => RegExp(r'[А-Яа-я]').hasMatch(a.name));
-    return ProjectGridAxes.merge(candidates, unitsPerMeter, isBulgarian: bg);
+    return ProjectGridAxes.merge(
+      candidates,
+      unitsPerMeter,
+      isBulgarian: bg,
+      preserveExtents: {
+        for (final a in original)
+          if (edited(a)) a.id,
+      },
+    );
   }
 
   static Map<String, StructuralGridAxis> _snapshots(BimWorkProject project) {

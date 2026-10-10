@@ -2547,5 +2547,7 @@
   "staircaseSupportConflict": "Existing supports overlap the staircase zone. Reposition them or correct the zone.",
   "staircaseCloseZone": "Save zone ({count} points)",
   "@staircaseCloseZone": {"placeholders": {"count": {"type": "int"}}},
-  "staircaseUseOpening": "Review opening contour"
+  "staircaseUseOpening": "Review opening contour",
+  "staircaseArms": "{count} flights",
+  "@staircaseArms": {"placeholders": {"count": {"type": "int"}}}
 }

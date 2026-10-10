@@ -7,6 +7,7 @@ import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/structural_designer/models/wall_axis_models.dart';
 import 'package:kotoview/src/features/structural_designer/models/slab_topology.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/slab_axis_support_grid.dart';
+import 'package:kotoview/src/features/structural_designer/analysis/slab_wall_support_filter.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/slab_envelope_detector.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/slab_seed_generator.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/slab_topology_analyzer.dart';
@@ -114,6 +115,33 @@ void main() {
               SlabTopologyAnalyzer.analyze(seeds, 100 * factor).issue,
               SlabTopologyIssue.none,
             );
+            if (floor['level'] == 2.8) {
+              final ring = envelope.contours.single;
+              for (final point in [
+                [-635, 447],
+                [-1070, 227],
+              ]) {
+                expect(
+                  polygon.inside(tr(point), ring),
+                  isFalse,
+                  reason:
+                      'An unsupported orphan line must not create an exterior spur',
+                );
+              }
+            }
+            if (floor['level'] == 2.8) {
+              for (final point in [
+                [-635, 447],
+                [-1070, 227],
+              ]) {
+                expect(
+                  polygon.inside(tr(point), envelope.contours.single),
+                  isFalse,
+                  reason:
+                      'Orphan wall strokes must not project an exterior spur',
+                );
+              }
+            }
             if (floor['level'] == 0) {
               final ring = seeds.single.polygon;
               expect(
@@ -146,10 +174,16 @@ void main() {
                   reason: '$point is outside or in the real facade recess',
                 );
               }
+              final cleaned = SlabWallSupportFilter.clean(
+                walls.selectedWallPairs,
+                walls.detectedScale,
+              );
+              int index(int original) =>
+                  cleaned.indexOf(walls.selectedWallPairs[original]);
               final doors = envelope.assumedGaps.where(
                 (g) =>
-                    (g.wallA == 11 && g.wallB == 12) ||
-                    (g.wallA == 29 && g.wallB == 30),
+                    (g.wallA == index(11) && g.wallB == index(12)) ||
+                    (g.wallA == index(29) && g.wallB == index(30)),
               );
               expect(doors, hasLength(2));
               for (final door in doors) {

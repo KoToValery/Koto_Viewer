@@ -30,7 +30,10 @@ class StaircaseSetupDialog extends StatefulWidget {
 }
 
 class _StaircaseSetupDialogState extends State<StaircaseSetupDialog> {
-  late StructuralProject project = widget.project;
+  late StructuralProject project = StaircaseInventory.adoptExisting(
+    widget.project,
+    widget.scale,
+  );
   late bool noStairs =
       project.staircaseReviewComplete && project.staircases.isEmpty;
   void finish(StaircaseSetupAction action, {String? coreId, String? storeyId}) {

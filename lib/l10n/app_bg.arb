@@ -1053,5 +1053,7 @@
   "staircaseSupportConflict": "Съществуващи опори навлизат в зоната на стълбата. Преместете ги или коригирайте зоната.",
   "staircaseCloseZone": "Запази зоната ({count} точки)",
   "@staircaseCloseZone": {"placeholders": {"count": {"type": "int"}}},
-  "staircaseUseOpening": "Прегледай контура на отвора"
+  "staircaseUseOpening": "Прегледай контура на отвора",
+  "staircaseArms": "{count} рамена",
+  "@staircaseArms": {"placeholders": {"count": {"type": "int"}}}
 }

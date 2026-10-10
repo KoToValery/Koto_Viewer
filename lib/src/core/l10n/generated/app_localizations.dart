@@ -5776,6 +5776,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Review opening contour'**
   String get staircaseUseOpening;
+
+  /// No description provided for @staircaseArms.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} flights'**
+  String staircaseArms(int count);
 }
 
 class _AppLocalizationsDelegate
