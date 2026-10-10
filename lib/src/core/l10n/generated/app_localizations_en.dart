@@ -3493,6 +3493,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneDragPrompt => 'Drag to draw room zone';
 
   @override
+  String get architectZoneDrawPrompt =>
+      'Click point by point to draft zone. Snap to first point to close.';
+
+  @override
+  String get architectZoneClose => 'Close Zone';
+
+  @override
+  String get architectZoneUndoPoint => 'Undo Point';
+
+  @override
+  String get architectZoneCancelDraft => 'Cancel';
+
+  @override
+  String get architectZonePointSnapStart => 'Close zone (1st point)';
+
+  @override
+  String get architectZoneSelfIntersectError =>
+      'Self-intersecting polygon boundary is not allowed';
+
+  @override
+  String get architectZoneMinPointsError => 'A zone requires at least 3 points';
+
+  @override
+  String architectZoneExtrudeOffset(String dist) {
+    return 'Extruded edge: $dist m';
+  }
+
+  @override
+  String architectZoneCleaned(int count) {
+    return 'Removed $count redundant/orphan vertices';
+  }
+
+  @override
+  String architectZonePointsCount(int count) {
+    return 'Points: $count';
+  }
+
+  @override
+  String get architectZoneAlignH => 'Straightened 0°';
+
+  @override
+  String get architectZoneAlignV => 'Straightened 90°';
+
+  @override
   String architectZoneCreated(String name, String area) {
     return 'Zone $name ($area m²) created';
   }

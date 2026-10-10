@@ -345,7 +345,7 @@ class ArchitectToolPalette extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          // Drag Prompt Badge
+          // Point-by-point prompt badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
@@ -357,13 +357,13 @@ class ArchitectToolPalette extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
-                  Icons.drag_indicator_rounded,
+                  Icons.polyline_rounded,
                   size: 14,
                   color: Color(0xFFFFA726),
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  l10n.architectZoneDragPrompt,
+                  l10n.architectZoneDrawPrompt,
                   style: const TextStyle(
                     color: Color(0xFFFFA726),
                     fontSize: 11,

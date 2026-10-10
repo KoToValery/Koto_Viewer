@@ -34,6 +34,23 @@ class Architect2dPainter extends CustomPainter {
   final double zoomScale;
   final Offset? cursorPosition;
 
+  // Point-by-point zone drafting
+  final List<Offset> zoneDraftingPoints;
+  final Offset? zoneDraftingCandidate;
+  final (Offset, Offset)? zoneOrthoGuide;
+  final String? zoneOrthoLabel;
+  final bool isZoneClosingSnap;
+  final bool isZoneDraftingSelfIntersecting;
+  final String? zoneCloseLabel;
+
+  // Edge extrusion preview
+  final List<Offset>? zoneExtrudePreviewPolygon;
+  final Offset? zoneExtrudeV1;
+  final Offset? zoneExtrudeV2;
+  final Offset? zoneExtrudeNormal;
+  final double? zoneExtrudeDistance;
+  final bool isZoneExtrudeSelfIntersecting;
+
   const Architect2dPainter({
     required this.project,
     required this.activeTool,
@@ -50,6 +67,19 @@ class Architect2dPainter extends CustomPainter {
     this.magneticGuides = const [],
     this.zoomScale = 1.0,
     this.cursorPosition,
+    this.zoneDraftingPoints = const [],
+    this.zoneDraftingCandidate,
+    this.zoneOrthoGuide,
+    this.zoneOrthoLabel,
+    this.isZoneClosingSnap = false,
+    this.isZoneDraftingSelfIntersecting = false,
+    this.zoneCloseLabel,
+    this.zoneExtrudePreviewPolygon,
+    this.zoneExtrudeV1,
+    this.zoneExtrudeV2,
+    this.zoneExtrudeNormal,
+    this.zoneExtrudeDistance,
+    this.isZoneExtrudeSelfIntersecting = false,
   });
 
   @override
@@ -59,6 +89,8 @@ class Architect2dPainter extends CustomPainter {
     _drawZones(canvas);
     _drawWalls(canvas);
     _drawActiveDrafting(canvas);
+    _drawZoneDrafting(canvas);
+    _drawZoneExtrudePreview(canvas);
     ArchitectZonePainterHelper.drawMagneticGuides(
       canvas: canvas,
       guides: magneticGuides,
@@ -75,7 +107,43 @@ class Architect2dPainter extends CustomPainter {
       draggingVertexIndex: draggingVertexIndex,
       draggingVertexPoint: draggingVertexPoint,
       mergeCandidateIndex: mergeCandidateIndex,
+      extrudePreviewPolygon: zoneExtrudePreviewPolygon,
+      isExtrudeSelfIntersecting: isZoneExtrudeSelfIntersecting,
     );
+  }
+
+  void _drawZoneDrafting(Canvas canvas) {
+    if (activeTool == ArchitectTool.zone && zoneDraftingPoints.isNotEmpty) {
+      ArchitectZonePainterHelper.drawPointByPointDrafting(
+        canvas: canvas,
+        points: zoneDraftingPoints,
+        candidatePoint: zoneDraftingCandidate,
+        category: activeZoneCategory ?? ArchitectZoneCategory.living,
+        zoomScale: zoomScale,
+        orthoGuide: zoneOrthoGuide,
+        orthoLabel: zoneOrthoLabel,
+        isClosingSnap: isZoneClosingSnap,
+        isSelfIntersecting: isZoneDraftingSelfIntersecting,
+        closeLabel: zoneCloseLabel,
+      );
+    }
+  }
+
+  void _drawZoneExtrudePreview(Canvas canvas) {
+    if (zoneExtrudeV1 != null &&
+        zoneExtrudeV2 != null &&
+        zoneExtrudeNormal != null &&
+        zoneExtrudeDistance != null) {
+      ArchitectZonePainterHelper.drawEdgeExtrudePreview(
+        canvas: canvas,
+        v1: zoneExtrudeV1!,
+        v2: zoneExtrudeV2!,
+        normal: zoneExtrudeNormal!,
+        distance: zoneExtrudeDistance!,
+        zoomScale: zoomScale,
+        isSelfIntersecting: isZoneExtrudeSelfIntersecting,
+      );
+    }
   }
 
   // ===========================================================================

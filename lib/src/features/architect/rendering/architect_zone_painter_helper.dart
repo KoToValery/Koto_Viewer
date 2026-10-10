@@ -15,6 +15,8 @@ class ArchitectZonePainterHelper {
     int? draggingVertexIndex,
     Offset? draggingVertexPoint,
     int? mergeCandidateIndex,
+    List<Offset>? extrudePreviewPolygon,
+    bool isExtrudeSelfIntersecting = false,
   }) {
     final activeStorey = project.activeStorey;
     if (activeStorey.zones.isEmpty) return;
@@ -29,6 +31,8 @@ class ArchitectZonePainterHelper {
         draggingVertexIndex: isSelected ? draggingVertexIndex : null,
         draggingVertexPoint: isSelected ? draggingVertexPoint : null,
         mergeCandidateIndex: isSelected ? mergeCandidateIndex : null,
+        extrudePreviewPolygon: isSelected ? extrudePreviewPolygon : null,
+        isExtrudeSelfIntersecting: isSelected ? isExtrudeSelfIntersecting : false,
       );
     }
   }
@@ -41,8 +45,12 @@ class ArchitectZonePainterHelper {
     int? draggingVertexIndex,
     Offset? draggingVertexPoint,
     int? mergeCandidateIndex,
+    List<Offset>? extrudePreviewPolygon,
+    bool isExtrudeSelfIntersecting = false,
   }) {
-    final poly = List<Offset>.from(zone.polygon);
+    final poly = extrudePreviewPolygon != null
+        ? List<Offset>.from(extrudePreviewPolygon)
+        : List<Offset>.from(zone.polygon);
     if (poly.length < 3) return;
 
     // If a vertex is currently being dragged, substitute its position for live preview
@@ -66,10 +74,11 @@ class ArchitectZonePainterHelper {
     canvas.drawPath(path, fillPaint);
 
     // 2. Zone border
+    final borderColor = isExtrudeSelfIntersecting
+        ? const Color(0xFFFF5252)
+        : (isSelected ? const Color(0xFF00E5FF) : zone.color.withValues(alpha: 0.85));
     final borderPaint = Paint()
-      ..color = isSelected
-          ? const Color(0xFF00E5FF)
-          : zone.color.withValues(alpha: 0.85)
+      ..color = borderColor
       ..strokeWidth = (isSelected ? 2.2 : 1.2) / zoomScale
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, borderPaint);
@@ -380,5 +389,270 @@ class ArchitectZonePainterHelper {
       canvas.drawLine(start, end, paint);
       current += dashLen + gapLen;
     }
+  }
+
+  /// Renders point-by-point zone drafting session with orthogonal straightening guides,
+  /// vertex nodes, live dimensions, and first-point closing snap targets.
+  static void drawPointByPointDrafting({
+    required Canvas canvas,
+    required List<Offset> points,
+    required Offset? candidatePoint,
+    required ArchitectZoneCategory category,
+    required double zoomScale,
+    (Offset, Offset)? orthoGuide,
+    String? orthoLabel,
+    bool isClosingSnap = false,
+    bool isSelfIntersecting = false,
+    String? closeLabel,
+  }) {
+    if (points.isEmpty) return;
+
+    final candidate = candidatePoint;
+    final allPoints = candidate != null ? [...points, candidate] : points;
+
+    // 1. Polygon Fill preview if >= 3 points
+    if (allPoints.length >= 3) {
+      final fillPath = Path()..moveTo(allPoints.first.dx, allPoints.first.dy);
+      for (int i = 1; i < allPoints.length; i++) {
+        fillPath.lineTo(allPoints[i].dx, allPoints[i].dy);
+      }
+      fillPath.close();
+
+      final fillPaint = Paint()
+        ..color = (isSelfIntersecting ? const Color(0xFFFF5252) : category.color)
+            .withValues(alpha: 0.18)
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(fillPath, fillPaint);
+    }
+
+    // 2. Committed segments
+    final strokeColor = isSelfIntersecting
+        ? const Color(0xFFFF5252)
+        : (isClosingSnap ? const Color(0xFF00E676) : const Color(0xFF00E5FF));
+
+    final committedPaint = Paint()
+      ..color = strokeColor.withValues(alpha: 0.9)
+      ..strokeWidth = 2.0 / zoomScale
+      ..style = PaintingStyle.stroke;
+
+    for (int i = 0; i < points.length - 1; i++) {
+      canvas.drawLine(points[i], points[i + 1], committedPaint);
+      final edgeLen = (points[i + 1] - points[i]).distance;
+      if (edgeLen > 0.6) {
+        _drawEdgeDimension(canvas, points[i], points[i + 1], edgeLen, zoomScale);
+      }
+    }
+
+    // 3. Active rubber-band segment from last committed point to candidate
+    if (candidate != null && points.isNotEmpty) {
+      final lastPt = points.last;
+      final rubberPaint = Paint()
+        ..color = strokeColor
+        ..strokeWidth = 1.8 / zoomScale
+        ..style = PaintingStyle.stroke;
+
+      _drawDashedLine(canvas, lastPt, candidate, rubberPaint, zoomScale);
+
+      // Dimension & angle badge for the active rubberband segment
+      final segLen = (candidate - lastPt).distance;
+      if (segLen > 0.25) {
+        _drawSegmentDimensionAndAngle(
+          canvas: canvas,
+          p1: lastPt,
+          p2: candidate,
+          length: segLen,
+          orthoLabel: orthoLabel,
+          zoomScale: zoomScale,
+        );
+      }
+    }
+
+    // 4. Extended orthogonal straightening guide line
+    if (orthoGuide != null) {
+      final orthoPaint = Paint()
+        ..color = const Color(0xFFFFD600).withValues(alpha: 0.85)
+        ..strokeWidth = 1.2 / zoomScale
+        ..style = PaintingStyle.stroke;
+      _drawDashedLine(canvas, orthoGuide.$1, orthoGuide.$2, orthoPaint, zoomScale);
+    }
+
+    // 5. Committed vertex nodes
+    final nodeRadius = 5.0 / zoomScale;
+    final nodeFill = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final nodeBorder = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..strokeWidth = 1.8 / zoomScale
+      ..style = PaintingStyle.stroke;
+
+    for (int i = 0; i < points.length; i++) {
+      final pt = points[i];
+      canvas.drawCircle(pt, nodeRadius, nodeFill);
+      canvas.drawCircle(pt, nodeRadius, nodeBorder);
+    }
+
+    // 6. First point closing target
+    if (points.length >= 3) {
+      final firstPt = points.first;
+      final targetRadius = (isClosingSnap ? 12.0 : 8.0) / zoomScale;
+      final targetPaint = Paint()
+        ..color = isClosingSnap ? const Color(0xFF00E676) : const Color(0xFF00E5FF)
+        ..strokeWidth = 2.0 / zoomScale
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawCircle(firstPt, targetRadius, targetPaint);
+
+      if (isClosingSnap) {
+        // Glowing target disk
+        final glowPaint = Paint()
+          ..color = const Color(0xFF00E676).withValues(alpha: 0.25)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(firstPt, targetRadius, glowPaint);
+
+        // Tooltip badge: "Затвори зона (1-ва точка)"
+        final badgeText = closeLabel ?? 'Затвори зона';
+        final tp = TextPainter(
+          text: TextSpan(
+            text: badgeText,
+            style: TextStyle(
+              color: const Color(0xFF00E676),
+              fontSize: 10.0 / zoomScale,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        final badgePos = firstPt - Offset(tp.width / 2, (targetRadius + tp.height + 6.0 / zoomScale));
+        final badgeRect = Rect.fromLTWH(
+          badgePos.dx - 6.0 / zoomScale,
+          badgePos.dy - 3.0 / zoomScale,
+          tp.width + 12.0 / zoomScale,
+          tp.height + 6.0 / zoomScale,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(badgeRect, Radius.circular(5.0 / zoomScale)),
+          Paint()..color = const Color(0xEE1A1C24),
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(badgeRect, Radius.circular(5.0 / zoomScale)),
+          Paint()
+            ..color = const Color(0xFF00E676)
+            ..strokeWidth = 1.0 / zoomScale
+            ..style = PaintingStyle.stroke,
+        );
+        tp.paint(canvas, badgePos);
+      }
+    }
+  }
+
+  static void _drawSegmentDimensionAndAngle({
+    required Canvas canvas,
+    required Offset p1,
+    required Offset p2,
+    required double length,
+    String? orthoLabel,
+    required double zoomScale,
+  }) {
+    final mid = (p1 + p2) / 2.0;
+    final delta = p2 - p1;
+    final u = delta / delta.distance;
+    final n = Offset(-u.dy, u.dx) * (0.35); // offset normal
+
+    final text = orthoLabel != null
+        ? '${length.toStringAsFixed(2)} m  ($orthoLabel)'
+        : '${length.toStringAsFixed(2)} m';
+
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 9.5 / zoomScale,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final center = mid + n;
+    final rect = Rect.fromCenter(
+      center: center,
+      width: tp.width + 6.0 / zoomScale,
+      height: tp.height + 4.0 / zoomScale,
+    );
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(4.0 / zoomScale)),
+      Paint()..color = const Color(0xEE1E1E28),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(4.0 / zoomScale)),
+      Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.6)
+        ..strokeWidth = 0.8 / zoomScale
+        ..style = PaintingStyle.stroke,
+    );
+    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
+  }
+
+  /// Draws live interactive extrusion step preview when dragging edge midpoint.
+  static void drawEdgeExtrudePreview({
+    required Canvas canvas,
+    required Offset v1,
+    required Offset v2,
+    required Offset normal,
+    required double distance,
+    required double zoomScale,
+    required bool isSelfIntersecting,
+  }) {
+    final vNew1 = v1 + normal * distance;
+    final vNew2 = v2 + normal * distance;
+    final color = isSelfIntersecting ? const Color(0xFFFF5252) : const Color(0xFF00E5FF);
+
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 1.8 / zoomScale
+      ..style = PaintingStyle.stroke;
+
+    _drawDashedLine(canvas, v1, vNew1, linePaint, zoomScale);
+    _drawDashedLine(canvas, vNew1, vNew2, linePaint, zoomScale);
+    _drawDashedLine(canvas, vNew2, v2, linePaint, zoomScale);
+
+    // Dimension badge
+    final midExtruded = (vNew1 + vNew2) / 2.0;
+    final distText = '${distance >= 0 ? "+" : ""}${distance.toStringAsFixed(2)} m';
+    final tp = TextPainter(
+      text: TextSpan(
+        text: distText,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 9.5 / zoomScale,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final center = midExtruded + normal * (0.25 * (distance >= 0 ? 1 : -1));
+    final rect = Rect.fromCenter(
+      center: center,
+      width: tp.width + 6.0 / zoomScale,
+      height: tp.height + 4.0 / zoomScale,
+    );
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(4.0 / zoomScale)),
+      Paint()..color = const Color(0xEE1E1E28),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(4.0 / zoomScale)),
+      Paint()
+        ..color = color
+        ..strokeWidth = 1.0 / zoomScale
+        ..style = PaintingStyle.stroke,
+    );
+    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
   }
 }

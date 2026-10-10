@@ -13,9 +13,11 @@ import '../rendering/architect_2d_painter.dart';
 import '../rendering/architect_3d_builder.dart';
 import '../rendering/architect_snap_helper.dart';
 import '../rendering/architect_zone_snap.dart';
+import '../services/architect_zone_tool.dart';
 import '../widgets/architect_new_project_dialog.dart';
 import '../widgets/architect_storey_bar.dart';
 import '../widgets/architect_tool_palette.dart';
+import '../widgets/architect_zone_drafting_bar.dart';
 import '../widgets/architect_zone_properties_card.dart';
 
 /// The primary unified workspace for architectural concept drafting in 2D and 3D.
@@ -43,6 +45,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _zoneMoveStartPoint;
   List<Offset>? _zoneMoveOriginalPolygon;
   List<(Offset, Offset)> _activeMagneticGuides = [];
+
+  // Unified tool controller for zone drafting, edge extrusion, and geometry
+  late final ArchitectZoneTool _zoneTool;
 
   // Wall Drafting State
   double _wallThickness = 0.25; // 25 cm default
@@ -74,6 +79,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool get _isInteractingWithElement =>
+      _zoneTool.isInteracting ||
       _draftStart != null ||
       _draggingVertexIndex != null ||
       _zoneMoveStartPoint != null;
@@ -86,6 +92,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           name: 'Архитектурен проект 1',
           storeyCount: 2,
         );
+
+    _zoneTool = ArchitectZoneTool()
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
 
     _camera3D = Cad3DCamera(
       yaw: math.pi / 4,
@@ -107,6 +118,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   @override
   void dispose() {
+    _zoneTool.dispose();
     _transformController.dispose();
     super.dispose();
   }
@@ -160,11 +172,80 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return null;
   }
 
+  void _commitDraftedZone() {
+    final l10n = context.l10n;
+    final newZone = _zoneTool.commitDrafting(
+      category: _activeZoneCategory,
+      defaultName: _activeZoneCategory.defaultBgName,
+    );
+
+    if (newZone != null) {
+      final activeStorey = _project.activeStorey;
+      final updatedStorey = activeStorey.copyWith(
+        zones: [...activeStorey.zones, newZone],
+      );
+
+      setState(() {
+        _project = _project.updateActiveStorey(updatedStorey);
+        _selectedZoneId = newZone.id;
+        _activeMagneticGuides = [];
+        _activeSnapLabel = null;
+      });
+
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.architectZoneCreated(newZone.name, newZone.area.toStringAsFixed(1)),
+          ),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    } else {
+      if (_zoneTool.pointStatus == ZoneDraftingPointStatus.selfIntersects) {
+        HapticFeedback.heavyImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.architectZoneSelfIntersectError),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        HapticFeedback.selectionClick();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.architectZoneMinPointsError),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    }
+  }
+
   void _onPointerDown(Offset screenPos) {
     final rawModel = _screenToModel(screenPos);
 
-    if (_activeTool == ArchitectTool.zone || _activeTool == ArchitectTool.select) {
-      // 1. If a zone is already selected, check its handles first
+    if (_activeTool == ArchitectTool.zone) {
+      // 1. If currently in point-by-point drafting mode:
+      if (_zoneTool.isDrafting) {
+        if (_zoneTool.isClosingSnap) {
+          _commitDraftedZone();
+          return;
+        }
+
+        final candidate = _zoneTool.candidatePoint ?? rawModel;
+        final added = _zoneTool.addDraftingPoint(candidate);
+        if (_zoneTool.pointStatus == ZoneDraftingPointStatus.closeTarget) {
+          _commitDraftedZone();
+        } else if (added) {
+          HapticFeedback.lightImpact();
+        } else if (_zoneTool.pointStatus == ZoneDraftingPointStatus.selfIntersects) {
+          HapticFeedback.heavyImpact();
+        }
+        return;
+      }
+
+      // 2. Check if a zone handle is hit on the selected zone
       final currentSelected = _selectedZone;
       if (currentSelected != null) {
         // Vertex handle check (drag existing vertex)
@@ -180,20 +261,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           return;
         }
 
-        // Midpoint grip check (split edge and insert new vertex)
+        // Midpoint handle check (extrude/pull edge preserving endpoints and creating new vertices)
         final midIdx = _hitTestZoneMidpoint(rawModel, currentSelected);
         if (midIdx != null) {
-          final p1 = currentSelected.polygon[midIdx];
-          final p2 = currentSelected.polygon[(midIdx + 1) % currentSelected.polygon.length];
-          final mid = (p1 + p2) / 2.0;
-          final updated = currentSelected.insertVertex(midIdx, mid);
-          _updateZone(updated);
-          setState(() {
-            _draggingVertexIndex = midIdx + 1;
-            _draggingVertexPoint = mid;
-            _mergeCandidateIndex = null;
-            _activeMagneticGuides = [];
-          });
+          _zoneTool.startExtrude(
+            zone: currentSelected,
+            edgeIndex: midIdx,
+            pointerModel: rawModel,
+          );
           HapticFeedback.mediumImpact();
           return;
         }
@@ -208,7 +283,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         }
       }
 
-      // 2. Check if tapped inside another zone
+      // 3. Check if tapped inside another zone to select it
       final hitZone = _findZoneAt(rawModel);
       if (hitZone != null) {
         setState(() {
@@ -219,33 +294,71 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return;
       }
 
-      // 3. In Zone tool: if tapped empty space, initiate drag-to-create zone
-      if (_activeTool == ArchitectTool.zone) {
-        final snap = ArchitectZoneSnap.snap(
-          raw: rawModel,
-          project: _project,
-          tolerance: 14.0 / _currentScale,
-        );
+      // 4. In Zone tool, tapping empty space starts point-by-point drafting
+      final snap = ArchitectZoneSnap.snap(
+        raw: rawModel,
+        project: _project,
+        tolerance: 14.0 / _currentScale,
+      );
+      _zoneTool.startDrafting(snap.isSnapped ? snap.point : rawModel);
+      setState(() {
+        _selectedZoneId = null;
+      });
+      HapticFeedback.mediumImpact();
+      return;
+    }
+
+    if (_activeTool == ArchitectTool.select) {
+      final currentSelected = _selectedZone;
+      if (currentSelected != null) {
+        final vIdx = _hitTestZoneVertex(rawModel, currentSelected);
+        if (vIdx != null) {
+          setState(() {
+            _draggingVertexIndex = vIdx;
+            _draggingVertexPoint = currentSelected.polygon[vIdx];
+            _mergeCandidateIndex = null;
+            _activeMagneticGuides = [];
+          });
+          HapticFeedback.selectionClick();
+          return;
+        }
+
+        final midIdx = _hitTestZoneMidpoint(rawModel, currentSelected);
+        if (midIdx != null) {
+          _zoneTool.startExtrude(
+            zone: currentSelected,
+            edgeIndex: midIdx,
+            pointerModel: rawModel,
+          );
+          HapticFeedback.mediumImpact();
+          return;
+        }
+
+        if (currentSelected.containsPoint(rawModel)) {
+          setState(() {
+            _zoneMoveStartPoint = rawModel;
+            _zoneMoveOriginalPolygon = List<Offset>.from(currentSelected.polygon);
+          });
+          return;
+        }
+      }
+
+      final hitZone = _findZoneAt(rawModel);
+      if (hitZone != null) {
         setState(() {
-          _draftStart = snap.point;
-          _draftEnd = snap.point;
-          _activeMagneticGuides = snap.magneticGuides;
-          _activeSnapLabel = snap.snapLabel;
-          _selectedZoneId = null;
+          _selectedZoneId = hitZone.id;
+          _selectedElementId = null;
         });
+        HapticFeedback.selectionClick();
         return;
       }
 
-      // 4. In Select tool: check if a wall is tapped
-      if (_activeTool == ArchitectTool.select) {
-        _trySelectElementAt(rawModel);
-        return;
-      }
+      _trySelectElementAt(rawModel);
+      return;
     }
 
     if (_activeTool == ArchitectTool.wall) {
       if (_draftStart == null) {
-        // Start a new wall run
         final snap = ArchitectSnapHelper.snapFree(
           rawPoint: rawModel,
           project: _project,
@@ -257,7 +370,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _activeSnapLabel = snap.snapLabel;
         });
       } else {
-        // If already chaining, finalize this segment and continue
         _commitCurrentWallSegment(rawModel);
       }
     } else if (_activeTool == ArchitectTool.door) {
@@ -268,7 +380,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerMove(Offset screenPos) {
     final rawModel = _screenToModel(screenPos);
 
-    // 1. Dragging a zone vertex (dynamic slab editing)
+    // 1. Point-by-point zone drafting preview
+    if (_activeTool == ArchitectTool.zone && _zoneTool.isDrafting) {
+      _zoneTool.updateDraftingPointer(
+        rawModelPoint: rawModel,
+        project: _project,
+        currentScale: _currentScale,
+      );
+      return;
+    }
+
+    // 2. Dragging edge midpoint (extruding segment)
+    if (_zoneTool.isExtruding) {
+      _zoneTool.updateExtrudePointer(rawModel);
+      return;
+    }
+
+    // 3. Dragging a zone vertex (dynamic slab editing)
     if (_draggingVertexIndex != null && _selectedZone != null) {
       final snap = ArchitectZoneSnap.snap(
         raw: rawModel,
@@ -286,7 +414,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 2. Moving whole zone
+    // 4. Moving whole zone
     if (_zoneMoveStartPoint != null && _zoneMoveOriginalPolygon != null && _selectedZone != null) {
       final delta = rawModel - _zoneMoveStartPoint!;
       final translated = _zoneMoveOriginalPolygon!.map((p) => p + delta).toList();
@@ -294,22 +422,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 3. Dragging to create a new zone
-    if (_activeTool == ArchitectTool.zone && _draftStart != null) {
-      final snap = ArchitectZoneSnap.snap(
-        raw: rawModel,
-        project: _project,
-        tolerance: 14.0 / _currentScale,
-      );
-      setState(() {
-        _draftEnd = snap.point;
-        _activeMagneticGuides = snap.magneticGuides;
-        _activeSnapLabel = snap.snapLabel;
-      });
-      return;
-    }
-
-    // 4. Wall drafting
+    // 5. Wall drafting
     if (_activeTool == ArchitectTool.wall && _draftStart != null) {
       final snap = ArchitectSnapHelper.snapWithAnchor(
         anchor: _draftStart!,
@@ -327,7 +440,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _onPointerUp(Offset screenPos) {
     final l10n = context.l10n;
 
-    // 1. Commit vertex drag
+    // 1. Edge extrusion commit
+    if (_zoneTool.isExtruding) {
+      final isSelfIntersecting = _zoneTool.isExtrudeSelfIntersecting;
+      final result = _zoneTool.commitExtrude();
+      if (result != null) {
+        final (updatedZone, cleanedCount) = result;
+        _updateZone(updatedZone);
+        HapticFeedback.mediumImpact();
+        if (cleanedCount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.architectZoneCleaned(cleanedCount)),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      } else if (isSelfIntersecting) {
+        HapticFeedback.heavyImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.architectZoneSelfIntersectError),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    // 2. Commit vertex drag with orphan cleaning & self-intersection protection
     if (_draggingVertexIndex != null && _selectedZone != null) {
       final zone = _selectedZone!;
       final idx = _draggingVertexIndex!;
@@ -336,7 +477,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (mergeCandidate != null && zone.polygon.length > 3) {
         final updated = zone.removeVertex(idx);
         if (updated != null) {
-          _updateZone(updated);
+          final cleaned = ArchitectZoneGeometry.cleanPolygon(updated.polygon);
+          _updateZone(updated.copyWith(polygon: cleaned));
           HapticFeedback.heavyImpact();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -346,9 +488,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           );
         }
       } else if (_draggingVertexPoint != null) {
-        final updated = zone.moveVertex(idx, _draggingVertexPoint!);
-        _updateZone(updated);
-        HapticFeedback.lightImpact();
+        final candidatePoly = List<Offset>.from(zone.polygon)..[idx] = _draggingVertexPoint!;
+        if (ArchitectZoneGeometry.hasSelfIntersections(candidatePoly)) {
+          HapticFeedback.heavyImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.architectZoneSelfIntersectError),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          final cleaned = ArchitectZoneGeometry.cleanPolygon(candidatePoly);
+          final updated = zone.copyWith(polygon: cleaned);
+          _updateZone(updated);
+          HapticFeedback.lightImpact();
+        }
       }
 
       setState(() {
@@ -361,7 +515,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 2. Commit whole zone move
+    // 3. Commit whole zone move
     if (_zoneMoveStartPoint != null) {
       setState(() {
         _zoneMoveStartPoint = null;
@@ -369,61 +523,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _activeMagneticGuides = [];
       });
       return;
-    }
-
-    // 3. Commit new zone creation
-    if (_activeTool == ArchitectTool.zone && _draftStart != null && _draftEnd != null) {
-      final rect = Rect.fromPoints(_draftStart!, _draftEnd!);
-      final w = rect.width.abs();
-      final h = rect.height.abs();
-
-      if (w >= 0.35 && h >= 0.35) {
-        final now = DateTime.now().millisecondsSinceEpoch;
-        final polygon = [
-          rect.topLeft,
-          rect.topRight,
-          rect.bottomRight,
-          rect.bottomLeft,
-        ];
-        final newZone = ArchitectZone(
-          id: 'zone_$now',
-          name: _activeZoneCategory.defaultBgName,
-          category: _activeZoneCategory,
-          polygon: polygon,
-        );
-
-        final activeStorey = _project.activeStorey;
-        final updatedStorey = activeStorey.copyWith(
-          zones: [...activeStorey.zones, newZone],
-        );
-
-        setState(() {
-          _project = _project.updateActiveStorey(updatedStorey);
-          _selectedZoneId = newZone.id;
-          _draftStart = null;
-          _draftEnd = null;
-          _activeMagneticGuides = [];
-          _activeSnapLabel = null;
-        });
-
-        HapticFeedback.mediumImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              l10n.architectZoneCreated(newZone.name, newZone.area.toStringAsFixed(1)),
-            ),
-            duration: const Duration(seconds: 1),
-          ),
-        );
-        return;
-      } else {
-        setState(() {
-          _draftStart = null;
-          _draftEnd = null;
-          _activeMagneticGuides = [];
-          _activeSnapLabel = null;
-        });
-      }
     }
 
     // 4. Wall drafting commit
@@ -667,7 +766,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
           // Main Viewport (2D Canvas or 3D Solid Model)
           Expanded(
-            child: _is3DView ? _build3DViewport() : _build2DCanvas(),
+            child: Stack(
+              children: [
+                _is3DView ? _build3DViewport() : _build2DCanvas(),
+                if (_zoneTool.isDrafting && !_is3DView)
+                  Positioned(
+                    top: 10,
+                    left: 0,
+                    right: 0,
+                    child: ArchitectZoneDraftingBar(
+                      tool: _zoneTool,
+                      category: _activeZoneCategory,
+                      onClose: _commitDraftedZone,
+                      onUndo: () => setState(
+                          () => _zoneTool.undoDraftingPoint()),
+                      onCancel: () =>
+                          setState(() => _zoneTool.cancelDrafting()),
+                    ),
+                  ),
+              ],
+            ),
           ),
 
           // Floating Zone Property Inspector Card if a zone is selected
@@ -684,6 +802,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ArchitectToolPalette(
               activeTool: _activeTool,
               onToolChanged: (tool) => setState(() {
+                _zoneTool.cancelAll();
                 _activeTool = tool;
                 _draftStart = null;
                 _draftEnd = null;
@@ -721,34 +840,64 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // ===========================================================================
 
   Widget _build2DCanvas() {
-    return GestureDetector(
-      onTapDown: (details) => _onPointerDown(details.localPosition),
-      onPanStart: (details) => _onPointerDown(details.localPosition),
-      onPanUpdate: (details) => _onPointerMove(details.localPosition),
-      onPanEnd: (details) => _onPointerUp(details.localPosition),
-      child: InteractiveViewer(
-        transformationController: _transformController,
-        boundaryMargin: const EdgeInsets.all(5000),
-        minScale: 0.05,
-        maxScale: 50.0,
-        panEnabled: !_isInteractingWithElement,
-        child: SizedBox.expand(
-          child: CustomPaint(
-            painter: Architect2dPainter(
-              project: _project,
-              activeTool: _activeTool,
-              activeDraftStart: _draftStart,
-              activeDraftEnd: _draftEnd,
-              activeWallThickness: _wallThickness,
-              activeSnapLabel: _activeSnapLabel,
-              selectedElementId: _selectedElementId,
-              selectedZoneId: _selectedZoneId,
-              activeZoneCategory: _activeZoneCategory,
-              draggingVertexIndex: _draggingVertexIndex,
-              draggingVertexPoint: _draggingVertexPoint,
-              mergeCandidateIndex: _mergeCandidateIndex,
-              magneticGuides: _activeMagneticGuides,
-              zoomScale: _currentScale,
+    return MouseRegion(
+      onHover: (event) {
+        if (_zoneTool.isDrafting) {
+          _onPointerMove(event.localPosition);
+        }
+      },
+      child: GestureDetector(
+        onTapDown: (details) => _onPointerDown(details.localPosition),
+        onPanStart: (details) {
+          if (!_zoneTool.isDrafting) {
+            _onPointerDown(details.localPosition);
+          }
+        },
+        onPanUpdate: (details) => _onPointerMove(details.localPosition),
+        onPanEnd: (details) => _onPointerUp(details.localPosition),
+        child: InteractiveViewer(
+          transformationController: _transformController,
+          boundaryMargin: const EdgeInsets.all(5000),
+          minScale: 0.05,
+          maxScale: 50.0,
+          panEnabled: !_isInteractingWithElement,
+          child: SizedBox.expand(
+            child: CustomPaint(
+              painter: Architect2dPainter(
+                project: _project,
+                activeTool: _activeTool,
+                activeDraftStart: _draftStart,
+                activeDraftEnd: _draftEnd,
+                activeWallThickness: _wallThickness,
+                activeSnapLabel: _activeSnapLabel,
+                selectedElementId: _selectedElementId,
+                selectedZoneId: _selectedZoneId,
+                activeZoneCategory: _activeZoneCategory,
+                draggingVertexIndex: _draggingVertexIndex,
+                draggingVertexPoint: _draggingVertexPoint,
+                mergeCandidateIndex: _mergeCandidateIndex,
+                magneticGuides: _zoneTool.isDrafting
+                    ? _zoneTool.magneticGuides
+                    : _activeMagneticGuides,
+                zoomScale: _currentScale,
+                zoneDraftingPoints: _zoneTool.draftPoints,
+                zoneDraftingCandidate: _zoneTool.candidatePoint,
+                zoneOrthoGuide: _zoneTool.orthoGuide,
+                zoneOrthoLabel: _zoneTool.orthoLabel,
+                isZoneClosingSnap: _zoneTool.isClosingSnap,
+                isZoneDraftingSelfIntersecting:
+                    _zoneTool.pointStatus ==
+                        ZoneDraftingPointStatus.selfIntersects,
+                zoneCloseLabel: context.l10n.architectZonePointSnapStart,
+                zoneExtrudePreviewPolygon:
+                    _zoneTool.extrudePreviewPolygon,
+                zoneExtrudeV1: _zoneTool.extrudeV1,
+                zoneExtrudeV2: _zoneTool.extrudeV2,
+                zoneExtrudeNormal: _zoneTool.extrudeNormal,
+                zoneExtrudeDistance: _zoneTool.extrudeDistance,
+                isZoneExtrudeSelfIntersecting:
+                    _zoneTool.isExtrudeSelfIntersecting,
+              ),
             ),
           ),
         ),

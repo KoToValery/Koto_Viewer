@@ -6023,6 +6023,78 @@ abstract class AppLocalizations {
   /// **'Drag to draw room zone'**
   String get architectZoneDragPrompt;
 
+  /// Guidance prompt when drawing point-by-point zone
+  ///
+  /// In en, this message translates to:
+  /// **'Click point by point to draft zone. Snap to first point to close.'**
+  String get architectZoneDrawPrompt;
+
+  /// Button to close and finalize zone polygon
+  ///
+  /// In en, this message translates to:
+  /// **'Close Zone'**
+  String get architectZoneClose;
+
+  /// Button to undo last placed vertex in zone drafting
+  ///
+  /// In en, this message translates to:
+  /// **'Undo Point'**
+  String get architectZoneUndoPoint;
+
+  /// Button to cancel zone drafting
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get architectZoneCancelDraft;
+
+  /// Snap badge when hovering start point
+  ///
+  /// In en, this message translates to:
+  /// **'Close zone (1st point)'**
+  String get architectZonePointSnapStart;
+
+  /// Error when polygon self-intersects
+  ///
+  /// In en, this message translates to:
+  /// **'Self-intersecting polygon boundary is not allowed'**
+  String get architectZoneSelfIntersectError;
+
+  /// Error when zone has less than 3 points
+  ///
+  /// In en, this message translates to:
+  /// **'A zone requires at least 3 points'**
+  String get architectZoneMinPointsError;
+
+  /// Label indicating edge offset distance
+  ///
+  /// In en, this message translates to:
+  /// **'Extruded edge: {dist} m'**
+  String architectZoneExtrudeOffset(String dist);
+
+  /// Notification when redundant/orphan vertices are eliminated
+  ///
+  /// In en, this message translates to:
+  /// **'Removed {count} redundant/orphan vertices'**
+  String architectZoneCleaned(int count);
+
+  /// Number of placed points
+  ///
+  /// In en, this message translates to:
+  /// **'Points: {count}'**
+  String architectZonePointsCount(int count);
+
+  /// Horizontal alignment badge
+  ///
+  /// In en, this message translates to:
+  /// **'Straightened 0°'**
+  String get architectZoneAlignH;
+
+  /// Vertical alignment badge
+  ///
+  /// In en, this message translates to:
+  /// **'Straightened 90°'**
+  String get architectZoneAlignV;
+
   /// Notification when a zone is created
   ///
   /// In en, this message translates to:

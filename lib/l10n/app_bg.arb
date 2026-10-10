@@ -1096,6 +1096,33 @@
   "architectCreateProject": "Създай проект",
   "architectToolZone": "Зони",
   "architectZoneDragPrompt": "Изтеглете с влачене за нова зона",
+  "architectZoneDrawPrompt": "Кликнете точка по точка за чертане на зона. Затворете при първата точка.",
+  "architectZoneClose": "Затвори зона",
+  "architectZoneUndoPoint": "Отмени точка",
+  "architectZoneCancelDraft": "Отказ",
+  "architectZonePointSnapStart": "Затваряне на зона (1-ва точка)",
+  "architectZoneSelfIntersectError": "Невалиден полигон с пресичащи се страни",
+  "architectZoneMinPointsError": "Зоната трябва да има поне 3 точки",
+  "architectZoneExtrudeOffset": "Изтеглена отсечка: {dist} m",
+  "@architectZoneExtrudeOffset": {
+    "placeholders": {
+      "dist": { "type": "String" }
+    }
+  },
+  "architectZoneCleaned": "Премахнати {count} излишни / сираци точки",
+  "@architectZoneCleaned": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "architectZonePointsCount": "Точки: {count}",
+  "@architectZonePointsCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "architectZoneAlignH": "Изправена 0°",
+  "architectZoneAlignV": "Изправена 90°",
   "architectZoneCreated": "Зона {name} ({area} m²) създадена",
   "@architectZoneCreated": {
     "placeholders": {

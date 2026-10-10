@@ -3508,6 +3508,50 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneDragPrompt => 'Изтеглете с влачене за нова зона';
 
   @override
+  String get architectZoneDrawPrompt =>
+      'Кликнете точка по точка за чертане на зона. Затворете при първата точка.';
+
+  @override
+  String get architectZoneClose => 'Затвори зона';
+
+  @override
+  String get architectZoneUndoPoint => 'Отмени точка';
+
+  @override
+  String get architectZoneCancelDraft => 'Отказ';
+
+  @override
+  String get architectZonePointSnapStart => 'Затваряне на зона (1-ва точка)';
+
+  @override
+  String get architectZoneSelfIntersectError =>
+      'Невалиден полигон с пресичащи се страни';
+
+  @override
+  String get architectZoneMinPointsError => 'Зоната трябва да има поне 3 точки';
+
+  @override
+  String architectZoneExtrudeOffset(String dist) {
+    return 'Изтеглена отсечка: $dist m';
+  }
+
+  @override
+  String architectZoneCleaned(int count) {
+    return 'Премахнати $count излишни / сираци точки';
+  }
+
+  @override
+  String architectZonePointsCount(int count) {
+    return 'Точки: $count';
+  }
+
+  @override
+  String get architectZoneAlignH => 'Изправена 0°';
+
+  @override
+  String get architectZoneAlignV => 'Изправена 90°';
+
+  @override
   String architectZoneCreated(String name, String area) {
     return 'Зона $name ($area m²) създадена';
   }

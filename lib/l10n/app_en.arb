@@ -2630,6 +2630,39 @@
   "@architectToolZone": { "description": "Functional zones tool" },
   "architectZoneDragPrompt": "Drag to draw room zone",
   "@architectZoneDragPrompt": { "description": "Guidance prompt when zone tool is active" },
+  "architectZoneDrawPrompt": "Click point by point to draft zone. Snap to first point to close.",
+  "@architectZoneDrawPrompt": { "description": "Guidance prompt when drawing point-by-point zone" },
+  "architectZoneClose": "Close Zone",
+  "@architectZoneClose": { "description": "Button to close and finalize zone polygon" },
+  "architectZoneUndoPoint": "Undo Point",
+  "@architectZoneUndoPoint": { "description": "Button to undo last placed vertex in zone drafting" },
+  "architectZoneCancelDraft": "Cancel",
+  "@architectZoneCancelDraft": { "description": "Button to cancel zone drafting" },
+  "architectZonePointSnapStart": "Close zone (1st point)",
+  "@architectZonePointSnapStart": { "description": "Snap badge when hovering start point" },
+  "architectZoneSelfIntersectError": "Self-intersecting polygon boundary is not allowed",
+  "@architectZoneSelfIntersectError": { "description": "Error when polygon self-intersects" },
+  "architectZoneMinPointsError": "A zone requires at least 3 points",
+  "@architectZoneMinPointsError": { "description": "Error when zone has less than 3 points" },
+  "architectZoneExtrudeOffset": "Extruded edge: {dist} m",
+  "@architectZoneExtrudeOffset": {
+    "description": "Label indicating edge offset distance",
+    "placeholders": { "dist": { "type": "String" } }
+  },
+  "architectZoneCleaned": "Removed {count} redundant/orphan vertices",
+  "@architectZoneCleaned": {
+    "description": "Notification when redundant/orphan vertices are eliminated",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "architectZonePointsCount": "Points: {count}",
+  "@architectZonePointsCount": {
+    "description": "Number of placed points",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "architectZoneAlignH": "Straightened 0°",
+  "@architectZoneAlignH": { "description": "Horizontal alignment badge" },
+  "architectZoneAlignV": "Straightened 90°",
+  "@architectZoneAlignV": { "description": "Vertical alignment badge" },
   "architectZoneCreated": "Zone {name} ({area} m²) created",
   "@architectZoneCreated": {
     "description": "Notification when a zone is created",
