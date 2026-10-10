@@ -348,6 +348,8 @@ class BimProjectLibraryService {
           layerVisibility: preserveAlignment ? s.layerVisibility : {},
           wallsDetected: metadata['wallsFound'] == true,
           processing: {
+            if (s.processing['structuralTransform'] != null)
+              'structuralTransform': s.processing['structuralTransform'],
             if (s.processing['structuralSeeds'] != null)
               'structuralSeeds': s.processing['structuralSeeds'],
             if (s.processing['structuralReviewRequired'] == true)

@@ -6871,6 +6871,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       existing: active.slabs,
       unitsPerMeter: _cadUnitsPerMeter,
       thickness: _currentSlabThickness,
+      floorOwned: widget.bimContext != null,
     );
     if (seeds.isNotEmpty) {
       final coloredSeeds = [
@@ -7023,6 +7024,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       existing: active.slabs,
       unitsPerMeter: _cadUnitsPerMeter,
       thickness: _currentSlabThickness,
+      floorOwned: widget.bimContext != null,
       wallReferences: wallReferences,
     );
     final total = ((metadata['slabEnvelope'] as Map?)?['contours'] as List? ?? []).length +
@@ -7492,6 +7494,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         existing: active.slabs,
         unitsPerMeter: _cadUnitsPerMeter,
         thickness: _currentSlabThickness,
+        floorOwned: widget.bimContext != null,
         wallReferences: wallReferences,
       );
       if (seeds.isNotEmpty) {

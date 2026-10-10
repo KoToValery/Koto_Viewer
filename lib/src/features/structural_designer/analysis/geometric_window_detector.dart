@@ -185,14 +185,27 @@ class GeometricWindowDetector {
         final facingB = jB.openNormal.dx * (-u.dx) + jB.openNormal.dy * (-u.dy);
         if (facingA < 0.85 || facingB < 0.85) continue;
 
-        // Check lateral offset between the two jamb centers
-        final n = Offset(-u.dy, u.dx);
-        final lateralOffset =
-            ((jB.center - jA.center).dx * n.dx +
-                    (jB.center - jA.center).dy * n.dy)
+        // A span is perpendicular to its own normal by definition. Measure
+        // against both observed wall axes instead: diagonal jumps between
+        // stepped facades otherwise produce a fictitious averaged barrier.
+        final axesCosine =
+            (jA.axisDir.dx * jB.axisDir.dx + jA.axisDir.dy * jB.axisDir.dy)
                 .abs();
+        if (axesCosine < math.cos(5 * math.pi / 180)) continue;
+        double acrossWall(Offset axis) =>
+            (spanVec.dx * axis.dy - spanVec.dy * axis.dx).abs();
+        final lateralOffset = math.max(
+          acrossWall(jA.axisDir),
+          acrossWall(jB.axisDir),
+        );
+        // Unequal wall thicknesses may share an exterior face while their
+        // centerlines differ by half the thickness difference. Glazing may be
+        // inset, but that does not move the adjoining wall faces.
+        final faceTolerance =
+            (jA.thickness - jB.thickness).abs() / 2 + 35 * scale;
+        if (lateralOffset > faceTolerance) continue;
         final maxThickness = math.max(jA.thickness, jB.thickness);
-        if (lateralOffset > maxThickness * 0.85 + 50 * scale) continue;
+        final n = Offset(-u.dy, u.dx);
 
         // Check if this opening spans the mouth of an inward recess/courtyard
         final isRecess = isRecessMouth(

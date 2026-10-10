@@ -25,6 +25,27 @@ StructuralPointerPainter pointer(Offset touch, {bool enabled = true}) =>
     );
 
 void main() {
+  test(
+    'focus follows a touched edge instead of the center of a large object',
+    () {
+      final p = StructuralPointerPainter(
+        touchPos: const Offset(292, 250),
+        targetPos: const Offset(200, 250),
+        placementPos: const Offset(200, 250),
+        activeTool: StructuralDrawTool.column,
+        showDetailLoupe: true,
+        previewElementPolygon: const [
+          Offset(100, 150),
+          Offset(300, 150),
+          Offset(300, 350),
+          Offset(100, 350),
+        ],
+      );
+      expect(p.detailFocusPosition, const Offset(300, 250));
+      expect(p.detailLoupeRect(const Size(400, 400)), isNotNull);
+      expect(p.effectivePlacementPosition, const Offset(200, 250));
+    },
+  );
   test('loupe stays in view and away from a finger near viewport edges', () {
     const size = Size(400, 400);
     for (final touch in [
@@ -84,7 +105,10 @@ void main() {
           find.byType(RawMagnifier),
         );
         final bounds = overlay.detailLoupeRect(const Size(400, 400))!;
-        expect(magnifier.focalPointOffset + bounds.center, touch);
+        expect(
+          magnifier.focalPointOffset + bounds.center,
+          overlay.detailFocusPosition,
+        );
         final boundary =
             key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
         final image = (await tester.runAsync(() => boundary.toImage()))!;
@@ -96,14 +120,20 @@ void main() {
             bytes.sublist((y * 400 + x) * 4, (y * 400 + x) * 4 + 3);
         // The wall exists only near the finger in the original drawing. Its
         // enlarged pixels must appear in the loupe, outside the moving polygon.
-        final wall = pixel(253, bounds.center.dy.round());
+        final wallPos =
+            bounds.center +
+            (const Offset(221, 240) - overlay.detailFocusPosition) * 2.5;
+        final wall = pixel(wallPos.dx.round(), wallPos.dy.round());
         expect(
           wall.every((c) => light ? c < 60 : c > 200),
           isTrue,
           reason: '$wall',
         );
         // Both backgrounds retain the same warm, clearly delineated edge.
-        final edge = pixel(225, (bounds.center.dy - 12).round());
+        final edgePos =
+            bounds.center +
+            (const Offset(200, 249) - overlay.detailFocusPosition) * 2.5;
+        final edge = pixel(edgePos.dx.round(), edgePos.dy.round());
         expect(edge[0], greaterThan(220));
         expect(edge[1], greaterThan(150));
         expect(edge[2], lessThan(130));

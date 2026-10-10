@@ -10,6 +10,7 @@ import '../models/bim_work_project.dart';
 import 'bim_underlay_conversion_service.dart';
 import 'bim_underlay_loader.dart';
 import 'bim_grid_axis_sync.dart';
+import 'bim_structural_alignment_sync.dart';
 import '../../structural_designer/analysis/project_grid_axes.dart';
 
 /// Source revisions and alignment are independent from manual structural edits.
@@ -20,6 +21,13 @@ class BimStructuralSeedSync {
     StructuralProject structural,
     Map<String, DxfDocument> documents,
   ) {
+    final rebased = BimStructuralAlignmentSync.rebase(
+      project,
+      structural,
+      documents,
+    );
+    project = rebased.project;
+    structural = rebased.structural;
     final updated = <StoreyLevel>[];
     final underlays = <BimStoreyUnderlay>[];
     final units =
@@ -50,25 +58,17 @@ class BimStructuralSeedSync {
         underlays.add(source);
         continue;
       }
-      final nextLevel = project.sortedStoreysByElevation
-          .where((s) => s.elevation > source.elevation)
-          .firstOrNull;
-      // An empty intermediate floor cannot be bypassed to create a ceiling
-      // at a different level from StructuralProject.resolveCeilingStorey.
-      final higher =
-          nextLevel != null && documents.containsKey(nextLevel.storeyId)
-          ? nextLevel
-          : null;
       final old = source.processing['structuralSeeds'] as Map?;
       final key = jsonEncode([
         SlabEnvelopeResult.version,
+        'floor-owned-v1',
         source.underlayFileName,
         source.processing['fingerprint'],
         meta['sourceToProject'],
         meta['axes'],
         meta['slabEnvelope'],
         meta['slabProjections'],
-        higher?.storeyId,
+        floor.id,
         project.sortedStoreysByElevation
             .map(
               (s) => [
@@ -84,9 +84,24 @@ class BimStructuralSeedSync {
         underlays.add(source);
         continue;
       }
+      var alignmentOnly = false;
+      if (rebased.moved.contains(floor.id) && old?['key'] is String) {
+        try {
+          final previousKey = jsonDecode(old!['key'] as String) as List;
+          final pathIndex = previousKey.indexWhere(
+            (v) => v == source.underlayFileName,
+          );
+          alignmentOnly =
+              pathIndex >= 0 &&
+              previousKey[pathIndex + 1] == source.processing['fingerprint'];
+        } catch (_) {
+          /* A source revision keeps the review flag. */
+        }
+      }
       var review =
           source.processing['structuralReviewRequired'] == true ||
-          ((old != null || project.axisSeedsConsumed) &&
+          (!alignmentOnly &&
+              (old != null || project.axisSeedsConsumed) &&
               (floor.columns.isNotEmpty ||
                   floor.shearWalls.isNotEmpty ||
                   floor.beams.isNotEmpty));
@@ -100,6 +115,7 @@ class BimStructuralSeedSync {
         existing: [],
         unitsPerMeter: scale,
         thickness: .20,
+        floorOwned: true,
       );
       final colored = [
         for (var i = 0; i < generated.length; i++)
@@ -111,26 +127,25 @@ class BimStructuralSeedSync {
       ];
       final oldSlabs = {
         for (final raw in (old?['slabs'] as List? ?? []))
-          (raw as Map)['id'] as String: Map<String, dynamic>.from(raw),
+          (raw as Map)['id'] as String: StructuralSlab.fromJson(
+            Map<String, dynamic>.from(raw),
+          ).copyWith(isFloorSlab: true).toJson(),
       };
-      final pending = List<StructuralSlab>.of(floor.slabs);
-      final snapshots = <Map<String, dynamic>>[];
       final automatic = SlabSeedGenerator.prefix(floor.id);
-      for (final slab in floor.slabs.where((s) => s.id.startsWith(automatic))) {
+      final owned = floor.slabs
+          .map(
+            (s) =>
+                s.id.startsWith(automatic) ? s.copyWith(isFloorSlab: true) : s,
+          )
+          .toList();
+      final pending = List<StructuralSlab>.of(owned);
+      final snapshots = <Map<String, dynamic>>[];
+      for (final slab in owned.where((s) => s.id.startsWith(automatic))) {
         final snapshot = oldSlabs[slab.id];
         final next = colored.where((s) => s.id == slab.id).firstOrNull;
         final untouched = snapshot != null
             ? equal(slab.toJson(), snapshot)
             : next != null && equal(slab.toJson(), next.toJson());
-        if (higher == null) {
-          if (untouched) {
-            pending.removeWhere((s) => s.id == slab.id);
-          } else {
-            review = true;
-            snapshots.add(snapshot ?? slab.toJson());
-          }
-          continue;
-        }
         if (snapshot != null &&
             next != null &&
             equal(slab.toJson()['polygon'], snapshot['polygon'])) {
@@ -156,16 +171,15 @@ class BimStructuralSeedSync {
             snapshots.add(next.toJson());
           }
         } else {
-          review = review || old != null;
+          review = review || (!alignmentOnly && old != null);
           snapshots.add(snapshot ?? slab.toJson());
         }
       }
-      if (higher != null) {
+      {
         for (final seed in colored) {
-          // An intentional deletion on the same ceiling is retained on revision.
+          // An intentional deletion on the same creation floor is retained on revision.
           if (pending.any((s) => s.id == seed.id) ||
-              (oldSlabs.containsKey(seed.id) &&
-                  old?['higher'] == higher.storeyId)) {
+              oldSlabs.containsKey(seed.id)) {
             continue;
           }
           if (floor.slabs.any((s) => !s.id.startsWith(automatic))) {
@@ -186,7 +200,7 @@ class BimStructuralSeedSync {
         }
       }
       // Keep deletion tombstones across later source revisions.
-      if (old?['higher'] == higher?.storeyId) {
+      {
         for (final entry in oldSlabs.entries) {
           if (!floor.slabs.any((s) => s.id == entry.key) &&
               !snapshots.any((s) => s['id'] == entry.key)) {
@@ -198,7 +212,7 @@ class BimStructuralSeedSync {
         ..remove('seedImportPending');
       processing['structuralSeeds'] = {
         'key': key,
-        'higher': higher?.storeyId,
+        'ownership': 'floor',
         'slabs': snapshots,
         'axisOwners': old?['axisOwners'] ?? {},
       };

@@ -22,6 +22,7 @@ class SlabSeedGenerator {
     required double unitsPerMeter,
     required double thickness,
     List<(Offset, Offset)>? wallReferences,
+    bool floorOwned = false,
   }) {
     final idPrefix = prefix(storeyId);
     if (existing.any((s) => s.id.startsWith(idPrefix)) ||
@@ -108,6 +109,7 @@ class SlabSeedGenerator {
             id: '${idPrefix}main_$i',
             polygon: polygon,
             thickness: thickness,
+            isFloorSlab: floorOwned,
           ),
         );
       }
@@ -152,6 +154,7 @@ class SlabSeedGenerator {
             id: '${idPrefix}projection_${typeName}_$i',
             polygon: polygon,
             thickness: thickness,
+            isFloorSlab: floorOwned,
           ),
         );
       }

@@ -4,6 +4,7 @@ import 'dart:ui';
 import '../../dxf_viewer/models/dxf_models.dart';
 import 'slab_envelope_detector.dart';
 import 'structural_underlay_filter.dart';
+import 'slab_parapet_chains.dart';
 
 /// External areas bounded by existing straight CAD chains and the envelope.
 /// Classifies geometric proposals into balconies (with parapet), cornices,
@@ -215,7 +216,8 @@ class SlabProjectionDetector {
         snapped.add(p[i]);
         continue;
       }
-      final corner = a + u * (((c - a).dx * v.dy - (c - a).dy * v.dx) / denominator);
+      final corner =
+          a + u * (((c - a).dx * v.dy - (c - a).dy * v.dx) / denominator);
       if ((corner - p[i]).distance > math.sqrt(2) * tolerance + epsilon) {
         snapped.add(p[i]);
       } else {
@@ -258,8 +260,10 @@ class SlabProjectionDetector {
           bool isPolygonEdge = false;
           for (var k = 0; k < polygon.length; k++) {
             final p1 = polygon[k], p2 = polygon[(k + 1) % polygon.length];
-            if (((e.p1 - p1).distance < 2.0 * scale && (e.p2 - p2).distance < 2.0 * scale) ||
-                ((e.p1 - p2).distance < 2.0 * scale && (e.p2 - p1).distance < 2.0 * scale)) {
+            if (((e.p1 - p1).distance < 2.0 * scale &&
+                    (e.p2 - p2).distance < 2.0 * scale) ||
+                ((e.p1 - p2).distance < 2.0 * scale &&
+                    (e.p2 - p1).distance < 2.0 * scale)) {
               isPolygonEdge = true;
               break;
             }
@@ -272,7 +276,10 @@ class SlabProjectionDetector {
           final pUnit = pDir / pLen;
           final cos = (edgeDir.dx * pUnit.dx + edgeDir.dy * pUnit.dy).abs();
           if (cos > 0.96) {
-            final distMid = ((e.p1 - edgeMid).dx * edgeDir.dy - (e.p1 - edgeMid).dy * edgeDir.dx).abs();
+            final distMid =
+                ((e.p1 - edgeMid).dx * edgeDir.dy -
+                        (e.p1 - edgeMid).dy * edgeDir.dx)
+                    .abs();
             if (distMid >= minParapetThick && distMid <= maxParapetThick) {
               return true;
             }
@@ -299,7 +306,11 @@ class SlabProjectionDetector {
     if (lowerLayer.contains('корниз') || lowerLayer.contains('cornice')) {
       return 'cornice';
     }
-    if (lowerLayer.contains('стрех') || lowerLayer.contains('eave') || lowerLayer.contains('overhang')) {
+    if (lowerLayer.contains('покрив') ||
+        lowerLayer.contains('roof') ||
+        lowerLayer.contains('стрех') ||
+        lowerLayer.contains('eave') ||
+        lowerLayer.contains('overhang')) {
       return 'eave';
     }
     if (lowerLayer.contains('терас') || lowerLayer.contains('terrace')) {
@@ -310,17 +321,28 @@ class SlabProjectionDetector {
     }
 
     // 1. Cornice (корниз): narrow cantilevered strip along facade, no parapet, depth 10 - 60 cm, aspect ratio >= 2.2
-    if (!hasParapet && cantileverDepthM >= 0.10 && cantileverDepthM <= 0.60 && aspectRatio >= 2.2) {
+    if (!hasParapet &&
+        cantileverDepthM >= 0.10 &&
+        cantileverDepthM <= 0.60 &&
+        aspectRatio >= 2.2) {
       return 'cornice';
     }
 
     // 2. Eave (стреха): roof/facade overhang, no parapet, depth 0.35 - 1.80 m
-    if (!hasParapet && (lowerLayer.contains('покрив') || lowerLayer.contains('roof') || (cantileverDepthM >= 0.35 && cantileverDepthM <= 1.50 && aspectRatio >= 3.0))) {
+    if (!hasParapet &&
+        (lowerLayer.contains('покрив') ||
+            lowerLayer.contains('roof') ||
+            (cantileverDepthM >= 0.35 &&
+                cantileverDepthM <= 1.50 &&
+                aspectRatio >= 3.0))) {
       return 'eave';
     }
 
     // 3. Balcony with parapet (балкон с парапет)
-    if (hasParapet && cantileverDepthM >= 0.50 && cantileverDepthM <= 2.60 && areaM2 <= 20.0) {
+    if (hasParapet &&
+        cantileverDepthM >= 0.50 &&
+        cantileverDepthM <= 2.60 &&
+        areaM2 <= 20.0) {
       return 'balcony';
     }
 
@@ -342,6 +364,7 @@ class SlabProjectionDetector {
     SlabEnvelopeResult envelope,
     double scale, {
     Set<String> wallLayers = const {},
+    bool includeParapetGraph = true,
   }) {
     if (envelope.contours.isEmpty || scale <= 0 || !scale.isFinite) return [];
     doc = DrawingFrameDetector.withoutFrames(doc);
@@ -427,7 +450,9 @@ class SlabProjectionDetector {
           }
         }
         if (samples < 5 || external / samples < 0.85) continue;
-        final minEnvelopeDist = rawPoly.map((p) => distance(p)).reduce(math.min);
+        final minEnvelopeDist = rawPoly
+            .map((p) => distance(p))
+            .reduce(math.min);
         if (minEnvelopeDist > attachment) continue;
 
         // Snap edge to main slab envelope if distance < 2 cm (20 mm * scale)
@@ -436,10 +461,17 @@ class SlabProjectionDetector {
 
         final unitsToM = 1.0 / (scale * 1000.0);
         final areaM2 = snappedArea * unitsToM * unitsToM;
-        final maxCantileverDist = snappedPoly.map((p) => distance(p)).reduce(math.max);
+        final maxCantileverDist = snappedPoly
+            .map((p) => distance(p))
+            .reduce(math.max);
         final cantileverDepthM = maxCantileverDist * unitsToM;
-        final facadeLength = snappedPoly.fold<double>(0.0, (sum, p) => sum + (distance(p) <= 20 * scale ? 100 * scale : 0.0));
-        final aspectRatio = cantileverDepthM > 0.05 ? ((facadeLength * unitsToM) / cantileverDepthM) : 10.0;
+        final facadeLength = snappedPoly.fold<double>(
+          0.0,
+          (sum, p) => sum + (distance(p) <= 20 * scale ? 100 * scale : 0.0),
+        );
+        final aspectRatio = cantileverDepthM > 0.05
+            ? ((facadeLength * unitsToM) / cantileverDepthM)
+            : 10.0;
         final hasParapet = _detectParapet(snappedPoly, doc, scale, entry.key);
 
         final kind = _classifyProjection(
@@ -563,7 +595,8 @@ class SlabProjectionDetector {
             ).fold<double>(0, (a, b) => a + b);
             final perimeter = List.generate(
               rawPolygon.length,
-              (i) => (rawPolygon[(i + 1) % rawPolygon.length] - rawPolygon[i]).distance,
+              (i) => (rawPolygon[(i + 1) % rawPolygon.length] - rawPolygon[i])
+                  .distance,
             ).fold<double>(0, (a, b) => a + b);
             if (perimeter > chainLength * 4 + 2 * attachment) continue;
             final rawArea = _area(rawPolygon);
@@ -594,18 +627,29 @@ class SlabProjectionDetector {
             if (samples < 5 || external / samples < 0.95) continue;
 
             // Pull/snap boundary segments to the main slab envelope if distance < 2 cm (20 mm * scale)
-            final polygon = _snapToEnvelope(rawPolygon, envelope.contours, scale);
+            final polygon = _snapToEnvelope(
+              rawPolygon,
+              envelope.contours,
+              scale,
+            );
             final area = _area(polygon);
 
             final unitsToM = 1.0 / (scale * 1000.0);
             final areaM2 = area * unitsToM * unitsToM;
-            final maxCantileverDist = polygon.map((p) => distance(p)).reduce(math.max);
+            final maxCantileverDist = polygon
+                .map((p) => distance(p))
+                .reduce(math.max);
             final cantileverDepthM = maxCantileverDist * unitsToM;
-            final facadeDist = List.generate(
-              polygon.length,
-              (i) => (polygon[(i + 1) % polygon.length] - polygon[i]).distance,
-            ).fold<double>(0, (sum, len) => sum + len) - chainLength;
-            final aspectRatio = cantileverDepthM > 0.05 ? ((facadeDist * unitsToM) / cantileverDepthM) : 10.0;
+            final facadeDist =
+                List.generate(
+                  polygon.length,
+                  (i) =>
+                      (polygon[(i + 1) % polygon.length] - polygon[i]).distance,
+                ).fold<double>(0, (sum, len) => sum + len) -
+                chainLength;
+            final aspectRatio = cantileverDepthM > 0.05
+                ? ((facadeDist * unitsToM) / cantileverDepthM)
+                : 10.0;
             final hasParapet = _detectParapet(polygon, doc, scale, entry.key);
 
             final kind = _classifyProjection(
@@ -633,6 +677,53 @@ class SlabProjectionDetector {
       }
     }
 
+    if (includeParapetGraph) {
+      final chains = SlabParapetChains.detect(doc, envelope, scale);
+      for (final chain in chains) {
+        final normalized = DxfDocument(
+          entities: [
+            DxfLwPolyline(
+              vertices: chain.points
+                  .map((p) => DxfPolylineVertex(x: p.dx, y: p.dy))
+                  .toList(),
+              layer: chain.layer,
+            ),
+          ],
+          layers: {chain.layer: DxfLayer(name: chain.layer)},
+          blocks: {},
+          headerVars: {},
+          bounds: doc.bounds,
+          entityStats: {},
+        );
+        for (final proposed in detect(
+          normalized,
+          envelope,
+          scale,
+          includeParapetGraph: false,
+        )) {
+          if (proposed.cantileverDepth < 350 * scale) continue;
+          final units = 1 / (scale * 1000);
+          candidates.add(
+            SlabProjectionCandidate(
+              proposed.contour,
+              chain.layer,
+              proposed.area,
+              hasParapet: true,
+              cantileverDepth: proposed.cantileverDepth,
+              kind: _classifyProjection(
+                isLoggia: proposed.kind == 'loggia',
+                hasParapet: true,
+                areaM2: proposed.area * units * units,
+                cantileverDepthM: proposed.cantileverDepth * units,
+                aspectRatio: 2,
+                sourceLayer: chain.layer,
+              ),
+            ),
+          );
+        }
+      }
+    }
+
     // Double railing outlines describe one external area with a parapet.
     // When a smaller outline is contained inside an enclosing outline,
     // mark the enclosing outline as having a parapet!
@@ -655,7 +746,9 @@ class SlabProjectionDetector {
           outer.contour,
           outer.sourceLayer,
           outer.area,
-          kind: (outer.kind == 'externalArea' || outer.kind == 'eave') ? 'balcony' : outer.kind,
+          kind: (outer.kind == 'externalArea' || outer.kind == 'eave')
+              ? 'balcony'
+              : outer.kind,
           hasParapet: true,
           cantileverDepth: outer.cantileverDepth,
         );

@@ -138,7 +138,9 @@ class BimAnalysisSnapshot {
           'columns': model.columns.length,
           'shearWalls': model.shearWalls.length,
           'beams': model.beams.length,
-          'ceilingSlabs': model.slabs.length,
+          'ownedSlabs': model.slabs.length,
+          'floorOwnedSlabs': model.slabs.where((s) => s.isFloorSlab).length,
+          'ceilingSlabs': model.slabs.where((s) => !s.isFloorSlab).length,
         },
       });
     }
@@ -163,7 +165,7 @@ class BimAnalysisSnapshot {
       'projectToMetresFormula':
           'metrePoint = (projectPoint - projectFrame.origin) / projectFrame.cadUnitsPerMeter',
       'slabOwnership':
-          'Stored slabs belong to the ceiling of their owning storey. Derived DXF plans can additionally show floor references; do not double-count them.',
+          'BIM slabs belong to the floor where they were created (isFloorSlab=true). Lower-storey plans can show them as ceiling references. Legacy isFloorSlab=false objects are ceiling-owned. Do not double-count references.',
       'gridAxes': structural.effectiveGridAxes.map((a) => a.toJson()).toList(),
       'detection':
           'WallAxisDetector and GeometricWindowDetector, with forced project CAD units per millimetre, matching the initial-scheme screen.',

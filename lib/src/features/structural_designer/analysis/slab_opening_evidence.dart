@@ -44,10 +44,13 @@ class SlabOpeningEvidence {
         }
       } else if (e is DxfLine) {
         result.add((tr(e.p1), tr(e.p2), layer));
-      } else if (e is DxfLwPolyline) {
-        final count = e.isClosed ? e.vertices.length : e.vertices.length - 1;
+      } else if (e is DxfLwPolyline || e is DxfPolyline) {
+        final (vertices, closed) = e is DxfLwPolyline
+            ? (e.vertices, e.isClosed)
+            : ((e as DxfPolyline).vertices, e.isClosed);
+        final count = closed ? vertices.length : vertices.length - 1;
         for (var i = 0; i < count; i++) {
-          final a = e.vertices[i], b = e.vertices[(i + 1) % e.vertices.length];
+          final a = vertices[i], b = vertices[(i + 1) % vertices.length];
           if (a.bulge.abs() < 1e-8) {
             result.add((tr(Offset(a.x, a.y)), tr(Offset(b.x, b.y)), layer));
           }
@@ -101,7 +104,9 @@ class SlabOpeningEvidence {
         candidates.add((lo, hi, offset, layer));
       }
       // Transverse stroke (mullion / profile / делител)
-      else if (cosAngle <= 0.25 && vDist >= 20.0 * scale && vDist <= thickness * 1.5) {
+      else if (cosAngle <= 0.25 &&
+          vDist >= 20.0 * scale &&
+          vDist <= thickness * 1.5) {
         transverseCount++;
       }
 

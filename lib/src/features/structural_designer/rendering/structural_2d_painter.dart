@@ -1669,8 +1669,9 @@ class Structural2dPainter extends CustomPainter {
     final activeFill = warning ? const Color(0xFF9C27B0) : const Color(0xFF00897B);
     final activeAccent = warning ? const Color(0xFFEA80FC) : const Color(0xFF26D6BD);
     final fillPaint = Paint()
-      ..color = isPreview || isMoving
-          ? const Color(0xB300E5FF)
+      ..color = isMoving
+          ? const Color(0x26FFB300)
+          : isPreview ? const Color(0xB300E5FF)
           : (isGhost ? const Color(0x4D78909C) : activeFill)
       ..style = PaintingStyle.fill;
 
@@ -1919,7 +1920,7 @@ class Structural2dPainter extends CustomPainter {
         path.close();
 
         final movingFill = Paint()
-          ..color = const Color(0x99FFB300)
+          ..color = const Color(0x26FFB300)
           ..style = PaintingStyle.fill;
         final movingBorder = Paint()
           ..color = const Color(0xFFFFD54F)

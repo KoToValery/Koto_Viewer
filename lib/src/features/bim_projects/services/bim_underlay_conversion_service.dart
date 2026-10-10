@@ -43,7 +43,7 @@ class BimConversionResult {
 /// Metadata travels with the binary document, including empty analysis results.
 class BimUnderlayMetadata {
   static const key = r'$KOTO_BIM_UNDERLAY';
-  static const version = 4;
+  static const version = 6;
 
   static Map<String, dynamic>? read(DxfDocument doc) {
     final raw = doc.headerVars[key];
@@ -52,6 +52,8 @@ class BimUnderlayMetadata {
       final value = jsonDecode(raw);
       if (value is Map<String, dynamic> &&
           (value['version'] == version ||
+              value['version'] == 5 ||
+              value['version'] == 4 ||
               value['version'] == 3 ||
               value['version'] == 2 ||
               value['version'] == 1) &&

@@ -73,16 +73,18 @@ Map<String, DxfDocument> docs(BimWorkProject p) => {
   for (final s in p.storeys) s.storeyId: drawing(),
 };
 void main() {
-  test('Only ceilings with a higher loaded floor plan are seeded', () {
-    final p = project([0, 2.8, 5.6]);
+  test('Automatic slabs belong to every loaded creation floor', () {
+    final p = project([0, 2.85, 5.6]);
     final (_, s) = BimStructuralSeedSync.refresh(p, model(p), docs(p));
-    expect(s.storeys.map((s) => s.slabs.length), [1, 1, 0]);
-    expect(
-      s.ceilingStoreys.first.structuralElevationFor(
-        s.storeys.first.slabs.first,
-      ),
-      closeTo(2.75, .001),
-    );
+    expect(s.storeys.map((s) => s.slabs.length), [1, 1, 1]);
+    for (final floor in s.storeys) {
+      expect(floor.slabs.single.isFloorSlab, true);
+      expect(
+        floor.structuralElevationFor(floor.slabs.single),
+        floor.elevation - .05,
+      );
+    }
+    expect(s.ceilingSlabStoreyFor(s.storeys.first)!.id, 's1');
     final single = project([0]);
     expect(
       BimStructuralSeedSync.refresh(
@@ -90,26 +92,31 @@ void main() {
         model(single),
         docs(single),
       ).$2.activeStorey.slabs,
-      isEmpty,
+      hasLength(1),
     );
     expect(
       BimStructuralSeedSync.refresh(p, model(p), {
         's0': drawing(),
-      }).$2.storeys.every((s) => s.slabs.isEmpty),
-      isTrue,
+      }).$2.storeys.map((s) => s.slabs.length),
+      [1, 0, 0],
     );
   });
-  test('An unloaded intermediate floor cannot be bypassed for a ceiling', () {
-    final p = project([0, 2.8, 5.6]);
-    final (_, s) = BimStructuralSeedSync.refresh(p, model(p), {
-      's0': drawing(),
-      's2': drawing(),
-    });
-    expect(s.storeys.every((s) => s.slabs.isEmpty), true);
-  });
-  test('Adding and removing a loaded floor refreshes ceiling ownership', () {
+  test(
+    'An unloaded intermediate floor does not own or borrow another slab',
+    () {
+      final p = project([0, 2.8, 5.6]);
+      final (_, s) = BimStructuralSeedSync.refresh(p, model(p), {
+        's0': drawing(),
+        's2': drawing(),
+      });
+      expect(s.storeys.map((s) => s.slabs.length), [1, 0, 1]);
+      expect(s.ceilingSlabStoreyFor(s.storeys.first), isNull);
+    },
+  );
+  test('Adding or removing another floor does not move floor-owned slabs', () {
     var p = project([0]);
     var (updated, s) = BimStructuralSeedSync.refresh(p, model(p), docs(p));
+    final original = s.storeys.first.slabs.single;
     p = updated.copyWith(
       storeys: [
         ...updated.storeys,
@@ -122,11 +129,11 @@ void main() {
       ],
     );
     (updated, s) = BimStructuralSeedSync.refresh(p, s, docs(p));
-    expect(s.storeys.map((s) => s.slabs.length), [1, 0]);
+    expect(s.storeys.map((s) => s.slabs.length), [1, 1]);
     p = updated.copyWith(storeys: [updated.storeys.first]);
     (updated, s) = BimStructuralSeedSync.refresh(p, s, docs(p));
     expect(s.storeys.length, 1);
-    expect(s.activeStorey.slabs, isEmpty);
+    expect(s.activeStorey.slabs.single.toJson(), original.toJson());
   });
   test(
     'Underlay revision updates outline and keeps thickness, stairs and supports',

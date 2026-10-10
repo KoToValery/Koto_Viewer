@@ -108,6 +108,39 @@ class StructuralPointerPainter extends CustomPainter {
   Offset get effectivePlacementPosition =>
       placementPos ?? snappedPos ?? targetPos;
 
+  /// Inspect the edge/corner closest to the finger, where alignment is judged.
+  /// Object placement still uses its independent reference point.
+  Offset get detailFocusPosition {
+    final polygon = previewElementPolygon;
+    if (polygon == null || polygon.length < 3) return snappedPos ?? targetPos;
+    var focus = polygon.first, distance = double.infinity;
+    for (var i = 0; i < polygon.length; i++) {
+      final a = polygon[i], delta = polygon[(i + 1) % polygon.length] - a;
+      final t = delta.distanceSquared == 0
+          ? 0.0
+          : (((touchPos - a).dx * delta.dx + (touchPos - a).dy * delta.dy) /
+                    delta.distanceSquared)
+                .clamp(0.0, 1.0);
+      final point = a + delta * t;
+      if ((point - touchPos).distance < distance) {
+        focus = point;
+        distance = (point - touchPos).distance;
+      }
+    }
+    for (final snap
+        in snappedPositions != null && snappedPositions!.isNotEmpty
+            ? snappedPositions!
+            : snappedPos != null
+            ? [snappedPos!]
+            : <Offset>[]) {
+      if ((snap - touchPos).distance <= math.min(distance + 12, 28)) {
+        focus = snap;
+        distance = (snap - touchPos).distance;
+      }
+    }
+    return focus;
+  }
+
   static const detailLoupeScale = 2.5;
 
   /// Shared geometry keeps the magnified scene and its vector overlay aligned.
@@ -115,7 +148,6 @@ class StructuralPointerPainter extends CustomPainter {
     if (!showDetailLoupe ||
         previewElementPolygon == null ||
         previewElementPolygon!.length < 3 ||
-        (effectivePlacementPosition - touchPos).distance >= 36 ||
         size.shortestSide < 110) {
       return null;
     }
@@ -454,7 +486,7 @@ class StructuralPointerPainter extends CustomPainter {
     }
     final loupe = detailLoupeRect(size);
     if (loupe != null) {
-      _drawDetailLoupe(canvas, loupe, effectiveTip);
+      _drawDetailLoupe(canvas, loupe, detailFocusPosition);
     }
 
     // 4c. Active measurement ruler line and architectural ticks
@@ -843,8 +875,7 @@ class StructuralPointerOverlay extends StatelessWidget {
               child: RawMagnifier(
                 key: const ValueKey('structural-detail-loupe'),
                 size: bounds.size,
-                focalPointOffset:
-                    painter.effectivePlacementPosition - bounds.center,
+                focalPointOffset: painter.detailFocusPosition - bounds.center,
                 magnificationScale: StructuralPointerPainter.detailLoupeScale,
                 decoration: const MagnifierDecoration(
                   shape: CircleBorder(),
