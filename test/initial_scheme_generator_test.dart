@@ -74,7 +74,7 @@ WallPairCandidate pair(Offset a, Offset b, double scale, {double width = .25}) {
 
 void main() {
   test(
-    'requires typed staircase; axes alone cannot authorize columns in rooms',
+    'first-level columns need no forced hole; axes alone cannot authorize columns in rooms',
     () {
       final (p, runs) = fixture();
       final axesOnly = InitialSchemeGenerator.generate(
@@ -102,7 +102,7 @@ void main() {
           wallPairs: runs,
           scale: 1,
         ).isEmpty,
-        isTrue,
+        isFalse,
       );
     },
   );

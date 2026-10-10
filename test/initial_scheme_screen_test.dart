@@ -1,3 +1,5 @@
+import 'package:kotoview/src/features/structural_designer/widgets/element_palette_bar.dart';
+import 'package:kotoview/src/features/structural_designer/rendering/structural_pointer_painter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,7 +13,7 @@ import 'initial_scheme_generator_test.dart' as fixtures;
 
 void main() {
   testWidgets(
-    'real menu accepts once, Undo restores and cancel leaves model unchanged',
+    'support tool action accepts once, Undo restores and cancel leaves model unchanged',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       tester.view.physicalSize = const Size(1000, 1000);
@@ -55,9 +57,13 @@ void main() {
           .currentStorey;
       final before = current();
       Future<void> open() async {
-        await tester.tap(find.byIcon(Icons.more_vert_rounded));
+        await tester.tap(find.byKey(const ValueKey('bim-navigation')));
         await tester.pumpAndSettle();
-        await tester.tap(find.text(l.schemeGenerate));
+        tester
+            .widget<ElementPaletteBar>(find.byType(ElementPaletteBar))
+            .onSelectTool(StructuralDrawTool.column);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('bim-generate-supports')));
         await tester.pumpAndSettle();
         expect(find.byType(InitialSchemeDialog), findsOneWidget);
       }

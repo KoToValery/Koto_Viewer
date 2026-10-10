@@ -46,7 +46,7 @@ StructuralProject plates() => const StructuralProject(
 );
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('coincident plate badges never overlap, at several zooms', () {
+  test('only compact ceiling badges appear, at several zooms', () {
     final p = plates();
     for (final zoom in [.2, 1.0, 5.0]) {
       final labels = SlabPlanLabels.layout(
@@ -55,11 +55,15 @@ void main() {
         project: (v) => v * 100,
         zoom: zoom,
       );
-      expect(labels, hasLength(2));
-      expect(labels[0].rect.overlaps(labels[1].rect), isFalse);
-      expect(labels[0].owner.id, 'g');
-      expect(labels[1].owner.id, 'f');
-      expect(labels[1].slab.id, 'upper');
+      expect(labels, hasLength(1));
+      expect(labels.single.owner.id, 'f');
+      expect(labels.single.slab.id, 'upper');
+      expect(labels.single.rect.height * zoom, lessThan(24));
+      expect(labels.single.rect.width * zoom, lessThan(160));
+      expect(
+        SlabPlanLabels.caption(labels.single.owner, labels.single.slab),
+        '+2.80 · 20 cm',
+      );
     }
   });
   test(
@@ -272,10 +276,8 @@ void main() {
         project: before.cadToScene,
         zoom: before.zoomScale,
       );
-      final own = labels.firstWhere((l) => l.owner.id == 'g');
-      await tester.tapAt(
-        tester.renderObject<RenderBox>(paint()).localToGlobal(own.rect.center),
-      );
+      expect(labels, hasLength(1));
+      await tester.tap(find.byKey(const ValueKey('bim-edit-floor-slab')));
       await tester.pumpAndSettle();
       expect(painter().currentStorey.id, 'g');
       expect(painter().selectedSlabId, 'ground');

@@ -371,7 +371,7 @@ void main() {
     'draw on upper plan, show below and edit on its original owner level',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
-      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.physicalSize = const Size(1000, 1400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -458,6 +458,18 @@ void main() {
       expect(painter().ceilingSlabStorey!.id, 'f');
       expect(painter().ceilingSlabStorey!.slabs.single.id, slab.id);
       expect(painter().ghostStorey, isNull);
+      expect(find.byKey(const ValueKey('bim-edit-floor-slab')), findsNothing);
+      await tester.tap(
+        find.descendant(of: find.byType(AppBar), matching: find.text('±0.00')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(StoreyManagerSheet),
+          matching: find.text('+2.85'),
+        ),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('bim-edit-floor-slab')));
       await tester.pumpAndSettle();
       expect(painter().currentStorey.id, 'f');

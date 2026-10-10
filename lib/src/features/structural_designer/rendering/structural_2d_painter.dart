@@ -15,6 +15,8 @@ import 'structural_overview_layout.dart';
 /// 2D CustomPainter that renders structural elements, ghost storeys (ArchiCAD Trace Reference),
 /// interactive drawing previews, and cantilever warning zones projected onto CAD scene coordinates.
 class Structural2dPainter extends CustomPainter {
+  final bool showSlabs;
+  final bool showGridAxes;
   final StoreyLevel currentStorey;
   final List<StoreyLevel> gridAxisStoreys;
   final StoreyLevel? floorSlabStorey;
@@ -92,6 +94,8 @@ class Structural2dPainter extends CustomPainter {
 
   const Structural2dPainter({
     required this.currentStorey,
+    this.showSlabs = true,
+    this.showGridAxes = true,
     this.gridAxisStoreys = const [],
     this.floorSlabStorey,
     this.ceilingSlabStorey,
@@ -182,7 +186,7 @@ class Structural2dPainter extends CustomPainter {
     // The lower storey's ceiling is also this storey's floor. Show it even
     // with trace reference off, without making it an editable roof plate.
     final floor = floorSlabStorey;
-    if (floor != null) {
+    if (showSlabs && floor != null) {
       for (var i = 0; i < floor.slabs.length; i++) {
         _drawSlab(canvas, floor.slabs[i], slabIndex: i,
           isGhost: currentStorey.slabs.isNotEmpty, readOnly: true,
@@ -192,7 +196,7 @@ class Structural2dPainter extends CustomPainter {
 
     // Floor slabs drawn on the higher level are the ceiling of this plan.
     final ceiling = ceilingSlabStorey;
-    if (ceiling != null) {
+    if (showSlabs && ceiling != null) {
       for (var i = 0; i < ceiling.slabs.length; i++) {
         _drawSlab(canvas, ceiling.slabs[i], slabIndex: i, isGhost: false,
           readOnly: true, levelOwner: ceiling);
@@ -200,7 +204,7 @@ class Structural2dPainter extends CustomPainter {
     }
 
     // 2. Slabs owned by this drawing remain available for editing.
-    if (currentStorey.slabs.isNotEmpty) {
+    if (showSlabs && currentStorey.slabs.isNotEmpty) {
       for (int i = 0; i < currentStorey.slabs.length; i++) {
         _drawSlab(
           canvas,
@@ -229,12 +233,12 @@ class Structural2dPainter extends CustomPainter {
 
     // 2c. Draw Active Storey Grid Axes
     final axisBubbles=_gridAxisBubbleCenters();
-    for (final axis in currentStorey.gridAxes) {
+    for (final axis in showGridAxes ? currentStorey.gridAxes : <StructuralGridAxis>[]) {
       _drawGridAxis(canvas, axis, isGhost: false, bubbleCenters:axisBubbles);
     }
 
     // 2d. Draw Grid Axis Offset Preview (Live duplication guidance)
-    if (axisOffsetPreview != null) {
+    if (showGridAxes && axisOffsetPreview != null) {
       _drawGridAxis(canvas, axisOffsetPreview!, isGhost: false, isPreview: true);
     }
 
@@ -306,7 +310,7 @@ class Structural2dPainter extends CustomPainter {
       );
     }
     _drawSupportOverviewLabels(canvas, overview);
-    if (activeTool == StructuralDrawTool.slab) _drawSlabLabels(canvas);
+    if (showSlabs && activeTool == StructuralDrawTool.slab) _drawSlabLabels(canvas);
   }
 
   void _drawMeasurementLine(Canvas canvas, Offset p1Cad, Offset p2Cad, String label, {Color color = const Color(0xFFFF5252)}) {
@@ -515,7 +519,7 @@ class Structural2dPainter extends CustomPainter {
   }
 
   void _drawGhostStorey(Canvas canvas, StoreyLevel ghost) {
-    for (int i = 0; i < ghost.slabs.length; i++) {
+    for (int i = 0; showSlabs && i < ghost.slabs.length; i++) {
       if (floorSlabStorey?.slabs.any((s) => s.id == ghost.slabs[i].id) == true ||
           ceilingSlabStorey?.slabs.any((s) => s.id == ghost.slabs[i].id) == true) {
         continue;
@@ -525,7 +529,7 @@ class Structural2dPainter extends CustomPainter {
     for (final beam in ghost.beams) {
       _drawBeam(canvas, beam, isGhost: true);
     }
-    for (final axis in ghost.gridAxes) {
+    for (final axis in showGridAxes ? ghost.gridAxes : <StructuralGridAxis>[]) {
       if (!currentStorey.gridAxes.any((a) => a.id == axis.id)) {
         _drawGridAxis(canvas, axis, isGhost: true);
       }
@@ -603,7 +607,6 @@ class Structural2dPainter extends CustomPainter {
   void _drawSlabLabels(Canvas canvas) {
     final labels = SlabPlanLabels.layout(current:currentStorey, lower:floorSlabStorey,
       upper:ceilingSlabStorey, project:cadToScene, zoom:zoomScale, selectedId:selectedSlabId);
-    String level(double z) => '${z > 0 ? '+' : z == 0 ? '±' : ''}${z.toStringAsFixed(2)}';
     for (final label in labels.reversed) {
       final slab = label.slab;
       final selected = !label.reference && slab.id == selectedSlabId;
@@ -615,18 +618,18 @@ class Structural2dPainter extends CustomPainter {
       canvas.save();
       canvas.translate(label.rect.center.dx, label.rect.center.dy);
       canvas.scale(1 / zoomScale);
-      final rect = Rect.fromCenter(center:Offset.zero, width:126, height:52);
+      final rect = Rect.fromCenter(center:Offset.zero,
+        width:label.rect.width * zoomScale, height:label.rect.height * zoomScale);
       final rounded = RRect.fromRectAndRadius(rect, const Radius.circular(5));
       canvas.drawRRect(rounded, Paint()..color=const Color(0xF0181A22));
       canvas.drawRRect(rounded, Paint()..color=selected ? Colors.white : color
         ..style=PaintingStyle.stroke..strokeWidth=selected ? 2 : 1);
-      final concrete = label.owner.structuralElevationFor(slab);
-      final ownerText = l10n?.localeName == 'bg' ? 'Етаж' : 'Level';
-      final text = TextPainter(text:TextSpan(children:[
-        TextSpan(text:'$ownerText ${level(label.owner.elevation)}\n', style:TextStyle(color: selected ? Colors.white : Colors.white70, fontSize:10)),
-        TextSpan(text:'${label.floor ? '↓' : '↑'} ${level(concrete)}\n', style:const TextStyle(color:Colors.white,fontSize:11.5,fontWeight:FontWeight.bold)),
-        TextSpan(text:'d = ${(slab.thickness * 100).round()} cm', style:TextStyle(color:color,fontSize:9.5)),
-      ]),textDirection:TextDirection.ltr,textAlign:TextAlign.center)..layout(maxWidth:120);
+      final text = TextPainter(
+        text: TextSpan(text: SlabPlanLabels.caption(label.owner, slab),
+          style: const TextStyle(color: Colors.white,
+            fontSize: SlabPlanLabels.fontSize, fontWeight: FontWeight.bold)),
+        textDirection: TextDirection.ltr,
+      )..layout();
       text.paint(canvas, Offset(-text.width / 2,-text.height / 2));
       canvas.restore();
     }

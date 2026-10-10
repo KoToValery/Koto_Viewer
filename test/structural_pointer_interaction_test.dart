@@ -200,10 +200,9 @@ void main() {
           (ghost.effectivePlacementPosition - oldScreen - delta).distance,
           lessThan(1e-6),
         );
-        expect(ghost.showDetailLoupe, !mouse);
         expect(
           find.byKey(const ValueKey('structural-detail-loupe')),
-          mouse ? findsNothing : findsOneWidget,
+          findsNothing,
         );
         final expectedPolygon = List<Offset>.of(ghost.previewElementPolygon!);
         await gesture.up();

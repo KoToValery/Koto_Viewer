@@ -156,6 +156,64 @@ class StaircaseInventory {
     return project.copyWith(staircases: cores, staircaseReviewComplete: false);
   }
 
+  /// The column workflow checks physical cuts only. Legacy scopes supply
+  /// expected arrival levels, but review and circulation drawing are optional.
+  static StaircaseInventory evaluateOpenings(
+    StructuralProject project,
+    double scale,
+  ) {
+    final floors = project.storeys.toList()
+      ..sort((a, b) => a.elevation.compareTo(b.elevation));
+    final gaps = <StaircaseGap>[], refs = <StaircaseOpeningOwner>[];
+    for (final floor in floors.skip(1)) {
+      final expected = project.staircases
+          .where(
+            (core) =>
+                levels(project, core).skip(1).any((s) => s.id == floor.id),
+          )
+          .toList();
+      final holes = physicalOpenings(project, floor, scale);
+      refs.addAll(holes);
+      final used = <int>{};
+      for (final core in expected) {
+        final anchors = [
+          for (final s in levels(project, core))
+            if (validZone(s.staircaseZones[core.id] ?? [], scale))
+              s.staircaseZones[core.id]!,
+        ];
+        int? match;
+        for (var i = 0; i < holes.length; i++) {
+          if (used.contains(i)) continue;
+          final hole = polygon(project, holes[i]);
+          if (anchors.isEmpty ||
+              anchors.any(
+                (zone) =>
+                    (SlabContactGeometry.measure(hole, [
+                          StructuralSlab(id: 'stair', polygon: zone),
+                        ], scale)?.areaM2 ??
+                        0) >
+                    .05,
+              )) {
+            match = i;
+            break;
+          }
+        }
+        if (match != null) {
+          used.add(match);
+        } else {
+          gaps.add(
+            StaircaseGap(
+              StaircaseRequirement.opening,
+              coreId: core.id,
+              storeyId: floor.id,
+            ),
+          );
+        }
+      }
+    }
+    return StaircaseInventory(List.unmodifiable(gaps), List.unmodifiable(refs));
+  }
+
   static StaircaseInventory evaluate(
     StructuralProject project,
     double scale, {

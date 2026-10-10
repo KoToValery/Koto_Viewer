@@ -1,3 +1,4 @@
+import 'analysis/staircase_automatic_openings.dart';
 import 'rendering/slab_plan_labels.dart';
 import 'analysis/geometric_window_detector.dart';
 import 'dart:async';
@@ -49,11 +50,6 @@ import 'widgets/structural_scheme_readiness_dialog.dart';
 import 'widgets/initial_scheme_dialog.dart';
 import 'analysis/initial_scheme_generator.dart';
 import 'analysis/structural_scheme_readiness.dart';
-import 'analysis/staircase_inventory.dart';
-import 'analysis/staircase_geometry_detector.dart';
-import 'analysis/structural_underlay_source.dart';
-import 'widgets/staircase_setup_dialog.dart';
-import 'widgets/staircase_geometry_dialog.dart';
 import 'widgets/slab_edge_offset_dialog.dart';
 import 'widgets/storey_manager_sheet.dart';
 import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
@@ -136,8 +132,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Offset? _slabStartCornerCad;
   Offset? _openingStartCad;
   String _selectedOpeningPreset = 'shaft';
-  String? _staircaseZoneCoreId;
-  String? _staircaseZoneStoreyId;
   final List<Offset> _slabPointsCad = [];
   final List<Offset> _openingPointsCad = [];
 
@@ -276,13 +270,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _renderScale = initialScale.clamp(0.001, 10000.0);
     _transformController.addListener(_onTransformChanged);
 
+    if (widget.bimContext != null) {
+      for (final doc in widget.bimContext!.underlaysByStorey.values) {
+        BimUnderlayMetadata.ensureDynamicLayers(doc);
+      }
+    }
+
     for (final entry in _document.layers.entries) {
       _originalLayerVisibility[entry.key] = entry.value.isVisible;
     }
 
     if (BimUnderlayMetadata.read(_document) != null) {
-      _underlayFilterActive = BimUnderlayMetadata.generatedLayers(_document)
-        .any((name) => _document.layers[name]?.isVisible == true);
+      final metadata = BimUnderlayMetadata.read(_document)!;
+      _underlayFilterActive = _document.layers[metadata['wallLayer']]?.isVisible == true;
     }
     // Standalone drawings retain their existing filter controls.
     // The user can manually toggle structural underlay filtering via the AppBar funnel icon.
@@ -699,6 +699,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   (String, int)? _hitTestOpening(Offset screenPos) {
+    if (!_showBimSlabs) return null;
     const double hitMarginScreen = 20.0;
     for (final slab in _project.activeStorey.slabs.reversed) {
       for (int i = 0; i < slab.openings.length; i++) {
@@ -768,6 +769,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   StructuralGridAxis? _hitTestGridAxis(Offset screenPos) {
+    if (!_showBimAxes) return null;
     const double hitMarginScreen = 24.0;
     for (final axis in _project.activeStorey.gridAxes.reversed) {
       final p1 = _cadToScreen(axis.start);
@@ -814,8 +816,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   String? _slabBadgeOwnerId;
+  bool get _showBimSlabs => widget.bimContext == null ||
+      BimUnderlayMetadata.dynamicVisible(_document, 'slabs');
+  bool get _showBimAxes => widget.bimContext == null ||
+      BimUnderlayMetadata.dynamicVisible(_document, 'axes');
+
   bool _slabBadgeSelectionHandled = false;
   StructuralSlab? _hitTestSlab(Offset screenPos) {
+    if (!_showBimSlabs) return null;
     if (_activeTool != StructuralDrawTool.slab && _activeTool != StructuralDrawTool.select) {
       return null;
     }
@@ -3536,7 +3544,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final index = _project.storeys.indexWhere((s) => s.id == ownerId);
         if (index >= 0 && index != _project.activeStoreyIndex) {
           _project = _project.copyWith(activeStoreyIndex:index);
-          _staircaseZoneCoreId = null; _staircaseZoneStoreyId = null;
+
           _selectedBeam = null; _selectedGridAxis = null; _selectedOpening = null;
           _originalLayerVisibility.clear();
           for (final entry in _document.layers.entries) {
@@ -6857,101 +6865,187 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _saveProject();
   }
 
-  Future<void> _manageStaircases() async {
-    if(_isEditingSlab || _slabPointsCad.isNotEmpty || _openingPointsCad.isNotEmpty ||
-      _wallStartCad!=null || _beamStartCad!=null) {
-      await showDialog<void>(context:context,builder:(_)=>StructuralSchemeReadinessDialog(
-        project:_project.copyWith(storeys:_project.ceilingStoreys),scale:_cadUnitsPerMeter,editing:true));
-      return;
-    }
-    final result=await showDialog<StaircaseSetupResult>(context:context,builder:(_)=>
-      StaircaseSetupDialog(project:_project,scale:_cadUnitsPerMeter));
-    if(!mounted || result==null) return;
+  Map<String, DxfDocument> get _staircaseDocuments =>
+      widget.bimContext?.underlaysByStorey ??
+      {_project.activeStorey.id: _document};
+
+  void _applyAutomaticStairCuts(AutomaticStairCuts result) {
+    if (result.added == 0) return;
     _pushUndo();
-    setState(()=>_project=result.project);
-    _saveProject();
-    if(result.action==StaircaseSetupAction.save) return;
-    final index=_project.storeys.indexWhere((s)=>s.id==result.storeyId);
-    if(index<0 || result.coreId==null) return;
     setState(() {
-      _project=_project.copyWith(activeStoreyIndex:index);
-      _selectedColumn=null; _selectedShearWall=null; _selectedBeam=null;
-      _selectedOpening=null; _selectedGridAxis=null;
-      _editingSlab=null; _initialSlabBeforeCorrection=null;
-      _isMovingColumn=false; _isMovingShearWall=false; _isMovingOpening=false;
-      _slabPointsCad.clear(); _openingPointsCad.clear();
-      _wallStartCad=null; _beamStartCad=null; _openingStartCad=null;
-      _selectedOpeningPreset='staircase';
-      _activeTool=StructuralDrawTool.slabOpening;
-      _staircaseZoneCoreId=result.action==StaircaseSetupAction.opening ? null:result.coreId;
-      _staircaseZoneStoreyId=_staircaseZoneCoreId==null ? null:result.storeyId;
-      _activeMagneticGuides=[]; _liveDimensionText=null;
+      _project = result.project;
+      _selectedOpening = null;
       _runAnalysis();
     });
-    if(result.action==StaircaseSetupAction.detect) {
-      final snapshot=_project;
-      final source=StructuralUnderlaySource.original(_document,metadata:BimUnderlayMetadata.read(_document));
-      var detected=StaircaseGeometryDetector.detect(source,_cadUnitsPerMeter);
-      String? referenceLevel;
-      if(detected.flights.isEmpty && !detected.limited && widget.bimContext!=null) {
-        final core=_project.staircases.firstWhere((c)=>c.id==result.coreId);
-        final levels=StaircaseInventory.levels(_project,core);
-        final current=levels.indexWhere((s)=>s.id==result.storeyId);
-        if(current>0) {
-          final lower=levels[current-1];
-          final saved=widget.bimContext!.underlaysByStorey[lower.id];
-          if(saved!=null) {
-            final evidence=StaircaseGeometryDetector.detect(StructuralUnderlaySource.original(
-              saved,metadata:BimUnderlayMetadata.read(saved)),_cadUnitsPerMeter);
-            if(evidence.flights.isNotEmpty && !evidence.limited) {
-              detected=StairGeometryResult(evidence.flights,detected.strokes,
-                boundaryStrokes:detected.boundaryStrokes);
-              referenceLevel=lower.elevationLabel;
-            }
-          }
-        }
-      }
-      final core=_project.staircases.firstWhere((c)=>c.id==result.coreId);
-      final selection=await showDialog<StaircaseGeometrySelection>(context:context,
-        builder:(_)=>StaircaseGeometryDialog(result:detected,referenceLevel:referenceLevel,
-          scale:_cadUnitsPerMeter,allowOpening:core.startStoreyId!=result.storeyId));
-      if(!mounted || !identical(snapshot,_project)) return;
-      if(selection!=null) { setState(() {
-        if(selection.isOpening) { _staircaseZoneCoreId=null;_staircaseZoneStoreyId=null; }
-        _openingPointsCad.addAll(selection.polygon);
-      }); }
+    _saveProject();
+  }
+
+  Future<void> _generateStaircaseOpenings() async {
+    if (_isEditingSlab ||
+        _slabPointsCad.isNotEmpty ||
+        _openingPointsCad.isNotEmpty ||
+        _wallStartCad != null ||
+        _beamStartCad != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.schemeEditing)));
+      return;
     }
-    if(!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content:Text(_staircaseZoneCoreId!=null ? context.l10n.staircaseZoneHint:
-        context.l10n.staircaseDrawOpening),duration:const Duration(seconds:8)));
+    final targets = StaircaseAutomaticOpenings.detect(
+      _project,
+      _staircaseDocuments,
+      _cadUnitsPerMeter,
+    );
+    final result = StaircaseAutomaticOpenings.apply(
+      _project,
+      targets,
+      _cadUnitsPerMeter,
+    );
+    _applyAutomaticStairCuts(result);
+    final missing = StaircaseAutomaticOpenings.missing(
+      _project,
+      targets,
+      _cadUnitsPerMeter,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.added > 0
+              ? context.l10n.staircaseAutoAdded(result.added)
+              : targets.isNotEmpty && missing.isEmpty
+              ? context.l10n.staircaseAutoExisting
+              : context.l10n.staircaseAutoNotFound,
+        ),
+      ),
+    );
   }
 
   Future<void> _generateInitialScheme() async {
-    final snapshot = _project;
-    if(widget.bimContext!=null &&
-      !StaircaseInventory.evaluate(snapshot,_cadUnitsPerMeter,requireReview:true).ready) {
-      await _manageStaircases();
-      return;
-    }
-    final analysisSnapshot = snapshot.copyWith(storeys: snapshot.ceilingStoreys);
+    var snapshot = _project;
+    var analysisSnapshot = snapshot.copyWith(storeys: snapshot.ceilingStoreys);
     final scale = _cadUnitsPerMeter;
-    final editing = _isEditingSlab || _slabPointsCad.isNotEmpty ||
-        _openingPointsCad.isNotEmpty || _openingStartCad != null ||
-        _wallStartCad != null || _beamStartCad != null;
-    if (!StructuralSchemeReadiness.evaluate(analysisSnapshot, scale, editing: editing).geometryReady) {
-      await showDialog<void>(context: context, builder: (_) =>
-        StructuralSchemeReadinessDialog(project: analysisSnapshot, scale: scale, editing: editing));
+    final editing =
+        _isEditingSlab ||
+        _slabPointsCad.isNotEmpty ||
+        _openingPointsCad.isNotEmpty ||
+        _openingStartCad != null ||
+        _wallStartCad != null ||
+        _beamStartCad != null;
+    if (!StructuralSchemeReadiness.evaluate(
+      analysisSnapshot,
+      scale,
+      editing: editing,
+    ).geometryReady) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => StructuralSchemeReadinessDialog(
+          project: analysisSnapshot,
+          scale: scale,
+          editing: editing,
+        ),
+      );
       return;
     }
-    final detection = WallAxisDetector.detect(_document, forceScaleFactor: scale / 1000);
+    if (widget.bimContext != null) {
+      final targets = StaircaseAutomaticOpenings.detect(
+        snapshot,
+        _staircaseDocuments,
+        scale,
+      );
+      final missing = StaircaseAutomaticOpenings.missing(
+        snapshot,
+        targets,
+        scale,
+      );
+      if (missing.isNotEmpty) {
+        final levels = [
+          for (final floor in snapshot.storeys)
+            if (missing.contains(floor.id)) floor.elevationLabel,
+        ].join(', ');
+        final cut = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(context.l10n.openingStaircaseTitle),
+            content: Text(context.l10n.staircaseAutoMissing(levels)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(context.l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(context.l10n.staircaseAutoGenerate),
+              ),
+            ],
+          ),
+        );
+        if (!mounted || cut != true || !identical(snapshot, _project)) return;
+        final result = StaircaseAutomaticOpenings.apply(
+          snapshot,
+          targets,
+          scale,
+          storeyIds: missing,
+        );
+        _applyAutomaticStairCuts(result);
+        if (StaircaseAutomaticOpenings.missing(
+          _project,
+          targets,
+          scale,
+        ).isNotEmpty) {
+          final unresolved = StaircaseAutomaticOpenings.missing(
+            _project,
+            targets,
+            scale,
+          );
+          final arrival =
+              _project.storeys.where((s) => unresolved.contains(s.id)).toList()
+                ..sort((a, b) => a.elevation.compareTo(b.elevation));
+          if (arrival.isNotEmpty) {
+            setState(() {
+              _project = _project.copyWith(
+                activeStoreyIndex: _project.storeys.indexWhere(
+                  (s) => s.id == arrival.first.id,
+                ),
+              );
+              _activeTool = StructuralDrawTool.slabOpening;
+              _selectedOpeningPreset = 'staircase';
+              _selectedColumn = null;
+              _selectedShearWall = null;
+              _selectedBeam = null;
+              _selectedGridAxis = null;
+              _originalLayerVisibility.clear();
+              for (final entry in _document.layers.entries) {
+                _originalLayerVisibility[entry.key] = entry.value.isVisible;
+              }
+              if (_underlayFilterActive) _applyUnderlayFilter(true);
+              _runAnalysis();
+            });
+            _saveProject();
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.l10n.staircaseAutoNotFound)),
+          );
+          return;
+        }
+        snapshot = _project;
+        analysisSnapshot = snapshot.copyWith(storeys: snapshot.ceilingStoreys);
+      }
+    }
+    final detection = WallAxisDetector.detect(
+      _document,
+      forceScaleFactor: scale / 1000,
+    );
     final proposal = await showDialog<InitialSchemeProposal>(
       context: context,
       builder: (_) => InitialSchemeDialog(
         project: analysisSnapshot,
         sourceProject: snapshot,
         pairs: detection.selectedWallPairs,
-        wallOpenings: GeometricWindowDetector.detect(_document, detection.selectedWallPairs, scale / 1000),
+        wallOpenings: GeometricWindowDetector.detect(
+          _document,
+          detection.selectedWallPairs,
+          scale / 1000,
+        ),
         closureSegments: detection.closureSegments,
         scale: scale,
         options: InitialSchemeOptions(
@@ -6966,8 +7060,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
     if (!mounted || proposal == null || proposal.isEmpty) return;
     if (!identical(_project, snapshot)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.schemeStale)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.schemeStale)));
       return;
     }
     _pushUndo();
@@ -7120,17 +7215,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         List.from(_openingPointsCad),
         minDistance: 0.005 * _cadUnitsPerMeter,
       );
-      if(_staircaseZoneCoreId!=null) {
-        if(_staircaseZoneStoreyId!=_project.activeStorey.id ||
-          !StaircaseInventory.validZone(cleanedPts,_cadUnitsPerMeter)) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(context.l10n.staircaseInvalidZone)));
-          return;
-        }
-        _pushUndo();
-        _updateActiveStorey(_project.activeStorey.copyWith(staircaseZones:{
-          ..._project.activeStorey.staircaseZones,_staircaseZoneCoreId!:cleanedPts}));
-
-      } else if (cleanedPts.length < 3 ||
+      if (cleanedPts.length < 3 ||
           !_addOpeningToSlab(cleanedPts, type: _currentOpeningType)) { return; }
       setState(() {
         _openingPointsCad.clear();
@@ -7426,6 +7511,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       builder: (_) => DxfLayerSheet(
         document: _document,
         isDark: true,
+        additionalLayerCounts: {
+          for (final entry in BimUnderlayMetadata.dynamicLayers(_document).entries)
+            entry.value: entry.key == 'axes' ? _project.activeStorey.gridAxes.length :
+              {for (final slab in [..._project.activeStorey.slabs,
+                ...?_floorSlabStorey?.slabs, ...?_ceilingSlabStorey?.slabs]) slab.id}.length,
+        },
         onLayersChanged: () {
           if (widget.bimContext != null) {
             final visMap = {for (final l in _document.layers.values) l.name: l.isVisible};
@@ -7433,6 +7524,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           }
           setState(() {
             _underlayRevision++;
+            if (!_showBimSlabs) {
+              _editingSlab = null;
+              _selectedOpening = null;
+              _selectedSlabVertexIndex = null;
+            }
+            if (!_showBimAxes) _selectedGridAxis = null;
           });
         },
       ),
@@ -7859,6 +7956,35 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
+  void _selectTool(StructuralDrawTool tool) {
+    if (_isEditingSlab) _cancelSlabCorrection();
+    setState(() {
+      _activeTool = tool;
+
+      _selectedColumn = null;
+      _selectedShearWall = null;
+      _selectedBeam = null;
+      _selectedOpening = null;
+      _selectedOpeningVertexIndex = null;
+      _selectedGridAxis = null;
+      _editingSlab = null;
+      _selectedSlabVertexIndex = null;
+      _isMovingColumn = false;
+      _isMovingShearWall = false;
+      _isMovingOpening = false;
+      _wallStartCad = null;
+      _beamStartCad = null;
+      _openingStartCad = null;
+      _measurementStartCad = null;
+      _activeMeasurement = null;
+      _firstWallEdgeStartCad = null;
+      _firstWallEdgeEndCad = null;
+      _slabStartCornerCad = null;
+      _slabPointsCad.clear();
+      _openingPointsCad.clear();
+    });
+  }
+
   void _toggleUnderlayFilter() {
     setState(() {
       _isFilteringUnderlay = true;
@@ -7867,7 +7993,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() {
-        _applyUnderlayFilter(!_underlayFilterActive);
+        final disabling = _underlayFilterActive;
+        _applyUnderlayFilter(!disabling);
+        if (disabling) _selectTool(StructuralDrawTool.layers);
         _isFilteringUnderlay = false;
       });
     });
@@ -7894,14 +8022,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StoreyLevel? get _ceilingSlabStorey => widget.bimContext == null
       ? null : _project.ceilingSlabStoreyFor(_project.activeStorey);
 
-  void _openFloorSlab() {
-    final floor = _ceilingSlabStorey ?? _floorSlabStorey;
-    if (floor == null) return;
-    final index = _project.storeys.indexWhere((s) => s.id == floor.id);
-    if (index < 0) return;
+  void _openCurrentSlab() {
+    final slabs = _project.activeStorey.slabs;
+    if (slabs.isEmpty) return;
     setState(() {
-      _project = _project.copyWith(activeStoreyIndex: index);
-      _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
       _selectedColumn = null;
       _selectedShearWall = null;
       _selectedBeam = null;
@@ -7915,15 +8039,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _slabPointsCad.clear();
       _openingPointsCad.clear();
       _activeTool = StructuralDrawTool.slab;
-      _originalLayerVisibility.clear();
-      for (final entry in _document.layers.entries) {
-        _originalLayerVisibility[entry.key] = entry.value.isVisible;
-      }
-      if (_underlayFilterActive) _applyUnderlayFilter(true);
-      _runAnalysis();
     });
-    _startSlabCorrection(floor.slabs.first);
-    _saveProject();
+    final name = BimUnderlayMetadata.dynamicLayers(_document)['slabs'];
+    if (name != null) {
+      _document.layers[name]?.isVisible = true;
+      _document.layers[name]?.isFrozen = false;
+      widget.bimContext?.onLayerVisibilityChanged(_project.activeStorey.id,
+        {for (final l in _document.layers.values) l.name: l.isVisible});
+    }
+    _startSlabCorrection(slabs.first);
   }
 
   // --- Storey Management Actions ---
@@ -7939,7 +8063,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         onSelectStorey: (idx) {
           setState(() {
             _project = _project.copyWith(activeStoreyIndex: idx);
-            _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
+
             _editingSlab = null;
             _initialSlabBeforeCorrection = null;
             _initialSlabCorrectionProject = null;
@@ -8095,7 +8219,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final center = wall?.center ?? column!.center;
     setState(() {
       _project = _project.copyWith(activeStoreyIndex: index);
-      _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
+
       _selectedColumn = column;
       _selectedShearWall = wall;
       _selectedBeam = null;
@@ -8165,6 +8289,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
       onPressed: _showLayersSheet,
+    );
+
+    final navigationButton = IconButton(
+      key: const ValueKey('bim-navigation'),
+      icon: Icon(Icons.pan_tool_rounded, size: 18,
+        color: _activeTool == StructuralDrawTool.select ? const Color(0xFF00E5FF) : Colors.white70),
+      tooltip: context.l10n.toolNavigation,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
+      onPressed: () => _selectTool(StructuralDrawTool.select),
     );
 
     final filterButton = Tooltip(
@@ -8264,17 +8398,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           case 'auto_walls':
             _runManualAutoDetectWalls();
             break;
-          case 'staircases':
-            _manageStaircases();
-            break;
-          case 'generate_scheme':
-            _generateInitialScheme();
-            break;
           case 'clear_structure':
             _clearStructuralSupports();
-            break;
-          case 'generate_slabs':
-            _generateSlabSeeds();
             break;
           case 'export':
             _showExportDialog();
@@ -8282,24 +8407,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         }
       },
       itemBuilder: (context) => [
-        PopupMenuItem(value:'staircases',child:Text(context.l10n.staircaseSetupTitle)),
-        if (_document.entities.isNotEmpty || widget.bimContext != null || BimUnderlayMetadata.read(_document) != null)
-          PopupMenuItem(
-            value: 'generate_slabs',
-            child: Row(
-              children: [
-                const Icon(Icons.auto_awesome, size: 20, color: Color(0xFF00E5FF)),
-                const SizedBox(width: 12),
-                Text(
-                  context.l10n.bimGenerateSlabs,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          PopupMenuItem(value: 'generate_scheme',
-            child: Text(context.l10n.schemeGenerate,
-              style: const TextStyle(color: Colors.white, fontSize: 13))),
           PopupMenuItem(value: 'clear_structure',
             child: Text(context.l10n.bimClearStructure,
               style: const TextStyle(color: Colors.orangeAccent, fontSize: 13))),
@@ -8433,6 +8540,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (!isCompact) {
       return [
         layersButton,
+        navigationButton,
         filterButton,
         undoButton,
         exportButton,
@@ -8445,6 +8553,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     // Compact mode for narrow/mobile screens to prevent RenderFlex horizontal overflows:
     // Display primary actions directly with Underlay filter quick button
     return [
+      navigationButton,
       filterButton,
       undoButton,
       viewport3dButton,
@@ -8457,7 +8566,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Widget build(BuildContext context) {
     final floor = _floorSlabStorey;
     final ceiling = _ceilingSlabStorey;
-    final reference = ceiling ?? floor;
     return Scaffold(
       backgroundColor: const Color(0xFF141414),
       appBar: AppBar(
@@ -8658,6 +8766,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                     currentScale: _renderScale,
                                     visibleCadRect: _underlayFilterActive ? null : _getVisibleCadRect(),
                                     settings: _displaySettings,
+                                    drawingColorOverride: _canvasTheme.isDark
+                                        ? const Color(0xFF92979C)
+                                        : const Color(0xFF757A80),
+                                    drawingStrokeWidthOverride: 0.8,
                                     revision: _underlayRevision,
                                     entityFilter: (_underlayFilterActive && BimUnderlayMetadata.read(_document) == null)
                                         ? _filterUnderlayEntity
@@ -8671,6 +8783,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               child: CustomPaint(
                                 painter: Structural2dPainter(
                                   currentStorey: _project.activeStorey,
+                                  showSlabs: _showBimSlabs,
+                                  showGridAxes: _showBimAxes,
                                   floorSlabStorey: floor,
                                   ceilingSlabStorey: ceiling,
                                   ghostStorey: _project.ghostStorey,
@@ -8815,8 +8929,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         targetPos: _targetScreenPos!,
                         placementPos: _currentCadCoord != null ? _cadToScreen(_currentCadCoord!) : null,
                         previewElementPolygon: _pointerElementPolygon(),
-                        showDetailLoupe: _activePointerKind != PointerDeviceKind.mouse && (_isMovingColumn || _isMovingShearWall),
-                        loupeHasScene: true,
                         snappedPos: _snappedScreenPos,
                         snappedPositions: _snappedScreenPositions,
                         snapType: _activeSnap?.type,
@@ -8861,7 +8973,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 ),
 
               // 3. Floor slab reference and trace status.
-              if (reference != null && (ceiling != null || _project.activeStorey.slabs.isEmpty))
+              if (widget.bimContext != null && _project.activeStorey.slabs.isNotEmpty)
                 Positioned(
                   top: 12, left: 12, right: 12,
                   child: Material(
@@ -8873,10 +8985,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                       child: Row(children: [
                         const Icon(Icons.layers_outlined, color: Color(0xFF00B0FF), size: 18),
                         const SizedBox(width: 8),
-                        Expanded(child: Text(ceiling != null
-                          ? context.l10n.bimCeilingSlabReference(ceiling.elevationLabel)
-                          : context.l10n.bimFloorSlabReference(
-                            _project.activeStorey.elevationLabel, reference.elevationLabel),
+                        Expanded(child: Text(
+                          '${context.l10n.toolSlab} · ${_project.activeStorey.elevationLabel}',
                           style: const TextStyle(color: Colors.white, fontSize: 12))),
                         const SizedBox(width: 8),
                         TextButton(
@@ -8885,7 +8995,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                               _isMovingShearWall || _isExtrudingEdge ||
                               _slabPointsCad.isNotEmpty || _openingPointsCad.isNotEmpty ||
                               _wallStartCad != null || _beamStartCad != null
-                              ? null : _openFloorSlab,
+                              ? null : _openCurrentSlab,
                           child: Text(context.l10n.bimEditFloorSlab),
                         ),
                       ]),
@@ -8923,12 +9033,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     ),
                   ),
                 ),
-
-              if(_staircaseZoneCoreId!=null && _staircaseZoneStoreyId==_project.activeStorey.id)
-                Positioned(top:60,left:12,right:12,child:IgnorePointer(child:Material(
-                  color:const Color(0xEE173C39),borderRadius:BorderRadius.circular(8),
-                  child:Padding(padding:const EdgeInsets.all(8),child:Text(
-                    context.l10n.staircaseZoneHint,style:const TextStyle(color:Colors.white,fontSize:12)))))),
 
               // 3b. Grid Axis Offset Direction Drag Guide Banner
               if (_isOffsettingAxisWithDrag && _axisBeingOffset != null)
@@ -9025,33 +9129,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         axisLockMode: _axisLockMode,
                         onUpdateAxisLockMode: (mode) => setState(() => _axisLockMode = mode),
                         activeTool: _activeTool,
-                        onSelectTool: (tool) {
-                          setState(() {
-                            _activeTool = tool;
-                            _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
-                            _selectedColumn = null;
-                            _selectedShearWall = null;
-                            _selectedBeam = null;
-                            _selectedOpening = null;
-                            _selectedOpeningVertexIndex = null;
-                            _selectedGridAxis = null;
-                            _editingSlab = null;
-                            _selectedSlabVertexIndex = null;
-                            _isMovingColumn = false;
-                            _isMovingShearWall = false;
-                            _isMovingOpening = false;
-                            _wallStartCad = null;
-                            _beamStartCad = null;
-                            _openingStartCad = null;
-                            _measurementStartCad = null;
-                            _activeMeasurement = null;
-                            _firstWallEdgeStartCad = null;
-                            _firstWallEdgeEndCad = null;
-                            _slabStartCornerCad = null;
-                            _slabPointsCad.clear();
-                            _openingPointsCad.clear();
-                          });
-                        },
+                        onSelectTool: _selectTool,
                         currentColumnPreset: _currentColumnPreset,
                         onUpdateColumnPreset: (preset) {
                           setState(() => _currentColumnPreset = preset);
@@ -9061,6 +9139,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                           setState(() => _currentWallThickness = t);
                         },
                         currentWallLength: _currentWallLength,
+                        currentWallRotationRad: _currentWallRotationRad,
                         onUpdateWallDimensions: (len, thick) {
                           setState(() {
                             _currentWallLength = len;
@@ -9093,12 +9172,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         onUpdateSlabThickness: (t) {
                           setState(() => _currentSlabThickness = t);
                         },
+                        onGenerateSupports: _generateInitialScheme,
+                        onManageUnderlays: widget.bimContext?.onManageStoreys,
                         onGenerateSlabs: _generateSlabSeeds,
+                        onGenerateStaircaseOpenings: _generateStaircaseOpenings,
                         currentOpeningPreset: _selectedOpeningPreset,
                         onUpdateOpeningPreset: (preset) {
                           setState(() {
                             _selectedOpeningPreset = preset;
-                            _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
+
                             _openingPointsCad.clear();
                             _openingStartCad = null;
                             _liveDimensionText = null;
@@ -9106,7 +9188,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         },
                         hasOpeningStartCorner: _openingStartCad != null,
                         isDrawingOpening: _activeTool == StructuralDrawTool.slabOpening,
-                        isDrawingCirculationZone: _staircaseZoneCoreId!=null && _staircaseZoneStoreyId==_project.activeStorey.id,
+
                         openingPointCount: _openingPointsCad.length,
                         onCloseOpening: _closeOpeningPolygon,
                         onUndoOpeningPoint: () {
@@ -9117,7 +9199,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         },
                         onClearOpening: () {
                           setState(() {
-                            _staircaseZoneCoreId=null; _staircaseZoneStoreyId=null;
+
                             _openingPointsCad.clear();
                             _openingStartCad = null;
                             _liveDimensionText = null;
@@ -9215,8 +9297,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_selectedColumn != null) {
       final col = _selectedColumn!;
       primaryColor = const Color(0xFFFFB300);
-      final int wCm = (col.width / _cadUnitsPerMeter * 100).round();
-      final int hCm = (col.height / _cadUnitsPerMeter * 100).round();
+      final rotated = math.sin(col.rotationRad).abs() > math.cos(col.rotationRad).abs();
+      final int wCm = ((rotated ? col.height : col.width) / _cadUnitsPerMeter * 100).round();
+      final int hCm = ((rotated ? col.width : col.height) / _cadUnitsPerMeter * 100).round();
       final String dimStr = col.shape == ColumnShape.lShape
           ? 'Г $wCm x $hCm / 25 cm'
           : col.shape == ColumnShape.circular
@@ -9287,7 +9370,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final double lengthM = wall.length / _cadUnitsPerMeter;
       final int thickCm = (wall.thickness / _cadUnitsPerMeter * 100).round();
       title = wall.displayName.isNotEmpty ? wall.displayName : context.l10n.shearWallTitle;
-      subtitle = '${lengthM.toStringAsFixed(2)} m (d=$thickCm cm)';
+      final lengthCm = (lengthM * 100).round();
+      final vertical = math.sin(wall.angleRad).abs() > math.cos(wall.angleRad).abs();
+      subtitle = vertical ? '$thickCm x $lengthCm cm' : '$lengthCm x $thickCm cm';
       onDeselect = () => setState(() => _selectedShearWall = null);
       onRename = _renameSelectedWall;
 

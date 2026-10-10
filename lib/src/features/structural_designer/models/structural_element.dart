@@ -2182,14 +2182,43 @@ class StructuralProject {
     ]);
   }
 
-  /// Exclude stale polygons outside a core's explicitly confirmed scope.
-  Map<String,List<Offset>> staircaseZonesFor(StoreyLevel storey) => {
-    for(final core in staircases)
-      if(storeys.any((s)=>s.id==core.startStoreyId && s.elevation<=storey.elevation) &&
-         storeys.any((s)=>s.id==core.endStoreyId && s.elevation>=storey.elevation) &&
-         storey.staircaseZones.containsKey(core.id))
-        core.id:storey.staircaseZones[core.id]!,
-  };
+  /// Physical arrival-floor holes reserve support space without requiring a
+  /// separate circulation drawing. Saved optional zones remain compatible.
+  Map<String, List<Offset>> staircaseZonesFor(StoreyLevel storey) {
+    final zones = <String, List<Offset>>{
+      for (final core in staircases)
+        if (storeys.any(
+              (s) =>
+                  s.id == core.startStoreyId && s.elevation <= storey.elevation,
+            ) &&
+            storeys.any(
+              (s) =>
+                  s.id == core.endStoreyId && s.elevation >= storey.elevation,
+            ) &&
+            storey.staircaseZones.containsKey(core.id))
+          core.id: storey.staircaseZones[core.id]!,
+    };
+    final legacy = floorSlabStoreyFor(storey);
+    final owners = [
+      storey.copyWith(slabs: storey.slabs.where((s) => s.isFloorSlab).toList()),
+      ?legacy,
+    ];
+    for (final owner in owners) {
+      for (final slab in owner.slabs) {
+        final finished =
+            owner.structuralElevationFor(slab) +
+            (slab.floorFinish ?? owner.floorFinishThickness);
+        if ((finished - storey.elevation).abs() > .01) continue;
+        for (var i = 0; i < slab.openings.length; i++) {
+          if (slab.getOpeningType(i) == SlabOpeningType.staircase &&
+              slab.openings[i].length >= 3) {
+            zones['floor_stair_${owner.id}_${slab.id}_$i'] = slab.openings[i];
+          }
+        }
+      }
+    }
+    return zones;
+  }
 
   List<StoreyLevel> get ceilingStoreys => storeys.map(supportedStoreyFor).toList();
 

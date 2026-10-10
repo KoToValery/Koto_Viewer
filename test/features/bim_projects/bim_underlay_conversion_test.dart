@@ -65,7 +65,7 @@ void main() {
   tearDown(() async => temp.delete(recursive: true));
 
   test(
-    'assumed opening layer and region report survive KCAD and reprocessing',
+    'internal opening and region report survive KCAD and reprocessing',
     () async {
       await source.writeAsString(drawing(opening: true));
       final result = await BimUnderlayConversionService.convert(source);
@@ -76,10 +76,10 @@ void main() {
       expect(report['contours'], isNotEmpty);
       expect(
         baked.entities.where((e) => e.layer == 'BIM_Slab_Assumed_Gaps'),
-        isNotEmpty,
+        isEmpty,
       );
+      expect(baked.layers.containsKey('BIM_Slab_Assumed_Gaps'), isFalse);
       BimUnderlayMetadata.setFiltered(baked, false);
-      expect(baked.layers['BIM_Slab_Assumed_Gaps']!.isVisible, isFalse);
       final again = await BimUnderlayConversionService.convert(result.kcadFile);
       addTearDown(again.dispose);
       final reloaded = await KcadService.loadKcadFile(again.kcadFile);
@@ -101,7 +101,7 @@ void main() {
   );
 
   test(
-    'Two stages preserve originals, bake walls/slabs and persist metadata',
+    'Two stages preserve originals, bake walls and live layer groups and persist metadata',
     () async {
       final stages = <BimConversionStage>[];
       final result = await BimUnderlayConversionService.convert(
@@ -122,7 +122,11 @@ void main() {
         closeTo(0.30, 0.00001),
       );
       expect(baked.entities.where((e) => e.layer == 'BIM_Walls'), isNotEmpty);
-      expect(baked.entities.where((e) => e.layer == 'BIM_Slabs').length, 1);
+      expect(baked.entities.where((e) => e.layer == 'BIM_Slabs'), isEmpty);
+      expect(BimUnderlayMetadata.dynamicLayers(baked), {
+        'axes': 'BIM_Axis',
+        'slabs': 'BIM_Slabs',
+      });
       expect(BimUnderlayMetadata.axes(baked), isNotEmpty);
       expect(
         BimUnderlayMetadata.read(baked)!['slabEnvelope']['status'],
@@ -130,10 +134,11 @@ void main() {
       );
       expect(
         baked.entities.where((e) => e.layer == 'BIM_Slab_Candidates'),
-        isNotEmpty,
+        isEmpty,
       );
       expect(pure.layers.containsKey('BIM_Slab_Candidates'), isFalse);
-      expect(baked.layers.containsKey('BIM_Axis'), isFalse);
+      expect(baked.layers.containsKey('BIM_Axis'), isTrue);
+      expect(baked.layers.containsKey('BIM_Slab_Candidates'), isFalse);
       expect(stages, BimConversionStage.values);
       BimUnderlayMetadata.setFiltered(baked, false);
       expect(baked.layers['walls']!.isVisible, isTrue);
@@ -143,7 +148,7 @@ void main() {
   );
 
   test(
-    'Native KCAD input preserves nested slab inserts and colliding layers',
+    'Native KCAD input preserves original nested inserts and colliding layers',
     () async {
       final doc = DxfParser.parseString(drawing());
       doc.layers['BIM_Walls'] = DxfLayer(name: 'BIM_Walls', colorIndex: 3);
@@ -186,22 +191,18 @@ void main() {
       expect(baked.layers['BIM_Slab_Candidates']!.colorIndex, 5);
       expect(
         BimUnderlayMetadata.generatedLayers(baked),
-        contains('BIM_Slab_Candidates_1'),
+        isNot(contains('BIM_Slab_Candidates_1')),
       );
       expect(
         BimUnderlayMetadata.generatedLayers(baked),
         contains('BIM_Walls_1'),
       );
-      final clone = baked.entities.whereType<DxfInsert>().firstWhere(
-        (e) => e.layer == 'BIM_Slabs',
-      );
-      expect(clone.insertPoint, const Offset(50, 60));
-      expect(clone.scaleX, 2);
-      expect(clone.scaleY, 3);
-      final nested =
-          baked.blocks[clone.blockName]!.entities.single as DxfInsert;
-      expect(nested.rotationDeg, 45);
-      expect(baked.blocks[nested.blockName]!.entities.single, isA<DxfCircle>());
+      expect(baked.entities.where((e) => e.layer == 'BIM_Slabs'), isEmpty);
+      final originalInsert = baked.entities.whereType<DxfInsert>().single;
+      expect(originalInsert.blockName, 'outer');
+      expect(originalInsert.insertPoint, const Offset(50, 60));
+      expect(originalInsert.scaleX, 2);
+      expect(originalInsert.scaleY, 3);
       expect(baked.blocks['slabPart']!.entities.length, 2);
       final again = await BimUnderlayConversionService.convert(result.kcadFile);
       addTearDown(again.dispose);
@@ -533,11 +534,17 @@ void main() {
       ).first;
       expect(aligned.start, before.start - const Offset(400, 400));
       expect(aligned.end, before.end - const Offset(400, 400));
-      final metadata = BimUnderlayMetadata.read(loaded.underlaysByStorey['b']!)!;
+      final metadata = BimUnderlayMetadata.read(
+        loaded.underlaysByStorey['b']!,
+      )!;
       expect(metadata['sourceToProject'], {
-        'scale': 1.0, 'translation': [-400.0, -400.0],
+        'scale': 1.0,
+        'translation': [-400.0, -400.0],
       });
-      expect(metadata['slabEnvelope'], BimUnderlayMetadata.read(local)!['slabEnvelope']);
+      expect(
+        metadata['slabEnvelope'],
+        BimUnderlayMetadata.read(local)!['slabEnvelope'],
+      );
     },
   );
 

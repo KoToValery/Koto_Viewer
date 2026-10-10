@@ -1,4 +1,6 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'structural_tool_groups.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/cantilever_analysis_models.dart';
 import '../models/seismic_analysis_models.dart';
@@ -51,6 +53,7 @@ class ElementPaletteBar extends StatelessWidget {
   final bool hasWallStart;
   final bool hasBeamStart;
   final double currentWallLength;
+  final double currentWallRotationRad;
   final void Function(double length, double thickness)? onUpdateWallDimensions;
   final VoidCallback? onRotateWall;
   final VoidCallback? onClearMeasurement;
@@ -59,7 +62,10 @@ class ElementPaletteBar extends StatelessWidget {
   final VoidCallback? onCustomWallThickness;
   final VoidCallback? onCustomBeamDimensions;
   final VoidCallback? onCustomSlabThickness;
+  final VoidCallback? onGenerateSupports;
+  final VoidCallback? onManageUnderlays;
   final VoidCallback? onGenerateSlabs;
+  final VoidCallback? onGenerateStaircaseOpenings;
   final VoidCallback? onCustomAxisName;
   final VoidCallback? onOpenLayerManager;
   final VoidCallback? onOpenUnderlayFilterConfig;
@@ -77,6 +83,7 @@ class ElementPaletteBar extends StatelessWidget {
     required this.currentWallThickness,
     required this.onUpdateWallThickness,
     this.currentWallLength = 1.50,
+    this.currentWallRotationRad = 0,
     this.onUpdateWallDimensions,
     this.onRotateWall,
     this.onClearMeasurement,
@@ -119,7 +126,10 @@ class ElementPaletteBar extends StatelessWidget {
     this.onCustomWallThickness,
     this.onCustomBeamDimensions,
     this.onCustomSlabThickness,
+    this.onGenerateSupports,
+    this.onManageUnderlays,
     this.onGenerateSlabs,
+    this.onGenerateStaircaseOpenings,
     this.onCustomAxisName,
     this.onOpenLayerManager,
     this.onOpenUnderlayFilterConfig,
@@ -180,98 +190,55 @@ class ElementPaletteBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Dynamic Scrollable Sub-bar for Active Tool parameters
-            if (activeTool == StructuralDrawTool.gridAxis)
-              _buildGridAxisOptionsBar(context)
-            else if (activeTool == StructuralDrawTool.column)
-              _buildColumnOptionsBar(context)
-            else if (activeTool == StructuralDrawTool.shearWall)
-              _buildWallOptionsBar(context)
-            else if (activeTool == StructuralDrawTool.beam)
-              _buildBeamOptionsBar(context)
-            else if (activeTool == StructuralDrawTool.slab)
-              _buildSlabOptionsBar(context)
-            else if (activeTool == StructuralDrawTool.slabOpening)
-              _buildOpeningOptionsBar(context)
-            else if (activeTool == StructuralDrawTool.measure)
-              _buildMeasureOptionsBar(context)
-            else if (activeTool == StructuralDrawTool.layers)
-              _buildLayersOptionsBar(context),
-
-            const SizedBox(height: 6),
-
-            // 3. Main Tools Row with visual separation between drawing & analysis
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Row(
-                children: [
-                  _buildToolButton(
-                    tool: StructuralDrawTool.gridAxis,
-                    icon: Icons.grid_3x3_rounded,
-                    label: context.l10n.toolGridAxis,
-                  ),
-                  _buildToolButton(
-                    tool: StructuralDrawTool.column,
-                    icon: Icons.view_column_rounded,
-                    label: context.l10n.toolColumn,
-                  ),
-                  _buildToolButton(
-                    tool: StructuralDrawTool.shearWall,
-                    icon: Icons.line_weight_rounded,
-                    label: context.l10n.toolShearWall,
-                  ),
-                  _buildToolButton(
-                    tool: StructuralDrawTool.beam,
-                    icon: Icons.horizontal_rule_rounded,
-                    label: context.l10n.toolBeam,
-                  ),
-                  _buildToolButton(
-                    tool: StructuralDrawTool.slab,
-                    icon: Icons.crop_square_rounded,
-                    label: context.l10n.toolSlab,
-                  ),
-                  _buildToolButton(
-                    tool: StructuralDrawTool.slabOpening,
-                    icon: Icons.tab_unselected_rounded,
-                    label: isDrawingCirculationZone ? context.l10n.staircaseZone:context.l10n.toolOpening,
-                  ),
-                  _buildToolButton(
-                    tool: StructuralDrawTool.measure,
-                    icon: Icons.straighten_rounded,
-                    label: context.l10n.toolMeasure,
-                  ),
-                  _buildToolButton(
-                    tool: StructuralDrawTool.layers,
-                    icon: Icons.layers_rounded,
-                    label: context.l10n.layersTabTitle,
-                  ),
-                  // Vertical divider between modeling elements and engineering checks
-                  Container(
-                    height: 28,
-                    width: 1,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    color: Colors.white24,
-                  ),
-                  // Cantilever Analysis report launcher with badge
-                  _buildCantileverAnalysisButton(context),
-                  // EC2 Vertical Capacity report launcher with badge
-                  _buildVerticalCapacityButton(context),
-                  // EC8 Seismic Analysis report launcher with badge
-                  _buildSeismicAnalysisButton(context),
-                ],
-              ),
-            ),
-          ],
+        child: StructuralToolGroups(
+          activeTool: activeTool,
+          onLeavePlacement: () => onSelectTool(StructuralDrawTool.select),
+          options: _buildActiveOptions(context),
+          toolsBuilder: _buildGroupedTools,
         ),
       ),
       ),
     );
+  }
+
+  Widget? _buildActiveOptions(BuildContext context) => switch (activeTool) {
+    StructuralDrawTool.gridAxis => _buildGridAxisOptionsBar(context),
+    StructuralDrawTool.column => _buildColumnOptionsBar(context),
+    StructuralDrawTool.shearWall => _buildWallOptionsBar(context),
+    StructuralDrawTool.beam => _buildBeamOptionsBar(context),
+    StructuralDrawTool.slab => _buildSlabOptionsBar(context),
+    StructuralDrawTool.slabOpening => _buildOpeningOptionsBar(context),
+    StructuralDrawTool.measure => _buildMeasureOptionsBar(context),
+    StructuralDrawTool.layers => _buildLayersOptionsBar(context),
+    _ => null,
+  };
+
+  Widget _buildGroupedTools(BuildContext context, StructuralToolGroup group) {
+    final tools = group == StructuralToolGroup.underlay
+        ? [StructuralDrawTool.layers, StructuralDrawTool.measure]
+        : group == StructuralToolGroup.structure
+        ? [StructuralDrawTool.gridAxis, StructuralDrawTool.column,
+            StructuralDrawTool.shearWall, StructuralDrawTool.beam,
+            StructuralDrawTool.slab, StructuralDrawTool.slabOpening]
+        : <StructuralDrawTool>[];
+    return Row(children: [
+      for (final tool in tools) _buildToolButton(tool: tool, icon: tool.icon,
+        label: tool == StructuralDrawTool.slabOpening && isDrawingCirculationZone
+            ? context.l10n.staircaseZone : tool.label(context.l10n)),
+      if (group == StructuralToolGroup.underlay && onManageUnderlays != null)
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ActionChip(
+          avatar: const Icon(Icons.align_horizontal_center, size: 16),
+          label: Text(context.l10n.bimAlignmentTitle), onPressed: onManageUnderlays)),
+      if (group == StructuralToolGroup.checks) ...[
+        if (onOpenVerticalCapacityReport != null)
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ActionChip(
+            avatar: const Icon(Icons.straighten_rounded, size: 16),
+            label: Text(context.l10n.bimSupportSpacingAction), onPressed: onOpenVerticalCapacityReport)),
+        _buildCantileverAnalysisButton(context),
+        _buildVerticalCapacityButton(context),
+        _buildSeismicAnalysisButton(context),
+      ],
+    ]);
   }
 
   Widget _buildToolButton({
@@ -530,10 +497,18 @@ class ElementPaletteBar extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
+          if (onGenerateSupports != null)
+            Padding(padding: const EdgeInsets.only(right: 5), child: ActionChip(
+              key: const ValueKey('bim-generate-supports'),
+              avatar: const Icon(Icons.auto_awesome, size: 14),
+              label: Text(context.l10n.bimGenerateSupportsAction, style: const TextStyle(fontSize: 11)),
+              onPressed: onGenerateSupports, visualDensity: VisualDensity.compact)),
           Padding(
             padding: const EdgeInsets.only(right: 5),
             child: ChoiceChip(
-              label: const Text('25×30 cm'),
+              label: Text(isFixedPreset
+                  ? '${(currentColumnPreset.width * 100).round()}×${(currentColumnPreset.height * 100).round()} cm'
+                  : '25×30 cm'),
               selected: isFixedPreset,
               onSelected: (selected) {
                 if (selected) {
@@ -619,6 +594,15 @@ class ElementPaletteBar extends StatelessWidget {
   }
 
   Widget _buildWallOptionsBar(BuildContext context) {
+    // Match the section dimensions to the orientation shown on the plan.
+    final rotated = math.sin(currentWallRotationRad).abs() >
+        math.cos(currentWallRotationRad).abs();
+    String sizeLabel(double length, double thickness) {
+      final first = rotated ? length : thickness;
+      final second = rotated ? thickness : length;
+      return '${(first * 100).round()}×${(second * 100).round()} cm';
+    }
+
     final bool isFixedPreset = (currentWallThickness - 0.25).abs() < 1e-3 && (currentWallLength - 1.50).abs() < 1e-3;
     final bool isAltPreset = (currentWallThickness - 0.25).abs() < 1e-3 && (currentWallLength - 1.20).abs() < 1e-3;
 
@@ -627,10 +611,16 @@ class ElementPaletteBar extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
+          if (onGenerateSupports != null)
+            Padding(padding: const EdgeInsets.only(right: 5), child: ActionChip(
+              key: const ValueKey('bim-generate-supports'),
+              avatar: const Icon(Icons.auto_awesome, size: 14),
+              label: Text(context.l10n.bimGenerateSupportsAction, style: const TextStyle(fontSize: 11)),
+              onPressed: onGenerateSupports, visualDensity: VisualDensity.compact)),
           Padding(
             padding: const EdgeInsets.only(right: 5),
             child: ChoiceChip(
-              label: Text(context.l10n.shearWallSizePreset),
+              label: Text(sizeLabel(1.50, 0.25)),
               selected: isFixedPreset,
               onSelected: (selected) {
                 if (selected) {
@@ -644,7 +634,7 @@ class ElementPaletteBar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 5),
             child: ChoiceChip(
-              label: Text(context.l10n.shearWallSizePresetAlt),
+              label: Text(sizeLabel(1.20, 0.25)),
               selected: isAltPreset,
               onSelected: (selected) {
                 if (selected) {
@@ -659,7 +649,7 @@ class ElementPaletteBar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 5),
               child: ChoiceChip(
-                label: Text('${(currentWallThickness * 100).round()}×${(currentWallLength * 100).round()} cm'),
+                label: Text(sizeLabel(currentWallLength, currentWallThickness)),
                 selected: true,
                 onSelected: (_) {},
                 visualDensity: VisualDensity.compact,
@@ -985,6 +975,12 @@ class ElementPaletteBar extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
+          if (onGenerateStaircaseOpenings!=null)
+            Padding(padding:const EdgeInsets.only(right:6),child:ActionChip(
+              key:const ValueKey('auto-staircase-openings'),
+              avatar:const Icon(Icons.auto_awesome,size:16),
+              label:Text(l10n.staircaseAutoGenerate),
+              onPressed:openingPointCount==0 ? onGenerateStaircaseOpenings : null)),
           if(isDrawingCirculationZone) Chip(label:Text(l10n.staircaseZone))
           else for (final (key, label) in presets)
             Padding(

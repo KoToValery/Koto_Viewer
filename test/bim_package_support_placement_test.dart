@@ -210,19 +210,17 @@ void main() {
         );
       }
       expect(search().floor.toJson(), result.floor.toJson());
-      // This fixture tests candidate placement on a conservative partial envelope;
-      // it must not silently satisfy the application's missing staircase gate.
+      // A first-level model no longer needs an artificial stair hole or review.
       expect(
-        StructuralSchemeReadiness.evaluate(project, 1).issues,
-        contains(SchemeReadinessIssue.missingStaircase),
+        StructuralSchemeReadiness.evaluate(project, 1).geometryReady,
+        isTrue,
       );
-      final gated = InitialSchemeGenerator.generate(
+      final generated = InitialSchemeGenerator.generate(
         project: project,
         wallPairs: pairs,
         scale: 1,
       );
-      expect(gated.columns, isEmpty);
-      expect(gated.walls, isEmpty);
+      expect(generated.isEmpty, isFalse);
     },
   );
   test(

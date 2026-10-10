@@ -50,8 +50,6 @@ class StructuralPointerPainter extends CustomPainter {
   final Offset targetPos;
   final Offset? placementPos;
   final List<Offset>? previewElementPolygon;
-  final bool showDetailLoupe;
-  final bool loupeHasScene;
   final Offset? snappedPos;
   final List<Offset>? snappedPositions;
   final DxfSnapType? snapType;
@@ -79,8 +77,6 @@ class StructuralPointerPainter extends CustomPainter {
     required this.targetPos,
     this.placementPos,
     this.previewElementPolygon,
-    this.showDetailLoupe = false,
-    this.loupeHasScene = false,
     this.snappedPos,
     this.snappedPositions,
     this.snapType,
@@ -107,70 +103,6 @@ class StructuralPointerPainter extends CustomPainter {
   /// Element reference point and snap marker are deliberately independent.
   Offset get effectivePlacementPosition =>
       placementPos ?? snappedPos ?? targetPos;
-
-  /// Inspect the edge/corner closest to the finger, where alignment is judged.
-  /// Object placement still uses its independent reference point.
-  Offset get detailFocusPosition {
-    final polygon = previewElementPolygon;
-    if (polygon == null || polygon.length < 3) return snappedPos ?? targetPos;
-    var focus = polygon.first, distance = double.infinity;
-    for (var i = 0; i < polygon.length; i++) {
-      final a = polygon[i], delta = polygon[(i + 1) % polygon.length] - a;
-      final t = delta.distanceSquared == 0
-          ? 0.0
-          : (((touchPos - a).dx * delta.dx + (touchPos - a).dy * delta.dy) /
-                    delta.distanceSquared)
-                .clamp(0.0, 1.0);
-      final point = a + delta * t;
-      if ((point - touchPos).distance < distance) {
-        focus = point;
-        distance = (point - touchPos).distance;
-      }
-    }
-    for (final snap
-        in snappedPositions != null && snappedPositions!.isNotEmpty
-            ? snappedPositions!
-            : snappedPos != null
-            ? [snappedPos!]
-            : <Offset>[]) {
-      if ((snap - touchPos).distance <= math.min(distance + 12, 28)) {
-        focus = snap;
-        distance = (snap - touchPos).distance;
-      }
-    }
-    return focus;
-  }
-
-  static const detailLoupeScale = 2.5;
-
-  /// Shared geometry keeps the magnified scene and its vector overlay aligned.
-  Rect? detailLoupeRect(Size size) {
-    if (!showDetailLoupe ||
-        previewElementPolygon == null ||
-        previewElementPolygon!.length < 3 ||
-        size.shortestSide < 110) {
-      return null;
-    }
-    final radius = math.min(60.0, (size.shortestSide - 16) / 2);
-    Offset keepInside(Offset point) => Offset(
-      point.dx.clamp(radius + 8, size.width - radius - 8).toDouble(),
-      point.dy.clamp(radius + 8, size.height - radius - 8).toDouble(),
-    );
-    final distance = radius + 54;
-    final candidates = [
-      keepInside(touchPos - Offset(0, distance)),
-      keepInside(touchPos + Offset(0, distance)),
-      keepInside(touchPos + Offset(distance, 0)),
-      keepInside(touchPos - Offset(distance, 0)),
-    ];
-    final location = candidates.firstWhere(
-      (p) => (p - touchPos).distance >= radius + 38,
-      orElse: () => candidates.reduce(
-        (a, b) => (a - touchPos).distance >= (b - touchPos).distance ? a : b,
-      ),
-    );
-    return Rect.fromCircle(center: location, radius: radius);
-  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -484,11 +416,6 @@ class StructuralPointerPainter extends CustomPainter {
         cross,
       );
     }
-    final loupe = detailLoupeRect(size);
-    if (loupe != null) {
-      _drawDetailLoupe(canvas, loupe, detailFocusPosition);
-    }
-
     // 4c. Active measurement ruler line and architectural ticks
     if (activeTool == StructuralDrawTool.measure && measureStartPos != null) {
       final p1 = measureStartPos!;
@@ -547,128 +474,6 @@ class StructuralPointerPainter extends CustomPainter {
         );
       }
     }
-  }
-
-  void _drawDetailLoupe(Canvas canvas, Rect bounds, Offset center) {
-    final location = bounds.center;
-    final radius = bounds.width / 2;
-    const outline = Color(0xFFFFC857);
-    const snapColor = Color(0xFF76FF72);
-    const halo = Color(0xFF151719);
-    if (!loupeHasScene) {
-      canvas.drawCircle(location, radius, Paint()..color = halo);
-    }
-    canvas.save();
-    canvas.clipPath(Path()..addOval(bounds.deflate(2)));
-    canvas.translate(location.dx, location.dy);
-    canvas.scale(detailLoupeScale);
-    canvas.translate(-center.dx, -center.dy);
-    final path = Path()..addPolygon(previewElementPolygon!, true);
-    canvas.drawPath(path, Paint()..color = outline.withValues(alpha: .10));
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = halo
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4 / detailLoupeScale,
-    );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = outline
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2 / detailLoupeScale,
-    );
-    final snaps = snappedPositions != null && snappedPositions!.isNotEmpty
-        ? snappedPositions!
-        : snappedPos != null
-        ? [snappedPos!]
-        : <Offset>[];
-    for (final point in snaps) {
-      canvas.save();
-      canvas.translate(point.dx, point.dy);
-      canvas.scale(1 / detailLoupeScale);
-      _drawSnapIndicator(
-        canvas,
-        Offset.zero,
-        snapType ?? DxfSnapType.nearest,
-        halo,
-        strokeWidth: 4,
-      );
-      _drawSnapIndicator(
-        canvas,
-        Offset.zero,
-        snapType ?? DxfSnapType.nearest,
-        snapColor,
-      );
-      canvas.restore();
-    }
-    canvas.restore();
-
-    // A screen-sized reticle stays legible without covering the exact target.
-    for (final direction in [const Offset(1, 0), const Offset(0, 1)]) {
-      for (final sign in [-1.0, 1.0]) {
-        final from = location + direction * (5 * sign);
-        final to = location + direction * (13 * sign);
-        canvas.drawLine(
-          from,
-          to,
-          Paint()
-            ..color = halo
-            ..strokeWidth = 4,
-        );
-        canvas.drawLine(
-          from,
-          to,
-          Paint()
-            ..color = Colors.white
-            ..strokeWidth = 1.5,
-        );
-      }
-    }
-    canvas.drawCircle(location, 2.5, Paint()..color = halo);
-    canvas.drawCircle(location, 1.2, Paint()..color = Colors.white);
-    canvas.drawCircle(
-      location,
-      radius,
-      Paint()
-        ..color = halo
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4,
-    );
-    canvas.drawCircle(
-      location,
-      radius - 1,
-      Paint()
-        ..color = const Color(0xFFE6E6E6)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
-    final label = TextPainter(
-      text: const TextSpan(
-        text: '×2.5',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    final labelPos = location + Offset(-label.width / 2, -radius + 8);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          labelPos.dx - 5,
-          labelPos.dy - 2,
-          label.width + 10,
-          label.height + 4,
-        ),
-        const Radius.circular(4),
-      ),
-      Paint()..color = halo,
-    );
-    label.paint(canvas, labelPos);
   }
 
   void _drawSnapIndicator(
@@ -836,8 +641,6 @@ class StructuralPointerPainter extends CustomPainter {
         oldDelegate.targetPos != targetPos ||
         oldDelegate.placementPos != placementPos ||
         oldDelegate.previewElementPolygon != previewElementPolygon ||
-        oldDelegate.showDetailLoupe != showDetailLoupe ||
-        oldDelegate.loupeHasScene != loupeHasScene ||
         oldDelegate.snappedPos != snappedPos ||
         oldDelegate.snappedPositions != snappedPositions ||
         oldDelegate.snapType != snapType ||
@@ -859,43 +662,12 @@ class StructuralPointerPainter extends CustomPainter {
   }
 }
 
-/// Samples the actual CAD canvas before the finger pointer is painted, so the
-/// loupe includes architecture and axes without magnifying the touch anchor.
+/// Screen-space placement and snap markers, without a magnifier.
 class StructuralPointerOverlay extends StatelessWidget {
   final StructuralPointerPainter painter;
 
   const StructuralPointerOverlay({super.key, required this.painter});
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final size = constraints.biggest;
-      final bounds = painter.detailLoupeRect(size);
-      return Stack(
-        children: [
-          if (bounds != null)
-            Positioned.fromRect(
-              rect: bounds,
-              child: RawMagnifier(
-                key: const ValueKey('structural-detail-loupe'),
-                size: bounds.size,
-                focalPointOffset: painter.detailFocusPosition - bounds.center,
-                magnificationScale: StructuralPointerPainter.detailLoupeScale,
-                decoration: const MagnifierDecoration(
-                  shape: CircleBorder(),
-                  shadows: [
-                    BoxShadow(
-                      color: Colors.black54,
-                      blurRadius: 8,
-                      blurStyle: BlurStyle.outer,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          Positioned.fill(child: CustomPaint(painter: painter)),
-        ],
-      );
-    },
-  );
+  Widget build(BuildContext context) => CustomPaint(painter: painter);
 }

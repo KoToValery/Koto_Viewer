@@ -116,10 +116,15 @@ class BimUnderlayLoader {
         scale: scale,
       );
 
+      BimUnderlayMetadata.ensureDynamicLayers(transformed);
+      final dynamicNames = BimUnderlayMetadata.dynamicLayers(transformed);
+      final hasDynamicPreferences = storey.layerVisibility.containsKey(dynamicNames['axes']);
+
       // Restore layer visibility if saved; if not saved yet (initial startup),
       // apply automatic underlay filter to all storeys so every layout starts filtered!
       if (storey.layerVisibility.isNotEmpty) {
         for (final entry in storey.layerVisibility.entries) {
+          if (!hasDynamicPreferences && dynamicNames.values.contains(entry.key)) continue;
           if (transformed.layers.containsKey(entry.key)) {
             transformed.layers[entry.key]!.isVisible = entry.value;
           }
@@ -140,7 +145,7 @@ class BimUnderlayLoader {
         BimUnderlayMetadata.setFiltered(transformed, true);
       }
 
-      final metadata = BimUnderlayMetadata.read(doc);
+      final metadata = BimUnderlayMetadata.read(transformed);
       if (metadata != null) {
         // Candidate contours stay in source CAD coordinates.
         metadata['sourceToProject'] = {

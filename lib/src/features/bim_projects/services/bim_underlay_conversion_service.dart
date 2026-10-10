@@ -9,12 +9,10 @@ import '../../../core/services/universal_encoding_service.dart';
 import '../../dxf_viewer/binary/kcad_service.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/parser/dxf_parser.dart';
-import '../../structural_designer/analysis/structural_underlay_filter.dart';
 import '../../structural_designer/analysis/wall_axis_detector.dart';
 import '../../structural_designer/analysis/slab_envelope_detector.dart';
 import '../../structural_designer/analysis/slab_projection_detector.dart';
 import '../../structural_designer/models/structural_element.dart';
-import 'dxf_document_transformer.dart';
 
 enum BimConversionStage { converting, analysing, ready }
 
@@ -43,7 +41,7 @@ class BimConversionResult {
 /// Metadata travels with the binary document, including empty analysis results.
 class BimUnderlayMetadata {
   static const key = r'$KOTO_BIM_UNDERLAY';
-  static const version = 6;
+  static const version = 8;
 
   static Map<String, dynamic>? read(DxfDocument doc) {
     final raw = doc.headerVars[key];
@@ -52,6 +50,8 @@ class BimUnderlayMetadata {
       final value = jsonDecode(raw);
       if (value is Map<String, dynamic> &&
           (value['version'] == version ||
+              value['version'] == 7 ||
+              value['version'] == 6 ||
               value['version'] == 5 ||
               value['version'] == 4 ||
               value['version'] == 3 ||
@@ -78,10 +78,87 @@ class BimUnderlayMetadata {
   static Set<String> generatedLayers(DxfDocument doc) =>
       Set<String>.from((read(doc)?['layers'] as List?) ?? []);
 
+  static const dynamicKey = r'$KOTO_BIM_DYNAMIC_LAYERS';
+
+  static Map<String, String> dynamicLayers(DxfDocument doc) {
+    final metadata = read(doc);
+    final value = metadata?['dynamicLayers'];
+    if (value is Map) return Map<String, String>.from(value);
+    try {
+      return Map<String, String>.from(
+        jsonDecode(doc.headerVars[dynamicKey] ?? '{}') as Map,
+      );
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Set<String> dynamicLayerNames(DxfDocument doc) =>
+      dynamicLayers(doc).values.toSet();
+
+  static bool dynamicVisible(DxfDocument doc, String kind) {
+    final name = dynamicLayers(doc)[kind];
+    final layer = doc.layers[name];
+    return layer == null || (layer.isVisible && !layer.isFrozen);
+  }
+
+  /// Replace owned CAD copies with visibility groups for live model objects.
+  /// Original source layers, including BIM-looking names, are never deleted.
+  static void ensureDynamicLayers(DxfDocument doc) {
+    if (dynamicLayers(doc).isNotEmpty) return;
+    final metadata = read(doc);
+    if (metadata != null) {
+      final wall = metadata['wallLayer'];
+      final obsolete = generatedLayers(doc)..remove(wall);
+      doc.entities.removeWhere((e) => obsolete.contains(e.layer));
+      for (final entities in doc.layoutEntities.values) {
+        entities.removeWhere((e) => obsolete.contains(e.layer));
+      }
+      for (final name in obsolete) {
+        doc.layers.remove(name);
+      }
+      for (final name in (metadata['blocks'] as List? ?? [])) {
+        doc.blocks.remove(name);
+      }
+      metadata['blocks'] = <String>[];
+      metadata['hasResults'] = doc.entities.any((e) => e.layer == wall);
+      doc.spatialIndex = null;
+    }
+    String unique(String base) {
+      var result = base, i = 1;
+      while (doc.layers.keys.any(
+        (name) => name.toLowerCase() == result.toLowerCase(),
+      )) {
+        result = '${base}_${i++}';
+      }
+      return result;
+    }
+
+    final names = {'axes': unique('BIM_Axis'), 'slabs': unique('BIM_Slabs')};
+    for (final entry in names.entries) {
+      doc.layers[entry.value] = DxfLayer(
+        name: entry.value,
+        colorIndex: entry.key == 'axes' ? 1 : 7,
+      );
+    }
+    if (metadata != null) {
+      metadata['dynamicLayers'] = names;
+      metadata['layers'] = [
+        if (metadata['wallLayer'] != null) metadata['wallLayer'],
+        ...names.values,
+      ];
+      metadata['visibleLayers'] = metadata['layers'];
+      doc.headerVars[key] = jsonEncode(metadata);
+    } else {
+      doc.headerVars[dynamicKey] = jsonEncode(names);
+    }
+  }
+
   static void setFiltered(DxfDocument doc, bool filtered) {
     final metadata = read(doc);
     if (metadata == null) return;
     final generated = generatedLayers(doc);
+    final dynamicNames = dynamicLayerNames(doc);
     final visible = Set<String>.from(
       metadata['visibleLayers'] as List? ?? metadata['layers'] as List,
     );
@@ -89,6 +166,7 @@ class BimUnderlayMetadata {
     // A completed empty result must leave the source visible.
     final hasResults = metadata['hasResults'] == true;
     for (final layer in doc.layers.values) {
+      if (dynamicNames.contains(layer.name)) continue;
       layer.isVisible = filtered && hasResults
           ? visible.contains(layer.name)
           : !generated.contains(layer.name) && (original[layer.name] == true);
@@ -222,7 +300,6 @@ DxfDocument _analyse(DxfDocument doc) {
 
   final walls = unique('BIM_Walls', doc.layers.keys);
   final slabs = unique('BIM_Slabs', doc.layers.keys);
-  final frames = DrawingFrameDetector.documentFrames(doc);
   final analysisDoc = DrawingFrameDetector.withoutFrames(doc);
   final detected = WallAxisDetector.detect(analysisDoc);
   final envelope = SlabEnvelopeDetector.detect(detected, document: analysisDoc);
@@ -234,114 +311,13 @@ DxfDocument _analyse(DxfDocument doc) {
         .expand((p) => [p.segmentA.sourceLayer, p.segmentB.sourceLayer])
         .toSet(),
   );
-  final projectionLayer = unique('BIM_Projection_Candidates', doc.layers.keys);
-  final candidates = unique('BIM_Slab_Candidates', doc.layers.keys);
-  final assumed = unique('BIM_Slab_Assumed_Gaps', doc.layers.keys);
-  final slabLayers = StructuralUnderlayFilter.detectSlabLayers(
-    doc,
-  ).detectedLayers.toSet();
+  final axisLayer = unique('BIM_Axis', doc.layers.keys);
   final additions = <DxfEntity>[];
-  final generatedBlocks = <String>[];
-  for (final candidate in projections) {
-    final ring = candidate.contour;
-    for (var i = 0; i < ring.length; i++) {
-      additions.add(
-        DxfLine(
-          p1: ring[i],
-          p2: ring[(i + 1) % ring.length],
-          layer: projectionLayer,
-          colorIndex: 4,
-        ),
-      );
-    }
-  }
-  if (projections.isNotEmpty) {
-    doc.layers[projectionLayer] = DxfLayer(
-      name: projectionLayer,
-      colorIndex: 4,
-      isVisible: false,
-    );
-  }
-
-  for (final gap in envelope.assumedGaps) {
-    additions.add(
-      DxfLine(p1: gap.start, p2: gap.end, layer: assumed, colorIndex: 1),
-    );
-  }
-  for (final ring in envelope.contours) {
-    for (var i = 0; i < ring.length; i++) {
-      additions.add(
-        DxfLine(
-          p1: ring[i],
-          p2: ring[(i + 1) % ring.length],
-          layer: candidates,
-          colorIndex: 30,
-        ),
-      );
-    }
-  }
   for (final segment in {
     ...detected.wallContourSegments,
     ...detected.closureSegments,
   }) {
     additions.add(DxfLine(p1: segment.$1, p2: segment.$2, layer: walls));
-  }
-  // Clone only slab branches, keeping INSERT transforms and original definitions.
-  DxfEntity? slabCopy(DxfEntity entity, bool inherited, Set<String> stack) {
-    if (frames.contains(entity)) return null;
-    final selected = inherited || slabLayers.contains(entity.layer);
-    if (entity is DxfInsert) {
-      if (stack.contains(entity.blockName)) {
-        throw FormatException('Cyclic block: ${entity.blockName}');
-      }
-      final block = doc.blocks[entity.blockName];
-      if (block == null) {
-        if (selected) {
-          throw FormatException('Missing slab block: ${entity.blockName}');
-        }
-        return null;
-      }
-      final children = block.entities
-          .map((e) => slabCopy(e, selected, {...stack, entity.blockName}))
-          .whereType<DxfEntity>()
-          .toList();
-      if (children.isEmpty) return null;
-      final name = unique('KOTO_BIM_SLAB', doc.blocks.keys);
-      doc.blocks[name] = DxfBlock(
-        name: name,
-        basePoint: block.basePoint,
-        entities: children,
-      );
-      generatedBlocks.add(name);
-      return DxfInsert(
-        blockName: name,
-        insertPoint: entity.insertPoint,
-        scaleX: entity.scaleX,
-        scaleY: entity.scaleY,
-        scaleZ: entity.scaleZ,
-        rotationDeg: entity.rotationDeg,
-        rowCount: entity.rowCount,
-        colCount: entity.colCount,
-        rowSpacing: entity.rowSpacing,
-        colSpacing: entity.colSpacing,
-        attributes: entity.attributes,
-        layer: slabs,
-        colorIndex: entity.colorIndex,
-        trueColor: entity.trueColor,
-      );
-    }
-    if (!selected) return null;
-    final copy = DxfDocumentTransformer.copyToLayer(entity, slabs);
-    if (copy.layer != slabs) {
-      throw UnsupportedError('Slab entity: ${entity.typeName}');
-    }
-    return copy;
-  }
-
-  for (final entity in List<DxfEntity>.of(doc.entities)) {
-    if (entity.isPaperSpace) continue;
-    final copy = slabCopy(entity, false, {});
-    if (copy != null) additions.add(copy);
   }
   doc.layers[walls] = DxfLayer(
     name: walls,
@@ -349,20 +325,7 @@ DxfDocument _analyse(DxfDocument doc) {
     customLineweight: 0.30,
   );
   doc.layers[slabs] = DxfLayer(name: slabs, colorIndex: 7);
-  if (envelope.contours.isNotEmpty) {
-    doc.layers[candidates] = DxfLayer(
-      name: candidates,
-      colorIndex: 30,
-      isVisible: false,
-    );
-  }
-  if (envelope.assumedGaps.isNotEmpty) {
-    doc.layers[assumed] = DxfLayer(
-      name: assumed,
-      colorIndex: 1,
-      isVisible: false,
-    );
-  }
+  doc.layers[axisLayer] = DxfLayer(name: axisLayer, colorIndex: 1);
   doc.entities.addAll(additions);
   final model = doc.layoutEntities['Model'];
   if (model != null && !identical(model, doc.entities)) model.addAll(additions);
@@ -378,17 +341,12 @@ DxfDocument _analyse(DxfDocument doc) {
     'hasResults': additions.isNotEmpty,
     'wallsFound': detected.hasWallsFound,
     'wallLayer': walls,
-    'layers': [
-      walls,
-      slabs,
-      if (envelope.contours.isNotEmpty) candidates,
-      if (envelope.assumedGaps.isNotEmpty) assumed,
-      if (projections.isNotEmpty) projectionLayer,
-    ],
-    'visibleLayers': [walls, slabs],
+    'layers': [walls, slabs, axisLayer],
+    'visibleLayers': [walls, slabs, axisLayer],
+    'dynamicLayers': {'axes': axisLayer, 'slabs': slabs},
     'slabEnvelope': envelope.toJson(),
     'slabProjections': projections.map((p) => p.toJson()).toList(),
-    'blocks': generatedBlocks,
+    'blocks': <String>[],
     'visibility': originalVisibility,
     'axes': axes.map((a) => a.toJson()).toList(),
   });

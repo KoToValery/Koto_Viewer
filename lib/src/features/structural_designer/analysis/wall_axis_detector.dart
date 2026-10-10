@@ -89,13 +89,13 @@ class WallAxisDetector {
     }
     final cutLwThreshold = maxDocLineweight >= 0.35
         ? 0.22
-        : (maxDocLineweight - 0.07);
+        : maxDocLineweight * 0.75;
 
     final List<LayerColorGroupResult> evaluatedGroups = [];
 
     for (final entry in segmentsByLayer.entries) {
       var segments = entry.value;
-      if (maxDocLineweight >= 0.25) {
+      if (maxDocLineweight >= 0.18) {
         segments = segments
             .where((s) => s.lineweight >= cutLwThreshold)
             .toList();
@@ -251,7 +251,7 @@ class WallAxisDetector {
 
     for (int i = 1; i < evaluatedGroups.length; i++) {
       final g = evaluatedGroups[i];
-      if (maxDocLineweight >= 0.25 && g.averageLineweight < cutLwThreshold) {
+      if (maxDocLineweight >= 0.18 && g.averageLineweight < cutLwThreshold) {
         continue;
       }
       // Include other high-scoring wall layers (e.g. interior + exterior walls, 12cm partition walls)
@@ -1108,6 +1108,20 @@ class WallAxisDetector {
     return segmentsByLayer;
   }
 
+  /// Zero is an explicit hairline, not an instruction to inherit a thick pen.
+  /// ByLayer children use their effective layer, not the INSERT's own pen.
+  static double _resolveLineweight(DxfEntity entity, DxfLayer? layer,
+      {DxfInsert? insert}) {
+    final own = entity.lineWeight;
+    if (own != null && own >= 0) return own;
+    if (own == -2 && insert != null) {
+      final parent = insert.lineWeight;
+      if (parent != null && parent >= 0) return parent;
+    }
+    final pen = layer?.effectiveLineweight;
+    return pen != null && pen >= 0 ? pen : 0;
+  }
+
   static void _extractSegmentsFromEntity(
     DxfDocument document,
     DxfEntity entity,
@@ -1121,13 +1135,7 @@ class WallAxisDetector {
         ? entity.colorIndex
         : layerObj?.colorIndex ?? 7;
     final resolvedTrueColor = entity.trueColor ?? layerObj?.trueColor;
-    final double layerLw =
-        layerObj?.effectiveLineweight ??
-        (layerObj?.isThick == true ? 0.70 : 0.0);
-    final resolvedLineweight =
-        (entity.lineWeight != null && entity.lineWeight! > 0)
-        ? entity.lineWeight!
-        : layerLw;
+    final resolvedLineweight = _resolveLineweight(entity, layerObj);
 
     if (entity is DxfLine) {
       _addSegmentIfValid(
@@ -1251,15 +1259,7 @@ class WallAxisDetector {
           child.colorIndex ?? insert.colorIndex ?? layerObj?.colorIndex ?? 7;
       final resolvedTrueColor =
           child.trueColor ?? insert.trueColor ?? layerObj?.trueColor;
-      final double layerLw =
-          layerObj?.effectiveLineweight ??
-          (layerObj?.isThick == true ? 0.70 : 0.0);
-      final resolvedLineweight =
-          (child.lineWeight != null && child.lineWeight! > 0)
-          ? child.lineWeight!
-          : (insert.lineWeight != null && insert.lineWeight! > 0)
-          ? insert.lineWeight!
-          : layerLw;
+      final resolvedLineweight = _resolveLineweight(child, layerObj, insert: insert);
 
       if (child is DxfLine) {
         _addSegmentIfValid(
@@ -1560,6 +1560,7 @@ class WallAxisDetector {
                 sourceColorIndex: curRefSeg.sourceColorIndex,
                 sourceTrueColor: curRefSeg.sourceTrueColor,
                 sourceEntity: curRefSeg.sourceEntity,
+            lineweight: curRefSeg.lineweight,
               ),
             );
             curTMin = next.tMin;
@@ -1589,6 +1590,7 @@ class WallAxisDetector {
             sourceColorIndex: curRefSeg.sourceColorIndex,
             sourceTrueColor: curRefSeg.sourceTrueColor,
             sourceEntity: curRefSeg.sourceEntity,
+            lineweight: curRefSeg.lineweight,
           ),
         );
       }
@@ -1750,7 +1752,7 @@ class WallAxisDetector {
 
     // Filter repetitive ladder rungs (e.g. stair treads, title block rows, gratings)
     // In solid walls, each face belongs to only one wall cavity.
-    // If a segment participates in pairs on BOTH sides at target wall thickness,
+    // If either face participates in pairs on BOTH sides at target wall thickness,
     // it is a shared internal rung of an equidistant ladder/stair/grid.
     if (pairs.length > 2) {
       final partnersMap = <WallSegment, List<double>>{};
@@ -1769,7 +1771,16 @@ class WallAxisDetector {
             aPartners.any((d) => d > 0) && aPartners.any((d) => d < 0);
         final bHasBoth =
             bPartners.any((d) => d > 0) && bPartners.any((d) => d < 0);
-        return aHasBoth && bHasBoth;
+        bool closedFace(WallSegment s) {
+          final e = s.sourceEntity;
+          return (e is DxfLwPolyline && e.isClosed) ||
+              (e is DxfPolyline && e.isClosed);
+        }
+        // Keep actual closed wall outlines; for independent rung lines remove
+        // the edge pairs as well, rather than leaving two fictitious end walls.
+        return (aHasBoth && bHasBoth) ||
+            ((aHasBoth || bHasBoth) &&
+                !closedFace(p.segmentA) && !closedFace(p.segmentB));
       });
     }
 

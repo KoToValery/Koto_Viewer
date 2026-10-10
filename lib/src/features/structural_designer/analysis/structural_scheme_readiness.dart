@@ -115,11 +115,6 @@ class StructuralSchemeReadiness {
         );
       }
     }
-    if (!project.staircaseReviewComplete &&
-        !project.storeys.any((s) => s.elevation < active.elevation - 1e-6) &&
-        !refs.any((r) => r.type == SlabOpeningType.staircase)) {
-      issues.add(SchemeReadinessIssue.missingStaircase);
-    }
     return StructuralSchemeReadiness(
       List.unmodifiable(issues),
       List.unmodifiable(refs),

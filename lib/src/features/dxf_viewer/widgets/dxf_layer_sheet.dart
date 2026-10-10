@@ -8,12 +8,14 @@ class DxfLayerSheet extends StatefulWidget {
   final DxfDocument document;
   final VoidCallback onLayersChanged;
   final bool isDark;
+  final Map<String, int> additionalLayerCounts;
 
   const DxfLayerSheet({
     super.key,
     required this.document,
     required this.onLayersChanged,
     required this.isDark,
+    this.additionalLayerCounts = const {},
   });
 
   static Future<void> show({
@@ -59,6 +61,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
         _layerCounts[name] = (_layerCounts[name] ?? 0) + 1;
       }
     }
+    _layerCounts.addAll(widget.additionalLayerCounts);
   }
 
   void _toggleAll(bool visible) {
@@ -77,7 +80,7 @@ class _DxfLayerSheetState extends State<DxfLayerSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final sortedLayers = widget.document.layers.values
-        .where((l) => (_layerCounts[l.name] ?? 0) > 0 || widget.document.layers.length == 1)
+        .where((l) => (_layerCounts[l.name] ?? 0) > 0 || widget.additionalLayerCounts.containsKey(l.name) || widget.document.layers.length == 1)
         .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
 

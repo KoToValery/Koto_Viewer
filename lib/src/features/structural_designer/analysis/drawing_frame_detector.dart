@@ -96,7 +96,7 @@ class DrawingFrameDetector {
           final h =
               points.map((p) => p.dy).reduce(math.max) -
               points.map((p) => p.dy).reduce(math.min);
-          if (w >= u0.distance * .9 && h >= v0.distance * .9) continue;
+          if (w >= u0.distance * .85 && h >= v0.distance * .85) continue;
         }
         final box = boxes[e];
         if (box == null) continue;

@@ -1,153 +1,230 @@
-import 'dart:ui';
+import 'package:kotoview/src/features/structural_designer/widgets/element_palette_bar.dart';
+import 'package:kotoview/src/features/structural_designer/rendering/structural_pointer_painter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
-import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_bim_context.dart';
-import 'package:kotoview/src/features/structural_designer/rendering/structural_2d_painter.dart';
+import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
 import 'package:kotoview/src/features/structural_designer/structural_designer_screen.dart';
+import 'package:kotoview/src/features/structural_designer/rendering/structural_2d_painter.dart';
+import 'staircase_geometry_detector_test.dart' as geometry;
+import 'package:kotoview/src/features/structural_designer/widgets/initial_scheme_dialog.dart';
 import 'package:kotoview/src/features/structural_designer/widgets/staircase_setup_dialog.dart';
-import 'package:kotoview/src/features/structural_designer/analysis/staircase_inventory.dart';
+import 'staircase_automatic_openings_test.dart' as f;
 
-const plate = [Offset(0, 0), Offset(10, 0), Offset(10, 10), Offset(0, 10)];
-const zone = [Offset(2, 2), Offset(6, 2), Offset(6, 6), Offset(2, 6)];
-const cut = [
-  Offset(3, 3),
-  Offset(5, 3),
-  Offset(5, 4),
-  Offset(4, 4),
-  Offset(4, 5),
-  Offset(3, 5),
-];
+Future<void> pump(
+  WidgetTester tester,
+  StructuralProject initial,
+  void Function(StructuralProject) save, {
+  Map<String, DxfDocument>? source,
+  String lang = 'en',
+  Size viewport = const Size(1000, 900),
+}) async {
+  SharedPreferences.setMockInitialValues({});
+  tester.view.physicalSize = viewport;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  final docs = source ?? f.drawings();
+  final doc = DxfDocument(
+    entities: docs['g']!.entities,
+    layers: {},
+    blocks: {},
+    headerVars: {},
+    entityStats: {},
+    bounds: const Rect.fromLTRB(-2, -2, 8, 8),
+  );
+  await tester.pumpWidget(
+    MaterialApp(
+      locale: Locale(lang),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: StructuralDesignerScreen(
+        document: doc,
+        initialProject: initial,
+        title: 'Automatic stairs',
+        bimContext: StructuralBimContext(
+          underlaysByStorey: docs,
+          projectBounds: doc.bounds,
+          cadUnitsPerMeter: 1,
+          onProjectChanged: save,
+          onLayerVisibilityChanged: (_, _) {},
+          onWallsDetected: (_) {},
+          onExport: (_, _, _) async {},
+          onManageStoreys: () {},
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> menu(WidgetTester tester, String label) async {
+  final l = await AppLocalizations.delegate.load(const Locale('en'));
+  await tester.tap(find.byKey(const ValueKey('bim-navigation')));
+  await tester.pumpAndSettle();
+  final staircase = label == l.staircaseAutoGenerate;
+  tester
+      .widget<ElementPaletteBar>(find.byType(ElementPaletteBar))
+      .onSelectTool(
+        staircase ? StructuralDrawTool.slabOpening : StructuralDrawTool.column,
+      );
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(
+    find.byKey(
+      ValueKey(staircase ? 'auto-staircase-openings' : 'bim-generate-supports'),
+    ),
+  );
+  await tester.tap(
+    find.byKey(
+      ValueKey(staircase ? 'auto-staircase-openings' : 'bim-generate-supports'),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets(
-    'BIM menu requires scope, ground zone stays solid, arrival polygon cuts only its floor',
+    'one opening action cuts and saves, repeat does not duplicate, undo restores all levels',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
-      tester.view.physicalSize = const Size(1100, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final document = DxfDocument(
-        entities: [],
-        layers: {},
-        blocks: {},
-        headerVars: {},
-        bounds: const Rect.fromLTWH(0, 0, 10, 10),
-        entityStats: {},
-      );
-      var saved = const StructuralProject(
-        storeys: [
-          StoreyLevel(
-            id: 'g',
-            name: 'g',
-            slabs: [
-              StructuralSlab(id: 'sg', polygon: plate, isFloorSlab: true),
-            ],
-          ),
-          StoreyLevel(
-            id: 'f',
-            name: 'f',
-            elevation: 2.8,
-            slabs: [
-              StructuralSlab(id: 'sf', polygon: plate, isFloorSlab: true),
-              StructuralSlab(id: 'roof', polygon: plate),
-            ],
-          ),
-        ],
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: StructuralDesignerScreen(
-            document: document,
-            initialProject: saved,
-            initialCadBounds: document.bounds,
-            title: 'staircase setup',
-            bimContext: StructuralBimContext(
-              underlaysByStorey: {'g': document, 'f': document},
-              projectBounds: document.bounds,
-              cadUnitsPerMeter: 1,
-              onProjectChanged: (p) => saved = p,
-              onLayerVisibilityChanged: (_, _) {},
-              onWallsDetected: (_) {},
-              onExport: (_, _, _) async {},
-              onManageStoreys: () {},
-            ),
-          ),
+      var saved = f.building();
+      await pump(tester, saved, (p) => saved = p);
+      final l = await AppLocalizations.delegate.load(const Locale('en'));
+      await menu(tester, l.staircaseAutoGenerate);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(StaircaseSetupDialog), findsNothing);
+      expect(saved.storeys[1].slabs.single.openings, hasLength(1));
+      expect(saved.storeys.first.slabs.single.openings, isEmpty);
+      expect(saved.storeys.last.slabs.single.openings, isEmpty);
+      expect(saved.staircases, isEmpty);
+      expect(saved.storeys.every((s) => s.staircaseZones.isEmpty), isTrue);
+      await menu(tester, l.staircaseAutoGenerate);
+      expect(saved.storeys[1].slabs.single.openings, hasLength(1));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byIcon(Icons.undo_rounded),
         ),
       );
       await tester.pumpAndSettle();
+      expect(saved.storeys[1].slabs.single.openings, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'column generation accepts a manual arrival cut without a review or zones',
+    (tester) async {
+      var saved = f.building(manual: true);
+      await pump(tester, saved, (p) => saved = p);
       final l = await AppLocalizations.delegate.load(const Locale('en'));
-      Finder paint() => find.byWidgetPredicate(
-        (w) => w is CustomPaint && w.painter is Structural2dPainter,
+      await menu(tester, l.schemeGenerate);
+      expect(find.byType(StaircaseSetupDialog), findsNothing);
+      expect(find.byType(InitialSchemeDialog), findsOneWidget);
+      expect(find.text(l.staircaseAutoMissing('+2.80')), findsNothing);
+      expect(saved.storeys.first.slabs.single.openings, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'missing arrival cut has one short prompt; generate cuts it and continues columns',
+    (tester) async {
+      var saved = f.building();
+      await pump(tester, saved, (p) => saved = p);
+      final l = await AppLocalizations.delegate.load(const Locale('en'));
+      await menu(tester, l.schemeGenerate);
+      expect(find.byType(StaircaseSetupDialog), findsNothing);
+      expect(find.text(l.staircaseAutoMissing('+2.80')), findsOneWidget);
+      expect(find.text(l.staircaseAutoMissing('±0.00')), findsNothing);
+      await tester.tap(
+        find.widgetWithText(FilledButton, l.staircaseAutoGenerate),
       );
-      Structural2dPainter painter() =>
-          tester.widget<CustomPaint>(paint()).painter as Structural2dPainter;
-      Offset screen(Offset p) => tester
-          .renderObject<RenderBox>(paint())
-          .localToGlobal(painter().cadToScene(p));
-      Future<void> menu(String title) async {
-        await tester.tap(find.byIcon(Icons.more_vert_rounded));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text(title).last);
-        await tester.pumpAndSettle();
-      }
-
-      Future<void> polygon(List<Offset> points, {bool isZone = false}) async {
-        for (final p in points) {
-          final gesture = await tester.startGesture(
-            screen(p),
-            kind: PointerDeviceKind.mouse,
-          );
-          await gesture.up();
-          await tester.pumpAndSettle();
-        }
-        await tester.tap(
-          find.text(
-            isZone
-                ? l.staircaseCloseZone(points.length)
-                : l.closeOpening(points.length),
-          ),
-        );
-        await tester.pumpAndSettle();
-      }
-
-      await menu(l.schemeGenerate);
-      expect(find.byType(StaircaseSetupDialog), findsOneWidget);
-      expect(saved.storeys.every((s) => s.columns.isEmpty), isTrue);
-      await tester.tap(find.text(l.staircaseAdd));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(l.staircaseDrawZone).first);
-      await tester.pumpAndSettle();
-      expect(painter().currentStorey.id, 'g');
-      expect(find.text(l.staircaseZoneHint), findsWidgets);
-      await polygon(zone, isZone: true);
-      expect(saved.staircases, hasLength(1));
-      final id = saved.staircases.single.id;
-      expect(saved.storeys.first.staircaseZones[id], zone);
+      expect(saved.storeys[1].slabs.single.openings, hasLength(1));
       expect(saved.storeys.first.slabs.single.openings, isEmpty);
-      await menu(l.staircaseSetupTitle);
-      await tester.tap(find.text(l.staircaseDrawOpening));
+      expect(find.byType(InitialSchemeDialog), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'stair preset offers a direct automatic button without a setup dialog',
+    (tester) async {
+      var saved = f.building();
+      await pump(tester, saved, (p) => saved = p);
+      final l = await AppLocalizations.delegate.load(const Locale('en'));
+      await tester.ensureVisible(find.text(l.toolOpening));
+      await tester.tap(find.text(l.toolOpening));
       await tester.pumpAndSettle();
-      expect(painter().currentStorey.id, 'f');
-      await polygon(cut);
-      expect(saved.storeys.last.slabs.first.openings.single, cut);
-      expect(saved.storeys.last.slabs.last.openings, isEmpty);
-      expect(saved.storeys.first.slabs.single.openings, isEmpty);
-      await menu(l.staircaseSetupTitle);
-      await tester.tap(find.text(l.staircaseDrawZone).last);
+      await tester.ensureVisible(find.text(l.stairsOpeningLabel));
+      await tester.tap(find.text(l.stairsOpeningLabel));
       await tester.pumpAndSettle();
-      await polygon(zone, isZone: true);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('auto-staircase-openings')),
+      );
+      await tester.tap(find.byKey(const ValueKey('auto-staircase-openings')));
+      await tester.pumpAndSettle();
+      expect(saved.storeys[1].slabs.single.openings, hasLength(1));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'an unresolved cut opens manual drawing on the arrival level, not the first slab',
+    (tester) async {
+      var saved = f.building();
+      final docs = f.drawings();
+      docs['f'] = geometry.doc(geometry.run());
+      await pump(tester, saved, (p) => saved = p, source: docs);
+      final l = await AppLocalizations.delegate.load(const Locale('en'));
+      await menu(tester, l.schemeGenerate);
+      await tester.tap(
+        find.widgetWithText(FilledButton, l.staircaseAutoGenerate),
+      );
+      await tester.pumpAndSettle();
+      expect(saved.activeStorey.id, 'f');
       expect(
-        StaircaseInventory.evaluate(saved, 1, requireReview: true).ready,
+        saved.storeys.every((s) => s.slabs.every((p) => p.openings.isEmpty)),
         isTrue,
       );
-      expect(saved.storeys.last.slabs.first.openings.single, cut);
+      final paint = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is Structural2dPainter,
+      );
+      expect(
+        (tester.widget<CustomPaint>(paint).painter as Structural2dPainter)
+            .activeTool,
+        StructuralDrawTool.slabOpening,
+      );
+      expect(find.byType(StaircaseSetupDialog), findsNothing);
+      expect(find.text(l.staircaseAutoNotFound), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'Bulgarian mobile stair button cuts immediately and fits the dock',
+    (tester) async {
+      var saved = f.building();
+      await pump(
+        tester,
+        saved,
+        (p) => saved = p,
+        lang: 'bg',
+        viewport: const Size(360, 800),
+      );
+      final l = await AppLocalizations.delegate.load(const Locale('bg'));
+      await tester.ensureVisible(find.text(l.toolOpening));
+      await tester.tap(find.text(l.toolOpening));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(l.stairsOpeningLabel));
+      await tester.tap(find.text(l.stairsOpeningLabel));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('auto-staircase-openings')),
+      );
+      await tester.tap(find.byKey(const ValueKey('auto-staircase-openings')));
+      await tester.pumpAndSettle();
+      expect(saved.storeys[1].slabs.single.openings, hasLength(1));
+      expect(find.byType(AlertDialog), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

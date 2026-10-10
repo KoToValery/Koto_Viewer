@@ -441,7 +441,7 @@ class InitialSchemeGenerator {
     InitialSchemeOptions options = const InitialSchemeOptions(),
     int variant = 0,
   }) {
-    if (!StaircaseInventory.evaluate(sourceProject ?? project, scale).ready ||
+    if (!StaircaseInventory.evaluateOpenings(sourceProject ?? project, scale).ready ||
         !scale.isFinite ||
         scale <= 0 ||
         !options.valid ||

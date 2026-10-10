@@ -145,6 +145,10 @@ class DxfPainter extends CustomPainter {
   final Rect? visibleCadRect;
   final bool Function(DxfEntity entity)? entityFilter;
   final int revision;
+  /// Optional presentation overrides; source geometry and layer styles stay intact.
+  final Color? drawingColorOverride;
+  /// Stroke width in screen pixels, independent of CAD lineweights and zoom.
+  final double? drawingStrokeWidthOverride;
 
   DxfPainter({
     required this.document,
@@ -160,6 +164,8 @@ class DxfPainter extends CustomPainter {
     this.visibleCadRect,
     this.entityFilter,
     this.revision = 0,
+    this.drawingColorOverride,
+    this.drawingStrokeWidthOverride,
   });
 
   @override
@@ -293,7 +299,7 @@ class DxfPainter extends CustomPainter {
             final layer = document.layers[mEntity.layer];
             if (layer != null && (!layer.isVisible || layer.isFrozen)) continue;
 
-            final color = DxfColorTable.resolveColor(
+            final color = drawingColorOverride ?? DxfColorTable.resolveColor(
               colorIndex: mEntity.colorIndex,
               trueColor: mEntity.trueColor,
               layerColor: layer != null
@@ -390,7 +396,7 @@ class DxfPainter extends CustomPainter {
         }
 
         final bool isDarkForEntity = isPaperSpaceMode ? false : theme.isDark;
-        final color = DxfColorTable.resolveColor(
+        final color = drawingColorOverride ?? DxfColorTable.resolveColor(
           colorIndex: entity.colorIndex,
           trueColor: entity.trueColor,
           layerColor: layer != null
@@ -682,6 +688,10 @@ class DxfPainter extends CustomPainter {
 
   double _calcStrokeWidth(double? lineWeight, {DxfLayer? layer, bool isThick = false}) {
     final scale = currentScale.clamp(0.001, 10000.0);
+
+    if (drawingStrokeWidthOverride != null) {
+      return drawingStrokeWidthOverride! / scale;
+    }
 
     // Determine effective lineweight in millimeters:
     // 1. User custom layer override (0.12, 0.25, 0.35, 0.70 mm)
@@ -2201,7 +2211,7 @@ class DxfPainter extends CustomPainter {
             final effectiveTrueColor = subpath.trueColor ?? insert.trueColor;
             final effectiveLineWeight = subpath.lineWeight ?? insert.lineWeight;
 
-            final childColor = DxfColorTable.resolveColor(
+            final childColor = drawingColorOverride ?? DxfColorTable.resolveColor(
               colorIndex: effectiveColorIndex,
               trueColor: effectiveTrueColor,
               layerColor: childLayer != null
@@ -2246,7 +2256,7 @@ class DxfPainter extends CustomPainter {
             final childLayer = layers[child.layer];
             if (childLayer != null && (!childLayer.isVisible || childLayer.isFrozen)) continue;
 
-            final childColor = DxfColorTable.resolveColor(
+            final childColor = drawingColorOverride ?? DxfColorTable.resolveColor(
               colorIndex: child.colorIndex ?? insert.colorIndex,
               trueColor: child.trueColor ?? insert.trueColor,
               layerColor: childLayer != null
@@ -2349,7 +2359,7 @@ class DxfPainter extends CustomPainter {
           entityPaint = paint;
         } else {
           final entityLayer = layers[entityToDraw.layer];
-          final textColor = DxfColorTable.resolveColor(
+          final textColor = drawingColorOverride ?? DxfColorTable.resolveColor(
             colorIndex: entityToDraw.colorIndex,
             trueColor: entityToDraw.trueColor,
             layerColor: entityLayer != null
@@ -3703,6 +3713,10 @@ class DxfPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant DxfPainter oldDelegate) {
+    if (oldDelegate.drawingColorOverride != drawingColorOverride ||
+        oldDelegate.drawingStrokeWidthOverride != drawingStrokeWidthOverride) {
+      return true;
+    }
     if (debugLogRepaintReasons) {
       if (oldDelegate.document != document) {
         debugPrint('[DxfPainter.shouldRepaint] Reason: document changed');

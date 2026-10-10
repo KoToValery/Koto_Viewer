@@ -264,8 +264,19 @@ void main() {
       expect(painter().floorSlabStorey!.slabs.single.openings, [opening]);
       expect(
         find.byKey(const ValueKey('bim-floor-slab-reference')),
-        findsOneWidget,
+        findsNothing,
       );
+      await tester.tap(
+        find.descendant(of: find.byType(AppBar), matching: find.text('+2.80')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(StoreyManagerSheet),
+          matching: find.text('±0.00'),
+        ),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('bim-edit-floor-slab')));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -319,7 +330,7 @@ void main() {
       expect(painter().ghostStorey!.id, 's0');
       expect(
         find.byKey(const ValueKey('bim-floor-slab-reference')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.text(l.traceReferenceLayer(saved.storeys.first.name)),
