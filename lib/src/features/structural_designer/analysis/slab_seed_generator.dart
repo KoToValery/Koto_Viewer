@@ -29,12 +29,13 @@ class SlabSeedGenerator {
         unitsPerMeter <= 0) {
       return [];
     }
-    // An already-open legacy project may still have an empty v4 envelope.
-    // Rebuild from original underlay geometry in its current project coordinates;
+    // An already-open legacy project may retain a partial envelope leaking
+    // through a short door jamb. Rebuild old envelopes, including nonempty ones,
+    // from original geometry in its current project coordinates;
     // exclude generated branches so they cannot vote twice in wall detection.
     final cached = metadata['slabEnvelope'] as Map?;
-    if ((cached?['contours'] as List? ?? []).isEmpty &&
-        ((cached?['version'] as num?)?.toInt() ?? 0) < 5) {
+    if (((cached?['version'] as num?)?.toInt() ?? 0) <
+        SlabEnvelopeResult.version) {
       final original = StructuralUnderlaySource.original(
         document,
         metadata: metadata,

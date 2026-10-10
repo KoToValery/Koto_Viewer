@@ -14,6 +14,7 @@ import 'geometric_window_detector.dart';
 /// Conservative preview only: enclosed free space is not proof of a slab.
 /// Coordinates remain in source CAD units, before project alignment.
 class SlabEnvelopeResult {
+  static const version = 6;
   final List<List<Offset>> contours;
   final List<String> diagnostics;
   final double cellSize;
@@ -32,7 +33,7 @@ class SlabEnvelopeResult {
   });
 
   Map<String, dynamic> toJson() => {
-    'version': 5,
+    'version': version,
     'status': contours.isEmpty ? 'unresolved' : 'needsReview',
     'coordinateSpace': 'sourceCad',
     'cellSize': cellSize,
@@ -91,6 +92,7 @@ class SlabEnvelopeDetector {
     final partition = SlabWallRegions.build(
       pairs,
       scale,
+      targetThicknessMm: walls.targetThicknessMm,
       windowOpenings: windowOpenings,
       openingEvidence: document == null
           ? const []

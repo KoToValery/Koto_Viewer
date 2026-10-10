@@ -104,7 +104,7 @@ void main() {
     expect(result.assumedGaps, hasLength(1));
     expect(result.regionReports.single['baselineContours'], isEmpty);
     expect(result.regionReports.single['usesAssumedGaps'], isTrue);
-    expect(result.toJson()['version'], 5);
+    expect(result.toJson()['version'], SlabEnvelopeResult.version);
     expect(result.assumedGaps.single.toJson()['confirmedOpening'], isFalse);
   });
   test('wide opening stays unresolved', () {

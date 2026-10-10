@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../structural_designer/analysis/slab_seed_generator.dart';
+import '../../structural_designer/analysis/slab_envelope_detector.dart';
 import '../../structural_designer/analysis/slab_topology_analyzer.dart';
 import '../../structural_designer/models/slab_topology.dart';
 import '../../structural_designer/models/structural_element.dart';
@@ -60,6 +61,7 @@ class BimStructuralSeedSync {
           : null;
       final old = source.processing['structuralSeeds'] as Map?;
       final key = jsonEncode([
+        SlabEnvelopeResult.version,
         source.underlayFileName,
         source.processing['fingerprint'],
         meta['sourceToProject'],
