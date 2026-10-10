@@ -3384,4 +3384,187 @@ class AppLocalizationsBg extends AppLocalizations {
   String staircaseArms(int count) {
     return '$count рамена';
   }
+
+  @override
+  String get architectStudio => 'Architect Studio';
+
+  @override
+  String get architectStudioSubtitle => '3D Идеен проект, стени, врати и етажи';
+
+  @override
+  String get architectNewProject => 'Нов архитектурен проект';
+
+  @override
+  String get architectProjectName => 'Име на проект';
+
+  @override
+  String get architectProjectNameHint => 'напр. Вила Алфа';
+
+  @override
+  String get architectUnits => 'Мерни единици';
+
+  @override
+  String get architectUnitMeters => 'Метри (m)';
+
+  @override
+  String get architectUnitCm => 'Сантиметри (cm)';
+
+  @override
+  String get architectStoreys => 'Етажност';
+
+  @override
+  String get architectStoreyCount => 'Брой етажи';
+
+  @override
+  String get architectStoreyHeight => 'Етажна височина (m)';
+
+  @override
+  String get architectGroundHeight => 'Височина на партер (m)';
+
+  @override
+  String get architectDynamicGridAxes => 'Динамични координатни оси';
+
+  @override
+  String get architectGridAxesX => 'Оси по X';
+
+  @override
+  String get architectGridAxesY => 'Оси по Y';
+
+  @override
+  String get architectGridSpacingX => 'Разстояние X (m)';
+
+  @override
+  String get architectGridSpacingY => 'Разстояние Y (m)';
+
+  @override
+  String get architectToolSelect => 'Избор';
+
+  @override
+  String get architectToolWall => 'Стена';
+
+  @override
+  String get architectToolDoor => 'Врата';
+
+  @override
+  String get architectToolMeasure => 'Измерване';
+
+  @override
+  String get architectWallThickness => 'Дебелина';
+
+  @override
+  String get architectWallSingle => 'Единична стена';
+
+  @override
+  String get architectWallChained => 'Верижна стена';
+
+  @override
+  String get architectFinishChained => 'Край на стената';
+
+  @override
+  String get architectDoorWidth => 'Широчина на врата';
+
+  @override
+  String get architectDoorHeight => 'Височина на врата';
+
+  @override
+  String get architectDoorSill => 'Праг (h)';
+
+  @override
+  String get architectDoorHingeLeft => 'Лява панта';
+
+  @override
+  String get architectDoorHingeRight => 'Дясна панта';
+
+  @override
+  String get architectDoorSwingIn => 'Навътре';
+
+  @override
+  String get architectDoorSwingOut => 'Навън';
+
+  @override
+  String get architectDoorSelectWallPrompt =>
+      'Докоснете стена, за да поставите вратата';
+
+  @override
+  String get architectWallDrawPrompt =>
+      'Докоснете за начало, докоснете отново за край на стената';
+
+  @override
+  String get architectView2D => '2D План';
+
+  @override
+  String get architectView3D => '3D Модел';
+
+  @override
+  String get architectResetView => 'Центрирай';
+
+  @override
+  String get architectCreateProject => 'Създай проект';
+
+  @override
+  String get architectToolZone => 'Зони';
+
+  @override
+  String get architectZoneDragPrompt => 'Изтеглете с влачене за нова зона';
+
+  @override
+  String architectZoneCreated(String name, String area) {
+    return 'Зона $name ($area m²) създадена';
+  }
+
+  @override
+  String get architectZoneDeleted => 'Зоната е изтрита';
+
+  @override
+  String get architectZoneMerged => 'Точките са обединени';
+
+  @override
+  String get architectZoneProperties => 'Свойства на зоната';
+
+  @override
+  String get architectZoneName => 'Име на помещение';
+
+  @override
+  String get architectZoneAreaLabel => 'Площ';
+
+  @override
+  String get architectZonePerimeterLabel => 'Периметър';
+
+  @override
+  String get architectDeleteZone => 'Изтрий зона';
+
+  @override
+  String get staircaseAutoGenerate => 'Генерирай отвори за стълби';
+
+  @override
+  String staircaseAutoAdded(int count) {
+    return 'Добавени отвори за стълби: $count';
+  }
+
+  @override
+  String get staircaseAutoExisting => 'Отворите за стълби вече са поставени.';
+
+  @override
+  String get staircaseAutoNotFound =>
+      'Не е открит отвор. Очертай го с инструмента „Стълбище“.';
+
+  @override
+  String staircaseAutoMissing(String levels) {
+    return 'Липсва отвор за стълби на кота $levels.';
+  }
+
+  @override
+  String get bimToolGroupUnderlay => 'Подложка';
+
+  @override
+  String get bimToolGroupStructure => 'Конструкция';
+
+  @override
+  String get bimToolGroupChecks => 'Проверки';
+
+  @override
+  String get bimGenerateSupportsAction => 'Генерирай колони и шайби';
+
+  @override
+  String get bimSupportSpacingAction => 'Разстояния';
 }

@@ -1055,5 +1055,83 @@
   "@staircaseCloseZone": {"placeholders": {"count": {"type": "int"}}},
   "staircaseUseOpening": "Прегледай контура на отвора",
   "staircaseArms": "{count} рамена",
-  "@staircaseArms": {"placeholders": {"count": {"type": "int"}}}
+  "@staircaseArms": {"placeholders": {"count": {"type": "int"}}},
+  "architectStudio": "Architect Studio",
+  "architectStudioSubtitle": "3D Идеен проект, стени, врати и етажи",
+  "architectNewProject": "Нов архитектурен проект",
+  "architectProjectName": "Име на проект",
+  "architectProjectNameHint": "напр. Вила Алфа",
+  "architectUnits": "Мерни единици",
+  "architectUnitMeters": "Метри (m)",
+  "architectUnitCm": "Сантиметри (cm)",
+  "architectStoreys": "Етажност",
+  "architectStoreyCount": "Брой етажи",
+  "architectStoreyHeight": "Етажна височина (m)",
+  "architectGroundHeight": "Височина на партер (m)",
+  "architectDynamicGridAxes": "Динамични координатни оси",
+  "architectGridAxesX": "Оси по X",
+  "architectGridAxesY": "Оси по Y",
+  "architectGridSpacingX": "Разстояние X (m)",
+  "architectGridSpacingY": "Разстояние Y (m)",
+  "architectToolSelect": "Избор",
+  "architectToolWall": "Стена",
+  "architectToolDoor": "Врата",
+  "architectToolMeasure": "Измерване",
+  "architectWallThickness": "Дебелина",
+  "architectWallSingle": "Единична стена",
+  "architectWallChained": "Верижна стена",
+  "architectFinishChained": "Край на стената",
+  "architectDoorWidth": "Широчина на врата",
+  "architectDoorHeight": "Височина на врата",
+  "architectDoorSill": "Праг (h)",
+  "architectDoorHingeLeft": "Лява панта",
+  "architectDoorHingeRight": "Дясна панта",
+  "architectDoorSwingIn": "Навътре",
+  "architectDoorSwingOut": "Навън",
+  "architectDoorSelectWallPrompt": "Докоснете стена, за да поставите вратата",
+  "architectWallDrawPrompt": "Докоснете за начало, докоснете отново за край на стената",
+  "architectView2D": "2D План",
+  "architectView3D": "3D Модел",
+  "architectResetView": "Центрирай",
+  "architectCreateProject": "Създай проект",
+  "architectToolZone": "Зони",
+  "architectZoneDragPrompt": "Изтеглете с влачене за нова зона",
+  "architectZoneCreated": "Зона {name} ({area} m²) създадена",
+  "@architectZoneCreated": {
+    "placeholders": {
+      "name": { "type": "String" },
+      "area": { "type": "String" }
+    }
+  },
+  "architectZoneDeleted": "Зоната е изтрита",
+  "architectZoneMerged": "Точките са обединени",
+  "architectZoneProperties": "Свойства на зоната",
+  "architectZoneName": "Име на помещение",
+  "architectZoneAreaLabel": "Площ",
+  "architectZonePerimeterLabel": "Периметър",
+  "architectDeleteZone": "Изтрий зона",
+  "staircaseAutoGenerate": "Генерирай отвори за стълби",
+  "staircaseAutoAdded": "Добавени отвори за стълби: {count}",
+  "@staircaseAutoAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "staircaseAutoExisting": "Отворите за стълби вече са поставени.",
+  "staircaseAutoNotFound": "Не е открит отвор. Очертай го с инструмента „Стълбище“.",
+  "staircaseAutoMissing": "Липсва отвор за стълби на кота {levels}.",
+  "@staircaseAutoMissing": {
+    "placeholders": {
+      "levels": {
+        "type": "String"
+      }
+    }
+  },
+  "bimToolGroupUnderlay": "Подложка",
+  "bimToolGroupStructure": "Конструкция",
+  "bimToolGroupChecks": "Проверки",
+  "bimGenerateSupportsAction": "Генерирай колони и шайби",
+  "bimSupportSpacingAction": "Разстояния"
 }

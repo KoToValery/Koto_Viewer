@@ -3370,4 +3370,186 @@ class AppLocalizationsEn extends AppLocalizations {
   String staircaseArms(int count) {
     return '$count flights';
   }
+
+  @override
+  String get architectStudio => 'Architect Studio';
+
+  @override
+  String get architectStudioSubtitle =>
+      '3D Conceptual design, walls, doors & storeys';
+
+  @override
+  String get architectNewProject => 'New Architectural Project';
+
+  @override
+  String get architectProjectName => 'Project Name';
+
+  @override
+  String get architectProjectNameHint => 'e.g. Modern Villa Alpha';
+
+  @override
+  String get architectUnits => 'Units';
+
+  @override
+  String get architectUnitMeters => 'Meters (m)';
+
+  @override
+  String get architectUnitCm => 'Centimeters (cm)';
+
+  @override
+  String get architectStoreys => 'Storeys';
+
+  @override
+  String get architectStoreyCount => 'Number of Storeys';
+
+  @override
+  String get architectStoreyHeight => 'Typical Floor Height (m)';
+
+  @override
+  String get architectGroundHeight => 'Ground Floor Height (m)';
+
+  @override
+  String get architectDynamicGridAxes => 'Dynamic Grid Axes';
+
+  @override
+  String get architectGridAxesX => 'Axes on X';
+
+  @override
+  String get architectGridAxesY => 'Axes on Y';
+
+  @override
+  String get architectGridSpacingX => 'Spacing X (m)';
+
+  @override
+  String get architectGridSpacingY => 'Spacing Y (m)';
+
+  @override
+  String get architectToolSelect => 'Select';
+
+  @override
+  String get architectToolWall => 'Wall';
+
+  @override
+  String get architectToolDoor => 'Door';
+
+  @override
+  String get architectToolMeasure => 'Measure';
+
+  @override
+  String get architectWallThickness => 'Thickness';
+
+  @override
+  String get architectWallSingle => 'Single Wall';
+
+  @override
+  String get architectWallChained => 'Chained Wall';
+
+  @override
+  String get architectFinishChained => 'Finish Wall';
+
+  @override
+  String get architectDoorWidth => 'Door Width';
+
+  @override
+  String get architectDoorHeight => 'Door Height';
+
+  @override
+  String get architectDoorSill => 'Sill (hp)';
+
+  @override
+  String get architectDoorHingeLeft => 'Hinge Left';
+
+  @override
+  String get architectDoorHingeRight => 'Hinge Right';
+
+  @override
+  String get architectDoorSwingIn => 'Swing Inward';
+
+  @override
+  String get architectDoorSwingOut => 'Swing Outward';
+
+  @override
+  String get architectDoorSelectWallPrompt => 'Tap on a wall to place door';
+
+  @override
+  String get architectWallDrawPrompt => 'Tap to start wall, tap again to place';
+
+  @override
+  String get architectView2D => '2D Plan';
+
+  @override
+  String get architectView3D => '3D Model';
+
+  @override
+  String get architectResetView => 'Reset View';
+
+  @override
+  String get architectCreateProject => 'Create Project';
+
+  @override
+  String get architectToolZone => 'Zones';
+
+  @override
+  String get architectZoneDragPrompt => 'Drag to draw room zone';
+
+  @override
+  String architectZoneCreated(String name, String area) {
+    return 'Zone $name ($area m²) created';
+  }
+
+  @override
+  String get architectZoneDeleted => 'Zone deleted';
+
+  @override
+  String get architectZoneMerged => 'Corners merged';
+
+  @override
+  String get architectZoneProperties => 'Zone Properties';
+
+  @override
+  String get architectZoneName => 'Room Name';
+
+  @override
+  String get architectZoneAreaLabel => 'Area';
+
+  @override
+  String get architectZonePerimeterLabel => 'Perimeter';
+
+  @override
+  String get architectDeleteZone => 'Delete Zone';
+
+  @override
+  String get staircaseAutoGenerate => 'Generate stair openings';
+
+  @override
+  String staircaseAutoAdded(int count) {
+    return 'Stair openings added: $count';
+  }
+
+  @override
+  String get staircaseAutoExisting => 'The stair openings are already placed.';
+
+  @override
+  String get staircaseAutoNotFound =>
+      'No opening was found. Draw it with the Staircase tool.';
+
+  @override
+  String staircaseAutoMissing(String levels) {
+    return 'Missing stair opening at $levels.';
+  }
+
+  @override
+  String get bimToolGroupUnderlay => 'Underlay';
+
+  @override
+  String get bimToolGroupStructure => 'Structure';
+
+  @override
+  String get bimToolGroupChecks => 'Checks';
+
+  @override
+  String get bimGenerateSupportsAction => 'Generate columns and walls';
+
+  @override
+  String get bimSupportSpacingAction => 'Spacing';
 }

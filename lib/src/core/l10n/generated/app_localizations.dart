@@ -5782,6 +5782,354 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} flights'**
   String staircaseArms(int count);
+
+  /// Title for standalone Architect Studio module
+  ///
+  /// In en, this message translates to:
+  /// **'Architect Studio'**
+  String get architectStudio;
+
+  /// Subtitle for Architect Studio hero card
+  ///
+  /// In en, this message translates to:
+  /// **'3D Conceptual design, walls, doors & storeys'**
+  String get architectStudioSubtitle;
+
+  /// Title for new project dialog
+  ///
+  /// In en, this message translates to:
+  /// **'New Architectural Project'**
+  String get architectNewProject;
+
+  /// Label for project name field
+  ///
+  /// In en, this message translates to:
+  /// **'Project Name'**
+  String get architectProjectName;
+
+  /// Hint for project name field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Modern Villa Alpha'**
+  String get architectProjectNameHint;
+
+  /// Label for units selector
+  ///
+  /// In en, this message translates to:
+  /// **'Units'**
+  String get architectUnits;
+
+  /// Meters unit
+  ///
+  /// In en, this message translates to:
+  /// **'Meters (m)'**
+  String get architectUnitMeters;
+
+  /// Centimeters unit
+  ///
+  /// In en, this message translates to:
+  /// **'Centimeters (cm)'**
+  String get architectUnitCm;
+
+  /// Storeys section title
+  ///
+  /// In en, this message translates to:
+  /// **'Storeys'**
+  String get architectStoreys;
+
+  /// Number of storeys field label
+  ///
+  /// In en, this message translates to:
+  /// **'Number of Storeys'**
+  String get architectStoreyCount;
+
+  /// Floor height field label
+  ///
+  /// In en, this message translates to:
+  /// **'Typical Floor Height (m)'**
+  String get architectStoreyHeight;
+
+  /// Ground floor height field label
+  ///
+  /// In en, this message translates to:
+  /// **'Ground Floor Height (m)'**
+  String get architectGroundHeight;
+
+  /// Title for grid axes option
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic Grid Axes'**
+  String get architectDynamicGridAxes;
+
+  /// Count of grid axes on X
+  ///
+  /// In en, this message translates to:
+  /// **'Axes on X'**
+  String get architectGridAxesX;
+
+  /// Count of grid axes on Y
+  ///
+  /// In en, this message translates to:
+  /// **'Axes on Y'**
+  String get architectGridAxesY;
+
+  /// Spacing between X axes
+  ///
+  /// In en, this message translates to:
+  /// **'Spacing X (m)'**
+  String get architectGridSpacingX;
+
+  /// Spacing between Y axes
+  ///
+  /// In en, this message translates to:
+  /// **'Spacing Y (m)'**
+  String get architectGridSpacingY;
+
+  /// Selection tool
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get architectToolSelect;
+
+  /// Wall tool
+  ///
+  /// In en, this message translates to:
+  /// **'Wall'**
+  String get architectToolWall;
+
+  /// Door tool
+  ///
+  /// In en, this message translates to:
+  /// **'Door'**
+  String get architectToolDoor;
+
+  /// Measure tool
+  ///
+  /// In en, this message translates to:
+  /// **'Measure'**
+  String get architectToolMeasure;
+
+  /// Wall thickness label
+  ///
+  /// In en, this message translates to:
+  /// **'Thickness'**
+  String get architectWallThickness;
+
+  /// Single wall mode
+  ///
+  /// In en, this message translates to:
+  /// **'Single Wall'**
+  String get architectWallSingle;
+
+  /// Chained wall mode
+  ///
+  /// In en, this message translates to:
+  /// **'Chained Wall'**
+  String get architectWallChained;
+
+  /// Button to finish chained wall
+  ///
+  /// In en, this message translates to:
+  /// **'Finish Wall'**
+  String get architectFinishChained;
+
+  /// Door width label
+  ///
+  /// In en, this message translates to:
+  /// **'Door Width'**
+  String get architectDoorWidth;
+
+  /// Door height label
+  ///
+  /// In en, this message translates to:
+  /// **'Door Height'**
+  String get architectDoorHeight;
+
+  /// Door sill height label
+  ///
+  /// In en, this message translates to:
+  /// **'Sill (hp)'**
+  String get architectDoorSill;
+
+  /// Left hinge side
+  ///
+  /// In en, this message translates to:
+  /// **'Hinge Left'**
+  String get architectDoorHingeLeft;
+
+  /// Right hinge side
+  ///
+  /// In en, this message translates to:
+  /// **'Hinge Right'**
+  String get architectDoorHingeRight;
+
+  /// Inward swing direction
+  ///
+  /// In en, this message translates to:
+  /// **'Swing Inward'**
+  String get architectDoorSwingIn;
+
+  /// Outward swing direction
+  ///
+  /// In en, this message translates to:
+  /// **'Swing Outward'**
+  String get architectDoorSwingOut;
+
+  /// Guidance prompt when door tool is active
+  ///
+  /// In en, this message translates to:
+  /// **'Tap on a wall to place door'**
+  String get architectDoorSelectWallPrompt;
+
+  /// Guidance prompt when wall tool is active
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to start wall, tap again to place'**
+  String get architectWallDrawPrompt;
+
+  /// 2D floor plan view toggle
+  ///
+  /// In en, this message translates to:
+  /// **'2D Plan'**
+  String get architectView2D;
+
+  /// 3D viewport toggle
+  ///
+  /// In en, this message translates to:
+  /// **'3D Model'**
+  String get architectView3D;
+
+  /// Reset camera view action
+  ///
+  /// In en, this message translates to:
+  /// **'Reset View'**
+  String get architectResetView;
+
+  /// Button to create architectural project
+  ///
+  /// In en, this message translates to:
+  /// **'Create Project'**
+  String get architectCreateProject;
+
+  /// Functional zones tool
+  ///
+  /// In en, this message translates to:
+  /// **'Zones'**
+  String get architectToolZone;
+
+  /// Guidance prompt when zone tool is active
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to draw room zone'**
+  String get architectZoneDragPrompt;
+
+  /// Notification when a zone is created
+  ///
+  /// In en, this message translates to:
+  /// **'Zone {name} ({area} m²) created'**
+  String architectZoneCreated(String name, String area);
+
+  /// Notification when a zone is deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Zone deleted'**
+  String get architectZoneDeleted;
+
+  /// Notification when zone vertices are merged
+  ///
+  /// In en, this message translates to:
+  /// **'Corners merged'**
+  String get architectZoneMerged;
+
+  /// Title for zone properties sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Zone Properties'**
+  String get architectZoneProperties;
+
+  /// Room name label
+  ///
+  /// In en, this message translates to:
+  /// **'Room Name'**
+  String get architectZoneName;
+
+  /// Room area label
+  ///
+  /// In en, this message translates to:
+  /// **'Area'**
+  String get architectZoneAreaLabel;
+
+  /// Room perimeter label
+  ///
+  /// In en, this message translates to:
+  /// **'Perimeter'**
+  String get architectZonePerimeterLabel;
+
+  /// Button to delete selected zone
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Zone'**
+  String get architectDeleteZone;
+
+  /// No description provided for @staircaseAutoGenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate stair openings'**
+  String get staircaseAutoGenerate;
+
+  /// No description provided for @staircaseAutoAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Stair openings added: {count}'**
+  String staircaseAutoAdded(int count);
+
+  /// No description provided for @staircaseAutoExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'The stair openings are already placed.'**
+  String get staircaseAutoExisting;
+
+  /// No description provided for @staircaseAutoNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No opening was found. Draw it with the Staircase tool.'**
+  String get staircaseAutoNotFound;
+
+  /// No description provided for @staircaseAutoMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing stair opening at {levels}.'**
+  String staircaseAutoMissing(String levels);
+
+  /// No description provided for @bimToolGroupUnderlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Underlay'**
+  String get bimToolGroupUnderlay;
+
+  /// No description provided for @bimToolGroupStructure.
+  ///
+  /// In en, this message translates to:
+  /// **'Structure'**
+  String get bimToolGroupStructure;
+
+  /// No description provided for @bimToolGroupChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks'**
+  String get bimToolGroupChecks;
+
+  /// No description provided for @bimGenerateSupportsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate columns and walls'**
+  String get bimGenerateSupportsAction;
+
+  /// No description provided for @bimSupportSpacingAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Spacing'**
+  String get bimSupportSpacingAction;
 }
 
 class _AppLocalizationsDelegate
