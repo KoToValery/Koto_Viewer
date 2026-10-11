@@ -1,5 +1,6 @@
 // === SECTION: ARCHITECTURAL TOOL PALETTE BAR ===
 import 'package:flutter/material.dart';
+import 'architect_wall_type_label.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
@@ -306,8 +307,9 @@ class ArchitectToolPalette extends StatelessWidget {
                   label,
                   style: TextStyle(
                     color: isSelected ? Colors.white : Colors.white70,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     fontSize: 12.5,
                   ),
                 ),
@@ -347,8 +349,9 @@ class ArchitectToolPalette extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                   ),
-                  label: Text(wt.name),
-                  selected: activeWallType?.id == wt.id ||
+                  label: Text(wt.compactLabel(l10n)),
+                  selected:
+                      activeWallType?.id == wt.id ||
                       (activeWallType == null &&
                           (wallThickness - wt.totalThickness).abs() < 1e-3),
                   onSelected: (sel) {
@@ -397,10 +400,17 @@ class ArchitectToolPalette extends StatelessWidget {
             const SizedBox(width: 8),
             ActionChip(
               backgroundColor: const Color(0xFF00E5FF),
-              avatar: const Icon(Icons.check_rounded, size: 14, color: Colors.black),
+              avatar: const Icon(
+                Icons.check_rounded,
+                size: 14,
+                color: Colors.black,
+              ),
               label: Text(
                 l10n.architectFinishChained,
-                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               onPressed: onFinishChainedWall,
               visualDensity: VisualDensity.compact,
@@ -458,9 +468,11 @@ class ArchitectToolPalette extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           ChoiceChip(
-            label: Text(isHingeLeft
-                ? l10n.architectDoorHingeLeft
-                : l10n.architectDoorHingeRight),
+            label: Text(
+              isHingeLeft
+                  ? l10n.architectDoorHingeLeft
+                  : l10n.architectDoorHingeRight,
+            ),
             selected: true,
             onSelected: (_) => onHingeSideChanged(!isHingeLeft),
             avatar: const Icon(Icons.swap_horiz_rounded, size: 14),
@@ -597,8 +609,12 @@ class ArchitectToolPalette extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: ChoiceChip(
-                label: Text('${(sz.$1 * 100).round()}x${(sz.$2 * 100).round()} cm'),
-                selected: (beamWidth - sz.$1).abs() < 1e-3 && (beamDepth - sz.$2).abs() < 1e-3,
+                label: Text(
+                  '${(sz.$1 * 100).round()}x${(sz.$2 * 100).round()} cm',
+                ),
+                selected:
+                    (beamWidth - sz.$1).abs() < 1e-3 &&
+                    (beamDepth - sz.$2).abs() < 1e-3,
                 onSelected: (sel) {
                   if (sel) {
                     onBeamWidthChanged?.call(sz.$1);

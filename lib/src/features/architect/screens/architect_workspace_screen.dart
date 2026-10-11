@@ -164,15 +164,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _project,
     );
     if (!saved && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            Localizations.localeOf(context).languageCode == 'bg'
-                ? 'Промените не са записани. Проверете мястото за съхранение.'
-                : 'Changes could not be saved. Check storage.',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.architectSaveFailed)));
     }
   }
 
@@ -198,7 +192,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _cancelDrafting() {
     _wallInsertPointId = null;
-    _wallPrecisionMode = false;
     _interactionEpoch++;
     _cancelActiveDrags();
     _zoneTool.cancelAll();
@@ -224,7 +217,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   WallReferenceLine _wallReference = WallReferenceLine.center;
   bool _wallTouchInput = false;
   bool _wallPlacingWithHold = false;
-  bool _wallPrecisionMode = false;
+  bool _wallPrecisionMode = true;
   Offset? _wallTouchPosition;
   ArchitectWall? _wallEndpointOriginal;
   bool _wallDragStart = false;
@@ -1814,7 +1807,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         CreateArchitectWall(storeyId: _project.activeStorey.id, wall: newWall),
       );
       _wallDirectionLocked = false;
-      _wallPrecisionMode = false;
       if (continueChain == true) _wallMode = WallDraftingMode.chained;
       if (continueChain ?? (_wallMode == WallDraftingMode.chained)) {
         _draftStart = p2;
@@ -1834,7 +1826,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _finishChainedWall() {
     setState(() {
-      _wallPrecisionMode = false;
       _draftStart = null;
       _draftEnd = null;
       _wallDirectionLocked = false;
@@ -1854,13 +1845,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _commands.execute(command);
     } on ArgumentError {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            Localizations.localeOf(context).languageCode == 'bg'
-                ? 'Промяната пресича отвор или създава твърде къса стена. Изберете друга точка.'
-                : 'The edit crosses an opening or creates a wall that is too short. Choose another point.',
-          ),
-        ),
+        SnackBar(content: Text(context.l10n.architectWallEditRejected)),
       );
     }
   }
@@ -1878,7 +1863,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             length: _project.units.toUnit(length),
             unit: _project.units.symbol,
             minimumLength: _project.units.toUnit(.001),
-            isBulgarian: Localizations.localeOf(context).languageCode == 'bg',
             onLength: (value) => length = _project.units.fromUnit(value),
             onEnd: () {
               Navigator.of(dialogContext).pop();
@@ -2079,7 +2063,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Future<void> _promptAddAnnotation(Offset point) async {
     final l10n = context.l10n;
-    final controller = TextEditingController(text: 'Текст / Кота');
+    final controller = TextEditingController(
+      text: context.l10n.architectToolText,
+    );
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2437,7 +2423,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _draftStart = null;
                     _draftEnd = null;
                     _wallDirectionLocked = false;
-                    _wallPrecisionMode = false;
                     _wallInsertPointId = null;
                     _activeMagneticGuides = [];
                     _activeSnapLabel = null;
@@ -2627,11 +2612,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             color: Colors.cyanAccent,
                             size: 20,
                           ),
-                          tooltip:
-                              Localizations.localeOf(context).languageCode ==
-                                  'bg'
-                              ? 'Точна дължина'
-                              : 'Exact length',
+                          tooltip: context.l10n.architectWallLength,
                           onPressed: _editWallLength,
                         ),
                         IconButton(
@@ -2643,11 +2624,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                 : Colors.cyanAccent,
                             size: 20,
                           ),
-                          tooltip:
-                              Localizations.localeOf(context).languageCode ==
-                                  'bg'
-                              ? 'Нова точка: посочете по стената'
-                              : 'Insert point: tap the wall',
+                          tooltip: context.l10n.architectWallInsertPoint,
                           onPressed: () => setState(
                             () => _wallInsertPointId = _selectedWall!.id,
                           ),
@@ -2661,11 +2638,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                 : Colors.white54,
                             size: 20,
                           ),
-                          tooltip:
-                              Localizations.localeOf(context).languageCode ==
-                                  'bg'
-                              ? 'Успоредно изтегляне'
-                              : 'Parallel drag',
+                          tooltip: context.l10n.architectWallParallel,
                           onPressed: () => setState(
                             () => _wallParallelMove = !_wallParallelMove,
                           ),
@@ -2883,7 +2856,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               'Axis intersection' => DxfSnapType.intersection,
                               'Midpoint' => DxfSnapType.midpoint,
                               'Center' => DxfSnapType.center,
-                    _ when label.endsWith('°') => DxfSnapType.perpendicular,
+                              _ when label.endsWith('°') =>
+                                DxfSnapType.perpendicular,
                               _ => DxfSnapType.nearest,
                             };
                       return CustomPaint(
@@ -2931,15 +2905,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         _activeTool == ArchitectTool.wall &&
                                 !_wallPlacingWithHold &&
                                 !_wallDirectionLocked
-                            ? (Localizations.localeOf(context).languageCode ==
-                                      'bg'
-                                  ? 'Задръж и плъзни: точка • бързо плъзгане: местене\nРазмер: точно въвеждане • 2 пръста: zoom'
-                                  : 'Hold and drag: point • quick drag: pan\nLength: exact input • 2 fingers: zoom')
+                            ? context.l10n.architectWallDraftHint
                             : _cursorModel == null
-                            ? (Localizations.localeOf(context).languageCode ==
-                                      'bg'
-                                  ? '2 пръста: местене/мащаб • мишка: среден бутон/колело'
-                                  : '2 fingers: pan/zoom • mouse: middle button/wheel')
+                            ? context.l10n.architectNavigationHint
                             : 'X: ${_project.units.format((_columnPreviewPoint ?? _draftEnd ?? _cursorModel!).dx, decimals: 3)}  '
                                   'Y: ${_project.units.format((_columnPreviewPoint ?? _draftEnd ?? _cursorModel!).dy, decimals: 3)}',
                         style: const TextStyle(
@@ -2986,19 +2954,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               DropdownMenuItem(
                                 value: reference,
                                 child: Text(
-                                  Localizations.localeOf(
-                                            context,
-                                          ).languageCode ==
-                                          'bg'
-                                      ? switch (reference) {
-                                          WallReferenceLine.center =>
-                                            'Водеща: център',
-                                          WallReferenceLine.left =>
-                                            'Водеща: ляв край',
-                                          WallReferenceLine.right =>
-                                            'Водеща: десен край',
-                                        }
-                                      : 'Reference: ${reference.name}',
+                                  switch (reference) {
+                                    WallReferenceLine.center =>
+                                      context.l10n.architectWallReferenceCenter,
+                                    WallReferenceLine.left =>
+                                      context.l10n.architectWallReferenceLeft,
+                                    WallReferenceLine.right =>
+                                      context.l10n.architectWallReferenceRight,
+                                  },
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -3022,11 +2985,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             ? null
                             : _chooseWallDimension,
                         icon: const Icon(Icons.straighten, size: 18),
-                        label: Text(
-                          Localizations.localeOf(context).languageCode == 'bg'
-                              ? 'Размер'
-                              : 'Length',
-                        ),
+                        label: Text(context.l10n.architectWallLength),
                       ),
                       IconButton(
                         key: const ValueKey('wall-chain-toggle'),
@@ -3035,10 +2994,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           height: 40,
                         ),
                         padding: EdgeInsets.zero,
-                        tooltip:
-                            Localizations.localeOf(context).languageCode == 'bg'
-                            ? 'Свързани стени'
-                            : 'Connected walls',
+                        tooltip: context.l10n.architectWallChained,
                         onPressed: () => setState(
                           () =>
                               _wallMode = _wallMode == WallDraftingMode.chained
@@ -3061,11 +3017,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           ),
                           padding: EdgeInsets.zero,
                           key: const ValueKey('wall-stop-drawing'),
-                          tooltip:
-                              Localizations.localeOf(context).languageCode ==
-                                  'bg'
-                              ? 'Завърши чертането'
-                              : 'Stop drawing',
+                          tooltip: context.l10n.architectFinishChained,
                           onPressed: _finishChainedWall,
                           icon: const Icon(
                             Icons.close,
@@ -3116,9 +3068,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         ),
                         unit: _project.units.symbol,
                         minimumLength: _project.units.toUnit(.001),
-                        isBulgarian:
-                            Localizations.localeOf(context).languageCode ==
-                            'bg',
                         onLength: (value) {
                           if (_project.units.fromUnit(value) < .001) return;
                           final delta = _draftEnd! - _draftStart!;
@@ -3153,6 +3102,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     ],
   );
 
+  String? _localizedSnapLabel(String? label) {
+    final l10n = context.l10n;
+    return switch (label) {
+      'Endpoint' || 'Axis endpoint' => l10n.snapEndpoint,
+      'Vertex' => l10n.snapPoint,
+      'Midpoint' => l10n.snapMidpoint,
+      'Center' => l10n.snapCenter,
+      'Intersection' || 'Axis intersection' => l10n.snapIntersection,
+      'Edge' => l10n.snapNearest,
+      final String value when value.startsWith('Axis ') =>
+        '${l10n.architectToolAxis} ${value.substring(5)}',
+      _ => label,
+    };
+  }
+
   Architect2dPainter _makePainter(ArchitectPaintLayer layer) =>
       Architect2dPainter(
         project: _elementMovePreview ?? _project,
@@ -3174,7 +3138,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         activeDraftEnd: _draftEnd,
         activeWallThickness: _wallThickness,
         activeWallReference: _wallReference,
-        activeSnapLabel: _activeSnapLabel,
+        activeWallTypeId: _activeWallType?.id,
+        activeSnapLabel: _localizedSnapLabel(_activeSnapLabel),
         selectedElementId: _selectedElementId,
         selectedZoneId: _selectedZoneId,
         activeZoneCategory: _activeZoneCategory,

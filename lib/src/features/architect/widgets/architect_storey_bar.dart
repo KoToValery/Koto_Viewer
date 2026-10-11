@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/architect_project.dart';
 
-/// Horizontal storey switcher bar displaying elevation badges.
+/// One compact elevation per tab; custom names remain available in tooltips.
 class ArchitectStoreyBar extends StatelessWidget {
   final ArchitectProject project;
   final ValueChanged<String> onStoreySelected;
-
   const ArchitectStoreyBar({
     super.key,
     required this.project,
@@ -15,81 +14,47 @@ class ArchitectStoreyBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (project.storeys.isEmpty) return const SizedBox.shrink();
-
     return Container(
-      height: 42,
+      height: 36,
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E26),
         border: Border(
-          bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.08),
-          ),
+          bottom: BorderSide(color: Colors.white.withValues(alpha: .08)),
         ),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         itemCount: project.storeys.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        separatorBuilder: (_, _) => const SizedBox(width: 4),
         itemBuilder: (context, index) {
-
           final storey = project.storeys[index];
-          final isActive = storey.id == project.activeStoreyId;
-
-          return Material(
-            color: isActive
-                ? const Color(0xFF00E5FF).withValues(alpha: 0.22)
-                : const Color(0xFF282834),
-            borderRadius: BorderRadius.circular(8),
-            child: InkWell(
-              onTap: () => onStoreySelected(storey.id),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isActive
-                        ? const Color(0xFF00E5FF)
-                        : Colors.white.withValues(alpha: 0.1),
-                    width: isActive ? 1.4 : 1.0,
+          final active = storey.id == project.activeStoreyId;
+          final label = storey.elevationLabel;
+          final description = storey.name.contains(label)
+              ? storey.name
+              : '${storey.name} · $label';
+          return Tooltip(
+            message: description,
+            child: Material(
+              color: active ? const Color(0xFF00E5FF) : const Color(0xFF282834),
+              borderRadius: BorderRadius.circular(6),
+              child: InkWell(
+                onTap: () => onStoreySelected(storey.id),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      storey.name,
-                      style: TextStyle(
-                        color: isActive ? Colors.white : Colors.white70,
-                        fontWeight:
-                            isActive ? FontWeight.bold : FontWeight.w500,
-                        fontSize: 12,
-                      ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: active ? Colors.black : Colors.white70,
+                      fontSize: 12,
+                      fontWeight: active ? FontWeight.bold : FontWeight.w500,
                     ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? const Color(0xFF00E5FF)
-                            : Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        storey.elevationLabel,
-                        style: TextStyle(
-                          color: isActive ? Colors.black : Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

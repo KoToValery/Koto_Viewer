@@ -7,22 +7,43 @@ class ArchitectWallNetwork {
   static final _cache = Expando<Path>();
   static Path polygon(List<Offset> points) => Path()..addPolygon(points, true);
 
-  static Path body(List<ArchitectWall> walls) {
-    final cached = _cache[walls];
+  static (double, double) _faces(
+    ArchitectWall wall,
+    Map<String, (double, double)>? faceOffsets,
+  ) {
+    final offset =
+        wall.centerOffset.dx * wall.normalVector.dx +
+        wall.centerOffset.dy * wall.normalVector.dy;
+    return faceOffsets?[wall.id] ??
+        (offset - wall.thickness / 2, offset + wall.thickness / 2);
+  }
+
+  static Path body(
+    List<ArchitectWall> walls, {
+    Map<String, (double, double)>? faceOffsets,
+  }) {
+    final cached = faceOffsets == null ? _cache[walls] : null;
     if (cached != null) return cached;
     var result = Path();
     for (final wall in walls) {
       if (wall.length < 1e-6) continue;
+      final (low, high) = _faces(wall, faceOffsets);
+      final n = wall.normalVector;
       result = Path.combine(
         PathOperation.union,
         result,
-        polygon(wall.polygonCorners),
+        polygon([
+          wall.startPoint + n * low,
+          wall.endPoint + n * low,
+          wall.endPoint + n * high,
+          wall.startPoint + n * high,
+        ]),
       );
     }
-    for (final junction in junctions(walls)) {
+    for (final junction in junctions(walls, faceOffsets: faceOffsets)) {
       result = Path.combine(PathOperation.union, result, polygon(junction.$1));
     }
-    _cache[walls] = result;
+    if (faceOffsets == null) _cache[walls] = result;
     return result;
   }
 
@@ -31,6 +52,7 @@ class ArchitectWallNetwork {
   static List<(List<Offset>, double)> junctions(
     List<ArchitectWall> walls, {
     bool solidOnly = false,
+    Map<String, (double, double)>? faceOffsets,
   }) {
     final result = <(List<Offset>, double)>[];
     for (var i = 0; i < walls.length; i++) {
@@ -54,29 +76,44 @@ class ArchitectWallNetwork {
           continue;
         }
         final points = <Offset>[];
-        for (final sa in [-1, 1]) {
-          for (final sb in [-1, 1]) {
+        final fa = _faces(a, faceOffsets), fb = _faces(b, faceOffsets);
+        for (final sa in [fa.$1, fa.$2]) {
+          for (final sb in [fb.$1, fb.$2]) {
             final p = intersection(
-              a.centerStart + a.normalVector * (sa * a.thickness / 2),
-              a.centerEnd + a.normalVector * (sa * a.thickness / 2),
-              b.centerStart + b.normalVector * (sb * b.thickness / 2),
-              b.centerEnd + b.normalVector * (sb * b.thickness / 2),
+              a.startPoint + a.normalVector * sa,
+              a.endPoint + a.normalVector * sa,
+              b.startPoint + b.normalVector * sb,
+              b.endPoint + b.normalVector * sb,
             );
             if (p != null) points.add(p);
           }
         }
         // Bound acute mitres; avoid long spikes at nearly parallel walls.
         if (points.length != 4) continue;
+        // A layer need not contain its reference node (an edge reference may
+        // lie in the insulation). Extend its end faces to the shared mitre.
+        if (faceOffsets != null) {
+          points.addAll([
+            node + a.normalVector * fa.$1,
+            node + a.normalVector * fa.$2,
+            node + b.normalVector * fb.$1,
+            node + b.normalVector * fb.$2,
+          ]);
+          final hull = _hull(points);
+          points
+            ..clear()
+            ..addAll(hull);
+        }
         final limit = 4 * math.max(a.thickness, b.thickness);
         if (points.any((p) => (p - node).distance > limit)) {
           final bounded = points
               .where((p) => (p - node).distance <= limit)
               .toList();
           for (final w in [a, b]) {
-            final center = node + w.centerOffset;
+            final face = _faces(w, faceOffsets);
             bounded.addAll([
-              center - w.normalVector * (w.thickness / 2),
-              center + w.normalVector * (w.thickness / 2),
+              node + w.normalVector * face.$1,
+              node + w.normalVector * face.$2,
             ]);
           }
           points.clear();

@@ -5918,37 +5918,37 @@ abstract class AppLocalizations {
   /// Wall thickness label
   ///
   /// In en, this message translates to:
-  /// **'Thickness'**
+  /// **'Thk.'**
   String get architectWallThickness;
 
   /// Single wall mode
   ///
   /// In en, this message translates to:
-  /// **'Single Wall'**
+  /// **'Single'**
   String get architectWallSingle;
 
   /// Chained wall mode
   ///
   /// In en, this message translates to:
-  /// **'Chained Wall'**
+  /// **'Chain'**
   String get architectWallChained;
 
   /// Button to finish chained wall
   ///
   /// In en, this message translates to:
-  /// **'Finish Wall'**
+  /// **'End'**
   String get architectFinishChained;
 
   /// Door width label
   ///
   /// In en, this message translates to:
-  /// **'Door Width'**
+  /// **'Width'**
   String get architectDoorWidth;
 
   /// Door height label
   ///
   /// In en, this message translates to:
-  /// **'Door Height'**
+  /// **'Height'**
   String get architectDoorHeight;
 
   /// Door sill height label
@@ -5960,13 +5960,13 @@ abstract class AppLocalizations {
   /// Left hinge side
   ///
   /// In en, this message translates to:
-  /// **'Hinge Left'**
+  /// **'Left'**
   String get architectDoorHingeLeft;
 
   /// Right hinge side
   ///
   /// In en, this message translates to:
-  /// **'Hinge Right'**
+  /// **'Right'**
   String get architectDoorHingeRight;
 
   /// Inward swing direction
@@ -6032,7 +6032,7 @@ abstract class AppLocalizations {
   /// Guidance prompt when drawing point-by-point zone
   ///
   /// In en, this message translates to:
-  /// **'Click point by point to draft zone. Snap to first point to close.'**
+  /// **'Points → close'**
   String get architectZoneDrawPrompt;
 
   /// Prompt when starting zone drafting
@@ -6506,7 +6506,7 @@ abstract class AppLocalizations {
   /// Level mark tool
   ///
   /// In en, this message translates to:
-  /// **'Level Mark'**
+  /// **'Level'**
   String get architectToolLevel;
 
   /// Text annotation tool
@@ -6536,7 +6536,7 @@ abstract class AppLocalizations {
   /// Window width label
   ///
   /// In en, this message translates to:
-  /// **'Window Width'**
+  /// **'Width'**
   String get architectWindowWidth;
 
   /// Window height label
@@ -6548,7 +6548,7 @@ abstract class AppLocalizations {
   /// Window sill label
   ///
   /// In en, this message translates to:
-  /// **'Sill (hp)'**
+  /// **'Sill'**
   String get architectWindowSill;
 
   /// Column shape label
@@ -6560,7 +6560,7 @@ abstract class AppLocalizations {
   /// Rectangular column shape
   ///
   /// In en, this message translates to:
-  /// **'Rectangular'**
+  /// **'Rect.'**
   String get architectColumnRect;
 
   /// Circular column shape
@@ -6572,19 +6572,19 @@ abstract class AppLocalizations {
   /// Column size label
   ///
   /// In en, this message translates to:
-  /// **'Column Size'**
+  /// **'Size'**
   String get architectColumnSize;
 
   /// Beam size label
   ///
   /// In en, this message translates to:
-  /// **'Beam Size'**
+  /// **'Size'**
   String get architectBeamSize;
 
   /// Stair width label
   ///
   /// In en, this message translates to:
-  /// **'Flight Width'**
+  /// **'Width'**
   String get architectStairWidth;
 
   /// Stair steps label
@@ -6596,7 +6596,7 @@ abstract class AppLocalizations {
   /// Opening type label
   ///
   /// In en, this message translates to:
-  /// **'Opening Type'**
+  /// **'Type'**
   String get architectOpeningType;
 
   /// Shaft opening type
@@ -6608,7 +6608,7 @@ abstract class AppLocalizations {
   /// Slab void opening type
   ///
   /// In en, this message translates to:
-  /// **'Slab Void'**
+  /// **'Slab'**
   String get architectOpeningVoid;
 
   /// Level mark elevation label
@@ -6620,7 +6620,7 @@ abstract class AppLocalizations {
   /// Annotation text label
   ///
   /// In en, this message translates to:
-  /// **'Annotation Text'**
+  /// **'Text'**
   String get architectAnnotationText;
 
   /// Toggle underlay display
@@ -6946,6 +6946,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Parapet height'**
   String get architectParapetHeightLabel;
+
+  /// No description provided for @architectWallLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get architectWallLength;
+
+  /// No description provided for @architectWallDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get architectWallDirection;
+
+  /// No description provided for @architectWallEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get architectWallEnd;
+
+  /// No description provided for @architectWallContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get architectWallContinue;
+
+  /// No description provided for @architectWallReferenceCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get architectWallReferenceCenter;
+
+  /// No description provided for @architectWallReferenceLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get architectWallReferenceLeft;
+
+  /// No description provided for @architectWallReferenceRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get architectWallReferenceRight;
+
+  /// No description provided for @architectWallInsertPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Point'**
+  String get architectWallInsertPoint;
+
+  /// No description provided for @architectWallParallel.
+  ///
+  /// In en, this message translates to:
+  /// **'Parallel'**
+  String get architectWallParallel;
+
+  /// No description provided for @architectWallDraftHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold → point · 2 fingers → zoom'**
+  String get architectWallDraftHint;
+
+  /// No description provided for @architectNavigationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pan / zoom'**
+  String get architectNavigationHint;
+
+  /// No description provided for @architectWallEditRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening or wall too short.'**
+  String get architectWallEditRejected;
+
+  /// No description provided for @architectSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed. Check storage.'**
+  String get architectSaveFailed;
+
+  /// No description provided for @architectWallExterior.
+  ///
+  /// In en, this message translates to:
+  /// **'Exterior'**
+  String get architectWallExterior;
+
+  /// No description provided for @architectWallPartition.
+  ///
+  /// In en, this message translates to:
+  /// **'Partition'**
+  String get architectWallPartition;
+
+  /// No description provided for @architectWallBrick.
+  ///
+  /// In en, this message translates to:
+  /// **'Brick'**
+  String get architectWallBrick;
+
+  /// No description provided for @architectWallConcrete.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete'**
+  String get architectWallConcrete;
+
+  /// No description provided for @architectWallParapet.
+  ///
+  /// In en, this message translates to:
+  /// **'Parapet'**
+  String get architectWallParapet;
 }
 
 class _AppLocalizationsDelegate

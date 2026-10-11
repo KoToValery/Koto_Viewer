@@ -3453,31 +3453,31 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectToolMeasure => 'Измерване';
 
   @override
-  String get architectWallThickness => 'Дебелина';
+  String get architectWallThickness => 'Деб.';
 
   @override
-  String get architectWallSingle => 'Единична стена';
+  String get architectWallSingle => 'Една';
 
   @override
-  String get architectWallChained => 'Верижна стена';
+  String get architectWallChained => 'Свързани';
 
   @override
-  String get architectFinishChained => 'Край на стената';
+  String get architectFinishChained => 'Край';
 
   @override
-  String get architectDoorWidth => 'Широчина на врата';
+  String get architectDoorWidth => 'Шир.';
 
   @override
-  String get architectDoorHeight => 'Височина на врата';
+  String get architectDoorHeight => 'Вис.';
 
   @override
   String get architectDoorSill => 'Праг (h)';
 
   @override
-  String get architectDoorHingeLeft => 'Лява панта';
+  String get architectDoorHingeLeft => 'Лява';
 
   @override
-  String get architectDoorHingeRight => 'Дясна панта';
+  String get architectDoorHingeRight => 'Дясна';
 
   @override
   String get architectDoorSwingIn => 'Навътре';
@@ -3512,8 +3512,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectZoneDragPrompt => 'Изтеглете с влачене за нова зона';
 
   @override
-  String get architectZoneDrawPrompt =>
-      'Кликнете точка по точка за чертане на зона. Затворете при първата точка.';
+  String get architectZoneDrawPrompt => 'Точки → затвори';
 
   @override
   String get architectZoneTapFirstPoint =>
@@ -3770,7 +3769,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectToolOpening => 'Отвор';
 
   @override
-  String get architectToolStair => 'Стълбище';
+  String get architectToolStair => 'Стълби';
 
   @override
   String get architectToolDimension => 'Размери';
@@ -3791,49 +3790,49 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectToolCadCircle => 'Окръжност';
 
   @override
-  String get architectWindowWidth => 'Ширина на прозорец';
+  String get architectWindowWidth => 'Шир.';
 
   @override
   String get architectWindowHeight => 'Височина';
 
   @override
-  String get architectWindowSill => 'Парапет (hp)';
+  String get architectWindowSill => 'Подпр.';
 
   @override
   String get architectColumnShape => 'Форма';
 
   @override
-  String get architectColumnRect => 'Правоъгълна';
+  String get architectColumnRect => 'Правоъг.';
 
   @override
   String get architectColumnCircle => 'Кръгла';
 
   @override
-  String get architectColumnSize => 'Размер на колона';
+  String get architectColumnSize => 'Размер';
 
   @override
-  String get architectBeamSize => 'Размер на греда';
+  String get architectBeamSize => 'Размер';
 
   @override
-  String get architectStairWidth => 'Ширина на рамо';
+  String get architectStairWidth => 'Шир.';
 
   @override
   String get architectStairSteps => 'Стъпала';
 
   @override
-  String get architectOpeningType => 'Тип отвор';
+  String get architectOpeningType => 'Тип';
 
   @override
   String get architectOpeningShaft => 'Шахта';
 
   @override
-  String get architectOpeningVoid => 'Отвор в плоча';
+  String get architectOpeningVoid => 'Плоча';
 
   @override
   String get architectLevelElevation => 'Кота';
 
   @override
-  String get architectAnnotationText => 'Текст на анотация';
+  String get architectAnnotationText => 'Текст';
 
   @override
   String get architectUnderlayToggle => 'CAD Подложка';
@@ -4017,4 +4016,58 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectParapetHeightLabel => 'Височина';
+
+  @override
+  String get architectWallLength => 'Размер';
+
+  @override
+  String get architectWallDirection => 'Посока';
+
+  @override
+  String get architectWallEnd => 'Край';
+
+  @override
+  String get architectWallContinue => 'Продължи';
+
+  @override
+  String get architectWallReferenceCenter => 'Център';
+
+  @override
+  String get architectWallReferenceLeft => 'Ляво';
+
+  @override
+  String get architectWallReferenceRight => 'Дясно';
+
+  @override
+  String get architectWallInsertPoint => 'Точка';
+
+  @override
+  String get architectWallParallel => 'Успоредно';
+
+  @override
+  String get architectWallDraftHint => 'Задръж → точка · 2 пръста → мащаб';
+
+  @override
+  String get architectNavigationHint => 'Местене / мащаб';
+
+  @override
+  String get architectWallEditRejected => 'Отвор или твърде къса стена.';
+
+  @override
+  String get architectSaveFailed => 'Записът не успя. Проверете паметта.';
+
+  @override
+  String get architectWallExterior => 'Външна';
+
+  @override
+  String get architectWallPartition => 'Преградна';
+
+  @override
+  String get architectWallBrick => 'Тухла';
+
+  @override
+  String get architectWallConcrete => 'Бетон';
+
+  @override
+  String get architectWallParapet => 'Борд';
 }

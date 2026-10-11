@@ -254,6 +254,8 @@ void main() {
       await open(tester, model);
       await tester.tap(find.byIcon(Icons.line_weight_rounded));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
+      await tester.pump();
       await wallTap(tester, Offset.zero);
       await tester.pump();
       final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
@@ -305,6 +307,8 @@ void main() {
       await open(tester, model);
       await tester.tap(find.byIcon(Icons.line_weight_rounded));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
+      await tester.pump();
       await wallTap(tester, Offset.zero);
       await tester.pump();
       final translation = camera(tester).translation;

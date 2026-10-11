@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 
 /// Local keypad never requests platform text input or covers the whole canvas.
 class ArchitectWallDraftingPanel extends StatefulWidget {
   final double length;
   final String unit;
-  final bool isBulgarian;
   final double minimumLength;
   final ValueChanged<double> onLength;
   final VoidCallback onEnd, onContinue, onUnlock, onCancel;
@@ -12,7 +12,6 @@ class ArchitectWallDraftingPanel extends StatefulWidget {
     super.key,
     required this.length,
     required this.unit,
-    required this.isBulgarian,
     this.minimumLength = .001,
     required this.onLength,
     required this.onEnd,
@@ -50,7 +49,7 @@ class _ArchitectWallDraftingPanelState
 
   @override
   Widget build(BuildContext context) {
-    final bg = widget.isBulgarian;
+    final l10n = context.l10n;
     return Material(
       color: const Color(0xF51E242C),
       elevation: 8,
@@ -63,9 +62,20 @@ class _ArchitectWallDraftingPanelState
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    bg ? 'Фиксирана посока' : 'Direction locked',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        padding: EdgeInsets.zero,
+                      ),
+                      onPressed: widget.onUnlock,
+                      icon: const Icon(Icons.turn_right, size: 16),
+                      label: Text(
+                        l10n.architectWallDirection,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
                   ),
                 ),
                 SizedBox(
@@ -157,7 +167,7 @@ class _ArchitectWallDraftingPanelState
                       foregroundColor: Colors.cyanAccent,
                     ),
                     onPressed: _valid ? widget.onEnd : null,
-                    child: Text(bg ? 'Край' : 'End'),
+                    child: Text(l10n.architectWallEnd),
                   ),
                 ),
                 Expanded(
@@ -168,21 +178,10 @@ class _ArchitectWallDraftingPanelState
                       foregroundColor: const Color(0xFF1E242C),
                     ),
                     onPressed: _valid ? widget.onContinue : null,
-                    child: Text(bg ? 'Продължи' : 'Continue'),
+                    child: Text(l10n.architectWallContinue),
                   ),
                 ),
               ],
-            ),
-            SizedBox(
-              height: 30,
-              child: TextButton(
-                style: TextButton.styleFrom(foregroundColor: Colors.white70),
-                onPressed: widget.onUnlock,
-                child: Text(
-                  bg ? 'Промени посоката / снап' : 'Change direction / snap',
-                  style: const TextStyle(fontSize: 11),
-                ),
-              ),
             ),
           ],
         ),

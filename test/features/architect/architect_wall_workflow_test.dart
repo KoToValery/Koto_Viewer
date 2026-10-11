@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
+import 'package:kotoview/src/features/architect/models/architect_wall_type.dart';
 import 'package:kotoview/src/features/architect/models/architect_door.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_wall_network.dart';
@@ -40,6 +41,8 @@ void main() {
       addTearDown(model.dispose);
       await workspace.open(tester, model);
       await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
       await tester.pump();
       final translation = workspace.camera(tester).translation;
       final first = await tester.startGesture(
@@ -93,6 +96,8 @@ void main() {
       await workspace.open(tester, model);
       await tester.tap(find.byIcon(Icons.line_weight_rounded));
       await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
+      await tester.pump();
       await workspace.wallTap(tester, Offset.zero);
       final first = await tester.startGesture(
         workspace.screen(tester, const Offset(1, 1)) + const Offset(0, 64),
@@ -128,6 +133,8 @@ void main() {
       addTearDown(model.dispose);
       await workspace.open(tester, model);
       await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('wall-chain-toggle')));
       await tester.pump();
@@ -447,8 +454,6 @@ void main() {
       await tester.tap(find.byIcon(Icons.line_weight_rounded));
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, Offset.zero);
-      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
-      await tester.pump();
       await workspace.wallTap(tester, const Offset(3, .04));
       await tester.tap(find.byKey(const ValueKey('wall-length-input')));
       await tester.pump();
@@ -463,10 +468,36 @@ void main() {
       expect(first.length, closeTo(4.25, 1e-9));
       expect(workspace.overlay(tester).activeDraftStart, first.endPoint);
       await workspace.wallTap(tester, first.endPoint + const Offset(0, 2));
-      await tester.tap(find.byKey(const ValueKey('wall-stop-drawing')));
+      expect(model.project.activeStorey.walls.length, 1);
+      expect(find.byKey(const ValueKey('wall-length-input')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('wall-length-input')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('wall-key-3')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.walls.last.startPoint, first.endPoint);
+      expect(model.project.activeStorey.walls.last.length, closeTo(3, 1e-9));
       expect(workspace.overlay(tester).activeDraftStart, isNull);
+      await tester.tap(find.byIcon(Icons.view_column_rounded));
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tester.pump();
+      await workspace.wallTap(tester, const Offset(-2, -2));
+      await workspace.wallTap(tester, const Offset(-1, -2));
+      expect(find.byKey(const ValueKey('wall-length-input')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('wall-end')));
+      await tester.pump();
+      expect(model.project.activeStorey.walls.length, 3);
+      // Manual disabling stays disabled after a commit.
+      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
+      await tester.pump();
+      await workspace.wallTap(tester, const Offset(-2, -3));
+      await workspace.wallTap(tester, const Offset(-1, -2));
+      expect(model.project.activeStorey.walls.length, 4);
+      await workspace.wallTap(tester, const Offset(0, -2));
+      expect(model.project.activeStorey.walls.length, 5);
+      expect(find.byKey(const ValueKey('wall-length-input')), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -544,6 +575,21 @@ void main() {
           wall: wall('b', const Offset(1.5, -.5), const Offset(1.5, 1.4)),
         ),
       );
+      model.commit(
+        model.project.copyWith(
+          wallTypes: ArchitectWallType.standardCatalog(),
+          storeys: [
+            model.project.activeStorey.copyWith(
+              walls: model.project.activeStorey.walls
+                  .map(
+                    (w) =>
+                        w.copyWith(thickness: .37, wallTypeId: 'ext_25_12_eps'),
+                  )
+                  .toList(),
+            ),
+          ],
+        ),
+      );
       const screenshotKey = ValueKey('wall-phone-preview');
       if (const bool.fromEnvironment('UPDATE_ARCHITECT_WALL_PREVIEW')) {
         await tester.runAsync(() async {
@@ -607,8 +653,6 @@ void main() {
         await held.cancel();
         await tester.pump();
       }
-      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
-      await tester.pump();
       await workspace.wallTap(tester, const Offset(-1, 1.5));
       final end = workspace.overlay(tester).activeDraftEnd;
       await tester.tap(find.byKey(const ValueKey('wall-length-input')));

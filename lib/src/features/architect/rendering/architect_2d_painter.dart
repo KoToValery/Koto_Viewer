@@ -11,6 +11,7 @@ import 'architect_grid_axis_painter_helper.dart';
 import 'architect_zone_painter_helper.dart';
 import 'architect_scene_geometry.dart';
 import 'architect_wall_network.dart';
+import 'architect_wall_layers.dart';
 import '../models/architect_wall.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
@@ -51,6 +52,7 @@ class Architect2dPainter extends CustomPainter {
   final Offset? activeDraftEnd;
   final double activeWallThickness;
   final WallReferenceLine activeWallReference;
+  final String? activeWallTypeId;
   final String? activeSnapLabel;
   final String? selectedElementId;
   final String? selectedZoneId;
@@ -117,6 +119,7 @@ class Architect2dPainter extends CustomPainter {
     this.activeDraftEnd,
     this.activeWallThickness = 0.25,
     this.activeWallReference = WallReferenceLine.center,
+    this.activeWallTypeId,
     this.activeSnapLabel,
     this.selectedElementId,
     this.selectedZoneId,
@@ -497,23 +500,76 @@ class Architect2dPainter extends CustomPainter {
   void _drawWalls(Canvas canvas) {
     final activeStorey = project.activeStorey;
 
-    final wallFillPaint = Paint()
-      ..color = const Color(0xFFE0E0E0)
-      ..style = PaintingStyle.fill;
-
     final wallBorderPaint = Paint()
       ..color = const Color(0xFF212121)
       ..strokeWidth = 1.5 / zoomScale
       ..style = PaintingStyle.stroke;
 
-    final body = ArchitectWallNetwork.body(_project.activeStorey.walls);
-    canvas.drawPath(body, wallFillPaint);
+    final layers = ArchitectWallLayers.forProject(_project);
+    _drawWallLayers(canvas, layers, wallBorderPaint);
+    for (final wall in activeStorey.walls) {
+      final isSelected = wall.id == selectedElementId;
+      final borderPaint = isSelected
+          ? (Paint()
+              ..color = const Color(0xFF00E5FF)
+              ..strokeWidth = 2.5 / zoomScale
+              ..style = PaintingStyle.stroke)
+          : wallBorderPaint;
+
+      if (isSelected) {
+        canvas.drawPath(
+          ArchitectWallNetwork.polygon(wall.polygonCorners),
+          borderPaint,
+        );
+        for (final point in [wall.startPoint, wall.endPoint]) {
+          canvas.drawCircle(point, 7 / zoomScale, Paint()..color = Colors.cyan);
+        }
+      }
+      for (final door in wall.doors) {
+        door.paint2D(
+          canvas: canvas,
+          wallStart: wall.centerStart,
+          wallEnd: wall.centerEnd,
+          wallThickness: wall.thickness,
+          zoomScale: zoomScale,
+          isSelected: door.id == selectedElementId,
+        );
+      }
+      for (final window in wall.windows) {
+        window.paint2D(
+          canvas: canvas,
+          wallStart: wall.centerStart,
+          wallEnd: wall.centerEnd,
+          wallThickness: wall.thickness,
+          zoomScale: zoomScale,
+          isSelected: window.id == selectedElementId,
+        );
+      }
+    }
+  }
+
+  void _drawWallLayers(
+    Canvas canvas,
+    ArchitectWallLayers layers,
+    Paint border, {
+    Color hatchColor = const Color(0xFF9EA5AC),
+  }) {
+    // Thin outer insulation outline; a heavier boundary encloses only the core.
+    canvas.drawPath(
+      layers.body,
+      Paint()
+        ..color = border.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .7 / zoomScale,
+    );
     canvas.save();
-    canvas.clipPath(body);
-    final bounds = body.getBounds().intersect(canvas.getLocalClipBounds());
+    canvas.clipPath(layers.core);
+    final bounds = layers.core.getBounds().intersect(
+      canvas.getLocalClipBounds(),
+    );
     final spacing = math.max(.12, 8 / zoomScale);
     final hatch = Paint()
-      ..color = const Color(0xFF9EA5AC)
+      ..color = hatchColor
       ..strokeWidth = .6 / zoomScale;
     for (
       double x = ((bounds.left - bounds.height) / spacing).floor() * spacing;
@@ -527,56 +583,7 @@ class Architect2dPainter extends CustomPainter {
       );
     }
     canvas.restore();
-    canvas.drawPath(body, wallBorderPaint);
-    for (final wall in activeStorey.walls) {
-      final isSelected = wall.id == selectedElementId;
-      final borderPaint = isSelected
-          ? (Paint()
-              ..color = const Color(0xFF00E5FF)
-              ..strokeWidth = 2.5 / zoomScale
-              ..style = PaintingStyle.stroke)
-          : wallBorderPaint;
-
-      // Draw Wall Body
-      final corners = wall.polygonCorners;
-      final path = Path()
-        ..moveTo(corners[0].dx, corners[0].dy)
-        ..lineTo(corners[1].dx, corners[1].dy)
-        ..lineTo(corners[2].dx, corners[2].dy)
-        ..lineTo(corners[3].dx, corners[3].dy)
-        ..close();
-
-      if (isSelected) {
-        canvas.drawPath(path, borderPaint);
-        for (final point in [wall.startPoint, wall.endPoint]) {
-          canvas.drawCircle(point, 7 / zoomScale, Paint()..color = Colors.cyan);
-        }
-      }
-
-      // Draw all hosted Doors
-      for (final door in wall.doors) {
-        door.paint2D(
-          canvas: canvas,
-          wallStart: wall.centerStart,
-          wallEnd: wall.centerEnd,
-          wallThickness: wall.thickness,
-          zoomScale: zoomScale,
-          isSelected: door.id == selectedElementId,
-        );
-      }
-
-      // Draw all hosted Windows
-      for (final window in wall.windows) {
-        window.paint2D(
-          canvas: canvas,
-          wallStart: wall.centerStart,
-          wallEnd: wall.centerEnd,
-          wallThickness: wall.thickness,
-          zoomScale: zoomScale,
-          isSelected: window.id == selectedElementId,
-        );
-      }
-    }
+    canvas.drawPath(layers.core, border);
   }
 
   // ===========================================================================
@@ -632,35 +639,22 @@ class Architect2dPainter extends CustomPainter {
       final dist = delta.distance;
       if (dist < 1e-4) return;
 
-      final corners = ArchitectWall(
+      final wall = ArchitectWall(
         id: 'preview',
         startPoint: p1,
         endPoint: p2,
         thickness: activeWallThickness,
         referenceLine: activeWallReference,
-      ).polygonCorners;
-
-      // Preview wall body
-      final previewPath = Path()
-        ..moveTo(corners[0].dx, corners[0].dy)
-        ..lineTo(corners[1].dx, corners[1].dy)
-        ..lineTo(corners[2].dx, corners[2].dy)
-        ..lineTo(corners[3].dx, corners[3].dy)
-        ..close();
-
-      canvas.drawPath(
-        previewPath,
-        Paint()
-          ..color = const Color(0x3300E5FF)
-          ..style = PaintingStyle.fill,
+        wallTypeId: activeWallTypeId,
       );
-
-      canvas.drawPath(
-        previewPath,
+      _drawWallLayers(
+        canvas,
+        ArchitectWallLayers.build([wall], _project.wallTypes),
         Paint()
           ..color = const Color(0xFF00E5FF)
           ..strokeWidth = 1.8 / zoomScale
           ..style = PaintingStyle.stroke,
+        hatchColor: const Color(0xFF00B8CC),
       );
 
       // Baseline guideline

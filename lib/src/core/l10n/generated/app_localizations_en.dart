@@ -3440,31 +3440,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectToolMeasure => 'Measure';
 
   @override
-  String get architectWallThickness => 'Thickness';
+  String get architectWallThickness => 'Thk.';
 
   @override
-  String get architectWallSingle => 'Single Wall';
+  String get architectWallSingle => 'Single';
 
   @override
-  String get architectWallChained => 'Chained Wall';
+  String get architectWallChained => 'Chain';
 
   @override
-  String get architectFinishChained => 'Finish Wall';
+  String get architectFinishChained => 'End';
 
   @override
-  String get architectDoorWidth => 'Door Width';
+  String get architectDoorWidth => 'Width';
 
   @override
-  String get architectDoorHeight => 'Door Height';
+  String get architectDoorHeight => 'Height';
 
   @override
   String get architectDoorSill => 'Sill (hp)';
 
   @override
-  String get architectDoorHingeLeft => 'Hinge Left';
+  String get architectDoorHingeLeft => 'Left';
 
   @override
-  String get architectDoorHingeRight => 'Hinge Right';
+  String get architectDoorHingeRight => 'Right';
 
   @override
   String get architectDoorSwingIn => 'Swing Inward';
@@ -3497,8 +3497,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectZoneDragPrompt => 'Drag to draw room zone';
 
   @override
-  String get architectZoneDrawPrompt =>
-      'Click point by point to draft zone. Snap to first point to close.';
+  String get architectZoneDrawPrompt => 'Points → close';
 
   @override
   String get architectZoneTapFirstPoint =>
@@ -3761,7 +3760,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectToolDimension => 'Dimension';
 
   @override
-  String get architectToolLevel => 'Level Mark';
+  String get architectToolLevel => 'Level';
 
   @override
   String get architectToolText => 'Text';
@@ -3776,49 +3775,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectToolCadCircle => 'Circle';
 
   @override
-  String get architectWindowWidth => 'Window Width';
+  String get architectWindowWidth => 'Width';
 
   @override
   String get architectWindowHeight => 'Window Height';
 
   @override
-  String get architectWindowSill => 'Sill (hp)';
+  String get architectWindowSill => 'Sill';
 
   @override
   String get architectColumnShape => 'Shape';
 
   @override
-  String get architectColumnRect => 'Rectangular';
+  String get architectColumnRect => 'Rect.';
 
   @override
   String get architectColumnCircle => 'Circular';
 
   @override
-  String get architectColumnSize => 'Column Size';
+  String get architectColumnSize => 'Size';
 
   @override
-  String get architectBeamSize => 'Beam Size';
+  String get architectBeamSize => 'Size';
 
   @override
-  String get architectStairWidth => 'Flight Width';
+  String get architectStairWidth => 'Width';
 
   @override
   String get architectStairSteps => 'Steps';
 
   @override
-  String get architectOpeningType => 'Opening Type';
+  String get architectOpeningType => 'Type';
 
   @override
   String get architectOpeningShaft => 'Shaft';
 
   @override
-  String get architectOpeningVoid => 'Slab Void';
+  String get architectOpeningVoid => 'Slab';
 
   @override
   String get architectLevelElevation => 'Elevation';
 
   @override
-  String get architectAnnotationText => 'Annotation Text';
+  String get architectAnnotationText => 'Text';
 
   @override
   String get architectUnderlayToggle => 'CAD Underlay';
@@ -4003,4 +4002,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectParapetHeightLabel => 'Parapet height';
+
+  @override
+  String get architectWallLength => 'Length';
+
+  @override
+  String get architectWallDirection => 'Direction';
+
+  @override
+  String get architectWallEnd => 'End';
+
+  @override
+  String get architectWallContinue => 'Next';
+
+  @override
+  String get architectWallReferenceCenter => 'Center';
+
+  @override
+  String get architectWallReferenceLeft => 'Left';
+
+  @override
+  String get architectWallReferenceRight => 'Right';
+
+  @override
+  String get architectWallInsertPoint => 'Point';
+
+  @override
+  String get architectWallParallel => 'Parallel';
+
+  @override
+  String get architectWallDraftHint => 'Hold → point · 2 fingers → zoom';
+
+  @override
+  String get architectNavigationHint => 'Pan / zoom';
+
+  @override
+  String get architectWallEditRejected => 'Opening or wall too short.';
+
+  @override
+  String get architectSaveFailed => 'Save failed. Check storage.';
+
+  @override
+  String get architectWallExterior => 'Exterior';
+
+  @override
+  String get architectWallPartition => 'Partition';
+
+  @override
+  String get architectWallBrick => 'Brick';
+
+  @override
+  String get architectWallConcrete => 'Concrete';
+
+  @override
+  String get architectWallParapet => 'Parapet';
 }
