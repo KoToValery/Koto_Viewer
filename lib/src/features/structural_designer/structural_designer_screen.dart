@@ -31,6 +31,7 @@ import 'analysis/slab_envelope_detector.dart';
 import 'analysis/slab_projection_detector.dart';
 import 'analysis/structural_magnetic_alignment_helper.dart';
 import 'analysis/structural_pointer_interaction.dart';
+import 'analysis/structural_measurement_snap.dart';
 import 'analysis/wall_axis_detector.dart';
 import 'analysis/project_grid_axes.dart';
 import 'rendering/grid_axis_presentation.dart';
@@ -3936,6 +3937,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _isMultiTouchGesture = false;
     _elementGrabOffsetCad = null;
 
+    if (_activeTool == StructuralDrawTool.measure) {
+      _isPlacingWithHold = true;
+      _updatePointer(event.localPosition,
+          isMouse: event.kind == PointerDeviceKind.mouse);
+      return;
+    }
+
     // 1. If currently in Slab Correction Mode:
     if (_isEditingSlab) {
       // Check if tapped on a vertex handle of the editing slab
@@ -4298,6 +4306,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
 
+    if (_activeTool == StructuralDrawTool.measure) {
+      _updatePointer(event.localPosition,
+          isMouse: event.kind == PointerDeviceKind.mouse);
+      return;
+    }
+
     // Updating grid axis offset drag direction
     if (_isOffsettingAxisWithDrag && _axisBeingOffset != null) {
       _updateAxisOffsetDrag(event.localPosition);
@@ -4535,6 +4549,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _updatePointer(Offset screenPos, {bool isMouse = false}) {
+    if (_activeTool == StructuralDrawTool.measure) {
+      _updateMeasurementPointer(screenPos, isMouse: isMouse);
+      return;
+    }
     final touchPos = screenPos;
 
     var targetPos = StructuralPointerInteraction.placementTarget(screenPos, isMouse: isMouse);
@@ -5121,6 +5139,80 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     });
   }
 
+  void _updateMeasurementPointer(Offset screenPos, {required bool isMouse}) {
+    final target = isMouse ? screenPos : screenPos - const Offset(0, 56);
+    final raw = _screenToCad(target);
+    DxfSnapResult? snap;
+    _activeMagneticGuides = [];
+    if (_snapEnabled) {
+      final edges = <(Offset, Offset)>[];
+      void polygon(List<Offset> points) {
+        for (var i = 0; i < points.length; i++) {
+          edges.add((points[i], points[(i + 1) % points.length]));
+        }
+      }
+      final storey = _project.activeStorey;
+      for (final column in storey.columns) { polygon(column.polygonVertices); }
+      for (final wall in storey.shearWalls) { polygon(wall.polygonVertices); }
+      for (final beam in storey.beams) {
+        polygon(beam.polygonVertices);
+        edges.add((beam.start, beam.end));
+      }
+      if (_showBimSlabs) {
+        final slabs = <String, StructuralSlab>{
+          for (final slab in [...storey.slabs, ...?_floorSlabStorey?.slabs,
+              ...?_ceilingSlabStorey?.slabs]) slab.id: slab,
+        };
+        for (final slab in slabs.values) {
+          polygon(slab.polygon);
+          for (final opening in slab.openings) { polygon(opening); }
+        }
+      }
+      if (_showBimAxes) {
+        for (final axis in _project.effectiveGridAxes) {
+          edges.add((axis.start, axis.end));
+        }
+      }
+      final pixelsPerCad = _getCadFitScale() *
+          _transformController.value.getMaxScaleOnAxis().clamp(.0001, 10000.0);
+      final result = StructuralMeasurementSnap.find(document: _document,
+          raw: raw, tolerance: 22 / pixelsPerCad, edges: edges,
+          start: _measurementStartCad);
+      snap = result.snap;
+      _activeMagneticGuides = result.guides;
+      if (snap != null && (_activeSnap?.point != snap.point ||
+          _activeSnap?.type != snap.type)) {
+        HapticFeedback.selectionClick();
+      }
+    }
+    final effective = snap?.point ?? raw;
+    final distance = _measurementStartCad == null ? null :
+        (effective - _measurementStartCad!).distance / _cadUnitsPerMeter;
+    setState(() {
+      _touchScreenPos = screenPos;
+      _targetScreenPos = target;
+      _snappedScreenPos = snap == null ? null : _cadToScreen(snap.point);
+      _snappedScreenPositions = _snappedScreenPos == null ? [] : [_snappedScreenPos!];
+      _activeSnap = snap;
+      _currentCadCoord = effective;
+      _liveDimensionText = distance == null ? null : distance >= 1
+          ? '${distance.toStringAsFixed(2)} m'
+          : '${(distance * 100).toStringAsFixed(1)} cm';
+    });
+  }
+
+  bool get _measurementTracksParallel {
+    final guides = _activeMagneticGuides;
+    if (_activeTool != StructuralDrawTool.measure || guides == null || guides.length < 2) {
+      return false;
+    }
+    final edge = guides.first.$2 - guides.first.$1;
+    final measurement = guides.last.$2 - guides.last.$1;
+    final lengths = edge.distance * measurement.distance;
+    return lengths > 1e-12 &&
+        (edge.dx * measurement.dy - edge.dy * measurement.dx).abs() / lengths < 1e-6;
+  }
+
   List<Offset>? _pointerElementPolygon() {
     final center = _currentCadCoord;
     if (center == null) return null;
@@ -5360,6 +5452,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_activePointersCount == 0) _activePointerKind = null;
     if (_isMultiTouchGesture) {
       if (_activePointersCount == 0) _isMultiTouchGesture = false;
+      return;
+    }
+
+    if (_activeTool == StructuralDrawTool.measure && _isPlacingWithHold) {
+      _updateMeasurementPointer(event.localPosition,
+          isMouse: event.kind == PointerDeviceKind.mouse);
+      _commitPlacement(_currentCadCoord!);
+      setState(() {
+        _isPlacingWithHold = false;
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _snappedScreenPositions = [];
+        _activeSnap = null;
+        _activeMagneticGuides = [];
+        _liveDimensionText = null;
+      });
       return;
     }
 
@@ -5757,6 +5866,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleLongPressStart(LongPressStartDetails details) {
+    if (_activeTool == StructuralDrawTool.measure) return;
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isExtrudingEdge || _activeGrip != null) return;
     if (_isMultiTouchGesture || _activePointersCount > 1) return;
@@ -5967,6 +6077,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
+    if (_activeTool == StructuralDrawTool.measure) return;
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isDraggingAxisHandle && _selectedGridAxis != null) {
       final cadPt = _screenToCad(details.localPosition);
@@ -6032,6 +6143,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleLongPressEnd(LongPressEndDetails details) {
+    if (_activeTool == StructuralDrawTool.measure) return;
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_draggingSlabVertexIndex != null && _editingSlab != null) {
       final idx = _draggingSlabVertexIndex!;
@@ -6234,6 +6346,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleLongPressCancel() {
+    if (_activeTool == StructuralDrawTool.measure) return;
     if (_isMovingColumn) {
       setState(() {
         _isMovingColumn = false;
@@ -6302,6 +6415,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleTapUp(TapUpDetails details) {
+    if (_activeTool == StructuralDrawTool.measure) return;
     // Pointer-down may navigate to the badge owner and rearrange its labels.
     // The same tap must not select the next storey's newly positioned badge.
     if (_slabBadgeSelectionHandled) {
@@ -8990,6 +9104,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         openingPoints: _openingPointsCad.map(_cadToScreen).toList(),
                         activeOpeningType: _currentOpeningType,
                         liveDimensionText: _liveDimensionText,
+                        measurementParallel: _measurementTracksParallel,
                         scale: _cadUnitsPerMeter * _getCadFitScale() * _transformController.value.getMaxScaleOnAxis(),
                         l10n: context.l10n,
                       ),

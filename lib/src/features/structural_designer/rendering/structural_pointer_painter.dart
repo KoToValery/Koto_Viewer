@@ -69,6 +69,7 @@ class StructuralPointerPainter extends CustomPainter {
   final double? previewWallThicknessScreen;
   final double? previewWallRotationRad;
   final String? liveDimensionText;
+  final bool measurementParallel;
   final double scale;
   final AppLocalizations? l10n;
 
@@ -96,6 +97,7 @@ class StructuralPointerPainter extends CustomPainter {
     this.previewWallThicknessScreen,
     this.previewWallRotationRad,
     this.liveDimensionText,
+    this.measurementParallel = false,
     this.scale = 1.0,
     this.l10n,
   });
@@ -455,7 +457,23 @@ class StructuralPointerPainter extends CustomPainter {
     }
 
     // 5. Dimension badge (when drawing wall, beam, slab, custom opening, column/wall axis snap, or measuring)
-    if (liveDimensionText != null) {
+    if (activeTool == StructuralDrawTool.measure) {
+      final snapLabel = switch (snapType) {
+        DxfSnapType.endpoint => l10n?.snapEndpoint,
+        DxfSnapType.intersection => l10n?.snapIntersection,
+        DxfSnapType.midpoint => l10n?.snapMidpoint,
+        DxfSnapType.center => l10n?.snapCenter,
+        DxfSnapType.nearest => l10n?.snapNearest,
+        DxfSnapType.perpendicular => measurementParallel ? '∥' : l10n?.snapPerpendicular,
+        DxfSnapType.point => l10n?.snapPoint,
+        null => null,
+      };
+      final text = [?liveDimensionText, ?snapLabel].join(' • ');
+      if (text.isNotEmpty) {
+        _drawDimensionBadge(canvas, effectiveTip, effectiveTip, text,
+            badgeCenter: effectiveTip - const Offset(0, 32), viewport: size);
+      }
+    } else if (liveDimensionText != null) {
       final startPos =
           wallStartPos ??
           beamStartPos ??
@@ -521,12 +539,27 @@ class StructuralPointerPainter extends CustomPainter {
           ..close();
         canvas.drawPath(path, snapPaint);
         break;
+      case DxfSnapType.perpendicular:
+        if (measurementParallel) {
+          canvas.drawLine(pos + const Offset(-5, 7), pos + const Offset(1, -7), snapPaint);
+          canvas.drawLine(pos + const Offset(1, 7), pos + const Offset(7, -7), snapPaint);
+        } else {
+          canvas.drawPath(Path()
+            ..moveTo(pos.dx - s, pos.dy - s)
+            ..lineTo(pos.dx - s, pos.dy + s)
+            ..lineTo(pos.dx + s, pos.dy + s)
+            ..moveTo(pos.dx - s, pos.dy)
+            ..lineTo(pos.dx, pos.dy)
+            ..lineTo(pos.dx, pos.dy + s), snapPaint);
+        }
+        break;
       default:
         canvas.drawCircle(pos, s, snapPaint);
     }
   }
 
-  void _drawDimensionBadge(Canvas canvas, Offset p1, Offset p2, String text) {
+  void _drawDimensionBadge(Canvas canvas, Offset p1, Offset p2, String text,
+      {Offset? badgeCenter, Size? viewport}) {
     final mid = Offset((p1.dx + p2.dx) / 2.0, (p1.dy + p2.dy) / 2.0);
     final dx = p2.dx - p1.dx;
     final dy = p2.dy - p1.dy;
@@ -549,6 +582,15 @@ class StructuralPointerPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+
+    if (badgeCenter != null && viewport != null) {
+      offsetMid = Offset(
+        badgeCenter.dx.clamp(tp.width / 2 + 8,
+            math.max(tp.width / 2 + 8, viewport.width - tp.width / 2 - 8)),
+        badgeCenter.dy.clamp(tp.height / 2 + 8,
+            math.max(tp.height / 2 + 8, viewport.height - tp.height / 2 - 8)),
+      );
+    }
 
     final badgeOffset = Offset(
       offsetMid.dx - tp.width / 2.0,
@@ -658,7 +700,8 @@ class StructuralPointerPainter extends CustomPainter {
         oldDelegate.previewWallLengthScreen != previewWallLengthScreen ||
         oldDelegate.previewWallThicknessScreen != previewWallThicknessScreen ||
         oldDelegate.previewWallRotationRad != previewWallRotationRad ||
-        oldDelegate.liveDimensionText != liveDimensionText;
+        oldDelegate.liveDimensionText != liveDimensionText ||
+        oldDelegate.measurementParallel != measurementParallel;
   }
 }
 
