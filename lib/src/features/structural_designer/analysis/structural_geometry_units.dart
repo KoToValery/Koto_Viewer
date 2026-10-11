@@ -1,4 +1,5 @@
 import 'dart:ui';
+import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../models/structural_element.dart';
 
 /// Local metre coordinates for numerical assessment only. Model objects and
@@ -8,12 +9,15 @@ class StructuralGeometryUnits {
   final double scale;
   final Offset origin;
   const StructuralGeometryUnits(this.scale, this.origin);
-  double _round(double x) => x.isFinite ? (x * 1e9).round() / 1e9 : x;
-  Offset toMetres(Offset p) => Offset(
-    _round((p.dx - origin.dx) / scale),
-    _round((p.dy - origin.dy) / scale),
-  );
-  Offset toCad(Offset p) => origin + p * scale;
+  double _round(double x) => BimPrecisionPolicy.removeNumericalNoise(x);
+  BimCoordinateFrame get frame =>
+      BimCoordinateFrame(origin: origin, unitsPerMeter: scale);
+  Offset toMetres(Offset p) {
+    final metres = frame.toModel(p);
+    return Offset(_round(metres.dx), _round(metres.dy));
+  }
+
+  Offset toCad(Offset p) => frame.toCad(p);
   StructuralGridAxis axis(StructuralGridAxis a) =>
       a.copyWith(start: toMetres(a.start), end: toMetres(a.end));
   StoreyLevel floor(StoreyLevel s) => s.copyWith(
@@ -51,8 +55,10 @@ class StructuralGeometryUnits {
         ),
     ],
     gridAxes: s.gridAxes.map(axis).toList(),
-    staircaseZones: {for (final e in s.staircaseZones.entries)
-      e.key:e.value.map(toMetres).toList()},
+    staircaseZones: {
+      for (final e in s.staircaseZones.entries)
+        e.key: e.value.map(toMetres).toList(),
+    },
   );
   StructuralProject project(StructuralProject p) => p.copyWith(
     storeys: p.storeys.map(floor).toList(),

@@ -3,6 +3,7 @@ import '../../core/l10n/l10n_extensions.dart';
 import '../architect/screens/architect_workspace_screen.dart';
 import '../architect/widgets/architect_project_wizard_dialog.dart';
 import 'models/bim_work_project.dart';
+import 'models/bim_coordinate_frame.dart';
 import 'screens/bim_alignment_screen.dart';
 import 'screens/bim_workspace_screen.dart';
 import 'services/bim_export_service.dart';
@@ -135,6 +136,9 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
             initialProject: archProject,
             bimProject: project,
             underlaysByStorey: underlays?.underlaysByStorey,
+            underlayFrame: BimCoordinateFrame(
+              origin: underlays?.referenceControlPoint ?? Offset.zero,
+              unitsPerMeter: underlays?.cadUnitsPerMeter ?? 1),
           ),
         ),
       ).then((_) => _loadProjects());

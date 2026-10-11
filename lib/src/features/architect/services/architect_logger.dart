@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 /// Centralized diagnostic logging utility for the architectural workspace,
 /// viewport gestures, zoom/pan transforms, and zone drafting/editing operations.
 class ArchitectLogger {
-  static bool enabled = true;
+  static bool enabled = kDebugMode;
   static final List<String> _history = [];
   static const int _maxHistory = 150;
 

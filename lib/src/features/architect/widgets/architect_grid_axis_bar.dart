@@ -27,6 +27,13 @@ class ArchitectGridAxisBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: tool,
+      builder: (context, child) => _buildContents(context),
+    );
+  }
+
+  Widget _buildContents(BuildContext context) {
     final l10n = context.l10n;
 
     return Container(
@@ -82,7 +89,10 @@ class ArchitectGridAxisBar extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white12,
                         borderRadius: BorderRadius.circular(8),
@@ -100,10 +110,7 @@ class ArchitectGridAxisBar extends StatelessWidget {
                 ),
                 Text(
                   l10n.architectAxisDrawPrompt,
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 11,
-                  ),
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

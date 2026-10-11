@@ -28,7 +28,23 @@ enum ArchitectUnit {
 
   String format(double meters, {int decimals = 2}) {
     final val = toUnit(meters);
-    if (this == ArchitectUnit.millimeters || this == ArchitectUnit.inches) {
+    if (this == ArchitectUnit.inches || this == ArchitectUnit.feet) {
+      final total = (meters.abs() / .0254 * 16).round();
+      final sign = meters < 0 && total != 0 ? '-' : '';
+      final feet = this == ArchitectUnit.feet ? total ~/ 192 : 0;
+      final remainder = this == ArchitectUnit.feet ? total % 192 : total;
+      final whole = remainder ~/ 16;
+      var numerator = remainder % 16;
+      var denominator = 16;
+      while (numerator > 0 && numerator.isEven) {
+        numerator ~/= 2;
+        denominator ~/= 2;
+      }
+      final fraction = numerator == 0 ? '' : ' $numerator/$denominator';
+      return this == ArchitectUnit.feet
+          ? '$sign$feet′ $whole$fraction″'
+          : '$sign$whole$fraction in';
+    } else if (this == ArchitectUnit.millimeters) {
       return '${val.toStringAsFixed(0)} $symbol';
     } else if (this == ArchitectUnit.centimeters) {
       return '${val.toStringAsFixed(0)} $symbol';
@@ -100,98 +116,116 @@ class ArchitectStorey {
     List<ArchitectElevationMarker>? elevationMarkers,
     List<ArchitectAnnotation>? annotations,
     List<ArchitectCadPrimitive>? cadPrimitives,
-  }) =>
-      ArchitectStorey(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        elevation: elevation ?? this.elevation,
-        height: height ?? this.height,
-        floorFinishThickness: floorFinishThickness ?? this.floorFinishThickness,
-        walls: walls ?? this.walls,
-        zones: zones ?? this.zones,
-        columns: columns ?? this.columns,
-        beams: beams ?? this.beams,
-        slabs: slabs ?? this.slabs,
-        openings: openings ?? this.openings,
-        stairs: stairs ?? this.stairs,
-        dimensions: dimensions ?? this.dimensions,
-        elevationMarkers: elevationMarkers ?? this.elevationMarkers,
-        annotations: annotations ?? this.annotations,
-        cadPrimitives: cadPrimitives ?? this.cadPrimitives,
-      );
+  }) => ArchitectStorey(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    elevation: elevation ?? this.elevation,
+    height: height ?? this.height,
+    floorFinishThickness: floorFinishThickness ?? this.floorFinishThickness,
+    walls: walls ?? this.walls,
+    zones: zones ?? this.zones,
+    columns: columns ?? this.columns,
+    beams: beams ?? this.beams,
+    slabs: slabs ?? this.slabs,
+    openings: openings ?? this.openings,
+    stairs: stairs ?? this.stairs,
+    dimensions: dimensions ?? this.dimensions,
+    elevationMarkers: elevationMarkers ?? this.elevationMarkers,
+    annotations: annotations ?? this.annotations,
+    cadPrimitives: cadPrimitives ?? this.cadPrimitives,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'elevation': elevation,
-        'height': height,
-        'floorFinishThickness': floorFinishThickness,
-        'walls': walls.map((w) => w.toJson()).toList(),
-        'zones': zones.map((z) => z.toJson()).toList(),
-        'columns': columns.map((c) => c.toJson()).toList(),
-        'beams': beams.map((b) => b.toJson()).toList(),
-        'slabs': slabs.map((s) => s.toJson()).toList(),
-        'openings': openings.map((o) => o.toJson()).toList(),
-        'stairs': stairs.map((st) => st.toJson()).toList(),
-        'dimensions': dimensions.map((d) => d.toJson()).toList(),
-        'elevationMarkers': elevationMarkers.map((m) => m.toJson()).toList(),
-        'annotations': annotations.map((a) => a.toJson()).toList(),
-        'cadPrimitives': cadPrimitives.map((p) => p.toJson()).toList(),
-      };
+    'id': id,
+    'name': name,
+    'elevation': elevation,
+    'height': height,
+    'floorFinishThickness': floorFinishThickness,
+    'walls': walls.map((w) => w.toJson()).toList(),
+    'zones': zones.map((z) => z.toJson()).toList(),
+    'columns': columns.map((c) => c.toJson()).toList(),
+    'beams': beams.map((b) => b.toJson()).toList(),
+    'slabs': slabs.map((s) => s.toJson()).toList(),
+    'openings': openings.map((o) => o.toJson()).toList(),
+    'stairs': stairs.map((st) => st.toJson()).toList(),
+    'dimensions': dimensions.map((d) => d.toJson()).toList(),
+    'elevationMarkers': elevationMarkers.map((m) => m.toJson()).toList(),
+    'annotations': annotations.map((a) => a.toJson()).toList(),
+    'cadPrimitives': cadPrimitives.map((p) => p.toJson()).toList(),
+  };
 
-  factory ArchitectStorey.fromJson(Map<String, dynamic> json) =>
-      ArchitectStorey(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
-        height: (json['height'] as num?)?.toDouble() ?? 2.80,
-        floorFinishThickness:
-            (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
-        walls: (json['walls'] as List<dynamic>?)
-                ?.map((w) => ArchitectWall.fromJson(w as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        zones: (json['zones'] as List<dynamic>?)
-                ?.map((z) => ArchitectZone.fromJson(z as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        columns: (json['columns'] as List<dynamic>?)
-                ?.map((c) => ArchitectColumn.fromJson(c as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        beams: (json['beams'] as List<dynamic>?)
-                ?.map((b) => ArchitectBeam.fromJson(b as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        slabs: (json['slabs'] as List<dynamic>?)
-                ?.map((s) => ArchitectSlab.fromJson(s as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        openings: (json['openings'] as List<dynamic>?)
-                ?.map((o) => ArchitectOpening.fromJson(o as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        stairs: (json['stairs'] as List<dynamic>?)
-                ?.map((st) => ArchitectStair.fromJson(st as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        dimensions: (json['dimensions'] as List<dynamic>?)
-                ?.map((d) => ArchitectDimension.fromJson(d as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        elevationMarkers: (json['elevationMarkers'] as List<dynamic>?)
-                ?.map((m) => ArchitectElevationMarker.fromJson(m as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        annotations: (json['annotations'] as List<dynamic>?)
-                ?.map((a) => ArchitectAnnotation.fromJson(a as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        cadPrimitives: (json['cadPrimitives'] as List<dynamic>?)
-                ?.map((p) => ArchitectCadPrimitive.fromJson(p as Map<String, dynamic>))
-                .toList() ??
-            const [],
-      );
+  factory ArchitectStorey.fromJson(
+    Map<String, dynamic> json,
+  ) => ArchitectStorey(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
+    height: (json['height'] as num?)?.toDouble() ?? 2.80,
+    floorFinishThickness:
+        (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
+    walls:
+        (json['walls'] as List<dynamic>?)
+            ?.map((w) => ArchitectWall.fromJson(w as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    zones:
+        (json['zones'] as List<dynamic>?)
+            ?.map((z) => ArchitectZone.fromJson(z as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    columns:
+        (json['columns'] as List<dynamic>?)
+            ?.map((c) => ArchitectColumn.fromJson(c as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    beams:
+        (json['beams'] as List<dynamic>?)
+            ?.map((b) => ArchitectBeam.fromJson(b as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    slabs:
+        (json['slabs'] as List<dynamic>?)
+            ?.map((s) => ArchitectSlab.fromJson(s as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    openings:
+        (json['openings'] as List<dynamic>?)
+            ?.map((o) => ArchitectOpening.fromJson(o as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    stairs:
+        (json['stairs'] as List<dynamic>?)
+            ?.map((st) => ArchitectStair.fromJson(st as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    dimensions:
+        (json['dimensions'] as List<dynamic>?)
+            ?.map((d) => ArchitectDimension.fromJson(d as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    elevationMarkers:
+        (json['elevationMarkers'] as List<dynamic>?)
+            ?.map(
+              (m) =>
+                  ArchitectElevationMarker.fromJson(m as Map<String, dynamic>),
+            )
+            .toList() ??
+        const [],
+    annotations:
+        (json['annotations'] as List<dynamic>?)
+            ?.map(
+              (a) => ArchitectAnnotation.fromJson(a as Map<String, dynamic>),
+            )
+            .toList() ??
+        const [],
+    cadPrimitives:
+        (json['cadPrimitives'] as List<dynamic>?)
+            ?.map(
+              (p) => ArchitectCadPrimitive.fromJson(p as Map<String, dynamic>),
+            )
+            .toList() ??
+        const [],
+  );
 }
 
 /// The root model for an architectural concept project.
@@ -218,9 +252,10 @@ class ArchitectProject {
     this.wallTypes = const [],
   });
 
-  ArchitectStorey get activeStorey =>
-      storeys.firstWhere((s) => s.id == activeStoreyId,
-          orElse: () => storeys.isNotEmpty ? storeys.first : _emptyStorey);
+  ArchitectStorey get activeStorey => storeys.firstWhere(
+    (s) => s.id == activeStoreyId,
+    orElse: () => storeys.isNotEmpty ? storeys.first : _emptyStorey,
+  );
 
   static const _emptyStorey = ArchitectStorey(
     id: 'default',
@@ -249,59 +284,60 @@ class ArchitectProject {
     String? activeStoreyId,
     List<StructuralGridAxis>? gridAxes,
     List<ArchitectWallType>? wallTypes,
-  }) =>
-      ArchitectProject(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-        units: units ?? this.units,
-        storeys: storeys ?? this.storeys,
-        activeStoreyId: activeStoreyId ?? this.activeStoreyId,
-        gridAxes: gridAxes ?? this.gridAxes,
-        wallTypes: wallTypes ?? this.wallTypes,
-      );
+  }) => ArchitectProject(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    units: units ?? this.units,
+    storeys: storeys ?? this.storeys,
+    activeStoreyId: activeStoreyId ?? this.activeStoreyId,
+    gridAxes: gridAxes ?? this.gridAxes,
+    wallTypes: wallTypes ?? this.wallTypes,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-        'units': units.name,
-        'storeys': storeys.map((s) => s.toJson()).toList(),
-        'activeStoreyId': activeStoreyId,
-        'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
-        'wallTypes': wallTypes.map((w) => w.toJson()).toList(),
-      };
+    'id': id,
+    'name': name,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+    'units': units.name,
+    'storeys': storeys.map((s) => s.toJson()).toList(),
+    'activeStoreyId': activeStoreyId,
+    'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
+    'wallTypes': wallTypes.map((w) => w.toJson()).toList(),
+  };
 
-  factory ArchitectProject.fromJson(Map<String, dynamic> json) =>
-      ArchitectProject(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-            DateTime.now(),
-        updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
-            DateTime.now(),
-        units: ArchitectUnit.values.firstWhere(
-          (u) => u.name == json['units'],
-          orElse: () => ArchitectUnit.meters,
-        ),
-        storeys: (json['storeys'] as List<dynamic>?)
-                ?.map((s) => ArchitectStorey.fromJson(s as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        activeStoreyId: json['activeStoreyId'] as String? ?? '',
-        gridAxes: (json['gridAxes'] as List<dynamic>?)
-                ?.map((a) =>
-                    StructuralGridAxis.fromJson(a as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        wallTypes: (json['wallTypes'] as List<dynamic>?)
-                ?.map((w) =>
-                    ArchitectWallType.fromJson(w as Map<String, dynamic>))
-                .toList() ??
-            ArchitectWallType.standardCatalog(),
-      );
+  factory ArchitectProject.fromJson(
+    Map<String, dynamic> json,
+  ) => ArchitectProject(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    createdAt:
+        DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+    updatedAt:
+        DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
+    units: ArchitectUnit.values.firstWhere(
+      (u) => u.name == json['units'],
+      orElse: () => ArchitectUnit.meters,
+    ),
+    storeys:
+        (json['storeys'] as List<dynamic>?)
+            ?.map((s) => ArchitectStorey.fromJson(s as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    activeStoreyId: json['activeStoreyId'] as String? ?? '',
+    gridAxes:
+        (json['gridAxes'] as List<dynamic>?)
+            ?.map((a) => StructuralGridAxis.fromJson(a as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    wallTypes:
+        (json['wallTypes'] as List<dynamic>?)
+            ?.map((w) => ArchitectWallType.fromJson(w as Map<String, dynamic>))
+            .toList() ??
+        ArchitectWallType.standardCatalog(),
+  );
 
   /// Factory creating an architectural project configured from the starter wizard.
   factory ArchitectProject.starterWithCatalog({
@@ -326,12 +362,14 @@ class ArchitectProject {
       final name = currentElevation.abs() < 1e-4
           ? '±0.00'
           : '+${currentElevation.toStringAsFixed(2)}';
-      storeys.add(ArchitectStorey(
-        id: 'storey_$i',
-        name: name,
-        elevation: currentElevation,
-        height: h,
-      ));
+      storeys.add(
+        ArchitectStorey(
+          id: 'storey_$i',
+          name: name,
+          elevation: currentElevation,
+          height: h,
+        ),
+      );
       currentElevation += h;
     }
 
@@ -343,7 +381,8 @@ class ArchitectProject {
       customSpacingY: customSpacingY,
     );
 
-    final finalWallTypes = wallTypes ??
+    final finalWallTypes =
+        wallTypes ??
         ArchitectWallType.standardCatalog(
           parapetHeight: ArchitectWallType.resolveParapetHeight(
             storeyElevation: currentElevation,
@@ -385,12 +424,14 @@ class ArchitectProject {
       final name = i == 0
           ? 'Партер ±0.00'
           : 'Етаж $i (+${currentElevation.toStringAsFixed(2)})';
-      storeys.add(ArchitectStorey(
-        id: 'storey_$i',
-        name: name,
-        elevation: currentElevation,
-        height: h,
-      ));
+      storeys.add(
+        ArchitectStorey(
+          id: 'storey_$i',
+          name: name,
+          elevation: currentElevation,
+          height: h,
+        ),
+      );
       currentElevation += h;
     }
 
@@ -402,28 +443,32 @@ class ArchitectProject {
 
       for (int i = 0; i < axesX; i++) {
         final x = i * spacingX;
-        axes.add(StructuralGridAxis(
-          id: 'axis_x_$i',
-          name: '${i + 1}',
-          start: Offset(x, -margin),
-          end: Offset(x, totalHeight + margin),
-          bubbleAtStart: true,
-          bubbleAtEnd: true,
-        ));
+        axes.add(
+          StructuralGridAxis(
+            id: 'axis_x_$i',
+            name: '${i + 1}',
+            start: Offset(x, -margin),
+            end: Offset(x, totalHeight + margin),
+            bubbleAtStart: true,
+            bubbleAtEnd: true,
+          ),
+        );
       }
 
       final letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
       for (int j = 0; j < axesY; j++) {
         final y = j * spacingY;
         final label = j < letters.length ? letters[j] : 'Y$j';
-        axes.add(StructuralGridAxis(
-          id: 'axis_y_$j',
-          name: label,
-          start: Offset(-margin, y),
-          end: Offset(totalWidth + margin, y),
-          bubbleAtStart: true,
-          bubbleAtEnd: true,
-        ));
+        axes.add(
+          StructuralGridAxis(
+            id: 'axis_y_$j',
+            name: label,
+            start: Offset(-margin, y),
+            end: Offset(totalWidth + margin, y),
+            bubbleAtStart: true,
+            bubbleAtEnd: true,
+          ),
+        );
       }
     }
 

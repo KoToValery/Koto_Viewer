@@ -42,19 +42,18 @@ class ArchitectWindow {
     int panesCount = 2,
     String? specId,
     String? uuid,
-  }) =>
-      ArchitectWindow(
-        id: id ?? this.id,
-        wallId: wallId ?? this.wallId,
-        offsetRatio: offsetRatio ?? this.offsetRatio,
-        width: width ?? this.width,
-        height: height ?? this.height,
-        sillHeight: sillHeight ?? this.sillHeight,
-        frameThickness: frameThickness ?? this.frameThickness,
-        panesCount: panesCount,
-        specId: specId ?? this.specId,
-        uuid: uuid ?? this.uuid,
-      );
+  }) => ArchitectWindow(
+    id: id ?? this.id,
+    wallId: wallId ?? this.wallId,
+    offsetRatio: offsetRatio ?? this.offsetRatio,
+    width: width ?? this.width,
+    height: height ?? this.height,
+    sillHeight: sillHeight ?? this.sillHeight,
+    frameThickness: frameThickness ?? this.frameThickness,
+    panesCount: panesCount,
+    specId: specId ?? this.specId,
+    uuid: uuid ?? this.uuid,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -69,18 +68,19 @@ class ArchitectWindow {
     'uuid': uuid,
   };
 
-  factory ArchitectWindow.fromJson(Map<String, dynamic> json) => ArchitectWindow(
-    id: json['id'] as String,
-    wallId: json['wallId'] as String,
-    offsetRatio: (json['offsetRatio'] as num).toDouble(),
-    width: (json['width'] as num?)?.toDouble() ?? 1.20,
-    height: (json['height'] as num?)?.toDouble() ?? 1.40,
-    sillHeight: (json['sillHeight'] as num?)?.toDouble() ?? 0.85,
-    frameThickness: (json['frameThickness'] as num?)?.toDouble() ?? 0.05,
-    panesCount: (json['panesCount'] as num?)?.toInt() ?? 2,
-    specId: json['specId'] as String? ?? 'П1',
-    uuid: json['uuid'] as String? ?? json['id'] as String,
-  );
+  factory ArchitectWindow.fromJson(Map<String, dynamic> json) =>
+      ArchitectWindow(
+        id: json['id'] as String,
+        wallId: json['wallId'] as String,
+        offsetRatio: (json['offsetRatio'] as num).toDouble(),
+        width: (json['width'] as num?)?.toDouble() ?? 1.20,
+        height: (json['height'] as num?)?.toDouble() ?? 1.40,
+        sillHeight: (json['sillHeight'] as num?)?.toDouble() ?? 0.85,
+        frameThickness: (json['frameThickness'] as num?)?.toDouble() ?? 0.05,
+        panesCount: (json['panesCount'] as num?)?.toInt() ?? 2,
+        specId: json['specId'] as String? ?? 'П1',
+        uuid: json['uuid'] as String? ?? json['id'] as String,
+      );
 
   // ===========================================================================
   // 2D CANVAS RENDERING
@@ -131,8 +131,14 @@ class ArchitectWindow {
     // 1. Cut wall opening rectangle (fill with white to mask wall fill)
     final openingPath = Path()
       ..moveTo(pLeftBase.dx - n.dx * halfThick, pLeftBase.dy - n.dy * halfThick)
-      ..lineTo(pRightBase.dx - n.dx * halfThick, pRightBase.dy - n.dy * halfThick)
-      ..lineTo(pRightBase.dx + n.dx * halfThick, pRightBase.dy + n.dy * halfThick)
+      ..lineTo(
+        pRightBase.dx - n.dx * halfThick,
+        pRightBase.dy - n.dy * halfThick,
+      )
+      ..lineTo(
+        pRightBase.dx + n.dx * halfThick,
+        pRightBase.dy + n.dy * halfThick,
+      )
       ..lineTo(pLeftBase.dx + n.dx * halfThick, pLeftBase.dy + n.dy * halfThick)
       ..close();
     canvas.drawPath(openingPath, openingCutPaint);
@@ -205,8 +211,11 @@ class ArchitectWindow {
         text: TextSpan(
           text: text,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF0277BD),
-            fontSize: 9.0 / zoomScale * 14.0,
+            color: isSelected
+                ? const Color(0xFF00E5FF)
+                : const Color(0xFF0277BD),
+            fontFamily: 'Roboto',
+            fontSize: 12.0,
             fontWeight: FontWeight.bold,
             height: 1.1,
           ),
@@ -224,6 +233,7 @@ class ArchitectWindow {
         angle += math.pi;
       }
       canvas.rotate(angle);
+      canvas.scale(1.0 / zoomScale);
       tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
       canvas.restore();
     }
@@ -278,7 +288,16 @@ class ArchitectWindow {
     final gp2 = (centerPos + u * (halfW - jWidth)) - n * 0.01;
     final gp3 = (centerPos + u * (halfW - jWidth)) + n * 0.01;
     final gp4 = (centerPos - u * (halfW - jWidth)) + n * 0.01;
-    _addBox3D(tris, gp1, gp2, gp3, gp4, zBottom + 0.04, zTop - 0.04, glassColor);
+    _addBox3D(
+      tris,
+      gp1,
+      gp2,
+      gp3,
+      gp4,
+      zBottom + 0.04,
+      zTop - 0.04,
+      glassColor,
+    );
 
     return tris;
   }

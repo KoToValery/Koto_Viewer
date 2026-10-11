@@ -35,7 +35,9 @@ class ArchitectZonePainterHelper {
         draggingVertexPoint: isSelected ? draggingVertexPoint : null,
         mergeCandidateIndex: isSelected ? mergeCandidateIndex : null,
         extrudePreviewPolygon: isSelected ? extrudePreviewPolygon : null,
-        isExtrudeSelfIntersecting: isSelected ? isExtrudeSelfIntersecting : false,
+        isExtrudeSelfIntersecting: isSelected
+            ? isExtrudeSelfIntersecting
+            : false,
         editingPolygon: isSelected ? editingPolygon : null,
         isMoveWholeZoneMode: isSelected ? isMoveWholeZoneMode : false,
         moveDistanceMeters: isSelected ? moveDistanceMeters : 0.0,
@@ -60,8 +62,8 @@ class ArchitectZonePainterHelper {
     final poly = extrudePreviewPolygon != null
         ? List<Offset>.from(extrudePreviewPolygon)
         : (isSelected && editingPolygon != null
-            ? List<Offset>.from(editingPolygon)
-            : List<Offset>.from(zone.polygon));
+              ? List<Offset>.from(editingPolygon)
+              : List<Offset>.from(zone.polygon));
     if (poly.length < 3) return;
 
     // If a vertex is currently being dragged, substitute its position for live preview
@@ -87,7 +89,9 @@ class ArchitectZonePainterHelper {
     // 2. Zone border
     final borderColor = isExtrudeSelfIntersecting
         ? const Color(0xFFFF5252)
-        : (isSelected ? const Color(0xFF00E5FF) : zone.color.withValues(alpha: 0.85));
+        : (isSelected
+              ? const Color(0xFF00E5FF)
+              : zone.color.withValues(alpha: 0.85));
     final borderPaint = Paint()
       ..color = borderColor
       ..strokeWidth = (isSelected ? 2.2 : 1.2) / zoomScale
@@ -123,6 +127,11 @@ class ArchitectZonePainterHelper {
     required double zoomScale,
     required bool isSelected,
   }) {
+    canvas.save();
+    canvas.translate(centroid.dx, centroid.dy);
+    canvas.scale(1.0 / zoomScale);
+    centroid = Offset.zero;
+    zoomScale = 1;
     final areaText = '${zone.area.toStringAsFixed(1)} m²';
     final nameText = zone.name;
 
@@ -130,6 +139,7 @@ class ArchitectZonePainterHelper {
       text: nameText,
       style: TextStyle(
         color: Colors.white,
+        fontFamily: 'Roboto',
         fontSize: 11.0 / zoomScale,
         fontWeight: FontWeight.bold,
       ),
@@ -138,6 +148,7 @@ class ArchitectZonePainterHelper {
       text: '\n$areaText',
       style: TextStyle(
         color: zone.color,
+        fontFamily: 'Roboto',
         fontSize: 10.0 / zoomScale,
         fontWeight: FontWeight.w600,
       ),
@@ -161,8 +172,9 @@ class ArchitectZonePainterHelper {
       ..color = const Color(0xDE1A1C24)
       ..style = PaintingStyle.fill;
     final borderPaint = Paint()
-      ..color = (isSelected ? const Color(0xFF00E5FF) : zone.color)
-          .withValues(alpha: 0.6)
+      ..color = (isSelected ? const Color(0xFF00E5FF) : zone.color).withValues(
+        alpha: 0.6,
+      )
       ..strokeWidth = 1.0 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -175,10 +187,8 @@ class ArchitectZonePainterHelper {
       borderPaint,
     );
 
-    tp.paint(
-      canvas,
-      centroid - Offset(tp.width / 2, tp.height / 2),
-    );
+    tp.paint(canvas, centroid - Offset(tp.width / 2, tp.height / 2));
+    canvas.restore();
   }
 
   /// Draws dynamic vertex handles and edge midpoint grips.
@@ -234,7 +244,8 @@ class ArchitectZonePainterHelper {
       ..style = PaintingStyle.stroke;
 
     final mergeFill = Paint()
-      ..color = const Color(0xFFFF3D00) // Red pulse for merge candidate
+      ..color =
+          const Color(0xFFFF3D00) // Red pulse for merge candidate
       ..style = PaintingStyle.fill;
 
     for (int i = 0; i < polygon.length; i++) {
@@ -245,7 +256,8 @@ class ArchitectZonePainterHelper {
       // Drop shadow
       canvas.drawCircle(
         v,
-        (isMergeCandidate || isDragging ? vertexRadius * 1.4 : vertexRadius) + 1.5 / zoomScale,
+        (isMergeCandidate || isDragging ? vertexRadius * 1.4 : vertexRadius) +
+            1.5 / zoomScale,
         Paint()..color = Colors.black45,
       );
 
@@ -271,6 +283,7 @@ class ArchitectZonePainterHelper {
           text: '${i + 1}',
           style: TextStyle(
             color: Colors.black87,
+            fontFamily: 'Roboto',
             fontSize: 10.5 / zoomScale,
             fontWeight: FontWeight.bold,
           ),
@@ -298,6 +311,7 @@ class ArchitectZonePainterHelper {
         text: '${length.toStringAsFixed(2)} m',
         style: TextStyle(
           color: const Color(0xFFEEEEEE),
+          fontFamily: 'Roboto',
           fontSize: 8.5 / zoomScale,
           fontWeight: FontWeight.bold,
         ),
@@ -344,12 +358,14 @@ class ArchitectZonePainterHelper {
     canvas.drawRect(rect, borderPaint);
 
     // Live dimensions badge in center
-    final label = '${category.defaultBgName}\n${w.toStringAsFixed(2)} × ${h.toStringAsFixed(2)} m\n${area.toStringAsFixed(1)} m²';
+    final label =
+        '${category.defaultBgName}\n${w.toStringAsFixed(2)} × ${h.toStringAsFixed(2)} m\n${area.toStringAsFixed(1)} m²';
     final tp = TextPainter(
       text: TextSpan(
         text: label,
         style: TextStyle(
           color: Colors.white,
+          fontFamily: 'Roboto',
           fontSize: 10.5 / zoomScale,
           fontWeight: FontWeight.bold,
         ),
@@ -442,7 +458,8 @@ class ArchitectZonePainterHelper {
 
     // 0. Quick rectangle mode preview
     if (previewRectangle.length == 4) {
-      final rectPath = Path()..moveTo(previewRectangle[0].dx, previewRectangle[0].dy);
+      final rectPath = Path()
+        ..moveTo(previewRectangle[0].dx, previewRectangle[0].dy);
       for (int i = 1; i < 4; i++) {
         rectPath.lineTo(previewRectangle[i].dx, previewRectangle[i].dy);
       }
@@ -483,8 +500,9 @@ class ArchitectZonePainterHelper {
       fillPath.close();
 
       final fillPaint = Paint()
-        ..color = (isSelfIntersecting ? const Color(0xFFFF5252) : category.color)
-            .withValues(alpha: 0.18)
+        ..color =
+            (isSelfIntersecting ? const Color(0xFFFF5252) : category.color)
+                .withValues(alpha: 0.18)
         ..style = PaintingStyle.fill;
       canvas.drawPath(fillPath, fillPaint);
     }
@@ -503,7 +521,13 @@ class ArchitectZonePainterHelper {
       canvas.drawLine(points[i], points[i + 1], committedPaint);
       final edgeLen = (points[i + 1] - points[i]).distance;
       if (edgeLen > 0.6) {
-        _drawEdgeDimension(canvas, points[i], points[i + 1], edgeLen, zoomScale);
+        _drawEdgeDimension(
+          canvas,
+          points[i],
+          points[i + 1],
+          edgeLen,
+          zoomScale,
+        );
       }
     }
 
@@ -537,7 +561,13 @@ class ArchitectZonePainterHelper {
         ..color = const Color(0xFFFFD600).withValues(alpha: 0.85)
         ..strokeWidth = 1.2 / zoomScale
         ..style = PaintingStyle.stroke;
-      _drawDashedLine(canvas, orthoGuide.$1, orthoGuide.$2, orthoPaint, zoomScale);
+      _drawDashedLine(
+        canvas,
+        orthoGuide.$1,
+        orthoGuide.$2,
+        orthoPaint,
+        zoomScale,
+      );
     }
 
     // 5. Committed vertex nodes (Numbered 1..N GPS_Mapping style)
@@ -551,7 +581,9 @@ class ArchitectZonePainterHelper {
       if (isStartNode) {
         // --- POINT 1: SPECIAL START BEACON & CLOSING TARGET ---
         final beaconRadius = (isClosingSnap ? 24.0 : 20.0) / zoomScale;
-        final beaconColor = isClosingSnap ? const Color(0xFF00E676) : const Color(0xFF00E5FF);
+        final beaconColor = isClosingSnap
+            ? const Color(0xFF00E676)
+            : const Color(0xFF00E5FF);
 
         // Pulsing radar glow aura
         canvas.drawCircle(
@@ -608,6 +640,7 @@ class ArchitectZonePainterHelper {
             text: '1',
             style: TextStyle(
               color: Colors.black87,
+              fontFamily: 'Roboto',
               fontSize: 12.0 / zoomScale,
               fontWeight: FontWeight.w900,
             ),
@@ -623,6 +656,7 @@ class ArchitectZonePainterHelper {
               text: '1',
               style: TextStyle(
                 color: const Color(0xFF00E5FF),
+                fontFamily: 'Roboto',
                 fontSize: 9.5 / zoomScale,
                 fontWeight: FontWeight.bold,
               ),
@@ -630,7 +664,8 @@ class ArchitectZonePainterHelper {
             textDirection: TextDirection.ltr,
           )..layout();
 
-          final labelPos = pt + Offset(-tpLabel.width / 2, beaconRadius + 4.0 / zoomScale);
+          final labelPos =
+              pt + Offset(-tpLabel.width / 2, beaconRadius + 4.0 / zoomScale);
           final labelRect = Rect.fromLTWH(
             labelPos.dx - 6.0 / zoomScale,
             labelPos.dy - 3.0 / zoomScale,
@@ -638,11 +673,17 @@ class ArchitectZonePainterHelper {
             tpLabel.height + 6.0 / zoomScale,
           );
           canvas.drawRRect(
-            RRect.fromRectAndRadius(labelRect, Radius.circular(5.0 / zoomScale)),
+            RRect.fromRectAndRadius(
+              labelRect,
+              Radius.circular(5.0 / zoomScale),
+            ),
             Paint()..color = const Color(0xEE1A1C24),
           );
           canvas.drawRRect(
-            RRect.fromRectAndRadius(labelRect, Radius.circular(5.0 / zoomScale)),
+            RRect.fromRectAndRadius(
+              labelRect,
+              Radius.circular(5.0 / zoomScale),
+            ),
             Paint()
               ..color = const Color(0xFF00E5FF)
               ..strokeWidth = 1.0 / zoomScale
@@ -659,6 +700,7 @@ class ArchitectZonePainterHelper {
               text: badgeText,
               style: TextStyle(
                 color: const Color(0xFF00E676),
+                fontFamily: 'Roboto',
                 fontSize: 10.5 / zoomScale,
                 fontWeight: FontWeight.bold,
               ),
@@ -666,7 +708,12 @@ class ArchitectZonePainterHelper {
             textDirection: TextDirection.ltr,
           )..layout();
 
-          final badgePos = pt - Offset(tpClose.width / 2, (beaconRadius + tpClose.height + 6.0 / zoomScale));
+          final badgePos =
+              pt -
+              Offset(
+                tpClose.width / 2,
+                (beaconRadius + tpClose.height + 6.0 / zoomScale),
+              );
           final badgeRect = Rect.fromLTWH(
             badgePos.dx - 7.0 / zoomScale,
             badgePos.dy - 4.0 / zoomScale,
@@ -674,11 +721,17 @@ class ArchitectZonePainterHelper {
             tpClose.height + 8.0 / zoomScale,
           );
           canvas.drawRRect(
-            RRect.fromRectAndRadius(badgeRect, Radius.circular(6.0 / zoomScale)),
+            RRect.fromRectAndRadius(
+              badgeRect,
+              Radius.circular(6.0 / zoomScale),
+            ),
             Paint()..color = const Color(0xF2161822),
           );
           canvas.drawRRect(
-            RRect.fromRectAndRadius(badgeRect, Radius.circular(6.0 / zoomScale)),
+            RRect.fromRectAndRadius(
+              badgeRect,
+              Radius.circular(6.0 / zoomScale),
+            ),
             Paint()
               ..color = const Color(0xFF00E676)
               ..strokeWidth = 1.5 / zoomScale
@@ -711,6 +764,7 @@ class ArchitectZonePainterHelper {
             text: '${i + 1}',
             style: TextStyle(
               color: Colors.white,
+              fontFamily: 'Roboto',
               fontSize: 11.0 / zoomScale,
               fontWeight: FontWeight.bold,
             ),
@@ -744,6 +798,7 @@ class ArchitectZonePainterHelper {
         text: text,
         style: TextStyle(
           color: Colors.white,
+          fontFamily: 'Roboto',
           fontSize: 9.5 / zoomScale,
           fontWeight: FontWeight.bold,
         ),
@@ -784,7 +839,9 @@ class ArchitectZonePainterHelper {
   }) {
     final vNew1 = v1 + normal * distance;
     final vNew2 = v2 + normal * distance;
-    final color = isSelfIntersecting ? const Color(0xFFFF5252) : const Color(0xFF00E5FF);
+    final color = isSelfIntersecting
+        ? const Color(0xFFFF5252)
+        : const Color(0xFF00E5FF);
 
     final linePaint = Paint()
       ..color = color
@@ -797,12 +854,14 @@ class ArchitectZonePainterHelper {
 
     // Dimension badge
     final midExtruded = (vNew1 + vNew2) / 2.0;
-    final distText = '${distance >= 0 ? "+" : ""}${distance.toStringAsFixed(2)} m';
+    final distText =
+        '${distance >= 0 ? "+" : ""}${distance.toStringAsFixed(2)} m';
     final tp = TextPainter(
       text: TextSpan(
         text: distText,
         style: TextStyle(
           color: Colors.white,
+          fontFamily: 'Roboto',
           fontSize: 9.5 / zoomScale,
           fontWeight: FontWeight.bold,
         ),

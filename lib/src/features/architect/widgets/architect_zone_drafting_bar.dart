@@ -24,6 +24,13 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: tool,
+      builder: (context, child) => _buildContents(context),
+    );
+  }
+
+  Widget _buildContents(BuildContext context) {
     final l10n = context.l10n;
     final isSelfIntersecting =
         tool.pointStatus == ZoneDraftingPointStatus.selfIntersects;
@@ -92,7 +99,10 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: tool.draftPointCount == 0
                       ? category.color.withValues(alpha: 0.18)
@@ -109,10 +119,14 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                     Icon(
                       tool.draftPointCount == 0
                           ? Icons.touch_app_rounded
-                          : (canClose ? Icons.check_circle_outline_rounded : Icons.edit_location_alt_rounded),
+                          : (canClose
+                                ? Icons.check_circle_outline_rounded
+                                : Icons.edit_location_alt_rounded),
                       color: tool.draftPointCount == 0
                           ? category.color
-                          : (canClose ? const Color(0xFF00E676) : const Color(0xFF00E5FF)),
+                          : (canClose
+                                ? const Color(0xFF00E676)
+                                : const Color(0xFF00E5FF)),
                       size: 16,
                     ),
                     const SizedBox(width: 8),
@@ -121,12 +135,16 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                         tool.draftPointCount == 0
                             ? l10n.architectZoneTapFirstPoint
                             : (canClose
-                                ? l10n.architectZonePointSnapStart
-                                : l10n.architectZoneNextPointPrompt(tool.draftPointCount + 1)),
+                                  ? l10n.architectZonePointSnapStart
+                                  : l10n.architectZoneNextPointPrompt(
+                                      tool.draftPointCount + 1,
+                                    )),
                         style: TextStyle(
                           color: tool.draftPointCount == 0
                               ? Colors.white
-                              : (canClose ? const Color(0xFF00E676) : Colors.white),
+                              : (canClose
+                                    ? const Color(0xFF00E676)
+                                    : Colors.white),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -148,8 +166,10 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
               children: [
                 // Category pill
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: category.color.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(8),
@@ -216,8 +236,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                 if (tool.activeSegmentLength != null) ...[
                   _buildMetricChip(
                     icon: Icons.straighten_rounded,
-                    label:
-                        '${tool.activeSegmentLength!.toStringAsFixed(2)} m',
+                    label: '${tool.activeSegmentLength!.toStringAsFixed(2)} m',
                     subLabel: tool.orthoLabel,
                     color: const Color(0xFFFFD600),
                   ),

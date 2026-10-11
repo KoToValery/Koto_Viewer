@@ -9,6 +9,7 @@ class DxfSegmentSnap {
     required Offset point,
     required double radius,
     bool continuousOnly = false,
+    Map<String, bool> layerVisibility = const {},
   }) {
     if (!radius.isFinite || radius <= 0) return [];
     final query = Rect.fromCircle(center: point, radius: radius);
@@ -41,7 +42,8 @@ class DxfSegmentSnap {
         return;
       }
       final layer = e.layer == '0' ? inheritedLayer : e.layer;
-      if (document.layers[layer]?.isVisible == false) {
+      if (document.layers[layer]?.isVisible == false ||
+          layerVisibility[layer] == false) {
         return;
       }
       var type = (e.lineType ?? 'BYLAYER').toUpperCase();

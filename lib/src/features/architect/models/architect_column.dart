@@ -33,16 +33,15 @@ class ArchitectColumn {
     double? depth,
     double? rotationDeg,
     String? label,
-  }) =>
-      ArchitectColumn(
-        id: id ?? this.id,
-        position: position ?? this.position,
-        shape: shape ?? this.shape,
-        width: width ?? this.width,
-        depth: depth ?? this.depth,
-        rotationDeg: rotationDeg ?? this.rotationDeg,
-        label: label ?? this.label,
-      );
+  }) => ArchitectColumn(
+    id: id ?? this.id,
+    position: position ?? this.position,
+    shape: shape ?? this.shape,
+    width: width ?? this.width,
+    depth: depth ?? this.depth,
+    rotationDeg: rotationDeg ?? this.rotationDeg,
+    label: label ?? this.label,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -54,21 +53,22 @@ class ArchitectColumn {
     'label': label,
   };
 
-  factory ArchitectColumn.fromJson(Map<String, dynamic> json) => ArchitectColumn(
-    id: json['id'] as String,
-    position: Offset(
-      (json['position']['x'] as num).toDouble(),
-      (json['position']['y'] as num).toDouble(),
-    ),
-    shape: ColumnShape.values.firstWhere(
-      (s) => s.name == json['shape'],
-      orElse: () => ColumnShape.rectangular,
-    ),
-    width: (json['width'] as num?)?.toDouble() ?? 0.25,
-    depth: (json['depth'] as num?)?.toDouble() ?? 0.25,
-    rotationDeg: (json['rotationDeg'] as num?)?.toDouble() ?? 0.0,
-    label: json['label'] as String? ?? 'К1',
-  );
+  factory ArchitectColumn.fromJson(Map<String, dynamic> json) =>
+      ArchitectColumn(
+        id: json['id'] as String,
+        position: Offset(
+          (json['position']['x'] as num).toDouble(),
+          (json['position']['y'] as num).toDouble(),
+        ),
+        shape: ColumnShape.values.firstWhere(
+          (s) => s.name == json['shape'],
+          orElse: () => ColumnShape.rectangular,
+        ),
+        width: (json['width'] as num?)?.toDouble() ?? 0.25,
+        depth: (json['depth'] as num?)?.toDouble() ?? 0.25,
+        rotationDeg: (json['rotationDeg'] as num?)?.toDouble() ?? 0.0,
+        label: json['label'] as String? ?? 'К1',
+      );
 
   bool containsPoint(Offset pt, {double tolerance = 0.10}) {
     if (shape == ColumnShape.circular) {
@@ -134,12 +134,15 @@ class ArchitectColumn {
       final dCm = (depth * 100).round();
       final text = shape == ColumnShape.circular ? 'd=$wCm' : '$wCm/$dCm';
 
+      canvas.save();
+      canvas.scale(1.0 / zoomScale);
       final tp = TextPainter(
         text: TextSpan(
           text: text,
           style: TextStyle(
             color: isSelected ? const Color(0xFF00E5FF) : Colors.white,
-            fontSize: 7.0 / zoomScale * 14.0,
+            fontFamily: 'Roboto',
+            fontSize: 11.0,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -148,6 +151,7 @@ class ArchitectColumn {
       )..layout();
 
       tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      canvas.restore();
     }
 
     canvas.restore();
@@ -172,8 +176,14 @@ class ArchitectColumn {
         final a1 = (i / segments) * 2 * math.pi;
         final a2 = ((i + 1) / segments) * 2 * math.pi;
 
-        final p1 = Offset(position.dx + r * math.cos(a1), position.dy + r * math.sin(a1));
-        final p2 = Offset(position.dx + r * math.cos(a2), position.dy + r * math.sin(a2));
+        final p1 = Offset(
+          position.dx + r * math.cos(a1),
+          position.dy + r * math.sin(a1),
+        );
+        final p2 = Offset(
+          position.dx + r * math.cos(a2),
+          position.dy + r * math.sin(a2),
+        );
 
         final v1B = Vector3(p1.dx, p1.dy, zMin);
         final v2B = Vector3(p2.dx, p2.dy, zMin);

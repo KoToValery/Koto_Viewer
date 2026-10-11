@@ -1,15 +1,10 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_project.dart';
+import 'architect_snap_helper.dart';
 import '../models/architect_zone.dart';
 
-enum ArchitectZoneSnapType {
-  none,
-  gridAxis,
-  zoneVertex,
-  zoneEdge,
-  zoneWallGap,
-}
+enum ArchitectZoneSnapType { none, gridAxis, zoneVertex, zoneEdge, zoneWallGap }
 
 class ArchitectZoneSnapResult {
   final Offset point;
@@ -39,8 +34,13 @@ class ArchitectZoneSnap {
     String? excludedZoneId,
     int? movingVertexIndex,
     double tolerance = 0.25, // in meters
-    List<double> wallGaps = const [0.0, 0.12, 0.25], // standard wall thicknesses
+    List<double> wallGaps = const [
+      0.0,
+      0.12,
+      0.25,
+    ], // standard wall thicknesses
   }) {
+    tolerance = tolerance.clamp(0.0, .20);
     final activeStorey = project.activeStorey;
     final otherZones = activeStorey.zones
         .where((z) => z.id != excludedZoneId)
@@ -153,9 +153,7 @@ class ArchitectZoneSnap {
               bestLabel = gap == 0.0
                   ? '${zone.name} (Ръб)'
                   : '${zone.name} (+${(gap * 100).round()} cm)';
-              guides = [
-                (targetA - unitAb * 1.5, targetB + unitAb * 1.5),
-              ];
+              guides = [(targetA - unitAb * 1.5, targetB + unitAb * 1.5)];
             }
           }
         }
@@ -165,74 +163,63 @@ class ArchitectZoneSnap {
     // -------------------------------------------------------------------------
     // 4. SNAP TO STRUCTURAL GRID AXES
     // -------------------------------------------------------------------------
-    double snappedX = bestPoint.dx;
-    double snappedY = bestPoint.dy;
-    bool axisSnapX = false;
-    bool axisSnapY = false;
-    String? axisLabelX;
-    String? axisLabelY;
-
-    for (final axis in project.gridAxes) {
-      final isVertical = (axis.end.dx - axis.start.dx).abs() < 1e-3;
-      final isHorizontal = (axis.end.dy - axis.start.dy).abs() < 1e-3;
-
-      if (isVertical) {
-        // Vertical axis: check dx distance
-        final axisX = axis.start.dx;
-        final dX = (raw.dx - axisX).abs();
-        if (dX <= tolerance) {
-          snappedX = axisX;
-          axisSnapX = true;
-          axisLabelX = 'Ос ${axis.name}';
-          guides.add((
-            Offset(axisX, raw.dy - 3.0),
-            Offset(axisX, raw.dy + 3.0),
-          ));
-        }
-      } else if (isHorizontal) {
-        // Horizontal axis: check dy distance
-        final axisY = axis.start.dy;
-        final dY = (raw.dy - axisY).abs();
-        if (dY <= tolerance) {
-          snappedY = axisY;
-          axisSnapY = true;
-          axisLabelY = 'Ос ${axis.name}';
-          guides.add((
-            Offset(raw.dx - 3.0, axisY),
-            Offset(raw.dx + 3.0, axisY),
-          ));
-        }
-      } else {
-        // Angled axis: distance to segment
-        if (axis.distanceToSegment(raw) <= tolerance) {
-          final proj = axis.projectPoint(raw);
-          snappedX = proj.dx;
-          snappedY = proj.dy;
-          bestPoint = proj;
-          bestType = ArchitectZoneSnapType.gridAxis;
-          bestLabel = 'Ос ${axis.name}';
-          final dir = axis.direction;
-          guides.add((
-            proj - dir * 3.0,
-            proj + dir * 3.0,
-          ));
-        }
+    Offset? axisX;
+    Offset? axisY;
+    double distanceX = tolerance + 1e-9, distanceY = tolerance + 1e-9;
+    String? labelX, labelY;
+    void considerAxis(Offset point, String label) {
+      final distance = (point - raw).distance;
+      if (distance <= bestDistance && distance <= tolerance) {
+        bestDistance = distance;
+        bestPoint = point;
+        bestType = ArchitectZoneSnapType.gridAxis;
+        bestLabel = label;
+        guides = [];
       }
     }
 
-    if (axisSnapX || axisSnapY) {
-      bestPoint = Offset(snappedX, snappedY);
-      bestType = ArchitectZoneSnapType.gridAxis;
-      if (axisSnapX && axisSnapY) {
-        bestLabel = '$axisLabelX × $axisLabelY';
+    final axes = project.gridAxes.toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+    for (final axis in axes) {
+      final vertical = (axis.end.dx - axis.start.dx).abs() < 1e-9;
+      final horizontal = (axis.end.dy - axis.start.dy).abs() < 1e-9;
+      if (vertical) {
+        final d = (raw.dx - axis.start.dx).abs();
+        if (d < distanceX) {
+          distanceX = d;
+          axisX = Offset(axis.start.dx, raw.dy);
+          labelX = 'Ос ${axis.name}';
+        }
+      } else if (horizontal) {
+        final d = (raw.dy - axis.start.dy).abs();
+        if (d < distanceY) {
+          distanceY = d;
+          axisY = Offset(raw.dx, axis.start.dy);
+          labelY = 'Ос ${axis.name}';
+        }
       } else {
-        bestLabel = axisLabelX ?? axisLabelY;
+        considerAxis(axis.projectPoint(raw), 'Ос ${axis.name}');
+      }
+    }
+    if (axisX != null) considerAxis(axisX, labelX!);
+    if (axisY != null) considerAxis(axisY, labelY!);
+    if (axisX != null && axisY != null) {
+      final intersection = Offset(axisX.dx, axisY.dy);
+      if ((intersection - raw).distance <= tolerance &&
+          (bestType == ArchitectZoneSnapType.none ||
+              bestType == ArchitectZoneSnapType.gridAxis)) {
+        bestPoint = intersection;
+        bestType = ArchitectZoneSnapType.gridAxis;
+        bestLabel = '$labelX × $labelY';
+        guides = [];
       }
     }
 
     final isSnapped = bestType != ArchitectZoneSnapType.none;
     return ArchitectZoneSnapResult(
-      point: bestPoint,
+      point: isSnapped
+          ? bestPoint
+          : ArchitectSnapHelper.precision(project).inputPoint(raw),
       isSnapped: isSnapped,
       snapType: bestType,
       snapLabel: bestLabel,

@@ -2,6 +2,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
+import '../../dxf_viewer/rendering/dxf_quadtree.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import 'architect_2d_painter.dart';
@@ -10,6 +11,8 @@ import 'architect_2d_painter.dart';
 /// (windows, columns, beams, slabs, openings, stairs, annotations, dimensions, and CAD underlays).
 class ArchitectElementsPainterHelper {
   ArchitectElementsPainterHelper._();
+  static final _indexes = Expando<DxfQuadTree>();
+  static final _paths = Expando<Path>();
 
   // ===========================================================================
   // 1. CAD UNDERLAY (DXF/DWG BACKGROUND)
@@ -20,16 +23,30 @@ class ArchitectElementsPainterHelper {
     required DxfDocument? underlayDoc,
     required double zoomScale,
     required Map<String, bool> layerVisibility,
+    Rect? visibleRect,
   }) {
     if (underlayDoc == null || underlayDoc.entities.isEmpty) return;
 
     final underlayPaint = Paint()
-      ..color = const Color(0x3A00838F) // faint cyan/teal CAD underlay blueprint tone
+      ..color =
+          const Color(0x3A00838F) // faint cyan/teal CAD underlay blueprint tone
       ..strokeWidth = 0.8 / zoomScale
       ..style = PaintingStyle.stroke;
 
-    for (final entity in underlayDoc.entities) {
-      if (layerVisibility[entity.layer] == false) {
+    final entities = visibleRect == null
+        ? underlayDoc.entities
+        : (_indexes[underlayDoc] ??=
+                  underlayDoc.spatialIndex ??
+                  DxfQuadTree.build(
+                    underlayDoc.entities,
+                    underlayDoc.blocks,
+                    underlayDoc.bounds,
+                  ))
+              .query(visibleRect);
+    for (final entity in entities) {
+      if (layerVisibility[entity.layer] == false ||
+          (layerVisibility[entity.layer] == null &&
+              underlayDoc.layers[entity.layer]?.isVisible == false)) {
         continue;
       }
 
@@ -37,28 +54,42 @@ class ArchitectElementsPainterHelper {
         canvas.drawLine(entity.p1, entity.p2, underlayPaint);
       } else if (entity is DxfLwPolyline) {
         if (entity.vertices.length >= 2) {
-          final path = Path()..moveTo(entity.vertices[0].x, entity.vertices[0].y);
-          for (int i = 1; i < entity.vertices.length; i++) {
-            path.lineTo(entity.vertices[i].x, entity.vertices[i].y);
+          final path =
+              _paths[entity] ??
+              (Path()..moveTo(entity.vertices[0].x, entity.vertices[0].y));
+          if (_paths[entity] == null) {
+            for (int i = 1; i < entity.vertices.length; i++) {
+              path.lineTo(entity.vertices[i].x, entity.vertices[i].y);
+            }
+            if (entity.isClosed) path.close();
+            _paths[entity] = path;
           }
-          if (entity.isClosed) path.close();
           canvas.drawPath(path, underlayPaint);
         }
       } else if (entity is DxfPolyline) {
         if (entity.vertices.length >= 2) {
-          final path = Path()..moveTo(entity.vertices[0].x, entity.vertices[0].y);
-          for (int i = 1; i < entity.vertices.length; i++) {
-            path.lineTo(entity.vertices[i].x, entity.vertices[i].y);
+          final path =
+              _paths[entity] ??
+              (Path()..moveTo(entity.vertices[0].x, entity.vertices[0].y));
+          if (_paths[entity] == null) {
+            for (int i = 1; i < entity.vertices.length; i++) {
+              path.lineTo(entity.vertices[i].x, entity.vertices[i].y);
+            }
+            if (entity.isClosed) path.close();
+            _paths[entity] = path;
           }
-          if (entity.isClosed) path.close();
           canvas.drawPath(path, underlayPaint);
         }
       } else if (entity is DxfCircle) {
         canvas.drawCircle(entity.center, entity.radius, underlayPaint);
       } else if (entity is DxfArc) {
-        final rect = Rect.fromCircle(center: entity.center, radius: entity.radius);
+        final rect = Rect.fromCircle(
+          center: entity.center,
+          radius: entity.radius,
+        );
         final startAngle = entity.startAngleDeg * math.pi / 180.0;
-        double sweepAngle = (entity.endAngleDeg - entity.startAngleDeg) * math.pi / 180.0;
+        double sweepAngle =
+            (entity.endAngleDeg - entity.startAngleDeg) * math.pi / 180.0;
         if (sweepAngle < 0) sweepAngle += 2 * math.pi;
         canvas.drawArc(rect, startAngle, sweepAngle, false, underlayPaint);
       }
@@ -89,9 +120,9 @@ class ArchitectElementsPainterHelper {
       final isSelected = slab.id == selectedElementId;
       final border = isSelected
           ? (Paint()
-            ..color = const Color(0xFF00E5FF)
-            ..strokeWidth = 2.5 / zoomScale
-            ..style = PaintingStyle.stroke)
+              ..color = const Color(0xFF00E5FF)
+              ..strokeWidth = 2.5 / zoomScale
+              ..style = PaintingStyle.stroke)
           : slabBorderPaint;
 
       final path = Path()..moveTo(slab.polygon[0].dx, slab.polygon[0].dy);
@@ -105,19 +136,24 @@ class ArchitectElementsPainterHelper {
 
       if (zoomScale > 12.0) {
         final c = slab.centroid;
+        canvas.save();
+        canvas.translate(c.dx, c.dy);
+        canvas.scale(1.0 / zoomScale);
         final tp = TextPainter(
           text: TextSpan(
             text: '${slab.label}\n${slab.area.toStringAsFixed(1)} m²',
             style: TextStyle(
               color: const Color(0xFF37474F),
-              fontSize: 8.0 / zoomScale * 14.0,
+              fontFamily: 'Roboto',
+              fontSize: 12.0,
               fontWeight: FontWeight.w600,
             ),
           ),
           textAlign: TextAlign.center,
           textDirection: TextDirection.ltr,
         )..layout();
-        tp.paint(canvas, Offset(c.dx - tp.width / 2, c.dy - tp.height / 2));
+        tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+        canvas.restore();
       }
     }
   }
@@ -141,9 +177,9 @@ class ArchitectElementsPainterHelper {
       final isSelected = beam.id == selectedElementId;
       final paint = isSelected
           ? (Paint()
-            ..color = const Color(0xFF00E5FF)
-            ..strokeWidth = 2.2 / zoomScale
-            ..style = PaintingStyle.stroke)
+              ..color = const Color(0xFF00E5FF)
+              ..strokeWidth = 2.2 / zoomScale
+              ..style = PaintingStyle.stroke)
           : beamDashPaint;
 
       final corners = beam.polygonCorners;
@@ -167,18 +203,25 @@ class ArchitectElementsPainterHelper {
 
       if (zoomScale > 15.0) {
         final mid = (beam.startPoint + beam.endPoint) / 2.0;
+        canvas.save();
+        canvas.translate(mid.dx, mid.dy);
+        canvas.scale(1.0 / zoomScale);
         final tp = TextPainter(
           text: TextSpan(
             text: beam.label,
             style: TextStyle(
-              color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF263238),
-              fontSize: 7.0 / zoomScale * 14.0,
+              color: isSelected
+                  ? const Color(0xFF00E5FF)
+                  : const Color(0xFF263238),
+              fontFamily: 'Roboto',
+              fontSize: 11.0,
               fontWeight: FontWeight.bold,
             ),
           ),
           textDirection: TextDirection.ltr,
         )..layout();
-        tp.paint(canvas, Offset(mid.dx - tp.width / 2, mid.dy - tp.height / 2));
+        tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+        canvas.restore();
       }
     }
   }
@@ -227,9 +270,9 @@ class ArchitectElementsPainterHelper {
       final isSelected = op.id == selectedElementId;
       final pBorder = isSelected
           ? (Paint()
-            ..color = const Color(0xFF00E5FF)
-            ..strokeWidth = 2.4 / zoomScale
-            ..style = PaintingStyle.stroke)
+              ..color = const Color(0xFF00E5FF)
+              ..strokeWidth = 2.4 / zoomScale
+              ..style = PaintingStyle.stroke)
           : borderPaint;
 
       final path = Path()..moveTo(op.boundary[0].dx, op.boundary[0].dy);
@@ -254,18 +297,23 @@ class ArchitectElementsPainterHelper {
 
       if (zoomScale > 12.0) {
         final c = op.centroid;
+        canvas.save();
+        canvas.translate(c.dx, c.dy);
+        canvas.scale(1.0 / zoomScale);
         final tp = TextPainter(
           text: TextSpan(
             text: op.label,
             style: TextStyle(
               color: const Color(0xFFBF360C),
-              fontSize: 8.0 / zoomScale * 14.0,
+              fontFamily: 'Roboto',
+              fontSize: 12.0,
               fontWeight: FontWeight.bold,
             ),
           ),
           textDirection: TextDirection.ltr,
         )..layout();
-        tp.paint(canvas, Offset(c.dx - tp.width / 2, c.dy - tp.height / 2));
+        tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+        canvas.restore();
       }
     }
   }
@@ -299,9 +347,9 @@ class ArchitectElementsPainterHelper {
       final isSelected = stair.id == selectedElementId;
       final pBorder = isSelected
           ? (Paint()
-            ..color = const Color(0xFF00E5FF)
-            ..strokeWidth = 2.5 / zoomScale
-            ..style = PaintingStyle.stroke)
+              ..color = const Color(0xFF00E5FF)
+              ..strokeWidth = 2.5 / zoomScale
+              ..style = PaintingStyle.stroke)
           : borderPaint;
 
       final corners = stair.polygonCorners;
@@ -402,8 +450,11 @@ class ArchitectElementsPainterHelper {
         text: TextSpan(
           text: dim.displayText,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF263238),
-            fontSize: 8.5 / zoomScale * 14.0,
+            color: isSelected
+                ? const Color(0xFF00E5FF)
+                : const Color(0xFF263238),
+            fontFamily: 'Roboto',
+            fontSize: 12.0,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -415,6 +466,7 @@ class ArchitectElementsPainterHelper {
       double angle = math.atan2(u.dy, u.dx);
       if (angle > math.pi / 2 || angle < -math.pi / 2) angle += math.pi;
       canvas.rotate(angle);
+      canvas.scale(1.0 / zoomScale);
       tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
       canvas.restore();
     }
@@ -433,7 +485,9 @@ class ArchitectElementsPainterHelper {
     for (final marker in storey.elevationMarkers) {
       final isSelected = marker.id == selectedElementId;
       final p = marker.position;
-      final color = isSelected ? const Color(0xFF00E5FF) : const Color(0xFFD81B60);
+      final color = isSelected
+          ? const Color(0xFF00E5FF)
+          : const Color(0xFFD81B60);
 
       final markerPaint = Paint()
         ..color = color
@@ -452,18 +506,23 @@ class ArchitectElementsPainterHelper {
       canvas.drawLine(p, Offset(p.dx + s * 3.0, p.dy), markerPaint);
 
       final label = marker.formattedElevation;
+      canvas.save();
+      canvas.translate(p.dx + s * .4, p.dy - .02);
+      canvas.scale(1.0 / zoomScale);
       final tp = TextPainter(
         text: TextSpan(
           text: marker.label != null ? '$label (${marker.label})' : label,
           style: TextStyle(
             color: color,
-            fontSize: 9.0 / zoomScale * 14.0,
+            fontFamily: 'Roboto',
+            fontSize: 12.0,
             fontWeight: FontWeight.bold,
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(canvas, Offset(p.dx + s * 0.4, p.dy - tp.height - 0.02));
+      tp.paint(canvas, Offset(0, -tp.height));
+      canvas.restore();
     }
   }
 
@@ -475,18 +534,25 @@ class ArchitectElementsPainterHelper {
   }) {
     for (final ann in storey.annotations) {
       final isSelected = ann.id == selectedElementId;
+      canvas.save();
+      canvas.translate(ann.position.dx, ann.position.dy);
+      canvas.scale(1.0 / zoomScale);
       final tp = TextPainter(
         text: TextSpan(
           text: ann.text,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF212121),
-            fontSize: ann.fontSize * zoomScale.clamp(8.0, 30.0),
+            color: isSelected
+                ? const Color(0xFF00E5FF)
+                : const Color(0xFF212121),
+            fontFamily: 'Roboto',
+            fontSize: ann.fontSize * zoomScale,
             fontWeight: FontWeight.w600,
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(canvas, Offset(ann.position.dx, ann.position.dy));
+      tp.paint(canvas, Offset.zero);
+      canvas.restore();
     }
   }
 
@@ -549,7 +615,8 @@ class ArchitectElementsPainterHelper {
       canvas.drawCircle(p2, r, previewPaint);
     } else if (activeTool == ArchitectTool.beam) {
       canvas.drawLine(p1, p2, previewPaint);
-    } else if (activeTool == ArchitectTool.opening || activeTool == ArchitectTool.cadRect) {
+    } else if (activeTool == ArchitectTool.opening ||
+        activeTool == ArchitectTool.cadRect) {
       final rect = Rect.fromPoints(p1, p2);
       canvas.drawRect(rect, fillPreview);
       canvas.drawRect(rect, previewPaint);
@@ -583,11 +650,15 @@ class ArchitectElementsPainterHelper {
       canvas.drawLine(p1, p2, previewPaint);
       final dist = (p2 - p1).distance;
       final mid = (p1 + p2) / 2.0;
+      canvas.save();
+      canvas.translate(mid.dx, mid.dy);
+      canvas.scale(1.0 / zoomScale);
       final tp = TextPainter(
         text: TextSpan(
           text: '${dist.toStringAsFixed(2)} m',
           style: const TextStyle(
             color: Colors.white,
+            fontFamily: 'Roboto',
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -597,8 +668,8 @@ class ArchitectElementsPainterHelper {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(
-            mid.dx - tp.width / 2 - 4,
-            mid.dy - tp.height / 2 - 2,
+            -tp.width / 2 - 4,
+            -tp.height / 2 - 2,
             tp.width + 8,
             tp.height + 4,
           ),
@@ -606,7 +677,8 @@ class ArchitectElementsPainterHelper {
         ),
         Paint()..color = const Color(0xDD000000),
       );
-      tp.paint(canvas, Offset(mid.dx - tp.width / 2, mid.dy - tp.height / 2));
+      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      canvas.restore();
     }
   }
 

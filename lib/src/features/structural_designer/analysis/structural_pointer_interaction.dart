@@ -1,5 +1,5 @@
-import 'dart:math' as math;
 import 'dart:ui';
+import '../../bim_projects/models/bim_coordinate_frame.dart';
 
 /// Screen-space capture limits, independent of zoom and CAD units.
 class StructuralPointerInteraction {
@@ -8,9 +8,10 @@ class StructuralPointerInteraction {
     required bool isMouse,
     required double pixelsPerCadUnit,
     required double cadUnitsPerMeter,
-  }) => math.min(
-    (isMouse ? 8.0 : 12.0) / pixelsPerCadUnit,
-    .20 * cadUnitsPerMeter,
+  }) => BimPrecisionPolicy.captureTolerance(
+    pixelsPerUnit: pixelsPerCadUnit,
+    unitsPerMeter: cadUnitsPerMeter,
+    pixels: isMouse ? 8 : 12,
   );
 
   static Offset placementTarget(Offset pointer, {required bool isMouse}) =>

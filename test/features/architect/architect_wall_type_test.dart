@@ -288,7 +288,7 @@ void main() {
       expect(ArchitectUnit.feet.symbol, 'ft');
       expect(ArchitectUnit.feet.toUnit(0.3048), closeTo(1.0, 1e-4));
       expect(ArchitectUnit.feet.fromUnit(1.0), closeTo(0.3048, 1e-4));
-      expect(ArchitectUnit.feet.format(3.00), '9.84 ft');
+      expect(ArchitectUnit.feet.format(3.00), '9′ 10 1/8″');
 
       expect(ArchitectUnit.inches.isImperial, isTrue);
       expect(ArchitectUnit.inches.isMetric, isFalse);
@@ -296,7 +296,7 @@ void main() {
       expect(ArchitectUnit.inches.symbol, 'in');
       expect(ArchitectUnit.inches.toUnit(0.254), closeTo(10.0, 1e-4));
       expect(ArchitectUnit.inches.fromUnit(10.0), closeTo(0.254, 1e-4));
-      expect(ArchitectUnit.inches.format(0.25), '10 in');
+      expect(ArchitectUnit.inches.format(0.25), '9 13/16 in');
     });
   });
 }

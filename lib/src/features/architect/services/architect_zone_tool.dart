@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'architect_element_id.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
 import '../rendering/architect_zone_snap.dart';
@@ -37,12 +38,7 @@ import '../rendering/architect_zone_snap.dart';
 // === SECTION: ORTHO_GUIDES_AND_STATUS_ENUMS ===
 
 /// Orthogonal guide orientation for vector-style alignment.
-enum ArchitectOrthoType {
-  none,
-  horizontal,
-  vertical,
-  diagonal45,
-}
+enum ArchitectOrthoType { none, horizontal, vertical, diagonal45 }
 
 /// Result of orthogonal straightening snap relative to an anchor vertex.
 class ArchitectOrthoSnapResult {
@@ -62,18 +58,10 @@ class ArchitectOrthoSnapResult {
 }
 
 /// Status of candidate point during point-by-point drawing.
-enum ZoneDraftingPointStatus {
-  valid,
-  closeTarget,
-  selfIntersects,
-  tooClose,
-}
+enum ZoneDraftingPointStatus { valid, closeTarget, selfIntersects, tooClose }
 
 /// Mode of zone creation: freeform point-by-point or 2-click rectangle.
-enum ArchitectZoneDraftMode {
-  polyline,
-  rectangle,
-}
+enum ArchitectZoneDraftMode { polyline, rectangle }
 
 // === SECTION: GEOMETRY_AND_MATH_ENGINE ===
 
@@ -195,10 +183,11 @@ class ArchitectZoneGeometry {
           final chordLen = chord.distance;
           final double distToChord;
           if (chordLen > 1e-4) {
-            final t = (((validPts[i].dx - validPts[prev].dx) * chord.dx +
-                        (validPts[i].dy - validPts[prev].dy) * chord.dy) /
-                    (chordLen * chordLen))
-                .clamp(0.0, 1.0);
+            final t =
+                (((validPts[i].dx - validPts[prev].dx) * chord.dx +
+                            (validPts[i].dy - validPts[prev].dy) * chord.dy) /
+                        (chordLen * chordLen))
+                    .clamp(0.0, 1.0);
             final proj = validPts[prev] + chord * t;
             distToChord = (validPts[i] - proj).distance;
           } else {
@@ -206,7 +195,9 @@ class ArchitectZoneGeometry {
           }
 
           // Collinear redundant vertex
-          if ((cross.abs() < 0.04 && dot > 0.96) ||
+          if ((cross.abs() < 0.04 &&
+                  dot > 0.96 &&
+                  distToChord < minCollinearDistance) ||
               (distToChord < minCollinearDistance && dot > 0.5)) {
             validPts.removeAt(i);
             changed = true;
@@ -493,7 +484,8 @@ class ArchitectZoneGeometry {
       }
 
       // Detect turning direction (CW vs CCW)
-      final cross = (p1.dx - p0.dx) * (p2.dy - p1.dy) - (p1.dy - p0.dy) * (p2.dx - p1.dx);
+      final cross =
+          (p1.dx - p0.dx) * (p2.dy - p1.dy) - (p1.dy - p0.dy) * (p2.dx - p1.dx);
       final turnAngle = cross < 0 ? -90.0 : 90.0;
 
       final d01 = (p1 - p0).distance;
@@ -528,12 +520,7 @@ class ArchitectZoneGeometry {
       final alignedCenter = calculateCentroid([ap0, ap1, ap2, ap3]);
       final shift = origCenter - alignedCenter;
 
-      return [
-        ap0 + shift,
-        ap1 + shift,
-        ap2 + shift,
-        ap3 + shift,
-      ];
+      return [ap0 + shift, ap1 + shift, ap2 + shift, ap3 + shift];
     }
 
     // 2. Multi-point polygon alignment (L-shaped, T-shaped, arbitrary polyline)
@@ -592,9 +579,13 @@ class ArchitectZoneGeometry {
       }
 
       // Closing segment ray intersection for closed polygons
-      if (isClosed && points.length > 3 && i == points.length - 2 && firstAlignedBearing != null) {
+      if (isClosed &&
+          points.length > 3 &&
+          i == points.length - 2 &&
+          firstAlignedBearing != null) {
         final closingDelta = points.last - points.first;
-        double closingBearing = math.atan2(closingDelta.dy, closingDelta.dx) * 180.0 / math.pi;
+        double closingBearing =
+            math.atan2(closingDelta.dy, closingDelta.dx) * 180.0 / math.pi;
         if (closingBearing < 0) closingBearing += 360.0;
 
         double relClosing = (closingBearing - firstAlignedBearing) % 360.0;
@@ -604,9 +595,15 @@ class ArchitectZoneGeometry {
         if (d90 > 180.0) d90 = 360.0 - d90;
 
         double snappedRelClosing = d90 <= 12.0 ? n90 : relClosing;
-        double targetClosing = (firstAlignedBearing + snappedRelClosing) % 360.0;
+        double targetClosing =
+            (firstAlignedBearing + snappedRelClosing) % 360.0;
 
-        final isect = rayIntersection(aligned.last, targetAngle, points.first, targetClosing);
+        final isect = rayIntersection(
+          aligned.last,
+          targetAngle,
+          points.first,
+          targetClosing,
+        );
         if (isect != null && (isect - aligned.last).distance < dist * 2.5) {
           aligned.add(isect);
           prevAlignedBearing = targetAngle;
@@ -616,7 +613,8 @@ class ArchitectZoneGeometry {
 
       prevAlignedBearing = targetAngle;
       final rad = targetAngle * math.pi / 180.0;
-      final nextPt = aligned.last + Offset(math.cos(rad) * dist, math.sin(rad) * dist);
+      final nextPt =
+          aligned.last + Offset(math.cos(rad) * dist, math.sin(rad) * dist);
       aligned.add(nextPt);
     }
 
@@ -746,6 +744,7 @@ class ArchitectZoneTool extends ChangeNotifier {
     }
     return _draftPoints.length >= 3;
   }
+
   bool get canClose => canCloseDraft;
   Offset? get candidatePoint => _snappedPoint ?? _candidatePoint;
   Offset? get rawCandidatePoint => _candidatePoint;
@@ -782,7 +781,8 @@ class ArchitectZoneTool extends ChangeNotifier {
 
   double get livePerimeter {
     if (_draftPoints.isEmpty) return 0.0;
-    if (_draftMode == ArchitectZoneDraftMode.rectangle && candidatePoint != null) {
+    if (_draftMode == ArchitectZoneDraftMode.rectangle &&
+        candidatePoint != null) {
       final p0 = _draftPoints[0];
       final p2 = candidatePoint!;
       return 2.0 * ((p2.dx - p0.dx).abs() + (p2.dy - p0.dy).abs());
@@ -815,7 +815,8 @@ class ArchitectZoneTool extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // Extrusion Getters
   // ---------------------------------------------------------------------------
-  bool get isExtruding => _extrudeEdgeIndex != null && _extrudeTargetZone != null;
+  bool get isExtruding =>
+      _extrudeEdgeIndex != null && _extrudeTargetZone != null;
   int? get extrudeEdgeIndex => _extrudeEdgeIndex;
   double get extrudeDistance => _extrudeDistance;
   double get activeDistance => _extrudeDistance;
@@ -846,7 +847,8 @@ class ArchitectZoneTool extends ChangeNotifier {
   double get moveDistanceMeters => _moveDistanceMeters;
 
   /// General flag for whether tool has an active modal interaction.
-  bool get isInteracting => isDrafting || isExtruding || isMoveWholeZoneMode || isMovingZone;
+  bool get isInteracting =>
+      isDrafting || isExtruding || isMoveWholeZoneMode || isMovingZone;
 
   // Convenient aliases
   void start(Offset startPoint) => startDrafting(startPoint);
@@ -856,18 +858,16 @@ class ArchitectZoneTool extends ChangeNotifier {
   ArchitectZone? commit({
     required ArchitectZoneCategory category,
     required String defaultName,
-  }) =>
-      commitDrafting(category: category, defaultName: defaultName);
+  }) => commitDrafting(category: category, defaultName: defaultName);
   void updatePointer({
     required Offset rawModelPoint,
     required ArchitectProject project,
     required double currentScale,
-  }) =>
-      updateDraftingPointer(
-        rawModelPoint: rawModelPoint,
-        project: project,
-        currentScale: currentScale,
-      );
+  }) => updateDraftingPointer(
+    rawModelPoint: rawModelPoint,
+    project: project,
+    currentScale: currentScale,
+  );
 
   // ---------------------------------------------------------------------------
   // Drafting Methods
@@ -894,18 +894,19 @@ class ArchitectZoneTool extends ChangeNotifier {
   }) {
     if (!isDrafting) return;
 
-    if (_candidatePoint != null && (rawModelPoint - _candidatePoint!).distance < 0.02) {
+    if (_candidatePoint != null &&
+        (rawModelPoint - _candidatePoint!).distance < 1e-9) {
       return;
     }
 
     _candidatePoint = rawModelPoint;
     final lastPoint = _draftPoints.last;
-    final snapTolerance = 14.0 / currentScale;
+    final snapTolerance = math.min(14.0 / currentScale, .20);
 
     // 1. Closing snap to first point
     if (_draftPoints.length >= 3) {
       final firstPoint = _draftPoints.first;
-      if ((rawModelPoint - firstPoint).distance <= snapTolerance * 1.5) {
+      if ((rawModelPoint - firstPoint).distance <= snapTolerance) {
         _snappedPoint = firstPoint;
         _isClosingSnap = true;
         _orthoGuide = null;
@@ -925,7 +926,7 @@ class ArchitectZoneTool extends ChangeNotifier {
       tolerance: snapTolerance,
     );
 
-    Offset candidate = zoneSnap.isSnapped ? zoneSnap.point : rawModelPoint;
+    Offset candidate = zoneSnap.point;
     _magneticGuides = zoneSnap.magneticGuides;
 
     // 3. Orthogonal straightening guide relative to previous point
@@ -935,7 +936,9 @@ class ArchitectZoneTool extends ChangeNotifier {
       snapAngleToleranceDeg: 7.0,
     );
 
-    if (orthoResult.isSnapped) {
+    if (!zoneSnap.isSnapped &&
+        orthoResult.isSnapped &&
+        (orthoResult.point - rawModelPoint).distance <= snapTolerance) {
       candidate = orthoResult.point;
       _orthoGuide = orthoResult.guideLine;
       _orthoLabel = orthoResult.type == ArchitectOrthoType.horizontal
@@ -957,7 +960,7 @@ class ArchitectZoneTool extends ChangeNotifier {
 
     if (isIntersecting) {
       _pointStatus = ZoneDraftingPointStatus.selfIntersects;
-    } else if ((candidate - lastPoint).distance < 0.15) {
+    } else if ((candidate - lastPoint).distance < 0.001) {
       _pointStatus = ZoneDraftingPointStatus.tooClose;
     } else {
       _pointStatus = ZoneDraftingPointStatus.valid;
@@ -972,10 +975,11 @@ class ArchitectZoneTool extends ChangeNotifier {
       return true;
     }
 
-    if (_draftMode == ArchitectZoneDraftMode.rectangle && _draftPoints.length == 1) {
+    if (_draftMode == ArchitectZoneDraftMode.rectangle &&
+        _draftPoints.length == 1) {
       final p0 = _draftPoints[0];
       final p2 = point;
-      if ((p2.dx - p0.dx).abs() < 0.1 || (p2.dy - p0.dy).abs() < 0.1) {
+      if ((p2.dx - p0.dx).abs() < 0.001 || (p2.dy - p0.dy).abs() < 0.001) {
         return false;
       }
       final p1 = Offset(p2.dx, p0.dy);
@@ -991,17 +995,20 @@ class ArchitectZoneTool extends ChangeNotifier {
 
     if (_draftPoints.length >= 3) {
       final distToStart = (point - _draftPoints.first).distance;
-      if (_isClosingSnap || distToStart <= 0.35) {
+      if (_isClosingSnap || distToStart <= 1e-9) {
         return true;
       }
     }
 
-    if ((point - _draftPoints.last).distance < 0.15) {
+    if ((point - _draftPoints.last).distance < 0.001) {
       return false;
     }
 
     if (ArchitectZoneGeometry.segmentIntersectsChain(
-        _draftPoints.last, point, _draftPoints)) {
+      _draftPoints.last,
+      point,
+      _draftPoints,
+    )) {
       _pointStatus = ZoneDraftingPointStatus.selfIntersects;
       notifyListeners();
       return false;
@@ -1079,8 +1086,8 @@ class ArchitectZoneTool extends ChangeNotifier {
 
     final cleaned = ArchitectZoneGeometry.cleanPolygon(
       _draftPoints,
-      minDistance: 0.05,
-      minCollinearDistance: 0.02,
+      minDistance: 1e-6,
+      minCollinearDistance: 1e-7,
     );
 
     if (cleaned.length < 3) return null;
@@ -1091,7 +1098,7 @@ class ArchitectZoneTool extends ChangeNotifier {
       return null;
     }
 
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final newZone = ArchitectZone(
       id: 'zone_$now',
       name: defaultName,
@@ -1122,7 +1129,10 @@ class ArchitectZoneTool extends ChangeNotifier {
     _extrudeV1 = poly[edgeIndex];
     _extrudeV2 = poly[(edgeIndex + 1) % n];
     _extrudeMidInitial = (_extrudeV1! + _extrudeV2!) / 2.0;
-    _extrudeNormal = ArchitectZoneGeometry.calculateOutwardNormal(poly, edgeIndex);
+    _extrudeNormal = ArchitectZoneGeometry.calculateOutwardNormal(
+      poly,
+      edgeIndex,
+    );
     _extrudeDistance = 0.0;
     _extrudePreviewPolygon = List<Offset>.from(poly);
     _isExtrudeSelfIntersecting = false;
@@ -1153,18 +1163,22 @@ class ArchitectZoneTool extends ChangeNotifier {
       }
     }
 
-    _isExtrudeSelfIntersecting = ArchitectZoneGeometry.hasSelfIntersections(testPts);
+    _isExtrudeSelfIntersecting = ArchitectZoneGeometry.hasSelfIntersections(
+      testPts,
+    );
     _extrudePreviewPolygon = testPts;
     notifyListeners();
   }
 
   (ArchitectZone, int cleanedCount)? commitExtrude() {
-    if (!isExtruding || _extrudeTargetZone == null || _extrudeEdgeIndex == null) {
+    if (!isExtruding ||
+        _extrudeTargetZone == null ||
+        _extrudeEdgeIndex == null) {
       cancelExtrude();
       return null;
     }
 
-    if (_extrudeDistance.abs() < 0.05) {
+    if (_extrudeDistance.abs() < 0.001) {
       cancelExtrude();
       return null;
     }
@@ -1175,7 +1189,7 @@ class ArchitectZoneTool extends ChangeNotifier {
       polygon: poly,
       edgeIndex: _extrudeEdgeIndex!,
       distance: _extrudeDistance,
-      minDistance: 0.05,
+      minDistance: 1e-6,
     );
 
     if (extruded == null) {
@@ -1255,7 +1269,9 @@ class ArchitectZoneTool extends ChangeNotifier {
   /// preserving centroid and area scale (GPS_Mapping squarify algorithm).
   bool autoAlignZone() {
     if (_editingPolygon == null || _editingPolygon!.length < 3) return false;
-    final aligned = ArchitectZoneGeometry.alignPolygonToNearest2D(_editingPolygon!);
+    final aligned = ArchitectZoneGeometry.alignPolygonToNearest2D(
+      _editingPolygon!,
+    );
     if (aligned.length != _editingPolygon!.length) return false;
 
     bool changed = false;
@@ -1290,8 +1306,14 @@ class ArchitectZoneTool extends ChangeNotifier {
     final delta = angleDeg - _lastAppliedRotationSlider;
     _editRotationSlider = angleDeg;
     if (delta.abs() > 0.01) {
-      final centroid = ArchitectZoneGeometry.calculateCentroid(_editingPolygon!);
-      _editingPolygon = ArchitectZoneGeometry.rotatePolygon(_editingPolygon!, delta, centroid);
+      final centroid = ArchitectZoneGeometry.calculateCentroid(
+        _editingPolygon!,
+      );
+      _editingPolygon = ArchitectZoneGeometry.rotatePolygon(
+        _editingPolygon!,
+        delta,
+        centroid,
+      );
       _lastAppliedRotationSlider = angleDeg;
       notifyListeners();
     }
@@ -1313,7 +1335,11 @@ class ArchitectZoneTool extends ChangeNotifier {
     if (_editingPolygon == null) return;
     _pushEditUndo();
     final centroid = ArchitectZoneGeometry.calculateCentroid(_editingPolygon!);
-    _editingPolygon = ArchitectZoneGeometry.rotatePolygon(_editingPolygon!, stepDeg, centroid);
+    _editingPolygon = ArchitectZoneGeometry.rotatePolygon(
+      _editingPolygon!,
+      stepDeg,
+      centroid,
+    );
     notifyListeners();
   }
 
@@ -1321,7 +1347,10 @@ class ArchitectZoneTool extends ChangeNotifier {
   void applyOffsetStep(double distanceMeters) {
     if (_editingPolygon == null) return;
     _pushEditUndo();
-    _editingPolygon = ArchitectZoneGeometry.offsetPolygon(_editingPolygon!, distanceMeters);
+    _editingPolygon = ArchitectZoneGeometry.offsetPolygon(
+      _editingPolygon!,
+      distanceMeters,
+    );
     notifyListeners();
   }
 
@@ -1342,16 +1371,23 @@ class ArchitectZoneTool extends ChangeNotifier {
   }
 
   void updateMovingZone(Offset modelPoint) {
-    if (!_isMoveWholeZoneMode || _moveStartPoint == null || _moveStartPolygon == null) return;
+    if (!_isMoveWholeZoneMode ||
+        _moveStartPoint == null ||
+        _moveStartPolygon == null) {
+      return;
+    }
     final delta = modelPoint - _moveStartPoint!;
     _moveDistanceMeters = delta.distance;
-    _editingPolygon = ArchitectZoneGeometry.translatePolygon(_moveStartPolygon!, delta);
+    _editingPolygon = ArchitectZoneGeometry.translatePolygon(
+      _moveStartPolygon!,
+      delta,
+    );
     notifyListeners();
   }
 
   void finishMovingZone() {
     if (_moveStartPolygon != null && _editingPolygon != null) {
-      if (_moveDistanceMeters > 0.02) {
+      if (_moveDistanceMeters > 1e-9) {
         _editUndoStack.add(_moveStartPolygon!);
         _editRedoStack.clear();
       }
@@ -1362,8 +1398,23 @@ class ArchitectZoneTool extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Abandon a pointer gesture without applying it or adding an Undo step.
+  void cancelMovingZone() {
+    if (_moveStartPolygon != null) {
+      _editingPolygon = List<Offset>.from(_moveStartPolygon!);
+    }
+    _moveStartPoint = null;
+    _moveStartPolygon = null;
+    _moveDistanceMeters = 0;
+    notifyListeners();
+  }
+
   void dragEditingVertex(int index, Offset newPos) {
-    if (_editingPolygon == null || index < 0 || index >= _editingPolygon!.length) return;
+    if (_editingPolygon == null ||
+        index < 0 ||
+        index >= _editingPolygon!.length) {
+      return;
+    }
     _pushEditUndo();
     _editingPolygon![index] = newPos;
     notifyListeners();
@@ -1374,10 +1425,11 @@ class ArchitectZoneTool extends ChangeNotifier {
     if (_editingZone == null || _editingPolygon == null) return null;
     final cleaned = ArchitectZoneGeometry.cleanPolygon(
       _editingPolygon!,
-      minDistance: 0.05,
-      minCollinearDistance: 0.02,
+      minDistance: 1e-6,
+      minCollinearDistance: 1e-7,
     );
-    if (cleaned.length < 3 || ArchitectZoneGeometry.hasSelfIntersections(cleaned)) {
+    if (cleaned.length < 3 ||
+        ArchitectZoneGeometry.hasSelfIntersections(cleaned)) {
       return null;
     }
     final updated = _editingZone!.copyWith(polygon: cleaned);

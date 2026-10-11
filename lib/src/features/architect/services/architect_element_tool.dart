@@ -1,5 +1,6 @@
 // === SECTION: ARCHITECTURAL ELEMENT TOOL ===
 import 'package:flutter/material.dart';
+import 'architect_element_id.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
@@ -95,7 +96,7 @@ class ArchitectElementTool extends ChangeNotifier {
     if (targetWall == null) return null;
 
     final (ratio, _) = targetWall.projectPoint(point);
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
 
     final newWindow = ArchitectWindow(
       id: 'win_$now',
@@ -123,7 +124,7 @@ class ArchitectElementTool extends ChangeNotifier {
     required ArchitectStorey storey,
     required Offset point,
   }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final newColumn = ArchitectColumn(
       id: 'col_$now',
       position: point,
@@ -148,7 +149,7 @@ class ArchitectElementTool extends ChangeNotifier {
     required Offset end,
   }) {
     if ((end - start).distance < 0.20) return null;
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final newBeam = ArchitectBeam(
       id: 'beam_$now',
       startPoint: start,
@@ -157,10 +158,7 @@ class ArchitectElementTool extends ChangeNotifier {
       depth: beamDepth,
     );
 
-    return (
-      storey.copyWith(beams: [...storey.beams, newBeam]),
-      newBeam,
-    );
+    return (storey.copyWith(beams: [...storey.beams, newBeam]), newBeam);
   }
 
   // ===========================================================================
@@ -187,7 +185,7 @@ class ArchitectElementTool extends ChangeNotifier {
     double thickness = 0.16,
   }) {
     if (slabDraftPoints.length < 3) return null;
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final newSlab = ArchitectSlab(
       id: 'slab_$now',
       polygon: List<Offset>.from(slabDraftPoints),
@@ -199,10 +197,7 @@ class ArchitectElementTool extends ChangeNotifier {
     slabCandidatePoint = null;
     notifyListeners();
 
-    return (
-      storey.copyWith(slabs: [...storey.slabs, newSlab]),
-      newSlab,
-    );
+    return (storey.copyWith(slabs: [...storey.slabs, newSlab]), newSlab);
   }
 
   void cancelSlabDrafting() {
@@ -222,7 +217,7 @@ class ArchitectElementTool extends ChangeNotifier {
   }) {
     final rect = Rect.fromPoints(p1, p2);
     if (rect.width < 0.15 || rect.height < 0.15) return null;
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final boundary = [
       rect.topLeft,
       rect.topRight,
@@ -252,7 +247,7 @@ class ArchitectElementTool extends ChangeNotifier {
     required Offset end,
   }) {
     if ((end - start).distance < 0.40) return null;
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final newStair = ArchitectStair(
       id: 'stair_$now',
       startPoint: start,
@@ -261,10 +256,7 @@ class ArchitectElementTool extends ChangeNotifier {
       stepCount: stairSteps,
     );
 
-    return (
-      storey.copyWith(stairs: [...storey.stairs, newStair]),
-      newStair,
-    );
+    return (storey.copyWith(stairs: [...storey.stairs, newStair]), newStair);
   }
 
   // ===========================================================================
@@ -277,7 +269,7 @@ class ArchitectElementTool extends ChangeNotifier {
     required Offset end,
   }) {
     if ((end - start).distance < 0.10) return null;
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final newDim = ArchitectDimension(
       id: 'dim_$now',
       startPoint: start,
@@ -299,7 +291,7 @@ class ArchitectElementTool extends ChangeNotifier {
     required Offset point,
     required double elevation,
   }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final newMarker = ArchitectElevationMarker(
       id: 'elev_$now',
       position: point,
@@ -324,7 +316,7 @@ class ArchitectElementTool extends ChangeNotifier {
     required String text,
     double fontSize = 0.25,
   }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final newAnnotation = ArchitectAnnotation(
       id: 'ann_$now',
       position: point,
@@ -351,7 +343,7 @@ class ArchitectElementTool extends ChangeNotifier {
     double strokeWidth = 1.0,
   }) {
     if ((end - start).distance < 0.05) return null;
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = ArchitectElementId.next('element');
     final newPrim = ArchitectCadPrimitive(
       id: 'cad_$now',
       type: type,
@@ -376,8 +368,7 @@ class ArchitectElementTool extends ChangeNotifier {
 
     // Check Columns
     for (final col in storey.columns) {
-      final r = (col.width + col.depth) / 4.0 + tolerance;
-      if ((point - col.position).distance <= r) {
+      if (col.containsPoint(point, tolerance: tolerance)) {
         return col.id;
       }
     }
@@ -385,13 +376,17 @@ class ArchitectElementTool extends ChangeNotifier {
     // Check Hosted Windows
     for (final wall in storey.walls) {
       for (final win in wall.windows) {
-        final winCenter = wall.startPoint + (wall.endPoint - wall.startPoint) * win.offsetRatio;
+        final winCenter =
+            wall.centerStart +
+            (wall.centerEnd - wall.centerStart) * win.offsetRatio;
         if ((point - winCenter).distance <= win.width / 2.0 + tolerance) {
           return win.id;
         }
       }
       for (final door in wall.doors) {
-        final doorCenter = wall.startPoint + (wall.endPoint - wall.startPoint) * door.offsetRatio;
+        final doorCenter =
+            wall.centerStart +
+            (wall.centerEnd - wall.centerStart) * door.offsetRatio;
         if ((point - doorCenter).distance <= door.width / 2.0 + tolerance) {
           return door.id;
         }
@@ -400,7 +395,11 @@ class ArchitectElementTool extends ChangeNotifier {
 
     // Check Beams
     for (final beam in storey.beams) {
-      final dist = _pointToSegmentDistance(point, beam.startPoint, beam.endPoint);
+      final dist = _pointToSegmentDistance(
+        point,
+        beam.startPoint,
+        beam.endPoint,
+      );
       if (dist <= beam.width / 2.0 + tolerance) {
         return beam.id;
       }
@@ -408,7 +407,11 @@ class ArchitectElementTool extends ChangeNotifier {
 
     // Check Stairs
     for (final stair in storey.stairs) {
-      final dist = _pointToSegmentDistance(point, stair.startPoint, stair.endPoint);
+      final dist = _pointToSegmentDistance(
+        point,
+        stair.startPoint,
+        stair.endPoint,
+      );
       if (dist <= stair.width / 2.0 + tolerance) {
         return stair.id;
       }
@@ -417,7 +420,10 @@ class ArchitectElementTool extends ChangeNotifier {
     // Check Openings
     for (final op in storey.openings) {
       if (op.boundary.length >= 2) {
-        final r = Rect.fromPoints(op.boundary.first, op.boundary[2 % op.boundary.length]).inflate(tolerance);
+        final r = Rect.fromPoints(
+          op.boundary.first,
+          op.boundary[2 % op.boundary.length],
+        ).inflate(tolerance);
         if (r.contains(point)) {
           return op.id;
         }
@@ -449,11 +455,15 @@ class ArchitectElementTool extends ChangeNotifier {
     // Check CAD Primitives
     for (final prim in storey.cadPrimitives) {
       if (prim.type == CadPrimitiveType.line) {
-        if (_pointToSegmentDistance(point, prim.startPoint, prim.endPoint) <= tolerance) {
+        if (_pointToSegmentDistance(point, prim.startPoint, prim.endPoint) <=
+            tolerance) {
           return prim.id;
         }
       } else if (prim.type == CadPrimitiveType.rect) {
-        final r = Rect.fromPoints(prim.startPoint, prim.endPoint).inflate(tolerance);
+        final r = Rect.fromPoints(
+          prim.startPoint,
+          prim.endPoint,
+        ).inflate(tolerance);
         if (r.contains(point)) return prim.id;
       } else if (prim.type == CadPrimitiveType.circle) {
         final rad = (prim.endPoint - prim.startPoint).distance;
@@ -486,10 +496,12 @@ class ArchitectElementTool extends ChangeNotifier {
   ArchitectStorey deleteElementById(ArchitectStorey storey, String elementId) {
     return storey.copyWith(
       walls: storey.walls
-          .map((w) => w.copyWith(
-                doors: w.doors.where((d) => d.id != elementId).toList(),
-                windows: w.windows.where((win) => win.id != elementId).toList(),
-              ))
+          .map(
+            (w) => w.copyWith(
+              doors: w.doors.where((d) => d.id != elementId).toList(),
+              windows: w.windows.where((win) => win.id != elementId).toList(),
+            ),
+          )
           .where((w) => w.id != elementId)
           .toList(),
       columns: storey.columns.where((c) => c.id != elementId).toList(),
@@ -498,11 +510,13 @@ class ArchitectElementTool extends ChangeNotifier {
       openings: storey.openings.where((o) => o.id != elementId).toList(),
       stairs: storey.stairs.where((s) => s.id != elementId).toList(),
       dimensions: storey.dimensions.where((d) => d.id != elementId).toList(),
-      elevationMarkers:
-          storey.elevationMarkers.where((e) => e.id != elementId).toList(),
+      elevationMarkers: storey.elevationMarkers
+          .where((e) => e.id != elementId)
+          .toList(),
       annotations: storey.annotations.where((a) => a.id != elementId).toList(),
-      cadPrimitives:
-          storey.cadPrimitives.where((c) => c.id != elementId).toList(),
+      cadPrimitives: storey.cadPrimitives
+          .where((c) => c.id != elementId)
+          .toList(),
     );
   }
 

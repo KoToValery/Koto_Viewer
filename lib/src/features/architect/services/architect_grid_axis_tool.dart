@@ -13,6 +13,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import 'architect_element_id.dart';
 
 import '../models/architect_grid_axis.dart';
 import '../models/architect_project.dart';
@@ -175,29 +176,26 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     var candidate = snap.point;
     String? label = snap.snapLabel;
 
-    // Check if we can align extents to an existing parallel axis in drafting
+    // Explicit geometry targets win. Optional extent alignment is chosen by
+    // total correction from the pointer, with a bounded radius and stable order.
     final candidateDir = candidate - _draftStart!;
-    if (candidateDir.distance > 0.3) {
-      final isVert = candidateDir.dx.abs() <= candidateDir.dy.abs();
-      for (final existing in project.gridAxes) {
-        if (existing.isVertical == isVert) {
-          // Snap extents along parallel direction
-          if (isVert) {
-            if ((candidate.dy - existing.end.dy).abs() < 16.0 / scale) {
-              candidate = Offset(candidate.dx, existing.end.dy);
-              label = 'Align';
-            } else if ((candidate.dy - existing.start.dy).abs() < 16.0 / scale) {
-              candidate = Offset(candidate.dx, existing.start.dy);
-              label = 'Align';
-            }
-          } else {
-            if ((candidate.dx - existing.end.dx).abs() < 16.0 / scale) {
-              candidate = Offset(existing.end.dx, candidate.dy);
-              label = 'Align';
-            } else if ((candidate.dx - existing.start.dx).abs() < 16.0 / scale) {
-              candidate = Offset(existing.start.dx, candidate.dy);
-              label = 'Align';
-            }
+    if (candidateDir.distance > .001 &&
+        (!snap.isSnapped || snap.angleDeg != null)) {
+      final vertical = candidateDir.dx.abs() <= candidateDir.dy.abs();
+      var best = math.min(14.0 / scale, .20) + 1e-9;
+      final axes = project.gridAxes.toList()
+        ..sort((a, b) => a.id.compareTo(b.id));
+      for (final axis in axes) {
+        if (axis.isVertical != vertical) continue;
+        for (final extent in [axis.start, axis.end]) {
+          final point = vertical
+              ? Offset(snap.point.dx, extent.dy)
+              : Offset(extent.dx, snap.point.dy);
+          final correction = (point - rawModelPoint).distance;
+          if (correction < best) {
+            best = correction;
+            candidate = point;
+            label = 'Align';
           }
         }
       }
@@ -226,9 +224,14 @@ class ArchitectGridAxisTool extends ChangeNotifier {
       return null;
     }
 
-    final suggestedName = getSuggestedAxisName(p1, p2, project.gridAxes, isBulgarian);
+    final suggestedName = getSuggestedAxisName(
+      p1,
+      p2,
+      project.gridAxes,
+      isBulgarian,
+    );
     final rawAxis = StructuralGridAxis(
-      id: 'axis_${DateTime.now().millisecondsSinceEpoch}',
+      id: ArchitectElementId.next('axis'),
       name: suggestedName,
       start: p1,
       end: p2,
@@ -240,10 +243,18 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     final parallelAxis = project.gridAxes
         .where((a) => a.isParallelTo(rawAxis, toleranceRad: 0.10))
         .firstOrNull;
-    final alignedAxis = parallelAxis != null ? rawAxis.alignWith(parallelAxis) : rawAxis;
+    final alignedAxis = parallelAxis != null
+        ? rawAxis.alignWith(parallelAxis)
+        : rawAxis;
 
-    final updatedAxes = resequenceAxes([...project.gridAxes, alignedAxis], isBulgarian);
-    final finalAxis = updatedAxes.firstWhere((a) => a.id == alignedAxis.id, orElse: () => alignedAxis);
+    final updatedAxes = resequenceAxes([
+      ...project.gridAxes,
+      alignedAxis,
+    ], isBulgarian);
+    final finalAxis = updatedAxes.firstWhere(
+      (a) => a.id == alignedAxis.id,
+      orElse: () => alignedAxis,
+    );
 
     _isDrafting = false;
     _draftStart = null;
@@ -284,16 +295,22 @@ class ArchitectGridAxisTool extends ChangeNotifier {
 
     var candidate = proj;
 
-    // Magnetic snap to parallel axes extents (aligning bubbles)
     final u = axis.direction;
-    for (final other in allAxes) {
-      if (other.id == axis.id || !axis.isParallelTo(other, toleranceRad: 0.05)) continue;
-      final otherExtent = _isStartHandle ? other.start : other.end;
-      final alongOther = (otherExtent - axis.start).dx * u.dx + (otherExtent - axis.start).dy * u.dy;
-      final extentTarget = axis.start + u * alongOther;
-      if ((proj - extentTarget).distance <= 16.0 / scale) {
-        candidate = extentTarget;
-        break;
+    var best = math.min(16.0 / scale, .20) + 1e-9;
+    final axes = allAxes.toList()..sort((a, b) => a.id.compareTo(b.id));
+    for (final other in axes) {
+      if (other.id == axis.id ||
+          !axis.isParallelTo(other, toleranceRad: 0.05)) {
+        continue;
+      }
+      final extent = _isStartHandle ? other.start : other.end;
+      final along =
+          (extent - axis.start).dx * u.dx + (extent - axis.start).dy * u.dy;
+      final point = axis.start + u * along;
+      final correction = (proj - point).distance;
+      if (correction < best) {
+        best = correction;
+        candidate = point;
       }
     }
 
@@ -312,7 +329,9 @@ class ArchitectGridAxisTool extends ChangeNotifier {
       return null;
     }
     final updated = _draggedAxisSnapshot!;
-    final newAxes = project.gridAxes.map((a) => a.id == updated.id ? updated : a).toList();
+    final newAxes = project.gridAxes
+        .map((a) => a.id == updated.id ? updated : a)
+        .toList();
     _isDraggingHandle = false;
     _draggedAxisSnapshot = null;
     notifyListeners();
@@ -341,23 +360,30 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     List<StructuralGridAxis> allAxes,
     double scale,
   ) {
-    if (!_isMovingAxis || _moveStartPoint == null || _moveOriginalAxis == null) return;
+    if (!_isMovingAxis ||
+        _moveStartPoint == null ||
+        _moveOriginalAxis == null) {
+      return;
+    }
     final delta = rawModelPoint - _moveStartPoint!;
     final orig = _moveOriginalAxis!;
 
     var candidateDelta = delta;
 
-    // Magnetic snap to other parallel axes spacing
     final normal = orig.normal;
-
-    for (final other in allAxes) {
-      if (other.id == orig.id || !orig.isParallelTo(other, toleranceRad: 0.05)) continue;
-      final distToOther = ((orig.start + delta) - other.start).dx * normal.dx +
+    var best = math.min(12.0 / scale, .20) + 1e-9;
+    final axes = allAxes.toList()..sort((a, b) => a.id.compareTo(b.id));
+    for (final other in axes) {
+      if (other.id == orig.id ||
+          !orig.isParallelTo(other, toleranceRad: 0.05)) {
+        continue;
+      }
+      final distance =
+          ((orig.start + delta) - other.start).dx * normal.dx +
           ((orig.start + delta) - other.start).dy * normal.dy;
-      if (distToOther.abs() <= 12.0 / scale) {
-        // Snap perpendicular offset exactly to other axis position
-        candidateDelta = delta - normal * distToOther;
-        break;
+      if (distance.abs() < best) {
+        best = distance.abs();
+        candidateDelta = delta - normal * distance;
       }
     }
 
@@ -365,11 +391,10 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     notifyListeners();
   }
 
-  ArchitectProject? commitMoving(
-    ArchitectProject project,
-    bool isBulgarian,
-  ) {
-    if (!_isMovingAxis || _moveOriginalAxis == null || _moveCurrentDelta == null) {
+  ArchitectProject? commitMoving(ArchitectProject project, bool isBulgarian) {
+    if (!_isMovingAxis ||
+        _moveOriginalAxis == null ||
+        _moveCurrentDelta == null) {
       cancelMoving();
       return null;
     }
@@ -414,7 +439,11 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     if (selected == null) return project;
 
     final parallel = project.gridAxes
-        .where((a) => a.id != selected.id && a.isParallelTo(selected, toleranceRad: 0.10))
+        .where(
+          (a) =>
+              a.id != selected.id &&
+              a.isParallelTo(selected, toleranceRad: 0.10),
+        )
         .firstOrNull;
 
     if (parallel == null) return project;
@@ -430,10 +459,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   }
 
   /// Aligns extents of all parallel groups across the project.
-  ArchitectProject alignAllAxes(
-    ArchitectProject project,
-    bool isBulgarian,
-  ) {
+  ArchitectProject alignAllAxes(ArchitectProject project, bool isBulgarian) {
     final aligned = ProjectGridAxes.alignExtents(project.gridAxes);
     final resequenced = resequenceAxes(aligned, isBulgarian);
     notifyListeners();
@@ -539,7 +565,10 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   StructuralGridAxis? getOffsetPreview(bool isBulgarian) {
     if (!_isOffsettingWithDrag || _axisBeingOffset == null) return null;
     final axis = _axisBeingOffset!;
-    final offsetVec = axis.computeOffsetVector(_offsetDistanceMeters, _currentOffsetSign);
+    final offsetVec = axis.computeOffsetVector(
+      _offsetDistanceMeters,
+      _currentOffsetSign,
+    );
     return StructuralGridAxis(
       id: 'preview_offset',
       name: getNextAxisName(axis.name, isBulgarian),
@@ -558,11 +587,14 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     required bool isBulgarian,
   }) {
     _offsetDistanceMeters = distanceMeters;
-    final offsetVec = originalAxis.computeOffsetVector(distanceMeters, directionSign);
+    final offsetVec = originalAxis.computeOffsetVector(
+      distanceMeters,
+      directionSign,
+    );
     final nextName = getNextAxisName(originalAxis.name, isBulgarian);
 
     final newAxis = StructuralGridAxis(
-      id: 'axis_${DateTime.now().millisecondsSinceEpoch}',
+      id: ArchitectElementId.next('axis'),
       name: nextName,
       start: originalAxis.start + offsetVec,
       end: originalAxis.end + offsetVec,
@@ -570,8 +602,14 @@ class ArchitectGridAxisTool extends ChangeNotifier {
       bubbleAtEnd: originalAxis.bubbleAtEnd,
     );
 
-    final updatedAxes = resequenceAxes([...project.gridAxes, newAxis], isBulgarian);
-    final finalAxis = updatedAxes.firstWhere((a) => a.id == newAxis.id, orElse: () => newAxis);
+    final updatedAxes = resequenceAxes([
+      ...project.gridAxes,
+      newAxis,
+    ], isBulgarian);
+    final finalAxis = updatedAxes.firstWhere(
+      (a) => a.id == newAxis.id,
+      orElse: () => newAxis,
+    );
 
     _isOffsettingWithDrag = false;
     _axisBeingOffset = null;
@@ -621,10 +659,62 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     final angle = math.atan2(end.dy - start.dy, end.dx - start.dx);
     final isVertical = (math.cos(angle).abs() <= math.sin(angle).abs());
 
-    final sameDirAxes = existingAxes.where((a) => a.isVertical == isVertical).toList();
+    final sameDirAxes = existingAxes
+        .where((a) => a.isVertical == isVertical)
+        .toList();
 
-    const cyrillic = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ'];
-    const latin = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+    const cyrillic = [
+      'А',
+      'Б',
+      'В',
+      'Г',
+      'Д',
+      'Е',
+      'Ж',
+      'З',
+      'И',
+      'К',
+      'Л',
+      'М',
+      'Н',
+      'О',
+      'П',
+      'Р',
+      'С',
+      'Т',
+      'У',
+      'Ф',
+      'Х',
+      'Ц',
+      'Ч',
+      'Ш',
+      'Щ',
+    ];
+    const latin = [
+      'A',
+      'B',
+      'C',
+      'D',
+      'E',
+      'F',
+      'G',
+      'H',
+      'J',
+      'K',
+      'L',
+      'M',
+      'N',
+      'P',
+      'R',
+      'S',
+      'T',
+      'U',
+      'V',
+      'W',
+      'X',
+      'Y',
+      'Z',
+    ];
     final letters = isBulgarian ? cyrillic : latin;
 
     if (sameDirAxes.isNotEmpty) {
@@ -649,9 +739,13 @@ class ArchitectGridAxisTool extends ChangeNotifier {
       }
     }
 
-    final otherDirAxes = existingAxes.where((a) => a.isVertical != isVertical).toList();
+    final otherDirAxes = existingAxes
+        .where((a) => a.isVertical != isVertical)
+        .toList();
     if (otherDirAxes.isNotEmpty) {
-      final otherHasNumbers = otherDirAxes.any((a) => int.tryParse(a.name) != null);
+      final otherHasNumbers = otherDirAxes.any(
+        (a) => int.tryParse(a.name) != null,
+      );
       if (otherHasNumbers) {
         return letters.first;
       } else {
@@ -667,8 +761,58 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     if (num != null) {
       return (num + 1).toString();
     }
-    const cyrillic = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ'];
-    const latin = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+    const cyrillic = [
+      'А',
+      'Б',
+      'В',
+      'Г',
+      'Д',
+      'Е',
+      'Ж',
+      'З',
+      'И',
+      'К',
+      'Л',
+      'М',
+      'Н',
+      'О',
+      'П',
+      'Р',
+      'С',
+      'Т',
+      'У',
+      'Ф',
+      'Х',
+      'Ц',
+      'Ч',
+      'Ш',
+      'Щ',
+    ];
+    const latin = [
+      'A',
+      'B',
+      'C',
+      'D',
+      'E',
+      'F',
+      'G',
+      'H',
+      'J',
+      'K',
+      'L',
+      'M',
+      'N',
+      'P',
+      'R',
+      'S',
+      'T',
+      'U',
+      'V',
+      'W',
+      'X',
+      'Y',
+      'Z',
+    ];
     final letters = isBulgarian ? cyrillic : latin;
     final idx = letters.indexOf(current.toUpperCase());
     if (idx != -1 && idx + 1 < letters.length) {

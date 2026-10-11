@@ -57,7 +57,13 @@ class ArchitectGridAxisPainterHelper {
       }
 
       final paint = isSelected ? selectedAxisPaint : normalAxisPaint;
-      _drawDashDotLine(canvas, renderAxis.start, renderAxis.end, paint, zoomScale);
+      _drawDashDotLine(
+        canvas,
+        renderAxis.start,
+        renderAxis.end,
+        paint,
+        zoomScale,
+      );
 
       // Draw bubbles
       if (renderAxis.bubbleAtStart) {
@@ -149,7 +155,13 @@ class ArchitectGridAxisPainterHelper {
       ..strokeWidth = 2.0 / zoomScale
       ..style = PaintingStyle.stroke;
 
-    _drawDashedLine(canvas, preview.start, preview.end, previewPaint, zoomScale);
+    _drawDashedLine(
+      canvas,
+      preview.start,
+      preview.end,
+      previewPaint,
+      zoomScale,
+    );
 
     if (preview.bubbleAtStart) {
       _drawBubble(
@@ -199,19 +211,23 @@ class ArchitectGridAxisPainterHelper {
     final dist = (end - start).distance;
     if (dist > 0.4) {
       final textSpan = TextSpan(
-        text: snapLabel != null ? '${dist.toStringAsFixed(2)} m ($snapLabel)' : '${dist.toStringAsFixed(2)} m',
+        text: snapLabel != null
+            ? '${dist.toStringAsFixed(2)} m ($snapLabel)'
+            : '${dist.toStringAsFixed(2)} m',
         style: TextStyle(
           color: Colors.white,
+          fontFamily: 'Roboto',
           fontSize: 10.0 / zoomScale,
           fontWeight: FontWeight.bold,
           backgroundColor: const Color(0xCC000000),
         ),
       );
-      final tp = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, mid - Offset(tp.width / 2, tp.height / 2 + 12.0 / zoomScale));
+      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)
+        ..layout();
+      tp.paint(
+        canvas,
+        mid - Offset(tp.width / 2, tp.height / 2 + 12.0 / zoomScale),
+      );
     }
   }
 
@@ -225,6 +241,11 @@ class ArchitectGridAxisPainterHelper {
     required bool isSelected,
     bool isGhost = false,
   }) {
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(1.0 / zoomScale);
+    center = Offset.zero;
+    zoomScale = 1;
     final double bubbleRadius = 12.0 / zoomScale;
 
     final bgPaint = Paint()
@@ -235,8 +256,8 @@ class ArchitectGridAxisPainterHelper {
       ..color = isGhost
           ? const Color(0xFF00E5FF)
           : isSelected
-              ? const Color(0xFFFF9F0A)
-              : const Color(0xFFC62828)
+          ? const Color(0xFFFF9F0A)
+          : const Color(0xFFC62828)
       ..strokeWidth = (isSelected ? 2.0 : 1.2) / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -247,17 +268,17 @@ class ArchitectGridAxisPainterHelper {
       text: label,
       style: TextStyle(
         color: isGhost ? const Color(0xFF00E5FF) : Colors.white,
+        fontFamily: 'Roboto',
         fontSize: 10.5 / zoomScale,
         fontWeight: FontWeight.bold,
       ),
     );
 
-    final tp = TextPainter(
-      text: textSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
+    final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)
+      ..layout();
 
     tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
+    canvas.restore();
   }
 
   static void _drawDashDotLine(

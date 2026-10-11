@@ -6,6 +6,9 @@ import 'architect_door.dart';
 import 'architect_wall_type.dart';
 import 'architect_window.dart';
 
+/// Left/right are relative to the direction from start to end.
+enum WallReferenceLine { center, left, right }
+
 /// Represents an architectural parametric wall with hosted openings (doors/windows).
 class ArchitectWall {
   final String id;
@@ -13,6 +16,7 @@ class ArchitectWall {
   final Offset endPoint;
   final double thickness; // in meters (default 0.25 m = 25 cm)
   final double height; // in meters (default 2.80 m or 1.05/1.20 m for parapets)
+  final WallReferenceLine referenceLine;
   final String? wallTypeId;
   final ParapetFinish? parapetFinish;
   final List<ArchitectDoor> doors;
@@ -24,6 +28,7 @@ class ArchitectWall {
     required this.endPoint,
     this.thickness = 0.25,
     this.height = 2.80,
+    this.referenceLine = WallReferenceLine.center,
     this.wallTypeId,
     this.parapetFinish,
     this.doors = const [],
@@ -46,15 +51,20 @@ class ArchitectWall {
     return Offset(-u.dy, u.dx);
   }
 
+  Offset get centerOffset =>
+      normalVector *
+      switch (referenceLine) {
+        WallReferenceLine.center => 0.0,
+        WallReferenceLine.left => -thickness / 2,
+        WallReferenceLine.right => thickness / 2,
+      };
+  Offset get centerStart => startPoint + centerOffset;
+  Offset get centerEnd => endPoint + centerOffset;
+
   /// 4 corner points of the 2D wall polygon.
   List<Offset> get polygonCorners {
     final n = normalVector * (thickness / 2.0);
-    return [
-      startPoint - n,
-      endPoint - n,
-      endPoint + n,
-      startPoint + n,
-    ];
+    return [centerStart - n, centerEnd - n, centerEnd + n, centerStart + n];
   }
 
   ArchitectWall copyWith({
@@ -63,22 +73,23 @@ class ArchitectWall {
     Offset? endPoint,
     double? thickness,
     double? height,
+    WallReferenceLine? referenceLine,
     String? wallTypeId,
     ParapetFinish? parapetFinish,
     List<ArchitectDoor>? doors,
     List<ArchitectWindow>? windows,
-  }) =>
-      ArchitectWall(
-        id: id ?? this.id,
-        startPoint: startPoint ?? this.startPoint,
-        endPoint: endPoint ?? this.endPoint,
-        thickness: thickness ?? this.thickness,
-        height: height ?? this.height,
-        wallTypeId: wallTypeId ?? this.wallTypeId,
-        parapetFinish: parapetFinish ?? this.parapetFinish,
-        doors: doors ?? this.doors,
-        windows: windows ?? this.windows,
-      );
+  }) => ArchitectWall(
+    id: id ?? this.id,
+    startPoint: startPoint ?? this.startPoint,
+    endPoint: endPoint ?? this.endPoint,
+    thickness: thickness ?? this.thickness,
+    height: height ?? this.height,
+    referenceLine: referenceLine ?? this.referenceLine,
+    wallTypeId: wallTypeId ?? this.wallTypeId,
+    parapetFinish: parapetFinish ?? this.parapetFinish,
+    doors: doors ?? this.doors,
+    windows: windows ?? this.windows,
+  );
 
   ArchitectWall addDoor(ArchitectDoor door) {
     return copyWith(doors: [...doors, door]);
@@ -101,10 +112,10 @@ class ArchitectWall {
     final len = length;
     if (len < 1e-4) return (0.0, (point - startPoint).distance);
     final u = unitVector;
-    final v = point - startPoint;
+    final v = point - centerStart;
     final dot = v.dx * u.dx + v.dy * u.dy;
     final ratio = (dot / len).clamp(0.0, 1.0);
-    final proj = startPoint + u * (ratio * len);
+    final proj = centerStart + u * (ratio * len);
     final dist = (point - proj).distance;
     return (ratio, dist);
   }
@@ -112,49 +123,58 @@ class ArchitectWall {
   /// Tests if a screen/model point lies within the wall body.
   bool containsPoint(Offset point, {double tolerance = 0.10}) {
     final (ratio, dist) = projectPoint(point);
-    return dist <= (thickness / 2.0 + tolerance) && ratio >= 0.0 && ratio <= 1.0;
+    return dist <= (thickness / 2.0 + tolerance) &&
+        ratio >= 0.0 &&
+        ratio <= 1.0;
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
-        'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
-        'thickness': thickness,
-        'height': height,
-        'wallTypeId': wallTypeId,
-        'parapetFinish': parapetFinish?.name,
-        'doors': doors.map((d) => d.toJson()).toList(),
-        'windows': windows.map((w) => w.toJson()).toList(),
-      };
+    'id': id,
+    'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
+    'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
+    'thickness': thickness,
+    'height': height,
+    'referenceLine': referenceLine.name,
+    'wallTypeId': wallTypeId,
+    'parapetFinish': parapetFinish?.name,
+    'doors': doors.map((d) => d.toJson()).toList(),
+    'windows': windows.map((w) => w.toJson()).toList(),
+  };
 
   factory ArchitectWall.fromJson(Map<String, dynamic> json) => ArchitectWall(
-        id: json['id'] as String,
-        startPoint: Offset(
-          (json['startPoint']['x'] as num).toDouble(),
-          (json['startPoint']['y'] as num).toDouble(),
-        ),
-        endPoint: Offset(
-          (json['endPoint']['x'] as num).toDouble(),
-          (json['endPoint']['y'] as num).toDouble(),
-        ),
-        thickness: (json['thickness'] as num?)?.toDouble() ?? 0.25,
-        height: (json['height'] as num?)?.toDouble() ?? 2.80,
-        wallTypeId: json['wallTypeId'] as String?,
-        parapetFinish: json['parapetFinish'] != null
-            ? ParapetFinish.values.firstWhere(
-                (p) => p.name == json['parapetFinish'],
-                orElse: () => ParapetFinish.cap,
-              )
-            : null,
-        doors: (json['doors'] as List<dynamic>?)
-                ?.map((d) => ArchitectDoor.fromJson(d as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        windows: (json['windows'] as List<dynamic>?)
-                ?.map((w) => ArchitectWindow.fromJson(w as Map<String, dynamic>))
-                .toList() ??
-            const [],
-      );
+    id: json['id'] as String,
+    startPoint: Offset(
+      (json['startPoint']['x'] as num).toDouble(),
+      (json['startPoint']['y'] as num).toDouble(),
+    ),
+    endPoint: Offset(
+      (json['endPoint']['x'] as num).toDouble(),
+      (json['endPoint']['y'] as num).toDouble(),
+    ),
+    thickness: (json['thickness'] as num?)?.toDouble() ?? 0.25,
+    height: (json['height'] as num?)?.toDouble() ?? 2.80,
+    referenceLine: WallReferenceLine.values.firstWhere(
+      (value) => value.name == json['referenceLine'],
+      orElse: () => WallReferenceLine.center,
+    ),
+    wallTypeId: json['wallTypeId'] as String?,
+    parapetFinish: json['parapetFinish'] != null
+        ? ParapetFinish.values.firstWhere(
+            (p) => p.name == json['parapetFinish'],
+            orElse: () => ParapetFinish.cap,
+          )
+        : null,
+    doors:
+        (json['doors'] as List<dynamic>?)
+            ?.map((d) => ArchitectDoor.fromJson(d as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    windows:
+        (json['windows'] as List<dynamic>?)
+            ?.map((w) => ArchitectWindow.fromJson(w as Map<String, dynamic>))
+            .toList() ??
+        const [],
+  );
 
   // ===========================================================================
   // 3D SOLID WALL EXTRUSION WITH BOOLEAN CUTOUTS
@@ -175,10 +195,15 @@ class ArchitectWall {
     final zTop = storeyElevation + height;
 
     // Extrude a solid rectangular prism segment between two offsets along the baseline
-    void addWallPrism(double startAlong, double endAlong, double zMin, double zMax) {
+    void addWallPrism(
+      double startAlong,
+      double endAlong,
+      double zMin,
+      double zMax,
+    ) {
       if (endAlong <= startAlong + 1e-4 || zMax <= zMin + 1e-4) return;
-      final a = startPoint + u * startAlong;
-      final b = startPoint + u * endAlong;
+      final a = centerStart + u * startAlong;
+      final b = centerStart + u * endAlong;
 
       final p1 = a - n * halfThick;
       final p2 = b - n * halfThick;
@@ -220,13 +245,16 @@ class ArchitectWall {
     }
 
     // Unified list of hosted openings (doors + windows)
-    final openings = <({
-      double offsetRatio,
-      double width,
-      double height,
-      double sillHeight,
-      List<Triangle3D> Function() build3DTris,
-    })>[];
+    final openings =
+        <
+          ({
+            double offsetRatio,
+            double width,
+            double height,
+            double sillHeight,
+            List<Triangle3D> Function() build3DTris,
+          })
+        >[];
 
     for (final d in doors) {
       openings.add((
@@ -235,8 +263,8 @@ class ArchitectWall {
         height: d.height,
         sillHeight: d.sillHeight,
         build3DTris: () => d.build3D(
-          wallStart: startPoint,
-          wallEnd: endPoint,
+          wallStart: centerStart,
+          wallEnd: centerEnd,
           wallThickness: thickness,
           storeyElevation: storeyElevation,
         ),
@@ -250,8 +278,8 @@ class ArchitectWall {
         height: w.height,
         sillHeight: w.sillHeight,
         build3DTris: () => w.build3D(
-          wallStart: startPoint,
-          wallEnd: endPoint,
+          wallStart: centerStart,
+          wallEnd: centerEnd,
           wallThickness: thickness,
           storeyElevation: storeyElevation,
         ),

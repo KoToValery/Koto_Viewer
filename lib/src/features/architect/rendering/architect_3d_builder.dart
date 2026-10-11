@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/architect_project.dart';
+import 'architect_wall_network.dart';
 
 /// Real-time 3D solid mesh builder for architectural projects.
 class Architect3dBuilder {
@@ -26,12 +27,51 @@ class Architect3dBuilder {
         allTris.addAll(wall.build3D(storeyElevation: storey.elevation));
       }
 
+      // Fill physical mitres at the same junctions used by the plan view.
+      for (final (points, height) in ArchitectWallNetwork.junctions(
+        storey.walls,
+        solidOnly: true,
+      )) {
+        const color = Color(0xFFECEFF1);
+        Vector3 bottom(Offset p) => Vector3(p.dx, p.dy, storey.elevation);
+        Vector3 top(Offset p) => Vector3(p.dx, p.dy, storey.elevation + height);
+        for (var i = 0; i < points.length; i++) {
+          final a = points[i], b = points[(i + 1) % points.length];
+          allTris.add(
+            Triangle3D(v0: bottom(a), v1: bottom(b), v2: top(b), color: color),
+          );
+          allTris.add(
+            Triangle3D(v0: bottom(a), v1: top(b), v2: top(a), color: color),
+          );
+        }
+        for (var i = 1; i < points.length - 1; i++) {
+          allTris.add(
+            Triangle3D(
+              v0: top(points[0]),
+              v1: top(points[i]),
+              v2: top(points[i + 1]),
+              color: color,
+            ),
+          );
+          allTris.add(
+            Triangle3D(
+              v0: bottom(points[0]),
+              v1: bottom(points[i + 1]),
+              v2: bottom(points[i]),
+              color: color,
+            ),
+          );
+        }
+      }
+
       // Add 3D columns
       for (final col in storey.columns) {
-        allTris.addAll(col.build3D(
-          storeyElevation: storey.elevation,
-          storeyHeight: storey.height,
-        ));
+        allTris.addAll(
+          col.build3D(
+            storeyElevation: storey.elevation,
+            storeyHeight: storey.height,
+          ),
+        );
       }
 
       // Add 3D beams
@@ -132,10 +172,6 @@ class Architect3dBuilder {
       allTris.add(Triangle3D(v0: v1, v1: v3, v2: v4, color: fallbackColor));
     }
 
-
-    return Mesh3D(
-      name: project.name,
-      triangles: allTris,
-    );
+    return Mesh3D(name: project.name, triangles: allTris);
   }
 }
