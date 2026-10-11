@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/models/architect_door.dart';
@@ -14,6 +15,7 @@ import 'package:kotoview/src/features/bim_projects/models/bim_coordinate_frame.d
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
+import 'package:kotoview/src/features/structural_designer/rendering/structural_pointer_painter.dart';
 import 'architect_workspace_interaction_test.dart' as workspace;
 
 ArchitectWall wall(
@@ -31,6 +33,129 @@ ArchitectWall wall(
 );
 
 void main() {
+  testWidgets(
+    'BIM hold aims above the finger, drag moves the tip, release commits directly',
+    (tester) async {
+      final model = workspace.commands();
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tester.pump();
+      final translation = workspace.camera(tester).translation;
+      final first = await tester.startGesture(
+        workspace.screen(tester, const Offset(-1, 1)) + const Offset(0, 64),
+      );
+      await tester.pump(const Duration(milliseconds: 279));
+      expect(find.byKey(const ValueKey('wall-offset-pointer')), findsNothing);
+      expect(workspace.overlay(tester).activeDraftStart, isNull);
+      await tester.pump(const Duration(milliseconds: 2));
+      expect(find.byKey(const ValueKey('wall-offset-pointer')), findsOneWidget);
+      await first.up();
+      await tester.pump();
+      expect(workspace.overlay(tester).activeDraftStart, const Offset(-1, 1));
+      expect(model.project.activeStorey.walls, isEmpty);
+      final second = await tester.startGesture(
+        workspace.screen(tester, const Offset(1, 1)) + const Offset(0, 64),
+      );
+      await tester.pump(const Duration(milliseconds: 281));
+      await second.moveTo(
+        workspace.screen(tester, const Offset(3, 1.04)) + const Offset(0, 64),
+      );
+      await tester.pump();
+      final preview = workspace.overlay(tester).activeDraftEnd!;
+      expect(preview.dy, closeTo(1, 1e-9));
+      expect(workspace.camera(tester).translation, translation);
+      final pointer =
+          tester
+                  .widget<CustomPaint>(
+                    find.byKey(const ValueKey('wall-offset-pointer')),
+                  )
+                  .painter!
+              as StructuralPointerPainter;
+      expect(
+        pointer.effectivePlacementPosition,
+        workspace.camera(tester).toScreen(preview),
+      );
+      await second.up();
+      await tester.pump();
+      expect(model.project.activeStorey.walls.single.endPoint, preview);
+      expect(find.byKey(const ValueKey('wall-length-input')), findsNothing);
+      expect(find.byKey(const ValueKey('wall-offset-pointer')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'A second finger cancels held placement and keeps the wall start through pinch',
+    (tester) async {
+      final model = workspace.commands();
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tester.pump();
+      await workspace.wallTap(tester, Offset.zero);
+      final first = await tester.startGesture(
+        workspace.screen(tester, const Offset(1, 1)) + const Offset(0, 64),
+        pointer: 21,
+      );
+      await tester.pump(const Duration(milliseconds: 281));
+      await first.moveBy(const Offset(10, 0));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('wall-offset-pointer')), findsOneWidget);
+      final second = await tester.startGesture(
+        workspace.screen(tester, const Offset(3, 2)),
+        pointer: 22,
+      );
+      await tester.pump();
+      expect(find.byKey(const ValueKey('wall-offset-pointer')), findsNothing);
+      final scale = workspace.camera(tester).scale;
+      await second.moveBy(const Offset(60, 20));
+      await second.up();
+      await first.up();
+      await tester.pump();
+      expect(workspace.camera(tester).scale, isNot(scale));
+      expect(workspace.overlay(tester).activeDraftStart, Offset.zero);
+      expect(model.project.activeStorey.walls, isEmpty);
+      await workspace.wallTap(tester, const Offset(4, 0));
+      expect(model.project.activeStorey.walls.single.length, closeTo(4, 1e-9));
+    },
+  );
+
+  testWidgets(
+    'Mouse primary drag places a wall without panning; connected mode continues on release',
+    (tester) async {
+      final model = workspace.commands();
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('wall-chain-toggle')));
+      await tester.pump();
+      final translation = workspace.camera(tester).translation;
+      final first = await tester.startGesture(
+        workspace.screen(tester, Offset.zero),
+        kind: PointerDeviceKind.mouse,
+      );
+      await first.up();
+      await tester.pump();
+      final second = await tester.startGesture(
+        workspace.screen(tester, const Offset(1, 1)),
+        kind: PointerDeviceKind.mouse,
+      );
+      await second.moveTo(workspace.screen(tester, const Offset(4, .05)));
+      await second.up();
+      await tester.pump();
+      expect(workspace.camera(tester).translation, translation);
+      final end = model.project.activeStorey.walls.single.endPoint;
+      expect(workspace.overlay(tester).activeDraftStart, end);
+      await workspace.wallTap(tester, end + const Offset(0, 2));
+      expect(model.project.activeStorey.walls.last.startPoint, end);
+      await tester.tap(find.byKey(const ValueKey('wall-stop-drawing')));
+      await tester.pump();
+      expect(workspace.overlay(tester).activeDraftStart, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
   test(
     'Parallel translation retains T attachments on the reference and physical face',
     () {
@@ -322,6 +447,8 @@ void main() {
       await tester.tap(find.byIcon(Icons.line_weight_rounded));
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, Offset.zero);
+      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
+      await tester.pump();
       await workspace.wallTap(tester, const Offset(3, .04));
       await tester.tap(find.byKey(const ValueKey('wall-length-input')));
       await tester.pump();
@@ -336,7 +463,7 @@ void main() {
       expect(first.length, closeTo(4.25, 1e-9));
       expect(workspace.overlay(tester).activeDraftStart, first.endPoint);
       await workspace.wallTap(tester, first.endPoint + const Offset(0, 2));
-      await tester.tap(find.byKey(const ValueKey('wall-end')));
+      await tester.tap(find.byKey(const ValueKey('wall-stop-drawing')));
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.walls.last.startPoint, first.endPoint);
       expect(workspace.overlay(tester).activeDraftStart, isNull);
@@ -440,7 +567,9 @@ void main() {
           key: screenshotKey,
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
-            theme: ThemeData(fontFamily: 'Roboto'),
+            theme: ThemeData.dark().copyWith(
+              textTheme: ThemeData.dark().textTheme.apply(fontFamily: 'Roboto'),
+            ),
             locale: const Locale('bg'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -457,6 +586,29 @@ void main() {
           .fit(const Rect.fromLTWH(-2, -2, 5, 5), padding: 40);
       await tester.pump();
       await workspace.wallTap(tester, const Offset(-1, -.5));
+      if (const bool.fromEnvironment('UPDATE_ARCHITECT_WALL_PREVIEW')) {
+        final held = await tester.startGesture(
+          workspace.screen(tester, const Offset(-1, 1.5)) + const Offset(0, 64),
+        );
+        await tester.pump(const Duration(milliseconds: 281));
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(screenshotKey),
+        );
+        await tester.runAsync(() async {
+          final image = await boundary.toImage(pixelRatio: 2);
+          final bytes = (await image.toByteData(
+            format: ui.ImageByteFormat.png,
+          ))!;
+          await File(
+            'docs/images/architect_wall_bim_placement.png',
+          ).writeAsBytes(bytes.buffer.asUint8List());
+          image.dispose();
+        });
+        await held.cancel();
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
+      await tester.pump();
       await workspace.wallTap(tester, const Offset(-1, 1.5));
       final end = workspace.overlay(tester).activeDraftEnd;
       await tester.tap(find.byKey(const ValueKey('wall-length-input')));

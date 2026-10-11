@@ -5,6 +5,94 @@ import 'package:kotoview/src/features/architect/widgets/architect_viewport.dart'
 import 'package:kotoview/src/features/bim_projects/controllers/bim_viewport_controller.dart';
 
 void main() {
+  testWidgets('Pending placement hold cannot activate after switching tools', (
+    tester,
+  ) async {
+    final camera = BimViewportController();
+    addTearDown(camera.dispose);
+    var key = 1, holds = 0, releases = 0;
+    late StateSetter rebuild;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return ArchitectViewport(
+              controller: camera,
+              interactionKey: key,
+              singlePointerPan: true,
+              touchHoldToPlace: true,
+              isDraggingHandle: () => false,
+              onToolHoldStart: (_) => holds++,
+              onToolDown: (_) {},
+              onToolMove: (_) {},
+              onToolHover: (_) {},
+              onToolUp: (_) => releases++,
+              onToolCancel: () {},
+              child: const SizedBox.expand(),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    final old = await tester.startGesture(const Offset(100, 200));
+    await tester.pump(const Duration(milliseconds: 100));
+    rebuild(() => key++);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await old.up();
+    expect(holds, 0);
+    expect(releases, 0);
+    final fresh = await tester.startGesture(const Offset(100, 200));
+    await tester.pump(const Duration(milliseconds: 281));
+    await fresh.up();
+    expect(holds, 1);
+    expect(releases, 1);
+  });
+
+  testWidgets(
+    'A second finger cancels a pending hold before its timer activates',
+    (tester) async {
+      final camera = BimViewportController();
+      addTearDown(camera.dispose);
+      var holds = 0, releases = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ArchitectViewport(
+            controller: camera,
+            singlePointerPan: true,
+            touchHoldToPlace: true,
+            isDraggingHandle: () => false,
+            onToolHoldStart: (_) => holds++,
+            onToolDown: (_) {},
+            onToolMove: (_) {},
+            onToolHover: (_) {},
+            onToolUp: (_) => releases++,
+            onToolCancel: () {},
+            child: const SizedBox.expand(),
+          ),
+        ),
+      );
+      await tester.pump();
+      final first = await tester.startGesture(
+        const Offset(100, 200),
+        pointer: 51,
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      final second = await tester.startGesture(
+        const Offset(300, 200),
+        pointer: 52,
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await second.up();
+      await first.up();
+      expect(holds, 0);
+      expect(releases, 0);
+      await tester.tapAt(const Offset(100, 200));
+      expect(releases, 1);
+    },
+  );
   testWidgets(
     'Single-pointer drafting never pans and commits its final position',
     (tester) async {

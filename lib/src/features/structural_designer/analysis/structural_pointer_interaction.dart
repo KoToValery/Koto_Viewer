@@ -3,6 +3,7 @@ import '../../bim_projects/models/bim_coordinate_frame.dart';
 
 /// Screen-space capture limits, independent of zoom and CAD units.
 class StructuralPointerInteraction {
+  static const placementHoldDuration = Duration(milliseconds: 280);
   static const touchClearancePx = 64.0;
   static double snapToleranceCad({
     required bool isMouse,

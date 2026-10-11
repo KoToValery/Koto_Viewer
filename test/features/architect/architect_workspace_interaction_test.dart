@@ -68,8 +68,8 @@ Offset screen(WidgetTester tester, Offset point) =>
     camera(tester).toScreen(point);
 
 Future<void> wallTap(WidgetTester tester, Offset point) async {
-  // The visible drafting target stays 64 pixels above a finger.
-  await tester.tapAt(screen(tester, point) + const Offset(0, 64));
+  // BIM quick taps use their actual location; holds use the offset target.
+  await tester.tapAt(screen(tester, point));
   await tester.pump();
 }
 
@@ -263,8 +263,6 @@ void main() {
       final preview = overlay(tester).activeDraftEnd!;
       expect(preview.dy.abs(), lessThan(1e-9));
       await wallTap(tester, const Offset(3.03, .08));
-      expect(model.project.activeStorey.walls, isEmpty);
-      await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
       expect(
         (model.project.activeStorey.walls.single.endPoint - preview).distance,
@@ -300,7 +298,7 @@ void main() {
   );
 
   testWidgets(
-    'Wall drafting allows one-finger navigation, explicit End and Undo',
+    'Wall drafting allows one-finger navigation, direct release and Undo',
     (tester) async {
       final model = commands();
       addTearDown(model.dispose);
@@ -320,7 +318,6 @@ void main() {
       expect(model.project.activeStorey.walls, isEmpty);
       expect(overlay(tester).activeDraftStart, Offset.zero);
       await wallTap(tester, const Offset(3, .05));
-      await tester.tap(find.byKey(const ValueKey('wall-end')));
       await tester.pumpAndSettle();
       expect(
         model.project.activeStorey.walls.single.endPoint.dy.abs(),

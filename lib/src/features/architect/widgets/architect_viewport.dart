@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
+import '../../structural_designer/analysis/structural_pointer_interaction.dart';
 
 /// A single owner for tool input and camera navigation, without gesture arenas.
 class ArchitectViewport extends StatefulWidget {
@@ -9,6 +11,8 @@ class ArchitectViewport extends StatefulWidget {
   final Widget child;
   final Object? interactionKey;
   final bool singlePointerPan;
+  final bool touchHoldToPlace;
+  final ValueChanged<Offset>? onToolHoldStart;
   final bool Function() isDraggingHandle;
   final ValueChanged<PointerDownEvent> onToolDown;
   final ValueChanged<PointerMoveEvent> onToolMove;
@@ -23,6 +27,8 @@ class ArchitectViewport extends StatefulWidget {
     required this.child,
     this.interactionKey,
     required this.singlePointerPan,
+    this.touchHoldToPlace = false,
+    this.onToolHoldStart,
     required this.isDraggingHandle,
     required this.onToolDown,
     required this.onToolMove,
@@ -43,11 +49,16 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
   bool _canPan = false;
   Offset? _down;
   bool _laidOut = false;
+  Timer? _holdTimer;
+  bool _held = false;
 
   @override
   void didUpdateWidget(covariant ArchitectViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.interactionKey != widget.interactionKey) {
+    if (oldWidget.interactionKey != widget.interactionKey ||
+        oldWidget.touchHoldToPlace != widget.touchHoldToPlace) {
+      _holdTimer?.cancel();
+      _held = false;
       // A release from an earlier tool/floor can never execute the new tool.
       _suppressRelease = _pointers.isNotEmpty;
       _navigation = false;
@@ -67,6 +78,8 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
   void _downEvent(PointerDownEvent event) {
     _pointers[event.pointer] = event.localPosition;
     if (_pointers.length > 1) {
+      _holdTimer?.cancel();
+      _held = false;
       widget.onToolCancel();
       _navigation = true;
       _suppressRelease = true;
@@ -78,7 +91,31 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
     _suppressRelease = _navigation;
     if (!_navigation) widget.onToolDown(event);
     _canPan =
-        _navigation || (widget.singlePointerPan && !widget.isDraggingHandle());
+        _navigation ||
+        (widget.singlePointerPan &&
+            !widget.isDraggingHandle() &&
+            !(widget.touchHoldToPlace &&
+                event.kind != PointerDeviceKind.touch));
+    if (widget.touchHoldToPlace &&
+        event.kind == PointerDeviceKind.touch &&
+        !_navigation &&
+        !widget.isDraggingHandle()) {
+      _holdTimer?.cancel();
+      _holdTimer = Timer(
+        StructuralPointerInteraction.placementHoldDuration,
+        () {
+          if (!mounted ||
+              _pointers.length != 1 ||
+              _navigation ||
+              _suppressRelease) {
+            return;
+          }
+          _held = true;
+          _canPan = false;
+          widget.onToolHoldStart?.call(_focal);
+        },
+      );
+    }
   }
 
   void _moveEvent(PointerMoveEvent event) {
@@ -97,7 +134,9 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
     if (_canPan &&
         !_navigation &&
         _down != null &&
-        (event.localPosition - _down!).distance > 8) {
+        (event.localPosition - _down!).distance >
+            (widget.touchHoldToPlace ? kTouchSlop : 8)) {
+      _holdTimer?.cancel();
       _navigation = true;
       _suppressRelease = true;
       widget.onToolCancel();
@@ -106,13 +145,17 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
     }
     if (_navigation) {
       widget.controller.panBy(_focal - previousFocal);
-    } else if (!_suppressRelease) {
+    } else if (!_suppressRelease &&
+        (!widget.touchHoldToPlace ||
+            _held ||
+            event.kind != PointerDeviceKind.touch)) {
       widget.onToolMove(event);
     }
   }
 
   void _upEvent(PointerUpEvent event) {
     if (!_pointers.containsKey(event.pointer)) return;
+    _holdTimer?.cancel();
     if (!_suppressRelease && !_navigation && _pointers.length == 1) {
       widget.onToolUp(event);
     }
@@ -121,6 +164,8 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
   }
 
   void _reset() {
+    _holdTimer?.cancel();
+    _held = false;
     _navigation = false;
     _suppressRelease = false;
     _canPan = false;
@@ -128,6 +173,7 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
   }
 
   void _cancel(PointerCancelEvent event) {
+    _holdTimer?.cancel();
     _pointers.remove(event.pointer);
     _suppressRelease = true;
     widget.onToolCancel();
@@ -139,6 +185,7 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
     GestureBinding.instance.pointerSignalResolver.register(event, (resolved) {
       final scroll = resolved as PointerScrollEvent;
       if (_pointers.isNotEmpty) {
+        _holdTimer?.cancel();
         _suppressRelease = true;
         widget.onToolCancel();
       }
@@ -175,6 +222,7 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
           onPointerHover: widget.onToolHover,
           onPointerSignal: _signal,
           onPointerPanZoomStart: (_) {
+            _holdTimer?.cancel();
             widget.onToolCancel();
             _suppressRelease = true;
             _lastTrackpadScale = 1;
@@ -198,4 +246,10 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
   );
 
   double _lastTrackpadScale = 1;
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
+  }
 }

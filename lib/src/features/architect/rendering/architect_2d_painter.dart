@@ -587,7 +587,7 @@ class Architect2dPainter extends CustomPainter {
     if (activeTool == ArchitectTool.wall && cursorPosition != null) {
       final target = activeDraftEnd ?? cursorPosition!;
       final paint = Paint()
-        ..color = Colors.orange
+        ..color = activeSnapLabel == null ? Colors.orange : Colors.cyan
         ..strokeWidth = 1.5 / zoomScale
         ..style = PaintingStyle.stroke;
       canvas.drawCircle(target, 7 / zoomScale, paint);

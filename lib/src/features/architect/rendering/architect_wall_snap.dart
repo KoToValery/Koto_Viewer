@@ -12,11 +12,12 @@ class ArchitectWallSnap {
     Offset? anchor,
     required ArchitectProject project,
     required double scale,
+    double capturePixels = 14,
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
   }) {
-    final radius = math.min(14 / scale, .20);
+    final radius = math.min(capturePixels / scale, .20);
     var best = ArchitectSnapHelper.snapFree(
       rawPoint: raw,
       project: project,

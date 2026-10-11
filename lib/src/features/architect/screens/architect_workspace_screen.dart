@@ -10,6 +10,9 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import '../../bim_projects/models/bim_work_project.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
+import '../../structural_designer/analysis/structural_pointer_interaction.dart';
+import '../../structural_designer/rendering/structural_pointer_painter.dart';
+import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../../bim_projects/services/bim_project_library_service.dart';
 import '../models/architect_door.dart';
 import '../models/architect_column.dart';
@@ -195,6 +198,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _cancelDrafting() {
     _wallInsertPointId = null;
+    _wallPrecisionMode = false;
     _interactionEpoch++;
     _cancelActiveDrags();
     _zoneTool.cancelAll();
@@ -219,6 +223,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Offset? _wallPanelAnchor;
   WallReferenceLine _wallReference = WallReferenceLine.center;
   bool _wallTouchInput = false;
+  bool _wallPlacingWithHold = false;
+  bool _wallPrecisionMode = false;
+  Offset? _wallTouchPosition;
   ArchitectWall? _wallEndpointOriginal;
   bool _wallDragStart = false;
   Offset _wallGrabOffset = Offset.zero;
@@ -472,7 +479,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     final rawModel = _screenToModel(event.localPosition);
     if (_activeTool == ArchitectTool.wall) {
-      _updatePointerPreview(_placementPosition(event.localPosition));
+      _wallPlacingWithHold = !_wallTouchInput;
+      _wallTouchPosition = null;
+      if (!_wallTouchInput) _updatePointerPreview(event.localPosition);
       _repaintPreview();
     }
     if (_activeTool == ArchitectTool.select && _selectedWall != null) {
@@ -638,12 +647,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         (event.localPosition - _handlePointerDown!).distance > 1e-6) {
       _handleMoved = true;
     }
+    if (_activeTool == ArchitectTool.wall &&
+        _wallTouchInput &&
+        _wallPlacingWithHold) {
+      _wallTouchPosition = event.localPosition;
+    }
     _updatePointerPreview(_placementPosition(event.localPosition));
   }
 
-  Offset _placementPosition(Offset point) =>
-      _activeTool == ArchitectTool.wall && _wallTouchInput
-      ? point - const Offset(0, 64)
+  void _beginWallHold(Offset point) {
+    if (_activeTool != ArchitectTool.wall || _wallDirectionLocked) return;
+    _wallPlacingWithHold = true;
+    _wallTouchPosition = point;
+    _updatePointerPreview(_placementPosition(point));
+    HapticFeedback.selectionClick();
+  }
+
+  Offset _placementPosition(Offset point) => _activeTool == ArchitectTool.wall
+      ? StructuralPointerInteraction.placementTarget(
+          point,
+          isMouse: !_wallTouchInput || !_wallPlacingWithHold,
+        )
       : point;
 
   ArchitectSnapResult _snapWall(Offset raw, {Offset? anchor}) =>
@@ -652,6 +676,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         anchor: anchor,
         project: _project,
         scale: _currentScale,
+        capturePixels: _wallTouchInput ? 12 : 8,
         underlay: _currentUnderlayDoc,
         frame: widget.underlayFrame,
         visibility: _underlayLayerVisibility,
@@ -660,6 +685,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _updatePointerPreview(Offset screenPosition) {
     final rawModel = _screenToModel(screenPosition);
     _cursorModel = rawModel;
+    if (_activeTool == ArchitectTool.wall && _draftStart == null) {
+      final snap = _snapWall(rawModel);
+      _cursorModel = snap.point;
+      _activeSnapLabel = snap.snapLabel;
+      _repaintPreview();
+      return;
+    }
     if (_wallEndpointOriginal != null && _elementMoveOriginal != null) {
       final original = _wallEndpointOriginal!;
       final snapProject = _project.updateActiveStorey(
@@ -896,9 +928,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     } else {
       _handleTap(_screenToModel(_placementPosition(event.localPosition)));
     }
+    _wallPlacingWithHold = false;
+    _wallTouchPosition = null;
+    _repaintPreview();
   }
 
   void _cancelActiveDrags() {
+    _wallPlacingWithHold = false;
+    _wallTouchPosition = null;
     _wallEndpointOriginal = null;
     _handleMoved = false;
     _handlePointerDown = null;
@@ -1309,15 +1346,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _draftEnd = snap.point;
           _activeSnapLabel = snap.snapLabel;
         });
+        HapticFeedback.lightImpact();
       } else {
         final snap = _snapWall(rawModel, anchor: _draftStart);
-        if ((snap.point - _draftStart!).distance >= .001) {
+        if ((snap.point - _draftStart!).distance >= .001 &&
+            _wallPrecisionMode) {
           setState(() {
             _draftEnd = snap.point;
             _activeSnapLabel = snap.snapLabel;
             _wallDirectionLocked = true;
             _wallPanelAnchor = (_draftStart! + snap.point) / 2;
           });
+        } else if ((snap.point - _draftStart!).distance >= .001) {
+          _commitCurrentWallSegment(snap.point);
         }
       }
       return;
@@ -1773,6 +1814,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         CreateArchitectWall(storeyId: _project.activeStorey.id, wall: newWall),
       );
       _wallDirectionLocked = false;
+      _wallPrecisionMode = false;
+      if (continueChain == true) _wallMode = WallDraftingMode.chained;
       if (continueChain ?? (_wallMode == WallDraftingMode.chained)) {
         _draftStart = p2;
         _draftEnd = p2;
@@ -1791,10 +1834,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _finishChainedWall() {
     setState(() {
+      _wallPrecisionMode = false;
       _draftStart = null;
       _draftEnd = null;
       _wallDirectionLocked = false;
       _activeSnapLabel = null;
+    });
+  }
+
+  void _chooseWallDimension() {
+    if (_wallDirectionLocked) return;
+    setState(() {
+      _wallPrecisionMode = !_wallPrecisionMode;
     });
   }
 
@@ -2386,6 +2437,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _draftStart = null;
                     _draftEnd = null;
                     _wallDirectionLocked = false;
+                    _wallPrecisionMode = false;
                     _wallInsertPointId = null;
                     _activeMagneticGuides = [];
                     _activeSnapLabel = null;
@@ -2767,6 +2819,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         singlePointerPan:
             _activeTool == ArchitectTool.select ||
             _activeTool == ArchitectTool.wall,
+        touchHoldToPlace:
+            _activeTool == ArchitectTool.wall && !_wallDirectionLocked,
+        onToolHoldStart: _beginWallHold,
         isDraggingHandle: () => _isActivelyDraggingHandle,
         onToolDown: _onPointerDown,
         onToolMove: _onPointerMove,
@@ -2804,6 +2859,52 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
               ),
             ),
+            if (_activeTool == ArchitectTool.wall)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_viewport, _previewRevision]),
+                    builder: (context, _) {
+                      final touch = _wallTouchPosition;
+                      final target = _draftEnd ?? _cursorModel;
+                      if (touch == null ||
+                          target == null ||
+                          !_wallPlacingWithHold ||
+                          _wallDirectionLocked) {
+                        return const SizedBox.shrink();
+                      }
+                      final tip = _viewport.toScreen(target);
+                      final label = _activeSnapLabel;
+                      final type = label == null
+                          ? null
+                          : switch (label) {
+                              'Endpoint' || 'Vertex' => DxfSnapType.endpoint,
+                              'Intersection' ||
+                              'Axis intersection' => DxfSnapType.intersection,
+                              'Midpoint' => DxfSnapType.midpoint,
+                              'Center' => DxfSnapType.center,
+                    _ when label.endsWith('°') => DxfSnapType.perpendicular,
+                              _ => DxfSnapType.nearest,
+                            };
+                      return CustomPaint(
+                        key: const ValueKey('wall-offset-pointer'),
+                        painter: StructuralPointerPainter(
+                          touchPos: touch,
+                          targetPos:
+                              StructuralPointerInteraction.placementTarget(
+                                touch,
+                                isMouse: false,
+                              ),
+                          placementPos: tip,
+                          snappedPos: type == null ? null : tip,
+                          snapType: type,
+                          activeTool: StructuralDrawTool.beam,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
             RepaintBoundary(
               child: ValueListenableBuilder<int>(
                 valueListenable: _previewRevision,
@@ -2814,6 +2915,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ),
             Positioned(
               left: 12,
+              right: 12,
               bottom: 12,
               child: IgnorePointer(
                 child: ValueListenableBuilder<int>(
@@ -2826,7 +2928,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(8),
                       child: Text(
-                        _cursorModel == null
+                        _activeTool == ArchitectTool.wall &&
+                                !_wallPlacingWithHold &&
+                                !_wallDirectionLocked
+                            ? (Localizations.localeOf(context).languageCode ==
+                                      'bg'
+                                  ? 'Задръж и плъзни: точка • бързо плъзгане: местене\nРазмер: точно въвеждане • 2 пръста: zoom'
+                                  : 'Hold and drag: point • quick drag: pan\nLength: exact input • 2 fingers: zoom')
+                            : _cursorModel == null
                             ? (Localizations.localeOf(context).languageCode ==
                                       'bg'
                                   ? '2 пръста: местене/мащаб • мишка: среден бутон/колело'
@@ -2837,6 +2946,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           color: Colors.white,
                           fontSize: 12,
                         ),
+                        maxLines: 2,
                       ),
                     ),
                   ),
@@ -2850,37 +2960,122 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         Positioned(
           top: 8,
           left: 8,
-          child: Material(
-            color: const Color(0xEE1E242C),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: DropdownButton<WallReferenceLine>(
-                value: _wallReference,
-                dropdownColor: const Color(0xFF1E242C),
-                underline: const SizedBox.shrink(),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white,
-                  fontSize: 12,
-                ),
-                items: [
-                  for (final reference in WallReferenceLine.values)
-                    DropdownMenuItem(
-                      value: reference,
-                      child: Text(
-                        Localizations.localeOf(context).languageCode == 'bg'
-                            ? switch (reference) {
-                                WallReferenceLine.center => 'Водеща: център',
-                                WallReferenceLine.left => 'Водеща: ляв край',
-                                WallReferenceLine.right => 'Водеща: десен край',
-                              }
-                            : 'Reference: ${reference.name}',
+          right: 8,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 380,
+              child: Material(
+                color: const Color(0xEE1E242C),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Expanded(
+                        child: DropdownButton<WallReferenceLine>(
+                          isExpanded: true,
+                          value: _wallReference,
+                          dropdownColor: const Color(0xFF1E242C),
+                          underline: const SizedBox.shrink(),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Colors.white, fontSize: 12),
+                          items: [
+                            for (final reference in WallReferenceLine.values)
+                              DropdownMenuItem(
+                                value: reference,
+                                child: Text(
+                                  Localizations.localeOf(
+                                            context,
+                                          ).languageCode ==
+                                          'bg'
+                                      ? switch (reference) {
+                                          WallReferenceLine.center =>
+                                            'Водеща: център',
+                                          WallReferenceLine.left =>
+                                            'Водеща: ляв край',
+                                          WallReferenceLine.right =>
+                                            'Водеща: десен край',
+                                        }
+                                      : 'Reference: ${reference.name}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _wallReference = value);
+                            }
+                          },
+                        ),
                       ),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _wallReference = value);
-                },
+                      TextButton.icon(
+                        key: const ValueKey('wall-dimension-mode'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: _wallPrecisionMode
+                              ? Colors.cyanAccent
+                              : Colors.white70,
+                        ),
+                        onPressed: _wallDirectionLocked
+                            ? null
+                            : _chooseWallDimension,
+                        icon: const Icon(Icons.straighten, size: 18),
+                        label: Text(
+                          Localizations.localeOf(context).languageCode == 'bg'
+                              ? 'Размер'
+                              : 'Length',
+                        ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('wall-chain-toggle'),
+                        constraints: const BoxConstraints.tightFor(
+                          width: 36,
+                          height: 40,
+                        ),
+                        padding: EdgeInsets.zero,
+                        tooltip:
+                            Localizations.localeOf(context).languageCode == 'bg'
+                            ? 'Свързани стени'
+                            : 'Connected walls',
+                        onPressed: () => setState(
+                          () =>
+                              _wallMode = _wallMode == WallDraftingMode.chained
+                              ? WallDraftingMode.singleLine
+                              : WallDraftingMode.chained,
+                        ),
+                        icon: Icon(
+                          Icons.linear_scale_rounded,
+                          size: 20,
+                          color: _wallMode == WallDraftingMode.chained
+                              ? Colors.cyanAccent
+                              : Colors.white54,
+                        ),
+                      ),
+                      if (_draftStart != null)
+                        IconButton(
+                          constraints: const BoxConstraints.tightFor(
+                            width: 36,
+                            height: 40,
+                          ),
+                          padding: EdgeInsets.zero,
+                          key: const ValueKey('wall-stop-drawing'),
+                          tooltip:
+                              Localizations.localeOf(context).languageCode ==
+                                  'bg'
+                              ? 'Завърши чертането'
+                              : 'Stop drawing',
+                          onPressed: _finishChainedWall,
+                          icon: const Icon(
+                            Icons.close,
+                            color: Colors.white70,
+                            size: 18,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

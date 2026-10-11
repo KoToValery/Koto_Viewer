@@ -8846,7 +8846,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     if (_activeTool != StructuralDrawTool.measure) LongPressGestureRecognizer:
                         GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
                       () => LongPressGestureRecognizer(
-                        duration: const Duration(milliseconds: 280),
+                        duration: StructuralPointerInteraction.placementHoldDuration,
                         debugOwner: this,
                       ),
                       (LongPressGestureRecognizer instance) {
