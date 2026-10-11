@@ -1,3 +1,5 @@
+import '../../structural_designer/analysis/slab_zone_grouping.dart';
+import '../../structural_designer/rendering/slab_colors.dart';
 import 'dart:convert';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../structural_designer/analysis/slab_seed_generator.dart';
@@ -62,6 +64,7 @@ class BimStructuralSeedSync {
       final key = jsonEncode([
         SlabEnvelopeResult.version,
         'floor-owned-v1',
+        'slab-zones-v1',
         source.underlayFileName,
         source.processing['fingerprint'],
         meta['sourceToProject'],
@@ -80,7 +83,7 @@ class BimStructuralSeedSync {
             .toList(),
       ]);
       if (old?['key'] == key) {
-        updated.add(floor);
+        updated.add(floor.copyWith(slabs: SlabZoneGrouping.attach(floor.slabs,units,owner:floor)));
         underlays.add(source);
         continue;
       }
@@ -120,9 +123,8 @@ class BimStructuralSeedSync {
       final colored = [
         for (var i = 0; i < generated.length; i++)
           generated[i].copyWith(
-            colorValue: Structural2dPainter
-                .slabPalette[i % Structural2dPainter.slabPalette.length]
-                .toARGB32(),
+            colorValue: SlabColors.forSlab(generated[i], fallback: Structural2dPainter
+                .slabPalette[i % Structural2dPainter.slabPalette.length]).toARGB32(),
           ),
       ];
       final oldSlabs = {
@@ -218,7 +220,7 @@ class BimStructuralSeedSync {
       };
       processing['structuralReviewRequired'] = review;
       underlays.add(source.copyWith(processing: processing));
-      updated.add(floor.copyWith(slabs: pending));
+      updated.add(floor.copyWith(slabs: SlabZoneGrouping.attach(pending,units,owner:floor)));
     }
     // Axis origins and owner mappings refresh even when slab processing is
     // cached. Numbers are global; source snapshots keep deletion tombstones.

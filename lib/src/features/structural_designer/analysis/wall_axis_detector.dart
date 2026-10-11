@@ -2174,6 +2174,8 @@ class WallAxisDetector {
       wallThickness,
       allPairs,
       pair,
+      atStart: true,
+      scale: scale,
     );
     final Offset faceAStart;
     final Offset faceBStart;
@@ -2211,6 +2213,8 @@ class WallAxisDetector {
       wallThickness,
       allPairs,
       pair,
+      atStart: false,
+      scale: scale,
     );
     final Offset faceAEnd;
     final Offset faceBEnd;
@@ -2265,9 +2269,16 @@ class WallAxisDetector {
     Offset wallDir,
     double wallThickness,
     List<WallPairCandidate> allPairs,
-    WallPairCandidate currentPair,
-  ) {
-    final tolerance = wallThickness * .02;
+    WallPairCandidate currentPair, {
+    required bool atStart,
+    required double scale,
+  }) {
+    final tolerance = math.max(wallThickness * .02, 5 * scale);
+    double along(Offset p) => p.dx * wallDir.dx + p.dy * wallDir.dy;
+    Offset faceEnd(WallSegment face) {
+      final forward = along(face.end) >= along(face.start);
+      return atStart == forward ? face.start : face.end;
+    }
 
     for (final other in allPairs) {
       if (identical(other, currentPair)) continue;
@@ -2282,6 +2293,19 @@ class WallAxisDetector {
         final closest = _closestPointOnSegment(midPt, p1, p2);
         if ((midPt - closest).distance <= other.perpendicularDistance / 2 + tolerance) {
           return true;
+        }
+        // At an L corner the common overlap ends at the INNER face, whereas
+        // the outer face continues across the other wall's full thickness.
+        // Confirm this by actual face contact; proximity alone must never
+        // remove a door jamb cap or truncate the outer corner.
+        for (final face in [currentPair.segmentA, currentPair.segmentB]) {
+          final endpoint = faceEnd(face);
+          if (along(endpoint - midPt).abs() > other.perpendicularDistance + tolerance) continue;
+          for (final target in [other.segmentA, other.segmentB]) {
+            if ((endpoint - _closestPointOnSegment(endpoint, target.start, target.end)).distance <= tolerance) {
+              return true;
+            }
+          }
         }
       } else {
         // Parallel wall: check if it touches midPt directly (collinear continuation with no opening)

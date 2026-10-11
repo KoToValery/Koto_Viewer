@@ -756,8 +756,26 @@ class SlabOpening {
 }
 
 /// Represents a reinforced concrete slab (плоча).
+enum SlabZoneKind {
+  balcony, cornice, terrace, loggia, eave, externalArea;
+
+  static SlabZoneKind? fromProjectionId(String id) {
+    if (!id.startsWith('bim_slab_')) return null;
+    final kind = RegExp(r'_projection_([a-zA-Z]+)_').firstMatch(id)?.group(1);
+    return switch (kind) {
+      'balcony' => balcony, 'cornice' => cornice, 'terrace' => terrace,
+      'loggia' => loggia, 'eave' => eave, 'area' => externalArea, _ => null,
+    };
+  }
+}
+
 class StructuralSlab {
   final String id;
+  /// Editable region of a parent plate; geometry and local thickness stay here.
+  final String? parentSlabId;
+  final SlabZoneKind? zoneKind;
+  SlabZoneKind? get effectiveZoneKind => zoneKind ?? SlabZoneKind.fromProjectionId(id);
+  bool get isSlabZone => effectiveZoneKind != null;
   final List<Offset> polygon; // Outer perimeter boundary
   final List<List<Offset>> openings; // Staircase, elevator, shaft cutouts
   final List<SlabOpeningType>? openingTypes; // Typed categorization of openings
@@ -778,6 +796,8 @@ class StructuralSlab {
   const StructuralSlab({
     required this.id,
     required this.polygon,
+    this.parentSlabId,
+    this.zoneKind,
     this.openings = const [],
     this.openingTypes,
     this.thickness = 0.20,
@@ -1808,6 +1828,9 @@ class StructuralSlab {
 
   StructuralSlab copyWith({
     String? id,
+    String? parentSlabId,
+    bool clearParentSlabId = false,
+    SlabZoneKind? zoneKind,
     List<Offset>? polygon,
     List<List<Offset>>? openings,
     List<SlabOpeningType>? openingTypes,
@@ -1822,6 +1845,8 @@ class StructuralSlab {
   }) {
     return StructuralSlab(
       id: id ?? this.id,
+      parentSlabId: clearParentSlabId ? null : parentSlabId ?? this.parentSlabId,
+      zoneKind: zoneKind ?? this.zoneKind,
       polygon: polygon ?? this.polygon,
       openings: openings ?? this.openings,
       openingTypes: openingTypes ?? this.openingTypes,
@@ -1836,6 +1861,8 @@ class StructuralSlab {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    if (parentSlabId != null) 'parentSlabId': parentSlabId,
+    if (zoneKind != null) 'zoneKind': zoneKind!.name,
     'polygon': polygon.map((p) => {'dx': p.dx, 'dy': p.dy}).toList(),
     'openings': openings.map((op) => op.map((p) => {'dx': p.dx, 'dy': p.dy}).toList()).toList(),
     if (openingTypes != null) 'openingTypes': openingTypes!.map((t) => t.name).toList(),
@@ -1850,6 +1877,8 @@ class StructuralSlab {
   factory StructuralSlab.fromJson(Map<String, dynamic> json) {
     return StructuralSlab(
       id: json['id'] as String,
+      parentSlabId: json['parentSlabId'] as String?,
+      zoneKind: SlabZoneKind.values.where((k) => k.name == json['zoneKind']).firstOrNull,
       polygon: (json['polygon'] as List<dynamic>?)
               ?.map((p) => Offset((p['dx'] as num).toDouble(), (p['dy'] as num).toDouble()))
               .toList() ??

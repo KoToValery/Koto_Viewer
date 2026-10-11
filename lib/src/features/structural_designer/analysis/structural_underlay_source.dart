@@ -17,7 +17,7 @@ class StructuralUnderlaySource {
         final value = jsonDecode(raw);
         if (value is! Map<String, dynamic> ||
             value['complete'] != true ||
-            !const [1, 2, 3, 4, 5, 6, 7, 8, 9].contains(value['version'])) {
+            !const [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].contains(value['version'])) {
           return document;
         }
         metadata = value;

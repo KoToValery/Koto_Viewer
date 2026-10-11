@@ -8,6 +8,7 @@ import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
 import 'structural_pointer_painter.dart';
 import 'slab_plan_labels.dart';
+import 'slab_colors.dart';
 import 'grid_axis_presentation.dart';
 import 'grid_axis_bubble_layout.dart';
 import 'support_span_overlay_layout.dart';
@@ -558,10 +559,8 @@ class Structural2dPainter extends CustomPainter {
   ];
 
   Color _getSlabBaseColor(StructuralSlab slab, int slabIndex) {
-    if (slab.colorValue != null) {
-      return Color(slab.colorValue!);
-    }
-    return slabPalette[slabIndex % slabPalette.length];
+    return SlabColors.forSlab(slab,
+      fallback: slabPalette[slabIndex % slabPalette.length]);
   }
 
   void _drawGroundFoundations(Canvas canvas) {

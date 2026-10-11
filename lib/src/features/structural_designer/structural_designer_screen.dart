@@ -1,3 +1,5 @@
+import 'analysis/slab_zone_grouping.dart';
+import 'rendering/slab_colors.dart';
 import 'rendering/grid_axis_bubble_layout.dart';
 import 'analysis/staircase_automatic_openings.dart';
 import 'rendering/slab_plan_labels.dart';
@@ -6837,8 +6839,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       final coloredSeeds = [
         for (var i = 0; i < seeds.length; i++)
           seeds[i].copyWith(
-            colorValue: Structural2dPainter.slabPalette[
-                i % Structural2dPainter.slabPalette.length].toARGB32(),
+            colorValue: SlabColors.forSlab(seeds[i], fallback: Structural2dPainter.slabPalette[
+                i % Structural2dPainter.slabPalette.length]).toARGB32(),
           ),
       ];
       _updateActiveStorey(active.copyWith(slabs: coloredSeeds));
@@ -7184,8 +7186,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final coloredSeeds = [
       for (var i = 0; i < seeds.length; i++)
         seeds[i].copyWith(
-          colorValue: Structural2dPainter.slabPalette[
-              (active.slabs.length + i) % Structural2dPainter.slabPalette.length].toARGB32(),
+          colorValue: SlabColors.forSlab(seeds[i], fallback: Structural2dPainter.slabPalette[
+              (active.slabs.length + i) % Structural2dPainter.slabPalette.length]).toARGB32(),
         ),
     ];
     _updateActiveStorey(active.copyWith(slabs: [...active.slabs, ...coloredSeeds]));
@@ -7252,6 +7254,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _updateActiveStorey(StoreyLevel newStorey) {
+    newStorey = newStorey.copyWith(slabs: SlabZoneGrouping.attach(
+      newStorey.slabs, _cadUnitsPerMeter, owner: newStorey));
     final storeys = List<StoreyLevel>.from(_project.storeys);
     storeys[_project.activeStoreyIndex] = newStorey;
     setState(() {
@@ -7636,8 +7640,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final coloredSeeds = [
           for (var i = 0; i < seeds.length; i++)
             seeds[i].copyWith(
-              colorValue: Structural2dPainter.slabPalette[
-                  (currentActive.slabs.length + i) % Structural2dPainter.slabPalette.length].toARGB32(),
+              colorValue: SlabColors.forSlab(seeds[i], fallback: Structural2dPainter.slabPalette[
+                  (currentActive.slabs.length + i) % Structural2dPainter.slabPalette.length]).toARGB32(),
             ),
         ];
         _updateActiveStorey(currentActive.copyWith(slabs: [...currentActive.slabs, ...coloredSeeds]));

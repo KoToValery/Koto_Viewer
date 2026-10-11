@@ -13,7 +13,7 @@ import 'slab_corner_and_projection_test.dart' show document, rectangle;
 
 void main() {
   testWidgets(
-    'standalone drawing exposes menu and slab button and generates without metadata',
+    'standalone drawing generates from the Slab tool without metadata',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       tester.view.physicalSize = const Size(1400, 1000);
@@ -56,7 +56,9 @@ void main() {
       expect(find.byType(BottomSheet), findsOneWidget);
       await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.tap(find.byKey(const ValueKey('bim-tool-group-structure')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Slab'));
       await tester.pumpAndSettle();
       expect(find.text('Generate initial slabs'), findsOneWidget);
       await tester.tap(find.text('Generate initial slabs'));
@@ -128,7 +130,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(saved, isEmpty);
       Future<void> command() async {
-        await tester.tap(find.byIcon(Icons.more_vert_rounded));
+        await tester.tap(
+          find.byKey(const ValueKey('bim-tool-group-structure')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Slab'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Generate initial slabs'));
         await tester.pumpAndSettle();

@@ -8,6 +8,7 @@ import 'slab_topology_analyzer.dart';
 import 'slab_envelope_detector.dart';
 import 'slab_projection_detector.dart';
 import 'wall_axis_detector.dart';
+import 'slab_zone_grouping.dart';
 import 'structural_underlay_source.dart';
 
 /// Explicit, one-shot generation. Existing generated slabs are never replaced.
@@ -152,6 +153,7 @@ class SlabSeedGenerator {
         result.add(
           StructuralSlab(
             id: '${idPrefix}projection_${typeName}_$i',
+            zoneKind: SlabZoneKind.fromProjectionId('${idPrefix}projection_${typeName}_$i'),
             polygon: polygon,
             thickness: thickness,
             isFloorSlab: floorOwned,
@@ -159,7 +161,7 @@ class SlabSeedGenerator {
         );
       }
     }
-    return result;
+    return SlabZoneGrouping.attach(result, unitsPerMeter);
   }
 
   static Iterable<(Offset, Offset)> edges(List<Offset> p) sync* {

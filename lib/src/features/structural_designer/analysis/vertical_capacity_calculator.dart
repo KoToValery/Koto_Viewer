@@ -46,6 +46,7 @@ class VerticalCapacityCalculator {
     required StoreyLevel storey,
     required double scale,
     required double totalFloorAreaM2,
+    List<SlabBoundaryEdge>? boundaries,
   }) {
     final cPos = col.center;
     double minDxPos = double.infinity;
@@ -96,13 +97,9 @@ class VerticalCapacityCalculator {
     double slabEdgeDyPos = double.infinity;
     double slabEdgeDyNeg = double.infinity;
 
-    for (final slab in storey.slabs) {
-      final poly = slab.polygon;
-      final n = poly.length;
-      if (n < 3) continue;
-      for (int i = 0; i < n; i++) {
-        final p1 = poly[i];
-        final p2 = poly[(i + 1) % n];
+    for (final edge in boundaries ?? SlabBoundaryGeometry.exposedEdges(storey.slabs, scale)) {
+        final p1 = edge.a;
+        final p2 = edge.b;
 
         // Horizontal ray at y = cPos.dy (checks +X and -X)
         if ((p1.dy <= cPos.dy && p2.dy > cPos.dy) || (p2.dy <= cPos.dy && p1.dy > cPos.dy)) {
@@ -127,7 +124,6 @@ class VerticalCapacityCalculator {
             if (dy < 0 && -dy < slabEdgeDyNeg) slabEdgeDyNeg = -dy;
           }
         }
-      }
     }
 
     // Determine tributary half-spans in all 4 directions
@@ -817,7 +813,9 @@ class VerticalCapacityCalculator {
       final s = project.storeys[sIdx];
       final double hSlabM = s.slabs.isNotEmpty ? s.slabs.first.thickness : 0.20;
       storeySlabThicknessM.add(hSlabM);
-      final double gSlab = 25.0 * hSlabM; // slab self-weight
+      final area = s.slabs.fold<double>(0, (sum, slab) => sum + slab.netArea);
+      final volume = s.slabs.fold<double>(0, (sum, slab) => sum + slab.netArea * slab.thickness);
+      final double gSlab = 25.0 * (area > 0 ? volume / area : hSlabM); // local thicknesses, weighted by area
       final double totalGk = gSlab + project.deadLoadSuperimposed;
       final double totalQk = project.liveLoad;
       final double wd = 1.35 * totalGk + 1.50 * totalQk;
@@ -904,6 +902,7 @@ class VerticalCapacityCalculator {
         bool hasConnectedBeams,
       })>[];
 
+      final floorBoundaries = SlabBoundaryGeometry.exposedEdges(storey.slabs, scale);
       for (final col in storey.columns) {
         final double acM2 = getColumnAreaM2(col, scale);
         final double aTribM2 = calculateColumnTributaryAreaM2(
@@ -911,6 +910,7 @@ class VerticalCapacityCalculator {
           storey: storey,
           scale: scale,
           totalFloorAreaM2: totalFootprintAreaM2,
+          boundaries: floorBoundaries,
         );
         final touched = storey.slabs
             .where(
@@ -923,9 +923,15 @@ class VerticalCapacityCalculator {
         final localSlabThicknessM = touched.isEmpty
             ? storeySlabThicknessM[sIdx]
             : touched.map((s) => s.thickness).reduce(math.min);
+        final plateIds = touched.map((s) => s.parentSlabId ?? s.id).toSet();
+        final plate = storey.slabs.where((s) => plateIds.contains(s.parentSlabId ?? s.id)).toList();
+        final grouped = plate.any((s) => s.parentSlabId != null);
+        final plateArea = plate.fold<double>(0, (sum, s) => sum + s.netArea);
+        final plateVolume = plate.fold<double>(0, (sum, s) => sum + s.netArea*s.thickness);
+        final gravityThickness = grouped && plateArea > 0 ? plateVolume/plateArea : localSlabThicknessM;
         final localFloorWd = touched.isEmpty
             ? floorWd
-            : 1.35 * (25 * localSlabThicknessM + project.deadLoadSuperimposed) +
+            : 1.35 * (25 * gravityThickness + project.deadLoadSuperimposed) +
                   1.5 * project.liveLoad;
         final double floorShearKn = localFloorWd * aTribM2;
         final double colSelfWeightKn = 25.0 * acM2 * storey.height * 1.35;

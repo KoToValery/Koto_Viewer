@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/dxf_viewer/models/dxf_models.dart';
 import 'package:kotoview/src/features/structural_designer/analysis/wall_axis_detector.dart';
@@ -88,6 +89,45 @@ void main() {
       }
     },
   );
+  for (final scale in [.001, .1, 1.0]) {
+    for (final angle in [0.0, math.pi / 5]) {
+      test(
+        'L corner preserves both outer faces, scale=$scale angle=$angle',
+        () {
+          Offset tr(Offset p) =>
+              Offset(
+                p.dx * math.cos(angle) - p.dy * math.sin(angle),
+                p.dx * math.sin(angle) + p.dy * math.cos(angle),
+              ) *
+              scale;
+          final d = f.doc([
+            for (final edge in [
+              (const Offset(0, 0), const Offset(4000, 0)),
+              (const Offset(250, 250), const Offset(4000, 250)),
+              (const Offset(0, 0), const Offset(0, 4000)),
+              (const Offset(250, 250), const Offset(250, 4000)),
+            ])
+              DxfLine(
+                p1: tr(edge.$1),
+                p2: tr(edge.$2),
+                layer: 'plan',
+                lineWeight: .3,
+              ),
+          ]);
+          final r = WallAxisDetector.detect(d, forceScaleFactor: scale);
+          expect(r.selectedWallPairs, hasLength(2));
+          for (final corner in [tr(Offset.zero), tr(const Offset(250, 250))]) {
+            final endpoints = r.wallContourSegments
+                .expand((s) => [s.$1, s.$2])
+                .where((p) => (p - corner).distance < scale)
+                .length;
+            expect(endpoints, 2);
+          }
+          expect(r.closureSegments, hasLength(2));
+        },
+      );
+    }
+  }
   test('thin closed treads cannot return through the column detector', () {
     DxfLwPolyline rectangle(double x, double pen) => DxfLwPolyline(
       layer: 'columns',

@@ -1,3 +1,4 @@
+import 'slab_colors.dart';
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import '../models/cantilever_analysis_models.dart';
@@ -196,9 +197,8 @@ class Structural3dMeshBuilder {
               highlightedCeiling!.slabs.any((s) => s.id == slab.id)) ||
             (highlightedFloor?.id == storey.id &&
               highlightedFloor!.slabs.any((s) => s.id == slab.id));
-        final Color baseColor = slab.colorValue != null
-            ? Color(slab.colorValue!)
-            : slab3dPalette[slabIdx % slab3dPalette.length];
+        final Color baseColor = SlabColors.forSlab(slab,
+            fallback: slab3dPalette[slabIdx % slab3dPalette.length]);
 
         final double slabZTop =
             storey.structuralElevationFor(slab) * cadUnitsPerMeter;

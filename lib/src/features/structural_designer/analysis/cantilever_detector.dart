@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/cantilever_analysis_models.dart';
 import '../models/structural_element.dart';
 import 'deflection_calculator.dart';
+import 'slab_boundary_geometry.dart';
+import 'structural_polygon_distance.dart';
 
 /// Geometry detector that scans structural storeys for cantilever overhangs,
 /// corner double cantilevers, and stacked transfer columns.
@@ -140,6 +142,9 @@ class CantileverDetector {
     const double minCantileverM = 0.60;
 
     int zoneCounter = 1;
+    final boundary = SlabBoundaryGeometry.exposedEdges(storey.slabs, cadUnitsPerMeter)
+      .where((e) => !e.opening).toList();
+    final epsilon = 1e-7 * cadUnitsPerMeter;
 
     for (final slab in storey.slabs) {
       final poly = slab.polygon;
@@ -148,8 +153,27 @@ class CantileverDetector {
       // Check each vertex of the slab polygon
       for (int i = 0; i < poly.length; i++) {
         final pt = poly[i];
-        final prevPt = poly[(i - 1 + poly.length) % poly.length];
-        final nextPt = poly[(i + 1) % poly.length];
+        // Region seams are not free slab edges. Use the real outer boundary,
+        // retaining this region's own thickness for the cantilever check.
+        final incident = boundary.where((e) =>
+          StructuralPolygonDistance.pointToSegment(pt,e.a,e.b) <= epsilon).toList();
+        if (incident.isEmpty) continue;
+        final directions = <Offset>[];
+        for (final edge in incident) {
+          for (final endpoint in [edge.a,edge.b]) {
+            final v = endpoint-pt;
+            if (v.distance>epsilon && !directions.any((d) =>
+              ((d/d.distance)-(v/v.distance)).distance<1e-6)) {
+              directions.add(v);
+            }
+          }
+        }
+        if (directions.length == 2 &&
+            (directions.first/directions.first.distance + directions.last/directions.last.distance).distance < 1e-6) {
+          continue;
+        }
+        final prevPt = directions.isEmpty ? pt : pt+directions.first;
+        final nextPt = directions.length<2 ? pt : pt+directions.last;
 
         final supportInfo =
             findClosestSupport(pt, storey.columns, storey.shearWalls);
@@ -174,7 +198,10 @@ class CantileverDetector {
           final double dot = (l1 > 1e-4 && l2 > 1e-4)
               ? (v1.dx * v2.dx + v1.dy * v2.dy) / (l1 * l2)
               : 0.0;
-          final bool isGeometricCorner = dot.abs() <= 0.85;
+          final bisector = l1 > epsilon && l2 > epsilon ? v1/l1+v2/l2 : Offset.zero;
+          final convex = bisector.distance > 1e-6 && SlabBoundaryGeometry.contains(
+            pt+bisector/bisector.distance*(1e-6*cadUnitsPerMeter),storey.slabs);
+          final bool isGeometricCorner = dot.abs() <= 0.85 && convex;
 
           final double dx = (pt.dx - closestSupport.dx).abs();
           final double dy = (pt.dy - closestSupport.dy).abs();
