@@ -8,6 +8,8 @@ class ArchitectWallDraftingPanel extends StatefulWidget {
   final double minimumLength;
   final ValueChanged<double> onLength;
   final VoidCallback onEnd, onContinue, onUnlock, onCancel;
+  final bool showContinue, showDirection, keypadInitiallyOpen;
+  final String? title, endLabel;
   const ArchitectWallDraftingPanel({
     super.key,
     required this.length,
@@ -18,6 +20,11 @@ class ArchitectWallDraftingPanel extends StatefulWidget {
     required this.onContinue,
     required this.onUnlock,
     required this.onCancel,
+    this.showContinue = true,
+    this.showDirection = true,
+    this.keypadInitiallyOpen = false,
+    this.title,
+    this.endLabel,
   });
   @override
   State<ArchitectWallDraftingPanel> createState() =>
@@ -28,13 +35,23 @@ class _ArchitectWallDraftingPanelState
     extends State<ArchitectWallDraftingPanel> {
   String? _input;
   bool _keypad = false;
-  bool get _valid =>
-      (_input == null ? widget.length : (double.tryParse(_input!) ?? 0)) >=
-      widget.minimumLength;
+  @override
+  void initState() {
+    super.initState();
+    _keypad = widget.keypadInitiallyOpen;
+  }
+
+  bool get _valid {
+    final value = _input == null ? widget.length : double.tryParse(_input!);
+    return value != null && value.isFinite && value >= widget.minimumLength;
+  }
+
   void _key(String key) {
     setState(() {
       var value = _input ?? '';
-      if (key == '⌫') {
+      if (key == '±') {
+        value = value.startsWith('-') ? value.substring(1) : '-$value';
+      } else if (key == '⌫') {
         value = value.isEmpty ? '' : value.substring(0, value.length - 1);
       } else if (key == '.') {
         if (!value.contains('.')) value = '${value.isEmpty ? '0' : value}.';
@@ -43,7 +60,9 @@ class _ArchitectWallDraftingPanelState
       }
       _input = value;
       final number = double.tryParse(value);
-      if (number != null && number > 0) widget.onLength(number);
+      if (number != null && number.isFinite && number >= widget.minimumLength) {
+        widget.onLength(number);
+      }
     });
   }
 
@@ -64,18 +83,16 @@ class _ArchitectWallDraftingPanelState
                 Expanded(
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        padding: EdgeInsets.zero,
-                      ),
-                      onPressed: widget.onUnlock,
-                      icon: const Icon(Icons.turn_right, size: 16),
-                      label: Text(
-                        l10n.architectWallDirection,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
+                    child: widget.showDirection
+                        ? IconButton(
+                            tooltip: l10n.architectWallDirection,
+                            onPressed: widget.onUnlock,
+                            icon: const Icon(Icons.explore_outlined, size: 20),
+                          )
+                        : Text(
+                            widget.title ?? '',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
                   ),
                 ),
                 SizedBox(
@@ -158,6 +175,8 @@ class _ArchitectWallDraftingPanelState
                   ],
                 ),
             ],
+            if (_keypad && widget.minimumLength < 0)
+              TextButton(onPressed: () => _key('±'), child: const Text('±')),
             Row(
               children: [
                 Expanded(
@@ -167,20 +186,21 @@ class _ArchitectWallDraftingPanelState
                       foregroundColor: Colors.cyanAccent,
                     ),
                     onPressed: _valid ? widget.onEnd : null,
-                    child: Text(l10n.architectWallEnd),
+                    child: Text(widget.endLabel ?? l10n.architectWallEnd),
                   ),
                 ),
-                Expanded(
-                  child: FilledButton(
-                    key: const ValueKey('wall-continue'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.cyanAccent,
-                      foregroundColor: const Color(0xFF1E242C),
+                if (widget.showContinue)
+                  Expanded(
+                    child: FilledButton(
+                      key: const ValueKey('wall-continue'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.cyanAccent,
+                        foregroundColor: const Color(0xFF1E242C),
+                      ),
+                      onPressed: _valid ? widget.onContinue : null,
+                      child: Text(l10n.architectWallContinue),
                     ),
-                    onPressed: _valid ? widget.onContinue : null,
-                    child: Text(l10n.architectWallContinue),
                   ),
-                ),
               ],
             ),
           ],

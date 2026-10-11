@@ -6,6 +6,8 @@ import '../../dxf_viewer/rendering/dxf_quadtree.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import 'architect_2d_painter.dart';
+import 'architect_dimension_layout.dart';
+import 'architect_wall_network.dart';
 
 /// Canvas painter helper for specialized architectural drawing elements
 /// (windows, columns, beams, slabs, openings, stairs, annotations, dimensions, and CAD underlays).
@@ -406,6 +408,7 @@ class ArchitectElementsPainterHelper {
     required ArchitectStorey storey,
     required double zoomScale,
     String? selectedElementId,
+    Path? wallObstacles,
   }) {
     for (final dim in storey.dimensions) {
       final isSelected = dim.id == selectedElementId;
@@ -445,7 +448,7 @@ class ArchitectElementsPainterHelper {
       canvas.drawLine(p2 - tickVec, p2 + tickVec, dimPaint);
 
       // Dimension text
-      final mid = (p1 + p2) / 2.0 + n * 0.10;
+      final preferredMid = (p1 + p2) / 2.0 + n * 0.10;
       final tp = TextPainter(
         text: TextSpan(
           text: dim.displayText,
@@ -461,6 +464,17 @@ class ArchitectElementsPainterHelper {
         textDirection: TextDirection.ltr,
       )..layout();
 
+      final envelope = Size(
+        tp.width * u.dx.abs() + tp.height * u.dy.abs() + 8,
+        tp.width * u.dy.abs() + tp.height * u.dx.abs() + 8,
+      );
+      final mid = ArchitectDimensionLayout.clearTextPosition(
+        preferredMid,
+        envelope,
+        zoomScale,
+        n * (dim.offsetDistance < 0 ? -1 : 1),
+        wallObstacles ?? ArchitectWallNetwork.body(storey.walls),
+      );
       canvas.save();
       canvas.translate(mid.dx, mid.dy);
       double angle = math.atan2(u.dy, u.dx);

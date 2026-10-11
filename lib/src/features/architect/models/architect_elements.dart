@@ -369,7 +369,7 @@ class ArchitectDimension {
     'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'offsetDistance': offsetDistance,
-    if (customText != null) 'customText': customText,
+    'customText': customText,
   };
 
   factory ArchitectDimension.fromJson(Map<String, dynamic> json) => ArchitectDimension(
@@ -427,7 +427,7 @@ class ArchitectElevationMarker {
     'id': id,
     'position': {'x': position.dx, 'y': position.dy},
     'elevation': elevation,
-    if (label != null) 'label': label,
+    'label': label,
   };
 
   factory ArchitectElevationMarker.fromJson(Map<String, dynamic> json) =>

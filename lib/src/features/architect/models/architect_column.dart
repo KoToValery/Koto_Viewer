@@ -13,6 +13,7 @@ class ArchitectColumn {
   final double width; // in meters (default 0.25 m = 25 cm)
   final double depth; // in meters (default 0.25 m = 25 cm)
   final double rotationDeg;
+  final double? height;
   final String label;
 
   const ArchitectColumn({
@@ -22,6 +23,7 @@ class ArchitectColumn {
     this.width = 0.25,
     this.depth = 0.25,
     this.rotationDeg = 0.0,
+    this.height,
     this.label = 'К1',
   });
 
@@ -32,6 +34,7 @@ class ArchitectColumn {
     double? width,
     double? depth,
     double? rotationDeg,
+    double? height,
     String? label,
   }) => ArchitectColumn(
     id: id ?? this.id,
@@ -40,6 +43,7 @@ class ArchitectColumn {
     width: width ?? this.width,
     depth: depth ?? this.depth,
     rotationDeg: rotationDeg ?? this.rotationDeg,
+    height: height ?? this.height,
     label: label ?? this.label,
   );
 
@@ -50,6 +54,7 @@ class ArchitectColumn {
     'width': width,
     'depth': depth,
     'rotationDeg': rotationDeg,
+    'height': height,
     'label': label,
   };
 
@@ -67,6 +72,7 @@ class ArchitectColumn {
         width: (json['width'] as num?)?.toDouble() ?? 0.25,
         depth: (json['depth'] as num?)?.toDouble() ?? 0.25,
         rotationDeg: (json['rotationDeg'] as num?)?.toDouble() ?? 0.0,
+        height: (json['height'] as num?)?.toDouble(),
         label: json['label'] as String? ?? 'К1',
       );
 
@@ -77,7 +83,12 @@ class ArchitectColumn {
     }
     final halfW = (width / 2.0) + tolerance;
     final halfD = (depth / 2.0) + tolerance;
-    final delta = pt - position;
+    final v = pt - position;
+    final angle = rotationDeg * math.pi / 180;
+    final delta = Offset(
+      v.dx * math.cos(angle) + v.dy * math.sin(angle),
+      -v.dx * math.sin(angle) + v.dy * math.cos(angle),
+    );
     return delta.dx.abs() <= halfW && delta.dy.abs() <= halfD;
   }
 
@@ -163,7 +174,7 @@ class ArchitectColumn {
   }) {
     final List<Triangle3D> tris = [];
     final zMin = storeyElevation;
-    final zMax = storeyElevation + storeyHeight;
+    final zMax = storeyElevation + (height ?? storeyHeight);
     const colColor = Color(0xFFB0BEC5);
 
     if (shape == ColumnShape.circular) {

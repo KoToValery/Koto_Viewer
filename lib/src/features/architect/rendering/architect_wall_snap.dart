@@ -5,6 +5,7 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/rendering/dxf_segment_snap.dart';
 import '../models/architect_project.dart';
 import 'architect_snap_helper.dart';
+import 'architect_wall_network.dart';
 
 class ArchitectWallSnap {
   static ArchitectSnapResult resolve({
@@ -17,7 +18,7 @@ class ArchitectWallSnap {
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
   }) {
-    final radius = math.min(capturePixels / scale, .20);
+    final radius = math.min(capturePixels / scale, .35);
     var best = ArchitectSnapHelper.snapFree(
       rawPoint: raw,
       project: project,
@@ -28,7 +29,14 @@ class ArchitectWallSnap {
     }
     var distance = best.isSnapped ? (best.point - raw).distance : radius + 1e-9;
     var priority = best.isSnapped
-        ? (best.snapLabel == 'Endpoint' || best.snapLabel == 'Vertex' ? 0 : 1)
+        ? switch (best.snapLabel) {
+            'Endpoint' || 'Vertex' || 'Axis endpoint' => 0,
+            'Axis intersection' ||
+            'Intersection' ||
+            'Center' ||
+            'Midpoint' => 1,
+            _ => 3,
+          }
         : 3;
     void consider(Offset point, String label, int rank) {
       if (anchor != null && (point - anchor).distance < .001) return;
@@ -42,6 +50,20 @@ class ArchitectWallSnap {
         );
         distance = d;
         priority = rank;
+      }
+    }
+
+    // The axis crossing must beat a nearer projection onto either axis.
+    final axes = project.gridAxes;
+    for (var i = 0; i < axes.length; i++) {
+      for (final b in axes.skip(i + 1)) {
+        final point = ArchitectWallNetwork.intersection(
+          axes[i].start,
+          axes[i].end,
+          b.start,
+          b.end,
+        );
+        if (point != null) consider(point, 'Axis intersection', 0);
       }
     }
 
@@ -83,6 +105,7 @@ class ArchitectWallSnap {
       }
     }
     if (best.isSnapped &&
+        (priority <= 1 || anchor == null) &&
         (anchor == null || (best.point - anchor).distance >= .001)) {
       return best;
     }
@@ -97,11 +120,14 @@ class ArchitectWallSnap {
     // Strong orthogonal capture; lighter 15-degree increments.
     for (final step in [math.pi / 2, math.pi / 12]) {
       final target = (angle / step).round() * step;
-      final threshold = step == math.pi / 2 ? math.pi / 22.5 : math.pi / 90;
+      final threshold = step == math.pi / 2 ? math.pi / 15 : math.pi / 90;
+      final directionRadius = step == math.pi / 2
+          ? math.min(28 / scale, .5)
+          : radius;
       final u = Offset(math.cos(target), math.sin(target));
       final projected = anchor + u * (delta.dx * u.dx + delta.dy * u.dy);
       if ((angle - target).abs() <= threshold &&
-          (projected - raw).distance <= radius) {
+          (projected - raw).distance <= directionRadius) {
         final degrees = (target * 180 / math.pi + 360) % 360;
         return ArchitectSnapResult(
           point: projected,
@@ -111,6 +137,7 @@ class ArchitectWallSnap {
         );
       }
     }
+    if (best.isSnapped) return best;
     return ArchitectSnapResult(
       point: ArchitectSnapHelper.precision(project).inputPoint(raw),
     );

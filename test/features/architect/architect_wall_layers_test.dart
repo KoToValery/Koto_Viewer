@@ -130,14 +130,14 @@ void main() {
       var hatchPixels = 0;
       var transparentCorePixels = 0;
       for (var x = 60; x < 580; x++) {
-        for (var y = 119; y < 131; y++) {
+        for (var y = 132; y < 143; y++) {
           expect(
             alpha(x, y),
             0,
             reason: 'Insulation has neither hatch nor fill',
           );
         }
-        for (var y = 70; y < 106; y++) {
+        for (var y = 82; y < 117; y++) {
           if (alpha(x, y) > 0) {
             hatchPixels++;
           } else {
@@ -157,7 +157,7 @@ void main() {
         return result;
       }
 
-      expect(rowOpacity(135, 139), lessThan(rowOpacity(60, 65)));
+      expect(rowOpacity(147, 151), lessThan(rowOpacity(72, 78)));
       picture.dispose();
     },
   );

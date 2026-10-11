@@ -13,6 +13,8 @@ import 'architect_scene_geometry.dart';
 import 'architect_wall_network.dart';
 import 'architect_wall_layers.dart';
 import '../models/architect_wall.dart';
+import 'architect_dimension_layout.dart';
+import '../services/architect_selection.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
 
@@ -53,6 +55,11 @@ class Architect2dPainter extends CustomPainter {
   final double activeWallThickness;
   final WallReferenceLine activeWallReference;
   final String? activeWallTypeId;
+  final WallExteriorSide activeWallExteriorSide;
+  final double? activeWallInsulation;
+  final bool showWallCursor;
+  final Set<String> selectedElementIds;
+  final Path? dimensionWallObstacles;
   final String? activeSnapLabel;
   final String? selectedElementId;
   final String? selectedZoneId;
@@ -120,6 +127,11 @@ class Architect2dPainter extends CustomPainter {
     this.activeWallThickness = 0.25,
     this.activeWallReference = WallReferenceLine.center,
     this.activeWallTypeId,
+    this.activeWallExteriorSide = WallExteriorSide.left,
+    this.activeWallInsulation,
+    this.showWallCursor = true,
+    this.selectedElementIds = const {},
+    this.dimensionWallObstacles,
     this.activeSnapLabel,
     this.selectedElementId,
     this.selectedZoneId,
@@ -240,6 +252,15 @@ class Architect2dPainter extends CustomPainter {
         _drawSelectedElement(canvas);
       }
       _drawActiveDrafting(canvas);
+      for (final id in selectedElementIds) {
+        canvas.drawPath(
+          ArchitectSelection.outline(project, id),
+          Paint()
+            ..color = Colors.cyan
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2 / zoomScale,
+        );
+      }
       ArchitectElementsPainterHelper.drawActiveElementsDrafting(
         canvas: canvas,
         activeTool: activeTool,
@@ -254,6 +275,9 @@ class Architect2dPainter extends CustomPainter {
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
+        wallObstacles:
+            dimensionWallObstacles ??
+            ArchitectWallNetwork.body(_project.activeStorey.walls),
       );
       ArchitectElementsPainterHelper.drawElevationMarkers(
         canvas: canvas,
@@ -338,6 +362,9 @@ class Architect2dPainter extends CustomPainter {
     final selected = _filterElements(project.activeStorey, selectedOnly: true);
     Architect2dPainter(
       project: project.updateActiveStorey(selected).copyWithGridAxes([]),
+      dimensionWallObstacles: ArchitectWallNetwork.body(
+        _project.activeStorey.walls,
+      ),
       activeTool: ArchitectTool.select,
       paintGrid: false,
       zoomScale: zoomScale,
@@ -591,23 +618,15 @@ class Architect2dPainter extends CustomPainter {
   // ===========================================================================
 
   void _drawActiveDrafting(Canvas canvas) {
-    if (activeTool == ArchitectTool.wall && cursorPosition != null) {
+    if (activeTool == ArchitectTool.wall &&
+        cursorPosition != null &&
+        showWallCursor) {
       final target = activeDraftEnd ?? cursorPosition!;
       final paint = Paint()
         ..color = activeSnapLabel == null ? Colors.orange : Colors.cyan
         ..strokeWidth = 1.5 / zoomScale
         ..style = PaintingStyle.stroke;
-      canvas.drawCircle(target, 7 / zoomScale, paint);
-      canvas.drawLine(
-        target - Offset(12 / zoomScale, 0),
-        target + Offset(12 / zoomScale, 0),
-        paint,
-      );
-      canvas.drawLine(
-        target - Offset(0, 12 / zoomScale),
-        target + Offset(0, 12 / zoomScale),
-        paint,
-      );
+      canvas.drawCircle(target, 5 / zoomScale, paint);
     }
     if (activeTool == ArchitectTool.column && columnPreview != null) {
       ArchitectElementsPainterHelper.drawColumns(
@@ -646,6 +665,8 @@ class Architect2dPainter extends CustomPainter {
         thickness: activeWallThickness,
         referenceLine: activeWallReference,
         wallTypeId: activeWallTypeId,
+        exteriorSide: activeWallExteriorSide,
+        insulationThicknessOverride: activeWallInsulation,
       );
       _drawWallLayers(
         canvas,
@@ -657,29 +678,9 @@ class Architect2dPainter extends CustomPainter {
         hatchColor: const Color(0xFF00B8CC),
       );
 
-      // Baseline guideline
-      canvas.drawLine(
-        p1,
-        p2,
-        Paint()
-          ..color = const Color(0xFFFFD600)
-          ..strokeWidth = 1.0 / zoomScale
-          ..style = PaintingStyle.stroke,
-      );
-
-      // End snap point target
-      canvas.drawCircle(
-        p2,
-        5.0 / zoomScale,
-        Paint()..color = const Color(0xFFFFD600),
-      );
-
-      // Dimensional length badge floating in the middle
-      final mid = (p1 + p2) / 2.0;
+      // Keep a single target marker and a length-only badge outside the body.
       final textSpan = TextSpan(
-        text: activeSnapLabel != null
-            ? '${project.units.format(dist, decimals: 3)}  ($activeSnapLabel)'
-            : project.units.format(dist, decimals: 3),
+        text: project.units.format(dist, decimals: 3),
         style: const TextStyle(
           color: Colors.white,
           fontFamily: 'Roboto',
@@ -691,22 +692,30 @@ class Architect2dPainter extends CustomPainter {
       final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)
         ..layout();
 
+      final badge = ArchitectDimensionLayout.wallBadge(
+        wall,
+        Size(tp.width + 12, tp.height + 6),
+        zoomScale,
+        obstacles: Path.combine(
+          PathOperation.union,
+          ArchitectWallNetwork.body(_project.activeStorey.walls),
+          Path()..addPolygon(wall.polygonCorners, true),
+        ),
+      );
       canvas.save();
-      canvas.translate(mid.dx, mid.dy);
+      canvas.translate(badge.center.dx, badge.center.dy);
       canvas.scale(1.0 / zoomScale);
-
-      final badgeRect = Rect.fromLTWH(
-        -tp.width / 2 - 6,
-        -tp.height / 2 - 18,
-        tp.width + 12,
-        tp.height + 6,
+      final badgeRect = Rect.fromCenter(
+        center: Offset.zero,
+        width: tp.width + 12,
+        height: tp.height + 6,
       );
 
       canvas.drawRRect(
         RRect.fromRectAndRadius(badgeRect, const Radius.circular(5)),
         Paint()..color = const Color(0xDD1E1E24),
       );
-      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2 - 15));
+      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
       canvas.restore();
     }
   }

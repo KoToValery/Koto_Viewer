@@ -6974,7 +6974,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectWallReferenceCenter.
   ///
   /// In en, this message translates to:
-  /// **'Center'**
+  /// **'Axis'**
   String get architectWallReferenceCenter;
 
   /// No description provided for @architectWallReferenceLeft.
@@ -7054,6 +7054,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Parapet'**
   String get architectWallParapet;
+
+  /// No description provided for @architectWallReferenceInner.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside'**
+  String get architectWallReferenceInner;
+
+  /// No description provided for @architectWallReferenceOuter.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside'**
+  String get architectWallReferenceOuter;
+
+  /// No description provided for @architectWallFlipSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip exterior side'**
+  String get architectWallFlipSide;
+
+  /// No description provided for @architectSelectionMulti.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi'**
+  String get architectSelectionMulti;
+
+  /// No description provided for @architectSelectionMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get architectSelectionMove;
+
+  /// No description provided for @architectProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Properties'**
+  String get architectProperties;
+
+  /// No description provided for @architectWallExtend.
+  ///
+  /// In en, this message translates to:
+  /// **'Extend'**
+  String get architectWallExtend;
+
+  /// No description provided for @architectWallJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get architectWallJoin;
+
+  /// No description provided for @architectOperationRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot apply here.'**
+  String get architectOperationRejected;
+
+  /// No description provided for @architectPropertyHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get architectPropertyHeight;
+
+  /// No description provided for @architectPropertyWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get architectPropertyWidth;
+
+  /// No description provided for @architectPropertyDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth'**
+  String get architectPropertyDepth;
+
+  /// No description provided for @architectPropertyThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Thk.'**
+  String get architectPropertyThickness;
+
+  /// No description provided for @architectPropertyCore.
+  ///
+  /// In en, this message translates to:
+  /// **'Brick'**
+  String get architectPropertyCore;
+
+  /// No description provided for @architectPropertyInsulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Insul.'**
+  String get architectPropertyInsulation;
+
+  /// No description provided for @architectPropertyAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Angle'**
+  String get architectPropertyAngle;
+
+  /// No description provided for @architectPropertySteps.
+  ///
+  /// In en, this message translates to:
+  /// **'Steps'**
+  String get architectPropertySteps;
+
+  /// No description provided for @architectPropertySill.
+  ///
+  /// In en, this message translates to:
+  /// **'Sill'**
+  String get architectPropertySill;
+
+  /// No description provided for @architectPropertyOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get architectPropertyOffset;
+
+  /// No description provided for @architectPropertySize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get architectPropertySize;
+
+  /// No description provided for @architectPropertyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get architectPropertyName;
+
+  /// No description provided for @architectWallExtendHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick target'**
+  String get architectWallExtendHint;
 }
 
 class _AppLocalizationsDelegate

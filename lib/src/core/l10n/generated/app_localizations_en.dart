@@ -4016,7 +4016,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallContinue => 'Next';
 
   @override
-  String get architectWallReferenceCenter => 'Center';
+  String get architectWallReferenceCenter => 'Axis';
 
   @override
   String get architectWallReferenceLeft => 'Left';
@@ -4056,4 +4056,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectWallParapet => 'Parapet';
+
+  @override
+  String get architectWallReferenceInner => 'Inside';
+
+  @override
+  String get architectWallReferenceOuter => 'Outside';
+
+  @override
+  String get architectWallFlipSide => 'Flip exterior side';
+
+  @override
+  String get architectSelectionMulti => 'Multi';
+
+  @override
+  String get architectSelectionMove => 'Move';
+
+  @override
+  String get architectProperties => 'Properties';
+
+  @override
+  String get architectWallExtend => 'Extend';
+
+  @override
+  String get architectWallJoin => 'Join';
+
+  @override
+  String get architectOperationRejected => 'Cannot apply here.';
+
+  @override
+  String get architectPropertyHeight => 'Height';
+
+  @override
+  String get architectPropertyWidth => 'Width';
+
+  @override
+  String get architectPropertyDepth => 'Depth';
+
+  @override
+  String get architectPropertyThickness => 'Thk.';
+
+  @override
+  String get architectPropertyCore => 'Brick';
+
+  @override
+  String get architectPropertyInsulation => 'Insul.';
+
+  @override
+  String get architectPropertyAngle => 'Angle';
+
+  @override
+  String get architectPropertySteps => 'Steps';
+
+  @override
+  String get architectPropertySill => 'Sill';
+
+  @override
+  String get architectPropertyOffset => 'Offset';
+
+  @override
+  String get architectPropertySize => 'Size';
+
+  @override
+  String get architectPropertyName => 'Name';
+
+  @override
+  String get architectWallExtendHint => 'Pick target';
 }

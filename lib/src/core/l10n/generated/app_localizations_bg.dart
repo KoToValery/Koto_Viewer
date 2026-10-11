@@ -4030,7 +4030,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallContinue => 'Продължи';
 
   @override
-  String get architectWallReferenceCenter => 'Център';
+  String get architectWallReferenceCenter => 'Ос';
 
   @override
   String get architectWallReferenceLeft => 'Ляво';
@@ -4070,4 +4070,70 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectWallParapet => 'Борд';
+
+  @override
+  String get architectWallReferenceInner => 'Вътре';
+
+  @override
+  String get architectWallReferenceOuter => 'Вън';
+
+  @override
+  String get architectWallFlipSide => 'Обърни външната страна';
+
+  @override
+  String get architectSelectionMulti => 'Много';
+
+  @override
+  String get architectSelectionMove => 'Мести';
+
+  @override
+  String get architectProperties => 'Свойства';
+
+  @override
+  String get architectWallExtend => 'Удължи';
+
+  @override
+  String get architectWallJoin => 'Свържи';
+
+  @override
+  String get architectOperationRejected => 'Не може тук.';
+
+  @override
+  String get architectPropertyHeight => 'Вис.';
+
+  @override
+  String get architectPropertyWidth => 'Шир.';
+
+  @override
+  String get architectPropertyDepth => 'Дълб.';
+
+  @override
+  String get architectPropertyThickness => 'Деб.';
+
+  @override
+  String get architectPropertyCore => 'Тухла';
+
+  @override
+  String get architectPropertyInsulation => 'Изол.';
+
+  @override
+  String get architectPropertyAngle => 'Ъгъл';
+
+  @override
+  String get architectPropertySteps => 'Стъпала';
+
+  @override
+  String get architectPropertySill => 'hp';
+
+  @override
+  String get architectPropertyOffset => 'Отстъп';
+
+  @override
+  String get architectPropertySize => 'Размер';
+
+  @override
+  String get architectPropertyName => 'Име';
+
+  @override
+  String get architectWallExtendHint => 'Посочи цел';
 }

@@ -5,6 +5,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_zone.dart';
 import 'architect_zone_tool.dart';
+import '../rendering/architect_wall_network.dart';
 export 'architect_element_id.dart';
 
 /// Commands accept model metres, never screen coordinates or a camera scale.
@@ -149,30 +150,11 @@ class UpdateArchitectWall extends ArchitectModelCommand {
     for (var i = 0; i < walls.length; i++) {
       final next = walls[i];
       final old = s.walls[i];
-      if (next.length == old.length) continue;
-      if ([
-        ...old.doors.map((d) => (d.offsetRatio, d.width)),
-        ...old.windows.map((w) => (w.offsetRatio, w.width)),
-      ].any(
-        (o) =>
-            o.$1 * old.length - o.$2 / 2 < 0 ||
-            o.$1 * old.length + o.$2 / 2 > next.length,
-      )) {
-        throw ArgumentError(
-          'A hosted opening would lie outside the edited wall',
-        );
+      if (next.startPoint != old.startPoint || next.endPoint != old.endPoint) {
+        walls[i] = _wallOpeningsAfterEdit(old, next);
       }
-      walls[i] = next.copyWith(
-        doors: [
-          for (final d in old.doors)
-            d.copyWith(offsetRatio: d.offsetRatio * old.length / next.length),
-        ],
-        windows: [
-          for (final w in old.windows)
-            w.copyWith(offsetRatio: w.offsetRatio * old.length / next.length),
-        ],
-      );
     }
+
     return ArchitectModelCommand.replace(project, s.copyWith(walls: walls));
   }
 }
@@ -318,6 +300,39 @@ class MoveArchitectElement extends ArchitectModelCommand {
         ),
       ).apply(project);
     }
+    for (final host in s.walls) {
+      final doors = host.doors.where((e) => e.id == elementId);
+      final windows = host.windows.where((e) => e.id == elementId);
+      if (doors.isEmpty && windows.isEmpty) continue;
+      final along =
+          delta.dx * host.unitVector.dx + delta.dy * host.unitVector.dy;
+      final ratio =
+          (doors.isNotEmpty
+              ? doors.first.offsetRatio
+              : windows.first.offsetRatio) +
+          along / host.length;
+      final width = doors.isNotEmpty ? doors.first.width : windows.first.width;
+      if (ratio * host.length < width / 2 ||
+          ratio * host.length > host.length - width / 2) {
+        throw ArgumentError('Opening would leave its host');
+      }
+      final next = host.copyWith(
+        doors: [
+          for (final d in host.doors)
+            d.id == elementId ? d.copyWith(offsetRatio: ratio) : d,
+        ],
+        windows: [
+          for (final w in host.windows)
+            w.id == elementId ? w.copyWith(offsetRatio: ratio) : w,
+        ],
+      );
+      return ArchitectModelCommand.replace(
+        project,
+        s.copyWith(
+          walls: [for (final w in s.walls) w.id == host.id ? next : w],
+        ),
+      );
+    }
     var found = false;
     bool matches(String id) {
       if (id == elementId) {
@@ -409,6 +424,236 @@ class MoveArchitectElement extends ArchitectModelCommand {
     ];
     if (!found) throw ArgumentError('Unknown movable element: $elementId');
     return ArchitectModelCommand.replace(project, next).copyWithGridAxes(axes);
+  }
+}
+
+/// Move selected walls simultaneously, carrying unselected attachments once.
+class MoveArchitectElements extends ArchitectModelCommand {
+  final String storeyId;
+  final Set<String> elementIds;
+  final Offset delta;
+  const MoveArchitectElements({
+    required this.storeyId,
+    required this.elementIds,
+    required this.delta,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(delta);
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    final movedWalls = storey.walls
+        .where((w) => elementIds.contains(w.id))
+        .toList();
+    final nextWalls = {for (final w in storey.walls) w.id: w};
+    for (final wall in movedWalls) {
+      final moved = wall.copyWith(
+        startPoint: wall.startPoint + delta,
+        endPoint: wall.endPoint + delta,
+      );
+      final attached = UpdateArchitectWall(
+        storeyId: storeyId,
+        wall: moved,
+      ).apply(project);
+      nextWalls[wall.id] = moved;
+      for (final other in attached.activeStorey.walls) {
+        if (elementIds.contains(other.id)) continue;
+        final old = storey.walls.firstWhere((w) => w.id == other.id);
+        var next = nextWalls[other.id]!;
+        if (old.startPoint != other.startPoint) {
+          next = next.copyWith(startPoint: other.startPoint);
+        }
+        if (old.endPoint != other.endPoint) {
+          next = next.copyWith(endPoint: other.endPoint);
+        }
+        nextWalls[other.id] = next;
+      }
+    }
+    var result = ArchitectModelCommand.replace(
+      project,
+      storey.copyWith(
+        walls: [
+          for (final w in storey.walls)
+            _wallOpeningsAfterEdit(w, nextWalls[w.id]!),
+        ],
+      ),
+    );
+    final carried = {
+      for (final w in movedWalls) ...[
+        w.id,
+        ...w.doors.map((d) => d.id),
+        ...w.windows.map((e) => e.id),
+      ],
+    };
+    for (final id in elementIds.difference(carried)) {
+      result = MoveArchitectElement(
+        storeyId: storeyId,
+        elementId: id,
+        delta: delta,
+      ).apply(result);
+    }
+    return result;
+  }
+}
+
+ArchitectWall _wallOpeningsAfterEdit(ArchitectWall old, ArchitectWall next) {
+  if (identical(old, next)) return next;
+  if (next.length < .001) throw ArgumentError('Wall too short');
+  final translation = next.startPoint - old.startPoint;
+  final translated =
+      ((next.endPoint - old.endPoint) - translation).distance < 1e-8;
+  double ratio(double oldRatio, double width) {
+    final point =
+        old.startPoint +
+        old.unitVector * (oldRatio * old.length) +
+        (translated ? translation : Offset.zero);
+    final d = point - next.startPoint;
+    final along = d.dx * next.unitVector.dx + d.dy * next.unitVector.dy;
+    if (along - width / 2 < -1e-8 || along + width / 2 > next.length + 1e-8) {
+      throw ArgumentError('Opening would leave its host');
+    }
+    return along / next.length;
+  }
+
+  return next.copyWith(
+    doors: [
+      for (final d in old.doors)
+        d.copyWith(offsetRatio: ratio(d.offsetRatio, d.width)),
+    ],
+    windows: [
+      for (final w in old.windows)
+        w.copyWith(offsetRatio: ratio(w.offsetRatio, w.width)),
+    ],
+  );
+}
+
+/// Extend/trim an endpoint while keeping openings at their physical locations.
+class ExtendArchitectWall extends ArchitectModelCommand {
+  final String storeyId, wallId;
+  final Offset target;
+  const ExtendArchitectWall({
+    required this.storeyId,
+    required this.wallId,
+    required this.target,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(target);
+    final s = ArchitectModelCommand.storey(project, storeyId);
+    final wall = s.walls.firstWhere((w) => w.id == wallId);
+    final delta = target - wall.startPoint;
+    final along = delta.dx * wall.unitVector.dx + delta.dy * wall.unitVector.dy;
+    final point = wall.startPoint + wall.unitVector * along;
+    final atStart =
+        (point - wall.startPoint).distance < (point - wall.endPoint).distance;
+    final next = atStart
+        ? wall.copyWith(startPoint: point)
+        : wall.copyWith(endPoint: point);
+    final updated = UpdateArchitectWall(
+      storeyId: storeyId,
+      wall: next,
+    ).apply(project);
+    return ArchitectModelCommand.replace(
+      updated,
+      updated.activeStorey.copyWith(
+        walls: [
+          for (final w in updated.activeStorey.walls)
+            _wallOpeningsAfterEdit(
+              s.walls.firstWhere((old) => old.id == w.id),
+              w,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Extend several selected walls to their nearest shared line intersections.
+class JoinArchitectWalls extends ArchitectModelCommand {
+  final String storeyId;
+  final Set<String> wallIds;
+  const JoinArchitectWalls({required this.storeyId, required this.wallIds});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final s = ArchitectModelCommand.storey(project, storeyId);
+    final walls = s.walls.where((w) => wallIds.contains(w.id)).toList();
+    if (walls.length < 2) throw ArgumentError('Select two walls');
+    final targets = <(String, bool), Offset>{};
+    void extend(ArchitectWall wall, Offset point) {
+      final d = point - wall.startPoint;
+      final along = d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+      final atStart = along < -1e-8;
+      if (!atStart && along <= wall.length + 1e-8) return;
+      final key = (wall.id, atStart);
+      final end = atStart ? wall.startPoint : wall.endPoint;
+      if (!targets.containsKey(key) ||
+          (point - end).distance < (targets[key]! - end).distance) {
+        targets[key] = point;
+      }
+    }
+
+    var compatible = false;
+    for (var i = 0; i < walls.length; i++) {
+      final a = walls[i];
+      for (final b in walls.skip(i + 1)) {
+        final point = ArchitectWallNetwork.intersection(
+          a.startPoint,
+          a.endPoint,
+          b.startPoint,
+          b.endPoint,
+        );
+        if (point != null) {
+          compatible = true;
+          extend(a, point);
+          extend(b, point);
+        } else {
+          final d = b.startPoint - a.startPoint;
+          if ((d.dx * a.normalVector.dx + d.dy * a.normalVector.dy).abs() >
+              1e-8) {
+            continue;
+          }
+          compatible = true;
+          final ends =
+              [
+                (a.startPoint, b.startPoint),
+                (a.startPoint, b.endPoint),
+                (a.endPoint, b.startPoint),
+                (a.endPoint, b.endPoint),
+              ]..sort(
+                (x, y) =>
+                    (x.$1 - x.$2).distance.compareTo((y.$1 - y.$2).distance),
+              );
+          final mid = (ends.first.$1 + ends.first.$2) / 2;
+          extend(a, mid);
+          extend(b, mid);
+        }
+      }
+    }
+    if (!compatible) {
+      throw ArgumentError('Parallel separated walls cannot join');
+    }
+    var result = project;
+    for (final wall in walls) {
+      final next = wall.copyWith(
+        startPoint: targets[(wall.id, true)],
+        endPoint: targets[(wall.id, false)],
+      );
+      result = UpdateArchitectWall(
+        storeyId: storeyId,
+        wall: next,
+      ).apply(result);
+    }
+    return ArchitectModelCommand.replace(
+      result,
+      result.activeStorey.copyWith(
+        walls: [
+          for (final w in result.activeStorey.walls)
+            _wallOpeningsAfterEdit(
+              s.walls.firstWhere((old) => old.id == w.id),
+              w,
+            ),
+        ],
+      ),
+    );
   }
 }
 

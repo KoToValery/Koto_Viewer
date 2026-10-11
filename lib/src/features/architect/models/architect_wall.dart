@@ -6,8 +6,10 @@ import 'architect_door.dart';
 import 'architect_wall_type.dart';
 import 'architect_window.dart';
 
-/// Left/right are relative to the direction from start to end.
-enum WallReferenceLine { center, left, right }
+/// Legacy left/right retain their saved physical placement.
+enum WallReferenceLine { center, inner, outer, left, right }
+
+enum WallExteriorSide { left, right }
 
 /// Represents an architectural parametric wall with hosted openings (doors/windows).
 class ArchitectWall {
@@ -17,6 +19,8 @@ class ArchitectWall {
   final double thickness; // in meters (default 0.25 m = 25 cm)
   final double height; // in meters (default 2.80 m or 1.05/1.20 m for parapets)
   final WallReferenceLine referenceLine;
+  final WallExteriorSide exteriorSide;
+  final double? insulationThicknessOverride;
   final String? wallTypeId;
   final ParapetFinish? parapetFinish;
   final List<ArchitectDoor> doors;
@@ -29,6 +33,8 @@ class ArchitectWall {
     this.thickness = 0.25,
     this.height = 2.80,
     this.referenceLine = WallReferenceLine.center,
+    this.exteriorSide = WallExteriorSide.left,
+    this.insulationThicknessOverride,
     this.wallTypeId,
     this.parapetFinish,
     this.doors = const [],
@@ -39,6 +45,21 @@ class ArchitectWall {
       height < 1.50 || (wallTypeId != null && wallTypeId!.contains('parapet'));
 
   double get length => (endPoint - startPoint).distance;
+
+  static final _standardInsulation = {
+    for (final type in ArchitectWallType.standardCatalog())
+      type.id: type.insulationThickness,
+  };
+  double get insulationThickness =>
+      (insulationThicknessOverride ?? _standardInsulation[wallTypeId] ?? 0)
+          .clamp(0.0, math.max(0.0, thickness - .001));
+  double get coreThickness => thickness - insulationThickness;
+  double get exteriorSign => exteriorSide == WallExteriorSide.left ? 1 : -1;
+  Offset get exteriorNormal => normalVector * exteriorSign;
+  Offset get coreCenterStart =>
+      centerStart - exteriorNormal * insulationThickness / 2;
+  Offset get coreCenterEnd =>
+      centerEnd - exteriorNormal * insulationThickness / 2;
 
   Offset get unitVector {
     final len = length;
@@ -54,7 +75,9 @@ class ArchitectWall {
   Offset get centerOffset =>
       normalVector *
       switch (referenceLine) {
-        WallReferenceLine.center => 0.0,
+        WallReferenceLine.center => exteriorSign * insulationThickness / 2,
+        WallReferenceLine.inner => exteriorSign * thickness / 2,
+        WallReferenceLine.outer => -exteriorSign * thickness / 2,
         WallReferenceLine.left => -thickness / 2,
         WallReferenceLine.right => thickness / 2,
       };
@@ -74,6 +97,8 @@ class ArchitectWall {
     double? thickness,
     double? height,
     WallReferenceLine? referenceLine,
+    WallExteriorSide? exteriorSide,
+    double? insulationThicknessOverride,
     String? wallTypeId,
     ParapetFinish? parapetFinish,
     List<ArchitectDoor>? doors,
@@ -85,6 +110,9 @@ class ArchitectWall {
     thickness: thickness ?? this.thickness,
     height: height ?? this.height,
     referenceLine: referenceLine ?? this.referenceLine,
+    exteriorSide: exteriorSide ?? this.exteriorSide,
+    insulationThicknessOverride:
+        insulationThicknessOverride ?? this.insulationThicknessOverride,
     wallTypeId: wallTypeId ?? this.wallTypeId,
     parapetFinish: parapetFinish ?? this.parapetFinish,
     doors: doors ?? this.doors,
@@ -135,6 +163,8 @@ class ArchitectWall {
     'thickness': thickness,
     'height': height,
     'referenceLine': referenceLine.name,
+    'exteriorSide': exteriorSide.name,
+    'insulationThicknessOverride': insulationThicknessOverride,
     'wallTypeId': wallTypeId,
     'parapetFinish': parapetFinish?.name,
     'doors': doors.map((d) => d.toJson()).toList(),
@@ -157,6 +187,12 @@ class ArchitectWall {
       (value) => value.name == json['referenceLine'],
       orElse: () => WallReferenceLine.center,
     ),
+    exteriorSide: WallExteriorSide.values.firstWhere(
+      (value) => value.name == json['exteriorSide'],
+      orElse: () => WallExteriorSide.left,
+    ),
+    insulationThicknessOverride: (json['insulationThicknessOverride'] as num?)
+        ?.toDouble(),
     wallTypeId: json['wallTypeId'] as String?,
     parapetFinish: json['parapetFinish'] != null
         ? ParapetFinish.values.firstWhere(

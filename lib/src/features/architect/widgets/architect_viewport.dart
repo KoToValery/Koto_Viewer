@@ -13,6 +13,7 @@ class ArchitectViewport extends StatefulWidget {
   final bool singlePointerPan;
   final bool touchHoldToPlace;
   final ValueChanged<Offset>? onToolHoldStart;
+  final bool Function(Offset)? onSelectionHold;
   final bool Function() isDraggingHandle;
   final ValueChanged<PointerDownEvent> onToolDown;
   final ValueChanged<PointerMoveEvent> onToolMove;
@@ -29,6 +30,7 @@ class ArchitectViewport extends StatefulWidget {
     required this.singlePointerPan,
     this.touchHoldToPlace = false,
     this.onToolHoldStart,
+    this.onSelectionHold,
     required this.isDraggingHandle,
     required this.onToolDown,
     required this.onToolMove,
@@ -96,13 +98,16 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
             !widget.isDraggingHandle() &&
             !(widget.touchHoldToPlace &&
                 event.kind != PointerDeviceKind.touch));
-    if (widget.touchHoldToPlace &&
-        event.kind == PointerDeviceKind.touch &&
-        !_navigation &&
-        !widget.isDraggingHandle()) {
+    if (!_navigation &&
+        (widget.onSelectionHold != null ||
+            widget.touchHoldToPlace &&
+                event.kind == PointerDeviceKind.touch &&
+                !widget.isDraggingHandle())) {
       _holdTimer?.cancel();
       _holdTimer = Timer(
-        StructuralPointerInteraction.placementHoldDuration,
+        widget.touchHoldToPlace && !widget.isDraggingHandle()
+            ? StructuralPointerInteraction.placementHoldDuration
+            : const Duration(milliseconds: 450),
         () {
           if (!mounted ||
               _pointers.length != 1 ||
@@ -110,9 +115,15 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
               _suppressRelease) {
             return;
           }
-          _held = true;
-          _canPan = false;
-          widget.onToolHoldStart?.call(_focal);
+          if (widget.onSelectionHold?.call(_focal) == true) {
+            _held = true;
+            _canPan = false;
+            _suppressRelease = true;
+          } else if (widget.touchHoldToPlace && !widget.isDraggingHandle()) {
+            _held = true;
+            _canPan = false;
+            widget.onToolHoldStart?.call(_focal);
+          }
         },
       );
     }
@@ -123,6 +134,11 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
     final previousFocal = _focal;
     final previousSpan = _span;
     _pointers[event.pointer] = event.localPosition;
+    if (!_held &&
+        _down != null &&
+        (event.localPosition - _down!).distance > 8) {
+      _holdTimer?.cancel();
+    }
     if (_pointers.length > 1) {
       widget.controller.navigate(
         previousFocal: previousFocal,

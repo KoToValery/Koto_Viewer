@@ -4,7 +4,7 @@ import '../models/architect_wall.dart';
 import '../models/architect_wall_type.dart';
 import 'architect_wall_network.dart';
 
-/// Insulation is on the left of the drawing direction. All layers retain the
+/// Insulation follows the explicit exterior side. All layers retain the
 /// original reference nodes, so their faces share the same mitred junctions.
 class ArchitectWallLayers {
   final Path body;
@@ -27,16 +27,17 @@ class ArchitectWallLayers {
     final faces = <String, (double, double)>{};
     for (final wall in walls) {
       final type = catalog[wall.wallTypeId];
-      final insulation = (type?.insulationThickness ?? 0).clamp(
-        0.0,
-        (wall.thickness - .001).clamp(0.0, double.infinity),
-      );
+      final insulation =
+          (wall.insulationThicknessOverride ??
+                  type?.insulationThickness ??
+                  wall.insulationThickness)
+              .clamp(0.0, (wall.thickness - .001).clamp(0.0, double.infinity));
       final offset =
           wall.centerOffset.dx * wall.normalVector.dx +
           wall.centerOffset.dy * wall.normalVector.dy;
       faces[wall.id] = (
-        offset - wall.thickness / 2,
-        offset + wall.thickness / 2 - insulation,
+        offset - wall.thickness / 2 + (wall.exteriorSign < 0 ? insulation : 0),
+        offset + wall.thickness / 2 - (wall.exteriorSign > 0 ? insulation : 0),
       );
     }
     final body = ArchitectWallNetwork.body(walls);
