@@ -842,10 +842,11 @@ class ArchitectZoneTool extends ChangeNotifier {
   bool get canRedoEdit => _editRedoStack.isNotEmpty;
   double get editRotationSlider => _editRotationSlider;
   bool get isMoveWholeZoneMode => _isMoveWholeZoneMode;
+  bool get isMovingZone => _moveStartPoint != null;
   double get moveDistanceMeters => _moveDistanceMeters;
 
   /// General flag for whether tool has an active modal interaction.
-  bool get isInteracting => isDrafting || isExtruding || isMoveWholeZoneMode;
+  bool get isInteracting => isDrafting || isExtruding || isMoveWholeZoneMode || isMovingZone;
 
   // Convenient aliases
   void start(Offset startPoint) => startDrafting(startPoint);

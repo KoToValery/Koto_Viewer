@@ -86,6 +86,57 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                   ],
                 ),
               ),
+            )
+          else
+            // Guidance prompt banner (GPS_Mapping style)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: tool.draftPointCount == 0
+                      ? category.color.withValues(alpha: 0.18)
+                      : const Color(0x3300E5FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: tool.draftPointCount == 0
+                        ? category.color.withValues(alpha: 0.4)
+                        : const Color(0x5500E5FF),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      tool.draftPointCount == 0
+                          ? Icons.touch_app_rounded
+                          : (canClose ? Icons.check_circle_outline_rounded : Icons.edit_location_alt_rounded),
+                      color: tool.draftPointCount == 0
+                          ? category.color
+                          : (canClose ? const Color(0xFF00E676) : const Color(0xFF00E5FF)),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        tool.draftPointCount == 0
+                            ? l10n.architectZoneTapFirstPoint
+                            : (canClose
+                                ? l10n.architectZonePointSnapStart
+                                : l10n.architectZoneNextPointPrompt(tool.draftPointCount + 1)),
+                        style: TextStyle(
+                          color: tool.draftPointCount == 0
+                              ? Colors.white
+                              : (canClose ? const Color(0xFF00E676) : Colors.white),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
 
           // Main metrics and controls row
@@ -214,11 +265,11 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
 
                 // Action: Undo last point
                 OutlinedButton.icon(
-                  onPressed: tool.draftPointCount > 1 ? onUndo : null,
+                  onPressed: tool.draftPointCount > 0 ? onUndo : null,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFFFB74D),
                     side: BorderSide(
-                      color: tool.draftPointCount > 1
+                      color: tool.draftPointCount > 0
                           ? const Color(0xFFFFB74D)
                           : Colors.white12,
                     ),

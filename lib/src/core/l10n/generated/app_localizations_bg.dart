@@ -3512,6 +3512,15 @@ class AppLocalizationsBg extends AppLocalizations {
       'Кликнете точка по точка за чертане на зона. Затворете при първата точка.';
 
   @override
+  String get architectZoneTapFirstPoint =>
+      'Докоснете за поставяне на първа точка (1)';
+
+  @override
+  String architectZoneNextPointPrompt(int count) {
+    return 'Точка $count: Докоснете за следваща точка или изберете 1 за затваряне';
+  }
+
+  @override
   String get architectZoneClose => 'Затвори зона';
 
   @override
@@ -3697,4 +3706,244 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectAxisMoved => 'Оста е преместена';
+
+  @override
+  String get architectDebugLogs => 'Диагностичен лог';
+
+  @override
+  String get architectClearLogs => 'Изчисти';
+
+  @override
+  String get architectCopyLogs => 'Копирай';
+
+  @override
+  String get architectNoLogs => 'Няма записани логове';
+
+  @override
+  String architectDoorPlaced(String specId, int width, int height) {
+    return 'Врата $specId ($width/$height) поставена';
+  }
+
+  @override
+  String get bimProjectType => 'Тип на проекта';
+
+  @override
+  String get bimProjectStructural => 'Конструктивен BiM';
+
+  @override
+  String get bimProjectArchitectural => 'Архитектурен BiM';
+
+  @override
+  String get bimProjectStructuralDesc =>
+      'Носещи елементи, колони, греди, шайби, плочи, сеизмичен анализ и носимоспособност';
+
+  @override
+  String get bimProjectArchitecturalDesc =>
+      'Стени, врати, прозорци, помещения, стълби, пълно архитектурно чертане';
+
+  @override
+  String get bimProjectFilterAll => 'Всички';
+
+  @override
+  String get bimProjectFilterStructural => 'Конструктивни';
+
+  @override
+  String get bimProjectFilterArchitectural => 'Архитектурни';
+
+  @override
+  String get architectToolWindow => 'Прозорец';
+
+  @override
+  String get architectToolColumn => 'Колона';
+
+  @override
+  String get architectToolBeam => 'Греда';
+
+  @override
+  String get architectToolSlab => 'Плоча';
+
+  @override
+  String get architectToolOpening => 'Отвор';
+
+  @override
+  String get architectToolStair => 'Стълбище';
+
+  @override
+  String get architectToolDimension => 'Размери';
+
+  @override
+  String get architectToolLevel => 'Кота';
+
+  @override
+  String get architectToolText => 'Текст';
+
+  @override
+  String get architectToolCadLine => 'Линия';
+
+  @override
+  String get architectToolCadRect => 'Правоъгълник';
+
+  @override
+  String get architectToolCadCircle => 'Окръжност';
+
+  @override
+  String get architectWindowWidth => 'Ширина на прозорец';
+
+  @override
+  String get architectWindowHeight => 'Височина';
+
+  @override
+  String get architectWindowSill => 'Парапет (hp)';
+
+  @override
+  String get architectColumnShape => 'Форма';
+
+  @override
+  String get architectColumnRect => 'Правоъгълна';
+
+  @override
+  String get architectColumnCircle => 'Кръгла';
+
+  @override
+  String get architectColumnSize => 'Размер на колона';
+
+  @override
+  String get architectBeamSize => 'Размер на греда';
+
+  @override
+  String get architectStairWidth => 'Ширина на рамо';
+
+  @override
+  String get architectStairSteps => 'Стъпала';
+
+  @override
+  String get architectOpeningType => 'Тип отвор';
+
+  @override
+  String get architectOpeningShaft => 'Шахта';
+
+  @override
+  String get architectOpeningVoid => 'Отвор в плоча';
+
+  @override
+  String get architectLevelElevation => 'Кота';
+
+  @override
+  String get architectAnnotationText => 'Текст на анотация';
+
+  @override
+  String get architectUnderlayToggle => 'CAD Подложка';
+
+  @override
+  String architectWindowPlaced(String specId, int width, int height) {
+    return 'Прозорец $specId ($width/$height) поставен';
+  }
+
+  @override
+  String architectColumnPlaced(String label) {
+    return 'Колона $label поставена';
+  }
+
+  @override
+  String get architectBeamPlaced => 'Греда поставена';
+
+  @override
+  String get architectStairPlaced => 'Стълбище поставено';
+
+  @override
+  String get architectOpeningPlaced => 'Отвор поставен';
+
+  @override
+  String get architectDimensionPlaced => 'Размерна линия поставена';
+
+  @override
+  String get architectLevelPlaced => 'Нивова кота поставена';
+
+  @override
+  String get architectAnnotationPlaced => 'Анотация поставена';
+
+  @override
+  String get architectCadShapePlaced => 'CAD фигура поставена';
+
+  @override
+  String get architectCategoryStructure => 'Конструкция';
+
+  @override
+  String get architectCategorySpaces => 'Пространства';
+
+  @override
+  String get architectCategoryAnnotations => 'Анотации';
+
+  @override
+  String get architectCategoryCad => 'CAD Чертане';
+
+  @override
+  String selectedElement(String id) {
+    return 'Избран: $id';
+  }
+
+  @override
+  String get architectWizardTitle => 'Нов архитектурен проект';
+
+  @override
+  String get architectWizardSubtitle => 'Бърз параметричен стартов магьосник';
+
+  @override
+  String get architectWizardSectionStoreys => 'Етажи и височини';
+
+  @override
+  String get architectWizardSectionGrid => 'Координатна мрежа (Оси)';
+
+  @override
+  String get architectWizardSectionWalls => 'Типове стени и парапет';
+
+  @override
+  String get architectWizardParapetTitle => 'Балконен парапет (борд 12 cm)';
+
+  @override
+  String architectWizardParapetHeightInfo(String height, String level) {
+    return 'Нормативна височина: $height m ($level)';
+  }
+
+  @override
+  String get architectWizardParapetUnder5 => 'до 5-ти етаж';
+
+  @override
+  String get architectWizardParapetOver5 => 'над 5-ти етаж / >20m';
+
+  @override
+  String get architectWizardParapetFinishCap => 'С предпазна шапка';
+
+  @override
+  String get architectWizardParapetFinishPipe =>
+      'С метална тръба на колонки (+15 cm)';
+
+  @override
+  String get architectWizardCreateAction => 'Създай проект и започни';
+
+  @override
+  String get wallTypeExt25Eps12 => 'Външна 25+12 EPS (37 cm)';
+
+  @override
+  String get wallTypeInt12Partition => 'Преградна 12 cm';
+
+  @override
+  String get wallTypeExt25Brick => 'Тухла 25 cm (без изолация)';
+
+  @override
+  String get wallTypeBearing25 => 'Стоманобетон 25 cm';
+
+  @override
+  String get wallTypeParapet12 => 'Борд 12 cm';
+
+  @override
+  String get architectDefaultProjectName => 'Архитектурен проект';
+
+  @override
+  String architectStoreyCountChip(int count) {
+    return '$count ет.';
+  }
+
+  @override
+  String get architectLaunchWizard => 'Стартирай с Архитектурен магьосник';
 }

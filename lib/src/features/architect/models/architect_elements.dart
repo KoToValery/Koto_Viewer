@@ -1,0 +1,560 @@
+// === SECTION: ARCHITECTURAL ELEMENT MODELS ===
+import 'dart:ui';
+import 'package:flutter/material.dart';
+
+// ===========================================================================
+// 1. ARCHITECTURAL BEAM / LINTEL
+// ===========================================================================
+
+class ArchitectBeam {
+  final String id;
+  final Offset startPoint;
+  final Offset endPoint;
+  final double width; // in meters (default 0.25 m = 25 cm)
+  final double depth; // in meters (default 0.50 m = 50 cm)
+  final String label;
+
+  const ArchitectBeam({
+    required this.id,
+    required this.startPoint,
+    required this.endPoint,
+    this.width = 0.25,
+    this.depth = 0.50,
+    this.label = 'Г 25/50',
+  });
+
+  double get length => (endPoint - startPoint).distance;
+
+  Offset get unitVector {
+    final len = length;
+    if (len < 1e-4) return const Offset(1, 0);
+    return (endPoint - startPoint) / len;
+  }
+
+  Offset get normalVector {
+    final u = unitVector;
+    return Offset(-u.dy, u.dx);
+  }
+
+  List<Offset> get polygonCorners {
+    final n = normalVector * (width / 2.0);
+    return [startPoint - n, endPoint - n, endPoint + n, startPoint + n];
+  }
+
+  ArchitectBeam copyWith({
+    String? id,
+    Offset? startPoint,
+    Offset? endPoint,
+    double? width,
+    double? depth,
+    String? label,
+  }) =>
+      ArchitectBeam(
+        id: id ?? this.id,
+        startPoint: startPoint ?? this.startPoint,
+        endPoint: endPoint ?? this.endPoint,
+        width: width ?? this.width,
+        depth: depth ?? this.depth,
+        label: label ?? this.label,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
+    'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
+    'width': width,
+    'depth': depth,
+    'label': label,
+  };
+
+  factory ArchitectBeam.fromJson(Map<String, dynamic> json) => ArchitectBeam(
+    id: json['id'] as String,
+    startPoint: Offset(
+      (json['startPoint']['x'] as num).toDouble(),
+      (json['startPoint']['y'] as num).toDouble(),
+    ),
+    endPoint: Offset(
+      (json['endPoint']['x'] as num).toDouble(),
+      (json['endPoint']['y'] as num).toDouble(),
+    ),
+    width: (json['width'] as num?)?.toDouble() ?? 0.25,
+    depth: (json['depth'] as num?)?.toDouble() ?? 0.50,
+    label: json['label'] as String? ?? 'Г 25/50',
+  );
+
+  bool containsPoint(Offset pt, {double tolerance = 0.15}) {
+    final len = length;
+    if (len < 1e-4) return (pt - startPoint).distance <= tolerance;
+    final u = unitVector;
+    final v = pt - startPoint;
+    final dot = v.dx * u.dx + v.dy * u.dy;
+    final ratio = (dot / len).clamp(0.0, 1.0);
+    final proj = startPoint + u * (ratio * len);
+    return (pt - proj).distance <= (width / 2.0 + tolerance);
+  }
+}
+
+// ===========================================================================
+// 2. ARCHITECTURAL SLAB / FLOOR
+// ===========================================================================
+
+class ArchitectSlab {
+  final String id;
+  final List<Offset> polygon;
+  final double thickness; // in meters (default 0.20 m = 20 cm)
+  final String label;
+
+  const ArchitectSlab({
+    required this.id,
+    required this.polygon,
+    this.thickness = 0.20,
+    this.label = 'Плоча d=20cm',
+  });
+
+  double get area {
+    if (polygon.length < 3) return 0.0;
+    double sum = 0.0;
+    for (int i = 0; i < polygon.length; i++) {
+      final p1 = polygon[i];
+      final p2 = polygon[(i + 1) % polygon.length];
+      sum += (p1.dx * p2.dy - p2.dx * p1.dy);
+    }
+    return (sum.abs() / 2.0);
+  }
+
+  Offset get centroid {
+    if (polygon.isEmpty) return Offset.zero;
+    double cx = 0, cy = 0;
+    for (final p in polygon) {
+      cx += p.dx;
+      cy += p.dy;
+    }
+    return Offset(cx / polygon.length, cy / polygon.length);
+  }
+
+  ArchitectSlab copyWith({
+    String? id,
+    List<Offset>? polygon,
+    double? thickness,
+    String? label,
+  }) =>
+      ArchitectSlab(
+        id: id ?? this.id,
+        polygon: polygon ?? this.polygon,
+        thickness: thickness ?? this.thickness,
+        label: label ?? this.label,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'polygon': polygon.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
+    'thickness': thickness,
+    'label': label,
+  };
+
+  factory ArchitectSlab.fromJson(Map<String, dynamic> json) => ArchitectSlab(
+    id: json['id'] as String,
+    polygon: (json['polygon'] as List<dynamic>?)
+            ?.map((p) => Offset((p['x'] as num).toDouble(), (p['y'] as num).toDouble()))
+            .toList() ??
+        const [],
+    thickness: (json['thickness'] as num?)?.toDouble() ?? 0.20,
+    label: json['label'] as String? ?? 'Плоча d=20cm',
+  );
+
+  bool containsPoint(Offset pt) {
+    if (polygon.length < 3) return false;
+    bool inside = false;
+    for (int i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      if (((polygon[i].dy > pt.dy) != (polygon[j].dy > pt.dy)) &&
+          (pt.dx < (polygon[j].dx - polygon[i].dx) * (pt.dy - polygon[i].dy) /
+                  (polygon[j].dy - polygon[i].dy) +
+              polygon[i].dx)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+}
+
+// ===========================================================================
+// 3. ARCHITECTURAL OPENING / SHAFT / VOID
+// ===========================================================================
+
+enum OpeningType { shaft, floorVoid, elevator }
+
+class ArchitectOpening {
+  final String id;
+  final List<Offset> boundary;
+  final String label;
+  final OpeningType type;
+
+  const ArchitectOpening({
+    required this.id,
+    required this.boundary,
+    this.label = 'Шахта',
+    this.type = OpeningType.shaft,
+  });
+
+  Offset get centroid {
+    if (boundary.isEmpty) return Offset.zero;
+    double cx = 0, cy = 0;
+    for (final p in boundary) {
+      cx += p.dx;
+      cy += p.dy;
+    }
+    return Offset(cx / boundary.length, cy / boundary.length);
+  }
+
+  ArchitectOpening copyWith({
+    String? id,
+    List<Offset>? boundary,
+    String? label,
+    OpeningType? type,
+  }) =>
+      ArchitectOpening(
+        id: id ?? this.id,
+        boundary: boundary ?? this.boundary,
+        label: label ?? this.label,
+        type: type ?? this.type,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'boundary': boundary.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
+    'label': label,
+    'type': type.name,
+  };
+
+  factory ArchitectOpening.fromJson(Map<String, dynamic> json) => ArchitectOpening(
+    id: json['id'] as String,
+    boundary: (json['boundary'] as List<dynamic>?)
+            ?.map((p) => Offset((p['x'] as num).toDouble(), (p['y'] as num).toDouble()))
+            .toList() ??
+        const [],
+    label: json['label'] as String? ?? 'Шахта',
+    type: OpeningType.values.firstWhere(
+      (t) => t.name == json['type'],
+      orElse: () => OpeningType.shaft,
+    ),
+  );
+}
+
+// ===========================================================================
+// 4. ARCHITECTURAL STAIR
+// ===========================================================================
+
+class ArchitectStair {
+  final String id;
+  final Offset startPoint;
+  final Offset endPoint;
+  final double width; // flight width in meters (default 1.10 m)
+  final int stepCount; // default 16
+  final bool hasLanding;
+
+  const ArchitectStair({
+    required this.id,
+    required this.startPoint,
+    required this.endPoint,
+    this.width = 1.10,
+    this.stepCount = 16,
+    this.hasLanding = false,
+  });
+
+  double get length => (endPoint - startPoint).distance;
+
+  Offset get unitVector {
+    final len = length;
+    if (len < 1e-4) return const Offset(1, 0);
+    return (endPoint - startPoint) / len;
+  }
+
+  Offset get normalVector {
+    final u = unitVector;
+    return Offset(-u.dy, u.dx);
+  }
+
+  List<Offset> get polygonCorners {
+    final n = normalVector * (width / 2.0);
+    return [startPoint - n, endPoint - n, endPoint + n, startPoint + n];
+  }
+
+  ArchitectStair copyWith({
+    String? id,
+    Offset? startPoint,
+    Offset? endPoint,
+    double? width,
+    int? stepCount,
+    bool? hasLanding,
+  }) =>
+      ArchitectStair(
+        id: id ?? this.id,
+        startPoint: startPoint ?? this.startPoint,
+        endPoint: endPoint ?? this.endPoint,
+        width: width ?? this.width,
+        stepCount: stepCount ?? this.stepCount,
+        hasLanding: hasLanding ?? this.hasLanding,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
+    'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
+    'width': width,
+    'stepCount': stepCount,
+    'hasLanding': hasLanding,
+  };
+
+  factory ArchitectStair.fromJson(Map<String, dynamic> json) => ArchitectStair(
+    id: json['id'] as String,
+    startPoint: Offset(
+      (json['startPoint']['x'] as num).toDouble(),
+      (json['startPoint']['y'] as num).toDouble(),
+    ),
+    endPoint: Offset(
+      (json['endPoint']['x'] as num).toDouble(),
+      (json['endPoint']['y'] as num).toDouble(),
+    ),
+    width: (json['width'] as num?)?.toDouble() ?? 1.10,
+    stepCount: (json['stepCount'] as num?)?.toInt() ?? 16,
+    hasLanding: json['hasLanding'] as bool? ?? false,
+  );
+}
+
+// ===========================================================================
+// 5. ARCHITECTURAL DIMENSION LINE (РАЗМЕРНА ЛИНИЯ)
+// ===========================================================================
+
+class ArchitectDimension {
+  final String id;
+  final Offset startPoint;
+  final Offset endPoint;
+  final double offsetDistance; // perpendicular offset in meters
+  final String? customText;
+
+  const ArchitectDimension({
+    required this.id,
+    required this.startPoint,
+    required this.endPoint,
+    this.offsetDistance = 0.50,
+    this.customText,
+  });
+
+  double get length => (endPoint - startPoint).distance;
+
+  String get displayText {
+    if (customText != null && customText!.trim().isNotEmpty) {
+      return customText!;
+    }
+    return length.toStringAsFixed(2);
+  }
+
+  ArchitectDimension copyWith({
+    String? id,
+    Offset? startPoint,
+    Offset? endPoint,
+    double? offsetDistance,
+    String? customText,
+  }) =>
+      ArchitectDimension(
+        id: id ?? this.id,
+        startPoint: startPoint ?? this.startPoint,
+        endPoint: endPoint ?? this.endPoint,
+        offsetDistance: offsetDistance ?? this.offsetDistance,
+        customText: customText ?? this.customText,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
+    'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
+    'offsetDistance': offsetDistance,
+    if (customText != null) 'customText': customText,
+  };
+
+  factory ArchitectDimension.fromJson(Map<String, dynamic> json) => ArchitectDimension(
+    id: json['id'] as String,
+    startPoint: Offset(
+      (json['startPoint']['x'] as num).toDouble(),
+      (json['startPoint']['y'] as num).toDouble(),
+    ),
+    endPoint: Offset(
+      (json['endPoint']['x'] as num).toDouble(),
+      (json['endPoint']['y'] as num).toDouble(),
+    ),
+    offsetDistance: (json['offsetDistance'] as num?)?.toDouble() ?? 0.50,
+    customText: json['customText'] as String?,
+  );
+}
+
+// ===========================================================================
+// 6. ARCHITECTURAL ELEVATION MARKER (НИВОВА КОТА ±0.00)
+// ===========================================================================
+
+class ArchitectElevationMarker {
+  final String id;
+  final Offset position;
+  final double elevation; // in meters
+  final String? label; // optional note, e.g. "ГП" or "КК"
+
+  const ArchitectElevationMarker({
+    required this.id,
+    required this.position,
+    required this.elevation,
+    this.label,
+  });
+
+  String get formattedElevation {
+    if (elevation.abs() < 1e-4) return '±0.00';
+    final sign = elevation > 0 ? '+' : '';
+    return '$sign${elevation.toStringAsFixed(2)}';
+  }
+
+  ArchitectElevationMarker copyWith({
+    String? id,
+    Offset? position,
+    double? elevation,
+    String? label,
+  }) =>
+      ArchitectElevationMarker(
+        id: id ?? this.id,
+        position: position ?? this.position,
+        elevation: elevation ?? this.elevation,
+        label: label ?? this.label,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'position': {'x': position.dx, 'y': position.dy},
+    'elevation': elevation,
+    if (label != null) 'label': label,
+  };
+
+  factory ArchitectElevationMarker.fromJson(Map<String, dynamic> json) =>
+      ArchitectElevationMarker(
+        id: json['id'] as String,
+        position: Offset(
+          (json['position']['x'] as num).toDouble(),
+          (json['position']['y'] as num).toDouble(),
+        ),
+        elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
+        label: json['label'] as String?,
+      );
+}
+
+// ===========================================================================
+// 7. ARCHITECTURAL TEXT ANNOTATION
+// ===========================================================================
+
+class ArchitectAnnotation {
+  final String id;
+  final Offset position;
+  final String text;
+  final double fontSize; // in meters (default 0.30 m)
+
+  const ArchitectAnnotation({
+    required this.id,
+    required this.position,
+    required this.text,
+    this.fontSize = 0.30,
+  });
+
+  ArchitectAnnotation copyWith({
+    String? id,
+    Offset? position,
+    String? text,
+    double? fontSize,
+  }) =>
+      ArchitectAnnotation(
+        id: id ?? this.id,
+        position: position ?? this.position,
+        text: text ?? this.text,
+        fontSize: fontSize ?? this.fontSize,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'position': {'x': position.dx, 'y': position.dy},
+    'text': text,
+    'fontSize': fontSize,
+  };
+
+  factory ArchitectAnnotation.fromJson(Map<String, dynamic> json) => ArchitectAnnotation(
+    id: json['id'] as String,
+    position: Offset(
+      (json['position']['x'] as num).toDouble(),
+      (json['position']['y'] as num).toDouble(),
+    ),
+    text: json['text'] as String? ?? '',
+    fontSize: (json['fontSize'] as num?)?.toDouble() ?? 0.30,
+  );
+}
+
+// ===========================================================================
+// 8. 2D CAD PRIMITIVES (LINE, RECT, CIRCLE)
+// ===========================================================================
+
+enum CadPrimitiveType { line, rect, circle }
+
+class ArchitectCadPrimitive {
+  final String id;
+  final CadPrimitiveType type;
+  final Offset startPoint;
+  final Offset endPoint;
+  final int colorValue; // ARGB
+  final double strokeWidth;
+
+  const ArchitectCadPrimitive({
+    required this.id,
+    required this.type,
+    required this.startPoint,
+    required this.endPoint,
+    this.colorValue = 0xFF424242,
+    this.strokeWidth = 1.0,
+  });
+
+  ArchitectCadPrimitive copyWith({
+    String? id,
+    CadPrimitiveType? type,
+    Offset? startPoint,
+    Offset? endPoint,
+    int? colorValue,
+    double? strokeWidth,
+  }) =>
+      ArchitectCadPrimitive(
+        id: id ?? this.id,
+        type: type ?? this.type,
+        startPoint: startPoint ?? this.startPoint,
+        endPoint: endPoint ?? this.endPoint,
+        colorValue: colorValue ?? this.colorValue,
+        strokeWidth: strokeWidth ?? this.strokeWidth,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'type': type.name,
+    'startPoint': {'x': startPoint.dx, 'y': startPoint.dy},
+    'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
+    'colorValue': colorValue,
+    'strokeWidth': strokeWidth,
+  };
+
+  factory ArchitectCadPrimitive.fromJson(Map<String, dynamic> json) =>
+      ArchitectCadPrimitive(
+        id: json['id'] as String,
+        type: CadPrimitiveType.values.firstWhere(
+          (t) => t.name == json['type'],
+          orElse: () => CadPrimitiveType.line,
+        ),
+        startPoint: Offset(
+          (json['startPoint']['x'] as num).toDouble(),
+          (json['startPoint']['y'] as num).toDouble(),
+        ),
+        endPoint: Offset(
+          (json['endPoint']['x'] as num).toDouble(),
+          (json['endPoint']['y'] as num).toDouble(),
+        ),
+        colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xFF424242,
+        strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 1.0,
+      );
+}

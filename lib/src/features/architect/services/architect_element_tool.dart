@@ -1,0 +1,523 @@
+// === SECTION: ARCHITECTURAL ELEMENT TOOL ===
+import 'package:flutter/material.dart';
+import '../models/architect_column.dart';
+import '../models/architect_elements.dart';
+import '../models/architect_project.dart';
+import '../models/architect_wall.dart';
+import '../models/architect_window.dart';
+
+/// Unified controller and interaction manager for specialized architectural drafting elements
+/// (windows, columns, beams, slabs, openings, stairs, dimensions, elevation markers, annotations, and CAD primitives).
+class ArchitectElementTool extends ChangeNotifier {
+  // Window options
+  double windowWidth = 1.20;
+  double windowHeight = 1.40;
+  double windowSill = 0.85;
+
+  // Column options
+  ColumnShape columnShape = ColumnShape.rectangular;
+  double columnWidth = 0.25;
+  double columnDepth = 0.25;
+
+  // Beam options
+  double beamWidth = 0.25;
+  double beamDepth = 0.40;
+
+  // Stair options
+  double stairWidth = 1.00;
+  int stairSteps = 16;
+
+  // Opening options
+  OpeningType openingType = OpeningType.shaft;
+
+  // Slab drafting state
+  final List<Offset> slabDraftPoints = [];
+  Offset? slabCandidatePoint;
+
+  // Measurement tool state
+  Offset? measureStart;
+  Offset? measureEnd;
+
+  // ===========================================================================
+  // 1. CONFIGURATION SETTERS
+  // ===========================================================================
+
+  void setWindowParams({double? width, double? height, double? sill}) {
+    if (width != null) windowWidth = width;
+    if (height != null) windowHeight = height;
+    if (sill != null) windowSill = sill;
+    notifyListeners();
+  }
+
+  void setColumnParams({ColumnShape? shape, double? width, double? depth}) {
+    if (shape != null) columnShape = shape;
+    if (width != null) columnWidth = width;
+    if (depth != null) columnDepth = depth;
+    notifyListeners();
+  }
+
+  void setBeamParams({double? width, double? depth}) {
+    if (width != null) beamWidth = width;
+    if (depth != null) beamDepth = depth;
+    notifyListeners();
+  }
+
+  void setStairParams({double? width, int? steps}) {
+    if (width != null) stairWidth = width;
+    if (steps != null) stairSteps = steps;
+    notifyListeners();
+  }
+
+  void setOpeningType(OpeningType type) {
+    openingType = type;
+    notifyListeners();
+  }
+
+  // ===========================================================================
+  // 2. WINDOW PLACEMENT
+  // ===========================================================================
+
+  (ArchitectStorey, ArchitectWindow)? placeWindow({
+    required ArchitectStorey storey,
+    required Offset point,
+  }) {
+    ArchitectWall? targetWall;
+    double bestDist = double.infinity;
+
+    for (final wall in storey.walls) {
+      final (_, dist) = wall.projectPoint(point);
+      if (dist <= wall.thickness / 2.0 + 0.30 && dist < bestDist) {
+        bestDist = dist;
+        targetWall = wall;
+      }
+    }
+
+    if (targetWall == null) return null;
+
+    final (ratio, _) = targetWall.projectPoint(point);
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final newWindow = ArchitectWindow(
+      id: 'win_$now',
+      wallId: targetWall.id,
+      offsetRatio: ratio,
+      width: windowWidth,
+      height: windowHeight,
+      sillHeight: windowSill,
+      uuid: 'UUID_$now',
+    );
+
+    final updatedWall = targetWall.addWindow(newWindow);
+    final updatedWalls = storey.walls
+        .map((w) => w.id == updatedWall.id ? updatedWall : w)
+        .toList();
+
+    return (storey.copyWith(walls: updatedWalls), newWindow);
+  }
+
+  // ===========================================================================
+  // 3. COLUMN PLACEMENT
+  // ===========================================================================
+
+  (ArchitectStorey, ArchitectColumn) placeColumn({
+    required ArchitectStorey storey,
+    required Offset point,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final newColumn = ArchitectColumn(
+      id: 'col_$now',
+      position: point,
+      shape: columnShape,
+      width: columnWidth,
+      depth: columnDepth,
+    );
+
+    return (
+      storey.copyWith(columns: [...storey.columns, newColumn]),
+      newColumn,
+    );
+  }
+
+  // ===========================================================================
+  // 4. BEAM PLACEMENT
+  // ===========================================================================
+
+  (ArchitectStorey, ArchitectBeam)? placeBeam({
+    required ArchitectStorey storey,
+    required Offset start,
+    required Offset end,
+  }) {
+    if ((end - start).distance < 0.20) return null;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final newBeam = ArchitectBeam(
+      id: 'beam_$now',
+      startPoint: start,
+      endPoint: end,
+      width: beamWidth,
+      depth: beamDepth,
+    );
+
+    return (
+      storey.copyWith(beams: [...storey.beams, newBeam]),
+      newBeam,
+    );
+  }
+
+  // ===========================================================================
+  // 5. SLAB DRAFTING
+  // ===========================================================================
+
+  bool addSlabPoint(Offset point) {
+    if (slabDraftPoints.isNotEmpty &&
+        (point - slabDraftPoints.last).distance < 0.10) {
+      return false;
+    }
+    slabDraftPoints.add(point);
+    notifyListeners();
+    return true;
+  }
+
+  void updateSlabCandidate(Offset? candidate) {
+    slabCandidatePoint = candidate;
+    notifyListeners();
+  }
+
+  (ArchitectStorey, ArchitectSlab)? commitSlab({
+    required ArchitectStorey storey,
+    double thickness = 0.16,
+  }) {
+    if (slabDraftPoints.length < 3) return null;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final newSlab = ArchitectSlab(
+      id: 'slab_$now',
+      polygon: List<Offset>.from(slabDraftPoints),
+      thickness: thickness,
+      label: 'Slab ${storey.slabs.length + 1}',
+    );
+
+    slabDraftPoints.clear();
+    slabCandidatePoint = null;
+    notifyListeners();
+
+    return (
+      storey.copyWith(slabs: [...storey.slabs, newSlab]),
+      newSlab,
+    );
+  }
+
+  void cancelSlabDrafting() {
+    slabDraftPoints.clear();
+    slabCandidatePoint = null;
+    notifyListeners();
+  }
+
+  // ===========================================================================
+  // 6. OPENING PLACEMENT
+  // ===========================================================================
+
+  (ArchitectStorey, ArchitectOpening)? placeOpening({
+    required ArchitectStorey storey,
+    required Offset p1,
+    required Offset p2,
+  }) {
+    final rect = Rect.fromPoints(p1, p2);
+    if (rect.width < 0.15 || rect.height < 0.15) return null;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final boundary = [
+      rect.topLeft,
+      rect.topRight,
+      rect.bottomRight,
+      rect.bottomLeft,
+    ];
+    final newOpening = ArchitectOpening(
+      id: 'op_$now',
+      boundary: boundary,
+      type: openingType,
+      label: 'Opening ${storey.openings.length + 1}',
+    );
+
+    return (
+      storey.copyWith(openings: [...storey.openings, newOpening]),
+      newOpening,
+    );
+  }
+
+  // ===========================================================================
+  // 7. STAIR PLACEMENT
+  // ===========================================================================
+
+  (ArchitectStorey, ArchitectStair)? placeStair({
+    required ArchitectStorey storey,
+    required Offset start,
+    required Offset end,
+  }) {
+    if ((end - start).distance < 0.40) return null;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final newStair = ArchitectStair(
+      id: 'stair_$now',
+      startPoint: start,
+      endPoint: end,
+      width: stairWidth,
+      stepCount: stairSteps,
+    );
+
+    return (
+      storey.copyWith(stairs: [...storey.stairs, newStair]),
+      newStair,
+    );
+  }
+
+  // ===========================================================================
+  // 8. DIMENSION PLACEMENT
+  // ===========================================================================
+
+  (ArchitectStorey, ArchitectDimension)? placeDimension({
+    required ArchitectStorey storey,
+    required Offset start,
+    required Offset end,
+  }) {
+    if ((end - start).distance < 0.10) return null;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final newDim = ArchitectDimension(
+      id: 'dim_$now',
+      startPoint: start,
+      endPoint: end,
+    );
+
+    return (
+      storey.copyWith(dimensions: [...storey.dimensions, newDim]),
+      newDim,
+    );
+  }
+
+  // ===========================================================================
+  // 9. ELEVATION MARKER PLACEMENT
+  // ===========================================================================
+
+  (ArchitectStorey, ArchitectElevationMarker) placeElevationMarker({
+    required ArchitectStorey storey,
+    required Offset point,
+    required double elevation,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final newMarker = ArchitectElevationMarker(
+      id: 'elev_$now',
+      position: point,
+      elevation: elevation,
+    );
+
+    return (
+      storey.copyWith(
+        elevationMarkers: [...storey.elevationMarkers, newMarker],
+      ),
+      newMarker,
+    );
+  }
+
+  // ===========================================================================
+  // 10. ANNOTATION PLACEMENT
+  // ===========================================================================
+
+  (ArchitectStorey, ArchitectAnnotation) placeAnnotation({
+    required ArchitectStorey storey,
+    required Offset point,
+    required String text,
+    double fontSize = 0.25,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final newAnnotation = ArchitectAnnotation(
+      id: 'ann_$now',
+      position: point,
+      text: text,
+      fontSize: fontSize,
+    );
+
+    return (
+      storey.copyWith(annotations: [...storey.annotations, newAnnotation]),
+      newAnnotation,
+    );
+  }
+
+  // ===========================================================================
+  // 11. CAD PRIMITIVE PLACEMENT
+  // ===========================================================================
+
+  (ArchitectStorey, ArchitectCadPrimitive)? placeCadPrimitive({
+    required ArchitectStorey storey,
+    required CadPrimitiveType type,
+    required Offset start,
+    required Offset end,
+    int colorValue = 0xFF9E9E9E,
+    double strokeWidth = 1.0,
+  }) {
+    if ((end - start).distance < 0.05) return null;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final newPrim = ArchitectCadPrimitive(
+      id: 'cad_$now',
+      type: type,
+      startPoint: start,
+      endPoint: end,
+      colorValue: colorValue,
+      strokeWidth: strokeWidth,
+    );
+
+    return (
+      storey.copyWith(cadPrimitives: [...storey.cadPrimitives, newPrim]),
+      newPrim,
+    );
+  }
+
+  // ===========================================================================
+  // 12. ELEMENT HIT TESTING (SELECT TOOL)
+  // ===========================================================================
+
+  String? hitTestElement(ArchitectStorey storey, Offset point, double scale) {
+    final tolerance = 14.0 / scale;
+
+    // Check Columns
+    for (final col in storey.columns) {
+      final r = (col.width + col.depth) / 4.0 + tolerance;
+      if ((point - col.position).distance <= r) {
+        return col.id;
+      }
+    }
+
+    // Check Hosted Windows
+    for (final wall in storey.walls) {
+      for (final win in wall.windows) {
+        final winCenter = wall.startPoint + (wall.endPoint - wall.startPoint) * win.offsetRatio;
+        if ((point - winCenter).distance <= win.width / 2.0 + tolerance) {
+          return win.id;
+        }
+      }
+      for (final door in wall.doors) {
+        final doorCenter = wall.startPoint + (wall.endPoint - wall.startPoint) * door.offsetRatio;
+        if ((point - doorCenter).distance <= door.width / 2.0 + tolerance) {
+          return door.id;
+        }
+      }
+    }
+
+    // Check Beams
+    for (final beam in storey.beams) {
+      final dist = _pointToSegmentDistance(point, beam.startPoint, beam.endPoint);
+      if (dist <= beam.width / 2.0 + tolerance) {
+        return beam.id;
+      }
+    }
+
+    // Check Stairs
+    for (final stair in storey.stairs) {
+      final dist = _pointToSegmentDistance(point, stair.startPoint, stair.endPoint);
+      if (dist <= stair.width / 2.0 + tolerance) {
+        return stair.id;
+      }
+    }
+
+    // Check Openings
+    for (final op in storey.openings) {
+      if (op.boundary.length >= 2) {
+        final r = Rect.fromPoints(op.boundary.first, op.boundary[2 % op.boundary.length]).inflate(tolerance);
+        if (r.contains(point)) {
+          return op.id;
+        }
+      }
+    }
+
+    // Check Dimensions
+    for (final dim in storey.dimensions) {
+      final dist = _pointToSegmentDistance(point, dim.startPoint, dim.endPoint);
+      if (dist <= tolerance) {
+        return dim.id;
+      }
+    }
+
+    // Check Elevation Markers
+    for (final el in storey.elevationMarkers) {
+      if ((point - el.position).distance <= 0.40 + tolerance) {
+        return el.id;
+      }
+    }
+
+    // Check Annotations
+    for (final ann in storey.annotations) {
+      if ((point - ann.position).distance <= 0.60 + tolerance) {
+        return ann.id;
+      }
+    }
+
+    // Check CAD Primitives
+    for (final prim in storey.cadPrimitives) {
+      if (prim.type == CadPrimitiveType.line) {
+        if (_pointToSegmentDistance(point, prim.startPoint, prim.endPoint) <= tolerance) {
+          return prim.id;
+        }
+      } else if (prim.type == CadPrimitiveType.rect) {
+        final r = Rect.fromPoints(prim.startPoint, prim.endPoint).inflate(tolerance);
+        if (r.contains(point)) return prim.id;
+      } else if (prim.type == CadPrimitiveType.circle) {
+        final rad = (prim.endPoint - prim.startPoint).distance;
+        final d = (point - prim.startPoint).distance;
+        if ((d - rad).abs() <= tolerance) return prim.id;
+      }
+    }
+
+    // Check Walls
+    for (final wall in storey.walls) {
+      if (wall.containsPoint(point)) {
+        return wall.id;
+      }
+    }
+
+    // Check Slabs
+    for (final slab in storey.slabs) {
+      if (slab.containsPoint(point)) {
+        return slab.id;
+      }
+    }
+
+    return null;
+  }
+
+  // ===========================================================================
+  // 13. ELEMENT DELETION
+  // ===========================================================================
+
+  ArchitectStorey deleteElementById(ArchitectStorey storey, String elementId) {
+    return storey.copyWith(
+      walls: storey.walls
+          .map((w) => w.copyWith(
+                doors: w.doors.where((d) => d.id != elementId).toList(),
+                windows: w.windows.where((win) => win.id != elementId).toList(),
+              ))
+          .where((w) => w.id != elementId)
+          .toList(),
+      columns: storey.columns.where((c) => c.id != elementId).toList(),
+      beams: storey.beams.where((b) => b.id != elementId).toList(),
+      slabs: storey.slabs.where((s) => s.id != elementId).toList(),
+      openings: storey.openings.where((o) => o.id != elementId).toList(),
+      stairs: storey.stairs.where((s) => s.id != elementId).toList(),
+      dimensions: storey.dimensions.where((d) => d.id != elementId).toList(),
+      elevationMarkers:
+          storey.elevationMarkers.where((e) => e.id != elementId).toList(),
+      annotations: storey.annotations.where((a) => a.id != elementId).toList(),
+      cadPrimitives:
+          storey.cadPrimitives.where((c) => c.id != elementId).toList(),
+    );
+  }
+
+  // ===========================================================================
+  // 14. HELPER GEOMETRY
+  // ===========================================================================
+
+  static double _pointToSegmentDistance(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final lenSq = ab.dx * ab.dx + ab.dy * ab.dy;
+    if (lenSq < 1e-8) return (p - a).distance;
+
+    final ap = p - a;
+    final t = ((ap.dx * ab.dx + ap.dy * ab.dy) / lenSq).clamp(0.0, 1.0);
+    final proj = a + ab * t;
+    return (p - proj).distance;
+  }
+}

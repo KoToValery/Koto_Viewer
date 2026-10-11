@@ -6,6 +6,7 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/bim_work_project.dart';
 import '../services/bim_project_library_service.dart';
 import '../services/bim_underlay_picker_helper.dart';
+import '../../architect/widgets/architect_project_wizard_dialog.dart';
 import 'bim_elevation_dialog.dart';
 
 class _StoreyDraft {
@@ -42,8 +43,11 @@ class BimNewProjectWizard extends StatefulWidget {
   final VoidCallback? onProjectCreated;
   final ValueChanged<BimWorkProject>? onProjectCreatedWithProject;
 
+  final BimProjectType initialProjectType;
+
   const BimNewProjectWizard({
     super.key,
+    this.initialProjectType = BimProjectType.structural,
     this.onProjectCreated,
     this.underlayPicker,
     this.underlayConverter,
@@ -52,6 +56,7 @@ class BimNewProjectWizard extends StatefulWidget {
 
   static Future<void> show(
     BuildContext context, {
+    BimProjectType initialProjectType = BimProjectType.structural,
     VoidCallback? onProjectCreated,
     ValueChanged<BimWorkProject>? onProjectCreatedWithProject,
   }) {
@@ -60,6 +65,7 @@ class BimNewProjectWizard extends StatefulWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => BimNewProjectWizard(
+        initialProjectType: initialProjectType,
         onProjectCreated: onProjectCreated,
         onProjectCreatedWithProject: onProjectCreatedWithProject,
       ),
@@ -78,12 +84,14 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
   final double _floorHeight = 2.80;
   bool _isCreating = false;
   int _nextStoreyId = 0;
+  late BimProjectType _selectedProjectType;
 
   final List<_StoreyDraft> _storeys = [];
 
   @override
   void initState() {
     super.initState();
+    _selectedProjectType = widget.initialProjectType;
     _generateDefaultStoreys();
   }
 
@@ -119,15 +127,24 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
     );
   }
 
-  bool get _canCreate =>
-      !_isCreating &&
-      _storeys.isNotEmpty &&
-      _storeys.every(
+  bool get _canCreate {
+    if (_isCreating || _storeys.isEmpty) return false;
+    if (_selectedProjectType == BimProjectType.architectural) {
+      return _storeys.every(
         (d) =>
-            d.converted != null &&
-            d.error == null &&
-            d.stage == BimConversionStage.ready,
+            d.pickedFile == null ||
+            (d.converted != null &&
+                d.error == null &&
+                d.stage == BimConversionStage.ready),
       );
+    }
+    return _storeys.every(
+      (d) =>
+          d.converted != null &&
+          d.error == null &&
+          d.stage == BimConversionStage.ready,
+    );
+  }
 
   String _getStoreyDisplayName(_StoreyDraft draft, int index) {
     return draft.elevationLabel;
@@ -242,6 +259,7 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
         name: _nameController.text.trim(),
         location: _locationController.text.trim(),
         storeys: storeyUnderlays,
+        projectType: _selectedProjectType,
       );
 
       pendingProjectId = project.id;
@@ -284,6 +302,41 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
       if (mounted) {
         setState(() => _isCreating = false);
       }
+    }
+  }
+
+  Future<void> _openArchitectWizardFromHere() async {
+    final archProject = await ArchitectProjectWizardDialog.show(
+      context,
+      initialProjectName: _nameController.text.trim().isNotEmpty
+          ? _nameController.text.trim()
+          : null,
+    );
+    if (archProject == null || !mounted) return;
+
+    final storeys = archProject.storeys.map((s) {
+      return BimStoreyUnderlay(
+        storeyId: s.id,
+        name: s.name,
+        elevation: s.elevation,
+        height: s.height,
+      );
+    }).toList();
+
+    final bimProject = await BimProjectLibraryService.instance.createProject(
+      name: archProject.name,
+      location: _locationController.text.trim(),
+      storeys: storeys,
+      projectType: BimProjectType.architectural,
+      initialArchitectProject: archProject,
+    );
+
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    if (widget.onProjectCreatedWithProject != null) {
+      widget.onProjectCreatedWithProject!(bimProject);
+    } else {
+      widget.onProjectCreated?.call();
     }
   }
 
@@ -385,7 +438,220 @@ class _BimNewProjectWizardState extends State<BimNewProjectWizard> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 18),
+
+                        // Project Type Selector
+                        Text(
+                          l10n.bimProjectType,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            // Structural Card
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _selectedProjectType = BimProjectType.structural),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: _selectedProjectType == BimProjectType.structural
+                                        ? const Color(0xFF00E5FF).withValues(alpha: 0.15)
+                                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _selectedProjectType == BimProjectType.structural
+                                          ? const Color(0xFF00E5FF)
+                                          : Colors.white12,
+                                      width: _selectedProjectType == BimProjectType.structural ? 1.8 : 1.0,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.apartment_rounded,
+                                            size: 20,
+                                            color: _selectedProjectType == BimProjectType.structural
+                                                ? const Color(0xFF00E5FF)
+                                                : Colors.white70,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              l10n.bimProjectStructural,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                color: _selectedProjectType == BimProjectType.structural
+                                                    ? Colors.white
+                                                    : Colors.white70,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        l10n.bimProjectStructuralDesc,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: Colors.white.withValues(alpha: 0.65),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            // Architectural Card
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _selectedProjectType = BimProjectType.architectural),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: _selectedProjectType == BimProjectType.architectural
+                                        ? const Color(0xFFAB47BC).withValues(alpha: 0.18)
+                                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _selectedProjectType == BimProjectType.architectural
+                                          ? const Color(0xFFAB47BC)
+                                          : Colors.white12,
+                                      width: _selectedProjectType == BimProjectType.architectural ? 1.8 : 1.0,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.architecture_rounded,
+                                            size: 20,
+                                            color: _selectedProjectType == BimProjectType.architectural
+                                                ? const Color(0xFFCE93D8)
+                                                : Colors.white70,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              l10n.bimProjectArchitectural,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                color: _selectedProjectType == BimProjectType.architectural
+                                                    ? Colors.white
+                                                    : Colors.white70,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        l10n.bimProjectArchitecturalDesc,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: Colors.white.withValues(alpha: 0.65),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_selectedProjectType == BimProjectType.architectural) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFAB47BC).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFCE93D8).withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.auto_awesome_rounded,
+                                  color: Color(0xFFCE93D8),
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        l10n.architectWizardTitle,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        l10n.architectWizardSubtitle,
+                                        style: const TextStyle(
+                                          color: Colors.white60,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFCE93D8),
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: _openArchitectWizardFromHere,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      l10n.architectLaunchWizard,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
 
                         // Storeys & Underlays Header
                         Row(

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_zone.dart';
+import 'package:kotoview/src/features/architect/services/architect_logger.dart';
 import 'package:kotoview/src/features/architect/services/architect_zone_tool.dart';
 
 void main() {
@@ -436,6 +437,70 @@ void main() {
       final committed = tool.commitEditingZone();
       expect(committed, isNotNull);
       expect(tool.isEditingZone, isFalse);
+    });
+  });
+
+  group('ArchitectLogger & Pointer Diagnostics Tests', () {
+    setUp(() {
+      ArchitectLogger.clear();
+    });
+
+    test('ArchitectLogger records entries with category, timestamp, and message', () {
+      ArchitectLogger.log('VIEWPORT', 'Scale changed to 40.0');
+      ArchitectLogger.log('TAP', 'Tap placed at Offset(2.0, 5.0)');
+
+      expect(ArchitectLogger.history.length, 2);
+      expect(ArchitectLogger.history[0], contains('[VIEWPORT] Scale changed to 40.0'));
+      expect(ArchitectLogger.history[1], contains('[TAP] Tap placed at Offset(2.0, 5.0)'));
+    });
+
+    test('ArchitectLogger circular buffer enforces 150 item maxHistory limit', () {
+      for (int i = 0; i < 200; i++) {
+        ArchitectLogger.log('TEST', 'Message $i');
+      }
+
+      expect(ArchitectLogger.history.length, 150);
+      expect(ArchitectLogger.history.first, contains('Message 50'));
+      expect(ArchitectLogger.history.last, contains('Message 199'));
+    });
+
+    test('ArchitectLogger clear empties the history buffer', () {
+      ArchitectLogger.log('GESTURE', 'Pinch zoom detected');
+      expect(ArchitectLogger.history.isNotEmpty, isTrue);
+
+      ArchitectLogger.clear();
+      expect(ArchitectLogger.history.isEmpty, isTrue);
+    });
+
+    test('ArchitectZoneTool isMovingZone accurately reflects drag start and finish', () {
+      final tool = ArchitectZoneTool();
+      final zone = ArchitectZone(
+        id: 'z1',
+        name: 'Zone',
+        category: ArchitectZoneCategory.living,
+        polygon: [
+          const Offset(0, 0),
+          const Offset(4, 0),
+          const Offset(4, 4),
+          const Offset(0, 4),
+        ],
+      );
+
+      tool.startEditingZone(zone);
+      tool.toggleMoveWholeZoneMode();
+      expect(tool.isMoveWholeZoneMode, isTrue);
+      expect(tool.isMovingZone, isFalse);
+
+      tool.startMovingZone(const Offset(2, 2));
+      expect(tool.isMovingZone, isTrue);
+      expect(tool.isInteracting, isTrue);
+
+      tool.updateMovingZone(const Offset(3, 3));
+      expect(tool.isMovingZone, isTrue);
+      expect(tool.moveDistanceMeters, closeTo(1.414, 0.01));
+
+      tool.finishMovingZone();
+      expect(tool.isMovingZone, isFalse);
     });
   });
 }

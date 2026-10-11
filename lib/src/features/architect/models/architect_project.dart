@@ -1,6 +1,10 @@
 import 'dart:ui';
 import '../../structural_designer/models/structural_element.dart';
+import 'architect_column.dart';
+import 'architect_elements.dart';
+import 'architect_grid_preset.dart';
 import 'architect_wall.dart';
+import 'architect_wall_type.dart';
 import 'architect_zone.dart';
 
 /// Supported distance units for architectural project dimensions.
@@ -14,7 +18,8 @@ enum ArchitectUnit {
   const ArchitectUnit(this.scaleToMeters, this.symbol);
 }
 
-/// Represents an architectural storey level with its height, elevation, walls, and zones.
+/// Represents an architectural storey level with its height, elevation, walls, zones,
+/// and comprehensive architectural drafting elements.
 class ArchitectStorey {
   final String id;
   final String name;
@@ -23,6 +28,15 @@ class ArchitectStorey {
   final double floorFinishThickness; // default 0.05 m
   final List<ArchitectWall> walls;
   final List<ArchitectZone> zones;
+  final List<ArchitectColumn> columns;
+  final List<ArchitectBeam> beams;
+  final List<ArchitectSlab> slabs;
+  final List<ArchitectOpening> openings;
+  final List<ArchitectStair> stairs;
+  final List<ArchitectDimension> dimensions;
+  final List<ArchitectElevationMarker> elevationMarkers;
+  final List<ArchitectAnnotation> annotations;
+  final List<ArchitectCadPrimitive> cadPrimitives;
 
   const ArchitectStorey({
     required this.id,
@@ -32,6 +46,15 @@ class ArchitectStorey {
     this.floorFinishThickness = 0.05,
     this.walls = const [],
     this.zones = const [],
+    this.columns = const [],
+    this.beams = const [],
+    this.slabs = const [],
+    this.openings = const [],
+    this.stairs = const [],
+    this.dimensions = const [],
+    this.elevationMarkers = const [],
+    this.annotations = const [],
+    this.cadPrimitives = const [],
   });
 
   String get elevationLabel {
@@ -48,6 +71,15 @@ class ArchitectStorey {
     double? floorFinishThickness,
     List<ArchitectWall>? walls,
     List<ArchitectZone>? zones,
+    List<ArchitectColumn>? columns,
+    List<ArchitectBeam>? beams,
+    List<ArchitectSlab>? slabs,
+    List<ArchitectOpening>? openings,
+    List<ArchitectStair>? stairs,
+    List<ArchitectDimension>? dimensions,
+    List<ArchitectElevationMarker>? elevationMarkers,
+    List<ArchitectAnnotation>? annotations,
+    List<ArchitectCadPrimitive>? cadPrimitives,
   }) =>
       ArchitectStorey(
         id: id ?? this.id,
@@ -57,6 +89,15 @@ class ArchitectStorey {
         floorFinishThickness: floorFinishThickness ?? this.floorFinishThickness,
         walls: walls ?? this.walls,
         zones: zones ?? this.zones,
+        columns: columns ?? this.columns,
+        beams: beams ?? this.beams,
+        slabs: slabs ?? this.slabs,
+        openings: openings ?? this.openings,
+        stairs: stairs ?? this.stairs,
+        dimensions: dimensions ?? this.dimensions,
+        elevationMarkers: elevationMarkers ?? this.elevationMarkers,
+        annotations: annotations ?? this.annotations,
+        cadPrimitives: cadPrimitives ?? this.cadPrimitives,
       );
 
   Map<String, dynamic> toJson() => {
@@ -67,6 +108,15 @@ class ArchitectStorey {
         'floorFinishThickness': floorFinishThickness,
         'walls': walls.map((w) => w.toJson()).toList(),
         'zones': zones.map((z) => z.toJson()).toList(),
+        'columns': columns.map((c) => c.toJson()).toList(),
+        'beams': beams.map((b) => b.toJson()).toList(),
+        'slabs': slabs.map((s) => s.toJson()).toList(),
+        'openings': openings.map((o) => o.toJson()).toList(),
+        'stairs': stairs.map((st) => st.toJson()).toList(),
+        'dimensions': dimensions.map((d) => d.toJson()).toList(),
+        'elevationMarkers': elevationMarkers.map((m) => m.toJson()).toList(),
+        'annotations': annotations.map((a) => a.toJson()).toList(),
+        'cadPrimitives': cadPrimitives.map((p) => p.toJson()).toList(),
       };
 
   factory ArchitectStorey.fromJson(Map<String, dynamic> json) =>
@@ -85,6 +135,42 @@ class ArchitectStorey {
                 ?.map((z) => ArchitectZone.fromJson(z as Map<String, dynamic>))
                 .toList() ??
             const [],
+        columns: (json['columns'] as List<dynamic>?)
+                ?.map((c) => ArchitectColumn.fromJson(c as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        beams: (json['beams'] as List<dynamic>?)
+                ?.map((b) => ArchitectBeam.fromJson(b as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        slabs: (json['slabs'] as List<dynamic>?)
+                ?.map((s) => ArchitectSlab.fromJson(s as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        openings: (json['openings'] as List<dynamic>?)
+                ?.map((o) => ArchitectOpening.fromJson(o as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        stairs: (json['stairs'] as List<dynamic>?)
+                ?.map((st) => ArchitectStair.fromJson(st as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        dimensions: (json['dimensions'] as List<dynamic>?)
+                ?.map((d) => ArchitectDimension.fromJson(d as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        elevationMarkers: (json['elevationMarkers'] as List<dynamic>?)
+                ?.map((m) => ArchitectElevationMarker.fromJson(m as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        annotations: (json['annotations'] as List<dynamic>?)
+                ?.map((a) => ArchitectAnnotation.fromJson(a as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        cadPrimitives: (json['cadPrimitives'] as List<dynamic>?)
+                ?.map((p) => ArchitectCadPrimitive.fromJson(p as Map<String, dynamic>))
+                .toList() ??
+            const [],
       );
 }
 
@@ -98,6 +184,7 @@ class ArchitectProject {
   final List<ArchitectStorey> storeys;
   final String activeStoreyId;
   final List<StructuralGridAxis> gridAxes;
+  final List<ArchitectWallType> wallTypes;
 
   const ArchitectProject({
     required this.id,
@@ -108,6 +195,7 @@ class ArchitectProject {
     required this.storeys,
     required this.activeStoreyId,
     this.gridAxes = const [],
+    this.wallTypes = const [],
   });
 
   ArchitectStorey get activeStorey =>
@@ -140,6 +228,7 @@ class ArchitectProject {
     List<ArchitectStorey>? storeys,
     String? activeStoreyId,
     List<StructuralGridAxis>? gridAxes,
+    List<ArchitectWallType>? wallTypes,
   }) =>
       ArchitectProject(
         id: id ?? this.id,
@@ -150,6 +239,7 @@ class ArchitectProject {
         storeys: storeys ?? this.storeys,
         activeStoreyId: activeStoreyId ?? this.activeStoreyId,
         gridAxes: gridAxes ?? this.gridAxes,
+        wallTypes: wallTypes ?? this.wallTypes,
       );
 
   Map<String, dynamic> toJson() => {
@@ -161,6 +251,7 @@ class ArchitectProject {
         'storeys': storeys.map((s) => s.toJson()).toList(),
         'activeStoreyId': activeStoreyId,
         'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
+        'wallTypes': wallTypes.map((w) => w.toJson()).toList(),
       };
 
   factory ArchitectProject.fromJson(Map<String, dynamic> json) =>
@@ -185,7 +276,73 @@ class ArchitectProject {
                     StructuralGridAxis.fromJson(a as Map<String, dynamic>))
                 .toList() ??
             const [],
+        wallTypes: (json['wallTypes'] as List<dynamic>?)
+                ?.map((w) =>
+                    ArchitectWallType.fromJson(w as Map<String, dynamic>))
+                .toList() ??
+            ArchitectWallType.standardCatalog(),
       );
+
+  /// Factory creating an architectural project configured from the starter wizard.
+  factory ArchitectProject.starterWithCatalog({
+    required String name,
+    int storeyCount = 2,
+    double groundHeight = 3.00,
+    double typicalHeight = 2.80,
+    ArchitectGridPreset? gridPreset,
+    int? customAxesX,
+    int? customAxesY,
+    double? customSpacingX,
+    double? customSpacingY,
+    List<ArchitectWallType>? wallTypes,
+    ArchitectUnit units = ArchitectUnit.meters,
+  }) {
+    final now = DateTime.now();
+    final storeys = <ArchitectStorey>[];
+    double currentElevation = 0.0;
+
+    for (int i = 0; i < storeyCount; i++) {
+      final h = i == 0 ? groundHeight : typicalHeight;
+      final name = currentElevation.abs() < 1e-4
+          ? '±0.00'
+          : '+${currentElevation.toStringAsFixed(2)}';
+      storeys.add(ArchitectStorey(
+        id: 'storey_$i',
+        name: name,
+        elevation: currentElevation,
+        height: h,
+      ));
+      currentElevation += h;
+    }
+
+    final preset = gridPreset ?? ArchitectGridPreset.standardPresets().first;
+    final axes = preset.generateAxes(
+      customAxesX: customAxesX,
+      customAxesY: customAxesY,
+      customSpacingX: customSpacingX,
+      customSpacingY: customSpacingY,
+    );
+
+    final finalWallTypes = wallTypes ??
+        ArchitectWallType.standardCatalog(
+          parapetHeight: ArchitectWallType.resolveParapetHeight(
+            storeyElevation: currentElevation,
+            storeyIndex: storeyCount,
+          ),
+        );
+
+    return ArchitectProject(
+      id: 'proj_${now.millisecondsSinceEpoch}',
+      name: name,
+      createdAt: now,
+      updatedAt: now,
+      units: units,
+      storeys: storeys,
+      activeStoreyId: storeys.isNotEmpty ? storeys.first.id : 'default',
+      gridAxes: axes,
+      wallTypes: finalWallTypes,
+    );
+  }
 
   /// Factory creating a quick starter template project.
   factory ArchitectProject.starter({
@@ -197,6 +354,7 @@ class ArchitectProject {
     int axesY = 3,
     double spacingX = 4.0,
     double spacingY = 5.0,
+    List<ArchitectWallType>? wallTypes,
   }) {
     final now = DateTime.now();
     final storeys = <ArchitectStorey>[];
@@ -257,6 +415,7 @@ class ArchitectProject {
       storeys: storeys,
       activeStoreyId: storeys.isNotEmpty ? storeys.first.id : 'default',
       gridAxes: axes,
+      wallTypes: wallTypes ?? ArchitectWallType.standardCatalog(),
     );
   }
 }

@@ -3497,6 +3497,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Click point by point to draft zone. Snap to first point to close.';
 
   @override
+  String get architectZoneTapFirstPoint =>
+      'Tap canvas to place start point (1)';
+
+  @override
+  String architectZoneNextPointPrompt(int count) {
+    return 'Point $count: Tap for next point or select 1 to close';
+  }
+
+  @override
   String get architectZoneClose => 'Close Zone';
 
   @override
@@ -3682,4 +3691,244 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectAxisMoved => 'Axis moved';
+
+  @override
+  String get architectDebugLogs => 'Diagnostic Logs';
+
+  @override
+  String get architectClearLogs => 'Clear Logs';
+
+  @override
+  String get architectCopyLogs => 'Copy';
+
+  @override
+  String get architectNoLogs => 'No logs recorded yet';
+
+  @override
+  String architectDoorPlaced(String specId, int width, int height) {
+    return 'Door $specId ($width/$height) placed';
+  }
+
+  @override
+  String get bimProjectType => 'Project Type';
+
+  @override
+  String get bimProjectStructural => 'Structural BiM';
+
+  @override
+  String get bimProjectArchitectural => 'Architectural BiM';
+
+  @override
+  String get bimProjectStructuralDesc =>
+      'Load-bearing elements, columns, beams, shear walls, slabs, seismic & load analysis';
+
+  @override
+  String get bimProjectArchitecturalDesc =>
+      'Walls, doors, windows, spaces, finishes, stairs, full architectural drafting';
+
+  @override
+  String get bimProjectFilterAll => 'All';
+
+  @override
+  String get bimProjectFilterStructural => 'Structural';
+
+  @override
+  String get bimProjectFilterArchitectural => 'Architectural';
+
+  @override
+  String get architectToolWindow => 'Window';
+
+  @override
+  String get architectToolColumn => 'Column';
+
+  @override
+  String get architectToolBeam => 'Beam';
+
+  @override
+  String get architectToolSlab => 'Slab';
+
+  @override
+  String get architectToolOpening => 'Opening';
+
+  @override
+  String get architectToolStair => 'Stairs';
+
+  @override
+  String get architectToolDimension => 'Dimension';
+
+  @override
+  String get architectToolLevel => 'Level Mark';
+
+  @override
+  String get architectToolText => 'Text';
+
+  @override
+  String get architectToolCadLine => 'Line';
+
+  @override
+  String get architectToolCadRect => 'Rectangle';
+
+  @override
+  String get architectToolCadCircle => 'Circle';
+
+  @override
+  String get architectWindowWidth => 'Window Width';
+
+  @override
+  String get architectWindowHeight => 'Window Height';
+
+  @override
+  String get architectWindowSill => 'Sill (hp)';
+
+  @override
+  String get architectColumnShape => 'Shape';
+
+  @override
+  String get architectColumnRect => 'Rectangular';
+
+  @override
+  String get architectColumnCircle => 'Circular';
+
+  @override
+  String get architectColumnSize => 'Column Size';
+
+  @override
+  String get architectBeamSize => 'Beam Size';
+
+  @override
+  String get architectStairWidth => 'Flight Width';
+
+  @override
+  String get architectStairSteps => 'Steps';
+
+  @override
+  String get architectOpeningType => 'Opening Type';
+
+  @override
+  String get architectOpeningShaft => 'Shaft';
+
+  @override
+  String get architectOpeningVoid => 'Slab Void';
+
+  @override
+  String get architectLevelElevation => 'Elevation';
+
+  @override
+  String get architectAnnotationText => 'Annotation Text';
+
+  @override
+  String get architectUnderlayToggle => 'CAD Underlay';
+
+  @override
+  String architectWindowPlaced(String specId, int width, int height) {
+    return 'Window $specId ($width/$height) placed';
+  }
+
+  @override
+  String architectColumnPlaced(String label) {
+    return 'Column $label placed';
+  }
+
+  @override
+  String get architectBeamPlaced => 'Beam placed';
+
+  @override
+  String get architectStairPlaced => 'Stairs placed';
+
+  @override
+  String get architectOpeningPlaced => 'Opening placed';
+
+  @override
+  String get architectDimensionPlaced => 'Dimension line placed';
+
+  @override
+  String get architectLevelPlaced => 'Level marker placed';
+
+  @override
+  String get architectAnnotationPlaced => 'Annotation placed';
+
+  @override
+  String get architectCadShapePlaced => 'CAD shape placed';
+
+  @override
+  String get architectCategoryStructure => 'Structure';
+
+  @override
+  String get architectCategorySpaces => 'Spaces';
+
+  @override
+  String get architectCategoryAnnotations => 'Annotations';
+
+  @override
+  String get architectCategoryCad => 'Drafting';
+
+  @override
+  String selectedElement(String id) {
+    return 'Selected: $id';
+  }
+
+  @override
+  String get architectWizardTitle => 'New Architectural Project';
+
+  @override
+  String get architectWizardSubtitle => 'Quick parametric project setup';
+
+  @override
+  String get architectWizardSectionStoreys => 'Storeys & Heights';
+
+  @override
+  String get architectWizardSectionGrid => 'Structural Grid (Axes)';
+
+  @override
+  String get architectWizardSectionWalls => 'Wall Types & Balcony Parapet';
+
+  @override
+  String get architectWizardParapetTitle => 'Balcony Parapet (12 cm curb)';
+
+  @override
+  String architectWizardParapetHeightInfo(String height, String level) {
+    return 'Code height: $height m ($level)';
+  }
+
+  @override
+  String get architectWizardParapetUnder5 => 'up to 5th storey';
+
+  @override
+  String get architectWizardParapetOver5 => 'above 5th storey / >20m';
+
+  @override
+  String get architectWizardParapetFinishCap => 'With Coping Cap';
+
+  @override
+  String get architectWizardParapetFinishPipe =>
+      'With Handrail Pipe on Posts (+15 cm)';
+
+  @override
+  String get architectWizardCreateAction => 'Create Project & Start';
+
+  @override
+  String get wallTypeExt25Eps12 => 'Exterior 25+12 EPS (37 cm)';
+
+  @override
+  String get wallTypeInt12Partition => 'Partition 12 cm';
+
+  @override
+  String get wallTypeExt25Brick => 'Brick 25 cm (no insulation)';
+
+  @override
+  String get wallTypeBearing25 => 'Concrete Shear Wall 25 cm';
+
+  @override
+  String get wallTypeParapet12 => 'Balcony Parapet 12 cm';
+
+  @override
+  String get architectDefaultProjectName => 'Architectural Project';
+
+  @override
+  String architectStoreyCountChip(int count) {
+    return '$count fl.';
+  }
+
+  @override
+  String get architectLaunchWizard => 'Start with Architectural Wizard';
 }

@@ -6029,6 +6029,18 @@ abstract class AppLocalizations {
   /// **'Click point by point to draft zone. Snap to first point to close.'**
   String get architectZoneDrawPrompt;
 
+  /// Prompt when starting zone drafting
+  ///
+  /// In en, this message translates to:
+  /// **'Tap canvas to place start point (1)'**
+  String get architectZoneTapFirstPoint;
+
+  /// Prompt during zone drafting
+  ///
+  /// In en, this message translates to:
+  /// **'Point {count}: Tap for next point or select 1 to close'**
+  String architectZoneNextPointPrompt(int count);
+
   /// Button to close and finalize zone polygon
   ///
   /// In en, this message translates to:
@@ -6364,6 +6376,456 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Axis moved'**
   String get architectAxisMoved;
+
+  /// Action and title for viewing diagnostic logs
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostic Logs'**
+  String get architectDebugLogs;
+
+  /// Button to clear diagnostic logs
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Logs'**
+  String get architectClearLogs;
+
+  /// Button to copy diagnostic logs
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get architectCopyLogs;
+
+  /// Placeholder when diagnostic log history is empty
+  ///
+  /// In en, this message translates to:
+  /// **'No logs recorded yet'**
+  String get architectNoLogs;
+
+  /// Snackbar when a door is placed
+  ///
+  /// In en, this message translates to:
+  /// **'Door {specId} ({width}/{height}) placed'**
+  String architectDoorPlaced(String specId, int width, int height);
+
+  /// Project type label
+  ///
+  /// In en, this message translates to:
+  /// **'Project Type'**
+  String get bimProjectType;
+
+  /// Structural BiM project type
+  ///
+  /// In en, this message translates to:
+  /// **'Structural BiM'**
+  String get bimProjectStructural;
+
+  /// Architectural BiM project type
+  ///
+  /// In en, this message translates to:
+  /// **'Architectural BiM'**
+  String get bimProjectArchitectural;
+
+  /// Description of structural BiM project
+  ///
+  /// In en, this message translates to:
+  /// **'Load-bearing elements, columns, beams, shear walls, slabs, seismic & load analysis'**
+  String get bimProjectStructuralDesc;
+
+  /// Description of architectural BiM project
+  ///
+  /// In en, this message translates to:
+  /// **'Walls, doors, windows, spaces, finishes, stairs, full architectural drafting'**
+  String get bimProjectArchitecturalDesc;
+
+  /// Filter tab for all projects
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get bimProjectFilterAll;
+
+  /// Filter tab for structural projects
+  ///
+  /// In en, this message translates to:
+  /// **'Structural'**
+  String get bimProjectFilterStructural;
+
+  /// Filter tab for architectural projects
+  ///
+  /// In en, this message translates to:
+  /// **'Architectural'**
+  String get bimProjectFilterArchitectural;
+
+  /// Window tool
+  ///
+  /// In en, this message translates to:
+  /// **'Window'**
+  String get architectToolWindow;
+
+  /// Column tool
+  ///
+  /// In en, this message translates to:
+  /// **'Column'**
+  String get architectToolColumn;
+
+  /// Beam tool
+  ///
+  /// In en, this message translates to:
+  /// **'Beam'**
+  String get architectToolBeam;
+
+  /// Slab tool
+  ///
+  /// In en, this message translates to:
+  /// **'Slab'**
+  String get architectToolSlab;
+
+  /// Opening tool
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get architectToolOpening;
+
+  /// Stairs tool
+  ///
+  /// In en, this message translates to:
+  /// **'Stairs'**
+  String get architectToolStair;
+
+  /// Dimension tool
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension'**
+  String get architectToolDimension;
+
+  /// Level mark tool
+  ///
+  /// In en, this message translates to:
+  /// **'Level Mark'**
+  String get architectToolLevel;
+
+  /// Text annotation tool
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get architectToolText;
+
+  /// CAD line tool
+  ///
+  /// In en, this message translates to:
+  /// **'Line'**
+  String get architectToolCadLine;
+
+  /// CAD rectangle tool
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangle'**
+  String get architectToolCadRect;
+
+  /// CAD circle tool
+  ///
+  /// In en, this message translates to:
+  /// **'Circle'**
+  String get architectToolCadCircle;
+
+  /// Window width label
+  ///
+  /// In en, this message translates to:
+  /// **'Window Width'**
+  String get architectWindowWidth;
+
+  /// Window height label
+  ///
+  /// In en, this message translates to:
+  /// **'Window Height'**
+  String get architectWindowHeight;
+
+  /// Window sill label
+  ///
+  /// In en, this message translates to:
+  /// **'Sill (hp)'**
+  String get architectWindowSill;
+
+  /// Column shape label
+  ///
+  /// In en, this message translates to:
+  /// **'Shape'**
+  String get architectColumnShape;
+
+  /// Rectangular column shape
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangular'**
+  String get architectColumnRect;
+
+  /// Circular column shape
+  ///
+  /// In en, this message translates to:
+  /// **'Circular'**
+  String get architectColumnCircle;
+
+  /// Column size label
+  ///
+  /// In en, this message translates to:
+  /// **'Column Size'**
+  String get architectColumnSize;
+
+  /// Beam size label
+  ///
+  /// In en, this message translates to:
+  /// **'Beam Size'**
+  String get architectBeamSize;
+
+  /// Stair width label
+  ///
+  /// In en, this message translates to:
+  /// **'Flight Width'**
+  String get architectStairWidth;
+
+  /// Stair steps label
+  ///
+  /// In en, this message translates to:
+  /// **'Steps'**
+  String get architectStairSteps;
+
+  /// Opening type label
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Type'**
+  String get architectOpeningType;
+
+  /// Shaft opening type
+  ///
+  /// In en, this message translates to:
+  /// **'Shaft'**
+  String get architectOpeningShaft;
+
+  /// Slab void opening type
+  ///
+  /// In en, this message translates to:
+  /// **'Slab Void'**
+  String get architectOpeningVoid;
+
+  /// Level mark elevation label
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation'**
+  String get architectLevelElevation;
+
+  /// Annotation text label
+  ///
+  /// In en, this message translates to:
+  /// **'Annotation Text'**
+  String get architectAnnotationText;
+
+  /// Toggle underlay display
+  ///
+  /// In en, this message translates to:
+  /// **'CAD Underlay'**
+  String get architectUnderlayToggle;
+
+  /// Snackbar when window placed
+  ///
+  /// In en, this message translates to:
+  /// **'Window {specId} ({width}/{height}) placed'**
+  String architectWindowPlaced(String specId, int width, int height);
+
+  /// Snackbar when column placed
+  ///
+  /// In en, this message translates to:
+  /// **'Column {label} placed'**
+  String architectColumnPlaced(String label);
+
+  /// Snackbar when beam placed
+  ///
+  /// In en, this message translates to:
+  /// **'Beam placed'**
+  String get architectBeamPlaced;
+
+  /// Snackbar when stair placed
+  ///
+  /// In en, this message translates to:
+  /// **'Stairs placed'**
+  String get architectStairPlaced;
+
+  /// Snackbar when opening placed
+  ///
+  /// In en, this message translates to:
+  /// **'Opening placed'**
+  String get architectOpeningPlaced;
+
+  /// Snackbar when dimension line placed
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension line placed'**
+  String get architectDimensionPlaced;
+
+  /// Snackbar when level marker placed
+  ///
+  /// In en, this message translates to:
+  /// **'Level marker placed'**
+  String get architectLevelPlaced;
+
+  /// Snackbar when annotation placed
+  ///
+  /// In en, this message translates to:
+  /// **'Annotation placed'**
+  String get architectAnnotationPlaced;
+
+  /// Snackbar when CAD shape placed
+  ///
+  /// In en, this message translates to:
+  /// **'CAD shape placed'**
+  String get architectCadShapePlaced;
+
+  /// Architectural elements structure category
+  ///
+  /// In en, this message translates to:
+  /// **'Structure'**
+  String get architectCategoryStructure;
+
+  /// Architectural spaces category
+  ///
+  /// In en, this message translates to:
+  /// **'Spaces'**
+  String get architectCategorySpaces;
+
+  /// Annotations and dimensions category
+  ///
+  /// In en, this message translates to:
+  /// **'Annotations'**
+  String get architectCategoryAnnotations;
+
+  /// Freehand CAD drafting category
+  ///
+  /// In en, this message translates to:
+  /// **'Drafting'**
+  String get architectCategoryCad;
+
+  /// Selected element indicator banner
+  ///
+  /// In en, this message translates to:
+  /// **'Selected: {id}'**
+  String selectedElement(String id);
+
+  /// Title of architectural starter wizard
+  ///
+  /// In en, this message translates to:
+  /// **'New Architectural Project'**
+  String get architectWizardTitle;
+
+  /// Subtitle of architectural starter wizard
+  ///
+  /// In en, this message translates to:
+  /// **'Quick parametric project setup'**
+  String get architectWizardSubtitle;
+
+  /// Storeys configuration section title
+  ///
+  /// In en, this message translates to:
+  /// **'Storeys & Heights'**
+  String get architectWizardSectionStoreys;
+
+  /// Grid axes section title
+  ///
+  /// In en, this message translates to:
+  /// **'Structural Grid (Axes)'**
+  String get architectWizardSectionGrid;
+
+  /// Wall types section title
+  ///
+  /// In en, this message translates to:
+  /// **'Wall Types & Balcony Parapet'**
+  String get architectWizardSectionWalls;
+
+  /// Parapet settings title
+  ///
+  /// In en, this message translates to:
+  /// **'Balcony Parapet (12 cm curb)'**
+  String get architectWizardParapetTitle;
+
+  /// Information about statutory parapet height
+  ///
+  /// In en, this message translates to:
+  /// **'Code height: {height} m ({level})'**
+  String architectWizardParapetHeightInfo(String height, String level);
+
+  /// Storey range descriptor
+  ///
+  /// In en, this message translates to:
+  /// **'up to 5th storey'**
+  String get architectWizardParapetUnder5;
+
+  /// Storey range descriptor
+  ///
+  /// In en, this message translates to:
+  /// **'above 5th storey / >20m'**
+  String get architectWizardParapetOver5;
+
+  /// Option for parapet coping cap
+  ///
+  /// In en, this message translates to:
+  /// **'With Coping Cap'**
+  String get architectWizardParapetFinishCap;
+
+  /// Option for parapet handrail pipe
+  ///
+  /// In en, this message translates to:
+  /// **'With Handrail Pipe on Posts (+15 cm)'**
+  String get architectWizardParapetFinishPipe;
+
+  /// Button to create project from wizard
+  ///
+  /// In en, this message translates to:
+  /// **'Create Project & Start'**
+  String get architectWizardCreateAction;
+
+  /// Exterior insulated wall name
+  ///
+  /// In en, this message translates to:
+  /// **'Exterior 25+12 EPS (37 cm)'**
+  String get wallTypeExt25Eps12;
+
+  /// Interior partition wall name
+  ///
+  /// In en, this message translates to:
+  /// **'Partition 12 cm'**
+  String get wallTypeInt12Partition;
+
+  /// Uninsulated brick wall name
+  ///
+  /// In en, this message translates to:
+  /// **'Brick 25 cm (no insulation)'**
+  String get wallTypeExt25Brick;
+
+  /// Bearing wall name
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete Shear Wall 25 cm'**
+  String get wallTypeBearing25;
+
+  /// Balcony parapet wall name
+  ///
+  /// In en, this message translates to:
+  /// **'Balcony Parapet 12 cm'**
+  String get wallTypeParapet12;
+
+  /// Default name for new architectural project
+  ///
+  /// In en, this message translates to:
+  /// **'Architectural Project'**
+  String get architectDefaultProjectName;
+
+  /// Storey count chip label
+  ///
+  /// In en, this message translates to:
+  /// **'{count} fl.'**
+  String architectStoreyCountChip(int count);
+
+  /// Action button to launch architectural setup wizard
+  ///
+  /// In en, this message translates to:
+  /// **'Start with Architectural Wizard'**
+  String get architectLaunchWizard;
 }
 
 class _AppLocalizationsDelegate

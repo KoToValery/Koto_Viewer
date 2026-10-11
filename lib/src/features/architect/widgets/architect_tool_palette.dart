@@ -1,9 +1,13 @@
+// === SECTION: ARCHITECTURAL TOOL PALETTE BAR ===
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
+import '../models/architect_column.dart';
+import '../models/architect_elements.dart';
+import '../models/architect_wall_type.dart';
 import '../models/architect_zone.dart';
 import '../rendering/architect_2d_painter.dart';
 
-/// Responsive bottom bar for active architectural drafting tools and contextual sub-options.
+/// Responsive bottom bar for architectural drafting tools and contextual sub-options.
 class ArchitectToolPalette extends StatelessWidget {
   final ArchitectTool activeTool;
   final ValueChanged<ArchitectTool> onToolChanged;
@@ -19,6 +23,9 @@ class ArchitectToolPalette extends StatelessWidget {
   final ValueChanged<WallDraftingMode> onWallModeChanged;
   final bool isChainingWall;
   final VoidCallback? onFinishChainedWall;
+  final List<ArchitectWallType>? wallTypes;
+  final ArchitectWallType? activeWallType;
+  final ValueChanged<ArchitectWallType>? onWallTypeSelected;
 
   // Door options
   final double doorWidth;
@@ -29,6 +36,38 @@ class ArchitectToolPalette extends StatelessWidget {
   final ValueChanged<double> onDoorSillChanged;
   final bool isHingeLeft;
   final ValueChanged<bool> onHingeSideChanged;
+
+  // Window options
+  final double windowWidth;
+  final ValueChanged<double>? onWindowWidthChanged;
+  final double windowHeight;
+  final ValueChanged<double>? onWindowHeightChanged;
+  final double windowSill;
+  final ValueChanged<double>? onWindowSillChanged;
+
+  // Column options
+  final ColumnShape columnShape;
+  final ValueChanged<ColumnShape>? onColumnShapeChanged;
+  final double columnWidth;
+  final ValueChanged<double>? onColumnWidthChanged;
+  final double columnDepth;
+  final ValueChanged<double>? onColumnDepthChanged;
+
+  // Beam options
+  final double beamWidth;
+  final ValueChanged<double>? onBeamWidthChanged;
+  final double beamDepth;
+  final ValueChanged<double>? onBeamDepthChanged;
+
+  // Stair options
+  final double stairWidth;
+  final ValueChanged<double>? onStairWidthChanged;
+  final int stairSteps;
+  final ValueChanged<int>? onStairStepsChanged;
+
+  // Opening options
+  final OpeningType openingType;
+  final ValueChanged<OpeningType>? onOpeningTypeChanged;
 
   const ArchitectToolPalette({
     super.key,
@@ -42,6 +81,9 @@ class ArchitectToolPalette extends StatelessWidget {
     required this.onWallModeChanged,
     this.isChainingWall = false,
     this.onFinishChainedWall,
+    this.wallTypes,
+    this.activeWallType,
+    this.onWallTypeSelected,
     required this.doorWidth,
     required this.onDoorWidthChanged,
     required this.doorHeight,
@@ -50,6 +92,28 @@ class ArchitectToolPalette extends StatelessWidget {
     required this.onDoorSillChanged,
     required this.isHingeLeft,
     required this.onHingeSideChanged,
+    this.windowWidth = 1.20,
+    this.onWindowWidthChanged,
+    this.windowHeight = 1.40,
+    this.onWindowHeightChanged,
+    this.windowSill = 0.85,
+    this.onWindowSillChanged,
+    this.columnShape = ColumnShape.rectangular,
+    this.onColumnShapeChanged,
+    this.columnWidth = 0.25,
+    this.onColumnWidthChanged,
+    this.columnDepth = 0.25,
+    this.onColumnDepthChanged,
+    this.beamWidth = 0.25,
+    this.onBeamWidthChanged,
+    this.beamDepth = 0.50,
+    this.onBeamDepthChanged,
+    this.stairWidth = 1.10,
+    this.onStairWidthChanged,
+    this.stairSteps = 16,
+    this.onStairStepsChanged,
+    this.openingType = OpeningType.shaft,
+    this.onOpeningTypeChanged,
   });
 
   @override
@@ -82,7 +146,17 @@ class ArchitectToolPalette extends StatelessWidget {
             else if (activeTool == ArchitectTool.wall)
               _buildWallSubBar(context)
             else if (activeTool == ArchitectTool.door)
-              _buildDoorSubBar(context),
+              _buildDoorSubBar(context)
+            else if (activeTool == ArchitectTool.window)
+              _buildWindowSubBar(context)
+            else if (activeTool == ArchitectTool.column)
+              _buildColumnSubBar(context)
+            else if (activeTool == ArchitectTool.beam)
+              _buildBeamSubBar(context)
+            else if (activeTool == ArchitectTool.stair)
+              _buildStairSubBar(context)
+            else if (activeTool == ArchitectTool.opening)
+              _buildOpeningSubBar(context),
 
             const SizedBox(height: 6),
 
@@ -98,16 +172,6 @@ class ArchitectToolPalette extends StatelessWidget {
                     label: l10n.architectToolSelect,
                   ),
                   _buildToolButton(
-                    tool: ArchitectTool.axis,
-                    icon: Icons.grid_on_rounded,
-                    label: l10n.architectToolAxis,
-                  ),
-                  _buildToolButton(
-                    tool: ArchitectTool.zone,
-                    icon: Icons.space_dashboard_rounded,
-                    label: l10n.architectToolZone,
-                  ),
-                  _buildToolButton(
                     tool: ArchitectTool.wall,
                     icon: Icons.line_weight_rounded,
                     label: l10n.architectToolWall,
@@ -118,8 +182,78 @@ class ArchitectToolPalette extends StatelessWidget {
                     label: l10n.architectToolDoor,
                   ),
                   _buildToolButton(
-                    tool: ArchitectTool.measure,
+                    tool: ArchitectTool.window,
+                    icon: Icons.window_rounded,
+                    label: l10n.architectToolWindow,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.column,
+                    icon: Icons.view_column_rounded,
+                    label: l10n.architectToolColumn,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.beam,
+                    icon: Icons.horizontal_rule_rounded,
+                    label: l10n.architectToolBeam,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.slab,
+                    icon: Icons.layers_rounded,
+                    label: l10n.architectToolSlab,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.opening,
+                    icon: Icons.crop_free_rounded,
+                    label: l10n.architectToolOpening,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.stair,
+                    icon: Icons.stairs_rounded,
+                    label: l10n.architectToolStair,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.zone,
+                    icon: Icons.space_dashboard_rounded,
+                    label: l10n.architectToolZone,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.dimension,
                     icon: Icons.straighten_rounded,
+                    label: l10n.architectToolDimension,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.level,
+                    icon: Icons.change_history_rounded,
+                    label: l10n.architectToolLevel,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.text,
+                    icon: Icons.title_rounded,
+                    label: l10n.architectToolText,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.cadLine,
+                    icon: Icons.timeline_rounded,
+                    label: l10n.architectToolCadLine,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.cadRect,
+                    icon: Icons.crop_square_rounded,
+                    label: l10n.architectToolCadRect,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.cadCircle,
+                    icon: Icons.radio_button_unchecked_rounded,
+                    label: l10n.architectToolCadCircle,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.axis,
+                    icon: Icons.grid_on_rounded,
+                    label: l10n.architectToolAxis,
+                  ),
+                  _buildToolButton(
+                    tool: ArchitectTool.measure,
+                    icon: Icons.square_foot_rounded,
                     label: l10n.architectToolMeasure,
                   ),
                 ],
@@ -149,7 +283,7 @@ class ArchitectToolPalette extends StatelessWidget {
           onTap: () => onToolChanged(tool),
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
@@ -167,14 +301,14 @@ class ArchitectToolPalette extends StatelessWidget {
                   size: 18,
                   color: isSelected ? const Color(0xFF00E5FF) : Colors.white70,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 7),
                 Text(
                   label,
                   style: TextStyle(
                     color: isSelected ? Colors.white : Colors.white70,
                     fontWeight:
                         isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 13,
+                    fontSize: 12.5,
                   ),
                 ),
               ],
@@ -193,32 +327,55 @@ class ArchitectToolPalette extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          // Wall Thickness Chips
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: Text(
               l10n.architectWallThickness,
-              style: const TextStyle(color: Colors.white54, fontSize: 11),
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ),
-          for (final t in [0.12, 0.25, 0.38])
-            Padding(
-              padding: const EdgeInsets.only(right: 5),
-              child: ChoiceChip(
-                label: Text('${(t * 100).round()} cm'),
-                selected: (wallThickness - t).abs() < 1e-3,
-                onSelected: (sel) {
-                  if (sel) onWallThicknessChanged(t);
-                },
-                visualDensity: VisualDensity.compact,
+          if (wallTypes != null && wallTypes!.isNotEmpty)
+            for (final wt in wallTypes!)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: ChoiceChip(
+                  avatar: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: wt.color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  label: Text(wt.name),
+                  selected: activeWallType?.id == wt.id ||
+                      (activeWallType == null &&
+                          (wallThickness - wt.totalThickness).abs() < 1e-3),
+                  onSelected: (sel) {
+                    if (sel) {
+                      onWallTypeSelected?.call(wt);
+                      onWallThicknessChanged(wt.totalThickness);
+                    }
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
+              )
+          else
+            for (final t in [0.12, 0.15, 0.20, 0.25, 0.38])
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: ChoiceChip(
+                  label: Text('${(t * 100).round()} cm'),
+                  selected: (wallThickness - t).abs() < 1e-3,
+                  onSelected: (sel) {
+                    if (sel) onWallThicknessChanged(t);
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
-            ),
           const SizedBox(width: 8),
-          Container(width: 1, height: 18, color: Colors.white24),
-          const SizedBox(width: 8),
-
-          // Single vs Chained Mode
           ChoiceChip(
+            avatar: const Icon(Icons.show_chart_rounded, size: 14),
             label: Text(l10n.architectWallSingle),
             selected: wallMode == WallDraftingMode.singleLine,
             onSelected: (sel) {
@@ -226,8 +383,9 @@ class ArchitectToolPalette extends StatelessWidget {
             },
             visualDensity: VisualDensity.compact,
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 4),
           ChoiceChip(
+            avatar: const Icon(Icons.linear_scale_rounded, size: 14),
             label: Text(l10n.architectWallChained),
             selected: wallMode == WallDraftingMode.chained,
             onSelected: (sel) {
@@ -235,18 +393,17 @@ class ArchitectToolPalette extends StatelessWidget {
             },
             visualDensity: VisualDensity.compact,
           ),
-
           if (isChainingWall && onFinishChainedWall != null) ...[
             const SizedBox(width: 8),
-            FilledButton.icon(
-              icon: const Icon(Icons.check_circle_rounded, size: 16),
-              label: Text(l10n.architectFinishChained),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF00E5FF),
-                foregroundColor: Colors.black,
-                visualDensity: VisualDensity.compact,
+            ActionChip(
+              backgroundColor: const Color(0xFF00E5FF),
+              avatar: const Icon(Icons.check_rounded, size: 14, color: Colors.black),
+              label: Text(
+                l10n.architectFinishChained,
+                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
               ),
               onPressed: onFinishChainedWall,
+              visualDensity: VisualDensity.compact,
             ),
           ],
         ],
@@ -262,40 +419,16 @@ class ArchitectToolPalette extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          // Prompt Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0x3300E5FF),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFF00E5FF)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.touch_app_rounded,
-                  size: 14,
-                  color: Color(0xFF00E5FF),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  l10n.architectDoorSelectWallPrompt,
-                  style: const TextStyle(
-                    color: Color(0xFF00E5FF),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              l10n.architectDoorWidth,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ),
-          const SizedBox(width: 8),
-
-          // Width Presets
-          for (final w in [0.80, 0.90, 1.00])
+          for (final w in [0.70, 0.80, 0.90, 1.00, 1.20])
             Padding(
-              padding: const EdgeInsets.only(right: 5),
+              padding: const EdgeInsets.only(right: 4),
               child: ChoiceChip(
                 label: Text('${(w * 100).round()} cm'),
                 selected: (doorWidth - w).abs() < 1e-3,
@@ -306,8 +439,6 @@ class ArchitectToolPalette extends StatelessWidget {
               ),
             ),
           const SizedBox(width: 6),
-
-          // Sill Presets (0 vs 15cm)
           ChoiceChip(
             label: const Text('hp = 0'),
             selected: doorSill == 0.0,
@@ -326,8 +457,6 @@ class ArchitectToolPalette extends StatelessWidget {
             visualDensity: VisualDensity.compact,
           ),
           const SizedBox(width: 8),
-
-          // Hinge Side
           ChoiceChip(
             label: Text(isHingeLeft
                 ? l10n.architectDoorHingeLeft
@@ -342,6 +471,228 @@ class ArchitectToolPalette extends StatelessWidget {
     );
   }
 
+  Widget _buildWindowSubBar(BuildContext context) {
+    final l10n = context.l10n;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              l10n.architectWindowWidth,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          for (final w in [0.60, 0.90, 1.20, 1.40, 1.80, 2.00])
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ChoiceChip(
+                label: Text('${(w * 100).round()} cm'),
+                selected: (windowWidth - w).abs() < 1e-3,
+                onSelected: (sel) {
+                  if (sel) onWindowWidthChanged?.call(w);
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              l10n.architectWindowSill,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          for (final s in [0.00, 0.85, 0.90])
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ChoiceChip(
+                label: Text(s == 0.0 ? '0' : '${(s * 100).round()} cm'),
+                selected: (windowSill - s).abs() < 1e-3,
+                onSelected: (sel) {
+                  if (sel) onWindowSillChanged?.call(s);
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColumnSubBar(BuildContext context) {
+    final l10n = context.l10n;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          ChoiceChip(
+            avatar: const Icon(Icons.crop_square_rounded, size: 14),
+            label: Text(l10n.architectColumnRect),
+            selected: columnShape == ColumnShape.rectangular,
+            onSelected: (sel) {
+              if (sel) onColumnShapeChanged?.call(ColumnShape.rectangular);
+            },
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 4),
+          ChoiceChip(
+            avatar: const Icon(Icons.circle_outlined, size: 14),
+            label: Text(l10n.architectColumnCircle),
+            selected: columnShape == ColumnShape.circular,
+            onSelected: (sel) {
+              if (sel) onColumnShapeChanged?.call(ColumnShape.circular);
+            },
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              l10n.architectColumnSize,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          for (final sz in [0.25, 0.30, 0.40])
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ChoiceChip(
+                label: Text('${(sz * 100).round()} cm'),
+                selected: (columnWidth - sz).abs() < 1e-3,
+                onSelected: (sel) {
+                  if (sel) {
+                    onColumnWidthChanged?.call(sz);
+                    onColumnDepthChanged?.call(sz);
+                  }
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBeamSubBar(BuildContext context) {
+    final l10n = context.l10n;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              l10n.architectBeamSize,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          for (final sz in [(0.25, 0.40), (0.25, 0.50), (0.25, 0.60)])
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ChoiceChip(
+                label: Text('${(sz.$1 * 100).round()}x${(sz.$2 * 100).round()} cm'),
+                selected: (beamWidth - sz.$1).abs() < 1e-3 && (beamDepth - sz.$2).abs() < 1e-3,
+                onSelected: (sel) {
+                  if (sel) {
+                    onBeamWidthChanged?.call(sz.$1);
+                    onBeamDepthChanged?.call(sz.$2);
+                  }
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStairSubBar(BuildContext context) {
+    final l10n = context.l10n;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              l10n.architectStairWidth,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          for (final w in [1.00, 1.10, 1.20])
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ChoiceChip(
+                label: Text('${(w * 100).round()} cm'),
+                selected: (stairWidth - w).abs() < 1e-3,
+                onSelected: (sel) {
+                  if (sel) onStairWidthChanged?.call(w);
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              l10n.architectStairSteps,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          for (final n in [14, 16, 18])
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ChoiceChip(
+                label: Text('$n'),
+                selected: stairSteps == n,
+                onSelected: (sel) {
+                  if (sel) onStairStepsChanged?.call(n);
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOpeningSubBar(BuildContext context) {
+    final l10n = context.l10n;
+
+    return Row(
+      children: [
+        ChoiceChip(
+          avatar: const Icon(Icons.crop_square_rounded, size: 14),
+          label: Text(l10n.architectOpeningShaft),
+          selected: openingType == OpeningType.shaft,
+          onSelected: (sel) {
+            if (sel) onOpeningTypeChanged?.call(OpeningType.shaft);
+          },
+          visualDensity: VisualDensity.compact,
+        ),
+        const SizedBox(width: 6),
+        ChoiceChip(
+          avatar: const Icon(Icons.fullscreen_exit_rounded, size: 14),
+          label: Text(l10n.architectOpeningVoid),
+          selected: openingType == OpeningType.floorVoid,
+          onSelected: (sel) {
+            if (sel) onOpeningTypeChanged?.call(OpeningType.floorVoid);
+          },
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
+    );
+  }
+
   Widget _buildZoneSubBar(BuildContext context) {
     final l10n = context.l10n;
 
@@ -350,7 +701,6 @@ class ArchitectToolPalette extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          // Point-by-point prompt badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
@@ -379,8 +729,6 @@ class ArchitectToolPalette extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-
-          // Zone category selection chips
           for (final cat in ArchitectZoneCategory.values)
             Padding(
               padding: const EdgeInsets.only(right: 5),

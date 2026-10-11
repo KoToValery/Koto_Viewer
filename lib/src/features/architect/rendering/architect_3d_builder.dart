@@ -26,6 +26,37 @@ class Architect3dBuilder {
         allTris.addAll(wall.build3D(storeyElevation: storey.elevation));
       }
 
+      // Add 3D columns
+      for (final col in storey.columns) {
+        allTris.addAll(col.build3D(
+          storeyElevation: storey.elevation,
+          storeyHeight: storey.height,
+        ));
+      }
+
+      // Add 3D beams
+      for (final beam in storey.beams) {
+        final corners = beam.polygonCorners;
+        final zTop = storey.elevation + storey.height;
+        final zBot = zTop - beam.depth;
+        const beamColor = Color(0xFF90A4AE);
+        final b1 = Vector3(corners[0].dx, corners[0].dy, zBot);
+        final b2 = Vector3(corners[1].dx, corners[1].dy, zBot);
+        final b3 = Vector3(corners[2].dx, corners[2].dy, zBot);
+        final b4 = Vector3(corners[3].dx, corners[3].dy, zBot);
+        final t1 = Vector3(corners[0].dx, corners[0].dy, zTop);
+        final t2 = Vector3(corners[1].dx, corners[1].dy, zTop);
+        final t3 = Vector3(corners[2].dx, corners[2].dy, zTop);
+        final t4 = Vector3(corners[3].dx, corners[3].dy, zTop);
+        // Bottom & Sides
+        allTris.add(Triangle3D(v0: b1, v1: b2, v2: b3, color: beamColor));
+        allTris.add(Triangle3D(v0: b1, v1: b3, v2: b4, color: beamColor));
+        allTris.add(Triangle3D(v0: b1, v1: t1, v2: t2, color: beamColor));
+        allTris.add(Triangle3D(v0: b1, v1: t2, v2: b2, color: beamColor));
+        allTris.add(Triangle3D(v0: b3, v1: t3, v2: t4, color: beamColor));
+        allTris.add(Triangle3D(v0: b3, v1: t4, v2: b4, color: beamColor));
+      }
+
       // Add 3D floor tiles for functional zones
       for (final zone in storey.zones) {
         if (zone.polygon.length >= 3) {

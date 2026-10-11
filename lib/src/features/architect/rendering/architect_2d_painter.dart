@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../dxf_viewer/models/dxf_models.dart';
 import '../../structural_designer/models/structural_element.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
+import 'architect_elements_painter_helper.dart';
 import 'architect_grid_axis_painter_helper.dart';
 import 'architect_zone_painter_helper.dart';
 
@@ -11,6 +13,18 @@ enum ArchitectTool {
   zone,
   wall,
   door,
+  window,
+  column,
+  beam,
+  slab,
+  opening,
+  stair,
+  dimension,
+  level,
+  text,
+  cadLine,
+  cadRect,
+  cadCircle,
   measure,
 }
 
@@ -72,6 +86,14 @@ class Architect2dPainter extends CustomPainter {
   final bool isMoveWholeZoneMode;
   final double zoneMoveDistanceMeters;
 
+  // CAD Underlay state
+  final DxfDocument? underlayDoc;
+  final Map<String, bool> underlayLayerVisibility;
+
+  // Slab drafting state
+  final List<Offset> slabDraftPoints;
+  final Offset? slabCandidatePoint;
+
   const Architect2dPainter({
     required this.project,
     required this.activeTool,
@@ -115,15 +137,94 @@ class Architect2dPainter extends CustomPainter {
     this.zoneEditingPolygon,
     this.isMoveWholeZoneMode = false,
     this.zoneMoveDistanceMeters = 0.0,
+    this.underlayDoc,
+    this.underlayLayerVisibility = const {},
+    this.slabDraftPoints = const [],
+    this.slabCandidatePoint,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (underlayDoc != null) {
+      ArchitectElementsPainterHelper.drawUnderlay(
+        canvas: canvas,
+        underlayDoc: underlayDoc,
+        zoomScale: zoomScale,
+        layerVisibility: underlayLayerVisibility,
+      );
+    }
     _drawDraftingGrid(canvas, size);
     _drawGridAxes(canvas);
+    ArchitectElementsPainterHelper.drawSlabs(
+      canvas: canvas,
+      storey: project.activeStorey,
+      zoomScale: zoomScale,
+      selectedElementId: selectedElementId,
+    );
     _drawZones(canvas);
+    ArchitectElementsPainterHelper.drawBeams(
+      canvas: canvas,
+      storey: project.activeStorey,
+      zoomScale: zoomScale,
+      selectedElementId: selectedElementId,
+    );
     _drawWalls(canvas);
+    ArchitectElementsPainterHelper.drawColumns(
+      canvas: canvas,
+      storey: project.activeStorey,
+      zoomScale: zoomScale,
+      selectedElementId: selectedElementId,
+    );
+    ArchitectElementsPainterHelper.drawOpenings(
+      canvas: canvas,
+      storey: project.activeStorey,
+      zoomScale: zoomScale,
+      selectedElementId: selectedElementId,
+    );
+    ArchitectElementsPainterHelper.drawStairs(
+      canvas: canvas,
+      storey: project.activeStorey,
+      zoomScale: zoomScale,
+      selectedElementId: selectedElementId,
+    );
+    ArchitectElementsPainterHelper.drawCadPrimitives(
+      canvas: canvas,
+      storey: project.activeStorey,
+      zoomScale: zoomScale,
+      selectedElementId: selectedElementId,
+    );
     _drawActiveDrafting(canvas);
+    ArchitectElementsPainterHelper.drawActiveElementsDrafting(
+      canvas: canvas,
+      activeTool: activeTool,
+      draftStart: activeDraftStart,
+      draftEnd: activeDraftEnd,
+      zoomScale: zoomScale,
+    );
+    ArchitectElementsPainterHelper.drawDimensions(
+      canvas: canvas,
+      storey: project.activeStorey,
+      zoomScale: zoomScale,
+      selectedElementId: selectedElementId,
+    );
+    ArchitectElementsPainterHelper.drawElevationMarkers(
+      canvas: canvas,
+      storey: project.activeStorey,
+      zoomScale: zoomScale,
+      selectedElementId: selectedElementId,
+    );
+    ArchitectElementsPainterHelper.drawAnnotations(
+      canvas: canvas,
+      storey: project.activeStorey,
+      zoomScale: zoomScale,
+      selectedElementId: selectedElementId,
+    );
+    ArchitectElementsPainterHelper.drawSlabDrafting(
+      canvas: canvas,
+      points: slabDraftPoints,
+      candidatePoint: slabCandidatePoint,
+      zoomScale: zoomScale,
+    );
     _drawZoneDrafting(canvas);
     _drawZoneExtrudePreview(canvas);
     ArchitectZonePainterHelper.drawMagneticGuides(
@@ -276,6 +377,18 @@ class Architect2dPainter extends CustomPainter {
           wallThickness: wall.thickness,
           zoomScale: zoomScale,
           isSelected: door.id == selectedElementId,
+        );
+      }
+
+      // Draw all hosted Windows
+      for (final window in wall.windows) {
+        window.paint2D(
+          canvas: canvas,
+          wallStart: wall.startPoint,
+          wallEnd: wall.endPoint,
+          wallThickness: wall.thickness,
+          zoomScale: zoomScale,
+          isSelected: window.id == selectedElementId,
         );
       }
     }

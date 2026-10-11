@@ -137,12 +137,22 @@ class BimStoreyUnderlay {
   }
 }
 
+/// Defines the specialty domain of a multi-storey BiM Work Project.
+enum BimProjectType {
+  /// Structural BiM Project (focus on load-bearing elements, columns, beams, walls, slabs, seismic & vertical capacity).
+  structural,
+
+  /// Architectural BiM Project (focus on spaces, partitions, doors, windows, stairs, finishes, annotations & multi-tool drafting).
+  architectural,
+}
+
 /// Represents a standalone BiM work project with multiple storeys,
 /// floor underlays, and structural drawings.
 class BimWorkProject {
   final String id;
   final String name;
   final String location;
+  final BimProjectType projectType;
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<BimStoreyUnderlay> storeys;
@@ -156,6 +166,7 @@ class BimWorkProject {
     required this.id,
     required this.name,
     this.location = '',
+    this.projectType = BimProjectType.structural,
     required this.createdAt,
     required this.updatedAt,
     this.storeys = const [],
@@ -177,6 +188,10 @@ class BimWorkProject {
   bool get isAligned => alignmentConfirmed;
 
   bool get hasAnyUnderlay => storeys.any((s) => s.hasUnderlay);
+  bool get hasUnderlays => hasAnyUnderlay;
+
+  bool get isArchitectural => projectType == BimProjectType.architectural;
+  bool get isStructural => projectType == BimProjectType.structural;
 
   int get underlaysCount => storeys.where((s) => s.hasUnderlay).length;
 
@@ -225,6 +240,7 @@ class BimWorkProject {
     String? id,
     String? name,
     String? location,
+    BimProjectType? projectType,
     DateTime? createdAt,
     DateTime? updatedAt,
     List<BimStoreyUnderlay>? storeys,
@@ -238,6 +254,7 @@ class BimWorkProject {
       id: id ?? this.id,
       name: name ?? this.name,
       location: location ?? this.location,
+      projectType: projectType ?? this.projectType,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       storeys: storeys ?? List<BimStoreyUnderlay>.from(this.storeys),
@@ -254,6 +271,7 @@ class BimWorkProject {
     'id': id,
     'name': name,
     'location': location,
+    'projectType': projectType.name,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'storeys': storeys.map((s) => s.toJson()).toList(),
@@ -278,6 +296,9 @@ class BimWorkProject {
           'proj_${DateTime.now().millisecondsSinceEpoch}',
       name: json['name'] as String? ?? 'BiM Project',
       location: json['location'] as String? ?? '',
+      projectType: json['projectType'] == 'architectural'
+          ? BimProjectType.architectural
+          : BimProjectType.structural,
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),

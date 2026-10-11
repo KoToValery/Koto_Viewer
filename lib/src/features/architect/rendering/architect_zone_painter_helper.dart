@@ -189,8 +189,8 @@ class ArchitectZonePainterHelper {
     int? draggingVertexIndex,
     int? mergeCandidateIndex,
   }) {
-    final vertexRadius = 6.0 / zoomScale;
-    final midpointRadius = 4.5 / zoomScale;
+    final vertexRadius = 12.0 / zoomScale;
+    final midpointRadius = 7.5 / zoomScale;
 
     // Edge midpoint grips
     final midFill = Paint()
@@ -198,7 +198,7 @@ class ArchitectZonePainterHelper {
       ..style = PaintingStyle.fill;
     final midBorder = Paint()
       ..color = Colors.black
-      ..strokeWidth = 1.2 / zoomScale
+      ..strokeWidth = 1.5 / zoomScale
       ..style = PaintingStyle.stroke;
 
     for (int i = 0; i < polygon.length; i++) {
@@ -224,13 +224,13 @@ class ArchitectZonePainterHelper {
       }
     }
 
-    // Vertex pins
+    // Vertex pins (GPS_Mapping style prominent nodes)
     final vFill = Paint()
       ..color = const Color(0xFF00E5FF)
       ..style = PaintingStyle.fill;
     final vBorder = Paint()
       ..color = Colors.white
-      ..strokeWidth = 1.5 / zoomScale
+      ..strokeWidth = 2.0 / zoomScale
       ..style = PaintingStyle.stroke;
 
     final mergeFill = Paint()
@@ -241,6 +241,13 @@ class ArchitectZonePainterHelper {
       final v = polygon[i];
       final isMergeCandidate = (i == mergeCandidateIndex);
       final isDragging = (i == draggingVertexIndex);
+
+      // Drop shadow
+      canvas.drawCircle(
+        v,
+        (isMergeCandidate || isDragging ? vertexRadius * 1.4 : vertexRadius) + 1.5 / zoomScale,
+        Paint()..color = Colors.black45,
+      );
 
       if (isMergeCandidate) {
         canvas.drawCircle(v, vertexRadius * 1.5, mergeFill);
@@ -263,8 +270,8 @@ class ArchitectZonePainterHelper {
         text: TextSpan(
           text: '${i + 1}',
           style: TextStyle(
-            color: Colors.black,
-            fontSize: 7.0 / zoomScale,
+            color: Colors.black87,
+            fontSize: 10.5 / zoomScale,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -534,85 +541,183 @@ class ArchitectZonePainterHelper {
     }
 
     // 5. Committed vertex nodes (Numbered 1..N GPS_Mapping style)
-    final nodeRadius = 7.0 / zoomScale;
-    final nodeFill = Paint()
-      ..color = const Color(0xFF161820)
-      ..style = PaintingStyle.fill;
-    final nodeBorder = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..strokeWidth = 1.6 / zoomScale
-      ..style = PaintingStyle.stroke;
+    final nodeRadius = 13.0 / zoomScale;
+    final nodeShadow = Paint()..color = Colors.black54;
 
     for (int i = 0; i < points.length; i++) {
       final pt = points[i];
-      canvas.drawCircle(pt, nodeRadius, nodeFill);
-      canvas.drawCircle(pt, nodeRadius, nodeBorder);
+      final isStartNode = (i == 0);
 
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '${i + 1}',
-          style: TextStyle(
-            color: const Color(0xFF00E5FF),
-            fontSize: 7.5 / zoomScale,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, pt - Offset(tp.width / 2, tp.height / 2));
-    }
+      if (isStartNode) {
+        // --- POINT 1: SPECIAL START BEACON & CLOSING TARGET ---
+        final beaconRadius = (isClosingSnap ? 24.0 : 20.0) / zoomScale;
+        final beaconColor = isClosingSnap ? const Color(0xFF00E676) : const Color(0xFF00E5FF);
 
-    // 6. First point closing target
-    if (points.length >= 3) {
-      final firstPt = points.first;
-      final targetRadius = (isClosingSnap ? 12.0 : 8.0) / zoomScale;
-      final targetPaint = Paint()
-        ..color = isClosingSnap ? const Color(0xFF00E676) : const Color(0xFF00E5FF)
-        ..strokeWidth = 2.0 / zoomScale
-        ..style = PaintingStyle.stroke;
+        // Pulsing radar glow aura
+        canvas.drawCircle(
+          pt,
+          beaconRadius,
+          Paint()
+            ..color = beaconColor.withValues(alpha: isClosingSnap ? 0.35 : 0.20)
+            ..style = PaintingStyle.fill,
+        );
 
-      canvas.drawCircle(firstPt, targetRadius, targetPaint);
+        // Outer beacon ring
+        canvas.drawCircle(
+          pt,
+          beaconRadius,
+          Paint()
+            ..color = beaconColor
+            ..strokeWidth = (isClosingSnap ? 2.5 : 1.8) / zoomScale
+            ..style = PaintingStyle.stroke,
+        );
 
-      if (isClosingSnap) {
-        // Glowing target disk
-        final glowPaint = Paint()
-          ..color = const Color(0xFF00E676).withValues(alpha: 0.25)
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(firstPt, targetRadius, glowPaint);
+        // Inner radar guide ring
+        canvas.drawCircle(
+          pt,
+          beaconRadius * 0.72,
+          Paint()
+            ..color = beaconColor.withValues(alpha: 0.5)
+            ..strokeWidth = 1.0 / zoomScale
+            ..style = PaintingStyle.stroke,
+        );
 
-        // Tooltip badge: "Затвори зона (1-ва точка)"
-        final badgeText = closeLabel ?? 'Затвори зона';
-        final tp = TextPainter(
+        // Drop shadow for core node
+        canvas.drawCircle(pt, nodeRadius + 1.5 / zoomScale, nodeShadow);
+
+        // Start core circle (solid high-contrast neon)
+        canvas.drawCircle(
+          pt,
+          nodeRadius,
+          Paint()
+            ..color = beaconColor
+            ..style = PaintingStyle.fill,
+        );
+        canvas.drawCircle(
+          pt,
+          nodeRadius,
+          Paint()
+            ..color = Colors.white
+            ..strokeWidth = 2.4 / zoomScale
+            ..style = PaintingStyle.stroke,
+        );
+
+        // Bold black numeral '1'
+        final tp1 = TextPainter(
           text: TextSpan(
-            text: badgeText,
+            text: '1',
             style: TextStyle(
-              color: const Color(0xFF00E676),
-              fontSize: 10.0 / zoomScale,
+              color: Colors.black87,
+              fontSize: 12.0 / zoomScale,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp1.paint(canvas, pt - Offset(tp1.width / 2, tp1.height / 2));
+
+        // When points.length == 1: show immediate helper badge under Point 1
+        if (points.length == 1) {
+          final tpLabel = TextPainter(
+            text: TextSpan(
+              text: '1',
+              style: TextStyle(
+                color: const Color(0xFF00E5FF),
+                fontSize: 9.5 / zoomScale,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+
+          final labelPos = pt + Offset(-tpLabel.width / 2, beaconRadius + 4.0 / zoomScale);
+          final labelRect = Rect.fromLTWH(
+            labelPos.dx - 6.0 / zoomScale,
+            labelPos.dy - 3.0 / zoomScale,
+            tpLabel.width + 12.0 / zoomScale,
+            tpLabel.height + 6.0 / zoomScale,
+          );
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(labelRect, Radius.circular(5.0 / zoomScale)),
+            Paint()..color = const Color(0xEE1A1C24),
+          );
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(labelRect, Radius.circular(5.0 / zoomScale)),
+            Paint()
+              ..color = const Color(0xFF00E5FF)
+              ..strokeWidth = 1.0 / zoomScale
+              ..style = PaintingStyle.stroke,
+          );
+          tpLabel.paint(canvas, labelPos);
+        }
+
+        // When closing snap is active (3+ points hovering start):
+        if (isClosingSnap && points.length >= 3) {
+          final badgeText = closeLabel ?? 'Затвори зона (1)';
+          final tpClose = TextPainter(
+            text: TextSpan(
+              text: badgeText,
+              style: TextStyle(
+                color: const Color(0xFF00E676),
+                fontSize: 10.5 / zoomScale,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+
+          final badgePos = pt - Offset(tpClose.width / 2, (beaconRadius + tpClose.height + 6.0 / zoomScale));
+          final badgeRect = Rect.fromLTWH(
+            badgePos.dx - 7.0 / zoomScale,
+            badgePos.dy - 4.0 / zoomScale,
+            tpClose.width + 14.0 / zoomScale,
+            tpClose.height + 8.0 / zoomScale,
+          );
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(badgeRect, Radius.circular(6.0 / zoomScale)),
+            Paint()..color = const Color(0xF2161822),
+          );
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(badgeRect, Radius.circular(6.0 / zoomScale)),
+            Paint()
+              ..color = const Color(0xFF00E676)
+              ..strokeWidth = 1.5 / zoomScale
+              ..style = PaintingStyle.stroke,
+          );
+          tpClose.paint(canvas, badgePos);
+        }
+      } else {
+        // --- SUBSEQUENT POINTS 2..N: HIGH CONTRAST BADGES ---
+        canvas.drawCircle(pt, nodeRadius + 1.5 / zoomScale, nodeShadow);
+
+        canvas.drawCircle(
+          pt,
+          nodeRadius,
+          Paint()
+            ..color = category.color
+            ..style = PaintingStyle.fill,
+        );
+        canvas.drawCircle(
+          pt,
+          nodeRadius,
+          Paint()
+            ..color = Colors.white
+            ..strokeWidth = 2.0 / zoomScale
+            ..style = PaintingStyle.stroke,
+        );
+
+        final tpN = TextPainter(
+          text: TextSpan(
+            text: '${i + 1}',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11.0 / zoomScale,
               fontWeight: FontWeight.bold,
             ),
           ),
           textDirection: TextDirection.ltr,
         )..layout();
-
-        final badgePos = firstPt - Offset(tp.width / 2, (targetRadius + tp.height + 6.0 / zoomScale));
-        final badgeRect = Rect.fromLTWH(
-          badgePos.dx - 6.0 / zoomScale,
-          badgePos.dy - 3.0 / zoomScale,
-          tp.width + 12.0 / zoomScale,
-          tp.height + 6.0 / zoomScale,
-        );
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(badgeRect, Radius.circular(5.0 / zoomScale)),
-          Paint()..color = const Color(0xEE1A1C24),
-        );
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(badgeRect, Radius.circular(5.0 / zoomScale)),
-          Paint()
-            ..color = const Color(0xFF00E676)
-            ..strokeWidth = 1.0 / zoomScale
-            ..style = PaintingStyle.stroke,
-        );
-        tp.paint(canvas, badgePos);
+        tpN.paint(canvas, pt - Offset(tpN.width / 2, tpN.height / 2));
       }
     }
   }

@@ -9,6 +9,7 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import 'bim_analysis_snapshot.dart';
 import '../../structural_designer/models/structural_element.dart';
 import '../../structural_designer/services/structural_persistence_service.dart';
+import '../../architect/models/architect_project.dart';
 import '../models/bim_work_project.dart';
 import 'bim_project_library_service.dart';
 import 'bim_underlay_loader.dart';
@@ -350,6 +351,84 @@ class BimExportService {
     }, 'packageInventory');
     final zipBytes = ZipEncoder().encode(archive)!;
     final zipFile = File('${tempDir.path}/${cleanProjName}_BimPackage.zip');
+    final pending = File(
+      '${zipFile.path}.tmp_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    try {
+      await pending.writeAsBytes(zipBytes, flush: true);
+      return await pending.rename(zipFile.path);
+    } finally {
+      if (await pending.exists()) await pending.delete();
+    }
+  }
+
+  /// Exports an architectural BiM project package as a ZIP containing manifest,
+  /// architectural model (JSON), and all referenced underlay CAD assets.
+  static Future<File> exportArchitecturalProjectZip({
+    required BimWorkProject project,
+    required ArchitectProject architect,
+    Directory? outputDirectory,
+    BimProjectLibraryService? libraryService,
+  }) async {
+    final lib = libraryService ?? BimProjectLibraryService.instance;
+    final tempDir = outputDirectory ?? await getTemporaryDirectory();
+    await tempDir.create(recursive: true);
+    final cleanProjName = project.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final archive = Archive();
+    final files = <String, Map<String, Object>>{};
+
+    void add(String path, List<int> bytes, String role) {
+      final name = _packagePath(path);
+      if (files.keys.any((p) => p.toLowerCase() == name.toLowerCase())) {
+        throw StateError('Duplicate ZIP path: $name');
+      }
+      archive.addFile(ArchiveFile(name, bytes.length, bytes));
+      files[name] = {
+        'path': name,
+        'role': role,
+        'bytes': bytes.length,
+        'sha256': sha256.convert(bytes).toString(),
+      };
+    }
+
+    void json(String path, Object value, String role) => add(
+      path,
+      utf8.encode(const JsonEncoder.withIndent('  ').convert(value)),
+      role,
+    );
+
+    // 1. Add project manifest
+    json('project.json', project.toJson(), 'projectManifest');
+
+    // 2. Add architectural model
+    json('architectural.json', architect.toJson(), 'architecturalModel');
+
+    // 3. Add any underlay files
+    for (final s in project.storeys) {
+      if (s.hasUnderlay) {
+        final path = s.underlayFileName!;
+        final file = await lib.getUnderlayFile(project.id, path);
+        if (file != null && await file.exists()) {
+          try {
+            add(_packagePath(path), await file.readAsBytes(), 'underlaySource');
+          } catch (_) {}
+        }
+      }
+    }
+
+    // 4. Add package inventory
+    json('package.json', {
+      'format': 'koto.bim.package',
+      'version': '1.0',
+      'projectType': 'architectural',
+      'projectId': project.id,
+      'name': project.name,
+      'createdAt': DateTime.now().toIso8601String(),
+      'files': files.values.toList(),
+    }, 'packageInventory');
+
+    final zipBytes = ZipEncoder().encode(archive)!;
+    final zipFile = File('${tempDir.path}/${cleanProjName}_ArchBimPackage.zip');
     final pending = File(
       '${zipFile.path}.tmp_${DateTime.now().microsecondsSinceEpoch}',
     );

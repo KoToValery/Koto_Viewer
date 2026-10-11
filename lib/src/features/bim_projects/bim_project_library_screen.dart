@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../core/l10n/l10n_extensions.dart';
+import '../architect/screens/architect_workspace_screen.dart';
+import '../architect/widgets/architect_project_wizard_dialog.dart';
 import 'models/bim_work_project.dart';
 import 'screens/bim_alignment_screen.dart';
 import 'screens/bim_workspace_screen.dart';
 import 'services/bim_export_service.dart';
 import 'services/bim_project_library_service.dart';
+import 'services/bim_underlay_loader.dart';
 import 'widgets/bim_new_project_wizard.dart';
 
 /// Screen listing all user's standalone BiM Work Projects with options to
@@ -24,6 +27,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
 
   bool _isLoading = true;
   List<BimWorkProject> _projects = [];
+  String _filterType = 'all'; // 'all', 'structural', 'architectural'
 
   @override
   void initState() {
@@ -42,21 +46,64 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
     }
   }
 
+  List<BimWorkProject> get _filteredProjects {
+    if (_filterType == 'structural') {
+      return _projects.where((p) => p.projectType == BimProjectType.structural).toList();
+    } else if (_filterType == 'architectural') {
+      return _projects.where((p) => p.projectType == BimProjectType.architectural).toList();
+    }
+    return _projects;
+  }
+
   void _openNewProjectWizard() {
+    if (_filterType == 'architectural') {
+      _openArchitectProjectWizard();
+      return;
+    }
     BimNewProjectWizard.show(
       context,
       onProjectCreatedWithProject: (newProject) {
         _loadProjects();
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => BimAlignmentScreen(project: newProject),
-          ),
-        ).then((_) => _loadProjects());
+        if (newProject.projectType == BimProjectType.architectural && newProject.isAligned) {
+          _openProject(newProject);
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => BimAlignmentScreen(project: newProject),
+            ),
+          ).then((_) => _loadProjects());
+        }
       },
     );
   }
 
-  void _openProject(BimWorkProject project) {
+  Future<void> _openArchitectProjectWizard() async {
+    final archProject = await ArchitectProjectWizardDialog.show(context);
+    if (archProject == null || !mounted) return;
+
+    final storeys = archProject.storeys.map((s) {
+      return BimStoreyUnderlay(
+        storeyId: s.id,
+        name: s.name,
+        elevation: s.elevation,
+        height: s.height,
+      );
+    }).toList();
+
+    final bimProject = await _library.createProject(
+      name: archProject.name,
+      storeys: storeys,
+      projectType: BimProjectType.architectural,
+      initialArchitectProject: archProject,
+    );
+
+    _loadProjects();
+    if (mounted) {
+      _openProject(bimProject);
+    }
+  }
+
+  Future<void> _openProject(BimWorkProject project) async {
     if (!project.isAligned) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -73,11 +120,31 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => BimWorkspaceScreen(project: project),
-      ),
-    ).then((_) => _loadProjects());
+    if (project.projectType == BimProjectType.architectural) {
+      final archProject = await _library.loadArchitectProject(project.id);
+      LoadedBimUnderlays? underlays;
+      if (project.hasUnderlays) {
+        try {
+          underlays = await BimUnderlayLoader.loadAndAlign(project: project);
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ArchitectWorkspaceScreen(
+            initialProject: archProject,
+            bimProject: project,
+            underlaysByStorey: underlays?.underlaysByStorey,
+          ),
+        ),
+      ).then((_) => _loadProjects());
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BimWorkspaceScreen(project: project),
+        ),
+      ).then((_) => _loadProjects());
+    }
   }
 
   void _openAlignment(BimWorkProject project) {
@@ -90,20 +157,37 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
 
   Future<void> _exportProjectZip(BimWorkProject project) async {
     try {
-      final structural = await _library.loadStructuralProject(project.id);
-      if (structural == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.l10n.exportFailed('Model not found'))),
-          );
+      dynamic zipFile;
+      if (project.projectType == BimProjectType.architectural) {
+        final arch = await _library.loadArchitectProject(project.id);
+        if (arch == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.l10n.exportFailed('Architectural model not found'))),
+            );
+          }
+          return;
         }
-        return;
-      }
+        zipFile = await BimExportService.exportArchitecturalProjectZip(
+          project: project,
+          architect: arch,
+        );
+      } else {
+        final structural = await _library.loadStructuralProject(project.id);
+        if (structural == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.l10n.exportFailed('Model not found'))),
+            );
+          }
+          return;
+        }
 
-      final zipFile = await BimExportService.exportProjectZip(
-        project: project,
-        structural: structural,
-      );
+        zipFile = await BimExportService.exportProjectZip(
+          project: project,
+          structural: structural,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -219,26 +303,48 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)))
           : _projects.isEmpty
               ? _buildEmptyState(context)
-              : RefreshIndicator(
-                  color: const Color(0xFF00E5FF),
-                  backgroundColor: const Color(0xFF1E1E24),
-                  onRefresh: _loadProjects,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    itemCount: _projects.length,
-                    separatorBuilder: (_, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final project = _projects[index];
-                      return _buildProjectCard(context, project);
-                    },
-                  ),
+              : Column(
+                  children: [
+                    _buildFilterBar(context),
+                    Expanded(
+                      child: RefreshIndicator(
+                        color: const Color(0xFF00E5FF),
+                        backgroundColor: const Color(0xFF1E1E24),
+                        onRefresh: _loadProjects,
+                        child: _filteredProjects.isEmpty
+                            ? Center(
+                                child: Text(
+                                  l10n.bimProjectNoProjects,
+                                  style: const TextStyle(color: Colors.white54),
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                itemCount: _filteredProjects.length,
+                                separatorBuilder: (_, index) => const SizedBox(height: 12),
+                                itemBuilder: (context, index) {
+                                  final project = _filteredProjects[index];
+                                  return _buildProjectCard(context, project);
+                                },
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF00E5FF),
+        backgroundColor: _filterType == 'architectural'
+            ? const Color(0xFFCE93D8)
+            : const Color(0xFF00E5FF),
         foregroundColor: Colors.black,
-        icon: const Icon(Icons.add_rounded),
+        icon: Icon(
+          _filterType == 'architectural'
+              ? Icons.auto_awesome_rounded
+              : Icons.add_rounded,
+        ),
         label: Text(
-          l10n.bimProjectNew,
+          _filterType == 'architectural'
+              ? l10n.architectWizardTitle
+              : l10n.bimProjectNew,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         onPressed: _openNewProjectWizard,
@@ -302,9 +408,77 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
     );
   }
 
+  Widget _buildFilterBar(BuildContext context) {
+    final l10n = context.l10n;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildFilterChip('all', l10n.bimProjectFilterAll, Icons.apps_rounded),
+            const SizedBox(width: 8),
+            _buildFilterChip('structural', l10n.bimProjectFilterStructural, Icons.apartment_rounded),
+            const SizedBox(width: 8),
+            _buildFilterChip('architectural', l10n.bimProjectFilterArchitectural, Icons.architecture_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String key, String label, IconData icon) {
+    final isSelected = _filterType == key;
+    final color = key == 'architectural'
+        ? const Color(0xFFFFB300)
+        : const Color(0xFF00E5FF);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => setState(() => _filterType = key),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.2) : const Color(0xFF1E1E24),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.white12,
+            width: isSelected ? 1.4 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? color : Colors.white60,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildProjectCard(BuildContext context, BimWorkProject project) {
     final l10n = context.l10n;
     final isReady = project.isAligned;
+    final isArch = project.projectType == BimProjectType.architectural;
+    final typeColor = isArch ? const Color(0xFFFFB300) : const Color(0xFF00E5FF);
+    final typeIcon = isArch ? Icons.architecture_rounded : Icons.apartment_rounded;
+    final typeLabel = isArch ? l10n.bimProjectArchitectural : l10n.bimProjectStructural;
+
     final formattedDate =
         '${project.updatedAt.day.toString().padLeft(2, '0')}.${project.updatedAt.month.toString().padLeft(2, '0')}.${project.updatedAt.year}';
 
@@ -314,7 +488,7 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isReady
-              ? const Color(0xFF00E5FF).withValues(alpha: 0.3)
+              ? typeColor.withValues(alpha: 0.3)
               : Colors.white10,
           width: 1.2,
         ),
@@ -343,12 +517,12 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                        color: typeColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
-                        Icons.apartment_rounded,
-                        color: Color(0xFF00E5FF),
+                      child: Icon(
+                        typeIcon,
+                        color: typeColor,
                         size: 24,
                       ),
                     ),
@@ -450,9 +624,35 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
 
                 const SizedBox(height: 14),
 
-                // Badges row: Storeys count, Status Badge
-                Row(
+                // Badges row: Project Type, Storeys count, Status Badge
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
+                    // Project Type badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: typeColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(typeIcon, size: 14, color: typeColor),
+                          const SizedBox(width: 6),
+                          Text(
+                            typeLabel,
+                            style: TextStyle(
+                              color: typeColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                     // Storeys badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -472,7 +672,6 @@ class _BimProjectLibraryScreenState extends State<BimProjectLibraryScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
 
                     // Status badge
                     Container(

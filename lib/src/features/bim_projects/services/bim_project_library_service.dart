@@ -11,6 +11,8 @@ import 'bim_underlay_conversion_service.dart';
 import 'bim_underlay_loader.dart';
 import 'bim_structural_seed_sync.dart';
 import '../../structural_designer/models/structural_element.dart';
+import '../../architect/models/architect_project.dart';
+import '../../architect/models/architect_wall_type.dart';
 import '../models/bim_work_project.dart';
 
 class _BimWriteQueue {
@@ -91,10 +93,13 @@ class BimProjectLibraryService {
   }
 
   /// Creates a new BiM project on disk with an initial manifest and empty structural model.
+  /// Creates a new BiM project on disk with an initial manifest and empty model.
   Future<BimWorkProject> createProject({
     required String name,
     String location = '',
     required List<BimStoreyUnderlay> storeys,
+    BimProjectType projectType = BimProjectType.structural,
+    ArchitectProject? initialArchitectProject,
   }) async {
     storeys = [...storeys]..sort((a, b) => a.elevation.compareTo(b.elevation));
     final now = DateTime.now();
@@ -104,14 +109,16 @@ class BimProjectLibraryService {
         .padLeft(6, '0');
     final id = 'bim_${now.millisecondsSinceEpoch}_$randSuffix';
 
+    final hasUnderlays = storeys.any((s) => s.hasUnderlay);
     final project = BimWorkProject(
       id: id,
       name: name.trim().isNotEmpty ? name.trim() : 'BiM Project',
       location: location.trim(),
+      projectType: projectType,
       createdAt: now,
       updatedAt: now,
       storeys: storeys,
-      alignmentConfirmed: false,
+      alignmentConfirmed: !hasUnderlays,
     );
 
     await getProjectDirectory(id);
@@ -119,34 +126,80 @@ class BimProjectLibraryService {
       throw FileSystemException('Cannot create project');
     }
 
-    // Initialize corresponding structural project
-    final initialStructuralStoreys = storeys.map((s) {
-      return StoreyLevel(
-        id: s.storeyId,
-        name: s.elevationLabel,
-        elevation: s.elevation,
-        height: s.height,
+    if (projectType == BimProjectType.architectural) {
+      final initialArchitect = initialArchitectProject != null
+          ? initialArchitectProject.copyWith(
+              id: id,
+              name: project.name,
+              createdAt: now,
+              updatedAt: now,
+            )
+          : () {
+              final initialArchitectStoreys = storeys.map((s) {
+                return ArchitectStorey(
+                  id: s.storeyId,
+                  name: s.name.isNotEmpty ? s.name : s.elevationLabel,
+                  elevation: s.elevation,
+                  height: s.height,
+                );
+              }).toList();
+
+              return ArchitectProject(
+                id: id,
+                name: project.name,
+                createdAt: now,
+                updatedAt: now,
+                wallTypes: ArchitectWallType.standardCatalog(),
+                storeys: initialArchitectStoreys.isNotEmpty
+                    ? initialArchitectStoreys
+                    : const [
+                        ArchitectStorey(
+                          id: 'storey_1',
+                          name: '±0.00',
+                          elevation: 0.0,
+                          height: 2.80,
+                        ),
+                      ],
+                activeStoreyId: initialArchitectStoreys.isNotEmpty
+                    ? initialArchitectStoreys.first.id
+                    : 'storey_1',
+              );
+            }();
+
+      if (!await saveArchitectProject(id, initialArchitect)) {
+        throw FileSystemException('Cannot initialize architectural model');
+      }
+    } else {
+      // Initialize corresponding structural project
+      final initialStructuralStoreys = storeys.map((s) {
+        return StoreyLevel(
+          id: s.storeyId,
+          name: s.elevationLabel,
+          elevation: s.elevation,
+          height: s.height,
+        );
+      }).toList();
+
+      final initialStructural = StructuralProject(
+        title: project.name,
+        storeys: initialStructuralStoreys.isNotEmpty
+            ? initialStructuralStoreys
+            : const [
+                StoreyLevel(
+                  id: 'storey_1',
+                  name: '±0.00',
+                  elevation: 0.0,
+                  height: 2.80,
+                ),
+              ],
+        activeStoreyIndex: 0,
       );
-    }).toList();
 
-    final initialStructural = StructuralProject(
-      title: project.name,
-      storeys: initialStructuralStoreys.isNotEmpty
-          ? initialStructuralStoreys
-          : const [
-              StoreyLevel(
-                id: 'storey_1',
-                name: '±0.00',
-                elevation: 0.0,
-                height: 2.80,
-              ),
-            ],
-      activeStoreyIndex: 0,
-    );
-
-    if (!await saveStructuralProject(id, initialStructural)) {
-      throw FileSystemException('Cannot initialize structural model');
+      if (!await saveStructuralProject(id, initialStructural)) {
+        throw FileSystemException('Cannot initialize structural model');
+      }
     }
+
     return project;
   }
 
@@ -282,6 +335,120 @@ class BimProjectLibraryService {
       return true;
     } catch (e) {
       debugPrint('Error saving structural project for $projectId: $e');
+      return false;
+    }
+  }
+
+  /// Loads the architectural project model for [projectId].
+  Future<ArchitectProject?> loadArchitectProject(String projectId) async {
+    try {
+      final projDir = await getProjectDirectory(projectId);
+      final archFile = File('${projDir.path}/architectural.json');
+      final manifest = await loadProject(projectId);
+
+      if (!await archFile.exists()) {
+        if (manifest == null) return null;
+        final storeys = manifest.storeys.map((s) {
+          return ArchitectStorey(
+            id: s.storeyId,
+            name: s.name.isNotEmpty ? s.name : s.elevationLabel,
+            elevation: s.elevation,
+            height: s.height,
+          );
+        }).toList();
+
+        final created = ArchitectProject(
+          id: projectId,
+          name: manifest.name,
+          createdAt: manifest.createdAt,
+          updatedAt: manifest.updatedAt,
+          storeys: storeys.isNotEmpty
+              ? storeys
+              : const [
+                  ArchitectStorey(
+                    id: 'storey_1',
+                    name: '±0.00',
+                    elevation: 0.0,
+                    height: 2.80,
+                  ),
+                ],
+          activeStoreyId: storeys.isNotEmpty ? storeys.first.id : 'storey_1',
+        );
+        await saveArchitectProject(projectId, created);
+        return created;
+      }
+
+      final content = await archFile.readAsString();
+      final jsonMap = jsonDecode(content) as Map<String, dynamic>;
+      final arch = ArchitectProject.fromJson(jsonMap);
+      if (manifest == null || manifest.storeys.isEmpty) return arch;
+
+      // Sync storeys with manifest elevations
+      final existingStoreys = {for (final s in arch.storeys) s.id: s};
+      final syncedStoreys = manifest.storeys.map((s) {
+        final existing = existingStoreys[s.storeyId];
+        if (existing != null) {
+          return existing.copyWith(
+            name: s.elevationLabel,
+            elevation: s.elevation,
+            height: s.height,
+          );
+        }
+        return ArchitectStorey(
+          id: s.storeyId,
+          name: s.elevationLabel,
+          elevation: s.elevation,
+          height: s.height,
+        );
+      }).toList();
+
+      final activeExists = syncedStoreys.any((s) => s.id == arch.activeStoreyId);
+      final activeId = activeExists
+          ? arch.activeStoreyId
+          : (syncedStoreys.isNotEmpty ? syncedStoreys.first.id : 'default');
+
+      return arch.copyWith(
+        storeys: syncedStoreys,
+        activeStoreyId: activeId,
+      );
+    } catch (e) {
+      debugPrint('Error loading architectural project for $projectId: $e');
+      return null;
+    }
+  }
+
+  /// Atomically saves the architectural model for [projectId].
+  Future<bool> saveArchitectProject(
+    String projectId,
+    ArchitectProject project,
+  ) => _writes.run(() => _saveArchitectProjectNow(projectId, project));
+
+  Future<bool> _saveArchitectProjectNow(
+    String projectId,
+    ArchitectProject project,
+  ) async {
+    try {
+      final projDir = await getProjectDirectory(projectId);
+      final archFile = File('${projDir.path}/architectural.json');
+      final tmpFile = File(
+        '${projDir.path}/architectural.json.tmp_${DateTime.now().microsecondsSinceEpoch}',
+      );
+
+      final content = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(project.toJson());
+      await tmpFile.writeAsString(content, flush: true);
+      await tmpFile.rename(archFile.path);
+
+      final manifest = await loadProject(projectId);
+      if (manifest != null) {
+        await _saveProjectManifestNow(
+          manifest.copyWith(updatedAt: DateTime.now()),
+        );
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error saving architectural project for $projectId: $e');
       return false;
     }
   }
