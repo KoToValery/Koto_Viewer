@@ -2081,6 +2081,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolMeasure => 'Measure';
 
   @override
+  String get bimMeasureGestureHint =>
+      'Drag to pan · Tap for a point · Hold for precision · Pinch to zoom';
+
+  @override
   String get distanceCentimeters => 'Distance (cm)';
 
   @override
@@ -3926,9 +3930,77 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String architectStoreyCountChip(int count) {
-    return '$count fl.';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Storeys',
+      one: '1 Storey',
+    );
+    return '$_temp0';
   }
 
   @override
   String get architectLaunchWizard => 'Start with Architectural Wizard';
+
+  @override
+  String get architectUnitMm => 'Millimeters (mm)';
+
+  @override
+  String get architectUnitFeet => 'Feet (ft)';
+
+  @override
+  String get architectUnitInches => 'Inches (in)';
+
+  @override
+  String get architectUnitSystem => 'Dimensions System';
+
+  @override
+  String get architectUnitSystemMetric => 'Metric (m, cm, mm)';
+
+  @override
+  String get architectUnitSystemImperial => 'Imperial (ft, in)';
+
+  @override
+  String get architectWizardStep1 => '1. Units';
+
+  @override
+  String get architectWizardStep2 => '2. Storeys & Grid';
+
+  @override
+  String get architectWizardStep3 => '3. Walls & Sizing';
+
+  @override
+  String get architectWizardStep1Subtitle =>
+      'Project name and dimensions system';
+
+  @override
+  String get architectWizardStep2Subtitle =>
+      'Storey heights and structural grid axes';
+
+  @override
+  String get architectWizardStep3Subtitle =>
+      'Wall thicknesses and balcony parapet finish';
+
+  @override
+  String get architectWizardNext => 'Next';
+
+  @override
+  String get architectWizardBack => 'Back';
+
+  @override
+  String get architectWallCore => 'Core thickness';
+
+  @override
+  String get architectWallInsulation => 'EPS Insulation';
+
+  @override
+  String architectWallTotalThickness(String thickness) {
+    return 'Total: $thickness';
+  }
+
+  @override
+  String get architectParapetCurb => 'Curb thickness';
+
+  @override
+  String get architectParapetHeightLabel => 'Parapet height';
 }

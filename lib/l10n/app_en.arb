@@ -1771,6 +1771,7 @@
     "placeholders": { "pressure": { "type": "String" } }
   },
   "toolMeasure": "Measure",
+  "bimMeasureGestureHint": "Drag to pan · Tap for a point · Hold for precision · Pinch to zoom",
   "@toolMeasure": { "description": "Distance measurement tool label" },
   "distanceCentimeters": "Distance (cm)",
   "@distanceCentimeters": { "description": "Distance in centimeters label" },
@@ -2955,7 +2956,7 @@
   "@wallTypeParapet12": { "description": "Balcony parapet wall name" },
   "architectDefaultProjectName": "Architectural Project",
   "@architectDefaultProjectName": { "description": "Default name for new architectural project" },
-  "architectStoreyCountChip": "{count} fl.",
+  "architectStoreyCountChip": "{count, plural, =1{1 Storey} other{{count} Storeys}}",
   "@architectStoreyCountChip": {
     "description": "Storey count chip label",
     "placeholders": {
@@ -2963,5 +2964,48 @@
     }
   },
   "architectLaunchWizard": "Start with Architectural Wizard",
-  "@architectLaunchWizard": { "description": "Action button to launch architectural setup wizard" }
+  "@architectLaunchWizard": { "description": "Action button to launch architectural setup wizard" },
+  "architectUnitMm": "Millimeters (mm)",
+  "@architectUnitMm": { "description": "Millimeters unit" },
+  "architectUnitFeet": "Feet (ft)",
+  "@architectUnitFeet": { "description": "Feet unit" },
+  "architectUnitInches": "Inches (in)",
+  "@architectUnitInches": { "description": "Inches unit" },
+  "architectUnitSystem": "Dimensions System",
+  "@architectUnitSystem": { "description": "Unit system selector label" },
+  "architectUnitSystemMetric": "Metric (m, cm, mm)",
+  "@architectUnitSystemMetric": { "description": "Metric unit system" },
+  "architectUnitSystemImperial": "Imperial (ft, in)",
+  "@architectUnitSystemImperial": { "description": "Imperial unit system" },
+  "architectWizardStep1": "1. Units",
+  "@architectWizardStep1": { "description": "Step 1 title in wizard" },
+  "architectWizardStep2": "2. Storeys & Grid",
+  "@architectWizardStep2": { "description": "Step 2 title in wizard" },
+  "architectWizardStep3": "3. Walls & Sizing",
+  "@architectWizardStep3": { "description": "Step 3 title in wizard" },
+  "architectWizardStep1Subtitle": "Project name and dimensions system",
+  "@architectWizardStep1Subtitle": { "description": "Step 1 subtitle" },
+  "architectWizardStep2Subtitle": "Storey heights and structural grid axes",
+  "@architectWizardStep2Subtitle": { "description": "Step 2 subtitle" },
+  "architectWizardStep3Subtitle": "Wall thicknesses and balcony parapet finish",
+  "@architectWizardStep3Subtitle": { "description": "Step 3 subtitle" },
+  "architectWizardNext": "Next",
+  "@architectWizardNext": { "description": "Next step button" },
+  "architectWizardBack": "Back",
+  "@architectWizardBack": { "description": "Back button" },
+  "architectWallCore": "Core thickness",
+  "@architectWallCore": { "description": "Wall core brick/concrete thickness" },
+  "architectWallInsulation": "EPS Insulation",
+  "@architectWallInsulation": { "description": "Wall EPS insulation thickness" },
+  "architectWallTotalThickness": "Total: {thickness}",
+  "@architectWallTotalThickness": {
+    "description": "Total wall thickness display",
+    "placeholders": {
+      "thickness": { "type": "String" }
+    }
+  },
+  "architectParapetCurb": "Curb thickness",
+  "@architectParapetCurb": { "description": "Balcony parapet curb thickness" },
+  "architectParapetHeightLabel": "Parapet height",
+  "@architectParapetHeightLabel": { "description": "Parapet height label" }
 }

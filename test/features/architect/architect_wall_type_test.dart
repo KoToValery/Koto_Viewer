@@ -216,5 +216,87 @@ void main() {
       expect(restored.gridAxes.length, project.gridAxes.length);
       expect(restored.wallTypes.first.id, project.wallTypes.first.id);
     });
+
+    test('preserves custom units and parametric wall thicknesses', () {
+      final customWalls = [
+        const ArchitectWallType(
+          id: 'ext_25_12_eps',
+          name: 'Custom Insulated Wall (43 cm)',
+          usage: WallUsage.exterior,
+          totalThickness: 0.43,
+          brickThickness: 0.28,
+          insulationThickness: 0.15,
+        ),
+        const ArchitectWallType(
+          id: 'parapet_12',
+          name: 'Custom Parapet 15 cm',
+          usage: WallUsage.parapet,
+          totalThickness: 0.15,
+          customHeight: 1.20,
+          parapetFinish: ParapetFinish.handrailPipes,
+        ),
+      ];
+
+      final project = ArchitectProject.starterWithCatalog(
+        name: 'Parametric Units Villa',
+        storeyCount: 2,
+        units: ArchitectUnit.feet,
+        wallTypes: customWalls,
+      );
+
+      expect(project.units, ArchitectUnit.feet);
+      expect(project.wallTypes.length, 2);
+      expect(project.wallTypes.first.totalThickness, closeTo(0.43, 1e-4));
+      expect(project.wallTypes.first.brickThickness, closeTo(0.28, 1e-4));
+      expect(project.wallTypes.first.insulationThickness, closeTo(0.15, 1e-4));
+      expect(project.wallTypes.last.customHeight, 1.20);
+      expect(project.wallTypes.last.parapetFinish, ParapetFinish.handrailPipes);
+
+      final json = project.toJson();
+      final restored = ArchitectProject.fromJson(json);
+      expect(restored.units, ArchitectUnit.feet);
+      expect(restored.wallTypes.length, 2);
+      expect(restored.wallTypes.first.totalThickness, closeTo(0.43, 1e-4));
+    });
+  });
+
+  group('ArchitectUnit tests', () {
+    test('metric units classification and formatting', () {
+      expect(ArchitectUnit.meters.isMetric, isTrue);
+      expect(ArchitectUnit.meters.isImperial, isFalse);
+      expect(ArchitectUnit.meters.format(3.00), '3.00 m');
+      expect(ArchitectUnit.meters.toUnit(3.0), 3.0);
+      expect(ArchitectUnit.meters.fromUnit(3.0), 3.0);
+
+      expect(ArchitectUnit.centimeters.isMetric, isTrue);
+      expect(ArchitectUnit.centimeters.isImperial, isFalse);
+      expect(ArchitectUnit.centimeters.format(0.25), '25 cm');
+      expect(ArchitectUnit.centimeters.toUnit(0.25), 25.0);
+      expect(ArchitectUnit.centimeters.fromUnit(25.0), closeTo(0.25, 1e-4));
+
+      expect(ArchitectUnit.millimeters.isMetric, isTrue);
+      expect(ArchitectUnit.millimeters.isImperial, isFalse);
+      expect(ArchitectUnit.millimeters.format(0.25), '250 mm');
+      expect(ArchitectUnit.millimeters.toUnit(0.25), 250.0);
+      expect(ArchitectUnit.millimeters.fromUnit(250.0), closeTo(0.25, 1e-4));
+    });
+
+    test('imperial units classification and formatting', () {
+      expect(ArchitectUnit.feet.isImperial, isTrue);
+      expect(ArchitectUnit.feet.isMetric, isFalse);
+      expect(ArchitectUnit.feet.scaleToMeters, 0.3048);
+      expect(ArchitectUnit.feet.symbol, 'ft');
+      expect(ArchitectUnit.feet.toUnit(0.3048), closeTo(1.0, 1e-4));
+      expect(ArchitectUnit.feet.fromUnit(1.0), closeTo(0.3048, 1e-4));
+      expect(ArchitectUnit.feet.format(3.00), '9.84 ft');
+
+      expect(ArchitectUnit.inches.isImperial, isTrue);
+      expect(ArchitectUnit.inches.isMetric, isFalse);
+      expect(ArchitectUnit.inches.scaleToMeters, 0.0254);
+      expect(ArchitectUnit.inches.symbol, 'in');
+      expect(ArchitectUnit.inches.toUnit(0.254), closeTo(10.0, 1e-4));
+      expect(ArchitectUnit.inches.fromUnit(10.0), closeTo(0.254, 1e-4));
+      expect(ArchitectUnit.inches.format(0.25), '10 in');
+    });
   });
 }

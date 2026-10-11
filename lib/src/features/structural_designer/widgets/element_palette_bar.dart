@@ -704,6 +704,9 @@ class ElementPaletteBar extends StatelessWidget {
               onPressed: onClearMeasurement,
               visualDensity: VisualDensity.compact,
             ),
+          const SizedBox(width: 12),
+          Text(context.l10n.bimMeasureGestureHint,
+              style: const TextStyle(color: Colors.white70, fontSize: 11)),
         ],
       ),
     );

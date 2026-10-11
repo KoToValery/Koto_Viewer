@@ -11,11 +11,31 @@ import 'architect_zone.dart';
 enum ArchitectUnit {
   meters(1.0, 'm'),
   centimeters(0.01, 'cm'),
-  millimeters(0.001, 'mm');
+  millimeters(0.001, 'mm'),
+  feet(0.3048, 'ft'),
+  inches(0.0254, 'in');
 
   final double scaleToMeters;
   final String symbol;
   const ArchitectUnit(this.scaleToMeters, this.symbol);
+
+  bool get isImperial =>
+      this == ArchitectUnit.feet || this == ArchitectUnit.inches;
+  bool get isMetric => !isImperial;
+
+  double toUnit(double meters) => meters / scaleToMeters;
+  double fromUnit(double valueInUnit) => valueInUnit * scaleToMeters;
+
+  String format(double meters, {int decimals = 2}) {
+    final val = toUnit(meters);
+    if (this == ArchitectUnit.millimeters || this == ArchitectUnit.inches) {
+      return '${val.toStringAsFixed(0)} $symbol';
+    } else if (this == ArchitectUnit.centimeters) {
+      return '${val.toStringAsFixed(0)} $symbol';
+    } else {
+      return '${val.toStringAsFixed(decimals)} $symbol';
+    }
+  }
 }
 
 /// Represents an architectural storey level with its height, elevation, walls, zones,

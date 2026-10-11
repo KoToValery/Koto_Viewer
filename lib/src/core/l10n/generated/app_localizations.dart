@@ -3648,6 +3648,12 @@ abstract class AppLocalizations {
   /// **'Measure'**
   String get toolMeasure;
 
+  /// No description provided for @bimMeasureGestureHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to pan · Tap for a point · Hold for precision · Pinch to zoom'**
+  String get bimMeasureGestureHint;
+
   /// Distance in centimeters label
   ///
   /// In en, this message translates to:
@@ -6818,7 +6824,7 @@ abstract class AppLocalizations {
   /// Storey count chip label
   ///
   /// In en, this message translates to:
-  /// **'{count} fl.'**
+  /// **'{count, plural, =1{1 Storey} other{{count} Storeys}}'**
   String architectStoreyCountChip(int count);
 
   /// Action button to launch architectural setup wizard
@@ -6826,6 +6832,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Start with Architectural Wizard'**
   String get architectLaunchWizard;
+
+  /// Millimeters unit
+  ///
+  /// In en, this message translates to:
+  /// **'Millimeters (mm)'**
+  String get architectUnitMm;
+
+  /// Feet unit
+  ///
+  /// In en, this message translates to:
+  /// **'Feet (ft)'**
+  String get architectUnitFeet;
+
+  /// Inches unit
+  ///
+  /// In en, this message translates to:
+  /// **'Inches (in)'**
+  String get architectUnitInches;
+
+  /// Unit system selector label
+  ///
+  /// In en, this message translates to:
+  /// **'Dimensions System'**
+  String get architectUnitSystem;
+
+  /// Metric unit system
+  ///
+  /// In en, this message translates to:
+  /// **'Metric (m, cm, mm)'**
+  String get architectUnitSystemMetric;
+
+  /// Imperial unit system
+  ///
+  /// In en, this message translates to:
+  /// **'Imperial (ft, in)'**
+  String get architectUnitSystemImperial;
+
+  /// Step 1 title in wizard
+  ///
+  /// In en, this message translates to:
+  /// **'1. Units'**
+  String get architectWizardStep1;
+
+  /// Step 2 title in wizard
+  ///
+  /// In en, this message translates to:
+  /// **'2. Storeys & Grid'**
+  String get architectWizardStep2;
+
+  /// Step 3 title in wizard
+  ///
+  /// In en, this message translates to:
+  /// **'3. Walls & Sizing'**
+  String get architectWizardStep3;
+
+  /// Step 1 subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Project name and dimensions system'**
+  String get architectWizardStep1Subtitle;
+
+  /// Step 2 subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Storey heights and structural grid axes'**
+  String get architectWizardStep2Subtitle;
+
+  /// Step 3 subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Wall thicknesses and balcony parapet finish'**
+  String get architectWizardStep3Subtitle;
+
+  /// Next step button
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get architectWizardNext;
+
+  /// Back button
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get architectWizardBack;
+
+  /// Wall core brick/concrete thickness
+  ///
+  /// In en, this message translates to:
+  /// **'Core thickness'**
+  String get architectWallCore;
+
+  /// Wall EPS insulation thickness
+  ///
+  /// In en, this message translates to:
+  /// **'EPS Insulation'**
+  String get architectWallInsulation;
+
+  /// Total wall thickness display
+  ///
+  /// In en, this message translates to:
+  /// **'Total: {thickness}'**
+  String architectWallTotalThickness(String thickness);
+
+  /// Balcony parapet curb thickness
+  ///
+  /// In en, this message translates to:
+  /// **'Curb thickness'**
+  String get architectParapetCurb;
+
+  /// Parapet height label
+  ///
+  /// In en, this message translates to:
+  /// **'Parapet height'**
+  String get architectParapetHeightLabel;
 }
 
 class _AppLocalizationsDelegate

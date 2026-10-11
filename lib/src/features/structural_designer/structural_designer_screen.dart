@@ -128,6 +128,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   // In-progress drawing & measuring states
   Offset? _measurementStartCad;
+  Timer? _measurementHoldTimer;
+  Offset? _measurementTouchDown;
+  Offset? _measurementTouchPosition;
+  bool _measurementHeldGesture = false;
   (Offset, Offset, String)? _activeMeasurement;
   Offset? _wallStartCad;
   Offset? _beamStartCad;
@@ -369,6 +373,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   @override
   void dispose() {
+    _measurementHoldTimer?.cancel();
     _scaleSettleTimer?.cancel();
     DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged);
     _transformController.removeListener(_onTransformChanged);
@@ -3870,6 +3875,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _activePointersCount++;
     _activePointerKind = event.kind;
     if (_activePointersCount > 1) {
+      _measurementHoldTimer?.cancel();
       _isMultiTouchGesture = true;
       if (_isPlacingWithHold) {
         setState(() {
@@ -3878,6 +3884,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           _targetScreenPos = null;
           _snappedScreenPos = null;
           _activeSnap = null;
+          _snappedScreenPositions = [];
+          _activeMagneticGuides = [];
+          _liveDimensionText = null;
         });
       }
       if (_isExtrudingEdge || _activeGrip != null) {
@@ -3938,9 +3947,26 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _elementGrabOffsetCad = null;
 
     if (_activeTool == StructuralDrawTool.measure) {
-      _isPlacingWithHold = true;
-      _updatePointer(event.localPosition,
-          isMouse: event.kind == PointerDeviceKind.mouse);
+      // Touch stays available to the pan recognizer until a hold wins.
+      if (event.kind == PointerDeviceKind.mouse) {
+        _isPlacingWithHold = true;
+        _updatePointer(event.localPosition, isMouse: true);
+      } else {
+        _measurementHeldGesture = false;
+        _measurementTouchDown = event.localPosition;
+        _measurementTouchPosition = event.localPosition;
+        _measurementHoldTimer?.cancel();
+        _measurementHoldTimer = Timer(const Duration(milliseconds: 280), () {
+          if (!mounted || _activeTool != StructuralDrawTool.measure ||
+              _activePointersCount != 1 || _isMultiTouchGesture) {
+            return;
+          }
+          _measurementHeldGesture = true;
+          setState(() => _isPlacingWithHold = true);
+          _updateMeasurementPointer(_measurementTouchPosition!, isMouse: false);
+          HapticFeedback.selectionClick();
+        });
+      }
       return;
     }
 
@@ -4307,8 +4333,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
 
     if (_activeTool == StructuralDrawTool.measure) {
-      _updatePointer(event.localPosition,
-          isMouse: event.kind == PointerDeviceKind.mouse);
+      _measurementTouchPosition = event.localPosition;
+      if (!_isPlacingWithHold && _measurementTouchDown != null &&
+          (event.localPosition - _measurementTouchDown!).distance > kTouchSlop) {
+        _measurementHoldTimer?.cancel();
+      }
+      if (_isPlacingWithHold) {
+        _updatePointer(event.localPosition,
+            isMouse: event.kind == PointerDeviceKind.mouse);
+      }
       return;
     }
 
@@ -5448,6 +5481,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerUp(PointerUpEvent event) {
+    _measurementHoldTimer?.cancel();
     _activePointersCount = math.max(0, _activePointersCount - 1);
     if (_activePointersCount == 0) _activePointerKind = null;
     if (_isMultiTouchGesture) {
@@ -5836,6 +5870,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
+    _measurementHoldTimer?.cancel();
     _activePointersCount = 0;
     _activePointerKind = null;
     _isMultiTouchGesture = false;
@@ -6415,7 +6450,25 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleTapUp(TapUpDetails details) {
-    if (_activeTool == StructuralDrawTool.measure) return;
+    if (_activeTool == StructuralDrawTool.measure) {
+      if (details.kind == PointerDeviceKind.mouse || _isMultiTouchGesture ||
+          _activePointersCount > 1 || _isPlacingWithHold || _measurementHeldGesture) {
+        return;
+      }
+      // A quick tap selects its actual location; holds use the offset tip.
+      _updateMeasurementPointer(details.localPosition, isMouse: true);
+      _commitPlacement(_currentCadCoord!);
+      setState(() {
+        _touchScreenPos = null;
+        _targetScreenPos = null;
+        _snappedScreenPos = null;
+        _snappedScreenPositions = [];
+        _activeSnap = null;
+        _activeMagneticGuides = [];
+        _liveDimensionText = null;
+      });
+      return;
+    }
     // Pointer-down may navigate to the badge owner and rearrange its labels.
     // The same tap must not select the next storey's newly positioned badge.
     if (_slabBadgeSelectionHandled) {
@@ -8091,6 +8144,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _selectTool(StructuralDrawTool tool) {
+    _measurementHoldTimer?.cancel();
     if (_isEditingSlab) _cancelSlabCorrection();
     setState(() {
       _activeTool = tool;
@@ -8789,7 +8843,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
               Positioned.fill(
                 child: RawGestureDetector(
                   gestures: <Type, GestureRecognizerFactory>{
-                    LongPressGestureRecognizer:
+                    if (_activeTool != StructuralDrawTool.measure) LongPressGestureRecognizer:
                         GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
                       () => LongPressGestureRecognizer(
                         duration: const Duration(milliseconds: 280),
@@ -8868,8 +8922,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         }
                       },
                       onInteractionEnd: (details) {
-                        _activePointersCount = 0;
-                        _isMultiTouchGesture = false;
+                        // In measurement mode the pointer listener owns the
+                        // count: ending a scale gesture can leave a finger down.
+                        if (_activeTool != StructuralDrawTool.measure) {
+                          _activePointersCount = 0;
+                          _isMultiTouchGesture = false;
+                        }
                         _scaleSettleTimer?.cancel();
                         _scaleSettleTimer = Timer(const Duration(milliseconds: 60), () {
                           if (!mounted) return;

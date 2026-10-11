@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -12,7 +13,7 @@ import 'package:kotoview/src/features/structural_designer/widgets/element_palett
 
 void main() {
   testWidgets(
-    'BIM touch measurement previews above the finger, commits on release and cancels pinch',
+    'BIM measurement separates one-finger pan, precision hold, tap and pinch',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       tester.view.physicalSize = const Size(1000, 900);
@@ -67,6 +68,8 @@ void main() {
               as Structural2dPainter;
       final first = await tester.startGesture(const Offset(400, 400));
       await tester.pump();
+      expect(find.byType(StructuralPointerOverlay), findsNothing);
+      await tester.pump(const Duration(milliseconds: 300));
       final pointer = tester
           .widget<StructuralPointerOverlay>(
             find.byType(StructuralPointerOverlay),
@@ -79,7 +82,17 @@ void main() {
       await tester.pump();
       expect(plan().measurementStartCad, start);
 
+      final controller = tester.widget<InteractiveViewer>(find.byType(InteractiveViewer)).transformationController!;
+      final beforePan = controller.value.clone();
+      await tester.dragFrom(const Offset(450, 400), const Offset(80, 30));
+      await tester.pumpAndSettle();
+      expect(controller.value, isNot(beforePan));
+      expect(plan().measurementStartCad, start);
+      expect(plan().activeMeasurement, isNull);
+      expect(find.byType(StructuralPointerOverlay), findsNothing);
+
       final second = await tester.startGesture(const Offset(600, 400));
+      await tester.pump(const Duration(milliseconds: 300));
       await second.moveTo(const Offset(650, 450));
       await tester.pump(const Duration(milliseconds: 350));
       final preview = tester
@@ -96,19 +109,55 @@ void main() {
       expect(plan().measurementStartCad, isNull);
 
       final a = await tester.startGesture(const Offset(400, 400), pointer: 3);
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(StructuralPointerOverlay), findsOneWidget);
       final b = await tester.startGesture(const Offset(600, 400), pointer: 4);
       await tester.pump();
+      final beforePinch = controller.value.getMaxScaleOnAxis();
       await a.moveTo(const Offset(380, 400));
       await b.moveTo(const Offset(620, 400));
       await tester.pump();
+      expect(controller.value.getMaxScaleOnAxis(), greaterThan(beforePinch));
       await a.up();
+      await tester.pump(const Duration(milliseconds: 350));
+      // The remaining finger cannot resume placement after a pinch.
+      await b.moveTo(const Offset(630, 420));
+      await tester.pump();
+      expect(plan().measurementStartCad, isNull);
       await b.up();
       await tester.pumpAndSettle();
       expect(plan().measurementStartCad, isNull);
       expect(plan().activeMeasurement?.$1, start);
       expect(plan().activeMeasurement?.$2, end);
       expect(find.byType(StructuralPointerOverlay), findsNothing);
+
+      await tester.tapAt(const Offset(450, 450));
+      await tester.pump();
+      final tappedStart = plan().measurementStartCad;
+      expect(tappedStart, isNotNull);
+      await tester.tapAt(const Offset(650, 450));
+      await tester.pump();
+      expect(plan().measurementStartCad, isNull);
+      expect(plan().activeMeasurement?.$1, tappedStart);
+      expect(plan().activeMeasurement?.$2, isNot(tappedStart));
+
+      final cancelled = await tester.startGesture(const Offset(400, 400));
+      await cancelled.cancel();
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(find.byType(StructuralPointerOverlay), findsNothing);
+      expect(plan().measurementStartCad, isNull);
+
+      final mouse = await tester.startGesture(const Offset(450, 450),
+          kind: PointerDeviceKind.mouse);
+      await tester.pump();
+      final mousePointer = tester.widget<StructuralPointerOverlay>(
+          find.byType(StructuralPointerOverlay)).painter;
+      expect(mousePointer.targetPos, mousePointer.touchPos);
+      await mouse.up();
+      await tester.pump();
+      // A mouse click commits once, without also triggering the touch tap path.
+      expect(plan().measurementStartCad, isNotNull);
+      expect(plan().activeMeasurement, isNull);
       expect(tester.takeException(), isNull);
     },
   );

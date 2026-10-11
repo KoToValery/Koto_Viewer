@@ -2090,6 +2090,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get toolMeasure => 'Мярка';
 
   @override
+  String get bimMeasureGestureHint =>
+      'Плъзни за навигация · Докосни за точка · Задръж за прецизност · 2 пръста за мащаб';
+
+  @override
   String get distanceCentimeters => 'Разстояние (см)';
 
   @override
@@ -3941,9 +3945,76 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String architectStoreyCountChip(int count) {
-    return '$count ет.';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count етажа',
+      one: '1 етаж',
+    );
+    return '$_temp0';
   }
 
   @override
   String get architectLaunchWizard => 'Стартирай с Архитектурен магьосник';
+
+  @override
+  String get architectUnitMm => 'Милиметри (mm)';
+
+  @override
+  String get architectUnitFeet => 'Футове (ft)';
+
+  @override
+  String get architectUnitInches => 'Инчове (in)';
+
+  @override
+  String get architectUnitSystem => 'Система от мерни единици';
+
+  @override
+  String get architectUnitSystemMetric => 'Метрична (m, cm, mm)';
+
+  @override
+  String get architectUnitSystemImperial => 'Имперска (ft, in)';
+
+  @override
+  String get architectWizardStep1 => '1. Единици';
+
+  @override
+  String get architectWizardStep2 => '2. Етажи и оси';
+
+  @override
+  String get architectWizardStep3 => '3. Размери на стени';
+
+  @override
+  String get architectWizardStep1Subtitle => 'Име на проект и мерни единици';
+
+  @override
+  String get architectWizardStep2Subtitle =>
+      'Светли височини и координатни оси';
+
+  @override
+  String get architectWizardStep3Subtitle =>
+      'Дебелини на стени и балконски парапет';
+
+  @override
+  String get architectWizardNext => 'Напред';
+
+  @override
+  String get architectWizardBack => 'Назад';
+
+  @override
+  String get architectWallCore => 'Основна дебелина';
+
+  @override
+  String get architectWallInsulation => 'Топлоизолация EPS';
+
+  @override
+  String architectWallTotalThickness(String thickness) {
+    return 'Общо: $thickness';
+  }
+
+  @override
+  String get architectParapetCurb => 'Дебелина борд';
+
+  @override
+  String get architectParapetHeightLabel => 'Височина';
 }
