@@ -163,51 +163,45 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  test(
-    'Parallel translation retains T attachments on the reference and physical face',
-    () {
-      final model = workspace.commands();
-      addTearDown(model.dispose);
-      model.execute(
-        CreateArchitectWall(
-          storeyId: 's',
-          wall: wall('a', Offset.zero, const Offset(4, 0)),
-        ),
-      );
-      model.execute(
-        CreateArchitectWall(
-          storeyId: 's',
-          wall: wall('b', const Offset(2, 0), const Offset(2, 3)),
-        ),
-      );
-      model.execute(
-        CreateArchitectWall(
-          storeyId: 's',
-          wall: wall('c', const Offset(3, -.2), const Offset(3, -3)),
-        ),
-      );
-      model.execute(
-        const MoveArchitectElement(
-          storeyId: 's',
-          elementId: 'a',
-          delta: Offset(0, 1),
-        ),
-      );
-      expect(
-        model.project.activeStorey.walls[1].startPoint,
-        const Offset(2, 1),
-      );
-      expect(
-        model.project.activeStorey.walls[2].startPoint,
-        const Offset(3, .8),
-      );
-      model.undo();
-      expect(
-        model.project.activeStorey.walls[2].startPoint,
-        const Offset(3, -.2),
-      );
-    },
-  );
+  test('Translation keeps unselected T branches stationary', () {
+    final model = workspace.commands();
+    addTearDown(model.dispose);
+    model.execute(
+      CreateArchitectWall(
+        storeyId: 's',
+        wall: wall('a', Offset.zero, const Offset(4, 0)),
+      ),
+    );
+    model.execute(
+      CreateArchitectWall(
+        storeyId: 's',
+        wall: wall('b', const Offset(2, 0), const Offset(2, 3)),
+      ),
+    );
+    model.execute(
+      CreateArchitectWall(
+        storeyId: 's',
+        wall: wall('c', const Offset(3, -.2), const Offset(3, -3)),
+      ),
+    );
+    model.execute(
+      const MoveArchitectElement(
+        storeyId: 's',
+        elementId: 'a',
+        delta: Offset(0, 1),
+      ),
+    );
+    expect(model.project.activeStorey.walls[1].startPoint, const Offset(2, 0));
+    expect(
+      model.project.activeStorey.walls[2].startPoint,
+      const Offset(3, -.2),
+    );
+    model.undo();
+    expect(
+      model.project.activeStorey.walls[2].startPoint,
+      const Offset(3, -.2),
+    );
+  });
 
   test(
     'Acute joins use a bounded bevel without disconnected contours or spikes',
@@ -503,7 +497,7 @@ void main() {
   );
 
   testWidgets(
-    'Selected endpoint drag retains its neighbour and can be undone',
+    'Selected endpoint drag keeps its neighbour stationary and can be undone',
     (tester) async {
       final model = workspace.commands();
       addTearDown(model.dispose);
@@ -542,7 +536,7 @@ void main() {
       );
       expect(
         model.project.activeStorey.walls.last.startPoint,
-        const Offset(5, 0),
+        const Offset(4, 0),
       );
       await tester.tap(find.byKey(const ValueKey('architect-undo')));
       await tester.pump();

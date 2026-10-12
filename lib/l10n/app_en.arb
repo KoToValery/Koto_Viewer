@@ -3047,5 +3047,12 @@
   "architectPropertyOffset": "Offset",
   "architectPropertySize": "Size",
   "architectPropertyName": "Name",
-  "architectWallExtendHint": "Pick target"
+  "architectWallExtendHint": "Pick target",
+  "architectWallCut": "Cut",
+  "architectWallCutHint": "Cut: choose two points across walls",
+  "architectWallDetach": "Detach",
+  "architectWallAttach": "Attach",
+  "architectWallMagnet": "Magnet",
+  "architectWallAlign": "Align",
+  "architectWallMirror": "Flip"
 }

@@ -66,7 +66,9 @@ class ArchitectWallNetwork {
           b.endPoint,
           finite: true,
         );
-        if (node == null) continue;
+        if (node == null || !a.connectsAt(node) || !b.connectsAt(node)) {
+          continue;
+        }
         if (solidOnly &&
             [a, b].every(
               (w) =>

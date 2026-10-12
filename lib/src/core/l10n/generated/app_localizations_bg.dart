@@ -4136,4 +4136,25 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectWallExtendHint => 'Посочи цел';
+
+  @override
+  String get architectWallCut => 'Срежи';
+
+  @override
+  String get architectWallCutHint => 'Срез: две точки през стените';
+
+  @override
+  String get architectWallDetach => 'Отдели';
+
+  @override
+  String get architectWallAttach => 'Свържи';
+
+  @override
+  String get architectWallMagnet => 'Магнит';
+
+  @override
+  String get architectWallAlign => 'Подравни';
+
+  @override
+  String get architectWallMirror => 'Обърни';
 }

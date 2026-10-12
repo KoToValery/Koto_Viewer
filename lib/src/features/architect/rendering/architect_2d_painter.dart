@@ -58,6 +58,7 @@ class Architect2dPainter extends CustomPainter {
   final WallExteriorSide activeWallExteriorSide;
   final double? activeWallInsulation;
   final bool showWallCursor;
+  final (Offset, Offset)? wallCutLine;
   final Set<String> selectedElementIds;
   final Path? dimensionWallObstacles;
   final String? activeSnapLabel;
@@ -130,6 +131,7 @@ class Architect2dPainter extends CustomPainter {
     this.activeWallExteriorSide = WallExteriorSide.left,
     this.activeWallInsulation,
     this.showWallCursor = true,
+    this.wallCutLine,
     this.selectedElementIds = const {},
     this.dimensionWallObstacles,
     this.activeSnapLabel,
@@ -355,7 +357,7 @@ class Architect2dPainter extends CustomPainter {
           ..strokeWidth = 2 / zoomScale,
       );
       for (final point in [wall.startPoint, wall.endPoint]) {
-        canvas.drawCircle(point, 7 / zoomScale, Paint()..color = Colors.cyan);
+        canvas.drawCircle(point, 3 / zoomScale, Paint()..color = Colors.cyan);
       }
       return;
     }
@@ -549,8 +551,23 @@ class Architect2dPainter extends CustomPainter {
           borderPaint,
         );
         for (final point in [wall.startPoint, wall.endPoint]) {
-          canvas.drawCircle(point, 7 / zoomScale, Paint()..color = Colors.cyan);
+          canvas.drawCircle(point, 3 / zoomScale, Paint()..color = Colors.cyan);
         }
+      }
+      // A detached end remains visibly capped even when bodies touch.
+      for (final end in [true, false]) {
+        if (end ? wall.connectStart : wall.connectEnd) continue;
+        final corners = wall.polygonCorners;
+        final core = wall.coreCorners;
+        final i = end ? 0 : 1, j = end ? 3 : 2;
+        canvas.drawLine(
+          corners[i],
+          corners[j],
+          Paint()
+            ..color = wallBorderPaint.color
+            ..strokeWidth = .7 / zoomScale,
+        );
+        canvas.drawLine(core[i], core[j], wallBorderPaint);
       }
       for (final door in wall.doors) {
         door.paint2D(
@@ -618,6 +635,35 @@ class Architect2dPainter extends CustomPainter {
   // ===========================================================================
 
   void _drawActiveDrafting(Canvas canvas) {
+    if (wallCutLine != null) {
+      canvas.drawLine(
+        wallCutLine!.$1,
+        wallCutLine!.$2,
+        Paint()
+          ..color = Colors.redAccent
+          ..strokeWidth = 1.5 / zoomScale,
+      );
+      canvas.drawCircle(
+        wallCutLine!.$1,
+        3 / zoomScale,
+        Paint()..color = Colors.redAccent,
+      );
+    }
+    if (activeTool == ArchitectTool.wall && cursorPosition != null) {
+      // Exact aim point sits at the tip, ahead of the offset pointer/ruler.
+      canvas.drawCircle(
+        activeDraftEnd ?? cursorPosition!,
+        2 / zoomScale,
+        Paint()..color = Colors.cyanAccent,
+      );
+    }
+    if (activeTool == ArchitectTool.wall && activeDraftStart != null) {
+      canvas.drawCircle(
+        activeDraftStart!,
+        3 / zoomScale,
+        Paint()..color = Colors.orangeAccent,
+      );
+    }
     if (activeTool == ArchitectTool.wall &&
         cursorPosition != null &&
         showWallCursor) {
@@ -678,6 +724,12 @@ class Architect2dPainter extends CustomPainter {
         hatchColor: const Color(0xFF00B8CC),
       );
 
+      canvas.drawCircle(
+        p1,
+        3 / zoomScale,
+        Paint()..color = Colors.orangeAccent,
+      );
+      canvas.drawCircle(p2, 2 / zoomScale, Paint()..color = Colors.cyanAccent);
       // Keep a single target marker and a length-only badge outside the body.
       final textSpan = TextSpan(
         text: project.units.format(dist, decimals: 3),

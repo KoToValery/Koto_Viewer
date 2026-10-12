@@ -4122,4 +4122,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectWallExtendHint => 'Pick target';
+
+  @override
+  String get architectWallCut => 'Cut';
+
+  @override
+  String get architectWallCutHint => 'Cut: choose two points across walls';
+
+  @override
+  String get architectWallDetach => 'Detach';
+
+  @override
+  String get architectWallAttach => 'Attach';
+
+  @override
+  String get architectWallMagnet => 'Magnet';
+
+  @override
+  String get architectWallAlign => 'Align';
+
+  @override
+  String get architectWallMirror => 'Flip';
 }

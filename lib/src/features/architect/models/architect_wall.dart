@@ -21,6 +21,8 @@ class ArchitectWall {
   final WallReferenceLine referenceLine;
   final WallExteriorSide exteriorSide;
   final double? insulationThicknessOverride;
+  final bool connectStart;
+  final bool connectEnd;
   final String? wallTypeId;
   final ParapetFinish? parapetFinish;
   final List<ArchitectDoor> doors;
@@ -35,6 +37,8 @@ class ArchitectWall {
     this.referenceLine = WallReferenceLine.center,
     this.exteriorSide = WallExteriorSide.left,
     this.insulationThicknessOverride,
+    this.connectStart = true,
+    this.connectEnd = true,
     this.wallTypeId,
     this.parapetFinish,
     this.doors = const [],
@@ -99,6 +103,8 @@ class ArchitectWall {
     WallReferenceLine? referenceLine,
     WallExteriorSide? exteriorSide,
     double? insulationThicknessOverride,
+    bool? connectStart,
+    bool? connectEnd,
     String? wallTypeId,
     ParapetFinish? parapetFinish,
     List<ArchitectDoor>? doors,
@@ -113,11 +119,47 @@ class ArchitectWall {
     exteriorSide: exteriorSide ?? this.exteriorSide,
     insulationThicknessOverride:
         insulationThicknessOverride ?? this.insulationThicknessOverride,
+    connectStart: connectStart ?? this.connectStart,
+    connectEnd: connectEnd ?? this.connectEnd,
     wallTypeId: wallTypeId ?? this.wallTypeId,
     parapetFinish: parapetFinish ?? this.parapetFinish,
     doors: doors ?? this.doors,
     windows: windows ?? this.windows,
   );
+
+  bool get isDetached => !connectStart && !connectEnd;
+
+  bool connectsAt(Offset point) {
+    if (isDetached) return false;
+    final delta = point - startPoint;
+    final along = delta.dx * unitVector.dx + delta.dy * unitVector.dy;
+    return (along.abs() >= 1e-8 || connectStart) &&
+        ((along - length).abs() >= 1e-8 || connectEnd);
+  }
+
+  List<Offset> get coreCorners {
+    final n = normalVector * coreThickness / 2;
+    return [
+      coreCenterStart - n,
+      coreCenterEnd - n,
+      coreCenterEnd + n,
+      coreCenterStart + n,
+    ];
+  }
+
+  /// Change the material side without moving the masonry/concrete core.
+  ArchitectWall mirroredAroundCore() {
+    final flipped = copyWith(
+      exteriorSide: exteriorSide == WallExteriorSide.left
+          ? WallExteriorSide.right
+          : WallExteriorSide.left,
+    );
+    final shift = coreCenterStart - flipped.coreCenterStart;
+    return flipped.copyWith(
+      startPoint: flipped.startPoint + shift,
+      endPoint: flipped.endPoint + shift,
+    );
+  }
 
   ArchitectWall addDoor(ArchitectDoor door) {
     return copyWith(doors: [...doors, door]);
@@ -165,6 +207,8 @@ class ArchitectWall {
     'referenceLine': referenceLine.name,
     'exteriorSide': exteriorSide.name,
     'insulationThicknessOverride': insulationThicknessOverride,
+    'connectStart': connectStart,
+    'connectEnd': connectEnd,
     'wallTypeId': wallTypeId,
     'parapetFinish': parapetFinish?.name,
     'doors': doors.map((d) => d.toJson()).toList(),
@@ -193,6 +237,8 @@ class ArchitectWall {
     ),
     insulationThicknessOverride: (json['insulationThicknessOverride'] as num?)
         ?.toDouble(),
+    connectStart: json['connectStart'] as bool? ?? true,
+    connectEnd: json['connectEnd'] as bool? ?? true,
     wallTypeId: json['wallTypeId'] as String?,
     parapetFinish: json['parapetFinish'] != null
         ? ParapetFinish.values.firstWhere(

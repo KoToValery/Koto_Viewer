@@ -6,6 +6,7 @@ import '../models/architect_wall.dart';
 import '../models/architect_zone.dart';
 import 'architect_zone_tool.dart';
 import '../rendering/architect_wall_network.dart';
+import 'architect_element_id.dart';
 export 'architect_element_id.dart';
 
 /// Commands accept model metres, never screen coordinates or a camera scale.
@@ -91,7 +92,12 @@ class CreateArchitectWall extends ArchitectModelCommand {
 class UpdateArchitectWall extends ArchitectModelCommand {
   final String storeyId;
   final ArchitectWall wall;
-  const UpdateArchitectWall({required this.storeyId, required this.wall});
+  final bool carryConnections;
+  const UpdateArchitectWall({
+    required this.storeyId,
+    required this.wall,
+    this.carryConnections = true,
+  });
   @override
   ArchitectProject apply(ArchitectProject project) {
     final s = ArchitectModelCommand.storey(project, storeyId);
@@ -101,6 +107,7 @@ class UpdateArchitectWall extends ArchitectModelCommand {
     ArchitectModelCommand.positive(wall.thickness);
     ArchitectModelCommand.positive(wall.height);
     Offset attached(Offset p) {
+      if (!carryConnections || !previous.connectsAt(p)) return p;
       if ((p - previous.startPoint).distance < 1e-8) return wall.startPoint;
       if ((p - previous.endPoint).distance < 1e-8) return wall.endPoint;
       final vector = p - previous.startPoint;
@@ -139,8 +146,12 @@ class UpdateArchitectWall extends ArchitectModelCommand {
         other.id == wall.id
             ? wall
             : other.copyWith(
-                startPoint: attached(other.startPoint),
-                endPoint: attached(other.endPoint),
+                startPoint: other.connectStart
+                    ? attached(other.startPoint)
+                    : other.startPoint,
+                endPoint: other.connectEnd
+                    ? attached(other.endPoint)
+                    : other.endPoint,
               ),
     ];
     if (walls.any((w) => w.length < .001)) {
@@ -163,11 +174,13 @@ class UpdateArchitectWall extends ArchitectModelCommand {
 class SplitArchitectWall extends ArchitectModelCommand {
   final String storeyId, wallId, newWallId;
   final double ratio;
+  final bool detachCut;
   const SplitArchitectWall({
     required this.storeyId,
     required this.wallId,
     required this.newWallId,
     required this.ratio,
+    this.detachCut = false,
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
@@ -190,6 +203,7 @@ class SplitArchitectWall extends ArchitectModelCommand {
     final point = wall.startPoint + (wall.endPoint - wall.startPoint) * ratio;
     final first = wall.copyWith(
       endPoint: point,
+      connectEnd: !detachCut,
       doors: [
         for (final d in wall.doors)
           if (d.offsetRatio < ratio)
@@ -204,6 +218,7 @@ class SplitArchitectWall extends ArchitectModelCommand {
     final second = wall.copyWith(
       id: newWallId,
       startPoint: point,
+      connectStart: !detachCut,
       doors: [
         for (final d in wall.doors)
           if (d.offsetRatio > ratio)
@@ -227,6 +242,100 @@ class SplitArchitectWall extends ArchitectModelCommand {
         walls: [
           for (final w in s.walls)
             if (w.id == wallId) ...[first, second] else w,
+        ],
+      ),
+    );
+  }
+}
+
+/// A finite cutting stroke splits all crossed selected walls atomically.
+class CutArchitectWalls extends ArchitectModelCommand {
+  final String storeyId;
+  final Set<String> wallIds;
+  final Offset start, end;
+  const CutArchitectWalls({
+    required this.storeyId,
+    required this.wallIds,
+    required this.start,
+    required this.end,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(start);
+    ArchitectModelCommand.point(end);
+    if ((end - start).distance < .001) throw ArgumentError('Cut too short');
+    var result = project;
+    var cuts = 0;
+    for (final wall in ArchitectModelCommand.storey(project, storeyId).walls) {
+      if (!wallIds.contains(wall.id)) continue;
+      final point = ArchitectWallNetwork.intersection(
+        wall.startPoint,
+        wall.endPoint,
+        start,
+        end,
+        finite: true,
+      );
+      if (point == null) continue;
+      final ratio =
+          ((point - wall.startPoint).dx * wall.unitVector.dx +
+              (point - wall.startPoint).dy * wall.unitVector.dy) /
+          wall.length;
+      if (ratio * wall.length < .001 || (1 - ratio) * wall.length < .001) {
+        continue;
+      }
+      result = SplitArchitectWall(
+        storeyId: storeyId,
+        wallId: wall.id,
+        newWallId: ArchitectElementId.next('wall'),
+        ratio: ratio,
+        detachCut: true,
+      ).apply(result);
+      cuts++;
+    }
+    if (cuts == 0) throw ArgumentError('No wall crossed');
+    return result;
+  }
+}
+
+class SetArchitectWallConnection extends ArchitectModelCommand {
+  final String storeyId;
+  final Set<String> wallIds;
+  final bool connected;
+  const SetArchitectWallConnection({
+    required this.storeyId,
+    required this.wallIds,
+    required this.connected,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      storey.copyWith(
+        walls: [
+          for (final w in storey.walls)
+            wallIds.contains(w.id)
+                ? w.copyWith(connectStart: connected, connectEnd: connected)
+                : w,
+        ],
+      ),
+    );
+  }
+}
+
+class MirrorArchitectWalls extends ArchitectModelCommand {
+  final String storeyId;
+  final Set<String> wallIds;
+  const MirrorArchitectWalls({required this.storeyId, required this.wallIds});
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      storey.copyWith(
+        walls: [
+          for (final w in storey.walls)
+            wallIds.contains(w.id) ? w.mirroredAroundCore() : w,
         ],
       ),
     );
@@ -291,13 +400,10 @@ class MoveArchitectElement extends ArchitectModelCommand {
     final s = ArchitectModelCommand.storey(project, storeyId);
     final walls = s.walls.where((w) => w.id == elementId);
     if (walls.isNotEmpty) {
-      final wall = walls.first;
-      return UpdateArchitectWall(
+      return MoveArchitectElements(
         storeyId: storeyId,
-        wall: wall.copyWith(
-          startPoint: wall.startPoint + delta,
-          endPoint: wall.endPoint + delta,
-        ),
+        elementIds: {elementId},
+        delta: delta,
       ).apply(project);
     }
     for (final host in s.walls) {
@@ -427,7 +533,7 @@ class MoveArchitectElement extends ArchitectModelCommand {
   }
 }
 
-/// Move selected walls simultaneously, carrying unselected attachments once.
+/// Move selected elements while keeping unselected supports stationary.
 class MoveArchitectElements extends ArchitectModelCommand {
   final String storeyId;
   final Set<String> elementIds;
@@ -444,38 +550,68 @@ class MoveArchitectElements extends ArchitectModelCommand {
     final movedWalls = storey.walls
         .where((w) => elementIds.contains(w.id))
         .toList();
+    // Only selected elements move. Connected ends slide on stationary supports.
     final nextWalls = {for (final w in storey.walls) w.id: w};
     for (final wall in movedWalls) {
-      final moved = wall.copyWith(
+      var moved = wall.copyWith(
         startPoint: wall.startPoint + delta,
         endPoint: wall.endPoint + delta,
       );
-      final attached = UpdateArchitectWall(
-        storeyId: storeyId,
-        wall: moved,
-      ).apply(project);
-      nextWalls[wall.id] = moved;
-      for (final other in attached.activeStorey.walls) {
-        if (elementIds.contains(other.id)) continue;
-        final old = storey.walls.firstWhere((w) => w.id == other.id);
-        var next = nextWalls[other.id]!;
-        if (old.startPoint != other.startPoint) {
-          next = next.copyWith(startPoint: other.startPoint);
+      Offset supported(Offset oldPoint, Offset translated, bool connected) {
+        if (!connected || wall.isDetached) return translated;
+        for (final support in storey.walls) {
+          if (elementIds.contains(support.id) || !support.connectsAt(oldPoint)) {
+            continue;
+          }
+          final faces = [
+            (support.startPoint, support.endPoint),
+            (support.polygonCorners[0], support.polygonCorners[1]),
+            (support.polygonCorners[3], support.polygonCorners[2]),
+            (support.coreCorners[0], support.coreCorners[1]),
+            (support.coreCorners[3], support.coreCorners[2]),
+          ];
+          for (final face in faces) {
+            final u = face.$2 - face.$1;
+            final d = oldPoint - face.$1;
+            final t = (d.dx * u.dx + d.dy * u.dy) / u.distanceSquared;
+            if (t < -1e-8 ||
+                t > 1 + 1e-8 ||
+                (oldPoint - (face.$1 + u * t)).distance > 1e-8) {
+              continue;
+            }
+            final point = ArchitectWallNetwork.intersection(
+              moved.startPoint,
+              moved.endPoint,
+              face.$1,
+              face.$2,
+            );
+            if (point != null) {
+              final v = point - face.$1;
+              final along = (v.dx * u.dx + v.dy * u.dy) / u.distanceSquared;
+              if (along < -1e-8 || along > 1 + 1e-8) {
+                throw ArgumentError('Detach before leaving the support');
+              }
+              return point;
+            }
+          }
         }
-        if (old.endPoint != other.endPoint) {
-          next = next.copyWith(endPoint: other.endPoint);
-        }
-        nextWalls[other.id] = next;
+        return translated;
       }
+
+      final translated = moved;
+      moved = moved.copyWith(
+        startPoint: supported(
+          wall.startPoint,
+          moved.startPoint,
+          wall.connectStart,
+        ),
+        endPoint: supported(wall.endPoint, moved.endPoint, wall.connectEnd),
+      );
+      nextWalls[wall.id] = _wallOpeningsAfterEdit(translated, moved);
     }
     var result = ArchitectModelCommand.replace(
       project,
-      storey.copyWith(
-        walls: [
-          for (final w in storey.walls)
-            _wallOpeningsAfterEdit(w, nextWalls[w.id]!),
-        ],
-      ),
+      storey.copyWith(walls: [for (final w in storey.walls) nextWalls[w.id]!]),
     );
     final carried = {
       for (final w in movedWalls) ...[
@@ -636,6 +772,8 @@ class JoinArchitectWalls extends ArchitectModelCommand {
       final next = wall.copyWith(
         startPoint: targets[(wall.id, true)],
         endPoint: targets[(wall.id, false)],
+        connectStart: true,
+        connectEnd: true,
       );
       result = UpdateArchitectWall(
         storeyId: storeyId,

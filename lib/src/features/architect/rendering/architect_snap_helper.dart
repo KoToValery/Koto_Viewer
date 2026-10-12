@@ -8,11 +8,13 @@ class ArchitectSnapResult {
   final bool isSnapped;
   final String? snapLabel;
   final double? angleDeg;
+  final List<(Offset, Offset)> magneticGuides;
   const ArchitectSnapResult({
     required this.point,
     this.isSnapped = false,
     this.snapLabel,
     this.angleDeg,
+    this.magneticGuides = const [],
   });
 }
 

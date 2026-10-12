@@ -290,9 +290,20 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
     for (final wall in next.activeStorey.walls.where(
       (w) => elementIds.contains(w.id),
     )) {
+      final old = project.activeStorey.walls.firstWhere((w) => w.id == wall.id);
+      var updated = wall;
+      final flipped = old.exteriorSide != wall.exteriorSide;
+      if (flipped) {
+        final shift = old.coreCenterStart - wall.coreCenterStart;
+        updated = wall.copyWith(
+          startPoint: wall.startPoint + shift,
+          endPoint: wall.endPoint + shift,
+        );
+      }
       result = UpdateArchitectWall(
         storeyId: storeyId,
-        wall: wall,
+        wall: updated,
+        carryConnections: !flipped,
       ).apply(result);
     }
     // Non-wall fields come from the same validated transaction.

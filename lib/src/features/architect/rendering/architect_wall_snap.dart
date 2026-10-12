@@ -6,6 +6,7 @@ import '../../dxf_viewer/rendering/dxf_segment_snap.dart';
 import '../models/architect_project.dart';
 import 'architect_snap_helper.dart';
 import 'architect_wall_network.dart';
+import 'architect_wall_geometry.dart';
 
 class ArchitectWallSnap {
   static ArchitectSnapResult resolve({
@@ -14,16 +15,19 @@ class ArchitectWallSnap {
     required ArchitectProject project,
     required double scale,
     double capturePixels = 14,
+    bool magnetic = true,
     DxfDocument? underlay,
     BimCoordinateFrame frame = const BimCoordinateFrame(),
     Map<String, bool> visibility = const {},
   }) {
     final radius = math.min(capturePixels / scale, .35);
-    var best = ArchitectSnapHelper.snapFree(
-      rawPoint: raw,
-      project: project,
-      tolerance: radius,
-    );
+    var best = magnetic
+        ? ArchitectSnapHelper.snapFree(
+            rawPoint: raw,
+            project: project,
+            tolerance: radius,
+          )
+        : ArchitectSnapResult(point: raw);
     if (anchor != null && (best.point - anchor).distance < .001) {
       best = ArchitectSnapResult(point: raw);
     }
@@ -54,7 +58,9 @@ class ArchitectWallSnap {
     }
 
     // The axis crossing must beat a nearer projection onto either axis.
-    final axes = project.gridAxes;
+    final axes = magnetic
+        ? project.gridAxes
+        : project.gridAxes.take(0).toList();
     for (var i = 0; i < axes.length; i++) {
       for (final b in axes.skip(i + 1)) {
         final point = ArchitectWallNetwork.intersection(
@@ -68,12 +74,14 @@ class ArchitectWallSnap {
     }
 
     final segments = <(Offset, Offset)>[];
-    for (final wall in project.activeStorey.walls) {
-      segments.add((wall.startPoint, wall.endPoint));
-      final corners = wall.polygonCorners;
-      segments.addAll([(corners[0], corners[1]), (corners[3], corners[2])]);
+    if (magnetic) {
+      final geometry = ArchitectWallGeometry.of(project.activeStorey.walls);
+      segments.addAll(geometry.edges);
+      for (final point in geometry.corners) {
+        consider(point, 'Vertex', 0);
+      }
     }
-    if (underlay != null) {
+    if (magnetic && underlay != null) {
       underlay.orBuildSpatialIndex;
       segments.addAll(
         DxfSegmentSnap.nearby(
@@ -109,6 +117,22 @@ class ArchitectWallSnap {
         (anchor == null || (best.point - anchor).distance >= .001)) {
       return best;
     }
+    if (magnetic && anchor == null) {
+      final aligned = ArchitectWallAlignment.point(
+        raw,
+        project.activeStorey.walls,
+        scale,
+      );
+      if (aligned.$2.isNotEmpty &&
+          (anchor == null || (aligned.$1 - anchor).distance >= .001)) {
+        return ArchitectSnapResult(
+          point: aligned.$1,
+          isSnapped: true,
+          snapLabel: 'Alignment',
+          magneticGuides: aligned.$2,
+        );
+      }
+    }
     if (anchor == null) {
       return ArchitectSnapResult(
         point: ArchitectSnapHelper.precision(project).inputPoint(raw),
@@ -134,6 +158,43 @@ class ArchitectWallSnap {
           isSnapped: true,
           snapLabel: '${degrees.round()}°',
           angleDeg: degrees,
+        );
+      }
+    }
+    if (magnetic) {
+      // Relative directions also work when the neighboring wall is rotated.
+      for (final wall in project.activeStorey.walls) {
+        for (final u in [wall.unitVector, wall.normalVector]) {
+          final along = delta.dx * u.dx + delta.dy * u.dy;
+          final projected = anchor + u * along;
+          if ((projected - raw).distance <= 8 / scale &&
+              (projected - raw).distance <=
+                  delta.distance * math.sin(math.pi / 90)) {
+            final direction = along < 0 ? u * -1 : u;
+            final degrees =
+                (math.atan2(direction.dy, direction.dx) * 180 / math.pi + 360) %
+                360;
+            return ArchitectSnapResult(
+              point: projected,
+              isSnapped: true,
+              snapLabel: '${degrees.round()}°',
+              angleDeg: degrees,
+              magneticGuides: [(anchor, projected)],
+            );
+          }
+        }
+      }
+      final aligned = ArchitectWallAlignment.point(
+        raw,
+        project.activeStorey.walls,
+        scale,
+      );
+      if (aligned.$2.isNotEmpty && (aligned.$1 - anchor).distance >= .001) {
+        return ArchitectSnapResult(
+          point: aligned.$1,
+          isSnapped: true,
+          snapLabel: 'Alignment',
+          magneticGuides: aligned.$2,
         );
       }
     }

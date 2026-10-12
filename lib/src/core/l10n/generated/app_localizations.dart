@@ -7186,6 +7186,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pick target'**
   String get architectWallExtendHint;
+
+  /// No description provided for @architectWallCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut'**
+  String get architectWallCut;
+
+  /// No description provided for @architectWallCutHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut: choose two points across walls'**
+  String get architectWallCutHint;
+
+  /// No description provided for @architectWallDetach.
+  ///
+  /// In en, this message translates to:
+  /// **'Detach'**
+  String get architectWallDetach;
+
+  /// No description provided for @architectWallAttach.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach'**
+  String get architectWallAttach;
+
+  /// No description provided for @architectWallMagnet.
+  ///
+  /// In en, this message translates to:
+  /// **'Magnet'**
+  String get architectWallMagnet;
+
+  /// No description provided for @architectWallAlign.
+  ///
+  /// In en, this message translates to:
+  /// **'Align'**
+  String get architectWallAlign;
+
+  /// No description provided for @architectWallMirror.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip'**
+  String get architectWallMirror;
 }
 
 class _AppLocalizationsDelegate

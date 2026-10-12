@@ -1337,5 +1337,12 @@
   "architectPropertyOffset": "Отстъп",
   "architectPropertySize": "Размер",
   "architectPropertyName": "Име",
-  "architectWallExtendHint": "Посочи цел"
+  "architectWallExtendHint": "Посочи цел",
+  "architectWallCut": "Срежи",
+  "architectWallCutHint": "Срез: две точки през стените",
+  "architectWallDetach": "Отдели",
+  "architectWallAttach": "Свържи",
+  "architectWallMagnet": "Магнит",
+  "architectWallAlign": "Подравни",
+  "architectWallMirror": "Обърни"
 }
