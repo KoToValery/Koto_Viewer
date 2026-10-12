@@ -2,9 +2,18 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_project.dart';
 import 'architect_snap_helper.dart';
+import '../../bim_projects/models/bim_coordinate_frame.dart';
+import '../../dxf_viewer/models/dxf_models.dart';
 import '../models/architect_zone.dart';
 
-enum ArchitectZoneSnapType { none, gridAxis, zoneVertex, zoneEdge, zoneWallGap }
+enum ArchitectZoneSnapType {
+  none,
+  gridAxis,
+  zoneVertex,
+  zoneEdge,
+  zoneWallGap,
+  element,
+}
 
 class ArchitectZoneSnapResult {
   final Offset point;
@@ -31,6 +40,10 @@ class ArchitectZoneSnap {
   static ArchitectZoneSnapResult snap({
     required Offset raw,
     required ArchitectProject project,
+    bool magnetic = true,
+    DxfDocument? underlay,
+    BimCoordinateFrame frame = const BimCoordinateFrame(),
+    Map<String, bool> visibility = const {},
     String? excludedZoneId,
     int? movingVertexIndex,
     double tolerance = 0.25, // in meters
@@ -41,6 +54,11 @@ class ArchitectZoneSnap {
     ], // standard wall thicknesses
   }) {
     tolerance = tolerance.clamp(0.0, .20);
+    if (!magnetic) {
+      return ArchitectZoneSnapResult(
+        point: ArchitectSnapHelper.precision(project).inputPoint(raw),
+      );
+    }
     final activeStorey = project.activeStorey;
     final otherZones = activeStorey.zones
         .where((z) => z.id != excludedZoneId)
@@ -215,6 +233,27 @@ class ArchitectZoneSnap {
       }
     }
 
+    if (bestType == ArchitectZoneSnapType.none) {
+      final common = ArchitectSnapHelper.snapFree(
+        rawPoint: raw,
+        project: project,
+        tolerance: tolerance,
+        alignment: true,
+        excludedIds: {?excludedZoneId},
+        underlay: underlay,
+        frame: frame,
+        visibility: visibility,
+      );
+      if (common.isSnapped) {
+        return ArchitectZoneSnapResult(
+          point: common.point,
+          isSnapped: true,
+          snapType: ArchitectZoneSnapType.element,
+          snapLabel: common.snapLabel,
+          magneticGuides: common.magneticGuides,
+        );
+      }
+    }
     final isSnapped = bestType != ArchitectZoneSnapType.none;
     return ArchitectZoneSnapResult(
       point: isSnapped

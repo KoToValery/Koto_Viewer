@@ -156,11 +156,11 @@ void main() {
       await tester.tapAt(screen(tester, const Offset(3, 3)));
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.columns.length, 1);
-      await tester.ensureVisible(find.byIcon(Icons.pan_tool_rounded));
+      await tester.ensureVisible(find.byIcon(Icons.view_column_rounded));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.tap(find.byIcon(Icons.view_column_rounded));
       await tester.pumpAndSettle();
-      await tester.tapAt(screen(tester, const Offset(3, 3)));
+      await tester.longPressAt(screen(tester, const Offset(3, 3)));
       await tester.pumpAndSettle();
       expect(
         overlay(tester).selectedElementId,
@@ -198,9 +198,9 @@ void main() {
         ),
       ]);
       await open(tester, model);
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.tap(find.byIcon(Icons.view_column_rounded));
       await tester.pumpAndSettle();
-      await tester.tapAt(screen(tester, original));
+      await tester.longPressAt(screen(tester, original));
       await tester.pump();
       var commits = 0;
       model.addListener(() => commits++);
@@ -209,7 +209,7 @@ void main() {
         screen(tester, grab),
         pointer: 51,
       );
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 281));
       expect(
         overlay(tester).project.activeStorey.columns.single.position,
         original,
@@ -231,6 +231,7 @@ void main() {
       expect(commits, 0);
       expect(model.project.activeStorey.columns.single.position, original);
       final drag = await tester.startGesture(screen(tester, grab));
+      await tester.pump(const Duration(milliseconds: 281));
       await drag.moveTo(screen(tester, grab + const Offset(.3, .2)));
       await drag.up();
       await tester.pumpAndSettle();
@@ -411,9 +412,9 @@ void main() {
         ),
       );
       await open(tester, model);
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.tap(find.byIcon(Icons.space_dashboard_rounded));
       await tester.pumpAndSettle();
-      await tester.tapAt(screen(tester, const Offset(2, 2)));
+      await tester.longPressAt(screen(tester, const Offset(2, 2)));
       await tester.pump();
       var commits = 0;
       model.addListener(() => commits++);
@@ -421,6 +422,7 @@ void main() {
         screen(tester, const Offset(2, 2)),
         pointer: 31,
       );
+      await tester.pump(const Duration(milliseconds: 281));
       await first.moveTo(screen(tester, const Offset(2.3, 2.2)));
       await tester.pump();
       expect(model.project.activeStorey.zones.single.polygon, polygon);
@@ -437,6 +439,7 @@ void main() {
       final drag = await tester.startGesture(
         screen(tester, const Offset(2, 2)),
       );
+      await tester.pump(const Duration(milliseconds: 281));
       await drag.moveTo(screen(tester, const Offset(2.2, 2.1)));
       await drag.up();
       await tester.pumpAndSettle();

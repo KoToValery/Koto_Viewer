@@ -3428,7 +3428,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectGridSpacingY => 'Spacing Y (m)';
 
   @override
-  String get architectToolSelect => 'Select';
+  String get architectToolSelect => 'Pan';
 
   @override
   String get architectToolWall => 'Wall';
@@ -4034,6 +4034,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallDraftHint => 'Hold → point · 2 fingers → zoom';
 
   @override
+  String get architectEditHoldHint => 'Hold → edit';
+
+  @override
   String get architectNavigationHint => 'Pan / zoom';
 
   @override
@@ -4127,7 +4130,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallCut => 'Cut';
 
   @override
-  String get architectWallCutHint => 'Cut: choose two points across walls';
+  String get architectWallCutHint => 'Tap the part between crossings';
 
   @override
   String get architectWallDetach => 'Detach';
@@ -4143,4 +4146,75 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectWallMirror => 'Flip';
+
+  @override
+  String get architectWallSplit => 'Split';
+
+  @override
+  String get architectWallSplitHint => 'Split: two points across walls';
+
+  @override
+  String get architectWallClearance => 'Clearance';
+
+  @override
+  String get architectGridNone => 'None';
+
+  @override
+  String get architectGridCustom => 'Custom';
+
+  @override
+  String architectGridBays(int x, int y) {
+    return 'Bays $x × $y';
+  }
+
+  @override
+  String get architectGridPickerHelp =>
+      'Drag to choose bays. Each direction has one more axis than bays. Tap a dimension on the grid to edit it.';
+
+  @override
+  String get architectGridFewer => 'Fewer bays';
+
+  @override
+  String get architectGridMore => 'More bays';
+
+  @override
+  String get architectWizardUnitsShort => 'Units';
+
+  @override
+  String get architectWizardGridShort => 'Grid';
+
+  @override
+  String get architectWizardWallsShort => 'Walls';
+
+  @override
+  String get architectWizardTitleShort => 'New project';
+
+  @override
+  String architectGridSpanLabel(String axes, String value) {
+    return 'Spacing $axes: $value';
+  }
+
+  @override
+  String get architectGridParkingHelp => 'Parking grid';
+
+  @override
+  String get architectGridResidentialHelp => 'Residential grid';
+
+  @override
+  String get architectGridVillaHelp => 'House grid';
+
+  @override
+  String get architectGridModularHelp => 'Office grid';
+
+  @override
+  String get architectGridNoneHelp => 'Start without axes';
+
+  @override
+  String get architectRadius => 'Radius';
+
+  @override
+  String get architectShapeWidth => 'Width';
+
+  @override
+  String get architectShapeHeight => 'Height';
 }

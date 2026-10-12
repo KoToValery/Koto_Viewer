@@ -10,6 +10,8 @@ import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_grid_preset.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall_type.dart';
+import 'architect_grid_scheme.dart';
+import 'architect_grid_preset_label.dart';
 
 /// Touch-first 3-step starter wizard dialog for configuring and instantiating
 /// an architectural concept project without forced keyboard entry.
@@ -50,10 +52,18 @@ class _ArchitectProjectWizardDialogState
   // Step 1: Structural Grid
   ArchitectGridPreset _selectedGridPreset =
       ArchitectGridPreset.standardPresets().first;
-  int _customAxesX = 4;
-  int _customAxesY = 3;
-  double _customSpacingX = 4.0;
-  double _customSpacingY = 5.0;
+  List<double> _spacingsX = [7.2, 7.2, 7.2];
+  List<double> _spacingsY = [6.6, 6.6];
+
+  void _chooseGrid(ArchitectGridPreset preset) {
+    setState(() {
+      _selectedGridPreset = preset;
+      if (preset.type != GridPresetType.none) {
+        _spacingsX = List.filled(preset.axesX - 1, preset.spacingX);
+        _spacingsY = List.filled(preset.axesY - 1, preset.spacingY);
+      }
+    });
+  }
 
   // Step 2: Parametric Wall Thicknesses (in meters)
   double _extBrickThickness = 0.25;
@@ -116,70 +126,81 @@ class _ArchitectProjectWizardDialogState
 
     if (_enabledWallTypeIds.contains('ext_25_12_eps')) {
       final total = _extBrickThickness + _extInsulationThickness;
-      final baseTitle = l10n.wallTypeExt25Eps12.split('(').first.trim();
-      wallCatalog.add(ArchitectWallType(
-        id: 'ext_25_12_eps',
-        name: '$baseTitle (${_unit.format(total)})',
-        usage: WallUsage.exterior,
-        totalThickness: total,
-        brickThickness: _extBrickThickness,
-        insulationThickness: _extInsulationThickness,
-        colorValue: 0xFFEF5350,
-      ));
+      final baseTitle = l10n.architectWallExterior;
+      wallCatalog.add(
+        ArchitectWallType(
+          id: 'ext_25_12_eps',
+          name: '$baseTitle (${_unit.format(total)})',
+          usage: WallUsage.exterior,
+          totalThickness: total,
+          brickThickness: _extBrickThickness,
+          insulationThickness: _extInsulationThickness,
+          colorValue: 0xFFEF5350,
+        ),
+      );
     }
 
     if (_enabledWallTypeIds.contains('int_12_partition')) {
-      final baseTitle = l10n.wallTypeInt12Partition.split(' ').first.trim();
-      wallCatalog.add(ArchitectWallType(
-        id: 'int_12_partition',
-        name: '$baseTitle ${_unit.format(_partitionThickness)}',
-        usage: WallUsage.interior,
-        totalThickness: _partitionThickness,
-        brickThickness: _partitionThickness,
-        insulationThickness: 0.0,
-        colorValue: 0xFFFFA726,
-      ));
+      final baseTitle = l10n.architectWallPartition;
+      wallCatalog.add(
+        ArchitectWallType(
+          id: 'int_12_partition',
+          name: '$baseTitle ${_unit.format(_partitionThickness)}',
+          usage: WallUsage.interior,
+          totalThickness: _partitionThickness,
+          brickThickness: _partitionThickness,
+          insulationThickness: 0.0,
+          colorValue: 0xFFFFA726,
+        ),
+      );
     }
 
     if (_enabledWallTypeIds.contains('ext_25_brick')) {
-      final baseTitle = l10n.wallTypeExt25Brick.split('(').first.trim();
-      wallCatalog.add(ArchitectWallType(
-        id: 'ext_25_brick',
-        name: '$baseTitle (${_unit.format(_brickThickness)})',
-        usage: WallUsage.exterior,
-        totalThickness: _brickThickness,
-        brickThickness: _brickThickness,
-        insulationThickness: 0.0,
-        colorValue: 0xFFFF7043,
-      ));
+      final baseTitle = l10n.architectWallBrick;
+      wallCatalog.add(
+        ArchitectWallType(
+          id: 'ext_25_brick',
+          name: '$baseTitle (${_unit.format(_brickThickness)})',
+          usage: WallUsage.exterior,
+          totalThickness: _brickThickness,
+          brickThickness: _brickThickness,
+          insulationThickness: 0.0,
+          colorValue: 0xFFFF7043,
+        ),
+      );
     }
 
     if (_enabledWallTypeIds.contains('bearing_25_concrete')) {
-      final baseTitle = l10n.wallTypeBearing25.replaceAll('25 cm', '').trim();
-      wallCatalog.add(ArchitectWallType(
-        id: 'bearing_25_concrete',
-        name: '$baseTitle ${_unit.format(_bearingThickness)}',
-        usage: WallUsage.bearing,
-        totalThickness: _bearingThickness,
-        brickThickness: _bearingThickness,
-        insulationThickness: 0.0,
-        colorValue: 0xFF78909C,
-      ));
+      final baseTitle = l10n.architectWallConcrete;
+      wallCatalog.add(
+        ArchitectWallType(
+          id: 'bearing_25_concrete',
+          name: '$baseTitle ${_unit.format(_bearingThickness)}',
+          usage: WallUsage.bearing,
+          totalThickness: _bearingThickness,
+          brickThickness: _bearingThickness,
+          insulationThickness: 0.0,
+          colorValue: 0xFF78909C,
+        ),
+      );
     }
 
     if (_enabledWallTypeIds.contains('parapet_12')) {
-      final baseTitle = l10n.wallTypeParapet12.replaceAll('12 cm', '').trim();
-      wallCatalog.add(ArchitectWallType(
-        id: 'parapet_12',
-        name: '$baseTitle ${_unit.format(_parapetThickness)} (h=${_unit.format(_parapetHeight)})',
-        usage: WallUsage.parapet,
-        totalThickness: _parapetThickness,
-        brickThickness: _parapetThickness,
-        insulationThickness: 0.0,
-        customHeight: _parapetHeight,
-        parapetFinish: _parapetFinish,
-        colorValue: 0xFF26A69A,
-      ));
+      final baseTitle = l10n.architectWallParapet;
+      wallCatalog.add(
+        ArchitectWallType(
+          id: 'parapet_12',
+          name:
+              '$baseTitle ${_unit.format(_parapetThickness)} (h=${_unit.format(_parapetHeight)})',
+          usage: WallUsage.parapet,
+          totalThickness: _parapetThickness,
+          brickThickness: _parapetThickness,
+          insulationThickness: 0.0,
+          customHeight: _parapetHeight,
+          parapetFinish: _parapetFinish,
+          colorValue: 0xFF26A69A,
+        ),
+      );
     }
 
     final project = ArchitectProject.starterWithCatalog(
@@ -188,10 +209,8 @@ class _ArchitectProjectWizardDialogState
       groundHeight: _groundHeight,
       typicalHeight: _typicalHeight,
       gridPreset: _selectedGridPreset,
-      customAxesX: _customAxesX,
-      customAxesY: _customAxesY,
-      customSpacingX: _customSpacingX,
-      customSpacingY: _customSpacingY,
+      spacingsX: _spacingsX,
+      spacingsY: _spacingsY,
       wallTypes: wallCatalog.isNotEmpty
           ? wallCatalog
           : ArchitectWallType.standardCatalog(
@@ -221,9 +240,13 @@ class _ArchitectProjectWizardDialogState
   Widget build(BuildContext context) {
     final l10n = context.l10n;
 
+    final compact = MediaQuery.sizeOf(context).width < 600;
     return Dialog(
       backgroundColor: const Color(0xFF1E1E26),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 16.0,
+        vertical: 24.0,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: Theme(
         data: ThemeData.dark().copyWith(
@@ -236,7 +259,9 @@ class _ArchitectProjectWizardDialogState
             selectedColor: const Color(0xFF00E5FF).withValues(alpha: 0.25),
             disabledColor: const Color(0xFF1E1E24),
             side: const BorderSide(color: Colors.white12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             labelStyle: const TextStyle(color: Colors.white70, fontSize: 13),
             secondaryLabelStyle: const TextStyle(
               color: Color(0xFF00E5FF),
@@ -275,25 +300,31 @@ class _ArchitectProjectWizardDialogState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            l10n.architectWizardTitle,
+                            compact
+                                ? l10n.architectWizardTitleShort
+                                : l10n.architectWizardTitle,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(
-                            _getStepSubtitle(l10n),
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
+                          if (!compact)
+                            Text(
+                              _getStepSubtitle(l10n),
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white54,
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
@@ -329,10 +360,23 @@ class _ArchitectProjectWizardDialogState
   }
 
   Widget _buildStepIndicator(AppLocalizations l10n) {
+    final compact = MediaQuery.sizeOf(context).width < 600;
     final steps = [
-      (0, l10n.architectWizardStep1, Icons.straighten_rounded),
-      (1, l10n.architectWizardStep2, Icons.grid_on_rounded),
-      (2, l10n.architectWizardStep3, Icons.line_weight_rounded),
+      (
+        0,
+        compact ? l10n.architectWizardUnitsShort : l10n.architectWizardStep1,
+        Icons.straighten_rounded,
+      ),
+      (
+        1,
+        compact ? l10n.architectWizardGridShort : l10n.architectWizardStep2,
+        Icons.grid_on_rounded,
+      ),
+      (
+        2,
+        compact ? l10n.architectWizardWallsShort : l10n.architectWizardStep3,
+        Icons.line_weight_rounded,
+      ),
     ];
 
     return Row(
@@ -349,6 +393,7 @@ class _ArchitectProjectWizardDialogState
             ),
           Flexible(
             child: GestureDetector(
+              key: ValueKey('architect-wizard-step-$i'),
               behavior: HitTestBehavior.opaque,
               onTap: () => setState(() => _currentStep = i),
               child: AnimatedContainer(
@@ -363,8 +408,8 @@ class _ArchitectProjectWizardDialogState
                     color: _currentStep == i
                         ? const Color(0xFF00E5FF)
                         : (i < _currentStep
-                            ? const Color(0xFF00E5FF).withValues(alpha: 0.4)
-                            : Colors.white12),
+                              ? const Color(0xFF00E5FF).withValues(alpha: 0.4)
+                              : Colors.white12),
                   ),
                 ),
                 child: Row(
@@ -377,8 +422,8 @@ class _ArchitectProjectWizardDialogState
                       color: _currentStep == i
                           ? const Color(0xFF00E5FF)
                           : (i < _currentStep
-                              ? const Color(0xFF00E5FF)
-                              : Colors.white54),
+                                ? const Color(0xFF00E5FF)
+                                : Colors.white54),
                     ),
                     const SizedBox(width: 4),
                     Flexible(
@@ -393,7 +438,9 @@ class _ArchitectProjectWizardDialogState
                               : FontWeight.normal,
                           color: _currentStep == i
                               ? const Color(0xFF00E5FF)
-                              : (i < _currentStep ? Colors.white : Colors.white60),
+                              : (i < _currentStep
+                                    ? Colors.white
+                                    : Colors.white60),
                         ),
                       ),
                     ),
@@ -434,8 +481,10 @@ class _ArchitectProjectWizardDialogState
             prefixIcon: const Icon(Icons.badge_outlined, size: 20),
             filled: true,
             fillColor: const Color(0xFF262632),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.white12),
@@ -496,8 +545,7 @@ class _ArchitectProjectWizardDialogState
               _buildChoiceChip(
                 label: l10n.architectUnitMeters,
                 selected: _unit == ArchitectUnit.meters,
-                onSelected: () =>
-                    setState(() => _unit = ArchitectUnit.meters),
+                onSelected: () => setState(() => _unit = ArchitectUnit.meters),
               ),
               _buildChoiceChip(
                 label: l10n.architectUnitCm,
@@ -515,14 +563,12 @@ class _ArchitectProjectWizardDialogState
               _buildChoiceChip(
                 label: l10n.architectUnitFeet,
                 selected: _unit == ArchitectUnit.feet,
-                onSelected: () =>
-                    setState(() => _unit = ArchitectUnit.feet),
+                onSelected: () => setState(() => _unit = ArchitectUnit.feet),
               ),
               _buildChoiceChip(
                 label: l10n.architectUnitInches,
                 selected: _unit == ArchitectUnit.inches,
-                onSelected: () =>
-                    setState(() => _unit = ArchitectUnit.inches),
+                onSelected: () => setState(() => _unit = ArchitectUnit.inches),
               ),
             ],
           ],
@@ -637,139 +683,37 @@ class _ArchitectProjectWizardDialogState
           runSpacing: 6,
           children: [
             for (final preset in ArchitectGridPreset.standardPresets())
-              _buildChoiceChip(
-                avatar: Icon(
-                  preset.type == GridPresetType.none
-                      ? Icons.crop_portrait_rounded
-                      : Icons.grid_4x4_rounded,
-                  size: 16,
-                  color: _selectedGridPreset.id == preset.id
-                      ? const Color(0xFF00E5FF)
-                      : Colors.white54,
+              Tooltip(
+                message: preset.help(l10n),
+                child: _buildChoiceChip(
+                  avatar: Icon(
+                    preset.type == GridPresetType.none
+                        ? Icons.crop_portrait_rounded
+                        : Icons.grid_4x4_rounded,
+                    size: 16,
+                    color: _selectedGridPreset.id == preset.id
+                        ? const Color(0xFF00E5FF)
+                        : Colors.white54,
+                  ),
+                  label: preset.label(l10n),
+                  selected: _selectedGridPreset.id == preset.id,
+                  onSelected: () => _chooseGrid(preset),
                 ),
-                label: preset.name,
-                selected: _selectedGridPreset.id == preset.id,
-                onSelected: () => setState(() => _selectedGridPreset = preset),
               ),
           ],
         ),
-        Padding(
-          padding: const EdgeInsets.only(top: 6, bottom: 8),
-          child: Text(
-            _selectedGridPreset.description,
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
-          ),
-        ),
-
-        // Custom Grid Configuration
-        if (_selectedGridPreset.type == GridPresetType.custom) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.architectGridAxesX,
-                      style: const TextStyle(color: Colors.white60, fontSize: 11),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        for (final count in [2, 3, 4, 5, 6])
-                          _buildChoiceChip(
-                            label: '$count',
-                            selected: _customAxesX == count,
-                            onSelected: () => setState(() => _customAxesX = count),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.architectGridAxesY,
-                      style: const TextStyle(color: Colors.white60, fontSize: 11),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        for (final count in [2, 3, 4, 5, 6])
-                          _buildChoiceChip(
-                            label: '$count',
-                            selected: _customAxesY == count,
-                            onSelected: () => setState(() => _customAxesY = count),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.architectGridSpacingX,
-                      style: const TextStyle(color: Colors.white60, fontSize: 11),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        for (final s in [3.0, 4.0, 5.0, 6.0])
-                          _buildChoiceChip(
-                            label: _unit.format(s, decimals: 0),
-                            selected: (_customSpacingX - s).abs() < 1e-3,
-                            onSelected: () => setState(() => _customSpacingX = s),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.architectGridSpacingY,
-                      style: const TextStyle(color: Colors.white60, fontSize: 11),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        for (final s in [3.0, 4.0, 5.0, 6.0])
-                          _buildChoiceChip(
-                            label: _unit.format(s, decimals: 0),
-                            selected: (_customSpacingY - s).abs() < 1e-3,
-                            onSelected: () => setState(() => _customSpacingY = s),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        if (_selectedGridPreset.type != GridPresetType.none) ...[
+          const SizedBox(height: 12),
+          ArchitectGridScheme(
+            spacingsX: _spacingsX,
+            spacingsY: _spacingsY,
+            unit: _unit,
+            onChanged: (x, y) => setState(() {
+              _spacingsX = x;
+              _spacingsY = y;
+              _selectedGridPreset = ArchitectGridPreset.standardPresets()
+                  .firstWhere((p) => p.type == GridPresetType.custom);
+            }),
           ),
         ],
       ],
@@ -1002,9 +946,8 @@ class _ArchitectProjectWizardDialogState
                   _buildChoiceChip(
                     label: l10n.architectWizardParapetFinishCap,
                     selected: _parapetFinish == ParapetFinish.cap,
-                    onSelected: () => setState(
-                      () => _parapetFinish = ParapetFinish.cap,
-                    ),
+                    onSelected: () =>
+                        setState(() => _parapetFinish = ParapetFinish.cap),
                   ),
                   _buildChoiceChip(
                     label: l10n.architectWizardParapetFinishPipe,
@@ -1150,8 +1093,10 @@ class _ArchitectProjectWizardDialogState
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00E5FF),
                 foregroundColor: Colors.black,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -1173,8 +1118,10 @@ class _ArchitectProjectWizardDialogState
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00E5FF),
                 foregroundColor: Colors.black,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -1200,45 +1147,46 @@ class _ArchitectProjectWizardDialogState
     required VoidCallback onSelected,
     Widget? avatar,
   }) {
-    return ChoiceChip(
-      avatar: avatar,
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onSelected(),
-      backgroundColor: const Color(0xFF262632),
-      selectedColor: const Color(0xFF00E5FF).withValues(alpha: 0.25),
-      side: BorderSide(
-        color: selected
-            ? const Color(0xFF00E5FF).withValues(alpha: 0.6)
-            : Colors.white12,
+    return Builder(
+      builder: (context) => ChoiceChip(
+        avatar: avatar,
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onSelected(),
+        backgroundColor: const Color(0xFF262632),
+        selectedColor: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+        side: BorderSide(
+          color: selected
+              ? const Color(0xFF00E5FF).withValues(alpha: 0.6)
+              : Colors.white12,
+        ),
+        labelStyle: DefaultTextStyle.of(context).style.copyWith(
+          color: selected ? const Color(0xFF00E5FF) : Colors.white70,
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+          fontSize: 12.5,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        checkmarkColor: const Color(0xFF00E5FF),
+        showCheckmark: false,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
       ),
-      labelStyle: TextStyle(
-        color: selected ? const Color(0xFF00E5FF) : Colors.white70,
-        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-        fontSize: 12.5,
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      checkmarkColor: const Color(0xFF00E5FF),
-      showCheckmark: false,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
     );
   }
 
-  Widget _buildSectionHeader({
-    required IconData icon,
-    required String title,
-  }) {
+  Widget _buildSectionHeader({required IconData icon, required String title}) {
     return Row(
       children: [
         Icon(icon, color: const Color(0xFF00E5FF), size: 16),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],

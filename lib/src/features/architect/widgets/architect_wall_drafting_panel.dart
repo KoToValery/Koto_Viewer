@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'architect_numeric_keypad.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
 /// Local keypad never requests platform text input or covers the whole canvas.
@@ -48,16 +49,7 @@ class _ArchitectWallDraftingPanelState
 
   void _key(String key) {
     setState(() {
-      var value = _input ?? '';
-      if (key == '±') {
-        value = value.startsWith('-') ? value.substring(1) : '-$value';
-      } else if (key == '⌫') {
-        value = value.isEmpty ? '' : value.substring(0, value.length - 1);
-      } else if (key == '.') {
-        if (!value.contains('.')) value = '${value.isEmpty ? '0' : value}.';
-      } else if (value.length < 10) {
-        value += key;
-      }
+      final value = ArchitectNumericKeypad.edit(_input, key);
       _input = value;
       final number = double.tryParse(value);
       if (number != null && number.isFinite && number >= widget.minimumLength) {
@@ -123,7 +115,7 @@ class _ArchitectWallDraftingPanelState
                   children: [
                     Expanded(
                       child: Text(
-                        '${_input ?? widget.length.toStringAsFixed(3)} ${widget.unit}',
+                        '${_input ?? widget.length.toStringAsFixed(2)} ${widget.unit}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -141,39 +133,7 @@ class _ArchitectWallDraftingPanelState
             ),
             if (_keypad) ...[
               const SizedBox(height: 4),
-              for (final row in [
-                ['1', '2', '3'],
-                ['4', '5', '6'],
-                ['7', '8', '9'],
-                ['.', '0', '⌫'],
-              ])
-                Row(
-                  children: [
-                    for (final key in row)
-                      Expanded(
-                        child: SizedBox(
-                          height: 36,
-                          child: TextButton(
-                            key: ValueKey('wall-key-$key'),
-                            onPressed: () => _key(key),
-                            child: key == '⌫'
-                                ? const Icon(
-                                    Icons.backspace_outlined,
-                                    color: Colors.white,
-                                    size: 20,
-                                  )
-                                : Text(
-                                    key,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+              ArchitectNumericKeypad(onKey: _key),
             ],
             if (_keypad && widget.minimumLength < 0)
               TextButton(onPressed: () => _key('±'), child: const Text('±')),

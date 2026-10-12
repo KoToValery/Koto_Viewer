@@ -47,6 +47,29 @@ ArchitectCommandController seeded(
   return ArchitectCommandController(project);
 }
 
+Future<void> selectTool(WidgetTester tester, String name) async {
+  final icon = switch (name) {
+    'wall' => Icons.line_weight_rounded,
+    'door' => Icons.meeting_room_rounded,
+    'window' => Icons.window_rounded,
+    'column' => Icons.view_column_rounded,
+    'beam' => Icons.horizontal_rule_rounded,
+    'slab' => Icons.layers_rounded,
+    'opening' => Icons.crop_free_rounded,
+    'stair' => Icons.stairs_rounded,
+    'zone' => Icons.space_dashboard_rounded,
+    'dimension' => Icons.straighten_rounded,
+    'level' => Icons.change_history_rounded,
+    'text' => Icons.title_rounded,
+    'CAD' => Icons.timeline_rounded,
+    'axis' => Icons.grid_on_rounded,
+    _ => throw ArgumentError(name),
+  };
+  await tester.ensureVisible(find.byIcon(icon));
+  await tester.tap(find.byIcon(icon));
+  await tester.pumpAndSettle();
+}
+
 Future<void> hold(WidgetTester tester, Offset point) async {
   final g = await tester.startGesture(workspace.screen(tester, point));
   await tester.pump(const Duration(milliseconds: 451));
@@ -554,10 +577,7 @@ void main() {
         addTearDown(model.dispose);
         final old = model.project;
         await workspace.open(tester, model);
-        if (c.$1 == 'wall') {
-          await tester.tap(find.byIcon(Icons.line_weight_rounded));
-          await tester.pump();
-        }
+        await selectTool(tester, c.$1);
         await hold(tester, c.$3);
         expect(
           find.byKey(const ValueKey('architect-selection-properties')),
@@ -592,6 +612,7 @@ void main() {
     );
     addTearDown(model.dispose);
     await workspace.open(tester, model);
+    await selectTool(tester, 'axis');
     await hold(tester, Offset.zero);
     await tester.tap(
       find.byKey(const ValueKey('architect-selection-properties')),
@@ -655,6 +676,7 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
+      await selectTool(tester, 'wall');
       await hold(tester, Offset.zero);
       await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
       await tester.pump();
@@ -685,6 +707,7 @@ void main() {
       final move = await tester.startGesture(
         workspace.screen(tester, Offset.zero),
       );
+      await tester.pump(const Duration(milliseconds: 281));
       await move.moveTo(workspace.screen(tester, const Offset(0, 1)));
       await move.up();
       await tester.pump();
@@ -713,6 +736,7 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
+      await selectTool(tester, 'wall');
       await hold(tester, const Offset(1, 0));
       await tester.tap(
         find.byKey(const ValueKey('architect-selection-properties')),
@@ -796,6 +820,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await selectTool(tester, 'wall');
     await hold(tester, Offset.zero);
     for (final id in [
       'architect-multi-select',

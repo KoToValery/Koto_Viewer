@@ -3441,7 +3441,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectGridSpacingY => 'Разстояние Y (m)';
 
   @override
-  String get architectToolSelect => 'Избор';
+  String get architectToolSelect => 'Навиг.';
 
   @override
   String get architectToolWall => 'Стена';
@@ -4048,6 +4048,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallDraftHint => 'Задръж → точка · 2 пръста → мащаб';
 
   @override
+  String get architectEditHoldHint => 'Задръж → редакция';
+
+  @override
   String get architectNavigationHint => 'Местене / мащаб';
 
   @override
@@ -4141,7 +4144,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallCut => 'Срежи';
 
   @override
-  String get architectWallCutHint => 'Срез: две точки през стените';
+  String get architectWallCutHint => 'Посочи участък между пресичания';
 
   @override
   String get architectWallDetach => 'Отдели';
@@ -4157,4 +4160,75 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectWallMirror => 'Обърни';
+
+  @override
+  String get architectWallSplit => 'Раздели';
+
+  @override
+  String get architectWallSplitHint => 'Срез: две точки през стените';
+
+  @override
+  String get architectWallClearance => 'Светло';
+
+  @override
+  String get architectGridNone => 'Без оси';
+
+  @override
+  String get architectGridCustom => 'Свободно';
+
+  @override
+  String architectGridBays(int x, int y) {
+    return 'Полета $x × $y';
+  }
+
+  @override
+  String get architectGridPickerHelp =>
+      'Изтегли за брой полета. Осите във всяка посока са с една повече. Докосни размер върху мрежата за редакция.';
+
+  @override
+  String get architectGridFewer => 'По-малко полета';
+
+  @override
+  String get architectGridMore => 'Повече полета';
+
+  @override
+  String get architectWizardUnitsShort => 'Единици';
+
+  @override
+  String get architectWizardGridShort => 'Оси';
+
+  @override
+  String get architectWizardWallsShort => 'Стени';
+
+  @override
+  String get architectWizardTitleShort => 'Нов проект';
+
+  @override
+  String architectGridSpanLabel(String axes, String value) {
+    return 'Междуосие $axes: $value';
+  }
+
+  @override
+  String get architectGridParkingHelp => 'Паркинг';
+
+  @override
+  String get architectGridResidentialHelp => 'Жилищна схема';
+
+  @override
+  String get architectGridVillaHelp => 'Къща';
+
+  @override
+  String get architectGridModularHelp => 'Офис';
+
+  @override
+  String get architectGridNoneHelp => 'Без начални оси';
+
+  @override
+  String get architectRadius => 'Радиус';
+
+  @override
+  String get architectShapeWidth => 'Ширина';
+
+  @override
+  String get architectShapeHeight => 'Височина';
 }

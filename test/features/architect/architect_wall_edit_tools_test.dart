@@ -361,6 +361,7 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
+      await editing.selectTool(tester, 'wall');
       await editing.hold(tester, const Offset(2, .2));
       await tester.tap(find.byKey(const ValueKey('wall-detach')));
       await tester.pumpAndSettle();
@@ -377,7 +378,7 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('wall-cut')));
+      await tester.tap(find.byKey(const ValueKey('wall-split-stroke')));
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(3, -1));
       final g = await tester.startGesture(
@@ -411,11 +412,13 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
+      await editing.selectTool(tester, 'wall');
       await editing.hold(tester, const Offset(2, 2.5));
       final old = model.project;
       final gesture = await tester.startGesture(
         workspace.screen(tester, const Offset(2, 2.5)),
       );
+      await tester.pump(const Duration(milliseconds: 281));
       await gesture.moveTo(workspace.screen(tester, const Offset(3, 3)));
       await tester.pump();
       final preview = workspace.overlay(tester).project;
@@ -492,6 +495,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await editing.selectTool(tester, 'wall');
     await editing.hold(tester, const Offset(0, -1));
     await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
     await tester.pumpAndSettle();
@@ -510,7 +514,7 @@ void main() {
     }
     await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('wall-cut')));
+    await tester.tap(find.byKey(const ValueKey('wall-split-stroke')));
     await tester.pumpAndSettle();
     await workspace.wallTap(tester, const Offset(0, -1.8));
     final gesture = await tester.startGesture(

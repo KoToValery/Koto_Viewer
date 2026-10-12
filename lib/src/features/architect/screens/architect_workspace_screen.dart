@@ -31,7 +31,11 @@ import '../rendering/architect_underlay_painter.dart';
 import '../rendering/architect_scene_geometry.dart';
 import '../services/architect_command_controller.dart';
 import '../services/architect_element_tool.dart';
+import '../services/architect_polygon_editor.dart';
+import '../widgets/architect_shape_dimension_panel.dart';
 import '../services/architect_selection.dart';
+import '../services/architect_wall_relations.dart';
+import '../rendering/architect_dimension_layout.dart';
 import '../rendering/architect_wall_network.dart';
 import '../widgets/architect_element_properties_dialog.dart';
 import '../services/architect_grid_axis_tool.dart';
@@ -217,9 +221,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelDrafting() {
+    _pendingShape = null;
+    _shapePanelAnchor = null;
     _selectionIds.clear();
     _wallCutIds = {};
     _wallCutStart = null;
+    _wallStartAttachment = null;
     _wallExtendId = null;
     _multiSelect = false;
     _moveSelection = false;
@@ -244,6 +251,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   WallDraftingMode _wallMode = WallDraftingMode.singleLine;
   Offset? _draftStart;
   Offset? _draftEnd;
+  CadPrimitiveType? _pendingShape;
+  Offset? _shapePanelAnchor;
+  final _polygonEditor = ArchitectPolygonEditor();
   bool _wallDirectionLocked = false;
   Offset? _wallPanelAnchor;
   WallReferenceLine _wallReference = WallReferenceLine.center;
@@ -251,7 +261,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   String? _wallExtendId;
   Set<String> _wallCutIds = {};
   Offset? _wallCutStart;
-  bool _wallMagnet = true;
+  bool _magnetEnabled = true;
+  bool _wallCutStroke = false;
+  bool _controlTrimClick = false;
+  ArchitectWallAttachment? _wallStartAttachment;
   final Set<String> _selectionIds = {};
   Set<String> _groupDragIds = {};
   bool _multiSelect = false;
@@ -263,10 +276,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ?_selectedZoneId,
           if (_axisTool.selectedAxisId != null) _axisTool.selectedAxisId!,
         };
-  bool _wallTouchInput = false;
-  bool _wallPlacingWithHold = false;
+  bool _touchInput = false;
+  bool _placingWithHold = false;
   bool _wallPrecisionMode = true;
-  Offset? _wallTouchPosition;
+  Offset? _touchPosition;
   ArchitectWall? _wallEndpointOriginal;
   ArchitectProject? _wallSnapProject;
   bool _wallDragStart = false;
@@ -321,6 +334,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   /// is actively being dragged. ArchitectViewport routes captured handles exclusively to the tool.
   bool get _isActivelyDraggingHandle =>
       _isHandleEngaged ||
+      _polygonEditor.active ||
       _draggingElementId != null ||
       _draggingVertexIndex != null ||
       _zoneTool.isExtruding ||
@@ -515,14 +529,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // === SECTION: 2D POINTER & TOUCH HANDLING (TOOL INPUT FROM ARCHITECT VIEWPORT) ===
 
   void _onPointerDown(PointerDownEvent event) {
-    _wallTouchInput = event.kind == PointerDeviceKind.touch;
+    _touchInput = event.kind == PointerDeviceKind.touch;
     _handlePointerDown = event.localPosition;
     _handleMoved = false;
     _isHandleEngaged = false;
 
     final rawModel = _screenToModel(event.localPosition);
-    if (_wallExtendId != null || _wallCutIds.isNotEmpty) return;
-    if (_activeTool == ArchitectTool.select &&
+    if (_activeTool == ArchitectTool.wall &&
+        event.kind == PointerDeviceKind.mouse &&
+        HardwareKeyboard.instance.isControlPressed) {
+      final span = _trimSpanAt(rawModel, restrictSelection: false);
+      if (span != null) {
+        _controlTrimClick = true;
+        _executeWallEdit(
+          TrimArchitectWall(
+            storeyId: _project.activeStoreyId,
+            wallId: span.wall.id,
+            pick: rawModel,
+          ),
+        );
+        return;
+      }
+    }
+    if (_wallCutIds.isNotEmpty) {
+      _cursorModel = rawModel;
+      _repaintPreview();
+      return;
+    }
+    if (_wallExtendId != null) return;
+    if (_activeTool != ArchitectTool.select &&
         (_multiSelect || _moveSelection)) {
       final id = _hitSelection(rawModel);
       if (_moveSelection && id != null && _effectiveSelection.contains(id)) {
@@ -536,13 +571,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
       return;
     }
+    final polygon = _selectedPolygon;
+    if (polygon != null &&
+        _polygonEditor.start(
+          _selectedElementId!,
+          polygon,
+          rawModel,
+          _currentScale,
+        )) {
+      _elementMoveOriginal = _project;
+      _elementMovePreview = _project;
+      _isHandleEngaged = true;
+      HapticFeedback.selectionClick();
+      return;
+    }
     if (_activeTool == ArchitectTool.wall) {
-      _wallPlacingWithHold = !_wallTouchInput;
-      _wallTouchPosition = null;
-      if (!_wallTouchInput) _updatePointerPreview(event.localPosition);
+      _placingWithHold = !_touchInput;
+      _touchPosition = null;
+      if (!_touchInput) _updatePointerPreview(event.localPosition);
       _repaintPreview();
     }
-    if (_activeTool == ArchitectTool.select && _selectedWall != null) {
+    if (_activeTool == ArchitectTool.wall && _selectedWall != null) {
       if (_wallInsertPointId != null) return;
       final wall = _selectedWall!;
       for (final atStart in [true, false]) {
@@ -566,17 +615,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     // 1. Grid Axis handle & body interactions in Axis or Select mode
-    if ((_activeTool == ArchitectTool.axis ||
-            _activeTool == ArchitectTool.select) &&
-        !_axisTool.isDrafting) {
+    if (_activeTool == ArchitectTool.axis && !_axisTool.isDrafting) {
       // 1a. Handle hit check (stretching axis extents)
       final axisHandle = _axisTool.hitTestAxisHandle(
         rawModel,
-        _activeTool == ArchitectTool.select
-            ? _project.gridAxes
-                  .where((a) => a.id == _axisTool.selectedAxisId)
-                  .toList()
-            : _project.gridAxes,
+        _project.gridAxes
+            .where((a) => a.id == _axisTool.selectedAxisId)
+            .toList(),
         tolerance: 18.0 / _currentScale,
       );
       if (axisHandle != null) {
@@ -597,17 +642,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         return;
       }
 
-      if (_activeTool == ArchitectTool.select &&
-          _tryStartElementDrag(rawModel)) {
-        return;
-      }
-
       // 1b. Axis body hit check (select or start move if already selected)
       final hitAxis = _axisTool.hitTestAxis(
         rawModel,
         _project.gridAxes,
         tolerance: 16.0 / _currentScale,
       );
+      if (_wallForAxis(rawModel) != null &&
+          (_axisTool.selectedAxisId == null ||
+              hitAxis?.id != _axisTool.selectedAxisId)) {
+        return;
+      }
       if (hitAxis != null) {
         if (_axisTool.selectedAxisId == hitAxis.id) {
           _axisTool.startMoving(hitAxis, rawModel);
@@ -630,8 +675,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     // 2. Zone handle interactions in Zone or Select mode
-    if (_activeTool == ArchitectTool.zone ||
-        _activeTool == ArchitectTool.select) {
+    if (_activeTool == ArchitectTool.zone) {
       // 2a. Whole zone move mode check (GPS_Mapping mode)
       if (_zoneTool.isMoveWholeZoneMode && _selectedZone != null) {
         _zoneTool.startMovingZone(rawModel);
@@ -693,6 +737,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
     }
 
+    if (_effectiveSelection.isNotEmpty &&
+        _activeTool != ArchitectTool.select &&
+        _tryStartElementDrag(rawModel)) {
+      return;
+    }
+
     // No handle engaged on pointer-down: free pan/zoom candidate
     ArchitectLogger.log(
       'VIEWPORT',
@@ -701,30 +751,76 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _onPointerMove(PointerMoveEvent event) {
+    if (_touchInput &&
+        _isActivelyDraggingHandle &&
+        !_handleMoved &&
+        _handlePointerDown != null &&
+        (event.localPosition - _handlePointerDown!).distance <= 6) {
+      return;
+    }
     if (_handlePointerDown != null &&
         (event.localPosition - _handlePointerDown!).distance > 1e-6) {
       _handleMoved = true;
     }
-    if (_activeTool == ArchitectTool.wall &&
-        _wallTouchInput &&
-        _wallPlacingWithHold) {
-      _wallTouchPosition = event.localPosition;
+    if (_touchInput && _placingWithHold) {
+      _touchPosition = event.localPosition;
     }
     _updatePointerPreview(_placementPosition(event.localPosition));
   }
 
-  void _beginWallHold(Offset point) {
-    if (_activeTool != ArchitectTool.wall || _wallDirectionLocked) return;
-    _wallPlacingWithHold = true;
-    _wallTouchPosition = point;
+  void _beginPlacementHold(Offset point) {
+    if (!_canPlaceWithMarker) return;
+    if (_effectiveSelection.isNotEmpty &&
+        _wallCutIds.isEmpty &&
+        _wallExtendId == null &&
+        _wallInsertPointId == null) {
+      // A hold on empty space resumes placement with the same active tool.
+      setState(() {
+        _selectionIds.clear();
+        _selectedElementId = null;
+        _selectedZoneId = null;
+        _zoneTool.cancelAll();
+        _axisTool.cancelAll();
+      });
+    }
+    _placingWithHold = true;
+    _touchPosition = point;
     _updatePointerPreview(_placementPosition(point));
     HapticFeedback.selectionClick();
   }
 
-  Offset _placementPosition(Offset point) => _activeTool == ArchitectTool.wall
+  bool get _canPlaceWithMarker =>
+      _activeTool != ArchitectTool.select &&
+      !_wallDirectionLocked &&
+      _pendingShape == null;
+
+  Offset? get _placementPreviewTarget {
+    final raw = _cursorModel;
+    if (raw != null &&
+        (_activeTool == ArchitectTool.door ||
+            _activeTool == ArchitectTool.window)) {
+      ArchitectWall? host;
+      var best = double.infinity;
+      for (final wall in _project.activeStorey.walls) {
+        final (_, distance) = wall.projectPoint(raw);
+        if (distance <= wall.thickness / 2 + .30 && distance < best) {
+          host = wall;
+          best = distance;
+        }
+      }
+      if (host != null) {
+        final (ratio, _) = host.projectPoint(raw);
+        return host.centerStart + (host.centerEnd - host.centerStart) * ratio;
+      }
+    }
+    return _draftEnd ?? raw;
+  }
+
+  Offset _placementPosition(Offset point) =>
+      _canPlaceWithMarker && !_isActivelyDraggingHandle
       ? StructuralPointerInteraction.placementTarget(
           point,
-          isMouse: !_wallTouchInput || !_wallPlacingWithHold,
+          isMouse: !_touchInput || !_placingWithHold,
         )
       : point;
 
@@ -734,22 +830,127 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         anchor: anchor,
         project: _project,
         scale: _currentScale,
-        capturePixels: _wallTouchInput ? 12 : 8,
-        magnetic: _wallMagnet,
+        capturePixels: _touchInput ? 12 : 8,
+        magnetic: _magnetEnabled,
         underlay: _currentUnderlayDoc,
         frame: widget.underlayFrame,
         visibility: _underlayLayerVisibility,
       );
 
+  ArchitectSnapResult _snapElement(Offset raw, {Offset? anchor}) {
+    final snap = anchor == null
+        ? ArchitectSnapHelper.snapFree(
+            rawPoint: raw,
+            project: _project,
+            tolerance: (_touchInput ? 12 : 8) / _currentScale,
+            magnetic: _magnetEnabled,
+            alignment: true,
+            underlay: _currentUnderlayDoc,
+            frame: widget.underlayFrame,
+            visibility: _underlayLayerVisibility,
+          )
+        : ArchitectSnapHelper.snapWithAnchor(
+            rawPoint: raw,
+            anchor: anchor,
+            project: _project,
+            tolerance: (_touchInput ? 12 : 8) / _currentScale,
+            magnetic: _magnetEnabled,
+            alignment: true,
+            underlay: _currentUnderlayDoc,
+            frame: widget.underlayFrame,
+            visibility: _underlayLayerVisibility,
+          );
+    _activeSnapLabel = snap.snapLabel;
+    _activeMagneticGuides = snap.magneticGuides;
+    return snap;
+  }
+
+  Offset _snapMovingElements(Offset delta, Set<String> ids) {
+    final snap = ArchitectSnapHelper.snapTranslation(
+      project: _elementMoveOriginal!,
+      elementIds: ids,
+      delta: delta,
+      tolerance: (_touchInput ? 12 : 8) / _currentScale,
+      magnetic: _magnetEnabled,
+      underlay: _currentUnderlayDoc,
+      frame: widget.underlayFrame,
+      visibility: _underlayLayerVisibility,
+    );
+    _activeSnapLabel = snap.snapLabel;
+    _activeMagneticGuides = snap.magneticGuides;
+    return snap.point;
+  }
+
+  List<Offset>? get _selectedPolygon {
+    if (_activeTool == ArchitectTool.cadRect) {
+      for (final p in _project.activeStorey.cadPrimitives) {
+        if (p.id == _selectedElementId && p.type == CadPrimitiveType.rect) {
+          return p.polygonCorners;
+        }
+      }
+    }
+    if (_activeTool == ArchitectTool.slab) {
+      for (final slab in _project.activeStorey.slabs) {
+        if (slab.id == _selectedElementId) return slab.polygon;
+      }
+    }
+    return null;
+  }
+
   void _updatePointerPreview(Offset screenPosition) {
+    if (_pendingShape != null) return;
     final rawModel = _screenToModel(screenPosition);
     _cursorModel = rawModel;
+    if (_polygonEditor.active) {
+      _polygonEditor.update(
+        rawModel,
+        (point) => ArchitectSnapHelper.snapFree(
+          rawPoint: point,
+          project: _elementMoveOriginal!,
+          tolerance: 12 / _currentScale,
+          magnetic: _magnetEnabled,
+          alignment: true,
+          excludedIds: {_polygonEditor.elementId!},
+          underlay: _currentUnderlayDoc,
+          frame: widget.underlayFrame,
+          visibility: _underlayLayerVisibility,
+        ),
+        math.min(12 / _currentScale, .20),
+      );
+      final snap = _polygonEditor.activeSnap;
+      _activeSnapLabel = snap?.snapLabel;
+      _activeMagneticGuides = snap?.magneticGuides ?? [];
+      _elementMovePreview = UpdateArchitectPolygon(
+        storeyId: _project.activeStoreyId,
+        elementId: _polygonEditor.elementId!,
+        polygon: _polygonEditor.preview!,
+      ).apply(_elementMoveOriginal!);
+      _repaintPreview();
+      return;
+    }
+    if (_activeTool == ArchitectTool.axis &&
+        !_axisTool.isDrafting &&
+        !_isActivelyDraggingHandle) {
+      final wall = _wallForAxis(rawModel);
+      if (wall != null) {
+        final d = rawModel - wall.coreCenterStart;
+        final along = (d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy)
+            .clamp(0.0, wall.length);
+        _cursorModel = wall.coreCenterStart + wall.unitVector * along;
+        _activeSnapLabel = 'Center';
+        _repaintPreview();
+        return;
+      }
+    }
     if (_wallCutIds.isNotEmpty) {
       _repaintPreview();
       return;
     }
-    if (_activeTool == ArchitectTool.wall && _draftStart == null) {
+    if (_activeTool == ArchitectTool.wall &&
+        _draftStart == null &&
+        !_isActivelyDraggingHandle) {
       final snap = _snapWall(rawModel);
+      _adoptWallReference(snap.wallAttachment);
       _cursorModel = snap.point;
       _activeSnapLabel = snap.snapLabel;
       _activeMagneticGuides = snap.magneticGuides;
@@ -767,7 +968,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
       final snap = ArchitectWallSnap.resolve(
         raw: rawModel + _wallGrabOffset,
-        magnetic: _wallMagnet,
+        magnetic: _magnetEnabled,
         anchor: _wallDragStart ? original.endPoint : original.startPoint,
         project: snapProject,
         scale: _currentScale,
@@ -793,12 +994,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _repaintPreview();
       return;
     }
-    if (_activeTool == ArchitectTool.column) {
-      _columnPreviewPoint = ArchitectSnapHelper.snapFree(
-        rawPoint: rawModel,
-        project: _project,
-        tolerance: 12.0 / _currentScale,
-      ).point;
+    if (_activeTool == ArchitectTool.column && !_isActivelyDraggingHandle) {
+      final snap = _snapElement(rawModel);
+      _columnPreviewPoint = snap.point;
+      _activeSnapLabel = snap.snapLabel;
+      _cursorModel = _columnPreviewPoint;
       _repaintPreview();
       return;
     }
@@ -809,7 +1009,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       var delta = ArchitectSnapHelper.precision(
         _project,
       ).inputPoint(rawModel - _elementMoveStart!);
-      if (_wallMagnet) {
+      if (_magnetEnabled &&
+          _elementMoveOriginal!.activeStorey.walls.any(
+            (w) => _groupDragIds.contains(w.id),
+          )) {
         final alignment = ArchitectWallAlignment.move(
           _elementMoveOriginal!.activeStorey.walls,
           _groupDragIds,
@@ -818,6 +1021,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         );
         delta = alignment.$1;
         _activeMagneticGuides = alignment.$2;
+      } else {
+        delta = _snapMovingElements(delta, _groupDragIds);
       }
       try {
         _elementMovePreview = MoveArchitectElements(
@@ -843,7 +1048,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         final n = selectedWall.normalVector;
         delta = n * (delta.dx * n.dx + delta.dy * n.dy);
       }
-      if (selectedWall != null && _wallMagnet) {
+      if (selectedWall != null && _magnetEnabled) {
         final alignment = ArchitectWallAlignment.move(
           _elementMoveOriginal!.activeStorey.walls,
           {selectedWall.id},
@@ -853,6 +1058,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         );
         delta = alignment.$1;
         _activeMagneticGuides = alignment.$2;
+      } else if (selectedWall == null) {
+        delta = _snapMovingElements(delta, {_draggingElementId!});
       }
       _elementMoveDelta = delta;
       if (selectedWall != null) {
@@ -900,7 +1107,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 0d. Axis drafting
     if (_activeTool == ArchitectTool.axis && _axisTool.isDrafting) {
-      _axisTool.updateDrafting(rawModel, _project, _currentScale);
+      _axisTool.updateDrafting(
+        rawModel,
+        _project,
+        _currentScale,
+        magnetic: _magnetEnabled,
+        snapper: (anchor) => _snapElement(rawModel, anchor: anchor),
+      );
+      _cursorModel = _axisTool.draftEnd;
+      _activeSnapLabel = _axisTool.draftSnapLabel;
+      _repaintPreview();
       return;
     }
 
@@ -910,7 +1126,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         rawModelPoint: rawModel,
         project: _project,
         currentScale: _currentScale,
+        magnetic: _magnetEnabled,
+        underlay: _currentUnderlayDoc,
+        frame: widget.underlayFrame,
+        visibility: _underlayLayerVisibility,
       );
+      _cursorModel = _zoneTool.candidatePoint;
+      _repaintPreview();
       return;
     }
 
@@ -923,6 +1145,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // 3. Dragging a zone vertex (dynamic slab editing)
     if (_draggingVertexIndex != null && _selectedZone != null) {
       final snap = ArchitectZoneSnap.snap(
+        magnetic: _magnetEnabled,
+        underlay: _currentUnderlayDoc,
+        frame: widget.underlayFrame,
+        visibility: _underlayLayerVisibility,
         raw: rawModel + _vertexGrabOffset,
         project: _project,
         excludedZoneId: _selectedZoneId,
@@ -959,6 +1185,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_wallDirectionLocked) return;
       final snap = _snapWall(rawModel, anchor: _draftStart);
       _activeMagneticGuides = snap.magneticGuides;
+      _orientWallReference(snap.point);
       _draftEnd = snap.point;
       _activeSnapLabel = snap.snapLabel;
       _repaintPreview();
@@ -976,17 +1203,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _activeTool == ArchitectTool.cadCircle ||
             _activeTool == ArchitectTool.measure)) {
       final snap = _activeTool == ArchitectTool.dimension
-          ? ArchitectSnapHelper.snapFree(
-              rawPoint: rawModel,
-              project: _project,
-              tolerance: 12.0 / _currentScale,
-            )
-          : ArchitectSnapHelper.snapWithAnchor(
-              anchor: _draftStart!,
-              rawPoint: rawModel,
-              project: _project,
-              tolerance: 12.0 / _currentScale,
-            );
+          ? _snapElement(rawModel)
+          : _snapElement(rawModel, anchor: _draftStart);
       _draftEnd = snap.point;
       _activeSnapLabel = snap.snapLabel;
       _repaintPreview();
@@ -997,7 +1215,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.slab &&
         _elementTool.slabDraftPoints.isNotEmpty) {
       _elementTool.updateSlabCandidate(_resolveSlabPoint(rawModel));
+      _cursorModel = _elementTool.slabCandidatePoint;
+    } else if (_canPlaceWithMarker &&
+        _activeTool != ArchitectTool.door &&
+        _activeTool != ArchitectTool.window) {
+      final snap = _snapElement(rawModel);
+      _cursorModel = snap.point;
+      _activeSnapLabel = snap.snapLabel;
     }
+    _repaintPreview();
   }
 
   Offset _resolveSlabPoint(Offset raw) {
@@ -1006,19 +1232,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         (raw - points.first).distance <= math.min(16 / _currentScale, .20)) {
       return points.first;
     }
-    return ArchitectSnapHelper.snapFree(
-      rawPoint: raw,
-      project: _project,
-      tolerance: 14 / _currentScale,
-    ).point;
+    return _snapElement(raw, anchor: points.lastOrNull).point;
   }
 
   void _onPointerHover(PointerHoverEvent event) {
-    _wallTouchInput = false;
+    _touchInput = false;
     _updatePointerPreview(event.localPosition);
   }
 
   void _onPointerUp(PointerUpEvent event) {
+    if (_controlTrimClick) {
+      _controlTrimClick = false;
+      return;
+    }
     if (_isActivelyDraggingHandle && !_handleMoved) {
       _cancelActiveDrags();
       _repaintPreview();
@@ -1034,15 +1260,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     } else {
       _handleTap(_screenToModel(_placementPosition(event.localPosition)));
     }
-    _wallPlacingWithHold = false;
-    _wallTouchPosition = null;
+    _placingWithHold = false;
+    _touchPosition = null;
     _repaintPreview();
   }
 
   void _cancelActiveDrags() {
+    _polygonEditor.cancel();
+    _controlTrimClick = false;
     _groupDragIds = {};
-    _wallPlacingWithHold = false;
-    _wallTouchPosition = null;
+    _placingWithHold = false;
+    _touchPosition = null;
     _wallEndpointOriginal = null;
     _wallSnapProject = null;
     _handleMoved = false;
@@ -1075,6 +1303,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _commitActiveHandleDrag(Offset screenPos) {
+    if (_polygonEditor.active) {
+      final id = _polygonEditor.elementId!, points = _polygonEditor.preview!;
+      final original = _polygonEditor.original!;
+      final valid = !_polygonEditor.invalid;
+      final changed =
+          points.length != original.length ||
+          List.generate(
+            points.length,
+            (i) => i < original.length && points[i] == original[i],
+          ).any((same) => !same);
+      _cancelActiveDrags();
+      if (valid && changed) {
+        _commands.execute(
+          UpdateArchitectPolygon(
+            storeyId: _project.activeStoreyId,
+            elementId: id,
+            polygon: points,
+          ),
+        );
+        _saveBiMProjectIfAttached();
+      } else if (!valid) {
+        _operationError();
+      }
+      return;
+    }
     if (_groupDragIds.isNotEmpty) {
       final ids = Set<String>.of(_groupDragIds);
       final delta = _elementMoveDelta;
@@ -1278,7 +1531,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _handleTap(Offset rawModel) {
+    if (_pendingShape != null) return;
     if (_wallCutIds.isNotEmpty) {
+      if (!_wallCutStroke) {
+        final span = _trimSpanAt(rawModel);
+        if (span == null) return;
+        final before = _project;
+        _executeWallEdit(
+          TrimArchitectWall(
+            storeyId: _project.activeStoreyId,
+            wallId: span.wall.id,
+            pick: rawModel,
+          ),
+        );
+        if (!identical(before, _project)) setState(() => _wallCutIds = {});
+        return;
+      }
       if (_wallCutStart == null) {
         setState(() => _wallCutStart = rawModel);
       } else {
@@ -1301,7 +1569,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final wall = _project.activeStorey.walls.firstWhere(
         (w) => w.id == _wallExtendId,
       );
-      final hit = _hitSelection(rawModel);
+      final hit =
+          _hitSelection(rawModel) ??
+          _axisTool
+              .hitTestAxis(
+                rawModel,
+                _project.gridAxes,
+                tolerance: 14 / _currentScale,
+              )
+              ?.id;
       Offset? target;
       for (final w in _project.activeStorey.walls.where(
         (w) => w.id == hit && w.id != wall.id,
@@ -1335,12 +1611,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       setState(() => _wallExtendId = null);
       return;
     }
-    if (_activeTool == ArchitectTool.select && _multiSelect) {
+    if (_activeTool != ArchitectTool.select && _multiSelect) {
       _selectAt(rawModel);
       return;
     }
 
-    if (_wallInsertPointId != null && _activeTool == ArchitectTool.select) {
+    if (_wallInsertPointId != null && _activeTool == ArchitectTool.wall) {
       final wall = _selectedWall;
       _wallInsertPointId = null;
       if (wall != null) {
@@ -1361,10 +1637,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     // 1. In Axis tool
     if (_activeTool == ArchitectTool.axis) {
+      final isBg = Localizations.localeOf(context).languageCode == 'bg';
       // If axis drafting is in progress, commit it
       if (_axisTool.isDrafting) {
-        final isBg = Localizations.localeOf(context).languageCode == 'bg';
-        _axisTool.updateDrafting(rawModel, _project, _currentScale);
+        _axisTool.updateDrafting(
+          rawModel,
+          _project,
+          _currentScale,
+          magnetic: _magnetEnabled,
+          snapper: (anchor) => _snapElement(rawModel, anchor: anchor),
+        );
         final result = _axisTool.commitDrafting(
           project: _project,
           isBulgarian: isBg,
@@ -1372,6 +1654,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         if (result != null) {
           final (updatedProj, newAxis) = result;
           setState(() => _project = updatedProj);
+          HapticFeedback.mediumImpact();
+        }
+        return;
+      }
+
+      final wall = _wallForAxis(rawModel);
+      if (wall != null) {
+        final result = _axisTool.placeOnWall(
+          project: _project,
+          wall: wall,
+          isBulgarian: isBg,
+        );
+        if (result != null) {
+          setState(() => _project = result.$1);
+          _saveBiMProjectIfAttached();
           HapticFeedback.mediumImpact();
         }
         return;
@@ -1394,11 +1691,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
 
       // Empty space tap -> start drafting new axis
-      final snap = ArchitectSnapHelper.snapFree(
-        rawPoint: rawModel,
-        project: _project,
-        tolerance: 14.0 / _currentScale,
-      );
+      final snap = _snapElement(rawModel);
       _axisTool.startDrafting(snap.point);
       setState(() {
         _selectedZoneId = null;
@@ -1417,6 +1710,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           rawModelPoint: rawModel,
           project: _project,
           currentScale: _currentScale,
+          magnetic: _magnetEnabled,
+          underlay: _currentUnderlayDoc,
+          frame: widget.underlayFrame,
+          visibility: _underlayLayerVisibility,
         );
 
         if (_zoneTool.isClosingSnap) {
@@ -1468,6 +1765,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       // Tapping empty space starts point-by-point drafting!
       final snap = ArchitectZoneSnap.snap(
+        magnetic: _magnetEnabled,
+        underlay: _currentUnderlayDoc,
+        frame: widget.underlayFrame,
+        visibility: _underlayLayerVisibility,
         raw: rawModel,
         project: _project,
         tolerance: 16.0 / _currentScale,
@@ -1486,36 +1787,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // 3. In Select tool
-    if (_activeTool == ArchitectTool.select) {
-      final hitZone = _findZoneAt(rawModel);
-      if (hitZone != null) {
-        _zoneTool.startEditingZone(hitZone);
-        setState(() {
-          _selectedZoneId = hitZone.id;
-          _selectedElementId = null;
-          _axisTool.deselect();
-        });
-        HapticFeedback.selectionClick();
-        return;
-      }
-
-      final hitAxis = _axisTool.hitTestAxis(
-        rawModel,
-        _project.gridAxes,
-        tolerance: 16.0 / _currentScale,
-      );
-      if (hitAxis != null) {
-        _axisTool.selectAxis(hitAxis.id);
-        setState(() {
-          _selectedZoneId = null;
-          _selectedElementId = null;
-        });
-        HapticFeedback.selectionClick();
-        return;
-      }
-
-      _trySelectElementAt(rawModel);
+    // Navigation never captures an element; selection belongs to its tool.
+    if (_activeTool == ArchitectTool.select) return;
+    if (_effectiveSelection.isNotEmpty) {
+      _selectAt(rawModel);
       return;
     }
 
@@ -1524,6 +1799,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_wallDirectionLocked) return;
       if (_draftStart == null) {
         final snap = _snapWall(rawModel);
+        _adoptWallReference(snap.wallAttachment);
+        _wallStartAttachment = snap.wallAttachment;
         setState(() {
           _draftStart = snap.point;
           _draftEnd = snap.point;
@@ -1532,6 +1809,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         HapticFeedback.lightImpact();
       } else {
         final snap = _snapWall(rawModel, anchor: _draftStart);
+        _orientWallReference(snap.point);
         if ((snap.point - _draftStart!).distance >= .001 &&
             _wallPrecisionMode) {
           setState(() {
@@ -1584,11 +1862,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 7. In Column tool
     if (_activeTool == ArchitectTool.column) {
-      final snap = ArchitectSnapHelper.snapFree(
-        rawPoint: rawModel,
-        project: _project,
-        tolerance: 12.0 / _currentScale,
-      );
+      final snap = _snapElement(rawModel);
       final pt = snap.point;
       final (_, newCol) = _elementTool.placeColumn(
         storey: _project.activeStorey,
@@ -1620,22 +1894,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // 8. In Beam tool
     if (_activeTool == ArchitectTool.beam) {
       if (_draftStart == null) {
-        final snap = ArchitectSnapHelper.snapFree(
-          rawPoint: rawModel,
-          project: _project,
-          tolerance: 12.0 / _currentScale,
-        );
+        final snap = _snapElement(rawModel);
         setState(() {
           _draftStart = snap.point;
           _draftEnd = snap.point;
         });
       } else {
-        final snap = ArchitectSnapHelper.snapWithAnchor(
-          anchor: _draftStart!,
-          rawPoint: rawModel,
-          project: _project,
-          tolerance: 12.0 / _currentScale,
-        );
+        final snap = _snapElement(rawModel, anchor: _draftStart);
         final res = _elementTool.placeBeam(
           storey: _project.activeStorey,
           start: _draftStart!,
@@ -1691,11 +1956,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.opening) {
       if (_draftStart == null) {
         setState(() {
-          final point = ArchitectSnapHelper.snapFree(
-            rawPoint: rawModel,
-            project: _project,
-            tolerance: 12.0 / _currentScale,
-          ).point;
+          final point = _snapElement(rawModel).point;
           _draftStart = point;
           _draftEnd = point;
         });
@@ -1733,11 +1994,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.stair) {
       if (_draftStart == null) {
         setState(() {
-          final point = ArchitectSnapHelper.snapFree(
-            rawPoint: rawModel,
-            project: _project,
-            tolerance: 12.0 / _currentScale,
-          ).point;
+          final point = _snapElement(rawModel).point;
           _draftStart = point;
           _draftEnd = point;
         });
@@ -1774,21 +2031,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // 12. In Dimension tool
     if (_activeTool == ArchitectTool.dimension) {
       if (_draftStart == null) {
-        final snap = ArchitectSnapHelper.snapFree(
-          rawPoint: rawModel,
-          project: _project,
-          tolerance: 12.0 / _currentScale,
-        );
+        final snap = _snapElement(rawModel);
         setState(() {
           _draftStart = snap.point;
           _draftEnd = snap.point;
         });
       } else {
-        final snap = ArchitectSnapHelper.snapFree(
-          rawPoint: rawModel,
-          project: _project,
-          tolerance: 12.0 / _currentScale,
-        );
+        final snap = _snapElement(rawModel);
         final res = _elementTool.placeDimension(
           storey: _project.activeStorey,
           start: _draftStart!,
@@ -1822,7 +2071,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.level) {
       final (updatedStorey, _) = _elementTool.placeElevationMarker(
         storey: _project.activeStorey,
-        point: rawModel,
+        point: _snapElement(rawModel).point,
         elevation: _project.activeStorey.elevation,
       );
       setState(() {
@@ -1841,55 +2090,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     // 14. In Text tool
     if (_activeTool == ArchitectTool.text) {
-      _promptAddAnnotation(rawModel);
+      _promptAddAnnotation(_snapElement(rawModel).point);
       return;
     }
 
-    // 15. In CAD Primitives tools
+    // 15. CAD shape dimensions freeze after the second point.
     if (_activeTool == ArchitectTool.cadLine ||
         _activeTool == ArchitectTool.cadRect ||
         _activeTool == ArchitectTool.cadCircle) {
       if (_draftStart == null) {
+        final point = _snapElement(rawModel).point;
         setState(() {
-          final point = ArchitectSnapHelper.snapFree(
-            rawPoint: rawModel,
-            project: _project,
-            tolerance: 12.0 / _currentScale,
-          ).point;
           _draftStart = point;
           _draftEnd = point;
         });
       } else {
+        final snap = _snapElement(rawModel, anchor: _draftStart);
+        _draftEnd = snap.point;
         final type = _activeTool == ArchitectTool.cadLine
             ? CadPrimitiveType.line
             : _activeTool == ArchitectTool.cadRect
             ? CadPrimitiveType.rect
             : CadPrimitiveType.circle;
-        final res = _elementTool.placeCadPrimitive(
-          storey: _project.activeStorey,
-          type: type,
-          start: _draftStart!,
-          end: _draftEnd ?? rawModel,
-        );
-        if (res != null) {
+        final attached =
+            snap.isSnapped &&
+            snap.snapLabel != 'Alignment' &&
+            !(snap.snapLabel?.endsWith('°') ?? false);
+        if (type == CadPrimitiveType.circle ||
+            (type == CadPrimitiveType.rect && !attached)) {
           setState(() {
-            _project = _project.updateActiveStorey(res.$1);
-            _draftStart = null;
-            _draftEnd = null;
+            _pendingShape = type;
+            _shapePanelAnchor = snap.point;
           });
-          _saveBiMProjectIfAttached();
-          HapticFeedback.lightImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.architectCadShapePlaced),
-              duration: const Duration(seconds: 1),
-            ),
-          );
         } else {
-          setState(() {
-            _draftStart = null;
-            _draftEnd = null;
-          });
+          _commitCadShape(type);
         }
       }
       return;
@@ -1899,11 +2133,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_activeTool == ArchitectTool.measure) {
       if (_draftStart == null) {
         setState(() {
-          final point = ArchitectSnapHelper.snapFree(
-            rawPoint: rawModel,
-            project: _project,
-            tolerance: 12.0 / _currentScale,
-          ).point;
+          final point = _snapElement(rawModel).point;
           _draftStart = point;
           _draftEnd = point;
         });
@@ -1980,6 +2210,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final len = (p2 - p1).distance;
     if (len < 0.001) return;
 
+    _orientWallReference(p2);
     final now = ArchitectElementId.next('element');
     final newWall = ArchitectWall(
       id: 'wall_$now',
@@ -2003,9 +2234,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (continueChain ?? (_wallMode == WallDraftingMode.chained)) {
         _draftStart = p2;
         _draftEnd = p2;
+        _wallStartAttachment = ArchitectWallAttachment(newWall, _wallReference);
       } else {
         _draftStart = null;
         _draftEnd = null;
+        _wallStartAttachment = null;
         _wallDirectionLocked = false;
         _wallInsertPointId = null;
         _activeSnapLabel = null;
@@ -2023,6 +2256,165 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _wallDirectionLocked = false;
       _activeSnapLabel = null;
     });
+  }
+
+  void _adoptWallReference(ArchitectWallAttachment? attachment) {
+    if (attachment == null) return;
+    if (_wallReference != attachment.reference) {
+      setState(() => _wallReference = attachment.reference);
+    }
+  }
+
+  void _orientWallReference(Offset end) {
+    if (_wallStartAttachment == null || _draftStart == null) return;
+    final side = _wallStartAttachment!.sideFor(
+      _draftStart!,
+      end,
+      _wallThickness,
+      _activeWallType?.insulationThickness ?? 0,
+    );
+    if (_wallExteriorSide != side) setState(() => _wallExteriorSide = side);
+  }
+
+  ArchitectWallTrimSpan? _trimSpanAt(
+    Offset point, {
+    bool restrictSelection = true,
+  }) {
+    ArchitectWall? picked;
+    var best = double.infinity;
+    for (final wall in _project.activeStorey.walls) {
+      if (restrictSelection && !_wallCutIds.contains(wall.id)) continue;
+      final (ratio, distance) = wall.projectPoint(point);
+      final d = point - wall.centerStart;
+      final along = d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+      if (along < -12 / _currentScale ||
+          along > wall.length + 12 / _currentScale) {
+        continue;
+      }
+      if (ratio >= 0 &&
+          distance <= wall.thickness / 2 + 12 / _currentScale &&
+          distance < best) {
+        picked = wall;
+        best = distance;
+      }
+    }
+    return picked == null
+        ? null
+        : ArchitectWallTrimSpan.at(picked, _project.activeStorey.walls, point);
+  }
+
+  List<ArchitectWallClearance> get _wallClearances {
+    final ids = _effectiveSelection;
+    if (_activeTool != ArchitectTool.wall ||
+        ids.length != 1 ||
+        _wallCutIds.isNotEmpty) {
+      return [];
+    }
+    final walls = (_elementMovePreview ?? _project).activeStorey.walls;
+    final selected = walls.where((w) => ids.contains(w.id));
+    return selected.isEmpty
+        ? []
+        : ArchitectWallClearance.nearest(selected.first, walls);
+  }
+
+  Widget _buildWallClearanceOverlay() => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: Listenable.merge([_viewport, _previewRevision]),
+      builder: (context, child) {
+        final clearances = _wallClearances;
+        if (clearances.isEmpty) return const SizedBox.shrink();
+        final walls = (_elementMovePreview ?? _project).activeStorey.walls;
+        final body = ArchitectWallNetwork.body(walls);
+        return Stack(
+          children: [
+            for (final gap in clearances)
+              Builder(
+                builder: (context) {
+                  final wall = walls.firstWhere((w) => w.id == gap.wallId);
+                  final position = ArchitectDimensionLayout.clearTextPosition(
+                    gap.midpoint,
+                    const Size(88, 36),
+                    _currentScale,
+                    wall.unitVector,
+                    body,
+                  );
+                  final screen = _viewport.toScreen(position);
+                  if (screen.dx < 44 ||
+                      screen.dx > _viewport.size.width - 44 ||
+                      screen.dy < 18 ||
+                      screen.dy > _viewport.size.height - 18) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned(
+                    left: screen.dx - 44,
+                    top: screen.dy - 18,
+                    width: 88,
+                    height: 36,
+                    child: Tooltip(
+                      message: context.l10n.architectWallClearance,
+                      child: Material(
+                        color: const Color(0xEE1E242C),
+                        borderRadius: BorderRadius.circular(6),
+                        child: InkWell(
+                          key: ValueKey('wall-clearance-${gap.neighborId}'),
+                          onTap: () => _editWallClearance(gap),
+                          child: Center(
+                            child: Text(
+                              _project.units.format(gap.distance, decimals: 3),
+                              style: const TextStyle(
+                                color: Colors.cyanAccent,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        );
+      },
+    ),
+  );
+
+  void _editWallClearance(ArchitectWallClearance gap) {
+    var distance = gap.distance;
+    final storeyId = _project.activeStoreyId;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: SizedBox(
+          width: 220,
+          child: ArchitectWallDraftingPanel(
+            title: context.l10n.architectWallClearance,
+            endLabel: context.l10n.save,
+            length: _project.units.toUnit(distance),
+            unit: _project.units.symbol,
+            minimumLength: 0,
+            keypadInitiallyOpen: true,
+            showContinue: false,
+            showDirection: false,
+            onLength: (value) => distance = _project.units.fromUnit(value),
+            onEnd: () {
+              Navigator.of(dialogContext).pop();
+              _executeWallEdit(
+                SetArchitectWallClearance(
+                  storeyId: storeyId,
+                  wallId: gap.wallId,
+                  neighborId: gap.neighborId,
+                  distance: distance,
+                ),
+              );
+            },
+            onCancel: () => Navigator.of(dialogContext).pop(),
+            onUnlock: () {},
+            onContinue: () {},
+          ),
+        ),
+      ),
+    );
   }
 
   void _chooseWallDimension() {
@@ -2145,24 +2537,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   String? _hitSelection(Offset point) {
-    final id = _elementTool.hitTestElement(
-      _project.activeStorey.copyWith(slabs: []),
+    if (_activeTool == ArchitectTool.axis) {
+      return _axisTool
+          .hitTestAxis(point, _project.gridAxes, tolerance: 14 / _currentScale)
+          ?.id;
+    }
+    if (_activeTool == ArchitectTool.zone) return _findZoneAt(point)?.id;
+    return _elementTool.hitTestForTool(
+      _project.activeStorey,
       point,
       _currentScale,
+      _activeTool,
     );
-    if (id != null) return id;
-    final axis = _axisTool.hitTestAxis(
-      point,
-      _project.gridAxes,
-      tolerance: 14 / _currentScale,
-    );
-    if (axis != null) return axis.id;
-    return _findZoneAt(point)?.id ??
-        _elementTool.hitTestElement(
-          _project.activeStorey,
-          point,
-          _currentScale,
-        );
   }
 
   bool _onSelectionHold(Offset screenPoint) {
@@ -2186,7 +2572,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _axisTool.cancelAll();
     setState(() {
       _interactionEpoch++;
-      _activeTool = ArchitectTool.select;
       _draftStart = null;
       _draftEnd = null;
       _selectedElementId = null;
@@ -2362,8 +2747,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 padding: EdgeInsets.zero,
                 icon: const Icon(Icons.more_horiz, color: Colors.white70),
                 onSelected: (action) {
-                  if (action == 'cut') {
+                  if (action == 'cut' || action == 'splitStroke') {
                     setState(() {
+                      _wallCutStroke = action == 'splitStroke';
                       _wallCutIds = Set.of(wallIds);
                       _wallCutStart = null;
                       _wallExtendId = null;
@@ -2378,7 +2764,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     );
                   } else if (action == 'magnet') {
                     setState(() {
-                      _wallMagnet = !_wallMagnet;
+                      _magnetEnabled = !_magnetEnabled;
                       _activeMagneticGuides = [];
                     });
                   } else if (action == 'join') {
@@ -2416,13 +2802,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ),
                   ),
                   PopupMenuItem(
+                    key: const ValueKey('wall-split-stroke'),
+                    value: 'splitStroke',
+                    child: Text(l.architectWallSplit),
+                  ),
+                  PopupMenuItem(
                     key: const ValueKey('wall-mirror'),
                     value: 'mirror',
                     child: Text(l.architectWallMirror),
                   ),
                   CheckedPopupMenuItem(
                     value: 'magnet',
-                    checked: _wallMagnet,
+                    checked: _magnetEnabled,
                     child: Text(l.architectWallMagnet),
                   ),
                   if (wallIds.length == 1 && !_multiSelect) ...[
@@ -2497,13 +2888,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   bool _tryStartElementDrag(Offset point) {
     final storey = _project.activeStorey;
-    // Filled slabs are background surfaces; point/line objects take precedence.
-    final id = _elementTool.hitTestElement(
-      storey.copyWith(slabs: []),
-      point,
-      _currentScale,
-    );
-    if (id == null) return false;
+    final id = _hitSelection(point);
+    if (id == null || !_effectiveSelection.contains(id)) return false;
     final movable = [
       ...storey.walls.map((e) => e.id),
       ...storey.walls.expand(
@@ -2511,6 +2897,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ),
       ...storey.columns.map((e) => e.id),
       ...storey.beams.map((e) => e.id),
+      ...storey.slabs.map((e) => e.id),
       ...storey.openings.map((e) => e.id),
       ...storey.stairs.map((e) => e.id),
       ...storey.dimensions.map((e) => e.id),
@@ -2534,22 +2921,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _elementMovePreview = _project;
     }
     return true;
-  }
-
-  void _trySelectElementAt(Offset point) {
-    final hitId = _elementTool.hitTestElement(
-      _project.activeStorey,
-      point,
-      _currentScale,
-    );
-    setState(() {
-      _selectedElementId = hitId;
-      _selectedZoneId = null;
-    });
-    _axisTool.deselect();
-    if (hitId != null) {
-      HapticFeedback.selectionClick();
-    }
   }
 
   String get _selectedElementLabel {
@@ -2950,6 +3321,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _selectedZoneId = null;
                     _selectedElementId = null;
                     _activeTool = tool;
+                    _pendingShape = null;
+                    _shapePanelAnchor = null;
                     _columnPreviewPoint = null;
                     _cursorModel = null;
                     _draftStart = null;
@@ -3239,12 +3612,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _project.id,
           _project.activeStoreyId,
         ),
-        singlePointerPan:
-            _activeTool == ArchitectTool.select ||
-            _activeTool == ArchitectTool.wall,
-        touchHoldToPlace:
-            _activeTool == ArchitectTool.wall && !_wallDirectionLocked,
-        onToolHoldStart: _beginWallHold,
+        singlePointerPan: true,
+        holdToEdit:
+            _effectiveSelection.isNotEmpty &&
+            (!_multiSelect || _moveSelection) &&
+            _wallCutIds.isEmpty &&
+            _wallExtendId == null &&
+            _wallInsertPointId == null,
+        touchHoldToPlace: _canPlaceWithMarker,
+        onToolHoldStart: _beginPlacementHold,
         onSelectionHold: _onSelectionHold,
         isDraggingHandle: () => _isActivelyDraggingHandle,
         onToolDown: _onPointerDown,
@@ -3283,17 +3659,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
               ),
             ),
-            if (_activeTool == ArchitectTool.wall)
+            if (_canPlaceWithMarker)
               Positioned.fill(
                 child: IgnorePointer(
                   child: AnimatedBuilder(
                     animation: Listenable.merge([_viewport, _previewRevision]),
                     builder: (context, _) {
-                      final touch = _wallTouchPosition;
-                      final target = _draftEnd ?? _cursorModel;
+                      final touch = _touchPosition;
+                      final target = _placementPreviewTarget;
                       if (touch == null ||
                           target == null ||
-                          !_wallPlacingWithHold ||
+                          !_placingWithHold ||
                           _wallDirectionLocked) {
                         return const SizedBox.shrink();
                       }
@@ -3307,12 +3683,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               'Axis intersection' => DxfSnapType.intersection,
                               'Midpoint' => DxfSnapType.midpoint,
                               'Center' => DxfSnapType.center,
+                              'Perpendicular' => DxfSnapType.perpendicular,
                               _ when label.endsWith('°') =>
                                 DxfSnapType.perpendicular,
                               _ => DxfSnapType.nearest,
                             };
                       return CustomPaint(
-                        key: const ValueKey('wall-offset-pointer'),
+                        key: ValueKey(
+                          _activeTool == ArchitectTool.wall
+                              ? 'wall-offset-pointer'
+                              : 'architect-offset-pointer',
+                        ),
                         painter: StructuralPointerPainter(
                           touchPos: touch,
                           targetPos:
@@ -3354,11 +3735,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       padding: const EdgeInsets.all(8),
                       child: Text(
                         _wallCutIds.isNotEmpty
-                            ? context.l10n.architectWallCutHint
+                            ? (_wallCutStroke
+                                  ? context.l10n.architectWallSplitHint
+                                  : context.l10n.architectWallCutHint)
                             : _wallExtendId != null
                             ? context.l10n.architectWallExtendHint
-                            : _activeTool == ArchitectTool.wall &&
-                                  !_wallPlacingWithHold &&
+                            : _effectiveSelection.isNotEmpty
+                            ? context.l10n.architectEditHoldHint
+                            : _canPlaceWithMarker &&
+                                  !_placingWithHold &&
                                   !_wallDirectionLocked
                             ? context.l10n.architectWallDraftHint
                             : _cursorModel == null
@@ -3379,7 +3764,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ],
         ),
       ),
-      if (_activeTool == ArchitectTool.wall)
+      _buildWallClearanceOverlay(),
+      _buildShapeDimensionOverlay(),
+      if (_activeTool != ArchitectTool.wall &&
+          _activeTool != ArchitectTool.select)
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Material(
+            color: const Color(0xEE1E242C),
+            borderRadius: BorderRadius.circular(8),
+            child: IconButton(
+              key: const ValueKey('architect-magnet'),
+              tooltip: _magnetEnabled
+                  ? context.l10n.snapEnabledTooltip
+                  : context.l10n.snapDisabledTooltip,
+              icon: Icon(
+                Icons.sensors,
+                size: 20,
+                color: _magnetEnabled ? Colors.cyanAccent : Colors.white54,
+              ),
+              onPressed: () => setState(() {
+                _magnetEnabled = !_magnetEnabled;
+                _activeSnapLabel = null;
+                _activeMagneticGuides = [];
+              }),
+            ),
+          ),
+        ),
+      if (_activeTool == ArchitectTool.wall && _effectiveSelection.isEmpty)
         Positioned(
           top: 8,
           left: 8,
@@ -3430,7 +3843,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           ],
                           onChanged: (value) {
                             if (value != null) {
-                              setState(() => _wallReference = value);
+                              setState(() {
+                                _wallReference = value;
+                                _wallStartAttachment = null;
+                              });
                             }
                           },
                         ),
@@ -3444,12 +3860,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         key: const ValueKey('wall-flip-side'),
                         tooltip: context.l10n.architectWallFlipSide,
                         icon: const Icon(Icons.flip, size: 20),
-                        onPressed: () => setState(
-                          () => _wallExteriorSide =
+                        onPressed: () => setState(() {
+                          _wallStartAttachment = null;
+                          _wallExteriorSide =
                               _wallExteriorSide == WallExteriorSide.left
                               ? WallExteriorSide.right
-                              : WallExteriorSide.left,
-                        ),
+                              : WallExteriorSide.left;
+                        }),
                       ),
                       IconButton(
                         key: const ValueKey('wall-magnet'),
@@ -3462,16 +3879,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         icon: Icon(
                           Icons.sensors,
                           size: 18,
-                          color: _wallMagnet
+                          color: _magnetEnabled
                               ? Colors.cyanAccent
                               : Colors.white54,
                         ),
                         onPressed: () => setState(() {
-                          _wallMagnet = !_wallMagnet;
+                          _magnetEnabled = !_magnetEnabled;
                           _activeMagneticGuides = [];
                         }),
                       ),
-                      TextButton.icon(
+                      TextButton(
                         key: const ValueKey('wall-dimension-mode'),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -3486,22 +3903,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         onPressed: _wallDirectionLocked
                             ? null
                             : _chooseWallDimension,
-                        icon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 4,
-                              height: 4,
-                              decoration: const BoxDecoration(
-                                color: Colors.cyanAccent,
-                                shape: BoxShape.circle,
+                        child: Tooltip(
+                          message: context.l10n.architectWallLength,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 4,
+                                height: 4,
+                                decoration: const BoxDecoration(
+                                  color: Colors.cyanAccent,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 3),
-                            const Icon(Icons.straighten, size: 18),
-                          ],
+                              const SizedBox(width: 3),
+                              const Icon(Icons.straighten, size: 18),
+                              if (MediaQuery.sizeOf(context).width >= 400) ...[
+                                const SizedBox(width: 8),
+                                Text(context.l10n.architectWallLength),
+                              ],
+                            ],
+                          ),
                         ),
-                        label: Text(context.l10n.architectWallLength),
                       ),
                       IconButton(
                         key: const ValueKey('wall-chain-toggle'),
@@ -3618,6 +4041,120 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     ],
   );
 
+  void _cancelCadShape() => setState(() {
+    _pendingShape = null;
+    _shapePanelAnchor = null;
+    _draftStart = null;
+    _draftEnd = null;
+    _activeMagneticGuides = [];
+    _activeSnapLabel = null;
+  });
+
+  void _commitCadShape(CadPrimitiveType type) {
+    final result = _elementTool.placeCadPrimitive(
+      storey: _project.activeStorey,
+      type: type,
+      start: _draftStart!,
+      end: _draftEnd!,
+    );
+    if (result == null) {
+      _operationError();
+      return;
+    }
+    try {
+      _commands.execute(
+        PlaceArchitectCadPrimitive(
+          storeyId: _project.activeStoreyId,
+          primitive: result.$2,
+        ),
+      );
+      _cancelCadShape();
+      _saveBiMProjectIfAttached();
+      HapticFeedback.lightImpact();
+    } on ArgumentError {
+      _operationError();
+    }
+  }
+
+  Widget _buildShapeDimensionOverlay() => Positioned.fill(
+    child: ValueListenableBuilder<int>(
+      valueListenable: _previewRevision,
+      builder: (_, revision, child) {
+        if (_pendingShape == null || _draftStart == null || _draftEnd == null) {
+          return const SizedBox.shrink();
+        }
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final position = _viewport.toScreen(
+              _shapePanelAnchor ?? _draftEnd!,
+            );
+            final width = math.min(260.0, constraints.maxWidth - 16);
+            final left = (position.dx + 16).clamp(
+              8.0,
+              math.max(8.0, constraints.maxWidth - width - 8),
+            );
+            final top = (position.dy + 24).clamp(
+              8.0,
+              math.max(8.0, constraints.maxHeight - 265),
+            );
+            final delta = _draftEnd! - _draftStart!;
+            final circle = _pendingShape == CadPrimitiveType.circle;
+            final values = circle
+                ? [delta.distance]
+                : [delta.dx.abs(), delta.dy.abs()];
+            return Stack(
+              children: [
+                Positioned(
+                  left: left.toDouble(),
+                  top: top.toDouble(),
+                  width: width,
+                  child: ArchitectShapeDimensionPanel(
+                    key: ValueKey((_draftStart, _pendingShape)),
+                    values: [for (final v in values) _project.units.toUnit(v)],
+                    labels: circle
+                        ? [context.l10n.architectRadius]
+                        : [
+                            context.l10n.architectShapeWidth,
+                            context.l10n.architectShapeHeight,
+                          ],
+                    unit: _project.units.symbol,
+                    minimum: _project.units.toUnit(.001),
+                    onChanged: (index, value) {
+                      final meters = _project.units.fromUnit(value);
+                      final current = _draftEnd! - _draftStart!;
+                      if (circle) {
+                        final u = current.distance > .000001
+                            ? current / current.distance
+                            : const Offset(1, 0);
+                        _draftEnd = _draftStart! + u * meters;
+                      } else {
+                        _draftEnd =
+                            _draftStart! +
+                            Offset(
+                              index == 0
+                                  ? (current.dx < 0 ? -meters : meters)
+                                  : current.dx,
+                              index == 1
+                                  ? (current.dy < 0 ? -meters : meters)
+                                  : current.dy,
+                            );
+                      }
+                      _activeMagneticGuides = [];
+                      _activeSnapLabel = null;
+                      _repaintPreview();
+                    },
+                    onSave: () => _commitCadShape(_pendingShape!),
+                    onCancel: _cancelCadShape,
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ),
+  );
+
   String? _localizedSnapLabel(String? label) {
     final l10n = context.l10n;
     return switch (label) {
@@ -3627,6 +4164,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       'Center' => l10n.snapCenter,
       'Intersection' || 'Axis intersection' => l10n.snapIntersection,
       'Edge' => l10n.snapNearest,
+      'Perpendicular' => l10n.snapPerpendicular,
       'Alignment' => l10n.architectWallAlign,
       final String value when value.startsWith('Axis ') =>
         '${l10n.architectToolAxis} ${value.substring(5)}',
@@ -3634,15 +4172,42 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     };
   }
 
+  ArchitectWall? _wallForAxis(Offset point) {
+    ArchitectWall? picked;
+    var best = double.infinity;
+    for (final wall in _project.activeStorey.walls) {
+      if (!wall.containsPoint(point)) continue;
+      final d = point - wall.coreCenterStart;
+      final distance =
+          (d.dx * wall.normalVector.dx + d.dy * wall.normalVector.dy).abs();
+      if (distance < best) {
+        best = distance;
+        picked = wall;
+      }
+    }
+    return picked;
+  }
+
+  ArchitectProject get _drawingProject {
+    final project = _elementMovePreview ?? _project;
+    return _axisTool.isDraggingHandle || _axisTool.isMovingAxis
+        ? project.copyWithGridAxes(_axisTool.previewAxes(project.gridAxes))
+        : project;
+  }
+
   Architect2dPainter _makePainter(ArchitectPaintLayer layer) =>
       Architect2dPainter(
-        project: _elementMovePreview ?? _project,
+        project: _drawingProject,
         viewport: _viewport,
         layer: layer,
-        activeTool: _activeTool,
+        activeTool: _effectiveSelection.isEmpty
+            ? _activeTool
+            : ArchitectTool.select,
         cursorPosition: _cursorModel,
         columnPreview:
-            _activeTool == ArchitectTool.column && _columnPreviewPoint != null
+            _activeTool == ArchitectTool.column &&
+                _effectiveSelection.isEmpty &&
+                _columnPreviewPoint != null
             ? ArchitectColumn(
                 id: 'preview',
                 position: _columnPreviewPoint!,
@@ -3656,8 +4221,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         activeWallThickness: _wallThickness,
         activeWallReference: _wallReference,
         activeWallExteriorSide: _wallExteriorSide,
-        showWallCursor: !_wallPlacingWithHold,
-        wallCutLine: _wallCutStart != null && _cursorModel != null
+        showWallCursor: !_placingWithHold,
+        wallClearances: _wallClearances,
+        wallTrimSpan:
+            _wallCutIds.isNotEmpty && !_wallCutStroke && _cursorModel != null
+            ? _trimSpanAt(_cursorModel!)
+            : null,
+        wallCutLine:
+            _wallCutStroke && _wallCutStart != null && _cursorModel != null
             ? (_wallCutStart!, _cursorModel!)
             : null,
         activeWallInsulation: _activeWallType?.insulationThickness,
@@ -3672,8 +4243,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         mergeCandidateIndex: _mergeCandidateIndex,
         selectedAxisId: _axisTool.selectedAxisId,
         draggedAxisSnapshot: _axisTool.draggedAxisSnapshot,
-        isDraggingAxisHandle: _axisTool.isDraggingHandle,
-        isMovingAxis: _axisTool.isMovingAxis,
+        isDraggingAxisHandle: false,
+        isMovingAxis: false,
         moveOriginalAxis: _axisTool.moveOriginalAxis,
         moveCurrentDelta: _axisTool.moveCurrentDelta,
         axisOffsetPreview: _axisTool.getOffsetPreview(
@@ -3708,6 +4279,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         underlayLayerVisibility: _underlayLayerVisibility,
         slabDraftPoints: _elementTool.slabDraftPoints,
         slabCandidatePoint: _elementTool.slabCandidatePoint,
+        polygonEditInvalid: _polygonEditor.invalid,
       );
 
   // === SECTION: 3D SOLID VIEWPORT ===

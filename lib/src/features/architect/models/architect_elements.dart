@@ -502,6 +502,7 @@ class ArchitectCadPrimitive {
   final Offset startPoint;
   final Offset endPoint;
   final int colorValue; // ARGB
+  final List<Offset>? polygon;
   final double strokeWidth;
 
   const ArchitectCadPrimitive({
@@ -511,7 +512,14 @@ class ArchitectCadPrimitive {
     required this.endPoint,
     this.colorValue = 0xFF424242,
     this.strokeWidth = 1.0,
+    this.polygon,
   });
+
+  List<Offset> get polygonCorners {
+    if (polygon != null) return polygon!;
+    final rect = Rect.fromPoints(startPoint, endPoint);
+    return [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
+  }
 
   ArchitectCadPrimitive copyWith({
     String? id,
@@ -520,15 +528,16 @@ class ArchitectCadPrimitive {
     Offset? endPoint,
     int? colorValue,
     double? strokeWidth,
-  }) =>
-      ArchitectCadPrimitive(
-        id: id ?? this.id,
-        type: type ?? this.type,
-        startPoint: startPoint ?? this.startPoint,
-        endPoint: endPoint ?? this.endPoint,
-        colorValue: colorValue ?? this.colorValue,
-        strokeWidth: strokeWidth ?? this.strokeWidth,
-      );
+    List<Offset>? polygon,
+  }) => ArchitectCadPrimitive(
+    id: id ?? this.id,
+    type: type ?? this.type,
+    startPoint: startPoint ?? this.startPoint,
+    endPoint: endPoint ?? this.endPoint,
+    colorValue: colorValue ?? this.colorValue,
+    strokeWidth: strokeWidth ?? this.strokeWidth,
+    polygon: polygon ?? this.polygon,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -537,6 +546,10 @@ class ArchitectCadPrimitive {
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'colorValue': colorValue,
     'strokeWidth': strokeWidth,
+    if (polygon != null)
+      'polygon': [
+        for (final p in polygon!) {'x': p.dx, 'y': p.dy},
+      ],
   };
 
   factory ArchitectCadPrimitive.fromJson(Map<String, dynamic> json) =>
@@ -556,5 +569,13 @@ class ArchitectCadPrimitive {
         ),
         colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xFF424242,
         strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 1.0,
+        polygon: (json['polygon'] as List?)
+            ?.map(
+              (p) => Offset(
+                (p['x'] as num).toDouble(),
+                (p['y'] as num).toDouble(),
+              ),
+            )
+            .toList(),
       );
 }

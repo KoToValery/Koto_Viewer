@@ -12,6 +12,7 @@ class ArchitectViewport extends StatefulWidget {
   final Object? interactionKey;
   final bool singlePointerPan;
   final bool touchHoldToPlace;
+  final bool holdToEdit;
   final ValueChanged<Offset>? onToolHoldStart;
   final bool Function(Offset)? onSelectionHold;
   final bool Function() isDraggingHandle;
@@ -29,6 +30,7 @@ class ArchitectViewport extends StatefulWidget {
     this.interactionKey,
     required this.singlePointerPan,
     this.touchHoldToPlace = false,
+    this.holdToEdit = false,
     this.onToolHoldStart,
     this.onSelectionHold,
     required this.isDraggingHandle,
@@ -53,14 +55,18 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
   bool _laidOut = false;
   Timer? _holdTimer;
   bool _held = false;
+  PointerDownEvent? _pendingEditDown;
 
   @override
   void didUpdateWidget(covariant ArchitectViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.interactionKey != widget.interactionKey ||
-        oldWidget.touchHoldToPlace != widget.touchHoldToPlace) {
+        (!_held &&
+            (oldWidget.touchHoldToPlace != widget.touchHoldToPlace ||
+                oldWidget.holdToEdit != widget.holdToEdit))) {
       _holdTimer?.cancel();
       _held = false;
+      _pendingEditDown = null;
       // A release from an earlier tool/floor can never execute the new tool.
       _suppressRelease = _pointers.isNotEmpty;
       _navigation = false;
@@ -91,7 +97,12 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
     _navigation =
         (event.buttons & (kMiddleMouseButton | kSecondaryMouseButton)) != 0;
     _suppressRelease = _navigation;
-    if (!_navigation) widget.onToolDown(event);
+    final deferredEdit =
+        !_navigation &&
+        widget.holdToEdit &&
+        event.kind == PointerDeviceKind.touch;
+    _pendingEditDown = deferredEdit ? event : null;
+    if (!_navigation && !deferredEdit) widget.onToolDown(event);
     _canPan =
         _navigation ||
         (widget.singlePointerPan &&
@@ -99,13 +110,16 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
             !(widget.touchHoldToPlace &&
                 event.kind != PointerDeviceKind.touch));
     if (!_navigation &&
-        (widget.onSelectionHold != null ||
+        (deferredEdit ||
+            widget.onSelectionHold != null ||
             widget.touchHoldToPlace &&
                 event.kind == PointerDeviceKind.touch &&
                 !widget.isDraggingHandle())) {
       _holdTimer?.cancel();
       _holdTimer = Timer(
-        widget.touchHoldToPlace && !widget.isDraggingHandle()
+        deferredEdit
+            ? const Duration(milliseconds: 280)
+            : widget.touchHoldToPlace && !widget.isDraggingHandle()
             ? StructuralPointerInteraction.placementHoldDuration
             : const Duration(milliseconds: 450),
         () {
@@ -114,6 +128,16 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
               _navigation ||
               _suppressRelease) {
             return;
+          }
+          if (_pendingEditDown != null) {
+            final down = _pendingEditDown!;
+            _pendingEditDown = null;
+            widget.onToolDown(down);
+            if (widget.isDraggingHandle()) {
+              _held = true;
+              _canPan = false;
+              return;
+            }
           }
           if (widget.onSelectionHold?.call(_focal) == true) {
             _held = true;
@@ -172,7 +196,10 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
   void _upEvent(PointerUpEvent event) {
     if (!_pointers.containsKey(event.pointer)) return;
     _holdTimer?.cancel();
-    if (!_suppressRelease && !_navigation && _pointers.length == 1) {
+    if (_pendingEditDown == null &&
+        !_suppressRelease &&
+        !_navigation &&
+        _pointers.length == 1) {
       widget.onToolUp(event);
     }
     _pointers.remove(event.pointer);
@@ -181,6 +208,7 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
 
   void _reset() {
     _holdTimer?.cancel();
+    _pendingEditDown = null;
     _held = false;
     _navigation = false;
     _suppressRelease = false;

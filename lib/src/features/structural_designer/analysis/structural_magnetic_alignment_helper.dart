@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
+import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
 import '../models/structural_element.dart';
 
 /// Magnetic alignment result for columns.
@@ -49,12 +50,14 @@ class BeamMagneticAlignmentResult {
   final List<(Offset, Offset)> guideLines;
   final String description;
   final Offset? markerPoint;
+  final DxfSnapResult? objectSnap;
 
   const BeamMagneticAlignmentResult({
     required this.snappedPoint,
     required this.guideLines,
     required this.description,
     this.markerPoint,
+    this.objectSnap,
   });
 }
 
@@ -1522,6 +1525,7 @@ class StructuralMagneticAlignmentHelper {
     required StoreyLevel activeStorey,
     String? excludeBeamId,
     double cadUnitsPerMeter = 1.0,
+    DxfDocument? dxfDocument,
   }) {
     // 1. Column Centers (Highest priority: axial connection directly to column center)
     StructuralColumn? bestCol;
@@ -1760,6 +1764,27 @@ class StructuralMagneticAlignmentHelper {
           guideLines: guides,
           description: 'gridAxis',
           markerPoint: proj,
+        );
+      }
+    }
+
+    // CAD endpoints, crossings and edges must win over direction/length rounding.
+    if (dxfDocument != null) {
+      final snap = DxfSnapHelper.findSnapPoint(
+        document: dxfDocument,
+        cadPoint: rawPoint,
+        toleranceCad: toleranceCad,
+        basePoint: beamStart,
+        includeIntersections: true,
+      );
+      if (snap != null &&
+          (beamStart == null || (snap.point - beamStart).distance > 1e-9)) {
+        return BeamMagneticAlignmentResult(
+          snappedPoint: snap.point,
+          guideLines: beamStart == null ? [] : [(beamStart, snap.point)],
+          description: 'cadObject',
+          markerPoint: snap.point,
+          objectSnap: snap,
         );
       }
     }

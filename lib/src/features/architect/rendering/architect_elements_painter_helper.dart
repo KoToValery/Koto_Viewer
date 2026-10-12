@@ -1,5 +1,6 @@
 // === SECTION: ARCHITECTURAL ELEMENTS PAINTER HELPER ===
 import 'dart:math' as math;
+import 'architect_polygon_painter.dart';
 import 'package:flutter/material.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/rendering/dxf_quadtree.dart';
@@ -590,8 +591,7 @@ class ArchitectElementsPainterHelper {
       if (prim.type == CadPrimitiveType.line) {
         canvas.drawLine(prim.startPoint, prim.endPoint, paint);
       } else if (prim.type == CadPrimitiveType.rect) {
-        final rect = Rect.fromPoints(prim.startPoint, prim.endPoint);
-        canvas.drawRect(rect, paint);
+        canvas.drawPath(Path()..addPolygon(prim.polygonCorners, true), paint);
       } else if (prim.type == CadPrimitiveType.circle) {
         final r = (prim.endPoint - prim.startPoint).distance;
         canvas.drawCircle(prim.startPoint, r, paint);
@@ -609,6 +609,7 @@ class ArchitectElementsPainterHelper {
     required Offset? draftStart,
     required Offset? draftEnd,
     required double zoomScale,
+    ArchitectUnit unit = ArchitectUnit.meters,
   }) {
     if (draftStart == null || draftEnd == null) return;
     final p1 = draftStart;
@@ -634,6 +635,17 @@ class ArchitectElementsPainterHelper {
       final rect = Rect.fromPoints(p1, p2);
       canvas.drawRect(rect, fillPreview);
       canvas.drawRect(rect, previewPaint);
+      ArchitectPolygonPainter.draw(
+        canvas: canvas,
+        polygon: [
+          rect.topLeft,
+          rect.topRight,
+          rect.bottomRight,
+          rect.bottomLeft,
+        ],
+        scale: zoomScale,
+        unit: unit,
+      );
       if (activeTool == ArchitectTool.opening) {
         canvas.drawLine(rect.topLeft, rect.bottomRight, previewPaint);
         canvas.drawLine(rect.topRight, rect.bottomLeft, previewPaint);
@@ -660,6 +672,18 @@ class ArchitectElementsPainterHelper {
     } else if (activeTool == ArchitectTool.cadCircle) {
       final r = (p2 - p1).distance;
       canvas.drawCircle(p1, r, previewPaint);
+      if (r > .001) {
+        canvas.drawLine(p1, p2, previewPaint);
+        final u = (p2 - p1) / r;
+        ArchitectPolygonPainter.dimension(
+          canvas,
+          p1,
+          p2,
+          Offset(-u.dy, u.dx),
+          zoomScale,
+          unit,
+        );
+      }
     } else if (activeTool == ArchitectTool.measure) {
       canvas.drawLine(p1, p2, previewPaint);
       final dist = (p2 - p1).distance;
@@ -669,7 +693,7 @@ class ArchitectElementsPainterHelper {
       canvas.scale(1.0 / zoomScale);
       final tp = TextPainter(
         text: TextSpan(
-          text: '${dist.toStringAsFixed(2)} m',
+          text: '${unit.toUnit(dist).toStringAsFixed(2)} ${unit.symbol}',
           style: const TextStyle(
             color: Colors.white,
             fontFamily: 'Roboto',

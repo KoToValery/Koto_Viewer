@@ -514,14 +514,15 @@ void main() {
         ),
       );
       await workspace.open(tester, model);
-      await tester.ensureVisible(find.byIcon(Icons.pan_tool_rounded));
-      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.ensureVisible(find.byIcon(Icons.line_weight_rounded));
+      await tester.tap(find.byIcon(Icons.line_weight_rounded));
       await tester.pumpAndSettle();
-      await tester.tapAt(workspace.screen(tester, const Offset(2, 0)));
+      await tester.longPressAt(workspace.screen(tester, const Offset(2, 0)));
       await tester.pump();
       final gesture = await tester.startGesture(
         workspace.screen(tester, const Offset(4, 0)),
       );
+      await tester.pump(const Duration(milliseconds: 281));
       await gesture.moveTo(workspace.screen(tester, const Offset(5, 0)));
       await tester.pump();
       expect(

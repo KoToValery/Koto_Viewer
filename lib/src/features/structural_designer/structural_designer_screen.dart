@@ -5005,9 +5005,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           toleranceCad: toleranceCad,
           activeStorey: _project.activeStorey,
           cadUnitsPerMeter: _cadUnitsPerMeter,
+          dxfDocument: _document,
         );
 
         if (mag != null) {
+          snap = mag.objectSnap;
           effectiveCad = mag.snappedPoint;
           _activeMagneticGuides = mag.guideLines;
           snappedScreen = _cadToScreen(mag.snappedPoint);

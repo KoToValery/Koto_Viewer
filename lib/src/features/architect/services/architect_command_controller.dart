@@ -2,11 +2,15 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
+import '../models/architect_elements.dart';
+import '../rendering/architect_scene_geometry.dart';
+import 'architect_polygon_geometry.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_zone.dart';
 import 'architect_zone_tool.dart';
 import '../rendering/architect_wall_network.dart';
 import 'architect_element_id.dart';
+import 'architect_wall_relations.dart';
 export 'architect_element_id.dart';
 
 /// Commands accept model metres, never screen coordinates or a camera scale.
@@ -297,6 +301,110 @@ class CutArchitectWalls extends ArchitectModelCommand {
   }
 }
 
+/// Remove the picked interval between crossings; retained pieces keep hosts.
+class TrimArchitectWall extends ArchitectModelCommand {
+  final String storeyId, wallId;
+  final Offset pick;
+  const TrimArchitectWall({
+    required this.storeyId,
+    required this.wallId,
+    required this.pick,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(pick);
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    final wall = storey.walls.firstWhere((w) => w.id == wallId);
+    final span = ArchitectWallTrimSpan.at(wall, storey.walls, pick);
+    for (final opening in [
+      ...wall.doors.map((o) => (o.offsetRatio, o.width)),
+      ...wall.windows.map((o) => (o.offsetRatio, o.width)),
+    ]) {
+      for (final cut in [span.from, span.to]) {
+        if (cut > 0 &&
+            cut < 1 &&
+            (cut - opening.$1).abs() * wall.length < opening.$2 / 2 + .001) {
+          throw ArgumentError('Cannot cut through an opening');
+        }
+      }
+    }
+    ArchitectWall slice(double from, double to, String id) => wall.copyWith(
+      id: id,
+      startPoint: wall.startPoint + wall.unitVector * (from * wall.length),
+      endPoint: wall.startPoint + wall.unitVector * (to * wall.length),
+      connectStart: from == 0 ? wall.connectStart : true,
+      connectEnd: to == 1 ? wall.connectEnd : true,
+      doors: [
+        for (final d in wall.doors)
+          if (d.offsetRatio > from && d.offsetRatio < to)
+            d.copyWith(
+              wallId: id,
+              offsetRatio: (d.offsetRatio - from) / (to - from),
+            ),
+      ],
+      windows: [
+        for (final w in wall.windows)
+          if (w.offsetRatio > from && w.offsetRatio < to)
+            w.copyWith(
+              wallId: id,
+              offsetRatio: (w.offsetRatio - from) / (to - from),
+            ),
+      ],
+    );
+    final retained = [
+      if (span.from > 0) slice(0, span.from, wall.id),
+      if (span.to < 1)
+        slice(
+          span.to,
+          1,
+          span.from == 0 ? wall.id : ArchitectElementId.next('wall'),
+        ),
+    ];
+    return ArchitectModelCommand.replace(
+      project,
+      storey.copyWith(
+        walls: [
+          for (final w in storey.walls)
+            if (w.id == wall.id) ...retained else w,
+        ],
+      ),
+    );
+  }
+}
+
+class SetArchitectWallClearance extends ArchitectModelCommand {
+  final String storeyId, wallId, neighborId;
+  final double distance;
+  const SetArchitectWallClearance({
+    required this.storeyId,
+    required this.wallId,
+    required this.neighborId,
+    required this.distance,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    if (!distance.isFinite || distance < 0) {
+      throw ArgumentError('Invalid clearance');
+    }
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    final wall = storey.walls.firstWhere((w) => w.id == wallId);
+    final clearance = ArchitectWallClearance.nearest(wall, storey.walls)
+        .firstWhere(
+          (c) => c.neighborId == neighborId,
+          orElse: () =>
+              throw ArgumentError('Wall no longer faces the neighbor'),
+        );
+    final delta =
+        wall.normalVector * (clearance.side * (clearance.distance - distance));
+    return MoveArchitectElements(
+      storeyId: storeyId,
+      elementIds: {wallId},
+      delta: delta,
+      extendSupports: true,
+    ).apply(project);
+  }
+}
+
 class SetArchitectWallConnection extends ArchitectModelCommand {
   final String storeyId;
   final Set<String> wallIds;
@@ -518,6 +626,7 @@ class MoveArchitectElement extends ArchitectModelCommand {
               ? e.copyWith(
                   startPoint: e.startPoint + delta,
                   endPoint: e.endPoint + delta,
+                  polygon: e.polygon == null ? null : polygon(e.polygon!),
                 )
               : e,
       ],
@@ -538,10 +647,15 @@ class MoveArchitectElements extends ArchitectModelCommand {
   final String storeyId;
   final Set<String> elementIds;
   final Offset delta;
+
+  /// Numeric clearance edits may extend an attached support past its old end.
+  /// Pointer dragging keeps the existing stationary-support constraint.
+  final bool extendSupports;
   const MoveArchitectElements({
     required this.storeyId,
     required this.elementIds,
     required this.delta,
+    this.extendSupports = false,
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
@@ -560,7 +674,8 @@ class MoveArchitectElements extends ArchitectModelCommand {
       Offset supported(Offset oldPoint, Offset translated, bool connected) {
         if (!connected || wall.isDetached) return translated;
         for (final support in storey.walls) {
-          if (elementIds.contains(support.id) || !support.connectsAt(oldPoint)) {
+          if (elementIds.contains(support.id) ||
+              !support.connectsAt(oldPoint)) {
             continue;
           }
           final faces = [
@@ -589,7 +704,32 @@ class MoveArchitectElements extends ArchitectModelCommand {
               final v = point - face.$1;
               final along = (v.dx * u.dx + v.dy * u.dy) / u.distanceSquared;
               if (along < -1e-8 || along > 1 + 1e-8) {
-                throw ArgumentError('Detach before leaving the support');
+                if (!extendSupports) {
+                  throw ArgumentError('Detach before leaving the support');
+                }
+                final referencePoint = support.startPoint + u * along;
+                final previous = nextWalls[support.id]!;
+                final currentAlong = along * support.length;
+                final startDelta = previous.startPoint - support.startPoint;
+                final endDelta = previous.endPoint - support.startPoint;
+                final startAlong =
+                    startDelta.dx * support.unitVector.dx +
+                    startDelta.dy * support.unitVector.dy;
+                final endAlong =
+                    endDelta.dx * support.unitVector.dx +
+                    endDelta.dy * support.unitVector.dy;
+                final extended = previous.copyWith(
+                  startPoint: currentAlong < startAlong
+                      ? referencePoint
+                      : previous.startPoint,
+                  endPoint: currentAlong > endAlong
+                      ? referencePoint
+                      : previous.endPoint,
+                );
+                nextWalls[support.id] = _wallOpeningsAfterEdit(
+                  previous,
+                  extended,
+                );
               }
               return point;
             }
@@ -829,6 +969,74 @@ class SetArchitectWallDimensions extends ArchitectModelCommand {
 }
 
 /// Shared transaction/Undo pipeline for UI and external automation.
+class PlaceArchitectCadPrimitive extends ArchitectModelCommand {
+  final String storeyId;
+  final ArchitectCadPrimitive primitive;
+  const PlaceArchitectCadPrimitive({
+    required this.storeyId,
+    required this.primitive,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(primitive.startPoint);
+    ArchitectModelCommand.point(primitive.endPoint);
+    ArchitectModelCommand.newId(project, primitive.id);
+    if ((primitive.endPoint - primitive.startPoint).distance < .001 ||
+        (primitive.type == CadPrimitiveType.rect &&
+            !ArchitectPolygonGeometry.valid(primitive.polygonCorners))) {
+      throw ArgumentError('Invalid CAD shape');
+    }
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(cadPrimitives: [...floor.cadPrimitives, primitive]),
+    );
+  }
+}
+
+class UpdateArchitectPolygon extends ArchitectModelCommand {
+  final String storeyId, elementId;
+  final List<Offset> polygon;
+  const UpdateArchitectPolygon({
+    required this.storeyId,
+    required this.elementId,
+    required this.polygon,
+  });
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    if (!ArchitectPolygonGeometry.valid(polygon)) {
+      throw ArgumentError('Invalid contour');
+    }
+    final floor = ArchitectModelCommand.storey(project, storeyId);
+    final slab = floor.slabs.any((s) => s.id == elementId);
+    final rect = floor.cadPrimitives.any(
+      (s) => s.id == elementId && s.type == CadPrimitiveType.rect,
+    );
+    if (!slab && !rect) throw ArgumentError('Unknown polygon element');
+    final points = List<Offset>.unmodifiable(polygon);
+    final bounds = ArchitectSceneGeometry.boundsOf(points);
+    return ArchitectModelCommand.replace(
+      project,
+      floor.copyWith(
+        slabs: [
+          for (final s in floor.slabs)
+            s.id == elementId ? s.copyWith(polygon: points) : s,
+        ],
+        cadPrimitives: [
+          for (final p in floor.cadPrimitives)
+            p.id == elementId
+                ? p.copyWith(
+                    polygon: points,
+                    startPoint: bounds.topLeft,
+                    endPoint: bounds.bottomRight,
+                  )
+                : p,
+        ],
+      ),
+    );
+  }
+}
+
 class ArchitectCommandController extends ChangeNotifier {
   ArchitectProject _project;
   final List<ArchitectProject> _undo = [];

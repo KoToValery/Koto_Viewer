@@ -5891,10 +5891,10 @@ abstract class AppLocalizations {
   /// **'Spacing Y (m)'**
   String get architectGridSpacingY;
 
-  /// Selection tool
+  /// Navigation tool
   ///
   /// In en, this message translates to:
-  /// **'Select'**
+  /// **'Pan'**
   String get architectToolSelect;
 
   /// Wall tool
@@ -7007,6 +7007,12 @@ abstract class AppLocalizations {
   /// **'Hold → point · 2 fingers → zoom'**
   String get architectWallDraftHint;
 
+  /// No description provided for @architectEditHoldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold → edit'**
+  String get architectEditHoldHint;
+
   /// No description provided for @architectNavigationHint.
   ///
   /// In en, this message translates to:
@@ -7196,7 +7202,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectWallCutHint.
   ///
   /// In en, this message translates to:
-  /// **'Cut: choose two points across walls'**
+  /// **'Tap the part between crossings'**
   String get architectWallCutHint;
 
   /// No description provided for @architectWallDetach.
@@ -7228,6 +7234,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Flip'**
   String get architectWallMirror;
+
+  /// No description provided for @architectWallSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Split'**
+  String get architectWallSplit;
+
+  /// No description provided for @architectWallSplitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Split: two points across walls'**
+  String get architectWallSplitHint;
+
+  /// No description provided for @architectWallClearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Clearance'**
+  String get architectWallClearance;
+
+  /// No description provided for @architectGridNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get architectGridNone;
+
+  /// No description provided for @architectGridCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get architectGridCustom;
+
+  /// No description provided for @architectGridBays.
+  ///
+  /// In en, this message translates to:
+  /// **'Bays {x} × {y}'**
+  String architectGridBays(int x, int y);
+
+  /// No description provided for @architectGridPickerHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to choose bays. Each direction has one more axis than bays. Tap a dimension on the grid to edit it.'**
+  String get architectGridPickerHelp;
+
+  /// No description provided for @architectGridFewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Fewer bays'**
+  String get architectGridFewer;
+
+  /// No description provided for @architectGridMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More bays'**
+  String get architectGridMore;
+
+  /// No description provided for @architectWizardUnitsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Units'**
+  String get architectWizardUnitsShort;
+
+  /// No description provided for @architectWizardGridShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get architectWizardGridShort;
+
+  /// No description provided for @architectWizardWallsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Walls'**
+  String get architectWizardWallsShort;
+
+  /// No description provided for @architectWizardTitleShort.
+  ///
+  /// In en, this message translates to:
+  /// **'New project'**
+  String get architectWizardTitleShort;
+
+  /// No description provided for @architectGridSpanLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Spacing {axes}: {value}'**
+  String architectGridSpanLabel(String axes, String value);
+
+  /// No description provided for @architectGridParkingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Parking grid'**
+  String get architectGridParkingHelp;
+
+  /// No description provided for @architectGridResidentialHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Residential grid'**
+  String get architectGridResidentialHelp;
+
+  /// No description provided for @architectGridVillaHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'House grid'**
+  String get architectGridVillaHelp;
+
+  /// No description provided for @architectGridModularHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Office grid'**
+  String get architectGridModularHelp;
+
+  /// No description provided for @architectGridNoneHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Start without axes'**
+  String get architectGridNoneHelp;
+
+  /// No description provided for @architectRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Radius'**
+  String get architectRadius;
+
+  /// No description provided for @architectShapeWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get architectShapeWidth;
+
+  /// No description provided for @architectShapeHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get architectShapeHeight;
 }
 
 class _AppLocalizationsDelegate

@@ -4,6 +4,7 @@ import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/rendering/dxf_segment_snap.dart';
 import '../models/architect_project.dart';
+import '../models/architect_wall.dart';
 import 'architect_snap_helper.dart';
 import 'architect_wall_network.dart';
 import 'architect_wall_geometry.dart';
@@ -55,6 +56,51 @@ class ArchitectWallSnap {
         distance = d;
         priority = rank;
       }
+    }
+
+    ArchitectSnapResult describe(ArchitectSnapResult result) {
+      if (!result.isSnapped) return result;
+      ArchitectWallAttachment? attachment;
+      var bestDistance = double.infinity;
+      for (final wall in project.activeStorey.walls) {
+        final inner =
+            wall.centerStart - wall.exteriorNormal * wall.thickness / 2;
+        final outer =
+            wall.centerStart + wall.exteriorNormal * wall.thickness / 2;
+        final coreOuter =
+            wall.coreCenterStart + wall.exteriorNormal * wall.coreThickness / 2;
+        for (final face in [
+          (WallReferenceLine.center, wall.coreCenterStart),
+          (WallReferenceLine.inner, inner),
+          (WallReferenceLine.outer, outer),
+          (WallReferenceLine.outer, coreOuter),
+        ]) {
+          final d = result.point - face.$2;
+          final along = d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+          final across =
+              (d.dx * wall.normalVector.dx + d.dy * wall.normalVector.dy).abs();
+          if (across > 1e-7 ||
+              along < -4 * wall.thickness ||
+              along > wall.length + 4 * wall.thickness) {
+            continue;
+          }
+          final projection =
+              face.$2 + wall.unitVector * along.clamp(0.0, wall.length);
+          final distance = (projection - raw).distance;
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            attachment = ArchitectWallAttachment(wall, face.$1);
+          }
+        }
+      }
+      return ArchitectSnapResult(
+        point: result.point,
+        isSnapped: result.isSnapped,
+        snapLabel: result.snapLabel,
+        angleDeg: result.angleDeg,
+        magneticGuides: result.magneticGuides,
+        wallAttachment: attachment,
+      );
     }
 
     // The axis crossing must beat a nearer projection onto either axis.
@@ -115,7 +161,7 @@ class ArchitectWallSnap {
     if (best.isSnapped &&
         (priority <= 1 || anchor == null) &&
         (anchor == null || (best.point - anchor).distance >= .001)) {
-      return best;
+      return describe(best);
     }
     if (magnetic && anchor == null) {
       final aligned = ArchitectWallAlignment.point(
@@ -198,7 +244,7 @@ class ArchitectWallSnap {
         );
       }
     }
-    if (best.isSnapped) return best;
+    if (best.isSnapped) return describe(best);
     return ArchitectSnapResult(
       point: ArchitectSnapHelper.precision(project).inputPoint(raw),
     );

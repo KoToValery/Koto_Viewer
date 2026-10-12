@@ -17,6 +17,7 @@ class ArchitectWallGeometry {
     for (final wall in walls) {
       if (wall.length < 1e-8) continue;
       edges.add((wall.startPoint, wall.endPoint));
+      edges.add((wall.coreCenterStart, wall.coreCenterEnd));
       for (final polygon in [wall.polygonCorners, wall.coreCorners]) {
         corners.addAll(polygon);
         for (var i = 0; i < polygon.length; i++) {

@@ -47,7 +47,9 @@ class ArchitectSceneGeometry {
                 (e.endPoint - e.startPoint).distance,
                 (e.endPoint - e.startPoint).distance,
               ),
-        ] else ...[
+        ] else if (e.type == CadPrimitiveType.rect)
+          ...e.polygonCorners
+        else ...[
           e.startPoint,
           e.endPoint,
         ],
@@ -89,7 +91,11 @@ class ArchitectSceneGeometry {
                 ? intersects([
                     e.startPoint,
                   ], (e.endPoint - e.startPoint).distance)
-                : intersects([e.startPoint, e.endPoint]),
+                : intersects(
+                    e.type == CadPrimitiveType.rect
+                        ? e.polygonCorners
+                        : [e.startPoint, e.endPoint],
+                  ),
           )
           .toList(),
     );

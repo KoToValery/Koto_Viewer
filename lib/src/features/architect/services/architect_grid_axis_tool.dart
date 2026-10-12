@@ -17,6 +17,7 @@ import 'architect_element_id.dart';
 
 import '../models/architect_grid_axis.dart';
 import '../models/architect_project.dart';
+import '../models/architect_wall.dart';
 import '../rendering/architect_snap_helper.dart';
 
 // === SECTION: TOOL CONTROLLER & STATE ===
@@ -26,6 +27,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   // Drafting State
   bool _isDrafting = false;
   Offset? _draftStart;
+  Offset? _draftAnchor;
   Offset? _draftEnd;
   String? _draftSnapLabel;
 
@@ -34,6 +36,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   bool _isDraggingHandle = false;
   bool _isStartHandle = true;
   StructuralGridAxis? _draggedAxisSnapshot;
+  StructuralGridAxis? _handleOriginalAxis;
 
   // Moving State (whole axis translation)
   bool _isMovingAxis = false;
@@ -153,6 +156,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   void startDrafting(Offset point) {
     _isDrafting = true;
     _draftStart = point;
+    _draftAnchor = point;
     _draftEnd = point;
     _draftSnapLabel = null;
     _selectedAxisId = null;
@@ -162,24 +166,30 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   void updateDrafting(
     Offset rawModelPoint,
     ArchitectProject project,
-    double scale,
-  ) {
-    if (!_isDrafting || _draftStart == null) return;
+    double scale, {
+    bool magnetic = true,
+    ArchitectSnapResult Function(Offset anchor)? snapper,
+  }) {
+    if (!_isDrafting || _draftAnchor == null) return;
 
-    final snap = ArchitectSnapHelper.snapWithAnchor(
-      anchor: _draftStart!,
-      rawPoint: rawModelPoint,
-      project: project,
-      tolerance: 14.0 / scale,
-    );
+    final snap =
+        snapper?.call(_draftAnchor!) ??
+        ArchitectSnapHelper.snapWithAnchor(
+          magnetic: magnetic,
+          anchor: _draftAnchor!,
+          rawPoint: rawModelPoint,
+          project: project,
+          tolerance: 14.0 / scale,
+        );
 
     var candidate = snap.point;
     String? label = snap.snapLabel;
 
     // Explicit geometry targets win. Optional extent alignment is chosen by
     // total correction from the pointer, with a bounded radius and stable order.
-    final candidateDir = candidate - _draftStart!;
-    if (candidateDir.distance > .001 &&
+    final candidateDir = candidate - _draftAnchor!;
+    if (magnetic &&
+        candidateDir.distance > .001 &&
         (!snap.isSnapped || snap.angleDeg != null)) {
       final vertical = candidateDir.dx.abs() <= candidateDir.dy.abs();
       var best = math.min(14.0 / scale, .20) + 1e-9;
@@ -201,7 +211,15 @@ class ArchitectGridAxisTool extends ChangeNotifier {
       }
     }
 
-    _draftEnd = candidate;
+    final raw = StructuralGridAxis(
+      id: 'preview',
+      name: '',
+      start: _draftAnchor!,
+      end: candidate,
+    );
+    final aligned = alignNewAxis(raw, project.gridAxes);
+    _draftStart = aligned.start;
+    _draftEnd = aligned.end;
     _draftSnapLabel = label;
     notifyListeners();
   }
@@ -209,6 +227,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   (ArchitectProject, StructuralGridAxis)? commitDrafting({
     required ArchitectProject project,
     required bool isBulgarian,
+    double parallelToleranceRad = .01,
   }) {
     if (!_isDrafting || _draftStart == null || _draftEnd == null) {
       cancelDrafting();
@@ -240,12 +259,11 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     );
 
     // Auto-align extents if a parallel axis exists
-    final parallelAxis = project.gridAxes
-        .where((a) => a.isParallelTo(rawAxis, toleranceRad: 0.10))
-        .firstOrNull;
-    final alignedAxis = parallelAxis != null
-        ? rawAxis.alignWith(parallelAxis)
-        : rawAxis;
+    final alignedAxis = alignNewAxis(
+      rawAxis,
+      project.gridAxes,
+      toleranceRad: parallelToleranceRad,
+    );
 
     final updatedAxes = resequenceAxes([
       ...project.gridAxes,
@@ -258,6 +276,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
 
     _isDrafting = false;
     _draftStart = null;
+    _draftAnchor = null;
     _draftEnd = null;
     _draftSnapLabel = null;
     _selectedAxisId = finalAxis.id;
@@ -269,6 +288,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   void cancelDrafting() {
     _isDrafting = false;
     _draftStart = null;
+    _draftAnchor = null;
     _draftEnd = null;
     _draftSnapLabel = null;
     notifyListeners();
@@ -276,11 +296,90 @@ class ArchitectGridAxisTool extends ChangeNotifier {
 
   // === SECTION: HANDLE DRAGGING (EXTENT STRETCHING) ===
 
+  static StructuralGridAxis alignNewAxis(
+    StructuralGridAxis axis,
+    List<StructuralGridAxis> axes, {
+    double toleranceRad = .01,
+  }) {
+    if (axis.length < .30) return axis;
+    final references =
+        axes
+            .where(
+              (a) =>
+                  a.length >= .001 &&
+                  a.isParallelTo(axis, toleranceRad: toleranceRad),
+            )
+            .toList()
+          ..sort((a, b) => a.id.compareTo(b.id));
+    return references.isEmpty ? axis : axis.alignWith(references.first);
+  }
+
+  static List<StructuralGridAxis> alignParallelAxes(
+    List<StructuralGridAxis> axes,
+    StructuralGridAxis reference,
+  ) => [
+    for (final axis in axes)
+      if (axis.id == reference.id)
+        reference
+      else if (axis.length >= .001 &&
+          axis.isParallelTo(reference, toleranceRad: .01))
+        axis.alignWith(reference)
+      else
+        axis,
+  ];
+
+  List<StructuralGridAxis> previewAxes(List<StructuralGridAxis> axes) {
+    final reference = _isDraggingHandle
+        ? _draggedAxisSnapshot
+        : _isMovingAxis &&
+              _moveOriginalAxis != null &&
+              _moveCurrentDelta != null
+        ? _moveOriginalAxis!.copyWith(
+            start: _moveOriginalAxis!.start + _moveCurrentDelta!,
+            end: _moveOriginalAxis!.end + _moveCurrentDelta!,
+          )
+        : null;
+    return reference == null ? axes : alignParallelAxes(axes, reference);
+  }
+
+  (ArchitectProject, StructuralGridAxis)? placeOnWall({
+    required ArchitectProject project,
+    required ArchitectWall wall,
+    required bool isBulgarian,
+  }) {
+    final raw = StructuralGridAxis(
+      id: ArchitectElementId.next('axis'),
+      name: '',
+      start: wall.coreCenterStart,
+      end: wall.coreCenterEnd,
+    );
+    final existing = project.gridAxes
+        .where(
+          (a) =>
+              a.length >= .001 &&
+              a.isParallelTo(raw, toleranceRad: 1e-6) &&
+              (a.projectPoint(raw.start) - raw.start).distance < 1e-6,
+        )
+        .firstOrNull;
+    if (existing != null) {
+      selectAxis(existing.id);
+      return (project, existing);
+    }
+    startDrafting(raw.start);
+    _draftEnd = raw.end;
+    return commitDrafting(
+      project: project,
+      isBulgarian: isBulgarian,
+      parallelToleranceRad: 1e-8,
+    );
+  }
+
   void startHandleDrag(StructuralGridAxis axis, bool isStart) {
     _isDraggingHandle = true;
     _isStartHandle = isStart;
     _selectedAxisId = axis.id;
     _draggedAxisSnapshot = axis;
+    _handleOriginalAxis = axis;
     notifyListeners();
   }
 
@@ -290,7 +389,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     double scale,
   ) {
     if (!_isDraggingHandle || _draggedAxisSnapshot == null) return;
-    final axis = _draggedAxisSnapshot!;
+    final axis = _handleOriginalAxis!;
     final proj = axis.projectPoint(rawModelPoint);
 
     var candidate = proj;
@@ -303,7 +402,11 @@ class ArchitectGridAxisTool extends ChangeNotifier {
           !axis.isParallelTo(other, toleranceRad: 0.05)) {
         continue;
       }
-      final extent = _isStartHandle ? other.start : other.end;
+      final sameDirection =
+          axis.direction.dx * other.direction.dx +
+              axis.direction.dy * other.direction.dy >=
+          0;
+      final extent = _isStartHandle == sameDirection ? other.start : other.end;
       final along =
           (extent - axis.start).dx * u.dx + (extent - axis.start).dy * u.dy;
       final point = axis.start + u * along;
@@ -314,6 +417,14 @@ class ArchitectGridAxisTool extends ChangeNotifier {
       }
     }
 
+    final d = candidate - axis.start;
+    final along = d.dx * u.dx + d.dy * u.dy;
+    candidate =
+        axis.start +
+        u *
+            (_isStartHandle
+                ? math.min(along, axis.length - .30)
+                : math.max(along, .30));
     _draggedAxisSnapshot = _isStartHandle
         ? axis.copyWith(start: candidate)
         : axis.copyWith(end: candidate);
@@ -329,11 +440,14 @@ class ArchitectGridAxisTool extends ChangeNotifier {
       return null;
     }
     final updated = _draggedAxisSnapshot!;
-    final newAxes = project.gridAxes
-        .map((a) => a.id == updated.id ? updated : a)
-        .toList();
+    if (updated.length < .30) {
+      cancelHandleDrag();
+      return null;
+    }
+    final newAxes = alignParallelAxes(project.gridAxes, updated);
     _isDraggingHandle = false;
     _draggedAxisSnapshot = null;
+    _handleOriginalAxis = null;
     notifyListeners();
     return project.copyWithGridAxes(newAxes);
   }
@@ -341,6 +455,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   void cancelHandleDrag() {
     _isDraggingHandle = false;
     _draggedAxisSnapshot = null;
+    _handleOriginalAxis = null;
     notifyListeners();
   }
 
@@ -405,9 +520,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
       end: orig.end + delta,
     );
 
-    final updatedAxes = project.gridAxes
-        .map((a) => a.id == movedAxis.id ? movedAxis : a)
-        .toList();
+    final updatedAxes = alignParallelAxes(project.gridAxes, movedAxis);
     final resequenced = resequenceAxes(updatedAxes, isBulgarian);
 
     _isMovingAxis = false;
@@ -628,10 +741,12 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   void cancelAll() {
     _isDrafting = false;
     _draftStart = null;
+    _draftAnchor = null;
     _draftEnd = null;
     _draftSnapLabel = null;
     _isDraggingHandle = false;
     _draggedAxisSnapshot = null;
+    _handleOriginalAxis = null;
     _isMovingAxis = false;
     _moveStartPoint = null;
     _moveOriginalAxis = null;

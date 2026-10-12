@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:math' as math;
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
+import '../models/architect_elements.dart';
 import '../models/architect_wall.dart';
 import '../rendering/architect_scene_geometry.dart';
 import 'architect_command_controller.dart';
@@ -173,6 +174,11 @@ class ArchitectSelection {
         return path
           ..moveTo(axis.start.dx, axis.start.dy)
           ..lineTo(axis.end.dx, axis.end.dy);
+      }
+    }
+    for (final p in s.cadPrimitives) {
+      if (p.id == id && p.type == CadPrimitiveType.rect) {
+        return path..addPolygon(p.polygonCorners, true);
       }
     }
     final rect = bounds(project, id);

@@ -58,15 +58,40 @@ class ArchitectWallNetwork {
     for (var i = 0; i < walls.length; i++) {
       final a = walls[i];
       for (final b in walls.skip(i + 1)) {
-        // Only a real finite reference-line junction can extend the bodies.
         final node = intersection(
+          a.startPoint,
+          a.endPoint,
+          b.startPoint,
+          b.endPoint,
+        );
+        if (node == null || !a.connectsAt(node) || !b.connectsAt(node)) {
+          continue;
+        }
+        bool inside(ArchitectWall wall, Offset p) {
+          final d = p - wall.centerStart;
+          final along = d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+          final across =
+              (d.dx * wall.normalVector.dx + d.dy * wall.normalVector.dy).abs();
+          return wall.connectsAt(p) &&
+              along >= -1e-8 &&
+              along <= wall.length + 1e-8 &&
+              across <= wall.thickness / 2 + 1e-8;
+        }
+
+        final finiteNode = intersection(
           a.startPoint,
           a.endPoint,
           b.startPoint,
           b.endPoint,
           finite: true,
         );
-        if (node == null || !a.connectsAt(node) || !b.connectsAt(node)) {
+        if (finiteNode == null &&
+            ![
+              if (a.connectStart) (a.startPoint, b),
+              if (a.connectEnd) (a.endPoint, b),
+              if (b.connectStart) (b.startPoint, a),
+              if (b.connectEnd) (b.endPoint, a),
+            ].any((contact) => inside(contact.$2, contact.$1))) {
           continue;
         }
         if (solidOnly &&
@@ -101,6 +126,18 @@ class ArchitectWallNetwork {
             node + b.normalVector * fb.$1,
             node + b.normalVector * fb.$2,
           ]);
+          for (final wall in [a, b]) {
+            final d = node - wall.startPoint;
+            final along = d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+            if (along < 0 || along > wall.length) {
+              final cap = along < 0 ? wall.startPoint : wall.endPoint;
+              final face = _faces(wall, faceOffsets);
+              points.addAll([
+                cap + wall.normalVector * face.$1,
+                cap + wall.normalVector * face.$2,
+              ]);
+            }
+          }
           final hull = _hull(points);
           points
             ..clear()

@@ -350,6 +350,8 @@ class ArchitectProject {
     int? customAxesY,
     double? customSpacingX,
     double? customSpacingY,
+    List<double>? spacingsX,
+    List<double>? spacingsY,
     List<ArchitectWallType>? wallTypes,
     ArchitectUnit units = ArchitectUnit.meters,
   }) {
@@ -379,6 +381,8 @@ class ArchitectProject {
       customAxesY: customAxesY,
       customSpacingX: customSpacingX,
       customSpacingY: customSpacingY,
+      spacingsX: spacingsX,
+      spacingsY: spacingsY,
     );
 
     final finalWallTypes =

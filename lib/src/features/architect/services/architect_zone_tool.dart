@@ -4,6 +4,8 @@ import 'architect_element_id.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
 import '../rendering/architect_zone_snap.dart';
+import '../../bim_projects/models/bim_coordinate_frame.dart';
+import '../../dxf_viewer/models/dxf_models.dart';
 
 // =============================================================================
 // FILE INDEX / TABLE OF CONTENTS (Grep markers: === SECTION: <NAME> ===)
@@ -891,13 +893,12 @@ class ArchitectZoneTool extends ChangeNotifier {
     required Offset rawModelPoint,
     required ArchitectProject project,
     required double currentScale,
+    bool magnetic = true,
+    DxfDocument? underlay,
+    BimCoordinateFrame frame = const BimCoordinateFrame(),
+    Map<String, bool> visibility = const {},
   }) {
     if (!isDrafting) return;
-
-    if (_candidatePoint != null &&
-        (rawModelPoint - _candidatePoint!).distance < 1e-9) {
-      return;
-    }
 
     _candidatePoint = rawModelPoint;
     final lastPoint = _draftPoints.last;
@@ -924,6 +925,10 @@ class ArchitectZoneTool extends ChangeNotifier {
       raw: rawModelPoint,
       project: project,
       tolerance: snapTolerance,
+      magnetic: magnetic,
+      underlay: underlay,
+      frame: frame,
+      visibility: visibility,
     );
 
     Offset candidate = zoneSnap.point;
@@ -936,7 +941,8 @@ class ArchitectZoneTool extends ChangeNotifier {
       snapAngleToleranceDeg: 7.0,
     );
 
-    if (!zoneSnap.isSnapped &&
+    if (magnetic &&
+        !zoneSnap.isSnapped &&
         orthoResult.isSnapped &&
         (orthoResult.point - rawModelPoint).distance <= snapTolerance) {
       candidate = orthoResult.point;

@@ -2,25 +2,31 @@ import 'dart:math' as math;
 import 'dart:ui';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../models/architect_project.dart';
+import '../models/architect_wall.dart';
+import '../../dxf_viewer/models/dxf_models.dart';
+import '../../dxf_viewer/rendering/dxf_segment_snap.dart';
+import '../../dxf_viewer/rendering/dxf_snap_helper.dart';
+import 'architect_snap_geometry.dart';
 
 class ArchitectSnapResult {
   final Offset point;
   final bool isSnapped;
   final String? snapLabel;
   final double? angleDeg;
+  final ArchitectWallAttachment? wallAttachment;
   final List<(Offset, Offset)> magneticGuides;
   const ArchitectSnapResult({
     required this.point,
     this.isSnapped = false,
     this.snapLabel,
     this.angleDeg,
+    this.wallAttachment,
     this.magneticGuides = const [],
   });
 }
 
-/// Bounded nearest-candidate snapping, independent of list order.
+/// Common bounded object snaps and magnetic guides for all drawing tools.
 class ArchitectSnapHelper {
-  static final _indexes = Expando<_SnapIndex>();
   static BimPrecisionPolicy precision(ArchitectProject project) =>
       project.units.isImperial
       ? BimPrecisionPolicy.imperial
@@ -31,154 +37,360 @@ class ArchitectSnapHelper {
     required Offset rawPoint,
     required ArchitectProject project,
     double tolerance = .20,
-  }) {
-    final radius = tolerance.clamp(0.0, .20);
-    final explicit = _nearest(rawPoint, project, radius, anchor: anchor);
-    if (explicit != null) return explicit;
-    final delta = rawPoint - anchor;
-    if (delta.distance < 1e-9) return ArchitectSnapResult(point: anchor);
-    final angle = math.atan2(delta.dy, delta.dx);
-    final target = (angle / (math.pi / 4)).round() * math.pi / 4;
-    if ((target - angle).abs() <= math.pi / 30) {
-      final u = Offset(math.cos(target), math.sin(target));
-      final projection = anchor + u * (delta.dx * u.dx + delta.dy * u.dy);
-      if ((projection - rawPoint).distance <= radius + 1e-9) {
-        final degrees = (target * 180 / math.pi + 360) % 360;
-        return ArchitectSnapResult(
-          point: projection,
-          isSnapped: true,
-          snapLabel: '${degrees.round()}°',
-          angleDeg: degrees,
-        );
-      }
-    }
-    return ArchitectSnapResult(
-      point: precision(project).inputPoint(rawPoint),
-      angleDeg: (angle * 180 / math.pi + 360) % 360,
-    );
-  }
+    bool magnetic = true,
+    bool alignment = false,
+    Set<String> excludedIds = const {},
+    DxfDocument? underlay,
+    BimCoordinateFrame frame = const BimCoordinateFrame(),
+    Map<String, bool> visibility = const {},
+  }) => _resolve(
+    raw: rawPoint,
+    anchor: anchor,
+    project: project,
+    radius: tolerance.clamp(0.0, .20),
+    magnetic: magnetic,
+    alignment: alignment,
+    excludedIds: excludedIds,
+    underlay: underlay,
+    frame: frame,
+    visibility: visibility,
+  );
 
   static ArchitectSnapResult snapFree({
     required Offset rawPoint,
     required ArchitectProject project,
     double tolerance = .20,
-  }) =>
-      _nearest(rawPoint, project, tolerance.clamp(0.0, .20)) ??
-      ArchitectSnapResult(point: precision(project).inputPoint(rawPoint));
+    bool magnetic = true,
+    bool alignment = false,
+    Set<String> excludedIds = const {},
+    DxfDocument? underlay,
+    BimCoordinateFrame frame = const BimCoordinateFrame(),
+    Map<String, bool> visibility = const {},
+  }) => _resolve(
+    raw: rawPoint,
+    project: project,
+    radius: tolerance.clamp(0.0, .20),
+    magnetic: magnetic,
+    alignment: alignment,
+    excludedIds: excludedIds,
+    underlay: underlay,
+    frame: frame,
+    visibility: visibility,
+  );
 
-  static ArchitectSnapResult? _nearest(
-    Offset raw,
-    ArchitectProject project,
-    double radius, {
-    Offset? anchor,
+  static int _rank(String label) => switch (label) {
+    'Endpoint' || 'Vertex' || 'Axis endpoint' => 0,
+    'Intersection' || 'Axis intersection' => 1,
+    'Center' || 'Midpoint' => 2,
+    'Perpendicular' => 3,
+    _ => 4,
+  };
+  static double _dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
+
+  /// Move the entire selection using its real features, excluding self-snaps.
+  static ArchitectSnapResult snapTranslation({
+    required ArchitectProject project,
+    required Set<String> elementIds,
+    required Offset delta,
+    double tolerance = .20,
+    bool magnetic = true,
+    DxfDocument? underlay,
+    BimCoordinateFrame frame = const BimCoordinateFrame(),
+    Map<String, bool> visibility = const {},
   }) {
-    final index = _indexes[project] ??= _SnapIndex(project);
-    _Candidate? best;
-    double bestDistance = radius + 1e-9;
-    void consider(_Candidate candidate) {
-      if (anchor != null && (candidate.point - anchor).distance < 1e-9) return;
-      final distance = (candidate.point - raw).distance;
-      if (distance > radius + 1e-9) return;
-      final tie = (distance - bestDistance).abs() <= 1e-9;
-      if (distance < bestDistance - 1e-9 ||
-          best == null ||
-          (tie && candidate.compareTo(best!) < 0)) {
-        best = candidate;
-        bestDistance = distance;
+    if (!magnetic) return ArchitectSnapResult(point: delta);
+    final points = ArchitectSnapGeometry.of(project).alignmentPoints
+        .where((p) => elementIds.contains(p.owner))
+        .map((p) => p.point)
+        .toSet();
+    ArchitectSnapResult? best;
+    var bestCorrection = double.infinity;
+    var bestRank = 99;
+    for (final point in points) {
+      final raw = point + delta;
+      final snap = snapFree(
+        rawPoint: raw,
+        project: project,
+        tolerance: tolerance,
+        alignment: true,
+        excludedIds: elementIds,
+        underlay: underlay,
+        frame: frame,
+        visibility: visibility,
+      );
+      if (!snap.isSnapped) continue;
+      final correction = snap.point - raw;
+      final rank = snap.snapLabel == 'Alignment' ? 5 : _rank(snap.snapLabel!);
+      if (rank < bestRank ||
+          (rank == bestRank && correction.distance < bestCorrection)) {
+        bestRank = rank;
+        bestCorrection = correction.distance;
+        best = ArchitectSnapResult(
+          point: delta + correction,
+          isSnapped: true,
+          snapLabel: snap.snapLabel,
+          magneticGuides: [...snap.magneticGuides, (raw, snap.point)],
+        );
+      }
+    }
+    return best ?? ArchitectSnapResult(point: delta);
+  }
+
+  static ArchitectSnapResult _resolve({
+    required Offset raw,
+    Offset? anchor,
+    required ArchitectProject project,
+    required double radius,
+    required bool magnetic,
+    required bool alignment,
+    required Set<String> excludedIds,
+    DxfDocument? underlay,
+    required BimCoordinateFrame frame,
+    required Map<String, bool> visibility,
+  }) {
+    if (!magnetic || radius <= 0) {
+      return ArchitectSnapResult(point: precision(project).inputPoint(raw));
+    }
+    final geometry = ArchitectSnapGeometry.of(project);
+    final excludeJoints = project.activeStorey.walls.any(
+      (w) => excludedIds.contains(w.id),
+    );
+    bool excluded(String owner) =>
+        excludedIds.contains(owner) ||
+        (owner == '@wall-joints' && excludeJoints) ||
+        (owner == '@axes' &&
+            project.gridAxes.any((a) => excludedIds.contains(a.id)));
+    ArchitectSnapPoint? best;
+    var bestDistance = radius + 1e-9;
+    void consider(Offset point, String label) {
+      if (anchor != null && (point - anchor).distance < 1e-9) return;
+      final d = (point - raw).distance;
+      if (d > radius + 1e-9) return;
+      final rank = _rank(label),
+          oldRank = best == null ? 99 : _rank(best!.label);
+      final tie = (d - bestDistance).abs() < 1e-9;
+      if (best == null ||
+          rank < oldRank ||
+          (rank == oldRank &&
+              (d < bestDistance - 1e-9 ||
+                  (tie &&
+                      (point.dx < best!.point.dx ||
+                          (point.dx == best!.point.dx &&
+                              point.dy < best!.point.dy)))))) {
+        best = (point: point, label: label, owner: '');
+        bestDistance = d;
       }
     }
 
-    for (final candidate in index.query(raw, radius)) {
-      consider(candidate);
+    for (final candidate in geometry.query(raw, radius)) {
+      if (!excluded(candidate.owner)) {
+        consider(candidate.point, candidate.label);
+      }
+    }
+    final nearby = <(Offset, Offset)>[];
+    for (final edge in geometry.edges) {
+      if (excluded(edge.owner)) continue;
+      final projection = DxfSnapHelper.closestPointOnSegment(
+        raw,
+        edge.a,
+        edge.b,
+      );
+      if ((projection - raw).distance <= radius) nearby.add((edge.a, edge.b));
+    }
+    if (underlay != null) {
+      underlay.orBuildSpatialIndex;
+      nearby.addAll(
+        DxfSegmentSnap.nearby(
+          document: underlay,
+          point: frame.toCad(raw),
+          radius: radius * frame.unitsPerMeter,
+          layerVisibility: visibility,
+        ).map((e) => (frame.toModel(e.$1), frame.toModel(e.$2))),
+      );
+    }
+    for (final edge in nearby) {
+      consider(edge.$1, 'Endpoint');
+      consider(edge.$2, 'Endpoint');
+      consider((edge.$1 + edge.$2) / 2, 'Midpoint');
+      consider(
+        DxfSnapHelper.closestPointOnSegment(raw, edge.$1, edge.$2),
+        'Edge',
+      );
+      if (anchor != null) {
+        final u = edge.$2 - edge.$1;
+        final t = _dot(anchor - edge.$1, u) / u.distanceSquared;
+        if (t >= 0 && t <= 1) consider(edge.$1 + u * t, 'Perpendicular');
+      }
+    }
+    for (var i = 0; i < nearby.length; i++) {
+      for (final other in nearby.skip(i + 1)) {
+        final p = DxfSegmentSnap.intersection(nearby[i], other);
+        if (p != null) consider(p, 'Intersection');
+      }
+    }
+    final circles = geometry.circles
+        .where(
+          (c) =>
+              !excluded(c.owner) &&
+              ((raw - c.center).distance - c.radius).abs() <= radius,
+        )
+        .toList();
+    for (final circle in circles) {
+      consider(
+        DxfSnapHelper.closestPointOnCircle(raw, circle.center, circle.radius),
+        'Edge',
+      );
+      for (final edge in nearby) {
+        for (final p in _circleCrossings(circle, edge)) {
+          consider(p, 'Intersection');
+        }
+      }
+    }
+    for (var i = 0; i < circles.length; i++) {
+      for (final b in circles.skip(i + 1)) {
+        final a = circles[i], d = b.center - a.center, length = d.distance;
+        if (length < 1e-9 ||
+            length > a.radius + b.radius ||
+            length < (a.radius - b.radius).abs()) {
+          continue;
+        }
+        final along =
+            (a.radius * a.radius - b.radius * b.radius + length * length) /
+            (2 * length);
+        final height = math.sqrt(
+          math.max(0, a.radius * a.radius - along * along),
+        );
+        final u = d / length, n = Offset(-u.dy, u.dx);
+        for (final p in [
+          a.center + u * along + n * height,
+          a.center + u * along - n * height,
+        ]) {
+          consider(p, 'Intersection');
+        }
+      }
     }
     for (final axis in project.gridAxes) {
-      consider(_Candidate(axis.projectPoint(raw), 'Axis ${axis.name}', 3));
+      if (excluded(axis.id)) continue;
+      consider(axis.projectPoint(raw), 'Axis ${axis.name}');
+      for (final edge in nearby) {
+        // Axes are reference lines; object edges remain finite.
+        final p = _axisCrossing(axis.start, axis.end, edge);
+        if (p != null) consider(p, 'Intersection');
+      }
     }
-    return best == null
-        ? null
-        : ArchitectSnapResult(
-            point: best!.point,
-            isSnapped: true,
-            snapLabel: best!.label,
-          );
-  }
-}
-
-class _Candidate {
-  final Offset point;
-  final String label;
-  final int priority;
-  const _Candidate(this.point, this.label, this.priority);
-  int compareTo(_Candidate other) {
-    final rank = priority.compareTo(other.priority);
-    if (rank != 0) return rank;
-    final x = point.dx.compareTo(other.point.dx);
-    if (x != 0) return x;
-    final y = point.dy.compareTo(other.point.dy);
-    return y != 0 ? y : label.compareTo(other.label);
-  }
-}
-
-/// Cached on immutable project revision; capture queries visit nearby buckets.
-class _SnapIndex {
-  static const cellSize = .5;
-  final Map<(int, int), List<_Candidate>> _cells = {};
-  _SnapIndex(ArchitectProject project) {
-    void add(Offset point, String label, int priority) {
-      if (!point.dx.isFinite || !point.dy.isFinite) return;
-      final key = (
-        (point.dx / cellSize).floor(),
-        (point.dy / cellSize).floor(),
+    if (best != null) {
+      return ArchitectSnapResult(
+        point: best!.point,
+        isSnapped: true,
+        snapLabel: best!.label,
+        magneticGuides: anchor == null ? [] : [(anchor, best!.point)],
       );
-      (_cells[key] ??= []).add(_Candidate(point, label, priority));
     }
+    if (anchor != null) {
+      final delta = raw - anchor;
+      if (delta.distance < 1e-9) return ArchitectSnapResult(point: anchor);
+      final angle = math.atan2(delta.dy, delta.dx);
+      // Right angles have stronger capture than intermediate directions.
+      for (final step in [math.pi / 2, math.pi / 4]) {
+        final target = (angle / step).round() * step;
+        final u = Offset(math.cos(target), math.sin(target));
+        final projection = anchor + u * _dot(delta, u);
+        final threshold = step == math.pi / 2 ? math.pi / 15 : math.pi / 30;
+        if ((angle - target).abs() <= threshold &&
+            (projection - raw).distance <= radius + 1e-9) {
+          final degrees = (target * 180 / math.pi + 360) % 360;
+          return ArchitectSnapResult(
+            point: projection,
+            isSnapped: true,
+            snapLabel: '${degrees.round()}°',
+            angleDeg: degrees,
+            magneticGuides: [(anchor, projection)],
+          );
+        }
+      }
+      if (alignment) {
+        for (final edge in geometry.edges) {
+          if (excluded(edge.owner)) continue;
+          final u = (edge.b - edge.a) / (edge.b - edge.a).distance;
+          for (final direction in [u, Offset(-u.dy, u.dx)]) {
+            final projection = anchor + direction * _dot(delta, direction);
+            if ((projection - raw).distance <= radius &&
+                (projection - raw).distance <=
+                    delta.distance * math.sin(math.pi / 90)) {
+              return ArchitectSnapResult(
+                point: projection,
+                isSnapped: true,
+                snapLabel: 'Alignment',
+                magneticGuides: [(anchor, projection), (edge.a, edge.b)],
+              );
+            }
+          }
+        }
+      }
+    }
+    if (alignment) {
+      Offset? aligned;
+      (Offset, Offset)? guide;
+      var distance = radius;
+      void align(Offset base, Offset direction) {
+        final projection = base + direction * _dot(raw - base, direction);
+        final d = (projection - raw).distance;
+        if (d < distance &&
+            (anchor == null || (projection - anchor).distance > 1e-9)) {
+          distance = d;
+          aligned = projection;
+          guide = (base, projection);
+        }
+      }
 
-    for (final wall in project.activeStorey.walls) {
-      add(wall.startPoint, 'Endpoint', 0);
-      add(wall.endPoint, 'Endpoint', 0);
-      add((wall.startPoint + wall.endPoint) / 2, 'Midpoint', 2);
-    }
-    for (final zone in project.activeStorey.zones) {
-      for (final point in zone.polygon) {
-        add(point, 'Vertex', 0);
+      for (final p in geometry.alignmentPoints) {
+        if (excluded(p.owner)) continue;
+        align(p.point, const Offset(1, 0));
+        align(p.point, const Offset(0, 1));
+      }
+      for (final edge in geometry.edges) {
+        if (excluded(edge.owner)) continue;
+        final u = (edge.b - edge.a) / (edge.b - edge.a).distance;
+        for (final p in [edge.a, edge.b]) {
+          align(p, u);
+          align(p, Offset(-u.dy, u.dx));
+        }
+      }
+      if (aligned != null) {
+        return ArchitectSnapResult(
+          point: aligned!,
+          isSnapped: true,
+          snapLabel: 'Alignment',
+          magneticGuides: [guide!],
+        );
       }
     }
-    for (final slab in project.activeStorey.slabs) {
-      for (final point in slab.polygon) {
-        add(point, 'Vertex', 0);
-      }
-    }
-    for (final column in project.activeStorey.columns) {
-      add(column.position, 'Center', 1);
-    }
-    final axes = project.gridAxes;
-    for (var i = 0; i < axes.length; i++) {
-      add(axes[i].start, 'Axis endpoint', 0);
-      add(axes[i].end, 'Axis endpoint', 0);
-      final u = axes[i].end - axes[i].start;
-      for (var j = i + 1; j < axes.length; j++) {
-        final v = axes[j].end - axes[j].start;
-        final cross = u.dx * v.dy - u.dy * v.dx;
-        if (cross.abs() <= 1e-12 * u.distance * v.distance) continue;
-        final d = axes[j].start - axes[i].start;
-        final t = (d.dx * v.dy - d.dy * v.dx) / cross;
-        add(axes[i].start + u * t, 'Axis intersection', 1);
-      }
+    return ArchitectSnapResult(point: precision(project).inputPoint(raw));
+  }
+
+  static Iterable<Offset> _circleCrossings(
+    ArchitectSnapCircle circle,
+    (Offset, Offset) edge,
+  ) sync* {
+    final u = edge.$2 - edge.$1, v = edge.$1 - circle.center;
+    final a = u.distanceSquared,
+        b = 2 * _dot(v, u),
+        c = v.distanceSquared - circle.radius * circle.radius;
+    final discriminant = b * b - 4 * a * c;
+    if (a < 1e-16 || discriminant < -1e-10) return;
+    final root = math.sqrt(math.max(0, discriminant));
+    for (final t in [(-b - root) / (2 * a), (-b + root) / (2 * a)]) {
+      if (t >= 0 && t <= 1) yield edge.$1 + u * t;
     }
   }
-  Iterable<_Candidate> query(Offset raw, double radius) sync* {
-    for (
-      var x = ((raw.dx - radius) / cellSize).floor();
-      x <= ((raw.dx + radius) / cellSize).floor();
-      x++
-    ) {
-      for (
-        var y = ((raw.dy - radius) / cellSize).floor();
-        y <= ((raw.dy + radius) / cellSize).floor();
-        y++
-      ) {
-        yield* _cells[(x, y)] ?? const <_Candidate>[];
-      }
-    }
+
+  static Offset? _axisCrossing(Offset a, Offset b, (Offset, Offset) edge) {
+    final u = b - a, v = edge.$2 - edge.$1, d = edge.$1 - a;
+    final cross = u.dx * v.dy - u.dy * v.dx;
+    if (cross.abs() <= 1e-12 * u.distance * v.distance) return null;
+    final s = (d.dx * u.dy - d.dy * u.dx) / cross;
+    if (s < 0 || s > 1) return null;
+    final t = (d.dx * v.dy - d.dy * v.dx) / cross;
+    return a + u * t;
   }
 }

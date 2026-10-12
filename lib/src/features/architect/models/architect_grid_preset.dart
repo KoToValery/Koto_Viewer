@@ -50,7 +50,7 @@ class ArchitectGridPreset {
     ArchitectGridPreset(
       id: 'preset_parking_72_66',
       name: '7.20 / 6.60',
-      description: 'Паркинг / Модул (3 места по 2.40m x 6.60m маневра)',
+      description: '',
       type: GridPresetType.parking,
       spacingX: 7.20,
       spacingY: 6.60,
@@ -60,7 +60,7 @@ class ArchitectGridPreset {
     ArchitectGridPreset(
       id: 'preset_res_36_60',
       name: '3.60 / 6.00',
-      description: 'Жилищна сграда (модул дневна/спални)',
+      description: '',
       type: GridPresetType.residential,
       spacingX: 3.60,
       spacingY: 6.00,
@@ -70,7 +70,7 @@ class ArchitectGridPreset {
     ArchitectGridPreset(
       id: 'preset_villa_45_45',
       name: '4.50 / 4.50',
-      description: 'Къща / Вила (удобен растер за еднофамилни сгради)',
+      description: '',
       type: GridPresetType.villa,
       spacingX: 4.50,
       spacingY: 4.50,
@@ -80,7 +80,7 @@ class ArchitectGridPreset {
     ArchitectGridPreset(
       id: 'preset_modular_60_60',
       name: '6.00 / 6.00',
-      description: 'Обществена / Офисна модулна мрежа',
+      description: '',
       type: GridPresetType.modular,
       spacingX: 6.00,
       spacingY: 6.00,
@@ -89,8 +89,8 @@ class ArchitectGridPreset {
     ),
     ArchitectGridPreset(
       id: 'preset_custom',
-      name: 'Свободен растер',
-      description: 'Потребителски брой оси и стъпка',
+      name: '',
+      description: '',
       type: GridPresetType.custom,
       spacingX: 4.00,
       spacingY: 5.00,
@@ -99,8 +99,8 @@ class ArchitectGridPreset {
     ),
     ArchitectGridPreset(
       id: 'preset_none',
-      name: 'Без оси',
-      description: 'Чист чертожен лист',
+      name: '',
+      description: '',
       type: GridPresetType.none,
       spacingX: 0.0,
       spacingY: 0.0,
@@ -115,25 +115,40 @@ class ArchitectGridPreset {
     int? customAxesY,
     double? customSpacingX,
     double? customSpacingY,
+    List<double>? spacingsX,
+    List<double>? spacingsY,
   }) {
     if (type == GridPresetType.none) return const [];
 
-    final nx = customAxesX ?? axesX;
-    final ny = customAxesY ?? axesY;
+    final nx = spacingsX != null ? spacingsX.length + 1 : customAxesX ?? axesX;
+    final ny = spacingsY != null ? spacingsY.length + 1 : customAxesY ?? axesY;
     final dx = customSpacingX ?? spacingX;
     final dy = customSpacingY ?? spacingY;
 
     if (nx <= 0 || ny <= 0 || dx <= 0 || dy <= 0) return const [];
 
-    final totalWidth = (nx - 1) * dx;
-    final totalHeight = (ny - 1) * dy;
+    final xSteps = spacingsX ?? List.filled(nx - 1, dx);
+    final ySteps = spacingsY ?? List.filled(ny - 1, dy);
+    if ([...xSteps, ...ySteps].any((d) => !d.isFinite || d <= 0)) {
+      throw ArgumentError('Invalid grid spacing');
+    }
+    final xs = [0.0];
+    final ys = [0.0];
+    for (final d in xSteps) {
+      xs.add(xs.last + d);
+    }
+    for (final d in ySteps) {
+      ys.add(ys.last + d);
+    }
+    final totalWidth = xs.last;
+    final totalHeight = ys.last;
     const margin = 1.50; // bubble extension margin in meters
 
     final axes = <StructuralGridAxis>[];
 
     // Vertical axes (numbered 1, 2, 3...)
     for (int i = 0; i < nx; i++) {
-      final x = i * dx;
+      final x = xs[i];
       axes.add(
         StructuralGridAxis(
           id: 'axis_x_${i + 1}',
@@ -147,9 +162,22 @@ class ArchitectGridPreset {
     }
 
     // Horizontal axes (lettered A, B, C...)
-    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+    const letters = [
+      'A',
+      'B',
+      'C',
+      'D',
+      'E',
+      'F',
+      'G',
+      'H',
+      'I',
+      'J',
+      'K',
+      'L',
+    ];
     for (int j = 0; j < ny; j++) {
-      final y = j * dy;
+      final y = ys[j];
       final label = j < letters.length ? letters[j] : 'Y${j + 1}';
       axes.add(
         StructuralGridAxis(

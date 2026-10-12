@@ -7,6 +7,8 @@ import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
 import '../models/architect_column.dart';
 import 'architect_elements_painter_helper.dart';
+import 'architect_polygon_painter.dart';
+import '../models/architect_elements.dart';
 import 'architect_grid_axis_painter_helper.dart';
 import 'architect_zone_painter_helper.dart';
 import 'architect_scene_geometry.dart';
@@ -15,6 +17,7 @@ import 'architect_wall_layers.dart';
 import '../models/architect_wall.dart';
 import 'architect_dimension_layout.dart';
 import '../services/architect_selection.dart';
+import '../services/architect_wall_relations.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
 
@@ -59,6 +62,8 @@ class Architect2dPainter extends CustomPainter {
   final double? activeWallInsulation;
   final bool showWallCursor;
   final (Offset, Offset)? wallCutLine;
+  final ArchitectWallTrimSpan? wallTrimSpan;
+  final List<ArchitectWallClearance> wallClearances;
   final Set<String> selectedElementIds;
   final Path? dimensionWallObstacles;
   final String? activeSnapLabel;
@@ -116,6 +121,7 @@ class Architect2dPainter extends CustomPainter {
   // Slab drafting state
   final List<Offset> slabDraftPoints;
   final Offset? slabCandidatePoint;
+  final bool polygonEditInvalid;
 
   Architect2dPainter({
     required ArchitectProject project,
@@ -132,6 +138,8 @@ class Architect2dPainter extends CustomPainter {
     this.activeWallInsulation,
     this.showWallCursor = true,
     this.wallCutLine,
+    this.wallTrimSpan,
+    this.wallClearances = const [],
     this.selectedElementIds = const {},
     this.dimensionWallObstacles,
     this.activeSnapLabel,
@@ -176,6 +184,7 @@ class Architect2dPainter extends CustomPainter {
     this.underlayLayerVisibility = const {},
     this.slabDraftPoints = const [],
     this.slabCandidatePoint,
+    this.polygonEditInvalid = false,
   }) : _project = project,
        _zoomScale = zoomScale,
        super(repaint: viewport);
@@ -253,6 +262,7 @@ class Architect2dPainter extends CustomPainter {
         _drawZones(canvas);
         _drawSelectedElement(canvas);
       }
+      _drawPolygonEditing(canvas);
       _drawActiveDrafting(canvas);
       for (final id in selectedElementIds) {
         canvas.drawPath(
@@ -269,6 +279,7 @@ class Architect2dPainter extends CustomPainter {
         draftStart: activeDraftStart,
         draftEnd: activeDraftEnd,
         zoomScale: zoomScale,
+        unit: _project.units,
       );
     }
     if (layer != ArchitectPaintLayer.interaction) {
@@ -362,6 +373,24 @@ class Architect2dPainter extends CustomPainter {
       return;
     }
     final selected = _filterElements(project.activeStorey, selectedOnly: true);
+    if (selected.slabs.isNotEmpty) {
+      ArchitectElementsPainterHelper.drawSlabs(
+        canvas: canvas,
+        storey: selected,
+        zoomScale: zoomScale,
+        selectedElementId: selectedElementId,
+      );
+      return;
+    }
+    if (selected.cadPrimitives.any((p) => p.type == CadPrimitiveType.rect)) {
+      ArchitectElementsPainterHelper.drawCadPrimitives(
+        canvas: canvas,
+        storey: selected,
+        zoomScale: zoomScale,
+        selectedElementId: selectedElementId,
+      );
+      return;
+    }
     Architect2dPainter(
       project: project.updateActiveStorey(selected).copyWithGridAxes([]),
       dimensionWallObstacles: ArchitectWallNetwork.body(
@@ -372,6 +401,30 @@ class Architect2dPainter extends CustomPainter {
       zoomScale: zoomScale,
       selectedElementId: selectedElementId,
     ).paint(canvas, Size.zero);
+  }
+
+  void _drawPolygonEditing(Canvas canvas) {
+    List<Offset>? polygon;
+    for (final p in _project.activeStorey.cadPrimitives) {
+      if (p.id == selectedElementId && p.type == CadPrimitiveType.rect) {
+        polygon = p.polygonCorners;
+      }
+    }
+    for (final slab in _project.activeStorey.slabs) {
+      if (slab.id == selectedElementId) polygon = slab.polygon;
+    }
+    if (polygon == null) return;
+    ArchitectPolygonPainter.draw(
+      canvas: canvas,
+      polygon: polygon,
+      scale: zoomScale,
+      unit: _project.units,
+      handles: true,
+      invalid: polygonEditInvalid,
+      obstacles:
+          dimensionWallObstacles ??
+          ArchitectWallNetwork.body(_project.activeStorey.walls),
+    );
   }
 
   void _drawZones(Canvas canvas) {
@@ -635,6 +688,48 @@ class Architect2dPainter extends CustomPainter {
   // ===========================================================================
 
   void _drawActiveDrafting(Canvas canvas) {
+    for (final gap in wallClearances) {
+      final wall = project.activeStorey.walls.firstWhere(
+        (w) => w.id == gap.wallId,
+      );
+      final tick = wall.unitVector * (4 / zoomScale);
+      final paint = Paint()
+        ..color = const Color(0xFF008C9E)
+        ..strokeWidth = 1 / zoomScale;
+      canvas.drawLine(gap.start, gap.end, paint);
+      for (final point in [gap.start, gap.end]) {
+        canvas.drawLine(point - tick, point + tick, paint);
+      }
+    }
+    if (wallTrimSpan != null) {
+      final span = wallTrimSpan!;
+      final preview = span.wall.copyWith(
+        startPoint:
+            span.wall.startPoint +
+            span.wall.unitVector * (span.from * span.wall.length),
+        endPoint:
+            span.wall.startPoint +
+            span.wall.unitVector * (span.to * span.wall.length),
+      );
+      canvas.drawPath(
+        ArchitectWallNetwork.polygon(preview.polygonCorners),
+        Paint()..color = Colors.redAccent.withValues(alpha: .25),
+      );
+      canvas.drawLine(
+        span.start,
+        span.end,
+        Paint()
+          ..color = Colors.redAccent
+          ..strokeWidth = 2 / zoomScale,
+      );
+      for (final point in [span.start, span.end]) {
+        canvas.drawCircle(
+          point,
+          3 / zoomScale,
+          Paint()..color = Colors.redAccent,
+        );
+      }
+    }
     if (wallCutLine != null) {
       canvas.drawLine(
         wallCutLine!.$1,

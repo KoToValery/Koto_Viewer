@@ -11,6 +11,49 @@ enum WallReferenceLine { center, inner, outer, left, right }
 
 enum WallExteriorSide { left, right }
 
+/// The physical line picked on a source wall, rather than its saved reference.
+class ArchitectWallAttachment {
+  final ArchitectWall source;
+  final WallReferenceLine reference;
+  const ArchitectWallAttachment(this.source, this.reference);
+
+  WallExteriorSide sideFor(
+    Offset start,
+    Offset end,
+    double thickness,
+    double insulation,
+  ) {
+    final delta = end - start;
+    if (delta.distance < .001) return source.exteriorSide;
+    final normal = Offset(-delta.dy, delta.dx) / delta.distance;
+    final aligned =
+        normal.dx * source.exteriorNormal.dx +
+        normal.dy * source.exteriorNormal.dy;
+    if (aligned.abs() > 1e-6) {
+      return aligned > 0 ? WallExteriorSide.left : WallExteriorSide.right;
+    }
+    // At a perpendicular corner, keep the core inside the source's end cap.
+    double score(WallExteriorSide side) {
+      final candidate = ArchitectWall(
+        id: 'attachment',
+        startPoint: start,
+        endPoint: end,
+        thickness: thickness,
+        insulationThicknessOverride: insulation,
+        referenceLine: reference,
+        exteriorSide: side,
+      );
+      final d = candidate.coreCenterStart - source.coreCenterStart;
+      final along = d.dx * source.unitVector.dx + d.dy * source.unitVector.dy;
+      return math.min(along, source.length - along);
+    }
+
+    return score(WallExteriorSide.left) >= score(WallExteriorSide.right)
+        ? WallExteriorSide.left
+        : WallExteriorSide.right;
+  }
+}
+
 /// Represents an architectural parametric wall with hosted openings (doors/windows).
 class ArchitectWall {
   final String id;

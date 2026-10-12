@@ -6,6 +6,7 @@ import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_window.dart';
+import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 
 /// Unified controller and interaction manager for specialized architectural drafting elements
 /// (windows, columns, beams, slabs, openings, stairs, dimensions, elevation markers, annotations, and CAD primitives).
@@ -342,7 +343,9 @@ class ArchitectElementTool extends ChangeNotifier {
     int colorValue = 0xFF9E9E9E,
     double strokeWidth = 1.0,
   }) {
-    if ((end - start).distance < 0.05) return null;
+    if ((end - start).distance < (type == CadPrimitiveType.line ? .05 : .001)) {
+      return null;
+    }
     final now = ArchitectElementId.next('element');
     final newPrim = ArchitectCadPrimitive(
       id: 'cad_$now',
@@ -362,6 +365,55 @@ class ArchitectElementTool extends ChangeNotifier {
   // ===========================================================================
   // 12. ELEMENT HIT TESTING (SELECT TOOL)
   // ===========================================================================
+
+  /// Filter before hit testing so overlapping objects of other tools cannot
+  /// capture a selection (including a door's host wall).
+  String? hitTestForTool(
+    ArchitectStorey storey,
+    Offset point,
+    double scale,
+    ArchitectTool tool,
+  ) {
+    final scoped = storey.copyWith(
+      walls: [
+        if ([
+          ArchitectTool.wall,
+          ArchitectTool.door,
+          ArchitectTool.window,
+        ].contains(tool))
+          for (final wall in storey.walls)
+            wall.copyWith(
+              doors: tool == ArchitectTool.door ? wall.doors : [],
+              windows: tool == ArchitectTool.window ? wall.windows : [],
+            ),
+      ],
+      columns: tool == ArchitectTool.column ? storey.columns : [],
+      beams: tool == ArchitectTool.beam ? storey.beams : [],
+      slabs: tool == ArchitectTool.slab ? storey.slabs : [],
+      openings: tool == ArchitectTool.opening ? storey.openings : [],
+      stairs: tool == ArchitectTool.stair ? storey.stairs : [],
+      dimensions: tool == ArchitectTool.dimension ? storey.dimensions : [],
+      annotations: tool == ArchitectTool.text ? storey.annotations : [],
+      elevationMarkers: tool == ArchitectTool.level
+          ? storey.elevationMarkers
+          : [],
+      cadPrimitives: storey.cadPrimitives
+          .where(
+            (p) => switch (tool) {
+              ArchitectTool.cadLine => p.type == CadPrimitiveType.line,
+              ArchitectTool.cadRect => p.type == CadPrimitiveType.rect,
+              ArchitectTool.cadCircle => p.type == CadPrimitiveType.circle,
+              _ => false,
+            },
+          )
+          .toList(),
+    );
+    final id = hitTestElement(scoped, point, scale);
+    if (tool != ArchitectTool.wall && scoped.walls.any((w) => w.id == id)) {
+      return null;
+    }
+    return id;
+  }
 
   String? hitTestElement(ArchitectStorey storey, Offset point, double scale) {
     final tolerance = 14.0 / scale;
@@ -460,11 +512,19 @@ class ArchitectElementTool extends ChangeNotifier {
           return prim.id;
         }
       } else if (prim.type == CadPrimitiveType.rect) {
-        final r = Rect.fromPoints(
-          prim.startPoint,
-          prim.endPoint,
-        ).inflate(tolerance);
-        if (r.contains(point)) return prim.id;
+        final points = prim.polygonCorners;
+        final path = Path()..addPolygon(points, true);
+        if (path.contains(point)) return prim.id;
+        for (var i = 0; i < points.length; i++) {
+          if (_pointToSegmentDistance(
+                point,
+                points[i],
+                points[(i + 1) % points.length],
+              ) <=
+              tolerance) {
+            return prim.id;
+          }
+        }
       } else if (prim.type == CadPrimitiveType.circle) {
         final rad = (prim.endPoint - prim.startPoint).distance;
         final d = (point - prim.startPoint).distance;
