@@ -3233,5 +3233,10 @@
   "architectRadialSplit": "Split",
   "@architectRadialSplit": { "description": "Radial menu split action" },
   "architectRadialOffset": "Offset",
-  "@architectRadialOffset": { "description": "Radial menu offset action" }
+  "@architectRadialOffset": { "description": "Radial menu offset action" },
+  "architectEdgeDistance": "Distance",
+  "architectEdgeSelectHint": "Select an edge",
+  "architectEdgeDistanceHint": "Set the distance by moving the selected edge.",
+  "architectEdgeMoveHint": "Move the edge parallel to itself, with both endpoints.",
+  "architectEdgePullHint": "Pull the edge and retain its original corners."
 }

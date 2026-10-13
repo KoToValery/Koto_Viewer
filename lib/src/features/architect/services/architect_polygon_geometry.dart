@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+enum ArchitectPolygonEdgeMode { pull, move }
+
 /// Shared contour editing for planar CAD shapes and volumetric slabs.
 class ArchitectPolygonGeometry {
   static const epsilon = 1e-8;
@@ -123,6 +125,40 @@ class ArchitectPolygonGeometry {
     // An inward pull must remove area; crossing the opposite side cannot flip it.
     if (distance < 0 &&
         signedArea(cleaned).abs() >= signedArea(polygon).abs()) {
+      return null;
+    }
+    return cleaned;
+  }
+
+  static List<Offset>? offsetEdge(
+    List<Offset> polygon,
+    int edge,
+    double distance, {
+    ArchitectPolygonEdgeMode mode = ArchitectPolygonEdgeMode.pull,
+  }) => mode == ArchitectPolygonEdgeMode.move
+      ? moveEdge(polygon, edge, distance)
+      : pullEdge(polygon, edge, distance);
+
+  /// Translate both endpoints by the same normal displacement. Neighboring
+  /// edges follow those endpoints without retaining the old endpoint positions.
+  static List<Offset>? moveEdge(
+    List<Offset> polygon,
+    int edge,
+    double distance,
+  ) {
+    if (polygon.length < 3 ||
+        edge < 0 ||
+        edge >= polygon.length ||
+        !distance.isFinite) {
+      return null;
+    }
+    final next = (edge + 1) % polygon.length;
+    final displacement = normal(polygon, edge) * distance;
+    final moved = List<Offset>.of(polygon)
+      ..[edge] = polygon[edge] + displacement
+      ..[next] = polygon[next] + displacement;
+    final cleaned = clean(moved);
+    if (!valid(cleaned) || signedArea(cleaned) * signedArea(polygon) <= 0) {
       return null;
     }
     return cleaned;

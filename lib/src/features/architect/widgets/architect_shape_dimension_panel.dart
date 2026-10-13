@@ -8,6 +8,7 @@ class ArchitectShapeDimensionPanel extends StatefulWidget {
   final List<String> labels;
   final String unit;
   final double minimum;
+  final bool canSave, signed;
   final void Function(int index, double value) onChanged;
   final VoidCallback onSave, onCancel;
   const ArchitectShapeDimensionPanel({
@@ -16,6 +17,8 @@ class ArchitectShapeDimensionPanel extends StatefulWidget {
     required this.labels,
     required this.unit,
     required this.minimum,
+    this.canSave = true,
+    this.signed = false,
     required this.onChanged,
     required this.onSave,
     required this.onCancel,
@@ -103,7 +106,14 @@ class _ArchitectShapeDimensionPanelState
                 ),
             ],
           ),
+          if (widget.signed)
+            TextButton(onPressed: () => key('±'), child: const Text('±')),
           ArchitectNumericKeypad(keyPrefix: 'shape-key', onKey: key),
+          if (!widget.canSave)
+            Text(
+              context.l10n.architectOperationRejected,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+            ),
           Row(
             children: [
               Expanded(
@@ -116,7 +126,9 @@ class _ArchitectShapeDimensionPanelState
               Expanded(
                 child: FilledButton(
                   key: const ValueKey('shape-save'),
-                  onPressed: List.generate(input.length, valid).every((v) => v)
+                  onPressed:
+                      widget.canSave &&
+                          List.generate(input.length, valid).every((v) => v)
                       ? widget.onSave
                       : null,
                   child: Text(context.l10n.save),

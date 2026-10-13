@@ -4467,4 +4467,22 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectRadialOffset => 'Офсет';
+
+  @override
+  String get architectEdgeDistance => 'Разстояние';
+
+  @override
+  String get architectEdgeSelectHint => 'Избери ръб';
+
+  @override
+  String get architectEdgeDistanceHint =>
+      'Задай разстоянието чрез преместване на избрания ръб.';
+
+  @override
+  String get architectEdgeMoveHint =>
+      'Мести ръба успоредно, заедно с двата му края.';
+
+  @override
+  String get architectEdgePullHint =>
+      'Изтегли ръба със запазване на старите върхове.';
 }

@@ -4451,4 +4451,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectRadialOffset => 'Offset';
+
+  @override
+  String get architectEdgeDistance => 'Distance';
+
+  @override
+  String get architectEdgeSelectHint => 'Select an edge';
+
+  @override
+  String get architectEdgeDistanceHint =>
+      'Set the distance by moving the selected edge.';
+
+  @override
+  String get architectEdgeMoveHint =>
+      'Move the edge parallel to itself, with both endpoints.';
+
+  @override
+  String get architectEdgePullHint =>
+      'Pull the edge and retain its original corners.';
 }

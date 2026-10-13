@@ -13,6 +13,7 @@ class ArchitectViewport extends StatefulWidget {
   final bool singlePointerPan;
   final bool touchHoldToPlace;
   final bool holdToEdit;
+  final ValueChanged<Offset>? onEditTap;
   final ValueChanged<Offset>? onToolHoldStart;
   final bool Function(Offset)? onSelectionHold;
   final bool Function() isDraggingHandle;
@@ -31,6 +32,7 @@ class ArchitectViewport extends StatefulWidget {
     required this.singlePointerPan,
     this.touchHoldToPlace = false,
     this.holdToEdit = false,
+    this.onEditTap,
     this.onToolHoldStart,
     this.onSelectionHold,
     required this.isDraggingHandle,
@@ -196,6 +198,12 @@ class _ArchitectViewportState extends State<ArchitectViewport> {
   void _upEvent(PointerUpEvent event) {
     if (!_pointers.containsKey(event.pointer)) return;
     _holdTimer?.cancel();
+    if (_pendingEditDown != null &&
+        !_suppressRelease &&
+        !_navigation &&
+        _pointers.length == 1) {
+      widget.onEditTap?.call(event.localPosition);
+    }
     if (_pendingEditDown == null &&
         !_suppressRelease &&
         !_navigation &&

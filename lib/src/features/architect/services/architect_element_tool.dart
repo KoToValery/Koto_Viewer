@@ -7,7 +7,6 @@ import '../models/architect_project.dart';
 import '../models/architect_door.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_window.dart';
-import '../models/architect_zone.dart';
 import '../models/architect_fenestration_style.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 

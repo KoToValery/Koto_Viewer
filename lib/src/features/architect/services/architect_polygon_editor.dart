@@ -17,6 +17,9 @@ class ArchitectPolygonEditor {
   bool isOffsetHandle = false;
   Offset? leaderOrigin;
   Offset? leaderTarget;
+  Offset? editedPoint;
+  Offset _handleDisplacement = Offset.zero;
+  ArchitectPolygonEdgeMode edgeMode = ArchitectPolygonEdgeMode.pull;
 
   bool get active => elementId != null;
 
@@ -26,11 +29,8 @@ class ArchitectPolygonEditor {
     if (!active || preview == null || index == null || !isOffsetHandle) {
       return null;
     }
-    final i = index!;
-    if (i < 0 || i >= preview!.length) return null;
-    final moving = edge
-        ? (preview![i] + preview![(i + 1) % preview!.length]) / 2
-        : preview![i];
+    final moving = editedPoint;
+    if (moving == null) return null;
     return leaderTarget != null ? (moving, leaderTarget!) : null;
   }
 
@@ -56,7 +56,36 @@ class ArchitectPolygonEditor {
     return mid + ArchitectPolygonGeometry.normal(polygon, i) * clearance;
   }
 
-  bool start(String id, List<Offset> polygon, Offset raw, double scale) {
+  bool startEdge(
+    String id,
+    List<Offset> polygon,
+    int selectedEdge,
+    Offset raw,
+    double scale, {
+    ArchitectPolygonEdgeMode mode = ArchitectPolygonEdgeMode.move,
+  }) {
+    if (selectedEdge < 0 || selectedEdge >= polygon.length) return false;
+    final midpoint =
+        (polygon[selectedEdge] + polygon[(selectedEdge + 1) % polygon.length]) /
+        2;
+    if (!start(id, polygon, midpoint, scale, mode: mode)) return false;
+    index = selectedEdge;
+    edge = true;
+    isOffsetHandle = false;
+    grabOffset = midpoint - raw;
+    leaderOrigin = midpoint;
+    editedPoint = midpoint;
+    _handleDisplacement = Offset.zero;
+    return true;
+  }
+
+  bool start(
+    String id,
+    List<Offset> polygon,
+    Offset raw,
+    double scale, {
+    ArchitectPolygonEdgeMode mode = ArchitectPolygonEdgeMode.pull,
+  }) {
     if (!ArchitectPolygonGeometry.valid(polygon)) return false;
     final directRadius = 18.0 / scale;
     final offsetRadius = 24.0 / scale;
@@ -152,11 +181,14 @@ class ArchitectPolygonEditor {
     preview = List.of(polygon);
     index = hit;
     edge = hitIsEdge;
+    edgeMode = mode;
     isOffsetHandle = hitIsOffset;
     grabOffset = chosenHandle - raw;
     leaderOrigin = edge
         ? (polygon[hit] + polygon[(hit + 1) % polygon.length]) / 2
         : polygon[hit];
+    editedPoint = leaderOrigin;
+    _handleDisplacement = chosenHandle - leaderOrigin!;
     leaderTarget = raw + grabOffset;
     invalid = false;
     return true;
@@ -168,9 +200,11 @@ class ArchitectPolygonEditor {
     double mergeRadius,
   ) {
     if (!active) return;
-    final polygon = original!, i = index!, target = raw + grabOffset;
-    leaderTarget = target;
+    final polygon = original!, i = index!;
+    final target = raw + grabOffset - _handleDisplacement;
+    leaderTarget = raw + grabOffset;
     List<Offset>? next;
+    Offset? movingPoint;
     if (edge) {
       final n = ArchitectPolygonGeometry.normal(polygon, i);
       final midpoint = (polygon[i] + polygon[(i + 1) % polygon.length]) / 2;
@@ -195,11 +229,13 @@ class ArchitectPolygonEditor {
         correctionDistance = along;
         activeSnap = result;
       }
-      next = ArchitectPolygonGeometry.pullEdge(
+      next = ArchitectPolygonGeometry.offsetEdge(
         polygon,
         i,
         distance + correctionDistance,
+        mode: edgeMode,
       );
+      movingPoint = midpoint + n * (distance + correctionDistance);
     } else {
       activeSnap = snap(target);
       var point = activeSnap!.point;
@@ -212,10 +248,14 @@ class ArchitectPolygonEditor {
         }
       }
       next = ArchitectPolygonGeometry.moveVertex(polygon, i, point);
+      movingPoint = point;
     }
     invalid = next == null;
     if (invalid) activeSnap = null;
-    if (next != null) preview = next;
+    if (next != null) {
+      preview = next;
+      editedPoint = movingPoint;
+    }
   }
 
   void cancel() {
@@ -228,5 +268,7 @@ class ArchitectPolygonEditor {
     isOffsetHandle = false;
     leaderOrigin = null;
     leaderTarget = null;
+    editedPoint = null;
+    _handleDisplacement = Offset.zero;
   }
 }

@@ -32,6 +32,9 @@ import '../rendering/architect_scene_geometry.dart';
 import '../services/architect_command_controller.dart';
 import '../services/architect_element_tool.dart';
 import '../services/architect_polygon_editor.dart';
+import '../services/architect_polygon_dimensions.dart';
+import '../services/architect_polygon_geometry.dart';
+import '../widgets/architect_polygon_distance_overlay.dart';
 import '../widgets/architect_shape_dimension_panel.dart';
 import '../services/architect_selection.dart';
 import '../services/architect_wall_relations.dart';
@@ -191,6 +194,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       ))
         e['id'] as String,
     };
+    _polygonSelectedEdge = null;
+    if (_polygonEditId != null && !valid.contains(_polygonEditId)) {
+      _polygonEditId = null;
+    }
     _selectionIds.removeWhere((id) => !valid.contains(id));
     if (_selectedElementId != null && !valid.contains(_selectedElementId)) {
       _selectedElementId = null;
@@ -225,6 +232,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelDrafting() {
+    _polygonEditId = null;
+    _polygonSelectedEdge = null;
     _pendingShape = null;
     _shapePanelAnchor = null;
     _selectionIds.clear();
@@ -258,6 +267,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   CadPrimitiveType? _pendingShape;
   Offset? _shapePanelAnchor;
   final _polygonEditor = ArchitectPolygonEditor();
+  ArchitectPolygonEdgeMode _polygonEdgeMode = ArchitectPolygonEdgeMode.pull;
+  String? _polygonEditId;
+  int? _polygonSelectedEdge;
+  bool _polygonDistanceOpen = false;
   Offset? _radialMenuScreenPosition;
   String? _radialMenuElementId;
   List<ArchitectRadialMenuItem> _radialMenuItems = [];
@@ -554,6 +567,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _isHandleEngaged = false;
 
     final rawModel = _screenToModel(event.localPosition);
+    if (_polygonDistanceOpen) return;
+    if (_polygonEditId != null) _selectPolygonEdge(rawModel);
     if (_activeTool == ArchitectTool.wall &&
         event.kind == PointerDeviceKind.mouse &&
         HardwareKeyboard.instance.isControlPressed) {
@@ -591,13 +606,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     final polygon = _selectedPolygon;
+    final movableEdge =
+        polygon != null &&
+            _polygonEditId != null &&
+            _polygonEdgeMode == ArchitectPolygonEdgeMode.move &&
+            !polygon.any((p) => (p - rawModel).distance < 10 / _currentScale)
+        ? ArchitectPolygonDimensions.hitEdge(
+            polygon,
+            rawModel,
+            18 / _currentScale,
+          )
+        : null;
     if (polygon != null &&
-        _polygonEditor.start(
-          (_selectedElementId ?? _selectedZoneId)!,
-          polygon,
-          rawModel,
-          _currentScale,
-        )) {
+        (movableEdge != null
+            ? _polygonEditor.startEdge(
+                (_selectedElementId ?? _selectedZoneId)!,
+                polygon,
+                movableEdge,
+                rawModel,
+                _currentScale,
+              )
+            : _polygonEditor.start(
+                (_selectedElementId ?? _selectedZoneId)!,
+                polygon,
+                rawModel,
+                _currentScale,
+                mode: _polygonEditId == null
+                    ? ArchitectPolygonEdgeMode.pull
+                    : _polygonEdgeMode,
+              ))) {
       _elementMoveOriginal = _project;
       _elementMovePreview = _project;
       _isHandleEngaged = true;
@@ -811,6 +848,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool get _canPlaceWithMarker =>
       _activeTool != ArchitectTool.select &&
       !_wallDirectionLocked &&
+      _polygonEditId == null &&
       _pendingShape == null;
 
   Offset? get _placementPreviewTarget {
@@ -1266,6 +1304,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (_isActivelyDraggingHandle && !_handleMoved) {
+      if (_polygonEditId != null) {
+        _selectPolygonEdge(_screenToModel(event.localPosition));
+      }
       _cancelActiveDrags();
       _repaintPreview();
       return;
@@ -1328,6 +1369,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       final id = _polygonEditor.elementId!, points = _polygonEditor.preview!;
       final original = _polygonEditor.original!;
       final valid = !_polygonEditor.invalid;
+      final editedEdge =
+          _polygonEditor.edge && _polygonEditor.editedPoint != null
+          ? ArchitectPolygonDimensions.hitEdge(
+              points,
+              _polygonEditor.editedPoint!,
+              .001,
+            )
+          : null;
       final changed =
           points.length != original.length ||
           List.generate(
@@ -1344,6 +1393,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         );
         _saveBiMProjectIfAttached();
+        if (_polygonEditId == id) _polygonSelectedEdge = editedEdge;
       } else if (!valid) {
         _operationError();
       }
@@ -1552,7 +1602,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _handleTap(Offset rawModel) {
-    if (_pendingShape != null) return;
+    if (_pendingShape != null || _polygonDistanceOpen) return;
+    if (_polygonEditId != null) {
+      _selectPolygonEdge(rawModel);
+      return;
+    }
     if (_wallCutIds.isNotEmpty) {
       if (!_wallCutStroke) {
         final span = _trimSpanAt(rawModel);
@@ -2403,6 +2457,269 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     ),
   );
 
+  List<Offset>? get _editablePolygon {
+    if (_polygonEditId == null ||
+        _polygonEditId != (_selectedElementId ?? _selectedZoneId)) {
+      return null;
+    }
+    final storey = (_elementMovePreview ?? _project).activeStorey;
+    for (final slab in storey.slabs) {
+      if (slab.id == _polygonEditId) return slab.polygon;
+    }
+    for (final primitive in storey.cadPrimitives) {
+      if (primitive.id == _polygonEditId &&
+          primitive.type == CadPrimitiveType.rect) {
+        return primitive.polygonCorners;
+      }
+    }
+    for (final zone in storey.zones) {
+      if (zone.id == _polygonEditId) return zone.polygon;
+    }
+    return null;
+  }
+
+  void _selectPolygonEdge(Offset point) {
+    if (_polygonDistanceOpen) return;
+    final polygon = _editablePolygon;
+    if (polygon == null) return;
+    var edge = ArchitectPolygonDimensions.hitEdge(
+      polygon,
+      point,
+      18 / _currentScale,
+    );
+    if (edge == null) {
+      var best = 18 / _currentScale;
+      for (var i = 0; i < polygon.length; i++) {
+        final handle = ArchitectPolygonEditor.offsetEdgeHandle(
+          polygon,
+          i,
+          _currentScale,
+        );
+        final distance = (point - handle).distance;
+        if (distance <= best) {
+          edge = i;
+          best = distance;
+        }
+      }
+    }
+    if (edge != null) {
+      setState(() => _polygonSelectedEdge = edge);
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  Widget _buildPolygonDistanceOverlay() => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: Listenable.merge([_viewport, _previewRevision]),
+      builder: (context, child) {
+        final polygon = _editablePolygon;
+        if (polygon == null || _radialMenuScreenPosition != null) {
+          return const SizedBox.shrink();
+        }
+        final edge = _polygonSelectedEdge;
+        final selected = edge != null && edge < polygon.length;
+        return Stack(
+          children: [
+            if (selected && !_polygonEditor.active)
+              Positioned.fill(
+                child: ArchitectPolygonDistanceOverlay(
+                  polygon: polygon,
+                  edge: edge,
+                  dimensions: ArchitectPolygonDimensions.nearest(
+                    elementId: _polygonEditId!,
+                    polygon: polygon,
+                    edge: edge,
+                    storey: (_elementMovePreview ?? _project).activeStorey,
+                  ),
+                  unit: _project.units,
+                  scale: _currentScale,
+                  toScreen: _viewport.toScreen,
+                  obstacles: ArchitectWallNetwork.body(
+                    (_elementMovePreview ?? _project).activeStorey.walls,
+                  ),
+                  onEdit: (dimension) => _editPolygonDistance(dimension),
+                ),
+              ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Material(
+                color: const Color(0xEE1E242C),
+                borderRadius: BorderRadius.circular(8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final mode in ArchitectPolygonEdgeMode.values)
+                      IconButton(
+                        key: ValueKey('polygon-edge-${mode.name}'),
+                        constraints: const BoxConstraints.tightFor(
+                          width: 44,
+                          height: 44,
+                        ),
+                        padding: EdgeInsets.zero,
+                        tooltip: mode == ArchitectPolygonEdgeMode.move
+                            ? context.l10n.architectEdgeMoveHint
+                            : context.l10n.architectEdgePullHint,
+                        icon: Icon(
+                          mode == ArchitectPolygonEdgeMode.move
+                              ? Icons.open_with
+                              : Icons.unfold_more,
+                          size: 20,
+                          color: _polygonEdgeMode == mode
+                              ? Colors.cyanAccent
+                              : Colors.white54,
+                        ),
+                        onPressed: _polygonDistanceOpen || _polygonEditor.active
+                            ? null
+                            : () => setState(() => _polygonEdgeMode = mode),
+                      ),
+                    if (!selected)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(context.l10n.architectEdgeSelectHint),
+                      )
+                    else
+                      TextButton.icon(
+                        key: const ValueKey('polygon-edge-offset'),
+                        onPressed: _polygonDistanceOpen
+                            ? null
+                            : () => _editPolygonDistance(null),
+                        icon: const Icon(Icons.swap_vert, size: 18),
+                        label: Text(context.l10n.architectZoneOffset),
+                      ),
+                    IconButton(
+                      key: const ValueKey('polygon-edit-close'),
+                      tooltip: context.l10n.close,
+                      onPressed: _polygonDistanceOpen
+                          ? null
+                          : () => setState(() {
+                              _polygonEditId = null;
+                              _polygonSelectedEdge = null;
+                            }),
+                      icon: const Icon(Icons.check, size: 20),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  Future<void> _editPolygonDistance(ArchitectPolygonDistance? dimension) async {
+    if (_polygonDistanceOpen) return;
+    final polygon = _editablePolygon, edge = _polygonSelectedEdge;
+    final id = _polygonEditId;
+    if (polygon == null || edge == null || id == null) return;
+    final original = List<Offset>.of(polygon);
+    final mode = _polygonEdgeMode;
+    final project = _project;
+    final unit = project.units;
+    List<Offset>? candidate = original;
+    var displacement = 0.0;
+    final normal = ArchitectPolygonGeometry.normal(original, edge);
+    final midpoint =
+        (original[edge] + original[(edge + 1) % original.length]) / 2;
+    setState(() => _polygonDistanceOpen = true);
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, dialogSetState) => Dialog(
+            alignment: Alignment.bottomCenter,
+            insetPadding: const EdgeInsets.all(16),
+            constraints: const BoxConstraints(maxWidth: 260),
+            backgroundColor: Colors.transparent,
+            child: SizedBox(
+              width: 250,
+              child: ArchitectShapeDimensionPanel(
+                values: [unit.toUnit(dimension?.distance ?? 0)],
+                labels: [
+                  dimension == null
+                      ? context.l10n.architectZoneOffset
+                      : context.l10n.architectEdgeDistance,
+                ],
+                unit: unit.symbol,
+                minimum: dimension == null
+                    ? -double.infinity
+                    : unit.toUnit(.001),
+                signed: dimension == null,
+                canSave: candidate != null && identical(project, _project),
+                onChanged: (_, value) {
+                  final meters = unit.fromUnit(value);
+                  displacement = dimension == null
+                      ? meters
+                      : dimension.side * (dimension.distance - meters);
+                  candidate = dimension == null
+                      ? ArchitectPolygonGeometry.offsetEdge(
+                          original,
+                          edge,
+                          meters,
+                          mode: mode,
+                        )
+                      : dimension.setDistance(original, meters, mode: mode);
+                  dialogSetState(() {});
+                  if (candidate != null) {
+                    _elementMovePreview = UpdateArchitectPolygon(
+                      storeyId: project.activeStoreyId,
+                      elementId: id,
+                      polygon: candidate!,
+                    ).apply(project);
+                    _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
+                      candidate!,
+                      midpoint + normal * displacement,
+                      .001,
+                    );
+                  }
+                  _repaintPreview();
+                },
+                onSave: () {
+                  if (candidate == null || !identical(project, _project)) {
+                    return;
+                  }
+                  _elementMovePreview = null;
+                  if (displacement.abs() > ArchitectPolygonGeometry.epsilon) {
+                    _commands.execute(
+                      UpdateArchitectPolygon(
+                        storeyId: project.activeStoreyId,
+                        elementId: id,
+                        polygon: candidate!,
+                      ),
+                    );
+                    _saveBiMProjectIfAttached();
+                  }
+                  _polygonSelectedEdge = ArchitectPolygonDimensions.hitEdge(
+                    candidate!,
+                    midpoint + normal * displacement,
+                    .001,
+                  );
+                  Navigator.of(dialogContext).pop();
+                },
+                onCancel: () => Navigator.of(dialogContext).pop(),
+              ),
+            ),
+          ),
+        ),
+      ).then((_) {
+        // Restore edge selection from the committed model (Cancel leaves it intact).
+        final current = _selectedPolygon;
+        if (current != null && identical(project, _project)) {
+          _polygonSelectedEdge = edge;
+        }
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _elementMovePreview = null;
+          _polygonDistanceOpen = false;
+        });
+        _repaintPreview();
+      }
+    }
+  }
+
   void _editWallClearance(ArchitectWallClearance gap) {
     var distance = gap.distance;
     final storeyId = _project.activeStoreyId;
@@ -2520,7 +2837,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final (ratio, _) = targetWall.projectPoint(point);
     final now = ArchitectElementId.next('element');
 
-    final activeStyle = _elementTool.activeDoorStyle ??
+    final activeStyle =
+        _elementTool.activeDoorStyle ??
         FenestrationLibraryService.instance.activeDoorStyle;
 
     final newDoor = ArchitectDoor(
@@ -2571,9 +2889,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         : FenestrationKind.window;
     final initialStyle = kind == FenestrationKind.door
         ? (_elementTool.activeDoorStyle ??
-            FenestrationLibraryService.instance.activeDoorStyle)
+              FenestrationLibraryService.instance.activeDoorStyle)
         : (_elementTool.activeWindowStyle ??
-            FenestrationLibraryService.instance.activeWindowStyle);
+              FenestrationLibraryService.instance.activeWindowStyle);
 
     final result = await Navigator.push<ArchitectFenestrationStyle>(
       context,
@@ -2615,7 +2933,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool _onSelectionHold(Offset screenPoint) {
-    if (_wallCutIds.isNotEmpty) return false;
+    if (_wallCutIds.isNotEmpty || _polygonEditId != null) return false;
     if (_isActivelyDraggingHandle) return false;
     if (_draftStart != null ||
         _wallDirectionLocked ||
@@ -2850,13 +3168,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       case ArchitectRadialAction.edit:
         final polygon = _selectedPolygon;
         if (polygon != null) {
-          _polygonEditor.start(
-            id,
-            polygon,
-            polygon.first,
-            _currentScale,
-          );
-          _repaintPreview();
+          _cancelActiveDrags();
+          setState(() {
+            _polygonEditId = id;
+            _polygonSelectedEdge = null;
+            _moveSelection = false;
+          });
         } else if (_selectedWall != null) {
           _wallEndpointOriginal = _selectedWall;
           _wallDragStart = false;
@@ -2865,6 +3182,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
       case ArchitectRadialAction.move:
         setState(() {
+          _polygonEditId = null;
+          _polygonSelectedEdge = null;
           _moveSelection = true;
         });
         break;
@@ -2953,6 +3272,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final id = _hitSelection(point);
     if (id == null) return false;
     _cancelActiveDrags();
+    _polygonEditId = null;
+    _polygonSelectedEdge = null;
     _zoneTool.cancelAll();
     _axisTool.cancelAll();
     setState(() {
@@ -3063,6 +3384,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
               onPressed: () => setState(() {
                 _radialMenuScreenPosition = null;
+                _polygonEditId = null;
+                _polygonSelectedEdge = null;
                 if (!_multiSelect) {
                   _selectionIds
                     ..clear()
@@ -3086,6 +3409,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
               onPressed: () => setState(() {
                 _radialMenuScreenPosition = null;
+                _polygonEditId = null;
+                _polygonSelectedEdge = null;
                 _moveSelection = !_moveSelection;
               }),
             ),
@@ -3752,9 +4077,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _wallThickness = wt.totalThickness;
                   }),
                   onCreateFenestration: _openFenestrationEditor,
-                  activeWindowStyle: _elementTool.activeWindowStyle ??
+                  activeWindowStyle:
+                      _elementTool.activeWindowStyle ??
                       FenestrationLibraryService.instance.activeWindowStyle,
-                  activeDoorStyle: _elementTool.activeDoorStyle ??
+                  activeDoorStyle:
+                      _elementTool.activeDoorStyle ??
                       FenestrationLibraryService.instance.activeDoorStyle,
                   onWindowStyleSelected: (style) {
                     setState(() {
@@ -4032,6 +4359,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         touchHoldToPlace: _canPlaceWithMarker,
         onToolHoldStart: _beginPlacementHold,
         onSelectionHold: _onSelectionHold,
+        onEditTap: _polygonEditId == null
+            ? null
+            : (position) => _selectPolygonEdge(_screenToModel(position)),
         isDraggingHandle: () => _isActivelyDraggingHandle,
         onToolDown: _onPointerDown,
         onToolMove: _onPointerMove,
@@ -4184,6 +4514,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ),
         ),
       _buildWallClearanceOverlay(),
+      _buildPolygonDistanceOverlay(),
       _buildShapeDimensionOverlay(),
       if (_activeTool != ArchitectTool.wall &&
           _activeTool != ArchitectTool.select)

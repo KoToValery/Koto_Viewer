@@ -1444,5 +1444,10 @@
   "architectRadialFlip": "Обърни",
   "architectRadialProperties": "Свойства",
   "architectRadialSplit": "Раздели",
-  "architectRadialOffset": "Офсет"
+  "architectRadialOffset": "Офсет",
+  "architectEdgeDistance": "Разстояние",
+  "architectEdgeSelectHint": "Избери ръб",
+  "architectEdgeDistanceHint": "Задай разстоянието чрез преместване на избрания ръб.",
+  "architectEdgeMoveHint": "Мести ръба успоредно, заедно с двата му края.",
+  "architectEdgePullHint": "Изтегли ръба със запазване на старите върхове."
 }

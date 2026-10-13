@@ -7828,6 +7828,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Offset'**
   String get architectRadialOffset;
+
+  /// No description provided for @architectEdgeDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get architectEdgeDistance;
+
+  /// No description provided for @architectEdgeSelectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select an edge'**
+  String get architectEdgeSelectHint;
+
+  /// No description provided for @architectEdgeDistanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the distance by moving the selected edge.'**
+  String get architectEdgeDistanceHint;
+
+  /// No description provided for @architectEdgeMoveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the edge parallel to itself, with both endpoints.'**
+  String get architectEdgeMoveHint;
+
+  /// No description provided for @architectEdgePullHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull the edge and retain its original corners.'**
+  String get architectEdgePullHint;
 }
 
 class _AppLocalizationsDelegate
