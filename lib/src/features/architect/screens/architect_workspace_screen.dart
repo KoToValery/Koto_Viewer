@@ -2543,11 +2543,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             Positioned(
               top: 8,
               left: 8,
+              right: 64,
               child: Material(
                 color: const Color(0xEE1E242C),
                 borderRadius: BorderRadius.circular(8),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisSize: MainAxisSize.max,
                   children: [
                     for (final mode in ArchitectPolygonEdgeMode.values)
                       IconButton(
@@ -2573,22 +2574,38 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             ? null
                             : () => setState(() => _polygonEdgeMode = mode),
                       ),
-                    if (!selected)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(context.l10n.architectEdgeSelectHint),
-                      )
-                    else
-                      TextButton.icon(
-                        key: const ValueKey('polygon-edge-offset'),
-                        onPressed: _polygonDistanceOpen
-                            ? null
-                            : () => _editPolygonDistance(null),
-                        icon: const Icon(Icons.swap_vert, size: 18),
-                        label: Text(context.l10n.architectZoneOffset),
-                      ),
+                    Expanded(
+                      child: !selected
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              child: Text(
+                                context.l10n.architectEdgeSelectHint,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            )
+                          : TextButton.icon(
+                              key: const ValueKey('polygon-edge-offset'),
+                              onPressed: _polygonDistanceOpen
+                                  ? null
+                                  : () => _editPolygonDistance(null),
+                              icon: const Icon(Icons.swap_vert, size: 18),
+                              label: Text(
+                                context.l10n.architectZoneOffset,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                    ),
                     IconButton(
                       key: const ValueKey('polygon-edit-close'),
+                      constraints: const BoxConstraints.tightFor(
+                        width: 44,
+                        height: 44,
+                      ),
+                      padding: EdgeInsets.zero,
                       tooltip: context.l10n.close,
                       onPressed: _polygonDistanceOpen
                           ? null
