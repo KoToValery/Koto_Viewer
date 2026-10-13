@@ -139,9 +139,9 @@ class ColumnVerticalCheck {
         recommendedPunchingSlabThicknessCm,
       );
     }
-    final int curWCm = (widthM * 100).round();
-    final int curHCm = (heightM * 100).round();
-    final int util = (axialUtilization * 100).round();
+    final int curWCm = widthM.isFinite ? (widthM * 100).round() : 0;
+    final int curHCm = heightM.isFinite ? (heightM * 100).round() : 0;
+    final int util = axialUtilization.isFinite ? (axialUtilization * 100).round() : 0;
 
     if (hasCritical) {
       return l10n.verticalRecColOverloaded(
@@ -233,9 +233,12 @@ class SlabDeflectionCheck {
   });
 
   bool get isSpanDetermined => maxSpanM.isFinite;
+  bool get isThicknessDetermined => currentThicknessM.isFinite && currentThicknessM > 0;
 
   String localizedRecommendation(AppLocalizations l10n) {
-    if (!isSpanDetermined) return l10n.schemeSpanUnknown;
+    if (!isSpanDetermined || !isThicknessDetermined || !recommendedMinThicknessM.isFinite) {
+      return l10n.schemeSpanUnknown;
+    }
     final int curCm = (currentThicknessM * 100).round();
     final int reqCm = (recommendedMinThicknessM * 100).ceil();
     if (!isDeflectionSafe) {

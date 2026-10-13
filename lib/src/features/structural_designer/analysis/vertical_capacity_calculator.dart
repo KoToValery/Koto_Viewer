@@ -1107,18 +1107,21 @@ class VerticalCapacityCalculator {
             ? '${minSideCm.toInt()}x${minSideCm.toInt()} cm (или шайба 25x${wallLengthCm.toInt()} cm)'
             : '${minSideCm.toInt()}x${minSideCm.toInt()} cm';
 
-        final curWCm = (colWM * 100).round();
-        final curHCm = (colHM * 100).round();
+        final curWCm = colWM.isFinite ? (colWM * 100).round() : 0;
+        final curHCm = colHM.isFinite ? (colHM * 100).round() : 0;
+        final utilPercent = axialUtil.isFinite ? (axialUtil * 100).round() : 0;
         final String rec;
         if (axialUtil > 1.0) {
           rec = 'Колона $colName в ${storey.name} не може да е ${curWCm}x$curHCm cm, трябва да е минимум $minSectionStr, за да носи $storeysAbove етажа (Ned = ${accumulatedNedKn.toStringAsFixed(0)} kN, капацитет Nrd = ${nrdKn.toStringAsFixed(0)} kN).';
         } else if (axialUtil > 0.80) {
-          rec = 'Колона $colName в ${storey.name} е близо до капацитета си (${(axialUtil * 100).round()}%). Препоръчва се преминаване към $minSectionStr.';
+          rec = 'Колона $colName в ${storey.name} е близо до капацитета си ($utilPercent%). Препоръчва се преминаване към $minSectionStr.';
         } else {
-          rec = 'Колона $colName (${curWCm}x$curHCm cm) в ${storey.name} поема $storeysAbove етажа напълно безопасно (${(axialUtil * 100).round()}%).';
+          rec = 'Колона $colName (${curWCm}x$curHCm cm) в ${storey.name} поема $storeysAbove етажа напълно безопасно ($utilPercent%).';
         }
 
-        final int recSlabH = (colData.localSlabThicknessM * 100).round() + 4;
+        final int recSlabH = colData.localSlabThicknessM.isFinite
+            ? (colData.localSlabThicknessM * 100).round() + 4
+            : 24;
         String? punchRec;
         if (colData.hasConnectedBeams) {
           punchRec = null;

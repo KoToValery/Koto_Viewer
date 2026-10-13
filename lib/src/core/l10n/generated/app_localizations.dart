@@ -3588,6 +3588,12 @@ abstract class AppLocalizations {
   /// **'Enlargement recommended'**
   String get verticalSlabStatusEnlarge;
 
+  /// Slab status undetermined
+  ///
+  /// In en, this message translates to:
+  /// **'Undetermined'**
+  String get verticalSlabStatusUnknown;
+
   /// Clear span label
   ///
   /// In en, this message translates to:

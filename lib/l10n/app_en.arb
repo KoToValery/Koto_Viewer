@@ -1746,6 +1746,8 @@
   "@verticalSlabStatusOk": { "description": "Slab status safe" },
   "verticalSlabStatusEnlarge": "Enlargement recommended",
   "@verticalSlabStatusEnlarge": { "description": "Slab status enlarge" },
+  "verticalSlabStatusUnknown": "Undetermined",
+  "@verticalSlabStatusUnknown": { "description": "Slab status undetermined" },
   "verticalClearSpanLmax": "Clear span (Lmax)",
   "@verticalClearSpanLmax": { "description": "Clear span label" },
   "verticalCurrentThicknessH": "Current thickness (h)",

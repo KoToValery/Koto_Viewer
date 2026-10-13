@@ -317,5 +317,75 @@ void main() {
       expect(find.text('Базисен натиск'), findsOneWidget);
       expect(find.text('Колони (1)'), findsOneWidget);
     });
+
+    testWidgets('VerticalCapacitySheet renders slabs tab with undetermined thickness (NaN) without throwing',
+        (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      const slabCheck = SlabDeflectionCheck(
+        storeyId: 's_empty',
+        storeyName: 'Roof Storey',
+        currentThicknessM: double.nan,
+        maxSpanM: double.nan,
+        recommendedMinThicknessM: 0.0,
+        isDeflectionSafe: false,
+        deflectionRatio: 0.0,
+        recommendation: 'Support span is undetermined.',
+      );
+
+      final report = VerticalCapacityReport(
+        totalVerticalLoadBaseKn: 1200.0,
+        basePressureKpa: 150.0,
+        footprintAreaM2: 100.0,
+        columnChecks: [],
+        slabChecks: [slabCheck],
+        criticalColumnsCount: 0,
+        warningColumnsCount: 0,
+        punchingRiskCount: 0,
+        maxAxialUtilization: 0.0,
+        maxPunchingUtilization: 0.0,
+        overallStatus: VerticalCapacityStatus.safe,
+      );
+
+      FlutterErrorDetails? caughtDetails;
+      FlutterError.onError = (details) {
+        caughtDetails = details;
+        FlutterError.dumpErrorToConsole(details);
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('bg'),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: VerticalCapacitySheet(report: report),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Switch to slabs tab
+      await tester.tap(find.text('Плочи (1)'));
+      await tester.pumpAndSettle();
+
+      final exception = tester.takeException();
+      if (exception != null) {
+        debugPrint('CAUGHT EXCEPTION: $exception');
+        if (caughtDetails != null) {
+          debugPrint('DETAILS: ${caughtDetails!.toString()}');
+        }
+      }
+      expect(exception, isNull);
+      expect(find.textContaining('Roof Storey'), findsOneWidget);
+      expect(find.text('Неопределено'), findsOneWidget);
+    });
   });
 }

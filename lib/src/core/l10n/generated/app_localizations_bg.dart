@@ -2053,6 +2053,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get verticalSlabStatusEnlarge => 'Препоръчва се уголемяване';
 
   @override
+  String get verticalSlabStatusUnknown => 'Неопределено';
+
+  @override
   String get verticalClearSpanLmax => 'Светъл отвор (Lmax)';
 
   @override

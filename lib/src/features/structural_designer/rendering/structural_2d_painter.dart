@@ -405,7 +405,7 @@ class Structural2dPainter extends CustomPainter {
         ? Rect.fromLTWH(0,0,size.width*zoom,size.height*zoom)
         : Rect.fromPoints(pixel(spanVisibleCadRect!.topLeft),pixel(spanVisibleCadRect!.bottomRight));
     String label(SupportSpanCheck c) =>
-        'L ${c.spanM.toStringAsFixed(2)} > ${c.allowableSpanM.toStringAsFixed(2)} m · h ${(c.thicknessM*100).round()} cm';
+        'L ${c.spanM.toStringAsFixed(2)} > ${c.allowableSpanM.toStringAsFixed(2)} m · h ${c.thicknessM.isFinite ? (c.thicknessM * 100).round() : '—'} cm';
     Color color(SupportSpanCheck c) => !c.isProblematic ? const Color(0xFF69F0AE) :
         c.utilization>=1.3 ? const Color(0xFFFF5252) : const Color(0xFFFFB74D);
     TextPainter text(String value,Color color,{double fontSize=11}) => TextPainter(

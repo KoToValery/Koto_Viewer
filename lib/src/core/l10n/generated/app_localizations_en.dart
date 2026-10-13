@@ -2046,6 +2046,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get verticalSlabStatusEnlarge => 'Enlargement recommended';
 
   @override
+  String get verticalSlabStatusUnknown => 'Undetermined';
+
+  @override
   String get verticalClearSpanLmax => 'Clear span (Lmax)';
 
   @override

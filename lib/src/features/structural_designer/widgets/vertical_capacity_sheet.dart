@@ -115,14 +115,18 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
               children: [
                 _buildStatCard(
                   title: context.l10n.totalBaseLoad,
-                  value: '${report.totalVerticalLoadBaseKn.toStringAsFixed(0)} kN',
+                  value: report.totalVerticalLoadBaseKn.isFinite
+                      ? '${report.totalVerticalLoadBaseKn.toStringAsFixed(0)} kN'
+                      : '—',
                   color: const Color(0xFF00E5FF),
                 ),
                 const SizedBox(width: 8),
                 _buildStatCard(
                   title: context.l10n.verticalBasePressure,
-                  value: '${report.basePressureKpa.toStringAsFixed(0)} kPa',
-                  color: report.basePressureKpa > 250
+                  value: report.basePressureKpa.isFinite
+                      ? '${report.basePressureKpa.toStringAsFixed(0)} kPa'
+                      : '—',
+                  color: (report.basePressureKpa.isFinite && report.basePressureKpa > 250)
                       ? const Color(0xFFFFB300)
                       : const Color(0xFF64B5F6),
                 ),
@@ -284,8 +288,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
 
   Widget _buildColumnCard(BuildContext context, ColumnVerticalCheck col) {
     final statusColor = col.status.color;
-    final int curWCm = (col.widthM * 100).round();
-    final int curHCm = (col.heightM * 100).round();
+    final int curWCm = col.widthM.isFinite ? (col.widthM * 100).round() : 0;
+    final int curHCm = col.heightM.isFinite ? (col.heightM * 100).round() : 0;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -316,6 +320,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       context.l10n.verticalStoreysCarried(
@@ -354,11 +360,11 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
           _buildUtilizationRow(
             label: context.l10n.verticalAxialCompressionLabel,
             valueText:
-                'Ned = ${col.accumulatedLoadNedKn.toStringAsFixed(0)} kN / Nrd = ${col.axialCapacityNrdKn.toStringAsFixed(0)} kN',
+                'Ned = ${col.accumulatedLoadNedKn.isFinite ? col.accumulatedLoadNedKn.toStringAsFixed(0) : '—'} kN / Nrd = ${col.axialCapacityNrdKn.isFinite ? col.axialCapacityNrdKn.toStringAsFixed(0) : '—'} kN',
             ratio: col.axialUtilization,
             color: col.isAxiallyOverloaded
                 ? const Color(0xFFFF1744)
-                : (col.axialUtilization > 0.8
+                : ((col.axialUtilization.isFinite && col.axialUtilization > 0.8)
                     ? const Color(0xFFFFB300)
                     : const Color(0xFF00E676)),
           ),
@@ -368,11 +374,11 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
           _buildUtilizationRow(
             label: context.l10n.verticalPunchingCheckLabel,
             valueText:
-                'v_Ed = ${col.punchingShearStressVedMpa.toStringAsFixed(2)} MPa / v_Rd,c = ${col.punchingShearResistanceVrdMpa.toStringAsFixed(2)} MPa',
+                'v_Ed = ${col.punchingShearStressVedMpa.isFinite ? col.punchingShearStressVedMpa.toStringAsFixed(2) : '—'} MPa / v_Rd,c = ${col.punchingShearResistanceVrdMpa.isFinite ? col.punchingShearResistanceVrdMpa.toStringAsFixed(2) : '—'} MPa',
             ratio: col.punchingUtilization,
             color: col.isPunchingCritical
                 ? const Color(0xFFFF1744)
-                : ((col.punchingUtilization > 0.85 ||
+                : (((col.punchingUtilization.isFinite && col.punchingUtilization > 0.85) ||
                           col.punchingRequiresReview)
                       ? const Color(0xFFFFB300)
                     : const Color(0xFF00E676)),
@@ -466,7 +472,8 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
     required double ratio,
     required Color color,
   }) {
-    final percent = (ratio * 100).round();
+    final percent = ratio.isFinite ? (ratio * 100).round() : 0;
+    final displayPercent = ratio.isFinite ? '$percent%' : '—';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -489,7 +496,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
                 child: Text(
-                  '$valueText ($percent%)',
+                  '$valueText ($displayPercent)',
                   style: TextStyle(
                     color: color,
                     fontSize: 11,
@@ -504,7 +511,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
         ClipRRect(
           borderRadius: BorderRadius.circular(3),
           child: LinearProgressIndicator(
-            value: ratio.clamp(0.0, 1.0),
+            value: ratio.isFinite ? ratio.clamp(0.0, 1.0) : 0.0,
             backgroundColor: Colors.white12,
             valueColor: AlwaysStoppedAnimation<Color>(color),
             minHeight: 5,
@@ -538,7 +545,7 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 assessment.topology.unresolvedAreaM2 > 1e-6 ||
                 assessment.topology.fields.any((f) => f.requiresReview));
         final bool isSafe = slab.isDeflectionSafe && !unresolved;
-        final color = (!slab.isSpanDetermined || unresolved)
+        final color = (!slab.isSpanDetermined || !slab.isThicknessDetermined || unresolved)
             ? Colors.amber : isSafe ? const Color(0xFF00E676) : const Color(0xFFFF1744);
 
         return Container(
@@ -566,8 +573,11 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -576,8 +586,11 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                       border: Border.all(color: color),
                     ),
                     child: Text(
-                      (!slab.isSpanDetermined || unresolved)
-                          ? context.l10n.schemeSpanUnknown : isSafe ? context.l10n.verticalSlabStatusOk : context.l10n.verticalSlabStatusEnlarge,
+                      (!slab.isSpanDetermined || !slab.isThicknessDetermined || unresolved)
+                          ? context.l10n.verticalSlabStatusUnknown
+                          : isSafe
+                              ? context.l10n.verticalSlabStatusOk
+                              : context.l10n.verticalSlabStatusEnlarge,
                       style: TextStyle(
                         color: color,
                         fontSize: 10,
@@ -598,11 +611,15 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                   ),
                   _buildSubmetric(
                     context.l10n.verticalCurrentThicknessH,
-                    '${(slab.currentThicknessM * 100).round()} cm',
+                    slab.isThicknessDetermined
+                        ? '${(slab.currentThicknessM * 100).round()} cm'
+                        : '—',
                   ),
                   _buildSubmetric(
                     context.l10n.verticalRequiredThicknessEc2,
-                    slab.isSpanDetermined ? '${(slab.recommendedMinThicknessM * 100).round()} cm' : '—',
+                    slab.isSpanDetermined && slab.recommendedMinThicknessM.isFinite
+                        ? '${(slab.recommendedMinThicknessM * 100).round()} cm'
+                        : '—',
                     color: !isSafe ? const Color(0xFFFF1744) : Colors.white70,
                   ),
                 ],
@@ -681,13 +698,19 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                 ),
                 const SizedBox(height: 12),
                 _buildInfoLine(context.l10n.verticalTotalBaseLoadNed,
-                    '${report.totalVerticalLoadBaseKn.toStringAsFixed(1)} kN'),
+                    report.totalVerticalLoadBaseKn.isFinite
+                        ? '${report.totalVerticalLoadBaseKn.toStringAsFixed(1)} kN'
+                        : '—'),
                 const SizedBox(height: 6),
                 _buildInfoLine(context.l10n.verticalFootprintArea,
-                    '${report.footprintAreaM2.toStringAsFixed(1)} m²'),
+                    report.footprintAreaM2.isFinite
+                        ? '${report.footprintAreaM2.toStringAsFixed(1)} m²'
+                        : '—'),
                 const SizedBox(height: 6),
                 _buildInfoLine(context.l10n.verticalMeanBasePressure,
-                    '${report.basePressureKpa.toStringAsFixed(1)} kPa (${(report.basePressureKpa / 100).toStringAsFixed(2)} kg/cm²)'),
+                    report.basePressureKpa.isFinite
+                        ? '${report.basePressureKpa.toStringAsFixed(1)} kPa (${(report.basePressureKpa / 100).toStringAsFixed(2)} kg/cm²)'
+                        : '—'),
                 const SizedBox(height: 14),
 
                 Container(
@@ -704,9 +727,11 @@ class _VerticalCapacitySheetState extends State<VerticalCapacitySheet>
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          report.basePressureKpa <= 200
+                          (report.basePressureKpa.isFinite && report.basePressureKpa <= 200)
                               ? context.l10n.verticalBasePressureSafeText(report.basePressureKpa.toStringAsFixed(0))
-                              : context.l10n.verticalBasePressureHighText(report.basePressureKpa.toStringAsFixed(0)),
+                              : (report.basePressureKpa.isFinite
+                                  ? context.l10n.verticalBasePressureHighText(report.basePressureKpa.toStringAsFixed(0))
+                                  : '—'),
                           style: const TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                       ),
