@@ -1,4 +1,5 @@
 import 'dart:ui';
+import '../adapters/architect_element_adapters.dart';
 import 'package:flutter/foundation.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
@@ -571,24 +572,27 @@ class MoveArchitectElement extends ArchitectModelCommand {
       ],
       columns: [
         for (final e in s.columns)
-          matches(e.id) ? e.copyWith(position: e.position + delta) : e,
+          matches(e.id)
+              ? const ArchitectColumnEditingAdapter().translate(e, delta)
+              : e,
       ],
       zones: [
         for (final e in s.zones)
-          matches(e.id) ? e.copyWith(polygon: polygon(e.polygon)) : e,
+          matches(e.id)
+              ? const ArchitectZoneEditingAdapter().translate(e, delta)
+              : e,
       ],
       beams: [
         for (final e in s.beams)
           matches(e.id)
-              ? e.copyWith(
-                  startPoint: e.startPoint + delta,
-                  endPoint: e.endPoint + delta,
-                )
+              ? const ArchitectBeamEditingAdapter().translate(e, delta)
               : e,
       ],
       slabs: [
         for (final e in s.slabs)
-          matches(e.id) ? e.copyWith(polygon: polygon(e.polygon)) : e,
+          matches(e.id)
+              ? const ArchitectSlabEditingAdapter().translate(e, delta)
+              : e,
       ],
       openings: [
         for (final e in s.openings)

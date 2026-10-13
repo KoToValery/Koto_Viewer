@@ -6,7 +6,7 @@
 | Етап | Състояние | Проверка / резултат |
 |---|---|---|
 | 0. Договор и baseline | Завършен | Поправено застъпване на polygon-edit-close и architect-magnet на телефон. Началната серия: 110 успешни теста. |
-| 1. Координатна и адаптерна основа | Предстои | |
+| 1. Координатна и адаптерна основа | Завършен | Общи координати/pointer правила, идентичност и неизменни снимки. Native адаптери са включени в Architect move и Construction Drag+. 75 успешни теста. |
 | 2. Сесии и транзакции | Предстои | |
 | 3. Общ viewport | Предстои | |
 | 4. Общ snap и scene index | Предстои | |
@@ -32,3 +32,13 @@
 Контурната лента вече има ограничена ширина с отделено място за магнита. Указанието и етикетът за отместване се побират в наличната ширина; двата режима на ръб и затварянето запазват постоянни touch размери.
 
 Начална серия: viewport gestures, workspace core, element snap, polygon editor/distance, radial menu/handles, wall smart edit, Construction compact controls/measurement и BIM frame/alignment. Резултат: 110/110. Провалът от одита вече е отстранен.
+
+## Етап 1
+
+`BimCoordinateFrame` и `BimPrecisionPolicy` са преместени в `bim_editing/geometry`; старият път е compatibility export, без второ копие. `BimPointerInteraction` е единствената реализация на захващане, hold duration, touch offset и capture бюджет; старото Structural име е alias.
+
+Добавени са document-scoped `BimElementRef`, неизменен `BimElementSnapshot` и typed native адаптери. Construction покрива колони, шайби, греди, оси и плочи с отвори; Architect — колони, греди, плочи и зони. Те са основа за последващото разширяване по capabilities, а не замяна на домейн моделите.
+
+Реални потребители: Construction Drag+ и Architect местене на колони/греди/плочи/зони. Векторите се преобразуват без round-trip през далечно начало и без закръгляне на внесените данни. Нулево отместване запазва оригиналния native обект.
+
+Проверки: CAD 1/100/1000, далечен origin, L-форма, rotation/mirror, host/reference настройки, beam secondary, slab holes/types, floor ownership, дебелини/коти/цветове, аналитичен кръг и неизменност на snapshot. Серията с адаптерни и съществуващи interaction тестове: 75/75.

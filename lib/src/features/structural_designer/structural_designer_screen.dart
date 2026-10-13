@@ -4,6 +4,8 @@ import 'rendering/grid_axis_bubble_layout.dart';
 import 'analysis/staircase_automatic_openings.dart';
 import 'rendering/slab_plan_labels.dart';
 import 'dart:async';
+import 'adapters/structural_element_adapters.dart';
+import '../bim_editing/geometry/bim_coordinate_frame.dart';
 import 'dart:math' as math;
 import '../bim_projects/services/bim_underlay_conversion_service.dart';
 import 'package:flutter/gestures.dart';
@@ -1214,18 +1216,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   Object? get _positionedDuplicate {
-    final delta =
-        (_duplicateTarget ?? Offset.zero) - (_duplicateOrigin ?? Offset.zero);
+    final delta = ((_duplicateTarget ?? Offset.zero) - (_duplicateOrigin ?? Offset.zero)) / _cadUnitsPerMeter;
+    final frame = BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter);
     return switch (_duplicateDraft) {
-      StructuralColumn c => c.copyWith(center: c.center + delta),
-      StructuralShearWall w => w.copyWith(
-        start: w.start + delta,
-        end: w.end + delta,
-      ),
-      StructuralBeam b => b.copyWith(
-        start: b.start + delta,
-        end: b.end + delta,
-      ),
+      StructuralColumn c => StructuralColumnEditingAdapter(frame: frame).translate(c, delta),
+      StructuralShearWall w => StructuralWallEditingAdapter(frame: frame).translate(w, delta),
+      StructuralBeam b => StructuralBeamEditingAdapter(frame: frame).translate(b, delta),
       _ => null,
     };
   }
