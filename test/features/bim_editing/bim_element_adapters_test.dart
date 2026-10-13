@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/bim_editing/geometry/bim_coordinate_frame.dart';
 import 'package:kotoview/src/features/bim_editing/scene/bim_element_adapter.dart';

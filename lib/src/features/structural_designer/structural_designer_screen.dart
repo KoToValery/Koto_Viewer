@@ -6,6 +6,8 @@ import 'rendering/slab_plan_labels.dart';
 import 'dart:async';
 import 'adapters/structural_element_adapters.dart';
 import '../bim_editing/geometry/bim_coordinate_frame.dart';
+import '../bim_editing/commands/bim_edit_history.dart';
+import '../bim_editing/interaction/bim_edit_session.dart';
 import 'dart:math' as math;
 import '../bim_projects/services/bim_underlay_conversion_service.dart';
 import 'package:flutter/gestures.dart';
@@ -177,7 +179,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StructuralColumn? _selectedColumn;
   StructuralShearWall? _selectedShearWall;
   StructuralBeam? _selectedBeam;
-  Object? _duplicateDraft;
+  BimEditSession<Object>? _duplicateSession;
+  Object? get _duplicateDraft => _duplicateSession?.original;
+  Object get _duplicateContext => (_project, _project.activeStorey.id, _activeTool);
   String? _duplicateStoreyId;
   Offset? _duplicateOrigin;
   Offset? _duplicateTarget;
@@ -240,7 +244,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Offset? _midpointTouchDownPos;
 
   // History for Undo
-  final List<StructuralProject> _undoStack = [];
+  final _history = BimEditHistory<StructuralProject>(limit: 20);
 
   // Viewport & Scale
   Size _viewportSize = Size.zero;
@@ -430,14 +434,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _pushUndo() {
-    _undoStack.add(_project);
-    if (_undoStack.length > 20) {
-      _undoStack.removeAt(0);
-    }
+    _history.checkpoint(_project);
   }
 
   void _undo() {
-    if (_undoStack.isNotEmpty) {
+    if (_history.canUndo) {
       setState(() {
         _selectedColumn = null;
         _isMovingColumn = false;
@@ -445,7 +446,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _isMovingShearWall = false;
         _editingSlab = null;
         _initialSlabBeforeCorrection = null;
-        _project = _undoStack.removeLast();
+        final viewedId = _project.activeStorey.id;
+        final snapshot = _history.undo(_project);
+        final index = snapshot.storeys.indexWhere((s) => s.id == viewedId);
+        _project = index < 0 ? snapshot : snapshot.copyWith(activeStoreyIndex: index);
         _runAnalysis();
       });
       _saveProject();
@@ -1206,7 +1210,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _ => Offset.zero,
     };
     setState(() {
-      _duplicateDraft = draft;
+      _duplicateSession = BimEditSession(context: _duplicateContext, original: draft);
       _duplicateStoreyId = active.id;
       _duplicateOrigin = center;
       _duplicateTarget = center;
@@ -1215,14 +1219,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
   }
 
-  Object? get _positionedDuplicate {
+  Object? get _positionedDuplicate => _duplicateSession?.preview;
+
+  Object _translatedDuplicate(Object original) {
     final delta = ((_duplicateTarget ?? Offset.zero) - (_duplicateOrigin ?? Offset.zero)) / _cadUnitsPerMeter;
     final frame = BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter);
-    return switch (_duplicateDraft) {
+    return switch (original) {
       StructuralColumn c => StructuralColumnEditingAdapter(frame: frame).translate(c, delta),
       StructuralShearWall w => StructuralWallEditingAdapter(frame: frame).translate(w, delta),
       StructuralBeam b => StructuralBeamEditingAdapter(frame: frame).translate(b, delta),
-      _ => null,
+      _ => throw ArgumentError.value(original),
     };
   }
 
@@ -1255,12 +1261,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           );
       if (snap != null) target = snap.point;
     }
-    setState(() => _duplicateTarget = target);
+    setState(() {
+      _duplicateTarget = target;
+      _duplicateSession?.update(_duplicateContext, _translatedDuplicate);
+    });
   }
 
   void _cancelDuplicateDrag() {
     setState(() {
-      _duplicateDraft = null;
+      _duplicateSession?.cancel();
+      _duplicateSession = null;
       _duplicateStoreyId = null;
       _duplicateOrigin = null;
       _duplicateTarget = null;
@@ -1272,8 +1282,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _cancelDuplicateDrag();
       return;
     }
-    final copy = _positionedDuplicate;
-    if (copy == null) return;
+    final copy = _duplicateSession?.finish(
+      _duplicateContext,
+      changed: ((_duplicateTarget ?? Offset.zero) - (_duplicateOrigin ?? Offset.zero)).distance > 1e-9 * _cadUnitsPerMeter,
+    );
+    if (copy == null) {
+      _cancelDuplicateDrag();
+      return;
+    }
     _pushUndo();
     _updateActiveStorey(_withDuplicate(_project.activeStorey));
     setState(() {
@@ -1282,7 +1298,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _selectedBeam = copy is StructuralBeam ? copy : null;
       _selectedGridAxis = null;
       _selectedOpening = null;
-      _duplicateDraft = null;
+      _duplicateSession?.cancel();
+      _duplicateSession = null;
       _duplicateStoreyId = null;
       _duplicateOrigin = null;
       _duplicateTarget = null;
@@ -2835,8 +2852,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _saveSlabCorrection() {
     if (_editingSlab == null) return;
-    _undoStack.add(_initialSlabCorrectionProject ?? _project);
-    if (_undoStack.length > 20) _undoStack.removeAt(0);
+    _history.checkpoint(_initialSlabCorrectionProject ?? _project);
     if (!_updateActiveStoreySlab(_editingSlab!)) return;
     setState(() {
       _editingSlab = null;
@@ -7589,12 +7605,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     final undoButton = IconButton(
       icon: Icon(Icons.undo_rounded,
-          color: _undoStack.isNotEmpty ? Colors.white : Colors.white24,
+          color: _history.canUndo ? Colors.white : Colors.white24,
           size: 20),
       tooltip: context.l10n.undoAction,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-      onPressed: _undoStack.isNotEmpty ? _undo : null,
+      onPressed: _history.canUndo ? _undo : null,
     );
 
     final exportButton = IconButton(

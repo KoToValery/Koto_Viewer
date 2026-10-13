@@ -1,6 +1,6 @@
 import 'dart:ui';
 import '../adapters/architect_element_adapters.dart';
-import 'package:flutter/foundation.dart';
+import '../../bim_editing/commands/bim_edit_history.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
@@ -1046,71 +1046,49 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
   }
 }
 
-class ArchitectCommandController extends ChangeNotifier {
-  ArchitectProject _project;
-  final List<ArchitectProject> _undo = [];
-  final List<ArchitectProject> _redo = [];
+class ArchitectCommandController
+    extends BimTransactionController<ArchitectProject> {
   static const historyLimit = 100;
-  ArchitectCommandController(this._project);
-  ArchitectProject get project => _project;
-  bool get canUndo => _undo.isNotEmpty;
-  bool get canRedo => _redo.isNotEmpty;
+  ArchitectCommandController(super.project)
+    : super(
+        historyLimit: historyLimit,
+        equivalent: _sameModel,
+        restoreView: _retainViewedStorey,
+      );
+  ArchitectProject get project => value;
 
-  void commit(ArchitectProject next) {
-    if (identical(next, _project)) return;
-    _undo.add(_project);
-    if (_undo.length > historyLimit) _undo.removeAt(0);
-    _redo.clear();
-    _project = next;
-    notifyListeners();
+  static bool _sameModel(ArchitectProject a, ArchitectProject b) {
+    if (identical(a, b)) return true;
+    final left = a.toJson()
+      ..remove('updatedAt')
+      ..remove('activeStoreyId');
+    final right = b.toJson()
+      ..remove('updatedAt')
+      ..remove('activeStoreyId');
+    return bimValuesEqual(left, right);
   }
 
   ArchitectProject execute(ArchitectModelCommand command) =>
       executeBatch([command]);
-  ArchitectProject executeBatch(Iterable<ArchitectModelCommand> commands) {
-    var next = _project;
-    // Validation completes before publishing; failure leaves history untouched.
-    for (final command in commands) {
-      next = command.apply(next);
-    }
-    commit(next);
-    return _project;
-  }
-
-  void restore(ArchitectProject project) {
-    _project = project;
-    _undo.clear();
-    _redo.clear();
-    notifyListeners();
-  }
+  ArchitectProject executeBatch(Iterable<ArchitectModelCommand> commands) =>
+      applyBatch(commands.map((command) => command.apply));
 
   /// Viewing another floor does not consume an Undo step or discard Redo.
   void activateStorey(String id) {
-    ArchitectModelCommand.storey(_project, id);
-    if (id == _project.activeStoreyId) return;
-    _project = _project.copyWith(activeStoreyId: id);
-    notifyListeners();
+    ArchitectModelCommand.storey(project, id);
+    if (id != project.activeStoreyId) {
+      replaceView(project.copyWith(activeStoreyId: id));
+    }
   }
 
-  ArchitectProject _retainViewedStorey(ArchitectProject snapshot) {
-    final id = _project.activeStoreyId;
+  static ArchitectProject _retainViewedStorey(
+    ArchitectProject snapshot,
+    ArchitectProject current,
+  ) {
+    final id = current.activeStoreyId;
     return id == snapshot.activeStoreyId ||
             !snapshot.storeys.any((s) => s.id == id)
         ? snapshot
         : snapshot.copyWith(activeStoreyId: id);
-  }
-
-  void undo() {
-    if (!canUndo) return;
-    _redo.add(_project);
-    _project = _retainViewedStorey(_undo.removeLast());
-    notifyListeners();
-  }
-
-  void redo() {
-    if (!canRedo) return;
-    _undo.add(_project);
-    _project = _retainViewedStorey(_redo.removeLast());
-    notifyListeners();
   }
 }

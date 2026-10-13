@@ -9,6 +9,7 @@ import '../../dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../bim_projects/models/bim_work_project.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
+import '../../bim_editing/interaction/bim_edit_session.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
 import '../../structural_designer/analysis/structural_pointer_interaction.dart';
 import '../../structural_designer/rendering/structural_pointer_painter.dart';
@@ -330,8 +331,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   String? _draggingElementId;
   Offset? _elementMoveStart;
   Offset? _elementMoveDelta;
-  ArchitectProject? _elementMoveOriginal;
-  ArchitectProject? _elementMovePreview;
+  BimEditSession<ArchitectProject>? _elementMoveSession;
+  ArchitectProject? _elementMovePreviewValue;
+  Object get _elementMoveContext =>
+      (_project, _project.activeStoreyId, _activeTool);
+  ArchitectProject? get _elementMoveOriginal => _elementMoveSession?.original;
+  set _elementMoveOriginal(ArchitectProject? project) {
+    _elementMoveSession?.cancel();
+    _elementMoveSession = project == null
+        ? null
+        : BimEditSession(context: _elementMoveContext, original: project);
+  }
+
+  ArchitectProject? get _elementMovePreview => _elementMovePreviewValue;
+  set _elementMovePreview(ArchitectProject? project) {
+    _elementMovePreviewValue = project;
+    if (project != null) {
+      _elementMoveSession?.update(_elementMoveContext, (_) => project);
+    }
+  }
+
+  ArchitectProject? _finishElementMove({required bool changed}) =>
+      _elementMoveSession?.finish(_elementMoveContext, changed: changed);
   final BimViewportController _viewport = BimViewportController();
   bool _hasFramedViewport = false;
   late Cad3DCamera _camera3D;
@@ -1399,28 +1420,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
       return;
     }
-    if (_groupDragIds.isNotEmpty) {
-      final ids = Set<String>.of(_groupDragIds);
-      final delta = _elementMoveDelta;
-      _cancelActiveDrags();
-      if (delta != null && delta.distance > 1e-9) {
-        _commands.execute(
-          MoveArchitectElements(
-            storeyId: _project.activeStoreyId,
-            elementIds: ids,
-            delta: delta,
-          ),
-        );
-        _saveBiMProjectIfAttached();
-      }
-      return;
-    }
-    final l10n = context.l10n;
-    final isBg = Localizations.localeOf(context).languageCode == 'bg';
-
-    if (_wallEndpointOriginal != null ||
-        (_draggingElementId != null && _selectedWall != null)) {
-      final preview = _elementMovePreview;
+    if (_groupDragIds.isNotEmpty ||
+        _wallEndpointOriginal != null ||
+        _draggingElementId != null) {
+      final preview = _finishElementMove(
+        changed:
+            _wallEndpointOriginal != null ||
+            (_elementMoveDelta?.distance ?? 0) > 1e-9,
+      );
       _cancelActiveDrags();
       if (preview != null) {
         _commands.commit(preview);
@@ -1428,24 +1435,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       }
       return;
     }
-
-    if (_draggingElementId != null && _elementMoveDelta != null) {
-      if (_elementMoveDelta!.distance > 1e-9) {
-        _commands.execute(
-          MoveArchitectElement(
-            storeyId: _project.activeStorey.id,
-            elementId: _draggingElementId!,
-            delta: _elementMoveDelta!,
-          ),
-        );
-      }
-      _draggingElementId = null;
-      _elementMoveStart = null;
-      _elementMoveDelta = null;
-      _elementMoveOriginal = null;
-      _elementMovePreview = null;
-      return;
-    }
+    final l10n = context.l10n;
+    final isBg = Localizations.localeOf(context).languageCode == 'bg';
 
     // 0. Commit axis offset drag
     if (_axisTool.isOffsettingWithDrag && _axisTool.axisBeingOffset != null) {
