@@ -8,7 +8,7 @@
 | 0. Договор и baseline | Завършен | Поправено застъпване на polygon-edit-close и architect-magnet на телефон. Началната серия: 110 успешни теста. |
 | 1. Координатна и адаптерна основа | Завършен | Общи координати/pointer правила, идентичност и неизменни снимки. Native адаптери са включени в Architect move и Construction Drag+. 75 успешни теста. |
 | 2. Сесии и транзакции | Завършена основа и bridge | Architect използва общи атомарни транзакции; Construction Undo използва общата история. Move и Drag+ са включени в общите сесии. 45 успешни теста. |
-| 3. Общ viewport | Предстои | |
+| 3. Общ viewport | Завършен | Един BimEditingViewport за двата режима, два camera adapters. 36 успешни теста; чист анализ. |
 | 4. Общ snap и scene index | Предстои | |
 | 5. Оси — пълен пилот | Предстои | |
 | 6. Колони/греди и Drag+ | Предстои | |
@@ -52,3 +52,11 @@ Construction използва същата ограничена история �
 Architect move/wall preview и Construction Drag+ използват обща сесия с документна версия, етаж и инструмент. Preview се получава от оригинала; отказ, стар контекст, повторно потвърждение и Drag+ без преместване не записват операция. Numeric polygon preview остава независим до контурния етап.
 
 Проверки: atomic failure/no-op, лимит на историята, Redo branch, еднократно finish, cancel, контекст, semantic equality и съществуващи реални pointer сценарии в двата режима: 45/45. Статичният анализ на променените екрани, core и тестове е чист.
+
+## Етап 3
+
+`BimEditingViewport` е единствен собственик на pointer/hold/pan/pinch/scroll/trackpad lifecycle. Architect името остава alias. Камерата `BimViewportController` е в общия модул; Construction използва `BimTransformNavigation` към съществуващата fitted scene с CAD Y orientation. Моделите и координатите им не се променят при навигация.
+
+От Construction са премахнати RawGestureDetector, Tap/LongPress recognizers и отделният measurement hold timer. Native handlers получават единствено tool events и адаптирани hold callbacks от общия собственик. InteractiveViewer засега е само transform renderer с изключени pan и scale; ще бъде премахнат в rendering cleanup. Старите native handlers още пазят compatibility flags за последващото си пренасяне.
+
+Проверки: 33 съществуващи сценария (двата екрана, placement, measurement, touch/mouse Drag+, pointer правила) и 3 нови общи camera/pinch контракта. Проверени focal anchoring, scale clamp, invalid scale и повторна работа след отменен жест. Анализът е чист.

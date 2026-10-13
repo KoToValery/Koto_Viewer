@@ -8,6 +8,8 @@ import 'adapters/structural_element_adapters.dart';
 import '../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../bim_editing/commands/bim_edit_history.dart';
 import '../bim_editing/interaction/bim_edit_session.dart';
+import '../bim_editing/interaction/bim_transform_navigation.dart';
+import '../bim_editing/widgets/bim_editing_viewport.dart';
 import 'dart:math' as math;
 import '../bim_projects/services/bim_underlay_conversion_service.dart';
 import 'package:flutter/gestures.dart';
@@ -95,6 +97,53 @@ class StructuralDesignerScreen extends StatefulWidget {
 
 class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   late final TransformationController _transformController;
+  late final _viewportNavigation = BimTransformNavigation(
+    controller: _transformController,
+    readSize: () => _viewportSize,
+    onResize: (size) => _viewportSize = size,
+  );
+  bool _viewportHeld = false;
+  bool get _viewportDragging => _duplicateDraft != null || _placementPointerHandled ||
+      _isPlacingWithHold || _isOffsettingAxisWithDrag || _isOffsettingColumnWithDrag ||
+      _isExtrudingEdge || _isMovingColumn || _isMovingShearWall || _isMovingOpening ||
+      _isDraggingAxisHandle || _activeGrip != null || _activeOpeningGrip != null ||
+      _draggingSlabVertexIndex != null || _draggingOpeningVertexIndex != null;
+
+  void _beginViewportHold(Offset position) {
+    _viewportHeld = true;
+    if (_activeTool == StructuralDrawTool.measure) {
+      _measurementHeldGesture = true;
+      setState(() => _isPlacingWithHold = true);
+      _updateMeasurementPointer(position, isMouse: false);
+      HapticFeedback.selectionClick();
+    } else {
+      _handleLongPressStart(LongPressStartDetails(localPosition: position));
+    }
+  }
+
+  void _moveViewportTool(PointerMoveEvent event) {
+    _handlePointerMove(event);
+    if (_viewportHeld) {
+      _handleLongPressMoveUpdate(LongPressMoveUpdateDetails(localPosition: event.localPosition));
+    }
+  }
+
+  void _releaseViewportTool(PointerUpEvent event) {
+    final held = _viewportHeld;
+    _viewportHeld = false;
+    _handlePointerUp(event);
+    if (held) {
+      _handleLongPressEnd(LongPressEndDetails(localPosition: event.localPosition));
+    } else {
+      _handleTapUp(TapUpDetails(localPosition: event.localPosition, kind: event.kind));
+    }
+  }
+
+  void _cancelViewportTool() {
+    _viewportHeld = false;
+    _handleLongPressCancel();
+    _handlePointerCancel(const PointerCancelEvent());
+  }
 
   DxfDocument get _document {
     if (widget.bimContext != null) {
@@ -128,9 +177,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   // In-progress drawing & measuring states
   Offset? _measurementStartCad;
-  Timer? _measurementHoldTimer;
-  Offset? _measurementTouchDown;
-  Offset? _measurementTouchPosition;
   bool _measurementHeldGesture = false;
   (Offset, Offset, String)? _activeMeasurement;
   Offset? _wallStartCad;
@@ -381,7 +427,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   @override
   void dispose() {
-    _measurementHoldTimer?.cancel();
     _scaleSettleTimer?.cancel();
     DxfDisplaySettingsService.settingsNotifier.removeListener(_onDisplaySettingsChanged);
     _transformController.removeListener(_onTransformChanged);
@@ -3068,78 +3113,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handlePointerDown(PointerDownEvent event) {
     _slabBadgeSelectionHandled = false;
-    _activePointersCount++;
+    _activePointersCount = 1;
     _activePointerKind = event.kind;
-    if (_activePointersCount > 1) {
-      if (_duplicateDraft != null) _cancelDuplicateDrag();
-      _measurementHoldTimer?.cancel();
-      _isMultiTouchGesture = true;
-      if (_isPlacingWithHold) {
-        setState(() {
-          _isPlacingWithHold = false;
-          _touchScreenPos = null;
-          _targetScreenPos = null;
-          _snappedScreenPos = null;
-          _activeSnap = null;
-          _snappedScreenPositions = [];
-          _activeMagneticGuides = [];
-          _liveDimensionText = null;
-        });
-      }
-      if (_isExtrudingEdge || _activeGrip != null) {
-        setState(() {
-          _isExtrudingEdge = false;
-          _activeGrip = null;
-          _activeExtrudingSlabId = null;
-          _midpointTouchDownPos = null;
-          _extrusionDistanceCad = 0.0;
-        });
-      }
-      if (_isMovingColumn) {
-        setState(() {
-          _isMovingColumn = false;
-          _touchScreenPos = null;
-          _targetScreenPos = null;
-          _snappedScreenPos = null;
-          _activeSnap = null;
-        });
-      }
-      if (_isMovingShearWall) {
-        setState(() {
-          _isMovingShearWall = false;
-          _touchScreenPos = null;
-          _targetScreenPos = null;
-          _snappedScreenPos = null;
-          _activeSnap = null;
-          _activeMagneticGuides = null;
-        });
-      }
-      if (_draggingSlabVertexIndex != null) {
-        setState(() {
-          _draggingSlabVertexIndex = null;
-          _draggingSlabVertexCad = null;
-          _mergeCandidateSlabVertexIndex = null;
-          _activeMagneticGuides = [];
-        });
-      }
-      if (_activeOpeningGrip != null) {
-        setState(() {
-          _activeOpeningGrip = null;
-          _isExtrudingEdge = false;
-          _extrusionDistanceCad = 0.0;
-          _previewOpeningOffsetPolygon = null;
-        });
-      }
-      if (_draggingOpeningVertexIndex != null) {
-        setState(() {
-          _draggingOpeningVertexIndex = null;
-          _draggingOpeningVertexCad = null;
-          _mergeCandidateOpeningVertexIndex = null;
-          _activeMagneticGuides = [];
-        });
-      }
-      return;
-    }
     _isMultiTouchGesture = false;
     _placementPointerHandled = false;
     if (_duplicateDraft != null) {
@@ -3168,19 +3143,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         _updatePointer(event.localPosition, isMouse: true);
       } else {
         _measurementHeldGesture = false;
-        _measurementTouchDown = event.localPosition;
-        _measurementTouchPosition = event.localPosition;
-        _measurementHoldTimer?.cancel();
-        _measurementHoldTimer = Timer(const Duration(milliseconds: 280), () {
-          if (!mounted || _activeTool != StructuralDrawTool.measure ||
-              _activePointersCount != 1 || _isMultiTouchGesture) {
-            return;
-          }
-          _measurementHeldGesture = true;
-          setState(() => _isPlacingWithHold = true);
-          _updateMeasurementPointer(_measurementTouchPosition!, isMouse: false);
-          HapticFeedback.selectionClick();
-        });
+
       }
       return;
     }
@@ -3552,11 +3515,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     }
 
     if (_activeTool == StructuralDrawTool.measure) {
-      _measurementTouchPosition = event.localPosition;
-      if (!_isPlacingWithHold && _measurementTouchDown != null &&
-          (event.localPosition - _measurementTouchDown!).distance > kTouchSlop) {
-        _measurementHoldTimer?.cancel();
-      }
       if (_isPlacingWithHold) {
         _updatePointer(event.localPosition,
             isMouse: event.kind == PointerDeviceKind.mouse);
@@ -4702,7 +4660,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerUp(PointerUpEvent event) {
-    _measurementHoldTimer?.cancel();
     _activePointersCount = math.max(0, _activePointersCount - 1);
     if (_activePointersCount == 0) _activePointerKind = null;
     if (_isMultiTouchGesture) {
@@ -5098,7 +5055,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handlePointerCancel(PointerCancelEvent event) {
     if (_duplicateDraft != null) _cancelDuplicateDrag();
-    _measurementHoldTimer?.cancel();
     _activePointersCount = 0;
     _activePointerKind = null;
     _isMultiTouchGesture = false;
@@ -7228,7 +7184,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _selectTool(StructuralDrawTool tool) {
     if (_duplicateDraft != null) _cancelDuplicateDrag();
-    _measurementHoldTimer?.cancel();
     if (_isEditingSlab) _cancelSlabCorrection();
     setState(() {
       _activeTool = tool;
@@ -7921,107 +7876,30 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           return Stack(
             fit: StackFit.expand,
             children: [
-              // 1. Gesture Recognizer wrapping InteractiveViewer:
-              // Allows free 1-finger pan and 2-finger zoom to navigate freely,
-              // and 280ms press-and-hold to activate element placement with 56px stem ruler!
+              // One shared owner routes tools and camera; the native viewer
+              // temporarily remains a transform-only rendering bridge.
               Positioned.fill(
-                child: RawGestureDetector(
-                  gestures: <Type, GestureRecognizerFactory>{
-                    if (_activeTool != StructuralDrawTool.measure) LongPressGestureRecognizer:
-                        GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
-                      () => LongPressGestureRecognizer(
-                        duration: StructuralPointerInteraction.placementHoldDuration,
-                        debugOwner: this,
-                      ),
-                      (LongPressGestureRecognizer instance) {
-                        instance
-                          ..onLongPressStart = _handleLongPressStart
-                          ..onLongPressMoveUpdate = _handleLongPressMoveUpdate
-                          ..onLongPressEnd = _handleLongPressEnd
-                          ..onLongPressCancel = _handleLongPressCancel;
-                      },
-                    ),
-                    TapGestureRecognizer:
-                        GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
-                      () => TapGestureRecognizer(debugOwner: this),
-                      (TapGestureRecognizer instance) {
-                        instance.onTapUp = _handleTapUp;
-                      },
-                    ),
-                  },
-                  child: Listener(
-                    onPointerDown: _handlePointerDown,
-                    onPointerMove: _handlePointerMove,
-                    onPointerUp: _handlePointerUp,
-                    onPointerCancel: _handlePointerCancel,
-                    child: InteractiveViewer(
-                      transformationController: _transformController,
-                      panEnabled: _duplicateDraft == null && !_isOffsettingAxisWithDrag && !_isOffsettingColumnWithDrag && !_isPlacingWithHold &&
-                          !_isExtrudingEdge &&
-                          !_isMovingColumn &&
-                          !_isMovingShearWall &&
-                          !_isMovingOpening &&
-                          _draggingSlabVertexIndex == null &&
-                          _draggingOpeningVertexIndex == null,
-                      scaleEnabled: _duplicateDraft == null && !_isOffsettingAxisWithDrag && !_isOffsettingColumnWithDrag && !_isPlacingWithHold &&
-                          !_isExtrudingEdge &&
-                          !_isMovingColumn &&
-                          !_isMovingShearWall &&
-                          !_isMovingOpening &&
-                          _draggingSlabVertexIndex == null &&
-                          _draggingOpeningVertexIndex == null,
-                      scaleFactor: 350.0,
-                      trackpadScrollCausesScale: true,
-                      minScale: 0.001,
-                      maxScale: 1000.0,
-                      boundaryMargin: const EdgeInsets.all(double.infinity),
-                      onInteractionStart: (details) {
-                        if (details.pointerCount > 1) {
-                          setState(() {
-                            _isMultiTouchGesture = true;
-                            _isPlacingWithHold = false;
-                            _isMovingColumn = false;
-                            _isMovingShearWall = false;
-                            _isMovingOpening = false;
-                            _isExtrudingEdge = false;
-                            _activeGrip = null;
-                            _activeExtrudingSlabId = null;
-                            _midpointTouchDownPos = null;
-                            _extrusionDistanceCad = 0.0;
-                            _draggingSlabVertexIndex = null;
-                            _draggingSlabVertexCad = null;
-                            _mergeCandidateSlabVertexIndex = null;
-                            _activeMagneticGuides = [];
-                            _draggingOpeningVertexIndex = null;
-                            _draggingOpeningVertexCad = null;
-                            _mergeCandidateOpeningVertexIndex = null;
-                            _activeMagneticGuides = [];
-                            _activeOpeningGrip = null;
-                            _previewOpeningOffsetPolygon = null;
-                            _touchScreenPos = null;
-                            _targetScreenPos = null;
-                            _snappedScreenPos = null;
-                            _activeSnap = null;
-                          });
-                        }
-                      },
-                      onInteractionEnd: (details) {
-                        // In measurement mode the pointer listener owns the
-                        // count: ending a scale gesture can leave a finger down.
-                        if (_activeTool != StructuralDrawTool.measure) {
-                          _activePointersCount = 0;
-                          _isMultiTouchGesture = false;
-                        }
-                        _scaleSettleTimer?.cancel();
-                        _scaleSettleTimer = Timer(const Duration(milliseconds: 60), () {
-                          if (!mounted) return;
-                          final currentScale =
-                              _transformController.value.getMaxScaleOnAxis().clamp(0.001, 10000.0);
-                          setState(() {
-                            _renderScale = currentScale;
-                          });
-                        });
-                      },
+                child: BimEditingViewport(
+                  controller: _viewportNavigation,
+                  inputKey: const ValueKey('construction-viewport-input'),
+                  interactionKey: (_document, _project.activeStorey.id, _activeTool),
+                  singlePointerPan: true,
+                  touchHoldToPlace: true,
+                  holdExistingHandles: true,
+                  isDraggingHandle: () => _viewportDragging,
+                  onToolDown: _handlePointerDown,
+                  onToolMove: _moveViewportTool,
+                  onToolHover: (_) {},
+                  onToolUp: _releaseViewportTool,
+                  onToolHoldStart: _beginViewportHold,
+                  onToolCancel: _cancelViewportTool,
+                  child: InteractiveViewer(
+                    transformationController: _transformController,
+                    panEnabled: false,
+                    scaleEnabled: false,
+                    minScale: .001,
+                    maxScale: 1000,
+                    boundaryMargin: const EdgeInsets.all(double.infinity),
                       child: Container(
                         color: _canvasTheme.bgColor,
                         width: _viewportSize.width,
@@ -8189,7 +8067,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         ),
                       ),
                     ),
-                  ),
                 ),
               ),
 
