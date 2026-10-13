@@ -5,6 +5,8 @@ import 'analysis/staircase_automatic_openings.dart';
 import 'rendering/slab_plan_labels.dart';
 import 'dart:async';
 import 'adapters/structural_element_adapters.dart';
+import 'adapters/structural_snap_scene.dart';
+import '../bim_editing/snapping/bim_snap_resolver.dart';
 import '../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../bim_editing/commands/bim_edit_history.dart';
 import '../bim_editing/interaction/bim_edit_session.dart';
@@ -4464,199 +4466,28 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad, {bool cornersOnly = false, String? excludedSlabId}) {
-    double minDist = toleranceCad;
-    DxfSnapResult? bestSnap;
-
-    final allStoreysToSnap = [
-      _project.activeStorey,
-      if (_project.ghostStorey != null) _project.ghostStorey!,
-    ];
-
-    for (final s in allStoreysToSnap) {
-      // 1. Grid Axis Intersections (HIGHEST precedence: 0.00 mm precision!)
-      for (int i = 0; i < s.gridAxes.length; i++) {
-        for (int j = i + 1; j < s.gridAxes.length; j++) {
-          final inter = s.gridAxes[i].intersectionWith(s.gridAxes[j]);
-          if (inter != null) {
-            final d = (cadPt - inter).distance;
-            if (d < minDist) {
-              minDist = d;
-              bestSnap = DxfSnapResult(
-                point: inter,
-                type: DxfSnapType.intersection,
-                distance: d,
-              );
-            }
-          }
-        }
-      }
-
-      // 2. Grid Axis Endpoints
-      for (final axis in s.gridAxes) {
-        final d1 = (cadPt - axis.start).distance;
-        if (d1 < minDist) {
-          minDist = d1;
-          bestSnap = DxfSnapResult(
-            point: axis.start,
-            type: DxfSnapType.endpoint,
-            distance: d1,
-          );
-        }
-        final d2 = (cadPt - axis.end).distance;
-        if (d2 < minDist) {
-          minDist = d2;
-          bestSnap = DxfSnapResult(
-            point: axis.end,
-            type: DxfSnapType.endpoint,
-            distance: d2,
-          );
-        }
-      }
-
-      // 3. Column corners ONLY (User request: "Колоните да имат снап само в ъглите")
-      for (final col in s.columns) {
-        if (_isMovingColumn && col.id == _selectedColumn?.id) continue;
-        for (final v in col.polygonVertices) {
-          final d = (cadPt - v).distance;
-          if (d < minDist) {
-            minDist = d;
-            bestSnap = DxfSnapResult(
-              point: v,
-              type: DxfSnapType.endpoint,
-              distance: d,
-            );
-          }
-        }
-      }
-
-      // 4. Wall endpoints and corners
-      for (final w in s.shearWalls) {
-        if (_isMovingShearWall && w.id == _selectedShearWall?.id) continue;
-        final d1 = (cadPt - w.start).distance;
-        if (d1 < minDist) {
-          minDist = d1;
-          bestSnap = DxfSnapResult(
-            point: w.start,
-            type: DxfSnapType.endpoint,
-            distance: d1,
-          );
-        }
-        final d2 = (cadPt - w.end).distance;
-        if (d2 < minDist) {
-          minDist = d2;
-          bestSnap = DxfSnapResult(
-            point: w.end,
-            type: DxfSnapType.endpoint,
-            distance: d2,
-          );
-        }
-        for (final v in w.polygonVertices) {
-          final d = (cadPt - v).distance;
-          if (d < minDist) {
-            minDist = d;
-            bestSnap = DxfSnapResult(
-              point: v,
-              type: DxfSnapType.endpoint,
-              distance: d,
-            );
-          }
-        }
-      }
-
-      // 5. Beam endpoints and midpoints
-      for (final b in s.beams) {
-        final d1 = (cadPt - b.start).distance;
-        if (d1 < minDist) {
-          minDist = d1;
-          bestSnap = DxfSnapResult(
-            point: b.start,
-            type: DxfSnapType.endpoint,
-            distance: d1,
-          );
-        }
-        final d2 = (cadPt - b.end).distance;
-        if (d2 < minDist) {
-          minDist = d2;
-          bestSnap = DxfSnapResult(
-            point: b.end,
-            type: DxfSnapType.endpoint,
-            distance: d2,
-          );
-        }
-        if (!cornersOnly) {
-          final dMid = (cadPt - (b.start + b.end) / 2.0).distance;
-          if (dMid < minDist) {
-            minDist = dMid;
-            bestSnap = DxfSnapResult(
-              point: (b.start + b.end) / 2.0,
-              type: DxfSnapType.midpoint,
-              distance: dMid,
-            );
-          }
-        }
-      }
-
-      // 6. Slab polygon vertices and edge midpoints
-      for (final slab in s.slabs) {
-        if (slab.id == excludedSlabId) continue;
-        for (final v in slab.polygon) {
-          final d = (cadPt - v).distance;
-          if (d < minDist) {
-            minDist = d;
-            bestSnap = DxfSnapResult(
-              point: v,
-              type: DxfSnapType.endpoint,
-              distance: d,
-            );
-          }
-        }
-        if (!cornersOnly) {
-          for (final g in slab.edgeGrips) {
-            final d = (cadPt - g.midpoint).distance;
-            if (d < minDist) {
-              minDist = d;
-              bestSnap = DxfSnapResult(
-                point: g.midpoint,
-                type: DxfSnapType.midpoint,
-                distance: d,
-              );
-            }
-          }
-        }
-
-        // 7. Slab Opening vertices and edge midpoints (shafts, staircases, elevators)
-        for (final op in slab.openings) {
-          final poly = op;
-          for (int i = 0; i < poly.length; i++) {
-            final v = poly[i];
-            final d = (cadPt - v).distance;
-            if (d < minDist) {
-              minDist = d;
-              bestSnap = DxfSnapResult(
-                point: v,
-                type: DxfSnapType.endpoint,
-                distance: d,
-              );
-            }
-            if (!cornersOnly && poly.length > 1) {
-              final nextV = poly[(i + 1) % poly.length];
-              final mid = (v + nextV) / 2.0;
-              final dMid = (cadPt - mid).distance;
-              if (dMid < minDist) {
-                minDist = dMid;
-                bestSnap = DxfSnapResult(
-                  point: mid,
-                  type: DxfSnapType.midpoint,
-                  distance: dMid,
-                );
-              }
-            }
-          }
-        }
-      }
+    final frame = BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter);
+    final raw = frame.toModel(cadPt), radius = toleranceCad / _cadUnitsPerMeter;
+    final resolver = BimSnapResolver<StructuralSnapFeature>(raw: raw, radius: radius);
+    for (final feature in StructuralSnapScene.of(_project, _cadUnitsPerMeter).query(raw, radius)) {
+      if (feature.owner == excludedSlabId ||
+          (_isMovingColumn && feature.owner == _selectedColumn?.id) ||
+          (_isMovingShearWall && feature.owner == _selectedShearWall?.id) ||
+          (cornersOnly && feature.kind == BimSnapKind.midpoint)) { continue; }
+      resolver.consider(BimSnapCandidate(point: feature.point, kind: feature.kind, source: feature));
     }
-
-    return bestSnap;
+    final best = resolver.best;
+    if (best == null) return null;
+    final point = frame.toCad(best.point);
+    return DxfSnapResult(
+      point: point,
+      type: switch (best.kind) {
+        BimSnapKind.intersection => DxfSnapType.intersection,
+        BimSnapKind.midpoint => DxfSnapType.midpoint,
+        _ => DxfSnapType.endpoint,
+      },
+      distance: (point - cadPt).distance,
+    );
   }
 
   void _handlePointerUp(PointerUpEvent event) {

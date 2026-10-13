@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import '../../bim_editing/scene/bim_point_index.dart';
+import '../../bim_editing/scene/bim_bounds_index.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
@@ -12,8 +14,9 @@ typedef ArchitectSnapCircle = ({Offset center, double radius, String owner});
 /// Immutable drawing geometry shared by every placement and editing tool.
 class ArchitectSnapGeometry {
   static final _cache = Expando<ArchitectSnapGeometry>();
-  static const _cellSize = .5;
-  final Map<(int, int), List<ArchitectSnapPoint>> _cells = {};
+  final _index = BimPointIndex<ArchitectSnapPoint>();
+  final _edgeIndex = BimBoundsIndex<ArchitectSnapEdge>();
+  final _circleIndex = BimBoundsIndex<ArchitectSnapCircle>();
   final List<ArchitectSnapEdge> edges = [];
   final List<ArchitectSnapCircle> circles = [];
   final List<ArchitectSnapPoint> alignmentPoints = [];
@@ -25,8 +28,7 @@ class ArchitectSnapGeometry {
     void point(Offset p, String label, String owner) {
       if (!p.dx.isFinite || !p.dy.isFinite) return;
       final value = (point: p, label: label, owner: owner);
-      (_cells[((p.dx / _cellSize).floor(), (p.dy / _cellSize).floor())] ??= [])
-          .add(value);
+      _index.add(p, value);
       if (label != 'Midpoint') alignmentPoints.add(value);
     }
 
@@ -181,21 +183,23 @@ class ArchitectSnapGeometry {
         );
       }
     }
+    for (final edge in edges) {
+      _edgeIndex.add(Rect.fromPoints(edge.a, edge.b), edge);
+    }
+    for (final circle in circles) {
+      _circleIndex.add(
+        Rect.fromCircle(center: circle.center, radius: circle.radius),
+        circle,
+      );
+    }
+    _index.seal();
   }
 
-  Iterable<ArchitectSnapPoint> query(Offset raw, double radius) sync* {
-    for (
-      var x = ((raw.dx - radius) / _cellSize).floor();
-      x <= ((raw.dx + radius) / _cellSize).floor();
-      x++
-    ) {
-      for (
-        var y = ((raw.dy - radius) / _cellSize).floor();
-        y <= ((raw.dy + radius) / _cellSize).floor();
-        y++
-      ) {
-        yield* _cells[(x, y)] ?? const <ArchitectSnapPoint>[];
-      }
-    }
-  }
+  Iterable<ArchitectSnapEdge> nearbyEdges(Offset raw, double radius) =>
+      _edgeIndex.query(Rect.fromCircle(center: raw, radius: radius));
+  Iterable<ArchitectSnapCircle> nearbyCircles(Offset raw, double radius) =>
+      _circleIndex.query(Rect.fromCircle(center: raw, radius: radius));
+
+  Iterable<ArchitectSnapPoint> query(Offset raw, double radius) =>
+      _index.query(raw, radius);
 }

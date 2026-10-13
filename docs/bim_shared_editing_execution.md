@@ -9,7 +9,7 @@
 | 1. Координатна и адаптерна основа | Завършен | Общи координати/pointer правила, идентичност и неизменни снимки. Native адаптери са включени в Architect move и Construction Drag+. 75 успешни теста. |
 | 2. Сесии и транзакции | Завършена основа и bridge | Architect използва общи атомарни транзакции; Construction Undo използва общата история. Move и Drag+ са включени в общите сесии. 45 успешни теста. |
 | 3. Общ viewport | Завършен | Един BimEditingViewport за двата режима, два camera adapters. 36 успешни теста; чист анализ. |
-| 4. Общ snap и scene index | Предстои | |
+| 4. Общ snap и scene index | Завършена основа и native providers | Обща bounded/deterministic selection и metre point/bounds indices. Съществуващи серии: 54 и 45 успешни теста. |
 | 5. Оси — пълен пилот | Предстои | |
 | 6. Колони/греди и Drag+ | Предстои | |
 | 7. Контури | Предстои | |
@@ -60,3 +60,11 @@ Architect move/wall preview и Construction Drag+ използват обща с
 От Construction са премахнати RawGestureDetector, Tap/LongPress recognizers и отделният measurement hold timer. Native handlers получават единствено tool events и адаптирани hold callbacks от общия собственик. InteractiveViewer засега е само transform renderer с изключени pan и scale; ще бъде премахнат в rendering cleanup. Старите native handlers още пазят compatibility flags за последващото си пренасяне.
 
 Проверки: 33 съществуващи сценария (двата екрана, placement, measurement, touch/mouse Drag+, pointer правила) и 3 нови общи camera/pinch контракта. Проверени focal anchoring, scale clamp, invalid scale и повторна работа след отменен жест. Анализът е чист.
+
+## Етап 4
+
+Общи са `BimSnapKind`, `BimSnapResolver`, `BimPointIndex` и `BimBoundsIndex`. Подреждането използва тип, разстояние и координати за deterministic tie; exact object coordinates не се закръглят. Индексите са в моделни метри и обработват големи заявки без обхождане на милиони празни клетки.
+
+Architect geometry provider използва общите индекси за точки, finite edges и аналитични circles. Construction получи revision/unit-scoped cached native scene provider вместо пълно обхождане на всички елементи при всяко движение. Запазени са Construction corner-only колони, slab/opening vertices и ghost references; excluded native IDs се филтрират преди resolver. Advanced wall attachments/alignment и underlay segment extraction остават provider/host extensions до съответните домейн етапи.
+
+Проверки: приоритет независимо от provider order, exact coordinates, anchor exclusion, отрицателни и далечни координати, overflow bounds, cache revision/units. Сериите с реални BIM interaction и snap/ownership сценарии са 54/54 и 45/45; анализът е чист.

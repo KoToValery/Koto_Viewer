@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import '../../bim_editing/snapping/bim_snap_resolver.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
@@ -78,13 +79,16 @@ class ArchitectSnapHelper {
     visibility: visibility,
   );
 
-  static int _rank(String label) => switch (label) {
-    'Endpoint' || 'Vertex' || 'Axis endpoint' => 0,
-    'Intersection' || 'Axis intersection' => 1,
-    'Center' || 'Midpoint' => 2,
-    'Perpendicular' => 3,
-    _ => 4,
+  static BimSnapKind _kind(String label) => switch (label) {
+    'Endpoint' || 'Vertex' || 'Axis endpoint' => BimSnapKind.endpoint,
+    'Intersection' || 'Axis intersection' => BimSnapKind.intersection,
+    'Center' => BimSnapKind.center,
+    'Midpoint' => BimSnapKind.midpoint,
+    'Perpendicular' => BimSnapKind.perpendicular,
+    'Alignment' => BimSnapKind.alignment,
+    _ => BimSnapKind.edge,
   };
+  static int _rank(String label) => _kind(label).priority;
   static double _dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
 
   /// Move the entire selection using its real features, excluding self-snaps.
@@ -160,27 +164,14 @@ class ArchitectSnapHelper {
         (owner == '@wall-joints' && excludeJoints) ||
         (owner == '@axes' &&
             project.gridAxes.any((a) => excludedIds.contains(a.id)));
-    ArchitectSnapPoint? best;
-    var bestDistance = radius + 1e-9;
-    void consider(Offset point, String label) {
-      if (anchor != null && (point - anchor).distance < 1e-9) return;
-      final d = (point - raw).distance;
-      if (d > radius + 1e-9) return;
-      final rank = _rank(label),
-          oldRank = best == null ? 99 : _rank(best!.label);
-      final tie = (d - bestDistance).abs() < 1e-9;
-      if (best == null ||
-          rank < oldRank ||
-          (rank == oldRank &&
-              (d < bestDistance - 1e-9 ||
-                  (tie &&
-                      (point.dx < best!.point.dx ||
-                          (point.dx == best!.point.dx &&
-                              point.dy < best!.point.dy)))))) {
-        best = (point: point, label: label, owner: '');
-        bestDistance = d;
-      }
-    }
+    final resolver = BimSnapResolver<String>(
+      raw: raw,
+      radius: radius,
+      anchor: anchor,
+    );
+    void consider(Offset point, String label) => resolver.consider(
+      BimSnapCandidate(point: point, kind: _kind(label), source: label),
+    );
 
     for (final candidate in geometry.query(raw, radius)) {
       if (!excluded(candidate.owner)) {
@@ -188,7 +179,7 @@ class ArchitectSnapHelper {
       }
     }
     final nearby = <(Offset, Offset)>[];
-    for (final edge in geometry.edges) {
+    for (final edge in geometry.nearbyEdges(raw, radius)) {
       if (excluded(edge.owner)) continue;
       final projection = DxfSnapHelper.closestPointOnSegment(
         raw,
@@ -228,7 +219,8 @@ class ArchitectSnapHelper {
         if (p != null) consider(p, 'Intersection');
       }
     }
-    final circles = geometry.circles
+    final circles = geometry
+        .nearbyCircles(raw, radius)
         .where(
           (c) =>
               !excluded(c.owner) &&
@@ -278,12 +270,13 @@ class ArchitectSnapHelper {
         if (p != null) consider(p, 'Intersection');
       }
     }
+    final best = resolver.best;
     if (best != null) {
       return ArchitectSnapResult(
-        point: best!.point,
+        point: best.point,
         isSnapped: true,
-        snapLabel: best!.label,
-        magneticGuides: anchor == null ? [] : [(anchor, best!.point)],
+        snapLabel: best.source,
+        magneticGuides: anchor == null ? [] : [(anchor, best.point)],
       );
     }
     if (anchor != null) {
