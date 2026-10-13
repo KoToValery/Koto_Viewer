@@ -3752,23 +3752,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _handleAxisOffset(StructuralGridAxis axis) {
     showArchitectGridAxisOffsetDialog(
       context: context,
-      axis: axis,
-      initialDistance: _axisTool.offsetDistanceMeters,
-      onApplyOffset: (distance, directionSign) {
-        final isBg = Localizations.localeOf(context).languageCode == 'bg';
-        final (updatedProj, newAxis) = _axisTool.applyOffset(
-          project: _project,
-          originalAxis: axis,
-          distanceMeters: distance,
-          directionSign: directionSign,
-          isBulgarian: isBg,
-        );
-        setState(() {
-          _project = updatedProj;
-        });
-        HapticFeedback.mediumImpact();
-        _promptDeletePreviousAxis(axis);
-      },
+      unitToMeters: _project.units.scaleToMeters,
+      unitSymbol: _project.units.symbol,
       onStartDragMode: (distance) {
         _axisTool.startOffsetDrag(axis, distance);
       },

@@ -10,7 +10,7 @@
 | 2. Сесии и транзакции | Завършена основа и bridge | Architect използва общи атомарни транзакции; Construction Undo използва общата история. Move и Drag+ са включени в общите сесии. 45 успешни теста. |
 | 3. Общ viewport | Завършен | Един BimEditingViewport за двата режима, два camera adapters. 36 успешни теста; чист анализ. |
 | 4. Общ snap и scene index | Завършена основа и native providers | Обща bounded/deterministic selection и metre point/bounds indices. Съществуващи серии: 54 и 45 успешни теста. |
-| 5. Оси — пълен пилот | Предстои | |
+| 5. Оси — пълен пилот | Завършен | Общ axis model/geometry/naming/extents, canvas-side offset, compact dialog и Construction transactional endpoint/body drag. 34 финални теста. |
 | 6. Колони/греди и Drag+ | Предстои | |
 | 7. Контури | Предстои | |
 | 8. Стени и специални hosts | Предстои | |
@@ -68,3 +68,13 @@ Architect move/wall preview и Construction Drag+ използват обща с
 Architect geometry provider използва общите индекси за точки, finite edges и аналитични circles. Construction получи revision/unit-scoped cached native scene provider вместо пълно обхождане на всички елементи при всяко движение. Запазени са Construction corner-only колони, slab/opening vertices и ghost references; excluded native IDs се филтрират преди resolver. Advanced wall attachments/alignment и underlay segment extraction остават provider/host extensions до съответните домейн етапи.
 
 Проверки: приоритет независимо от provider order, exact coordinates, anchor exclusion, отрицателни и далечни координати, overflow bounds, cache revision/units. Сериите с реални BIM interaction и snap/ownership сценарии са 54/54 и 45/45; анализът е чист.
+
+## Етап 5
+
+`BimGridAxis` е общата геометрия със старото име StructuralGridAxis като alias. Форматът и отделните project snapshots не се променят. Общи са naming, ProjectGridAxes extent/merge service и BimAxisOperations (alignNew, alignParallel, bounded endpoint resizing, parallel move capture, offset sign/vector). Native storey/underlay и wall-based placement остават адаптери към същите операции.
+
+Construction endpoint и axis-body drag използват BimEditSession: един preview project, без autosave/Undo по време на движение; cancel възстановява оригинала, release публикува веднъж. Запазват се bubble flags и sourceStoreyIds. Наклонени и reversed оси определят offset страна чрез dot с canonical normal. Offset copies използват copyWith вместо нов обект с изгубени настройки.
+
+Диалогът за разстояние е общ BimOffsetDialog, празен, без заглавие, presets и arrows. Architect използва избраната unit scale/symbol, Construction своята native m/cm настройка. Контекстна смяна при активен pointer отменя и native preview.
+
+Проверки: 49 съществуващи workspace/alignment/ownership теста и финална серия 34/34, включително oblique/reversed offset, .30 m minimum, reverse parallel extents, compact Architect dialog и Construction endpoint/body preview/cancel/commit/Undo в 1 и 1000 CAD units/metre. Анализът е чист.

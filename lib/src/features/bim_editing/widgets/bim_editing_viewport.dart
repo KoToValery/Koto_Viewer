@@ -78,6 +78,11 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
       _navigation = false;
       _canPan = false;
       _down = null;
+      if (_pointers.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) widget.onToolCancel();
+        });
+      }
     }
   }
 

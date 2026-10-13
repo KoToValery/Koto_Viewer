@@ -14,6 +14,8 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'architect_element_id.dart';
+import '../../bim_editing/operations/bim_axis_operations.dart';
+import '../../bim_editing/operations/bim_axis_naming.dart';
 
 import '../models/architect_grid_axis.dart';
 import '../models/architect_project.dart';
@@ -301,32 +303,13 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     List<StructuralGridAxis> axes, {
     double toleranceRad = .01,
   }) {
-    if (axis.length < .30) return axis;
-    final references =
-        axes
-            .where(
-              (a) =>
-                  a.length >= .001 &&
-                  a.isParallelTo(axis, toleranceRad: toleranceRad),
-            )
-            .toList()
-          ..sort((a, b) => a.id.compareTo(b.id));
-    return references.isEmpty ? axis : axis.alignWith(references.first);
+    return BimAxisOperations.alignNew(axis, axes, toleranceRad: toleranceRad);
   }
 
   static List<StructuralGridAxis> alignParallelAxes(
     List<StructuralGridAxis> axes,
     StructuralGridAxis reference,
-  ) => [
-    for (final axis in axes)
-      if (axis.id == reference.id)
-        reference
-      else if (axis.length >= .001 &&
-          axis.isParallelTo(reference, toleranceRad: .01))
-        axis.alignWith(reference)
-      else
-        axis,
-  ];
+  ) => BimAxisOperations.alignParallel(axes, reference);
 
   List<StructuralGridAxis> previewAxes(List<StructuralGridAxis> axes) {
     final reference = _isDraggingHandle
@@ -389,45 +372,13 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     double scale,
   ) {
     if (!_isDraggingHandle || _draggedAxisSnapshot == null) return;
-    final axis = _handleOriginalAxis!;
-    final proj = axis.projectPoint(rawModelPoint);
-
-    var candidate = proj;
-
-    final u = axis.direction;
-    var best = math.min(16.0 / scale, .20) + 1e-9;
-    final axes = allAxes.toList()..sort((a, b) => a.id.compareTo(b.id));
-    for (final other in axes) {
-      if (other.id == axis.id ||
-          !axis.isParallelTo(other, toleranceRad: 0.05)) {
-        continue;
-      }
-      final sameDirection =
-          axis.direction.dx * other.direction.dx +
-              axis.direction.dy * other.direction.dy >=
-          0;
-      final extent = _isStartHandle == sameDirection ? other.start : other.end;
-      final along =
-          (extent - axis.start).dx * u.dx + (extent - axis.start).dy * u.dy;
-      final point = axis.start + u * along;
-      final correction = (proj - point).distance;
-      if (correction < best) {
-        best = correction;
-        candidate = point;
-      }
-    }
-
-    final d = candidate - axis.start;
-    final along = d.dx * u.dx + d.dy * u.dy;
-    candidate =
-        axis.start +
-        u *
-            (_isStartHandle
-                ? math.min(along, axis.length - .30)
-                : math.max(along, .30));
-    _draggedAxisSnapshot = _isStartHandle
-        ? axis.copyWith(start: candidate)
-        : axis.copyWith(end: candidate);
+    _draggedAxisSnapshot = BimAxisOperations.handlePreview(
+      original: _handleOriginalAxis!,
+      startHandle: _isStartHandle,
+      point: rawModelPoint,
+      axes: allAxes,
+      captureRadius: math.min(16 / scale, .20),
+    );
     notifyListeners();
   }
 
@@ -480,29 +431,12 @@ class ArchitectGridAxisTool extends ChangeNotifier {
         _moveOriginalAxis == null) {
       return;
     }
-    final delta = rawModelPoint - _moveStartPoint!;
-    final orig = _moveOriginalAxis!;
-
-    var candidateDelta = delta;
-
-    final normal = orig.normal;
-    var best = math.min(12.0 / scale, .20) + 1e-9;
-    final axes = allAxes.toList()..sort((a, b) => a.id.compareTo(b.id));
-    for (final other in axes) {
-      if (other.id == orig.id ||
-          !orig.isParallelTo(other, toleranceRad: 0.05)) {
-        continue;
-      }
-      final distance =
-          ((orig.start + delta) - other.start).dx * normal.dx +
-          ((orig.start + delta) - other.start).dy * normal.dy;
-      if (distance.abs() < best) {
-        best = distance.abs();
-        candidateDelta = delta - normal * distance;
-      }
-    }
-
-    _moveCurrentDelta = candidateDelta;
+    _moveCurrentDelta = BimAxisOperations.movingDelta(
+      original: _moveOriginalAxis!,
+      delta: rawModelPoint - _moveStartPoint!,
+      axes: allAxes,
+      captureRadius: math.min(12 / scale, .20),
+    );
     notifyListeners();
   }
 
@@ -659,15 +593,11 @@ class ArchitectGridAxisTool extends ChangeNotifier {
 
   void updateOffsetDrag(Offset modelPt) {
     if (!_isOffsettingWithDrag || _axisBeingOffset == null) return;
-    final axis = _axisBeingOffset!;
-    final mid = (axis.start + axis.end) / 2.0;
-
-    final double newSign;
-    if (axis.isVertical) {
-      newSign = (modelPt.dx >= mid.dx) ? 1.0 : -1.0;
-    } else {
-      newSign = (modelPt.dy >= mid.dy) ? 1.0 : -1.0;
-    }
+    final newSign = BimAxisOperations.offsetSign(
+      _axisBeingOffset!,
+      modelPt,
+      previous: _currentOffsetSign,
+    );
 
     if (newSign != _currentOffsetSign) {
       _currentOffsetSign = newSign;
@@ -682,13 +612,11 @@ class ArchitectGridAxisTool extends ChangeNotifier {
       _offsetDistanceMeters,
       _currentOffsetSign,
     );
-    return StructuralGridAxis(
+    return axis.copyWith(
       id: 'preview_offset',
       name: getNextAxisName(axis.name, isBulgarian),
       start: axis.start + offsetVec,
       end: axis.end + offsetVec,
-      bubbleAtStart: axis.bubbleAtStart,
-      bubbleAtEnd: axis.bubbleAtEnd,
     );
   }
 
@@ -706,13 +634,11 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     );
     final nextName = getNextAxisName(originalAxis.name, isBulgarian);
 
-    final newAxis = StructuralGridAxis(
+    final newAxis = originalAxis.copyWith(
       id: ArchitectElementId.next('axis'),
       name: nextName,
       start: originalAxis.start + offsetVec,
       end: originalAxis.end + offsetVec,
-      bubbleAtStart: originalAxis.bubbleAtStart,
-      bubbleAtEnd: originalAxis.bubbleAtEnd,
     );
 
     final updatedAxes = resequenceAxes([
@@ -768,171 +694,9 @@ class ArchitectGridAxisTool extends ChangeNotifier {
   static String getSuggestedAxisName(
     Offset start,
     Offset end,
-    List<StructuralGridAxis> existingAxes,
+    List<StructuralGridAxis> axes,
     bool isBulgarian,
-  ) {
-    final angle = math.atan2(end.dy - start.dy, end.dx - start.dx);
-    final isVertical = (math.cos(angle).abs() <= math.sin(angle).abs());
-
-    final sameDirAxes = existingAxes
-        .where((a) => a.isVertical == isVertical)
-        .toList();
-
-    const cyrillic = [
-      'А',
-      'Б',
-      'В',
-      'Г',
-      'Д',
-      'Е',
-      'Ж',
-      'З',
-      'И',
-      'К',
-      'Л',
-      'М',
-      'Н',
-      'О',
-      'П',
-      'Р',
-      'С',
-      'Т',
-      'У',
-      'Ф',
-      'Х',
-      'Ц',
-      'Ч',
-      'Ш',
-      'Щ',
-    ];
-    const latin = [
-      'A',
-      'B',
-      'C',
-      'D',
-      'E',
-      'F',
-      'G',
-      'H',
-      'J',
-      'K',
-      'L',
-      'M',
-      'N',
-      'P',
-      'R',
-      'S',
-      'T',
-      'U',
-      'V',
-      'W',
-      'X',
-      'Y',
-      'Z',
-    ];
-    final letters = isBulgarian ? cyrillic : latin;
-
-    if (sameDirAxes.isNotEmpty) {
-      final hasNumbers = sameDirAxes.any((a) => int.tryParse(a.name) != null);
-      if (hasNumbers) {
-        int maxNum = 0;
-        for (final a in sameDirAxes) {
-          final val = int.tryParse(a.name);
-          if (val != null && val > maxNum) maxNum = val;
-        }
-        return (maxNum + 1).toString();
-      } else {
-        int maxIdx = -1;
-        for (final a in sameDirAxes) {
-          final idx = letters.indexOf(a.name.toUpperCase());
-          if (idx > maxIdx) maxIdx = idx;
-        }
-        if (maxIdx != -1 && maxIdx + 1 < letters.length) {
-          return letters[maxIdx + 1];
-        }
-        return getNextAxisName(sameDirAxes.last.name, isBulgarian);
-      }
-    }
-
-    final otherDirAxes = existingAxes
-        .where((a) => a.isVertical != isVertical)
-        .toList();
-    if (otherDirAxes.isNotEmpty) {
-      final otherHasNumbers = otherDirAxes.any(
-        (a) => int.tryParse(a.name) != null,
-      );
-      if (otherHasNumbers) {
-        return letters.first;
-      } else {
-        return '1';
-      }
-    }
-
-    return isVertical ? '1' : letters.first;
-  }
-
-  static String getNextAxisName(String current, bool isBulgarian) {
-    final num = int.tryParse(current);
-    if (num != null) {
-      return (num + 1).toString();
-    }
-    const cyrillic = [
-      'А',
-      'Б',
-      'В',
-      'Г',
-      'Д',
-      'Е',
-      'Ж',
-      'З',
-      'И',
-      'К',
-      'Л',
-      'М',
-      'Н',
-      'О',
-      'П',
-      'Р',
-      'С',
-      'Т',
-      'У',
-      'Ф',
-      'Х',
-      'Ц',
-      'Ч',
-      'Ш',
-      'Щ',
-    ];
-    const latin = [
-      'A',
-      'B',
-      'C',
-      'D',
-      'E',
-      'F',
-      'G',
-      'H',
-      'J',
-      'K',
-      'L',
-      'M',
-      'N',
-      'P',
-      'R',
-      'S',
-      'T',
-      'U',
-      'V',
-      'W',
-      'X',
-      'Y',
-      'Z',
-    ];
-    final letters = isBulgarian ? cyrillic : latin;
-    final idx = letters.indexOf(current.toUpperCase());
-    if (idx != -1 && idx + 1 < letters.length) {
-      return letters[idx + 1];
-    }
-    return '${current}_1';
-  }
+  ) => BimAxisNaming.getSuggestedAxisName(start, end, axes, isBulgarian);
+  static String getNextAxisName(String current, bool isBulgarian) =>
+      BimAxisNaming.getNextAxisName(current, isBulgarian);
 }

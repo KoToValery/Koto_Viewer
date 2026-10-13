@@ -7,6 +7,8 @@ import 'dart:async';
 import 'adapters/structural_element_adapters.dart';
 import 'adapters/structural_snap_scene.dart';
 import '../bim_editing/snapping/bim_snap_resolver.dart';
+import '../bim_editing/operations/bim_axis_operations.dart';
+import '../bim_editing/operations/bim_axis_naming.dart';
 import '../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../bim_editing/commands/bim_edit_history.dart';
 import '../bim_editing/interaction/bim_edit_session.dart';
@@ -242,6 +244,70 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Offset? _firstWallEdgeEndCad;
   bool _isDraggingAxisHandle = false;
   bool _draggingAxisStart = false;
+  BimEditSession<List<StructuralGridAxis>>? _axisGesture;
+  StructuralProject? _axisPreviewProject;
+  Offset? _axisMoveStart;
+  StructuralGridAxis _axisInMetres(StructuralGridAxis axis) => axis.copyWith(
+    start: axis.start / _cadUnitsPerMeter, end: axis.end / _cadUnitsPerMeter);
+  StructuralGridAxis _axisInCad(StructuralGridAxis axis) => axis.copyWith(
+    start: axis.start * _cadUnitsPerMeter, end: axis.end * _cadUnitsPerMeter);
+  void _beginAxisHandle(StructuralGridAxis axis, bool start) {
+    _axisMoveStart = null;
+    _axisGesture = BimEditSession(context: _duplicateContext,
+      original: List.unmodifiable(_project.effectiveGridAxes));
+    _selectedGridAxis = axis;
+    _draggingAxisStart = start;
+    _isDraggingAxisHandle = true;
+  }
+  void _beginAxisMove(StructuralGridAxis axis, Offset screen) {
+    _beginAxisHandle(axis, false);
+    _axisMoveStart = _screenToCad(screen) / _cadUnitsPerMeter;
+  }
+  void _previewAxisHandle(Offset screen) {
+    final session = _axisGesture;
+    if (session == null || _selectedGridAxis == null) return;
+    final original = session.original.firstWhere((a) => a.id == _selectedGridAxis!.id);
+    final model = _axisInMetres(original);
+    final point = _screenToCad(screen) / _cadUnitsPerMeter;
+    final axes = session.original.map(_axisInMetres).toList();
+    final radius = math.min(16 / (_getCadFitScale() * _transformController.value.getMaxScaleOnAxis() * _cadUnitsPerMeter), .20);
+    final StructuralGridAxis updated;
+    if (_axisMoveStart != null) {
+      final delta = BimAxisOperations.movingDelta(original: model,
+        delta: point - _axisMoveStart!, axes: axes, captureRadius: radius);
+      updated = _axisInCad(model.copyWith(start: model.start + delta, end: model.end + delta));
+    } else {
+      updated = _axisInCad(BimAxisOperations.handlePreview(original: model,
+        startHandle: _draggingAxisStart, point: point, axes: axes, captureRadius: radius));
+    }
+    if (!session.update(_duplicateContext, (axes) => BimAxisOperations.alignParallel(axes, updated))) return;
+    setState(() {
+      _axisPreviewProject = _project.copyWithGridAxes(session.preview);
+      _selectedGridAxis = updated;
+    });
+  }
+  void _cancelAxisGesture() {
+    _axisGesture?.cancel();
+    _axisGesture = null;
+    _axisPreviewProject = null;
+    _axisMoveStart = null;
+    _isDraggingAxisHandle = false;
+    if (_selectedGridAxis != null) _selectedGridAxis = _findProjectAxis(_selectedGridAxis!);
+  }
+  void _finishAxisGesture(Offset screen) {
+    _previewAxisHandle(screen);
+    final session = _axisGesture;
+    final changed = session != null && session.original.any((axis) {
+      final preview = session.preview.firstWhere((a) => a.id == axis.id);
+      return axis.start != preview.start || axis.end != preview.end;
+    });
+    final axes = session?.finish(_duplicateContext, changed: changed);
+    _cancelAxisGesture();
+    if (axes != null) {
+      _pushUndo();
+      _updateProjectGridAxes(resequenceGridAxes(axes, isBulgarian: Localizations.localeOf(context).languageCode == 'bg'));
+    }
+  }
   bool _isMovingColumn = false;
   bool _hasMovedSelectedColumn = false;
   bool _isMovingShearWall = false;
@@ -1954,114 +2020,20 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
   }
 
-  String _getNextAxisName(String current) {
-    final num = int.tryParse(current);
-    if (num != null) {
-      return (num + 1).toString();
-    }
-    final isBg = Localizations.localeOf(context).languageCode == 'bg';
-    const cyrillic = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ'];
-    const latin = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
-    final letters = isBg ? cyrillic : latin;
-    final idx = letters.indexOf(current.toUpperCase());
-    if (idx != -1 && idx + 1 < letters.length) {
-      return letters[idx + 1];
-    }
-    return '${current}_1';
-  }
-
-  /// Automatically assigns axis names: numbers in one direction, letters in the other.
-  String _getSuggestedAxisName(Offset start, Offset end) {
-    final angle = math.atan2(end.dy - start.dy, end.dx - start.dx);
-    final isVertical = (math.cos(angle).abs() <= math.sin(angle).abs());
-    final activeAxes = _project.activeStorey.gridAxes;
-
-    // Find all existing axes in this orientation
-    final sameDirAxes = activeAxes.where((a) {
-      final aAngle = a.angleRad;
-      final aIsVert = (math.cos(aAngle).abs() <= math.sin(aAngle).abs());
-      return aIsVert == isVertical;
-    }).toList();
-
-    final isBg = Localizations.localeOf(context).languageCode == 'bg';
-    const cyrillic = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ'];
-    const latin = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
-    final letters = isBg ? cyrillic : latin;
-
-    if (sameDirAxes.isNotEmpty) {
-      final hasNumbers = sameDirAxes.any((a) => int.tryParse(a.name) != null);
-      if (hasNumbers) {
-        int maxNum = 0;
-        for (final a in sameDirAxes) {
-          final val = int.tryParse(a.name);
-          if (val != null && val > maxNum) maxNum = val;
-        }
-        return (maxNum + 1).toString();
-      } else {
-        int maxIdx = -1;
-        for (final a in sameDirAxes) {
-          final idx = letters.indexOf(a.name.toUpperCase());
-          if (idx > maxIdx) maxIdx = idx;
-        }
-        if (maxIdx != -1 && maxIdx + 1 < letters.length) {
-          return letters[maxIdx + 1];
-        }
-        return _getNextAxisName(sameDirAxes.last.name);
-      }
-    }
-
-    // First axis in this direction: Check what the OTHER direction uses
-    final otherDirAxes = activeAxes.where((a) {
-      final aAngle = a.angleRad;
-      final aIsVert = (math.cos(aAngle).abs() <= math.sin(aAngle).abs());
-      return aIsVert != isVertical;
-    }).toList();
-
-    if (otherDirAxes.isNotEmpty) {
-      final otherHasNumbers = otherDirAxes.any((a) => int.tryParse(a.name) != null);
-      if (otherHasNumbers) {
-        return letters.first;
-      } else {
-        return '1';
-      }
-    }
-
-    // Default convention: Vertical axes are 1, 2, 3... and Horizontal axes are letters
-    return isVertical ? '1' : letters.first;
-  }
+  String _getNextAxisName(String current) => BimAxisNaming.getNextAxisName(
+    current, Localizations.localeOf(context).languageCode == 'bg');
+  String _getSuggestedAxisName(Offset start, Offset end) => BimAxisNaming.getSuggestedAxisName(
+    start, end, _project.effectiveGridAxes, Localizations.localeOf(context).languageCode == 'bg');
 
   Offset _computeAxisOffsetVector(StructuralGridAxis axis, double distanceMeters, double directionSign) {
-    final scale = _cadUnitsPerMeter;
-    final distCad = distanceMeters * scale;
-    final normal = axis.normal;
-    final angle = axis.angleRad;
-    final isVertical = (math.cos(angle).abs() < math.sin(angle).abs());
-
-    if (isVertical) {
-      // directionSign: -1 for Left, +1 for Right
-      final double sign = normal.dx > 0 ? (directionSign > 0 ? 1.0 : -1.0) : (directionSign > 0 ? -1.0 : 1.0);
-      return normal * (distCad * sign);
-    } else {
-      // directionSign: +1 for Up, -1 for Down
-      final double sign = normal.dy > 0 ? (directionSign > 0 ? 1.0 : -1.0) : (directionSign > 0 ? -1.0 : 1.0);
-      return normal * (distCad * sign);
-    }
+    return BimAxisOperations.offsetVector(axis, distanceMeters * _cadUnitsPerMeter, directionSign);
   }
 
   void _updateAxisOffsetDrag(Offset screenPos) {
     if (!_isOffsettingAxisWithDrag || _axisBeingOffset == null) return;
     final cadPt = _screenToCad(screenPos);
     final axis = _axisBeingOffset!;
-    final mid = (axis.start + axis.end) / 2.0;
-    final angle = axis.angleRad;
-    final isVertical = (math.cos(angle).abs() < math.sin(angle).abs());
-
-    final double newSign;
-    if (isVertical) {
-      newSign = (cadPt.dx >= mid.dx) ? 1.0 : -1.0;
-    } else {
-      newSign = (cadPt.dy >= mid.dy) ? 1.0 : -1.0;
-    }
+    final newSign = BimAxisOperations.offsetSign(axis, cadPt, previous: _currentOffsetSign);
 
     if (newSign != _currentOffsetSign) {
       setState(() {
@@ -2075,14 +2047,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (!_isOffsettingAxisWithDrag || _axisBeingOffset == null) return null;
     final axis = _axisBeingOffset!;
     final offsetVec = _computeAxisOffsetVector(axis, _axisOffsetDistanceMeters, _currentOffsetSign);
-    return StructuralGridAxis(
-      id: 'preview_offset',
-      name: _getNextAxisName(axis.name),
-      start: axis.start + offsetVec,
-      end: axis.end + offsetVec,
-      bubbleAtStart: axis.bubbleAtStart,
-      bubbleAtEnd: axis.bubbleAtEnd,
-    );
+    return axis.copyWith(id: 'preview_offset', name: _getNextAxisName(axis.name),
+      start: axis.start + offsetVec, end: axis.end + offsetVec);
   }
 
   void _startAxisOffsetDragMode(StructuralGridAxis axis, double distanceMeters) {
@@ -2098,14 +2064,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _axisOffsetDistanceMeters = distanceMeters;
     final offsetVec = _computeAxisOffsetVector(originalAxis, distanceMeters, directionSign);
     final nextName = _getNextAxisName(originalAxis.name);
-    final newAxis = StructuralGridAxis(
-      id: 'axis_${DateTime.now().millisecondsSinceEpoch}',
-      name: nextName,
-      start: originalAxis.start + offsetVec,
-      end: originalAxis.end + offsetVec,
-      bubbleAtStart: originalAxis.bubbleAtStart,
-      bubbleAtEnd: originalAxis.bubbleAtEnd,
-    );
+    final newAxis = originalAxis.copyWith(id: 'axis_${DateTime.now().microsecondsSinceEpoch}',
+      name: nextName, start: originalAxis.start + offsetVec, end: originalAxis.end + offsetVec);
 
     _pushUndo();
     final isBg = Localizations.localeOf(context).languageCode == 'bg';
@@ -3294,16 +3254,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_activeTool == StructuralDrawTool.gridAxis || _activeTool == StructuralDrawTool.select) {
       final handle = _hitTestGridAxisHandle(event.localPosition);
       if (handle != null) {
-        _pushUndo();
         setState(() {
-          _selectedGridAxis = handle.$1;
-          _isDraggingAxisHandle = true;
-          _draggingAxisStart = handle.$2;
+          _beginAxisHandle(handle.$1, handle.$2);
           _selectedColumn = null;
           _selectedShearWall = null;
           _selectedBeam = null;
         });
         HapticFeedback.selectionClick();
+        return;
+      }
+    }
+
+    if (event.kind == PointerDeviceKind.mouse &&
+        (_activeTool == StructuralDrawTool.gridAxis || _activeTool == StructuralDrawTool.select)) {
+      final axis = _hitTestGridAxis(event.localPosition);
+      if (axis != null) {
+        setState(() => _beginAxisMove(axis, event.localPosition));
         return;
       }
     }
@@ -3538,20 +3504,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // Dragging grid axis handle (extend/shorten along axis line, harmonizing all parallel axes)
     if (_isDraggingAxisHandle && _selectedGridAxis != null) {
-      final cadPt = _screenToCad(event.localPosition);
-      final proj = _selectedGridAxis!.projectPoint(cadPt);
-      final updatedAxis = _draggingAxisStart
-          ? _selectedGridAxis!.copyWith(start: proj)
-          : _selectedGridAxis!.copyWith(end: proj);
-      final axes = _project.effectiveGridAxes.map((a) {
-        if (a.id == updatedAxis.id) return updatedAxis;
-        if (a.isParallelTo(updatedAxis)) return a.alignWith(updatedAxis);
-        return a;
-      }).toList();
-      _updateProjectGridAxes(axes);
-      setState(() {
-        _selectedGridAxis = _findProjectAxis(updatedAxis);
-      });
+      _previewAxisHandle(event.localPosition);
       return;
     }
 
@@ -4541,9 +4494,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
     // 0. Dragging grid axis handle commit on release
     if (_isDraggingAxisHandle) {
-      setState(() {
-        _isDraggingAxisHandle = false;
-      });
+      _finishAxisGesture(event.localPosition);
       HapticFeedback.lightImpact();
       return;
     }
@@ -4885,6 +4836,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
+    _cancelAxisGesture();
     if (_duplicateDraft != null) _cancelDuplicateDrag();
     _activePointersCount = 0;
     _activePointerKind = null;
@@ -4916,6 +4868,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleLongPressStart(LongPressStartDetails details) {
+    if (_isDraggingAxisHandle) return;
     if (_duplicateDraft != null || _placementPointerHandled) return;
     if (_activeTool == StructuralDrawTool.measure) return;
     if (_activePointerKind == PointerDeviceKind.mouse) return;
@@ -4951,12 +4904,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_activeTool == StructuralDrawTool.gridAxis || _activeTool == StructuralDrawTool.select) {
       final axisHandle = _hitTestGridAxisHandle(details.localPosition);
       if (axisHandle != null) {
-        _pushUndo();
         HapticFeedback.heavyImpact();
         setState(() {
-          _selectedGridAxis = axisHandle.$1;
-          _isDraggingAxisHandle = true;
-          _draggingAxisStart = axisHandle.$2;
+          _beginAxisHandle(axisHandle.$1, axisHandle.$2);
           _selectedColumn = null;
           _selectedShearWall = null;
           _selectedBeam = null;
@@ -4969,7 +4919,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (hitAxis != null) {
         HapticFeedback.heavyImpact();
         setState(() {
-          _selectedGridAxis = hitAxis;
+          _beginAxisMove(hitAxis, details.localPosition);
           _selectedColumn = null;
           _selectedShearWall = null;
           _selectedBeam = null;
@@ -5132,20 +5082,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_activeTool == StructuralDrawTool.measure) return;
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isDraggingAxisHandle && _selectedGridAxis != null) {
-      final cadPt = _screenToCad(details.localPosition);
-      final proj = _selectedGridAxis!.projectPoint(cadPt);
-      final updatedAxis = _draggingAxisStart
-          ? _selectedGridAxis!.copyWith(start: proj)
-          : _selectedGridAxis!.copyWith(end: proj);
-      final axes = _project.effectiveGridAxes.map((a) {
-        if (a.id == updatedAxis.id) return updatedAxis;
-        if (a.isParallelTo(updatedAxis)) return a.alignWith(updatedAxis);
-        return a;
-      }).toList();
-      _updateProjectGridAxes(axes);
-      setState(() {
-        _selectedGridAxis = _findProjectAxis(updatedAxis);
-      });
+      _previewAxisHandle(details.localPosition);
       return;
     }
     if (_draggingSlabVertexIndex != null && _editingSlab != null) {
@@ -7014,6 +6951,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _selectTool(StructuralDrawTool tool) {
+    _cancelAxisGesture();
     if (_duplicateDraft != null) _cancelDuplicateDrag();
     if (_isEditingSlab) _cancelSlabCorrection();
     setState(() {
@@ -7771,7 +7709,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             Positioned.fill(
                               child: CustomPaint(
                                 painter: Structural2dPainter(
-                                  currentStorey: _withDuplicate(_project.activeStorey),
+                                  currentStorey: _withDuplicate((_axisPreviewProject ?? _project).activeStorey),
                                   showSlabs: _showBimSlabs,
                                   showFloorSlabs: widget.bimContext == null || _isEditingSlab,
                                   showGridAxes: _showBimAxes,
@@ -7843,7 +7781,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                                   selectedShearWallId: _selectedShearWall?.id,
                                   selectedBeamId: _selectedBeam?.id,
                                   selectedGridAxisId: _selectedGridAxis?.id,
-                                  gridAxisStoreys: _project.storeys,
+                                  gridAxisStoreys: (_axisPreviewProject ?? _project).storeys,
                                   axisOffsetPreview: _getAxisOffsetPreview(),
                                   columnOffsetPreview: _getColumnOffsetPreview(),
                                   firstWallEdgeStartCad: _firstWallEdgeStartCad,
