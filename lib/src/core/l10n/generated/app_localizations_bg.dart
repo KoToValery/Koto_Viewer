@@ -4440,4 +4440,31 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectFenestrationWithCasing => 'С обрамчване';
+
+  @override
+  String get architectRadialMove => 'Местене';
+
+  @override
+  String get architectRadialEdit => 'Редакция';
+
+  @override
+  String get architectRadialDelete => 'Изтриване';
+
+  @override
+  String get architectRadialDuplicate => 'Дублирай';
+
+  @override
+  String get architectRadialRotate => 'Завърти';
+
+  @override
+  String get architectRadialFlip => 'Обърни';
+
+  @override
+  String get architectRadialProperties => 'Свойства';
+
+  @override
+  String get architectRadialSplit => 'Раздели';
+
+  @override
+  String get architectRadialOffset => 'Офсет';
 }

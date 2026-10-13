@@ -1435,5 +1435,14 @@
   "architectFenestrationCasingColor": "Цвят на обрамчването",
   "architectFenestrationMountingPlane": "Монтажна равнина",
   "architectFenestrationMountingPlaneHelp": "В средата на тухления зид с фасадни обрамчвания",
-  "architectFenestrationWithCasing": "С обрамчване"
+  "architectFenestrationWithCasing": "С обрамчване",
+  "architectRadialMove": "Местене",
+  "architectRadialEdit": "Редакция",
+  "architectRadialDelete": "Изтриване",
+  "architectRadialDuplicate": "Дублирай",
+  "architectRadialRotate": "Завърти",
+  "architectRadialFlip": "Обърни",
+  "architectRadialProperties": "Свойства",
+  "architectRadialSplit": "Раздели",
+  "architectRadialOffset": "Офсет"
 }

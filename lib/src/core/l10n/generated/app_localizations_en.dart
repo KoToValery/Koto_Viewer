@@ -4424,4 +4424,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectFenestrationWithCasing => 'With casing';
+
+  @override
+  String get architectRadialMove => 'Move';
+
+  @override
+  String get architectRadialEdit => 'Edit';
+
+  @override
+  String get architectRadialDelete => 'Delete';
+
+  @override
+  String get architectRadialDuplicate => 'Duplicate';
+
+  @override
+  String get architectRadialRotate => 'Rotate';
+
+  @override
+  String get architectRadialFlip => 'Flip';
+
+  @override
+  String get architectRadialProperties => 'Properties';
+
+  @override
+  String get architectRadialSplit => 'Split';
+
+  @override
+  String get architectRadialOffset => 'Offset';
 }

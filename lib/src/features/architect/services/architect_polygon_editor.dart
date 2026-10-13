@@ -1,8 +1,10 @@
+// === SECTION: ARCHITECT POLYGON CONTROLLER & OFFSET HANDLES ===
 import 'dart:ui';
 import '../rendering/architect_snap_helper.dart';
 import 'architect_polygon_geometry.dart';
 
-/// One gesture controller for rectangles and slabs. Model commands own Undo.
+/// Gesture controller for contours, rectangles, and volumetric slabs.
+/// Supports direct handles and ergonomic offset leader handles (изнесена линия с точка).
 class ArchitectPolygonEditor {
   String? elementId;
   List<Offset>? original, preview;
@@ -10,40 +12,152 @@ class ArchitectPolygonEditor {
   bool edge = false, invalid = false;
   ArchitectSnapResult? activeSnap;
   Offset grabOffset = Offset.zero;
+
+  // Offset handle leader state
+  bool isOffsetHandle = false;
+  Offset? leaderOrigin;
+  Offset? leaderTarget;
+
   bool get active => elementId != null;
+
+  /// Live leader line connecting the actual moving contour point
+  /// to the offset handle under the user's finger.
+  (Offset, Offset)? get leaderLine {
+    if (!active || preview == null || index == null || !isOffsetHandle) {
+      return null;
+    }
+    final i = index!;
+    if (i < 0 || i >= preview!.length) return null;
+    final moving = edge
+        ? (preview![i] + preview![(i + 1) % preview!.length]) / 2
+        : preview![i];
+    return leaderTarget != null ? (moving, leaderTarget!) : null;
+  }
+
+  static Offset vertexNormal(List<Offset> polygon, int i) {
+    final len = polygon.length;
+    final prev = ArchitectPolygonGeometry.normal(polygon, (i - 1 + len) % len);
+    final curr = ArchitectPolygonGeometry.normal(polygon, i);
+    final bisector = prev + curr;
+    if (bisector.distance > 1e-6) {
+      return bisector / bisector.distance;
+    }
+    return curr;
+  }
+
+  static Offset offsetVertexHandle(List<Offset> polygon, int i, double scale) {
+    final clearance = 30.0 / scale;
+    return polygon[i] + vertexNormal(polygon, i) * clearance;
+  }
+
+  static Offset offsetEdgeHandle(List<Offset> polygon, int i, double scale) {
+    final clearance = 30.0 / scale;
+    final mid = (polygon[i] + polygon[(i + 1) % polygon.length]) / 2;
+    return mid + ArchitectPolygonGeometry.normal(polygon, i) * clearance;
+  }
 
   bool start(String id, List<Offset> polygon, Offset raw, double scale) {
     if (!ArchitectPolygonGeometry.valid(polygon)) return false;
-    final radius = 16 / scale;
+    final directRadius = 18.0 / scale;
+    final offsetRadius = 24.0 / scale;
+    final proximityRadius = 48.0 / scale;
+
     int? hit;
-    var best = radius;
+    var best = directRadius;
+    var hitIsEdge = false;
+    var hitIsOffset = false;
+    Offset? chosenHandle;
+
+    // 1. Direct vertex check
     for (var i = 0; i < polygon.length; i++) {
       final d = (raw - polygon[i]).distance;
       if (d < best) {
         hit = i;
         best = d;
+        hitIsEdge = false;
+        hitIsOffset = false;
+        chosenHandle = polygon[i];
       }
     }
-    edge = false;
-    // Closest handle wins even on short segments with overlapping touch areas.
+
+    // 2. Direct edge midpoint check
     for (var i = 0; i < polygon.length; i++) {
       final p = (polygon[i] + polygon[(i + 1) % polygon.length]) / 2;
       final d = (raw - p).distance;
       if (d < best - 1e-9) {
         hit = i;
         best = d;
-        edge = true;
+        hitIsEdge = true;
+        hitIsOffset = false;
+        chosenHandle = p;
       }
     }
-    if (hit == null) return false;
+
+    // 3. Offset vertex handle check (outward leader handles)
+    for (var i = 0; i < polygon.length; i++) {
+      final h = offsetVertexHandle(polygon, i, scale);
+      final d = (raw - h).distance;
+      if (d < offsetRadius && d < best) {
+        hit = i;
+        best = d;
+        hitIsEdge = false;
+        hitIsOffset = true;
+        chosenHandle = h;
+      }
+    }
+
+    // 4. Offset edge midpoint handle check (outward edge pull handles)
+    for (var i = 0; i < polygon.length; i++) {
+      final h = offsetEdgeHandle(polygon, i, scale);
+      final d = (raw - h).distance;
+      if (d < offsetRadius && d < best) {
+        hit = i;
+        best = d;
+        hitIsEdge = true;
+        hitIsOffset = true;
+        chosenHandle = h;
+      }
+    }
+
+    // 5. Proximity outside tap fallback (tap near contour to activate closest handle)
+    if (hit == null) {
+      var proximityBest = proximityRadius;
+      for (var i = 0; i < polygon.length; i++) {
+        final hv = offsetVertexHandle(polygon, i, scale);
+        final dv = (raw - hv).distance;
+        if (dv < proximityBest) {
+          hit = i;
+          proximityBest = dv;
+          hitIsEdge = false;
+          hitIsOffset = true;
+          chosenHandle = hv;
+        }
+
+        final he = offsetEdgeHandle(polygon, i, scale);
+        final de = (raw - he).distance;
+        if (de < proximityBest) {
+          hit = i;
+          proximityBest = de;
+          hitIsEdge = true;
+          hitIsOffset = true;
+          chosenHandle = he;
+        }
+      }
+    }
+
+    if (hit == null || chosenHandle == null) return false;
+
     elementId = id;
     original = List.of(polygon);
     preview = List.of(polygon);
     index = hit;
-    final handle = edge
+    edge = hitIsEdge;
+    isOffsetHandle = hitIsOffset;
+    grabOffset = chosenHandle - raw;
+    leaderOrigin = edge
         ? (polygon[hit] + polygon[(hit + 1) % polygon.length]) / 2
         : polygon[hit];
-    grabOffset = handle - raw;
+    leaderTarget = raw + grabOffset;
     invalid = false;
     return true;
   }
@@ -55,6 +169,7 @@ class ArchitectPolygonEditor {
   ) {
     if (!active) return;
     final polygon = original!, i = index!, target = raw + grabOffset;
+    leaderTarget = target;
     List<Offset>? next;
     if (edge) {
       final n = ArchitectPolygonGeometry.normal(polygon, i);
@@ -62,7 +177,6 @@ class ArchitectPolygonEditor {
       final distance = ArchitectPolygonGeometry.dot(target - midpoint, n);
       var correctionDistance = 0.0;
       activeSnap = null;
-      // Align either moving endpoint or midpoint, while preserving the edge direction.
       var best = double.infinity;
       for (final p in [
         polygon[i],
@@ -111,5 +225,8 @@ class ArchitectPolygonEditor {
     index = null;
     invalid = false;
     activeSnap = null;
+    isOffsetHandle = false;
+    leaderOrigin = null;
+    leaderTarget = null;
   }
 }

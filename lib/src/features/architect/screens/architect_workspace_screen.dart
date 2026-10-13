@@ -38,6 +38,7 @@ import '../services/architect_wall_relations.dart';
 import '../rendering/architect_dimension_layout.dart';
 import '../rendering/architect_wall_network.dart';
 import '../widgets/architect_element_properties_dialog.dart';
+import '../widgets/architect_radial_menu.dart';
 import '../services/architect_grid_axis_tool.dart';
 import '../services/architect_logger.dart';
 import '../services/architect_zone_tool.dart';
@@ -257,6 +258,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   CadPrimitiveType? _pendingShape;
   Offset? _shapePanelAnchor;
   final _polygonEditor = ArchitectPolygonEditor();
+  Offset? _radialMenuScreenPosition;
+  String? _radialMenuElementId;
+  List<ArchitectRadialMenuItem> _radialMenuItems = [];
   bool _wallDirectionLocked = false;
   Offset? _wallPanelAnchor;
   WallReferenceLine _wallReference = WallReferenceLine.center;
@@ -541,6 +545,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // === SECTION: 2D POINTER & TOUCH HANDLING (TOOL INPUT FROM ARCHITECT VIEWPORT) ===
 
   void _onPointerDown(PointerDownEvent event) {
+    if (_radialMenuScreenPosition != null) {
+      setState(() => _radialMenuScreenPosition = null);
+    }
     _touchInput = event.kind == PointerDeviceKind.touch;
     _handlePointerDown = event.localPosition;
     _handleMoved = false;
@@ -586,7 +593,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final polygon = _selectedPolygon;
     if (polygon != null &&
         _polygonEditor.start(
-          _selectedElementId!,
+          (_selectedElementId ?? _selectedZoneId)!,
           polygon,
           rawModel,
           _currentScale,
@@ -894,17 +901,18 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   List<Offset>? get _selectedPolygon {
-    if (_activeTool == ArchitectTool.cadRect) {
-      for (final p in _project.activeStorey.cadPrimitives) {
-        if (p.id == _selectedElementId && p.type == CadPrimitiveType.rect) {
-          return p.polygonCorners;
-        }
+    final id = _selectedElementId ?? _selectedZoneId;
+    if (id == null) return null;
+    for (final p in _project.activeStorey.cadPrimitives) {
+      if (p.id == id && p.type == CadPrimitiveType.rect) {
+        return p.polygonCorners;
       }
     }
-    if (_activeTool == ArchitectTool.slab) {
-      for (final slab in _project.activeStorey.slabs) {
-        if (slab.id == _selectedElementId) return slab.polygon;
-      }
+    for (final slab in _project.activeStorey.slabs) {
+      if (slab.id == id) return slab.polygon;
+    }
+    for (final zone in _project.activeStorey.zones) {
+      if (zone.id == id) return zone.polygon;
     }
     return null;
   }
@@ -1279,6 +1287,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _cancelActiveDrags() {
     _polygonEditor.cancel();
+    _radialMenuScreenPosition = null;
     _controlTrimClick = false;
     _groupDragIds = {};
     _placingWithHold = false;
@@ -2369,7 +2378,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         borderRadius: BorderRadius.circular(6),
                         child: InkWell(
                           key: ValueKey('wall-clearance-${gap.neighborId}'),
-                          onTap: () => _editWallClearance(gap),
+                          onTap: () {
+                            setState(() => _radialMenuScreenPosition = null);
+                            _editWallClearance(gap);
+                          },
                           child: Center(
                             child: Text(
                               _project.units.format(gap.distance, decimals: 3),
@@ -2612,7 +2624,329 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _elementTool.slabDraftPoints.isNotEmpty) {
       return false;
     }
-    return _selectAt(_screenToModel(screenPoint));
+    final ok = _selectAt(_screenToModel(screenPoint));
+    if (ok) {
+      final id = _selectedElementId ?? _selectedZoneId;
+      if (id != null) {
+        setState(() {
+          _radialMenuScreenPosition = screenPoint;
+          _radialMenuElementId = id;
+          _radialMenuItems = _buildRadialMenuItems(id);
+        });
+      }
+    }
+    return ok;
+  }
+
+  List<ArchitectRadialMenuItem> _buildRadialMenuItems(String elementId) {
+    final l10n = context.l10n;
+    final items = <ArchitectRadialMenuItem>[];
+
+    final storey = _project.activeStorey;
+    final isCol = storey.columns.any((c) => c.id == elementId);
+    final isWall = storey.walls.any((w) => w.id == elementId);
+    final isDoor = storey.walls.any(
+      (w) => w.doors.any((d) => d.id == elementId),
+    );
+    final isWindow = storey.walls.any(
+      (w) => w.windows.any((win) => win.id == elementId),
+    );
+    final isSlab = storey.slabs.any((s) => s.id == elementId);
+    final isCadPrim = storey.cadPrimitives.any((c) => c.id == elementId);
+    final isZone = storey.zones.any((z) => z.id == elementId);
+    final isAxis = _project.gridAxes.any((a) => a.id == elementId);
+
+    if (isCol) {
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.move,
+          icon: Icons.open_with,
+          label: l10n.architectRadialMove,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.rotate,
+          icon: Icons.rotate_right,
+          label: l10n.architectRadialRotate,
+          color: const Color(0xFF40C4FF),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.duplicate,
+          icon: Icons.copy_all,
+          label: l10n.architectRadialDuplicate,
+          color: const Color(0xFF64FFDA),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.properties,
+          icon: Icons.tune,
+          label: l10n.architectRadialProperties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
+    } else if (isWall) {
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.edit,
+          icon: Icons.edit_outlined,
+          label: l10n.architectRadialEdit,
+          color: const Color(0xFF00E5FF),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.move,
+          icon: Icons.open_with,
+          label: l10n.architectRadialMove,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.split,
+          icon: Icons.content_cut,
+          label: l10n.architectRadialSplit,
+          color: const Color(0xFFFF9100),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.flip,
+          icon: Icons.flip,
+          label: l10n.architectRadialFlip,
+          color: const Color(0xFF40C4FF),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.properties,
+          icon: Icons.tune,
+          label: l10n.architectRadialProperties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
+    } else if (isDoor || isWindow) {
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.move,
+          icon: Icons.open_with,
+          label: l10n.architectRadialMove,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      if (isDoor) {
+        items.add(
+          ArchitectRadialMenuItem(
+            action: ArchitectRadialAction.flip,
+            icon: Icons.flip,
+            label: l10n.architectRadialFlip,
+            color: const Color(0xFF40C4FF),
+          ),
+        );
+      }
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.properties,
+          icon: Icons.tune,
+          label: l10n.architectRadialProperties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
+    } else if (isSlab || isCadPrim || isZone) {
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.edit,
+          icon: Icons.edit_outlined,
+          label: l10n.architectRadialEdit,
+          color: const Color(0xFF00E5FF),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.move,
+          icon: Icons.open_with,
+          label: l10n.architectRadialMove,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.duplicate,
+          icon: Icons.copy_all,
+          label: l10n.architectRadialDuplicate,
+          color: const Color(0xFF64FFDA),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.properties,
+          icon: Icons.tune,
+          label: l10n.architectRadialProperties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
+    } else if (isAxis) {
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.move,
+          icon: Icons.open_with,
+          label: l10n.architectRadialMove,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.properties,
+          icon: Icons.tune,
+          label: l10n.architectRadialProperties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
+    } else {
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.move,
+          icon: Icons.open_with,
+          label: l10n.architectRadialMove,
+          color: const Color(0xFFFFB300),
+        ),
+      );
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.properties,
+          icon: Icons.tune,
+          label: l10n.architectRadialProperties,
+          color: const Color(0xFFB388FF),
+        ),
+      );
+    }
+
+    items.add(
+      ArchitectRadialMenuItem(
+        action: ArchitectRadialAction.delete,
+        icon: Icons.delete_outline,
+        label: l10n.architectRadialDelete,
+        color: const Color(0xFFFF5252),
+      ),
+    );
+
+    return items;
+  }
+
+  void _handleRadialAction(ArchitectRadialAction action) {
+    final id = _radialMenuElementId;
+    setState(() {
+      _radialMenuScreenPosition = null;
+      _radialMenuElementId = null;
+    });
+    if (id == null) return;
+
+    switch (action) {
+      case ArchitectRadialAction.edit:
+        final polygon = _selectedPolygon;
+        if (polygon != null) {
+          _polygonEditor.start(
+            id,
+            polygon,
+            polygon.first,
+            _currentScale,
+          );
+          _repaintPreview();
+        } else if (_selectedWall != null) {
+          _wallEndpointOriginal = _selectedWall;
+          _wallDragStart = false;
+        }
+        break;
+
+      case ArchitectRadialAction.move:
+        setState(() {
+          _moveSelection = true;
+        });
+        break;
+
+      case ArchitectRadialAction.duplicate:
+        final (nextStorey, newId) = _elementTool.duplicateElementById(
+          _project.activeStorey,
+          id,
+        );
+        if (newId != null) {
+          _commands.commit(_project.updateActiveStorey(nextStorey));
+          _saveBiMProjectIfAttached();
+          setState(() {
+            _selectedElementId = newId;
+            _selectedZoneId = null;
+          });
+          HapticFeedback.mediumImpact();
+        }
+        break;
+
+      case ArchitectRadialAction.rotate:
+        final nextStorey = _elementTool.rotateElementById(
+          _project.activeStorey,
+          id,
+        );
+        _commands.commit(_project.updateActiveStorey(nextStorey));
+        _saveBiMProjectIfAttached();
+        HapticFeedback.mediumImpact();
+        break;
+
+      case ArchitectRadialAction.flip:
+        final nextStorey = _elementTool.flipElementById(
+          _project.activeStorey,
+          id,
+        );
+        _commands.commit(_project.updateActiveStorey(nextStorey));
+        _saveBiMProjectIfAttached();
+        HapticFeedback.mediumImpact();
+        break;
+
+      case ArchitectRadialAction.split:
+        setState(() {
+          _wallCutStroke = true;
+          _wallCutIds = {id};
+          _wallCutStart = null;
+        });
+        break;
+
+      case ArchitectRadialAction.properties:
+        _showProperties();
+        break;
+
+      case ArchitectRadialAction.delete:
+        var storey = _project.activeStorey;
+        storey = _elementTool.deleteElementById(storey, id);
+        _commands.commit(
+          _project
+              .updateActiveStorey(
+                storey.copyWith(
+                  zones: storey.zones.where((z) => z.id != id).toList(),
+                ),
+              )
+              .copyWithGridAxes(
+                _project.gridAxes.where((a) => a.id != id).toList(),
+              ),
+        );
+        _saveBiMProjectIfAttached();
+        setState(() {
+          _selectedElementId = null;
+          _selectedZoneId = null;
+          _selectionIds.remove(id);
+        });
+        HapticFeedback.heavyImpact();
+        break;
+
+      case ArchitectRadialAction.offset:
+        final axis = _project.gridAxes.where((a) => a.id == id).firstOrNull;
+        if (axis != null) {
+          _handleAxisOffset(axis);
+        }
+        break;
+    }
   }
 
   bool _selectAt(Offset point) {
@@ -2728,6 +3062,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 color: _multiSelect ? Colors.amber : Colors.white70,
               ),
               onPressed: () => setState(() {
+                _radialMenuScreenPosition = null;
                 if (!_multiSelect) {
                   _selectionIds
                     ..clear()
@@ -2749,7 +3084,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 Icons.open_with,
                 color: _moveSelection ? Colors.amber : Colors.white70,
               ),
-              onPressed: () => setState(() => _moveSelection = !_moveSelection),
+              onPressed: () => setState(() {
+                _radialMenuScreenPosition = null;
+                _moveSelection = !_moveSelection;
+              }),
             ),
             IconButton(
               constraints: const BoxConstraints.tightFor(width: 40, height: 44),
@@ -2757,7 +3095,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               key: const ValueKey('architect-selection-properties'),
               tooltip: l.architectProperties,
               icon: const Icon(Icons.tune, color: Colors.white70),
-              onPressed: _showProperties,
+              onPressed: () {
+                setState(() => _radialMenuScreenPosition = null);
+                _showProperties();
+              },
             ),
             if (wallIds.isNotEmpty)
               IconButton(
@@ -3833,6 +4174,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ],
         ),
       ),
+      if (_radialMenuScreenPosition != null && _radialMenuItems.isNotEmpty)
+        Positioned.fill(
+          child: ArchitectRadialMenu(
+            center: _radialMenuScreenPosition!,
+            items: _radialMenuItems,
+            onActionSelected: _handleRadialAction,
+            onDismiss: () => setState(() => _radialMenuScreenPosition = null),
+          ),
+        ),
       _buildWallClearanceOverlay(),
       _buildShapeDimensionOverlay(),
       if (_activeTool != ArchitectTool.wall &&
@@ -4349,6 +4699,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         slabDraftPoints: _elementTool.slabDraftPoints,
         slabCandidatePoint: _elementTool.slabCandidatePoint,
         polygonEditInvalid: _polygonEditor.invalid,
+        polygonLeaderLine: _polygonEditor.leaderLine,
       );
 
   // === SECTION: 3D SOLID VIEWPORT ===

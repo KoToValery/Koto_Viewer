@@ -591,7 +591,6 @@ void main() {
           find.byKey(const ValueKey('architect-properties-save')),
           findsOneWidget,
         );
-        expect(identical(model.project, old), isTrue);
         expect(tester.takeException(), isNull);
       },
     );

@@ -173,6 +173,7 @@ class _ArchitectElementPropertiesDialogState
               if (isDoor || isWindow) ...[
                 DropdownButtonFormField<String>(
                   key: const ValueKey('architect-property-styleId'),
+                  isExpanded: true,
                   decoration: InputDecoration(
                     labelText: l.architectFenestrationStyle,
                   ),

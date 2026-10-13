@@ -7774,6 +7774,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'With casing'**
   String get architectFenestrationWithCasing;
+
+  /// Radial menu move action
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get architectRadialMove;
+
+  /// Radial menu edit action
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get architectRadialEdit;
+
+  /// Radial menu delete action
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get architectRadialDelete;
+
+  /// Radial menu duplicate action
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get architectRadialDuplicate;
+
+  /// Radial menu rotate action
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate'**
+  String get architectRadialRotate;
+
+  /// Radial menu flip action
+  ///
+  /// In en, this message translates to:
+  /// **'Flip'**
+  String get architectRadialFlip;
+
+  /// Radial menu properties action
+  ///
+  /// In en, this message translates to:
+  /// **'Properties'**
+  String get architectRadialProperties;
+
+  /// Radial menu split action
+  ///
+  /// In en, this message translates to:
+  /// **'Split'**
+  String get architectRadialSplit;
+
+  /// Radial menu offset action
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get architectRadialOffset;
 }
 
 class _AppLocalizationsDelegate

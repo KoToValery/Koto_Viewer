@@ -122,6 +122,7 @@ class Architect2dPainter extends CustomPainter {
   final List<Offset> slabDraftPoints;
   final Offset? slabCandidatePoint;
   final bool polygonEditInvalid;
+  final (Offset, Offset)? polygonLeaderLine;
 
   Architect2dPainter({
     required ArchitectProject project,
@@ -185,6 +186,7 @@ class Architect2dPainter extends CustomPainter {
     this.slabDraftPoints = const [],
     this.slabCandidatePoint,
     this.polygonEditInvalid = false,
+    this.polygonLeaderLine,
   }) : _project = project,
        _zoomScale = zoomScale,
        super(repaint: viewport);
@@ -421,6 +423,7 @@ class Architect2dPainter extends CustomPainter {
       unit: _project.units,
       handles: true,
       invalid: polygonEditInvalid,
+      leaderLine: polygonLeaderLine,
       obstacles:
           dimensionWallObstacles ??
           ArchitectWallNetwork.body(_project.activeStorey.walls),
@@ -882,6 +885,7 @@ class Architect2dPainter extends CustomPainter {
       selectedZoneId != oldDelegate.selectedZoneId ||
       selectedAxisId != oldDelegate.selectedAxisId ||
       selectedElementId != oldDelegate.selectedElementId ||
+      polygonLeaderLine != oldDelegate.polygonLeaderLine ||
       _zoomScale != oldDelegate._zoomScale ||
       underlayDoc != oldDelegate.underlayDoc;
 }

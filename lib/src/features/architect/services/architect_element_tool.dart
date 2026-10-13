@@ -4,8 +4,10 @@ import 'architect_element_id.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
+import '../models/architect_door.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_window.dart';
+import '../models/architect_zone.dart';
 import '../models/architect_fenestration_style.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 
@@ -596,6 +598,187 @@ class ArchitectElementTool extends ChangeNotifier {
           .where((c) => c.id != elementId)
           .toList(),
     );
+  }
+
+  // ===========================================================================
+  // 14. ELEMENT TRANSFORMS (DUPLICATE, ROTATE, FLIP)
+  // ===========================================================================
+
+  (ArchitectStorey, String?) duplicateElementById(
+    ArchitectStorey storey,
+    String elementId, {
+    Offset offset = const Offset(0.5, 0.5),
+  }) {
+    final timestamp = DateTime.now().millisecondsSinceEpoch % 1000000;
+    final newId = '${elementId}_c$timestamp';
+
+    // 1. Column
+    final colIndex = storey.columns.indexWhere((c) => c.id == elementId);
+    if (colIndex != -1) {
+      final col = storey.columns[colIndex];
+      final newCol = col.copyWith(id: newId, position: col.position + offset);
+      return (storey.copyWith(columns: [...storey.columns, newCol]), newId);
+    }
+
+    // 2. Wall
+    final wallIndex = storey.walls.indexWhere((w) => w.id == elementId);
+    if (wallIndex != -1) {
+      final wall = storey.walls[wallIndex];
+      final newWall = wall.copyWith(
+        id: newId,
+        startPoint: wall.startPoint + offset,
+        endPoint: wall.endPoint + offset,
+        doors: [],
+        windows: [],
+      );
+      return (storey.copyWith(walls: [...storey.walls, newWall]), newId);
+    }
+
+    // 3. Slab
+    final slabIndex = storey.slabs.indexWhere((s) => s.id == elementId);
+    if (slabIndex != -1) {
+      final slab = storey.slabs[slabIndex];
+      final newSlab = slab.copyWith(
+        id: newId,
+        polygon: slab.polygon.map((p) => p + offset).toList(),
+      );
+      return (storey.copyWith(slabs: [...storey.slabs, newSlab]), newId);
+    }
+
+    // 4. CAD Primitive
+    final cadIndex = storey.cadPrimitives.indexWhere((c) => c.id == elementId);
+    if (cadIndex != -1) {
+      final prim = storey.cadPrimitives[cadIndex];
+      final newPrim = prim.copyWith(
+        id: newId,
+        startPoint: prim.startPoint + offset,
+        endPoint: prim.endPoint + offset,
+      );
+      return (
+        storey.copyWith(cadPrimitives: [...storey.cadPrimitives, newPrim]),
+        newId,
+      );
+    }
+
+    // 5. Zone
+    final zoneIndex = storey.zones.indexWhere((z) => z.id == elementId);
+    if (zoneIndex != -1) {
+      final zone = storey.zones[zoneIndex];
+      final newZone = zone.copyWith(
+        id: newId,
+        polygon: zone.polygon.map((p) => p + offset).toList(),
+      );
+      return (storey.copyWith(zones: [...storey.zones, newZone]), newId);
+    }
+
+    // 6. Beam
+    final beamIndex = storey.beams.indexWhere((b) => b.id == elementId);
+    if (beamIndex != -1) {
+      final beam = storey.beams[beamIndex];
+      final newBeam = beam.copyWith(
+        id: newId,
+        startPoint: beam.startPoint + offset,
+        endPoint: beam.endPoint + offset,
+      );
+      return (storey.copyWith(beams: [...storey.beams, newBeam]), newId);
+    }
+
+    return (storey, null);
+  }
+
+  ArchitectStorey rotateElementById(ArchitectStorey storey, String elementId) {
+    // 1. Column (rotate 90 degrees)
+    final colIndex = storey.columns.indexWhere((c) => c.id == elementId);
+    if (colIndex != -1) {
+      final col = storey.columns[colIndex];
+      final newCols = List<ArchitectColumn>.from(storey.columns);
+      newCols[colIndex] = col.copyWith(
+        width: col.depth,
+        depth: col.width,
+        rotationDeg: (col.rotationDeg + 90) % 360,
+      );
+      return storey.copyWith(columns: newCols);
+    }
+
+    // 2. Wall (rotate 90 degrees around center)
+    final wallIndex = storey.walls.indexWhere((w) => w.id == elementId);
+    if (wallIndex != -1) {
+      final wall = storey.walls[wallIndex];
+      final mid = (wall.startPoint + wall.endPoint) / 2;
+      final delta = wall.endPoint - wall.startPoint;
+      final perp = Offset(-delta.dy, delta.dx) / 2;
+      final newWalls = List<ArchitectWall>.from(storey.walls);
+      newWalls[wallIndex] = wall.copyWith(
+        startPoint: mid - perp,
+        endPoint: mid + perp,
+      );
+      return storey.copyWith(walls: newWalls);
+    }
+
+    // 3. Slab (rotate 90 degrees around centroid)
+    final slabIndex = storey.slabs.indexWhere((s) => s.id == elementId);
+    if (slabIndex != -1) {
+      final slab = storey.slabs[slabIndex];
+      if (slab.polygon.isNotEmpty) {
+        final center =
+            slab.polygon.reduce((a, b) => a + b) /
+            slab.polygon.length.toDouble();
+        final rotatedPoly = slab.polygon.map((p) {
+          final rel = p - center;
+          return center + Offset(-rel.dy, rel.dx);
+        }).toList();
+        final newSlabs = List<ArchitectSlab>.from(storey.slabs);
+        newSlabs[slabIndex] = slab.copyWith(polygon: rotatedPoly);
+        return storey.copyWith(slabs: newSlabs);
+      }
+    }
+
+    // 4. CAD Primitive
+    final cadIndex = storey.cadPrimitives.indexWhere((c) => c.id == elementId);
+    if (cadIndex != -1) {
+      final prim = storey.cadPrimitives[cadIndex];
+      final mid = (prim.startPoint + prim.endPoint) / 2;
+      final delta = prim.endPoint - prim.startPoint;
+      final perp = Offset(-delta.dy, delta.dx) / 2;
+      final newCad = List<ArchitectCadPrimitive>.from(storey.cadPrimitives);
+      newCad[cadIndex] = prim.copyWith(
+        startPoint: mid - perp,
+        endPoint: mid + perp,
+      );
+      return storey.copyWith(cadPrimitives: newCad);
+    }
+
+    return storey;
+  }
+
+  ArchitectStorey flipElementById(ArchitectStorey storey, String elementId) {
+    // 1. Door
+    for (var w = 0; w < storey.walls.length; w++) {
+      final wall = storey.walls[w];
+      final dIdx = wall.doors.indexWhere((d) => d.id == elementId);
+      if (dIdx != -1) {
+        final door = wall.doors[dIdx];
+        final newDoors = List<ArchitectDoor>.from(wall.doors);
+        newDoors[dIdx] = door.copyWith(isHingeLeft: !door.isHingeLeft);
+        final newWalls = List<ArchitectWall>.from(storey.walls);
+        newWalls[w] = wall.copyWith(doors: newDoors);
+        return storey.copyWith(walls: newWalls);
+      }
+    }
+
+    // 2. Wall
+    final wallIndex = storey.walls.indexWhere((w) => w.id == elementId);
+    if (wallIndex != -1) {
+      final wall = storey.walls[wallIndex];
+      final newWalls = List<ArchitectWall>.from(storey.walls);
+      newWalls[wallIndex] = wall.copyWith(
+        startPoint: wall.endPoint,
+        endPoint: wall.startPoint,
+      );
+      return storey.copyWith(walls: newWalls);
+    }
+
+    return storey;
   }
 
   // ===========================================================================

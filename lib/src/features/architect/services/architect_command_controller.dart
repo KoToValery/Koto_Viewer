@@ -1012,7 +1012,8 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
     final rect = floor.cadPrimitives.any(
       (s) => s.id == elementId && s.type == CadPrimitiveType.rect,
     );
-    if (!slab && !rect) throw ArgumentError('Unknown polygon element');
+    final zone = floor.zones.any((z) => z.id == elementId);
+    if (!slab && !rect && !zone) throw ArgumentError('Unknown polygon element');
     final points = List<Offset>.unmodifiable(polygon);
     final bounds = ArchitectSceneGeometry.boundsOf(points);
     return ArchitectModelCommand.replace(
@@ -1031,6 +1032,10 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
                     endPoint: bounds.bottomRight,
                   )
                 : p,
+        ],
+        zones: [
+          for (final z in floor.zones)
+            z.id == elementId ? z.copyWith(polygon: points) : z,
         ],
       ),
     );
