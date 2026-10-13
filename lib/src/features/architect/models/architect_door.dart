@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
-
+import 'architect_fenestration_style.dart';
+import '../rendering/fenestration_3d_builder.dart';
+import '../services/fenestration_library_service.dart';
 
 /// Represents a hosted architectural door element adhering to the DXF standard.
 class ArchitectDoor {
@@ -19,6 +21,15 @@ class ArchitectDoor {
   final double openAngleDeg; // default 45.0° (half-open) or 90.0°
   final String specId; // Mark for schedule/table, e.g. "1" or "В1"
   final String uuid; // Unique persistent classifier identifier
+  final String? styleId;
+  final ArchitectFenestrationStyle? style;
+
+  /// Effective style from direct reference, or resolved from persistent library by [styleId].
+  ArchitectFenestrationStyle? get resolvedStyle =>
+      style ??
+      (styleId != null
+          ? FenestrationLibraryService.instance.getStyleById(styleId!)
+          : null);
 
   const ArchitectDoor({
     required this.id,
@@ -34,6 +45,8 @@ class ArchitectDoor {
     this.openAngleDeg = 45.0,
     this.specId = '1',
     required this.uuid,
+    this.styleId,
+    this.style,
   });
 
   /// Clear passage width between jamb frames in meters.
@@ -53,6 +66,8 @@ class ArchitectDoor {
     double? openAngleDeg,
     String? specId,
     String? uuid,
+    String? styleId,
+    ArchitectFenestrationStyle? style,
   }) =>
       ArchitectDoor(
         id: id ?? this.id,
@@ -68,6 +83,8 @@ class ArchitectDoor {
         openAngleDeg: openAngleDeg ?? this.openAngleDeg,
         specId: specId ?? this.specId,
         uuid: uuid ?? this.uuid,
+        styleId: styleId ?? this.styleId,
+        style: style ?? this.style,
       );
 
   Map<String, dynamic> toJson() => {
@@ -84,6 +101,8 @@ class ArchitectDoor {
         'openAngleDeg': openAngleDeg,
         'specId': specId,
         'uuid': uuid,
+        if (styleId != null) 'styleId': styleId,
+        if (style != null) 'style': style!.toJson(),
       };
 
   factory ArchitectDoor.fromJson(Map<String, dynamic> json) => ArchitectDoor(
@@ -100,6 +119,11 @@ class ArchitectDoor {
         openAngleDeg: (json['openAngleDeg'] as num?)?.toDouble() ?? 45.0,
         specId: json['specId'] as String? ?? '1',
         uuid: json['uuid'] as String? ?? json['id'] as String,
+        styleId: json['styleId'] as String?,
+        style: json['style'] != null
+            ? ArchitectFenestrationStyle.fromJson(
+                json['style'] as Map<String, dynamic>)
+            : null,
       );
 
   // ===========================================================================
@@ -115,7 +139,30 @@ class ArchitectDoor {
     required double wallThickness,
     required double zoomScale,
     bool isSelected = false,
+    double coreThickness = 0.25,
+    double insulationThickness = 0.0,
+    double exteriorSign = 1.0,
   }) {
+    final effectiveStyle = resolvedStyle;
+    if (effectiveStyle != null) {
+      effectiveStyle.paintPlan2D(
+        canvas: canvas,
+        wallStart: wallStart,
+        wallEnd: wallEnd,
+        wallThickness: wallThickness,
+        coreThickness: coreThickness,
+        insulationThickness: insulationThickness,
+        exteriorSign: exteriorSign,
+        offsetRatio: offsetRatio,
+        elementWidth: width,
+        elementHeight: height,
+        elementSillHeight: sillHeight,
+        zoomScale: zoomScale,
+        isSelected: isSelected,
+      );
+      return;
+    }
+
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;
     if (wallLen < 1e-4) return;
@@ -309,7 +356,28 @@ class ArchitectDoor {
     required Offset wallEnd,
     required double wallThickness,
     required double storeyElevation,
+    double coreThickness = 0.25,
+    double insulationThickness = 0.0,
+    double exteriorSign = 1.0,
   }) {
+    final effectiveStyle = resolvedStyle;
+    if (effectiveStyle != null) {
+      return Fenestration3dBuilder.buildOpening3D(
+        style: effectiveStyle,
+        wallStart: wallStart,
+        wallEnd: wallEnd,
+        wallThickness: wallThickness,
+        coreThickness: coreThickness,
+        insulationThickness: insulationThickness,
+        exteriorSign: exteriorSign,
+        offsetRatio: offsetRatio,
+        width: width,
+        height: height,
+        sillHeight: sillHeight,
+        storeyElevation: storeyElevation,
+      );
+    }
+
     final List<Triangle3D> tris = [];
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;

@@ -4217,4 +4217,211 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectShapeHeight => 'Height';
+
+  @override
+  String get architectFenestrationEditor => 'Window & Door Designer';
+
+  @override
+  String get architectFenestrationCreateNew => 'Create New';
+
+  @override
+  String get architectFenestrationEditStyle => 'Edit Model';
+
+  @override
+  String get architectFenestrationStyle => 'Opening Model';
+
+  @override
+  String get architectFenestrationSave => 'Save to Library';
+
+  @override
+  String get architectFenestrationSaveSuccess => 'Model saved to library';
+
+  @override
+  String get architectFenestrationLibrary => 'Openings Library';
+
+  @override
+  String get architectFenestrationCasing => 'Trim / Casing';
+
+  @override
+  String get architectFenestrationCasingWidth => 'Casing Width';
+
+  @override
+  String get architectFenestrationCasingProjection => 'Casing Projection';
+
+  @override
+  String get architectFenestrationCasingPlacement => 'Casing Position';
+
+  @override
+  String get architectFenestrationCasingExterior => 'Exterior';
+
+  @override
+  String get architectFenestrationCasingInterior => 'Interior';
+
+  @override
+  String get architectFenestrationCasingBoth => 'Both Sides';
+
+  @override
+  String get architectFenestrationFrame5Chamber => '5-Chamber Frame (70 mm)';
+
+  @override
+  String get architectFenestrationFrameFaceWidth => 'Frame Face';
+
+  @override
+  String get architectFenestrationGlazingDouble => 'Double Glazing (24 mm)';
+
+  @override
+  String get architectFenestrationGlazingThickness => 'Glazing Thickness';
+
+  @override
+  String get architectFenestrationSplitH => 'Split Horizontally';
+
+  @override
+  String get architectFenestrationSplitV => 'Split Vertically';
+
+  @override
+  String get architectFenestrationRemoveSplit => 'Remove Split';
+
+  @override
+  String get architectFenestrationPaneType => 'Pane Type';
+
+  @override
+  String get architectFenestrationPaneFixed => 'Fixed Glazing';
+
+  @override
+  String get architectFenestrationPaneTurnLeft => 'Casement Left';
+
+  @override
+  String get architectFenestrationPaneTurnRight => 'Casement Right';
+
+  @override
+  String get architectFenestrationPaneTiltTurn => 'Tilt & Turn';
+
+  @override
+  String get architectFenestrationPaneTopHopper => 'Top Hopper';
+
+  @override
+  String get architectFenestrationPaneDoorLeaf => 'Door Leaf';
+
+  @override
+  String get architectFenestrationPaneSolidPanel => 'Solid Panel';
+
+  @override
+  String get architectFenestrationDimensions => 'Dimensions';
+
+  @override
+  String get architectFenestrationProfile => 'Profile & Glass';
+
+  @override
+  String get architectFenestrationDivisions => 'Raster & Panes';
+
+  @override
+  String get architectFenestrationPresets => 'Presets';
+
+  @override
+  String get architectFenestrationViewElevation => 'Elevation';
+
+  @override
+  String get architectFenestrationView3D => '3D View';
+
+  @override
+  String get architectFenestrationViewPlan => 'Plan (2D)';
+
+  @override
+  String get architectFenestrationIncludeBottomCasing =>
+      'Include Bottom Casing';
+
+  @override
+  String get architectFenestrationWallContextHelp =>
+      'Casing sits on exterior face of wall & insulation without cutting wall';
+
+  @override
+  String get architectFenestrationApplyToProject => 'Apply to Project';
+
+  @override
+  String get architectFenestrationCustom => 'Custom';
+
+  @override
+  String get architectFenestrationPreset => 'Standard Preset';
+
+  @override
+  String get architectFenestrationSelectStyle => 'Select Opening Model';
+
+  @override
+  String get architectFenestrationStep1 => '1. Frame & Grid';
+
+  @override
+  String get architectFenestrationStep2 => '2. Operability';
+
+  @override
+  String get architectFenestrationStep3 => '3. Infill & Muntins';
+
+  @override
+  String get architectFenestrationNextStep => 'Next Step';
+
+  @override
+  String get architectFenestrationPrevStep => 'Previous Step';
+
+  @override
+  String get architectFenestrationMuntins => 'Muntins / Glazing Bars';
+
+  @override
+  String get architectFenestrationMuntinCols => 'Vertical Muntins';
+
+  @override
+  String get architectFenestrationMuntinRows => 'Horizontal Muntins';
+
+  @override
+  String get architectFenestrationMuntinWidth => 'Muntin Width';
+
+  @override
+  String get architectFenestrationMuntinNone => 'No Muntins';
+
+  @override
+  String get architectFenestrationMuntinClassic => 'Classic 2x2';
+
+  @override
+  String get architectFenestrationMuntinVictorian => 'Georgian 2x3';
+
+  @override
+  String get architectFenestrationMuntinGrid3x3 => 'Grid 3x3';
+
+  @override
+  String get architectFenestrationSashProfile => 'Inner Sash Frame';
+
+  @override
+  String get architectFenestrationExactDimension => 'Set Exact Dimension';
+
+  @override
+  String get architectFenestrationLeafWidth => 'Leaf Width';
+
+  @override
+  String get architectFenestrationLeafHeight => 'Leaf Height';
+
+  @override
+  String get architectFenestrationInfillGlazing => 'Glazing (Glass)';
+
+  @override
+  String get architectFenestrationInfillSolid => 'Solid Panel';
+
+  @override
+  String get architectFenestrationAddTransom => 'Add Transom (Horiz.)';
+
+  @override
+  String get architectFenestrationAddMullion => 'Add Mullion (Vert.)';
+
+  @override
+  String get architectFenestrationSelectedLeaf => 'Selected Pane';
+
+  @override
+  String get architectFenestrationCasingColor => 'Casing Color';
+
+  @override
+  String get architectFenestrationMountingPlane => 'Mounting Plane';
+
+  @override
+  String get architectFenestrationMountingPlaneHelp =>
+      'Centered inside brick core with exterior casing trim';
+
+  @override
+  String get architectFenestrationWithCasing => 'With casing';
 }

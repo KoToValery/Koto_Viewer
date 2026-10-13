@@ -2,6 +2,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
+import 'architect_fenestration_style.dart';
+import '../rendering/fenestration_3d_builder.dart';
+import '../services/fenestration_library_service.dart';
 
 /// Represents a hosted architectural window element adhering to standard CAD/BIM conventions.
 class ArchitectWindow {
@@ -17,6 +20,15 @@ class ArchitectWindow {
   final int panesCount; // 1 = fixed, 2 = double casement, 3 = triple
   final String specId; // Specification tag, e.g. "П1"
   final String uuid; // Unique persistent identifier
+  final String? styleId;
+  final ArchitectFenestrationStyle? style;
+
+  /// Effective style from direct reference, or resolved from persistent library by [styleId].
+  ArchitectFenestrationStyle? get resolvedStyle =>
+      style ??
+      (styleId != null
+          ? FenestrationLibraryService.instance.getStyleById(styleId!)
+          : null);
 
   const ArchitectWindow({
     required this.id,
@@ -29,6 +41,8 @@ class ArchitectWindow {
     this.panesCount = 2,
     this.specId = 'П1',
     required this.uuid,
+    this.styleId,
+    this.style,
   });
 
   ArchitectWindow copyWith({
@@ -42,6 +56,8 @@ class ArchitectWindow {
     int panesCount = 2,
     String? specId,
     String? uuid,
+    String? styleId,
+    ArchitectFenestrationStyle? style,
   }) => ArchitectWindow(
     id: id ?? this.id,
     wallId: wallId ?? this.wallId,
@@ -53,6 +69,8 @@ class ArchitectWindow {
     panesCount: panesCount,
     specId: specId ?? this.specId,
     uuid: uuid ?? this.uuid,
+    styleId: styleId ?? this.styleId,
+    style: style ?? this.style,
   );
 
   Map<String, dynamic> toJson() => {
@@ -66,6 +84,8 @@ class ArchitectWindow {
     'panesCount': panesCount,
     'specId': specId,
     'uuid': uuid,
+    if (styleId != null) 'styleId': styleId,
+    if (style != null) 'style': style!.toJson(),
   };
 
   factory ArchitectWindow.fromJson(Map<String, dynamic> json) =>
@@ -80,6 +100,11 @@ class ArchitectWindow {
         panesCount: (json['panesCount'] as num?)?.toInt() ?? 2,
         specId: json['specId'] as String? ?? 'П1',
         uuid: json['uuid'] as String? ?? json['id'] as String,
+        styleId: json['styleId'] as String?,
+        style: json['style'] != null
+            ? ArchitectFenestrationStyle.fromJson(
+                json['style'] as Map<String, dynamic>)
+            : null,
       );
 
   // ===========================================================================
@@ -93,7 +118,30 @@ class ArchitectWindow {
     required double wallThickness,
     required double zoomScale,
     bool isSelected = false,
+    double coreThickness = 0.25,
+    double insulationThickness = 0.0,
+    double exteriorSign = 1.0,
   }) {
+    final effectiveStyle = resolvedStyle;
+    if (effectiveStyle != null) {
+      effectiveStyle.paintPlan2D(
+        canvas: canvas,
+        wallStart: wallStart,
+        wallEnd: wallEnd,
+        wallThickness: wallThickness,
+        coreThickness: coreThickness,
+        insulationThickness: insulationThickness,
+        exteriorSign: exteriorSign,
+        offsetRatio: offsetRatio,
+        elementWidth: width,
+        elementHeight: height,
+        elementSillHeight: sillHeight,
+        zoomScale: zoomScale,
+        isSelected: isSelected,
+      );
+      return;
+    }
+
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;
     if (wallLen < 1e-4) return;
@@ -248,7 +296,28 @@ class ArchitectWindow {
     required Offset wallEnd,
     required double wallThickness,
     required double storeyElevation,
+    double coreThickness = 0.25,
+    double insulationThickness = 0.0,
+    double exteriorSign = 1.0,
   }) {
+    final effectiveStyle = resolvedStyle;
+    if (effectiveStyle != null) {
+      return Fenestration3dBuilder.buildOpening3D(
+        style: effectiveStyle,
+        wallStart: wallStart,
+        wallEnd: wallEnd,
+        wallThickness: wallThickness,
+        coreThickness: coreThickness,
+        insulationThickness: insulationThickness,
+        exteriorSign: exteriorSign,
+        offsetRatio: offsetRatio,
+        width: width,
+        height: height,
+        sillHeight: sillHeight,
+        storeyElevation: storeyElevation,
+      );
+    }
+
     final List<Triangle3D> tris = [];
     final wallVec = wallEnd - wallStart;
     final wallLen = wallVec.distance;

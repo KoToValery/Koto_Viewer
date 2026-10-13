@@ -235,7 +235,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
             : value.value;
       }
       for (final value in textValues.entries) {
-        if (!e.containsKey(value.key) ||
+        if ((!e.containsKey(value.key) && value.key != 'styleId') ||
             !{
               'text',
               'label',
@@ -244,6 +244,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'customText',
               'referenceLine',
               'exteriorSide',
+              'styleId',
             }.contains(value.key)) {
           throw ArgumentError('Unsupported property');
         }

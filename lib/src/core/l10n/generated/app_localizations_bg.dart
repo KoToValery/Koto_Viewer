@@ -4231,4 +4231,213 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectShapeHeight => 'Височина';
+
+  @override
+  String get architectFenestrationEditor => 'Редактор на дограма';
+
+  @override
+  String get architectFenestrationCreateNew => 'Създай нов';
+
+  @override
+  String get architectFenestrationEditStyle => 'Редактирай модел';
+
+  @override
+  String get architectFenestrationStyle => 'Модел на дограма';
+
+  @override
+  String get architectFenestrationSave => 'Запази в библиотека';
+
+  @override
+  String get architectFenestrationSaveSuccess =>
+      'Моделът е запазен в библиотеката';
+
+  @override
+  String get architectFenestrationLibrary => 'Библиотека дограма';
+
+  @override
+  String get architectFenestrationCasing => 'Обрамчване / Обшивка';
+
+  @override
+  String get architectFenestrationCasingWidth => 'Ширина на обрамчването';
+
+  @override
+  String get architectFenestrationCasingProjection => 'Издаване пред стената';
+
+  @override
+  String get architectFenestrationCasingPlacement => 'Позиция на обшивката';
+
+  @override
+  String get architectFenestrationCasingExterior => 'Външна (фасадна)';
+
+  @override
+  String get architectFenestrationCasingInterior => 'Вътрешна';
+
+  @override
+  String get architectFenestrationCasingBoth => 'Двустранно';
+
+  @override
+  String get architectFenestrationFrame5Chamber => '5-камерен профил (70 mm)';
+
+  @override
+  String get architectFenestrationFrameFaceWidth => 'Лицева ширина на каса';
+
+  @override
+  String get architectFenestrationGlazingDouble =>
+      'Двуслоен стъклопакет (24 mm)';
+
+  @override
+  String get architectFenestrationGlazingThickness => 'Дебелина на стъклопакет';
+
+  @override
+  String get architectFenestrationSplitH => 'Хоризонтален делител';
+
+  @override
+  String get architectFenestrationSplitV => 'Вертикален делител';
+
+  @override
+  String get architectFenestrationRemoveSplit => 'Премахни делител';
+
+  @override
+  String get architectFenestrationPaneType => 'Тип на полето';
+
+  @override
+  String get architectFenestrationPaneFixed => 'Глухо (фиксно)';
+
+  @override
+  String get architectFenestrationPaneTurnLeft => 'Отваряемо наляво';
+
+  @override
+  String get architectFenestrationPaneTurnRight => 'Отваряемо надясно';
+
+  @override
+  String get architectFenestrationPaneTiltTurn => 'Двуосно отваряне';
+
+  @override
+  String get architectFenestrationPaneTopHopper => 'Горно падащо (фрамуга)';
+
+  @override
+  String get architectFenestrationPaneDoorLeaf => 'Вратно крило';
+
+  @override
+  String get architectFenestrationPaneSolidPanel => 'Плътен термопанел';
+
+  @override
+  String get architectFenestrationDimensions => 'Размери';
+
+  @override
+  String get architectFenestrationProfile => 'Профил и стъкло';
+
+  @override
+  String get architectFenestrationDivisions => 'Растер и полета';
+
+  @override
+  String get architectFenestrationPresets => 'Шаблони';
+
+  @override
+  String get architectFenestrationViewElevation => 'Фасаден изглед';
+
+  @override
+  String get architectFenestrationView3D => '3D Изглед';
+
+  @override
+  String get architectFenestrationViewPlan => 'План (2D)';
+
+  @override
+  String get architectFenestrationIncludeBottomCasing =>
+      'Обрамчване и под прозореца';
+
+  @override
+  String get architectFenestrationWallContextHelp =>
+      'Обрамчването ляга по външната стена и изолацията, без да реже зида';
+
+  @override
+  String get architectFenestrationApplyToProject => 'Приложи към проекта';
+
+  @override
+  String get architectFenestrationCustom => 'Потребителски';
+
+  @override
+  String get architectFenestrationPreset => 'Стандартен образец';
+
+  @override
+  String get architectFenestrationSelectStyle => 'Избор на модел дограма';
+
+  @override
+  String get architectFenestrationStep1 => '1. Рамка и растер';
+
+  @override
+  String get architectFenestrationStep2 => '2. Отваряемост';
+
+  @override
+  String get architectFenestrationStep3 => '3. Пълнеж и шпроси';
+
+  @override
+  String get architectFenestrationNextStep => 'Следваща стъпка';
+
+  @override
+  String get architectFenestrationPrevStep => 'Предишна стъпка';
+
+  @override
+  String get architectFenestrationMuntins => 'Шпроси (растер на стъклото)';
+
+  @override
+  String get architectFenestrationMuntinCols => 'Вертикални шпроси';
+
+  @override
+  String get architectFenestrationMuntinRows => 'Хоризонтални шпроси';
+
+  @override
+  String get architectFenestrationMuntinWidth => 'Широчина на шпросите';
+
+  @override
+  String get architectFenestrationMuntinNone => 'Без шпроси';
+
+  @override
+  String get architectFenestrationMuntinClassic => 'Класик 2х2';
+
+  @override
+  String get architectFenestrationMuntinVictorian => 'Растер 2х3';
+
+  @override
+  String get architectFenestrationMuntinGrid3x3 => 'Каре 3х3';
+
+  @override
+  String get architectFenestrationSashProfile => 'Вътрешна рамка на крилото';
+
+  @override
+  String get architectFenestrationExactDimension => 'Задай точен размер';
+
+  @override
+  String get architectFenestrationLeafWidth => 'Широчина на крилото';
+
+  @override
+  String get architectFenestrationLeafHeight => 'Височина на крилото';
+
+  @override
+  String get architectFenestrationInfillGlazing => 'Стъклопакет';
+
+  @override
+  String get architectFenestrationInfillSolid => 'Плътен термопанел';
+
+  @override
+  String get architectFenestrationAddTransom => 'Добави фрамуга (хор.)';
+
+  @override
+  String get architectFenestrationAddMullion => 'Добави делител (верт.)';
+
+  @override
+  String get architectFenestrationSelectedLeaf => 'Маркирано поле';
+
+  @override
+  String get architectFenestrationCasingColor => 'Цвят на обрамчването';
+
+  @override
+  String get architectFenestrationMountingPlane => 'Монтажна равнина';
+
+  @override
+  String get architectFenestrationMountingPlaneHelp =>
+      'В средата на тухления зид с фасадни обрамчвания';
+
+  @override
+  String get architectFenestrationWithCasing => 'С обрамчване';
 }

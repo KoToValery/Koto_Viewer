@@ -52,6 +52,9 @@ import '../widgets/architect_zone_drafting_bar.dart';
 import '../widgets/architect_zone_properties_card.dart';
 import '../widgets/architect_viewport.dart';
 import '../widgets/architect_wall_drafting_panel.dart';
+import 'fenestration_editor_screen.dart';
+import '../models/architect_fenestration_style.dart';
+import '../services/fenestration_library_service.dart';
 
 // === SECTION: TABLE OF CONTENTS ===
 // 1. STATE & TOOL CONTROLLERS
@@ -368,6 +371,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _axisTool = ArchitectGridAxisTool()..addListener(_repaintPreview);
 
     _elementTool = ArchitectElementTool()..addListener(_repaintPreview);
+    FenestrationLibraryService.instance.init().then((_) {
+      if (mounted) {
+        _elementTool.activeWindowStyle ??=
+            FenestrationLibraryService.instance.activeWindowStyle;
+        _elementTool.activeDoorStyle ??=
+            FenestrationLibraryService.instance.activeDoorStyle;
+        setState(() {});
+      }
+    });
 
     if (widget.underlaysByStorey != null) {
       _underlaysByStorey = Map.from(widget.underlaysByStorey!);
@@ -2496,6 +2508,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final (ratio, _) = targetWall.projectPoint(point);
     final now = ArchitectElementId.next('element');
 
+    final activeStyle = _elementTool.activeDoorStyle ??
+        FenestrationLibraryService.instance.activeDoorStyle;
+
     final newDoor = ArchitectDoor(
       id: 'door_$now',
       wallId: targetWall.id,
@@ -2506,6 +2521,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       isHingeLeft: _isHingeLeft,
       specId: '$_doorSpecCounter',
       uuid: 'UUID_$now',
+      styleId: activeStyle.id,
+      style: activeStyle,
     );
 
     _doorSpecCounter++;
@@ -2534,6 +2551,40 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         duration: const Duration(seconds: 1),
       ),
     );
+  }
+
+  void _openFenestrationEditor() async {
+    final kind = _activeTool == ArchitectTool.door
+        ? FenestrationKind.door
+        : FenestrationKind.window;
+    final initialStyle = kind == FenestrationKind.door
+        ? (_elementTool.activeDoorStyle ??
+            FenestrationLibraryService.instance.activeDoorStyle)
+        : (_elementTool.activeWindowStyle ??
+            FenestrationLibraryService.instance.activeWindowStyle);
+
+    final result = await Navigator.push<ArchitectFenestrationStyle>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FenestrationEditorScreen(
+          initialKind: kind,
+          initialStyle: initialStyle,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        if (result.kind == FenestrationKind.window) {
+          _elementTool.setWindowStyle(result);
+        } else {
+          _doorWidth = result.defaultWidth;
+          _doorHeight = result.defaultHeight;
+          _doorSill = result.defaultSillHeight;
+          _elementTool.setDoorStyle(result);
+        }
+      });
+    }
   }
 
   String? _hitSelection(Offset point) {
@@ -3359,6 +3410,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _activeWallType = wt;
                     _wallThickness = wt.totalThickness;
                   }),
+                  onCreateFenestration: _openFenestrationEditor,
+                  activeWindowStyle: _elementTool.activeWindowStyle ??
+                      FenestrationLibraryService.instance.activeWindowStyle,
+                  activeDoorStyle: _elementTool.activeDoorStyle ??
+                      FenestrationLibraryService.instance.activeDoorStyle,
+                  onWindowStyleSelected: (style) {
+                    setState(() {
+                      _elementTool.setWindowStyle(style);
+                    });
+                  },
+                  onDoorStyleSelected: (style) {
+                    setState(() {
+                      _doorWidth = style.defaultWidth;
+                      _doorHeight = style.defaultHeight;
+                      _doorSill = style.defaultSillHeight;
+                      _elementTool.setDoorStyle(style);
+                    });
+                  },
                   doorWidth: _doorWidth,
                   onDoorWidthChanged: (w) => setState(() => _doorWidth = w),
                   doorHeight: _doorHeight,

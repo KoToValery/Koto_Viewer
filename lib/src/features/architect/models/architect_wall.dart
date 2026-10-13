@@ -392,6 +392,9 @@ class ArchitectWall {
           wallEnd: centerEnd,
           wallThickness: thickness,
           storeyElevation: storeyElevation,
+          coreThickness: coreThickness,
+          insulationThickness: insulationThickness,
+          exteriorSign: exteriorSign.toDouble(),
         ),
       ));
     }
@@ -407,6 +410,9 @@ class ArchitectWall {
           wallEnd: centerEnd,
           wallThickness: thickness,
           storeyElevation: storeyElevation,
+          coreThickness: coreThickness,
+          insulationThickness: insulationThickness,
+          exteriorSign: exteriorSign.toDouble(),
         ),
       ));
     }

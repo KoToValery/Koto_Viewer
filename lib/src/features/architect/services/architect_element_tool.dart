@@ -6,6 +6,7 @@ import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_window.dart';
+import '../models/architect_fenestration_style.dart';
 import '../rendering/architect_2d_painter.dart' show ArchitectTool;
 
 /// Unified controller and interaction manager for specialized architectural drafting elements
@@ -15,6 +16,8 @@ class ArchitectElementTool extends ChangeNotifier {
   double windowWidth = 1.20;
   double windowHeight = 1.40;
   double windowSill = 0.85;
+  ArchitectFenestrationStyle? activeWindowStyle;
+  ArchitectFenestrationStyle? activeDoorStyle;
 
   // Column options
   ColumnShape columnShape = ColumnShape.rectangular;
@@ -48,6 +51,19 @@ class ArchitectElementTool extends ChangeNotifier {
     if (width != null) windowWidth = width;
     if (height != null) windowHeight = height;
     if (sill != null) windowSill = sill;
+    notifyListeners();
+  }
+
+  void setWindowStyle(ArchitectFenestrationStyle style) {
+    activeWindowStyle = style;
+    windowWidth = style.defaultWidth;
+    windowHeight = style.defaultHeight;
+    windowSill = style.defaultSillHeight;
+    notifyListeners();
+  }
+
+  void setDoorStyle(ArchitectFenestrationStyle style) {
+    activeDoorStyle = style;
     notifyListeners();
   }
 
@@ -107,6 +123,8 @@ class ArchitectElementTool extends ChangeNotifier {
       height: windowHeight,
       sillHeight: windowSill,
       uuid: 'UUID_$now',
+      styleId: activeWindowStyle?.id,
+      style: activeWindowStyle,
     );
 
     final updatedWall = targetWall.addWindow(newWindow);

@@ -628,6 +628,9 @@ class Architect2dPainter extends CustomPainter {
           wallStart: wall.centerStart,
           wallEnd: wall.centerEnd,
           wallThickness: wall.thickness,
+          coreThickness: wall.coreThickness,
+          insulationThickness: wall.insulationThickness,
+          exteriorSign: wall.exteriorSign.toDouble(),
           zoomScale: zoomScale,
           isSelected: door.id == selectedElementId,
         );
@@ -638,6 +641,9 @@ class Architect2dPainter extends CustomPainter {
           wallStart: wall.centerStart,
           wallEnd: wall.centerEnd,
           wallThickness: wall.thickness,
+          coreThickness: wall.coreThickness,
+          insulationThickness: wall.insulationThickness,
+          exteriorSign: wall.exteriorSign.toDouble(),
           zoomScale: zoomScale,
           isSelected: window.id == selectedElementId,
         );

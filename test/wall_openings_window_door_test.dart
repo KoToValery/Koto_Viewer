@@ -17,6 +17,7 @@ void main() {
     // 1. Window bounds match opening cutout (900mm width, 1510mm with exterior sill drip)
     expect(window.bounds.sizeX, closeTo(900.0, 1.0));
     expect(window.bounds.sizeZ, closeTo(1510.0, 1.0));
+    expect(door.bounds, isNotNull);
 
 
     // 2. Wall does not contain reveal quads overlapping with the door casing

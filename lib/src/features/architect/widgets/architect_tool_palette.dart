@@ -6,12 +6,21 @@ import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_wall_type.dart';
 import '../models/architect_zone.dart';
+import '../models/architect_fenestration_style.dart';
+import '../services/fenestration_library_service.dart';
 import '../rendering/architect_2d_painter.dart';
 
 /// Responsive bottom bar for architectural drafting tools and contextual sub-options.
 class ArchitectToolPalette extends StatelessWidget {
   final ArchitectTool activeTool;
   final ValueChanged<ArchitectTool> onToolChanged;
+
+  // Fenestration (Window & Door Editor) options
+  final VoidCallback? onCreateFenestration;
+  final ArchitectFenestrationStyle? activeWindowStyle;
+  final ArchitectFenestrationStyle? activeDoorStyle;
+  final ValueChanged<ArchitectFenestrationStyle>? onWindowStyleSelected;
+  final ValueChanged<ArchitectFenestrationStyle>? onDoorStyleSelected;
 
   // Zone options
   final ArchitectZoneCategory activeZoneCategory;
@@ -85,6 +94,11 @@ class ArchitectToolPalette extends StatelessWidget {
     this.wallTypes,
     this.activeWallType,
     this.onWallTypeSelected,
+    this.onCreateFenestration,
+    this.activeWindowStyle,
+    this.activeDoorStyle,
+    this.onWindowStyleSelected,
+    this.onDoorStyleSelected,
     required this.doorWidth,
     required this.onDoorWidthChanged,
     required this.doorHeight,
@@ -429,6 +443,39 @@ class ArchitectToolPalette extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
+          if (onCreateFenestration != null) ...[
+            ActionChip(
+              avatar: const Icon(Icons.add_circle_outline_rounded, size: 14, color: Color(0xFF00E5FF)),
+              label: Text(
+                l10n.architectFenestrationCreateNew,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF00E5FF)),
+              ),
+              backgroundColor: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+              side: const BorderSide(color: Color(0xFF00E5FF)),
+              onPressed: onCreateFenestration,
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (activeDoorStyle != null) ...[
+            ActionChip(
+              avatar: const Icon(Icons.door_front_door_rounded, size: 14, color: Color(0xFF00E5FF)),
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    activeDoorStyle!.name,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down, size: 14, color: Colors.white70),
+                ],
+              ),
+              onPressed: () => _showStylePicker(context, FenestrationKind.door),
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 8),
+          ],
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: Text(
@@ -491,6 +538,39 @@ class ArchitectToolPalette extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
+          if (onCreateFenestration != null) ...[
+            ActionChip(
+              avatar: const Icon(Icons.add_circle_outline_rounded, size: 14, color: Color(0xFF00E5FF)),
+              label: Text(
+                l10n.architectFenestrationCreateNew,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF00E5FF)),
+              ),
+              backgroundColor: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+              side: const BorderSide(color: Color(0xFF00E5FF)),
+              onPressed: onCreateFenestration,
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (activeWindowStyle != null) ...[
+            ActionChip(
+              avatar: const Icon(Icons.window_rounded, size: 14, color: Color(0xFF00E5FF)),
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    activeWindowStyle!.name,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down, size: 14, color: Colors.white70),
+                ],
+              ),
+              onPressed: () => _showStylePicker(context, FenestrationKind.window),
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 8),
+          ],
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: Text(
@@ -760,6 +840,118 @@ class ArchitectToolPalette extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+
+  void _showStylePicker(BuildContext context, FenestrationKind kind) {
+    final l10n = context.l10n;
+    final styles = FenestrationLibraryService.instance.getStylesForKind(kind);
+    final activeStyle =
+        kind == FenestrationKind.door ? activeDoorStyle : activeWindowStyle;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1E222D),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      kind == FenestrationKind.door
+                          ? Icons.door_front_door_rounded
+                          : Icons.window_rounded,
+                      color: const Color(0xFF00E5FF),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      l10n.architectFenestrationSelectStyle,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (onCreateFenestration != null)
+                      TextButton.icon(
+                        icon: const Icon(Icons.add, size: 16),
+                        label: Text(l10n.architectFenestrationCreateNew),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          onCreateFenestration!();
+                        },
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: styles.length,
+                  itemBuilder: (ctx, i) {
+                    final s = styles[i];
+                    final isSelected = activeStyle?.id == s.id;
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(
+                        isSelected
+                            ? Icons.check_circle_rounded
+                            : Icons.circle_outlined,
+                        color: isSelected
+                            ? const Color(0xFF00E5FF)
+                            : Colors.white54,
+                      ),
+                      title: Text(
+                        s.name,
+                        style: TextStyle(
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${(s.defaultWidth * 100).round()} × ${(s.defaultHeight * 100).round()} cm'
+                        '${s.hasCasing ? ' • ${l10n.architectFenestrationCasing}' : ''}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white54,
+                        ),
+                      ),
+                      trailing: Chip(
+                        label: Text(
+                          s.isPreset
+                              ? l10n.architectFenestrationPreset
+                              : l10n.architectFenestrationCustom,
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                      ),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        if (kind == FenestrationKind.door) {
+                          onDoorStyleSelected?.call(s);
+                        } else {
+                          onWindowStyleSelected?.call(s);
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

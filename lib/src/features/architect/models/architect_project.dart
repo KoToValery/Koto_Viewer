@@ -6,6 +6,7 @@ import 'architect_grid_preset.dart';
 import 'architect_wall.dart';
 import 'architect_wall_type.dart';
 import 'architect_zone.dart';
+import 'architect_fenestration_style.dart';
 
 /// Supported distance units for architectural project dimensions.
 enum ArchitectUnit {
@@ -239,6 +240,7 @@ class ArchitectProject {
   final String activeStoreyId;
   final List<StructuralGridAxis> gridAxes;
   final List<ArchitectWallType> wallTypes;
+  final List<ArchitectFenestrationStyle> openingStyles;
 
   const ArchitectProject({
     required this.id,
@@ -250,6 +252,7 @@ class ArchitectProject {
     required this.activeStoreyId,
     this.gridAxes = const [],
     this.wallTypes = const [],
+    this.openingStyles = const [],
   });
 
   ArchitectStorey get activeStorey => storeys.firstWhere(
@@ -284,6 +287,7 @@ class ArchitectProject {
     String? activeStoreyId,
     List<StructuralGridAxis>? gridAxes,
     List<ArchitectWallType>? wallTypes,
+    List<ArchitectFenestrationStyle>? openingStyles,
   }) => ArchitectProject(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -294,6 +298,7 @@ class ArchitectProject {
     activeStoreyId: activeStoreyId ?? this.activeStoreyId,
     gridAxes: gridAxes ?? this.gridAxes,
     wallTypes: wallTypes ?? this.wallTypes,
+    openingStyles: openingStyles ?? this.openingStyles,
   );
 
   Map<String, dynamic> toJson() => {
@@ -306,6 +311,7 @@ class ArchitectProject {
     'activeStoreyId': activeStoreyId,
     'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
     'wallTypes': wallTypes.map((w) => w.toJson()).toList(),
+    'openingStyles': openingStyles.map((o) => o.toJson()).toList(),
   };
 
   factory ArchitectProject.fromJson(
@@ -337,6 +343,12 @@ class ArchitectProject {
             ?.map((w) => ArchitectWallType.fromJson(w as Map<String, dynamic>))
             .toList() ??
         ArchitectWallType.standardCatalog(),
+    openingStyles:
+        (json['openingStyles'] as List<dynamic>?)
+            ?.map((o) =>
+                ArchitectFenestrationStyle.fromJson(o as Map<String, dynamic>))
+            .toList() ??
+        const [],
   );
 
   /// Factory creating an architectural project configured from the starter wizard.

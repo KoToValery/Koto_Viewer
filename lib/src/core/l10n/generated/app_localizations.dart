@@ -7366,6 +7366,414 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Height'**
   String get architectShapeHeight;
+
+  /// Title of parametric window and door designer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Window & Door Designer'**
+  String get architectFenestrationEditor;
+
+  /// Button to create a new window or door model
+  ///
+  /// In en, this message translates to:
+  /// **'Create New'**
+  String get architectFenestrationCreateNew;
+
+  /// Button to edit opening style
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Model'**
+  String get architectFenestrationEditStyle;
+
+  /// Opening style label
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Model'**
+  String get architectFenestrationStyle;
+
+  /// Button to save window/door model to library
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Library'**
+  String get architectFenestrationSave;
+
+  /// Toast message on model save success
+  ///
+  /// In en, this message translates to:
+  /// **'Model saved to library'**
+  String get architectFenestrationSaveSuccess;
+
+  /// Openings library title
+  ///
+  /// In en, this message translates to:
+  /// **'Openings Library'**
+  String get architectFenestrationLibrary;
+
+  /// Window/door trim or casing label
+  ///
+  /// In en, this message translates to:
+  /// **'Trim / Casing'**
+  String get architectFenestrationCasing;
+
+  /// Width of trim casing around opening
+  ///
+  /// In en, this message translates to:
+  /// **'Casing Width'**
+  String get architectFenestrationCasingWidth;
+
+  /// Depth of casing projecting from wall surface
+  ///
+  /// In en, this message translates to:
+  /// **'Casing Projection'**
+  String get architectFenestrationCasingProjection;
+
+  /// Casing position label
+  ///
+  /// In en, this message translates to:
+  /// **'Casing Position'**
+  String get architectFenestrationCasingPlacement;
+
+  /// Exterior side casing
+  ///
+  /// In en, this message translates to:
+  /// **'Exterior'**
+  String get architectFenestrationCasingExterior;
+
+  /// Interior side casing
+  ///
+  /// In en, this message translates to:
+  /// **'Interior'**
+  String get architectFenestrationCasingInterior;
+
+  /// Both exterior and interior casing
+  ///
+  /// In en, this message translates to:
+  /// **'Both Sides'**
+  String get architectFenestrationCasingBoth;
+
+  /// 5-chamber PVC frame specification
+  ///
+  /// In en, this message translates to:
+  /// **'5-Chamber Frame (70 mm)'**
+  String get architectFenestrationFrame5Chamber;
+
+  /// Frame profile face width
+  ///
+  /// In en, this message translates to:
+  /// **'Frame Face'**
+  String get architectFenestrationFrameFaceWidth;
+
+  /// Double glazing unit specification
+  ///
+  /// In en, this message translates to:
+  /// **'Double Glazing (24 mm)'**
+  String get architectFenestrationGlazingDouble;
+
+  /// Glazing thickness label
+  ///
+  /// In en, this message translates to:
+  /// **'Glazing Thickness'**
+  String get architectFenestrationGlazingThickness;
+
+  /// Add horizontal division or transom
+  ///
+  /// In en, this message translates to:
+  /// **'Split Horizontally'**
+  String get architectFenestrationSplitH;
+
+  /// Add vertical division or mullion
+  ///
+  /// In en, this message translates to:
+  /// **'Split Vertically'**
+  String get architectFenestrationSplitV;
+
+  /// Remove subdivision in pane
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Split'**
+  String get architectFenestrationRemoveSplit;
+
+  /// Type of selected opening pane
+  ///
+  /// In en, this message translates to:
+  /// **'Pane Type'**
+  String get architectFenestrationPaneType;
+
+  /// Fixed glass pane
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed Glazing'**
+  String get architectFenestrationPaneFixed;
+
+  /// Openable casement turning left
+  ///
+  /// In en, this message translates to:
+  /// **'Casement Left'**
+  String get architectFenestrationPaneTurnLeft;
+
+  /// Openable casement turning right
+  ///
+  /// In en, this message translates to:
+  /// **'Casement Right'**
+  String get architectFenestrationPaneTurnRight;
+
+  /// Tilt and turn dual opening casement
+  ///
+  /// In en, this message translates to:
+  /// **'Tilt & Turn'**
+  String get architectFenestrationPaneTiltTurn;
+
+  /// Top opening hopper casement
+  ///
+  /// In en, this message translates to:
+  /// **'Top Hopper'**
+  String get architectFenestrationPaneTopHopper;
+
+  /// Door leaf pane
+  ///
+  /// In en, this message translates to:
+  /// **'Door Leaf'**
+  String get architectFenestrationPaneDoorLeaf;
+
+  /// Solid insulated infill panel
+  ///
+  /// In en, this message translates to:
+  /// **'Solid Panel'**
+  String get architectFenestrationPaneSolidPanel;
+
+  /// Dimensions tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Dimensions'**
+  String get architectFenestrationDimensions;
+
+  /// Profile and glass tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Profile & Glass'**
+  String get architectFenestrationProfile;
+
+  /// Subdivisions tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Raster & Panes'**
+  String get architectFenestrationDivisions;
+
+  /// Preset catalog tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Presets'**
+  String get architectFenestrationPresets;
+
+  /// 2D elevation view tab
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation'**
+  String get architectFenestrationViewElevation;
+
+  /// 3D view tab
+  ///
+  /// In en, this message translates to:
+  /// **'3D View'**
+  String get architectFenestrationView3D;
+
+  /// 2D plan view tab
+  ///
+  /// In en, this message translates to:
+  /// **'Plan (2D)'**
+  String get architectFenestrationViewPlan;
+
+  /// Bottom casing under window
+  ///
+  /// In en, this message translates to:
+  /// **'Include Bottom Casing'**
+  String get architectFenestrationIncludeBottomCasing;
+
+  /// Explanation of exterior casing relationship to wall
+  ///
+  /// In en, this message translates to:
+  /// **'Casing sits on exterior face of wall & insulation without cutting wall'**
+  String get architectFenestrationWallContextHelp;
+
+  /// Apply opening style to current project
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to Project'**
+  String get architectFenestrationApplyToProject;
+
+  /// Custom user-created opening style tag
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get architectFenestrationCustom;
+
+  /// Standard preset opening style tag
+  ///
+  /// In en, this message translates to:
+  /// **'Standard Preset'**
+  String get architectFenestrationPreset;
+
+  /// Modal title for choosing opening style
+  ///
+  /// In en, this message translates to:
+  /// **'Select Opening Model'**
+  String get architectFenestrationSelectStyle;
+
+  /// Step 1 in window designer: frame and division grid
+  ///
+  /// In en, this message translates to:
+  /// **'1. Frame & Grid'**
+  String get architectFenestrationStep1;
+
+  /// Step 2 in window designer: operability and inner sashes
+  ///
+  /// In en, this message translates to:
+  /// **'2. Operability'**
+  String get architectFenestrationStep2;
+
+  /// Step 3 in window designer: glass, panels, and muntins
+  ///
+  /// In en, this message translates to:
+  /// **'3. Infill & Muntins'**
+  String get architectFenestrationStep3;
+
+  /// Next step button
+  ///
+  /// In en, this message translates to:
+  /// **'Next Step'**
+  String get architectFenestrationNextStep;
+
+  /// Previous step button
+  ///
+  /// In en, this message translates to:
+  /// **'Previous Step'**
+  String get architectFenestrationPrevStep;
+
+  /// Glazing bars/muntins label
+  ///
+  /// In en, this message translates to:
+  /// **'Muntins / Glazing Bars'**
+  String get architectFenestrationMuntins;
+
+  /// Vertical muntin bars count
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical Muntins'**
+  String get architectFenestrationMuntinCols;
+
+  /// Horizontal muntin bars count
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal Muntins'**
+  String get architectFenestrationMuntinRows;
+
+  /// Width of muntin profile
+  ///
+  /// In en, this message translates to:
+  /// **'Muntin Width'**
+  String get architectFenestrationMuntinWidth;
+
+  /// Preset with no muntin bars
+  ///
+  /// In en, this message translates to:
+  /// **'No Muntins'**
+  String get architectFenestrationMuntinNone;
+
+  /// Classic 2x2 muntin grid preset
+  ///
+  /// In en, this message translates to:
+  /// **'Classic 2x2'**
+  String get architectFenestrationMuntinClassic;
+
+  /// Georgian 2x3 muntin grid preset
+  ///
+  /// In en, this message translates to:
+  /// **'Georgian 2x3'**
+  String get architectFenestrationMuntinVictorian;
+
+  /// Grid 3x3 muntin preset
+  ///
+  /// In en, this message translates to:
+  /// **'Grid 3x3'**
+  String get architectFenestrationMuntinGrid3x3;
+
+  /// Inner operable sash profile width
+  ///
+  /// In en, this message translates to:
+  /// **'Inner Sash Frame'**
+  String get architectFenestrationSashProfile;
+
+  /// Button to set exact dimension with keypad
+  ///
+  /// In en, this message translates to:
+  /// **'Set Exact Dimension'**
+  String get architectFenestrationExactDimension;
+
+  /// Width of individual leaf pane
+  ///
+  /// In en, this message translates to:
+  /// **'Leaf Width'**
+  String get architectFenestrationLeafWidth;
+
+  /// Height of individual leaf pane
+  ///
+  /// In en, this message translates to:
+  /// **'Leaf Height'**
+  String get architectFenestrationLeafHeight;
+
+  /// Glass infill option
+  ///
+  /// In en, this message translates to:
+  /// **'Glazing (Glass)'**
+  String get architectFenestrationInfillGlazing;
+
+  /// Solid insulated panel infill option
+  ///
+  /// In en, this message translates to:
+  /// **'Solid Panel'**
+  String get architectFenestrationInfillSolid;
+
+  /// Add horizontal division in selected pane
+  ///
+  /// In en, this message translates to:
+  /// **'Add Transom (Horiz.)'**
+  String get architectFenestrationAddTransom;
+
+  /// Add vertical division in selected pane
+  ///
+  /// In en, this message translates to:
+  /// **'Add Mullion (Vert.)'**
+  String get architectFenestrationAddMullion;
+
+  /// Selected leaf header
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Pane'**
+  String get architectFenestrationSelectedLeaf;
+
+  /// Color swatch label for exterior casing
+  ///
+  /// In en, this message translates to:
+  /// **'Casing Color'**
+  String get architectFenestrationCasingColor;
+
+  /// Mounting plane position label
+  ///
+  /// In en, this message translates to:
+  /// **'Mounting Plane'**
+  String get architectFenestrationMountingPlane;
+
+  /// Description of mounting position
+  ///
+  /// In en, this message translates to:
+  /// **'Centered inside brick core with exterior casing trim'**
+  String get architectFenestrationMountingPlaneHelp;
+
+  /// Subtitle tag indicating casing is enabled
+  ///
+  /// In en, this message translates to:
+  /// **'With casing'**
+  String get architectFenestrationWithCasing;
 }
 
 class _AppLocalizationsDelegate

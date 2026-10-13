@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
+import '../models/architect_fenestration_style.dart';
+import '../services/fenestration_library_service.dart';
 import '../services/architect_selection.dart';
 import 'architect_wall_drafting_panel.dart';
 
@@ -58,6 +60,18 @@ class _ArchitectElementPropertiesDialogState
               ? entry.value
               : null,
     };
+    final isDoor = records.isNotEmpty &&
+        records.every((e) =>
+            e.containsKey('offsetRatio') && e.containsKey('isHingeLeft'));
+    final isWindow = records.isNotEmpty &&
+        records.every((e) =>
+            e.containsKey('offsetRatio') && e.containsKey('panesCount'));
+    if (isDoor || isWindow) {
+      final styleIds = records.map((e) => e['styleId'] as String?).toSet();
+      if (styleIds.length == 1 && styleIds.first != null) {
+        texts['styleId'] = styleIds.first!;
+      }
+    }
   }
 
   String label(String key) {
@@ -142,6 +156,12 @@ class _ArchitectElementPropertiesDialogState
   Widget build(BuildContext context) {
     final l = context.l10n;
     final walls = records.every((e) => e.containsKey('referenceLine'));
+    final isDoor = records.isNotEmpty &&
+        records.every((e) =>
+            e.containsKey('offsetRatio') && e.containsKey('isHingeLeft'));
+    final isWindow = records.isNotEmpty &&
+        records.every((e) =>
+            e.containsKey('offsetRatio') && e.containsKey('panesCount'));
     return AlertDialog(
       title: Text(l.architectProperties),
       content: SizedBox(
@@ -150,6 +170,52 @@ class _ArchitectElementPropertiesDialogState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (isDoor || isWindow) ...[
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('architect-property-styleId'),
+                  decoration: InputDecoration(
+                    labelText: l.architectFenestrationStyle,
+                  ),
+                  initialValue: FenestrationLibraryService.instance
+                          .getStylesForKind(isDoor
+                              ? FenestrationKind.door
+                              : FenestrationKind.window)
+                          .any((s) =>
+                              s.id ==
+                              (texts['styleId'] ?? records.first['styleId']))
+                      ? (texts['styleId'] ??
+                          records.first['styleId'] as String?)
+                      : null,
+                  items: [
+                    for (final s in FenestrationLibraryService.instance
+                        .getStylesForKind(isDoor
+                            ? FenestrationKind.door
+                            : FenestrationKind.window))
+                      DropdownMenuItem(
+                        value: s.id,
+                        child: Text(
+                          s.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        texts['styleId'] = val;
+                        final s =
+                            FenestrationLibraryService.instance.getStyleById(val);
+                        if (s != null) {
+                          values['width'] = s.defaultWidth;
+                          values['height'] = s.defaultHeight;
+                          values['sillHeight'] = s.defaultSillHeight;
+                        }
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
               for (final entry in fields.entries)
                 ListTile(
                   key: ValueKey('architect-property-${entry.key}'),
