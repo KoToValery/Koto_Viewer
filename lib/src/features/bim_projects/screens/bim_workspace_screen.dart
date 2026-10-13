@@ -163,6 +163,21 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
     // Wall detection completed on a storey
   }
 
+  Future<void> _markUnderlaysReviewed() async {
+    final updated = _project.copyWith(
+      storeys: [
+        for (final s in _project.storeys)
+          s.copyWith(
+            processing: {...s.processing, 'structuralReviewRequired': false},
+          ),
+      ],
+    );
+    final saved = await BimProjectLibraryService.instance.saveProjectManifest(
+      updated,
+    );
+    if (mounted && saved) setState(() => _project = updated);
+  }
+
   Future<void> _handleExport(
     BuildContext context,
     StructuralProject project,
@@ -485,6 +500,15 @@ class _BimWorkspaceScreenState extends State<BimWorkspaceScreen> {
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Tooltip(
+                      message: context.l10n.bimUnderlayReviewCompleteTooltip,
+                      child: TextButton(
+                        onPressed: _markUnderlaysReviewed,
+                        child: Text(
+                          context.l10n.bimUnderlayReviewCompleteAction,
                         ),
                       ),
                     ),

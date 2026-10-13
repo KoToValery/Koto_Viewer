@@ -2453,7 +2453,7 @@
       }
     }
   },
-  "bimUnderlayReviewNeeded": "Underlay or alignment changed at {levels}. Review the preserved structural elements and openings.",
+  "bimUnderlayReviewNeeded": "Underlay data changed at {levels}. Review the preserved structural elements and openings.",
   "@bimUnderlayReviewNeeded": {
     "placeholders": {
       "levels": {
@@ -3238,5 +3238,10 @@
   "architectEdgeSelectHint": "Select an edge",
   "architectEdgeDistanceHint": "Set the distance by moving the selected edge.",
   "architectEdgeMoveHint": "Move the edge parallel to itself, with both endpoints.",
-  "architectEdgePullHint": "Pull the edge and retain its original corners."
+  "architectEdgePullHint": "Pull the edge and retain its original corners.",
+  "dragDuplicateAction": "Drag+",
+  "dragDuplicateHint": "Drag to place the copy",
+  "structuralBeamNamePrefix": "B",
+  "bimUnderlayReviewCompleteAction": "Reviewed",
+  "bimUnderlayReviewCompleteTooltip": "Mark the preserved elements and openings as reviewed"
 }

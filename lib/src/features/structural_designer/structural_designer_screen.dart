@@ -3,7 +3,6 @@ import 'rendering/slab_colors.dart';
 import 'rendering/grid_axis_bubble_layout.dart';
 import 'analysis/staircase_automatic_openings.dart';
 import 'rendering/slab_plan_labels.dart';
-import 'analysis/geometric_window_detector.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../bim_projects/services/bim_underlay_conversion_service.dart';
@@ -50,11 +49,8 @@ import 'widgets/seismic_load_dialog.dart';
 import 'widgets/slab_level_dialog.dart';
 import 'services/slab_opening_placement.dart';
 import 'services/slab_edit_validation.dart';
-import 'widgets/structural_scheme_readiness_dialog.dart';
-import 'widgets/initial_scheme_dialog.dart';
-import 'analysis/initial_scheme_generator.dart';
-import 'analysis/structural_scheme_readiness.dart';
 import 'widgets/slab_edge_offset_dialog.dart';
+import 'widgets/structural_offset_dialog.dart';
 import 'widgets/storey_manager_sheet.dart';
 import '../dxf_viewer/widgets/dxf_layer_sheet.dart';
 import '../dxf_viewer/widgets/dxf_entity_context_sheet.dart';
@@ -179,6 +175,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StructuralColumn? _selectedColumn;
   StructuralShearWall? _selectedShearWall;
   StructuralBeam? _selectedBeam;
+  Object? _duplicateDraft;
+  String? _duplicateStoreyId;
+  Offset? _duplicateOrigin;
+  Offset? _duplicateTarget;
+  bool _placementPointerHandled = false;
+
   (String, int)? _selectedOpening;
   StructuralGridAxis? _selectedGridAxis;
   String _currentAxisName = '1';
@@ -1176,33 +1178,125 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     });
   }
 
-  void _duplicateSelectedColumn() {
-    if (_selectedColumn == null) return;
-    _columnMirrorBase = null;
-    _columnMirrorCycle = 0;
-    _pushUndo();
-    final col = _selectedColumn!;
+  void _startDuplicateDrag(Object source) {
     final active = _project.activeStorey;
-    final offset = Offset(0.20 * _cadUnitsPerMeter, -0.20 * _cadUnitsPerMeter);
-    final nextName = _generateNextColumnName(active.columns);
-    final dup = StructuralColumn(
-      id: 'col_${DateTime.now().millisecondsSinceEpoch}',
-      name: nextName,
-      center: col.center + offset,
-      shape: col.shape,
-      width: col.width,
-      height: col.height,
-      rotationRad: col.rotationRad,
-      thickness: col.thickness,
-      isMirrored: col.isMirrored,
-    );
-    final updatedCols = List<StructuralColumn>.from(active.columns)..add(dup);
-    _updateActiveStorey(active.copyWith(columns: updatedCols));
+    final id = 'drag_copy_${DateTime.now().microsecondsSinceEpoch}';
+    final draft = switch (source) {
+      StructuralColumn c => c.copyWith(
+        id: id,
+        name: _generateNextColumnName(active.columns),
+      ),
+      StructuralShearWall w => w.copyWith(
+        id: id,
+        name: _generateNextShearWallName(active.shearWalls),
+      ),
+      StructuralBeam b => b.copyWith(
+        id: id,
+        name:
+            '${context.l10n.structuralBeamNamePrefix}${active.beams.map((b) => extractElementNumber(b.displayName) ?? 0).fold(0, math.max) + 1}',
+      ),
+      _ => throw ArgumentError.value(source),
+    };
+    final center = switch (source) {
+      StructuralColumn c => c.center,
+      StructuralShearWall w => w.center,
+      StructuralBeam b => (b.start + b.end) / 2,
+      _ => Offset.zero,
+    };
     setState(() {
-      _selectedColumn = dup;
-      _isMovingColumn = false;
+      _duplicateDraft = draft;
+      _duplicateStoreyId = active.id;
+      _duplicateOrigin = center;
+      _duplicateTarget = center;
+      _elementGrabOffsetCad = null;
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  Object? get _positionedDuplicate {
+    final delta =
+        (_duplicateTarget ?? Offset.zero) - (_duplicateOrigin ?? Offset.zero);
+    return switch (_duplicateDraft) {
+      StructuralColumn c => c.copyWith(center: c.center + delta),
+      StructuralShearWall w => w.copyWith(
+        start: w.start + delta,
+        end: w.end + delta,
+      ),
+      StructuralBeam b => b.copyWith(
+        start: b.start + delta,
+        end: b.end + delta,
+      ),
+      _ => null,
+    };
+  }
+
+  StoreyLevel _withDuplicate(StoreyLevel floor) =>
+      switch (floor.id == _duplicateStoreyId ? _positionedDuplicate : null) {
+        StructuralColumn c => floor.copyWith(columns: [...floor.columns, c]),
+        StructuralShearWall w => floor.copyWith(
+          shearWalls: [...floor.shearWalls, w],
+        ),
+        StructuralBeam b => floor.copyWith(beams: [...floor.beams, b]),
+        _ => floor,
+      };
+
+  void _updateDuplicateDrag(Offset screenPos, {required bool isMouse}) {
+    var target =
+        _screenToCad(screenPos) + (_elementGrabOffsetCad ?? Offset.zero);
+    if (_snapEnabled) {
+      final tolerance = StructuralPointerInteraction.snapToleranceCad(
+        isMouse: isMouse,
+        pixelsPerCadUnit:
+            _getCadFitScale() * _transformController.value.getMaxScaleOnAxis(),
+        cadUnitsPerMeter: _cadUnitsPerMeter,
+      );
+      final snap =
+          _findStructuralSnap(target, tolerance) ??
+          DxfSnapHelper.findSnapPoint(
+            document: _document,
+            cadPoint: target,
+            toleranceCad: tolerance,
+          );
+      if (snap != null) target = snap.point;
+    }
+    setState(() => _duplicateTarget = target);
+  }
+
+  void _cancelDuplicateDrag() {
+    setState(() {
+      _duplicateDraft = null;
+      _duplicateStoreyId = null;
+      _duplicateOrigin = null;
+      _duplicateTarget = null;
+    });
+  }
+
+  void _commitDuplicateDrag() {
+    if (_project.activeStorey.id != _duplicateStoreyId) {
+      _cancelDuplicateDrag();
+      return;
+    }
+    final copy = _positionedDuplicate;
+    if (copy == null) return;
+    _pushUndo();
+    _updateActiveStorey(_withDuplicate(_project.activeStorey));
+    setState(() {
+      _selectedColumn = copy is StructuralColumn ? copy : null;
+      _selectedShearWall = copy is StructuralShearWall ? copy : null;
+      _selectedBeam = copy is StructuralBeam ? copy : null;
+      _selectedGridAxis = null;
+      _selectedOpening = null;
+      _duplicateDraft = null;
+      _duplicateStoreyId = null;
+      _duplicateOrigin = null;
+      _duplicateTarget = null;
     });
     HapticFeedback.mediumImpact();
+  }
+
+  void _duplicateSelectedColumn() {
+    if (_selectedColumn == null) return;
+    _startDuplicateDrag(_selectedColumn!);
   }
 
   String _generateNextShearWallName(List<StructuralShearWall> existing) {
@@ -1377,502 +1471,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.selectionClick();
   }
 
-  void _showFinePositionSheet(BuildContext context, {required bool isColumn}) {
-    if (isColumn && _selectedColumn == null) return;
-    if (!isColumn && _selectedShearWall == null) return;
-
-    double stepM = 0.01; // 1 cm default step
-    final col = _selectedColumn;
-    final wall = _selectedShearWall;
-    final Offset initialCenter = isColumn ? col!.center : wall!.center;
-
-    final xController = TextEditingController(
-      text: (initialCenter.dx / _cadUnitsPerMeter).toStringAsFixed(3),
-    );
-    final yController = TextEditingController(
-      text: (initialCenter.dy / _cadUnitsPerMeter).toStringAsFixed(3),
-    );
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF1E1E24),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        side: BorderSide(color: Color(0xFF00E5FF), width: 1.5),
-      ),
-      builder: (bottomSheetCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            final activeStorey = _project.activeStorey;
-            final liveCol = isColumn ? activeStorey.columns.where((c) => c.id == col!.id).firstOrNull : null;
-            final liveWall = !isColumn ? activeStorey.shearWalls.where((w) => w.id == wall!.id).firstOrNull : null;
-            if (isColumn && liveCol == null) return const SizedBox.shrink();
-            if (!isColumn && liveWall == null) return const SizedBox.shrink();
-            final center = isColumn ? liveCol!.center : liveWall!.center;
-
-            void applyDelta(double dxM, double dyM) {
-              _pushUndo();
-              final offsetCad = Offset(dxM * _cadUnitsPerMeter, dyM * _cadUnitsPerMeter);
-              if (isColumn) {
-                final updated = liveCol!.copyWith(center: liveCol.center + offsetCad);
-                final updatedCols = activeStorey.columns.map((c) => c.id == updated.id ? updated : c).toList();
-                _updateActiveStorey(activeStorey.copyWith(columns: updatedCols));
-                setState(() => _selectedColumn = updated);
-              } else {
-                final updated = liveWall!.copyWith(
-                  start: liveWall.start + offsetCad,
-                  end: liveWall.end + offsetCad,
-                );
-                final updatedWalls = activeStorey.shearWalls.map((w) => w.id == updated.id ? updated : w).toList();
-                _updateActiveStorey(activeStorey.copyWith(shearWalls: updatedWalls));
-                setState(() => _selectedShearWall = updated);
-              }
-              final newCenter = center + offsetCad;
-              xController.text = (newCenter.dx / _cadUnitsPerMeter).toStringAsFixed(3);
-              yController.text = (newCenter.dy / _cadUnitsPerMeter).toStringAsFixed(3);
-              setSheetState(() {});
-              HapticFeedback.selectionClick();
-            }
-
-            void applyExactCoordinates() {
-              final newX = double.tryParse(xController.text.trim());
-              final newY = double.tryParse(yController.text.trim());
-              if (newX == null || newY == null) return;
-              _pushUndo();
-              final targetCenter = Offset(newX * _cadUnitsPerMeter, newY * _cadUnitsPerMeter);
-              if (isColumn) {
-                final updated = liveCol!.copyWith(center: targetCenter);
-                final updatedCols = activeStorey.columns.map((c) => c.id == updated.id ? updated : c).toList();
-                _updateActiveStorey(activeStorey.copyWith(columns: updatedCols));
-                setState(() => _selectedColumn = updated);
-              } else {
-                final halfLen = liveWall!.length / 2.0;
-                final u = Offset(math.cos(liveWall.angleRad), math.sin(liveWall.angleRad));
-                final updated = liveWall.copyWith(
-                  start: targetCenter - u * halfLen,
-                  end: targetCenter + u * halfLen,
-                );
-                final updatedWalls = activeStorey.shearWalls.map((w) => w.id == updated.id ? updated : w).toList();
-                _updateActiveStorey(activeStorey.copyWith(shearWalls: updatedWalls));
-                setState(() => _selectedShearWall = updated);
-              }
-              setSheetState(() {});
-              HapticFeedback.mediumImpact();
-            }
-
-            void snapNearest() {
-              if (isColumn) {
-                final fitScale = _getCadFitScale();
-                final currentScale = _transformController.value.getMaxScaleOnAxis();
-                final tol = 36.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
-                final mag = StructuralMagneticAlignmentHelper.alignColumn(
-                  rawCenter: center,
-                  columnWidth: liveCol!.width,
-                  columnHeight: liveCol.height,
-                  columnRotationRad: liveCol.rotationRad,
-                  toleranceCad: tol,
-                  activeStorey: activeStorey,
-                  movingColumnId: liveCol.id,
-                  dxfDocument: _document,
-                  cadUnitsPerMeter: _cadUnitsPerMeter,
-                );
-                if (mag != null) {
-                  _pushUndo();
-                  final updated = liveCol.copyWith(center: mag.snappedCenter);
-                  final updatedCols = activeStorey.columns.map((c) => c.id == updated.id ? updated : c).toList();
-                  _updateActiveStorey(activeStorey.copyWith(columns: updatedCols));
-                  setState(() => _selectedColumn = updated);
-                  xController.text = (mag.snappedCenter.dx / _cadUnitsPerMeter).toStringAsFixed(3);
-                  yController.text = (mag.snappedCenter.dy / _cadUnitsPerMeter).toStringAsFixed(3);
-                  setSheetState(() {});
-                  HapticFeedback.mediumImpact();
-                }
-              } else {
-                final fitScale = _getCadFitScale();
-                final currentScale = _transformController.value.getMaxScaleOnAxis();
-                final tol = 36.0 / (fitScale * currentScale.clamp(0.001, 10000.0));
-                final mag = StructuralMagneticAlignmentHelper.alignShearWall(
-                  rawCenter: center,
-                  wallLength: liveWall!.length,
-                  wallThickness: liveWall.thickness,
-                  wallRotationRad: liveWall.angleRad,
-                  toleranceCad: tol,
-                  activeStorey: activeStorey,
-                  movingWallId: liveWall.id,
-                  dxfDocument: _document,
-                  cadUnitsPerMeter: _cadUnitsPerMeter,
-                );
-                if (mag != null) {
-                  _pushUndo();
-                  final halfLen = liveWall.length / 2.0;
-                  final rot = mag.snappedRotationRad ?? liveWall.angleRad;
-                  final u = Offset(math.cos(rot), math.sin(rot));
-                  final updated = liveWall.copyWith(
-                    start: mag.snappedCenter - u * halfLen,
-                    end: mag.snappedCenter + u * halfLen,
-                  );
-                  final updatedWalls = activeStorey.shearWalls.map((w) => w.id == updated.id ? updated : w).toList();
-                  _updateActiveStorey(activeStorey.copyWith(shearWalls: updatedWalls));
-                  setState(() => _selectedShearWall = updated);
-                  xController.text = (mag.snappedCenter.dx / _cadUnitsPerMeter).toStringAsFixed(3);
-                  yController.text = (mag.snappedCenter.dy / _cadUnitsPerMeter).toStringAsFixed(3);
-                  setSheetState(() {});
-                  HapticFeedback.mediumImpact();
-                }
-              }
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 14,
-                bottom: MediaQuery.of(bottomSheetCtx).viewInsets.bottom + 16,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Handle & Title
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.tune_rounded, color: Color(0xFF00E5FF), size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${context.l10n.finePositionTitle} • ${isColumn ? liveCol!.displayName : liveWall!.displayName}',
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
-                          onPressed: () => Navigator.of(bottomSheetCtx).pop(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Step size selector chips
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        for (final (stepVal, stepLabel) in [
-                          (0.01, context.l10n.step1cm),
-                          (0.05, context.l10n.step5cm),
-                          (0.10, context.l10n.step10cm),
-                          (0.25, context.l10n.step25cm),
-                        ])
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                            child: ChoiceChip(
-                              label: Text(stepLabel),
-                              selected: (stepM - stepVal).abs() < 1e-4,
-                              onSelected: (sel) {
-                                if (sel) {
-                                  setSheetState(() => stepM = stepVal);
-                                  HapticFeedback.selectionClick();
-                                }
-                              },
-                              selectedColor: const Color(0xFF00E5FF),
-                              backgroundColor: const Color(0xFF2A2A32),
-                              labelStyle: TextStyle(
-                                color: (stepM - stepVal).abs() < 1e-4 ? Colors.black : Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Nudge D-Pad
-                    Column(
-                      children: [
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2A2A32),
-                            foregroundColor: const Color(0xFF00E5FF),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            minimumSize: const Size(56, 44),
-                          ),
-                          onPressed: () => applyDelta(0, stepM),
-                          child: const Icon(Icons.arrow_upward_rounded, size: 22),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2A2A32),
-                                foregroundColor: const Color(0xFF00E5FF),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                minimumSize: const Size(56, 44),
-                              ),
-                              onPressed: () => applyDelta(-stepM, 0),
-                              child: const Icon(Icons.arrow_back_rounded, size: 22),
-                            ),
-                            const SizedBox(width: 10),
-                            Tooltip(
-                              message: context.l10n.snapToNearest,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF00E5FF),
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  minimumSize: const Size(56, 44),
-                                ),
-                                onPressed: snapNearest,
-                                child: const Icon(Icons.filter_center_focus_rounded, size: 22),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2A2A32),
-                                foregroundColor: const Color(0xFF00E5FF),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                minimumSize: const Size(56, 44),
-                              ),
-                              onPressed: () => applyDelta(stepM, 0),
-                              child: const Icon(Icons.arrow_forward_rounded, size: 22),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2A2A32),
-                            foregroundColor: const Color(0xFF00E5FF),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            minimumSize: const Size(56, 44),
-                          ),
-                          onPressed: () => applyDelta(0, -stepM),
-                          child: const Icon(Icons.arrow_downward_rounded, size: 22),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Exact X and Y coordinate fields
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: xController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
-                            decoration: InputDecoration(
-                              labelText: context.l10n.coordinateXLabel,
-                              labelStyle: const TextStyle(color: Color(0xFF00E5FF), fontSize: 13),
-                              filled: true,
-                              fillColor: const Color(0xFF2A2A32),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onSubmitted: (_) => applyExactCoordinates(),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: yController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
-                            decoration: InputDecoration(
-                              labelText: context.l10n.coordinateYLabel,
-                              labelStyle: const TextStyle(color: Color(0xFF00E5FF), fontSize: 13),
-                              filled: true,
-                              fillColor: const Color(0xFF2A2A32),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onSubmitted: (_) => applyExactCoordinates(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00E5FF),
-                            foregroundColor: Colors.black,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
-                          onPressed: applyExactCoordinates,
-                          child: Text(context.l10n.applyAction, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    // Clear Distance to Neighbors Section (Светъл размер до съседи)
-                    _buildNeighborClearDistancesSection(
-                      context: ctx,
-                      center: center,
-                      width: isColumn ? liveCol!.width : liveWall!.length,
-                      height: isColumn ? liveCol!.height : liveWall!.thickness,
-                      activeStorey: activeStorey,
-                      currentElementId: isColumn ? liveCol!.id : liveWall!.id,
-                      onApplyDelta: applyDelta,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildNeighborClearDistancesSection({
-    required BuildContext context,
-    required Offset center,
-    required double width,
-    required double height,
-    required StoreyLevel activeStorey,
-    required String currentElementId,
-    required void Function(double dxM, double dyM) onApplyDelta,
-  }) {
-    final neighbors = StructuralMagneticAlignmentHelper.findNeighborClearDistances(
-      center: center,
-      width: width,
-      height: height,
-      activeStorey: activeStorey,
-      currentElementId: currentElementId,
-      cadUnitsPerMeter: _cadUnitsPerMeter,
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF24242C),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.space_bar_rounded, size: 16, color: Color(0xFF00E5FF)),
-              const SizedBox(width: 6),
-              Text(
-                context.l10n.clearDistanceToNeighbors,
-                style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (neighbors.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                context.l10n.noNeighborsFound,
-                style: const TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic),
-              ),
-            )
-          else
-            for (final n in neighbors)
-              _buildNeighborDistanceRow(context, n, onApplyDelta),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNeighborDistanceRow(
-    BuildContext context,
-    NeighborClearDistance n,
-    void Function(double dxM, double dyM) onApplyDelta,
-  ) {
-    String label;
-    IconData icon;
-    switch (n.direction) {
-      case 'left':
-        label = context.l10n.clearDistanceLeft(n.neighborName, n.currentClearDistanceM.toStringAsFixed(2));
-        icon = Icons.arrow_back_rounded;
-        break;
-      case 'right':
-        label = context.l10n.clearDistanceRight(n.neighborName, n.currentClearDistanceM.toStringAsFixed(2));
-        icon = Icons.arrow_forward_rounded;
-        break;
-      case 'top':
-        label = context.l10n.clearDistanceTop(n.neighborName, n.currentClearDistanceM.toStringAsFixed(2));
-        icon = Icons.arrow_upward_rounded;
-        break;
-      default:
-        label = context.l10n.clearDistanceBottom(n.neighborName, n.currentClearDistanceM.toStringAsFixed(2));
-        icon = Icons.arrow_downward_rounded;
-        break;
-    }
-
-    final controller = TextEditingController(text: n.currentClearDistanceM.toStringAsFixed(2));
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Colors.white70),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          SizedBox(
-            width: 70,
-            height: 34,
-            child: TextField(
-              controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: const Color(0xFF1E1E24),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00E5FF),
-              foregroundColor: Colors.black,
-              minimumSize: const Size(40, 34),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-            ),
-            onPressed: () {
-              final targetM = double.tryParse(controller.text.trim());
-              if (targetM != null && targetM > 0) {
-                final deltaCad = n.computeDeltaCad(
-                  targetClearDistanceM: targetM,
-                  cadUnitsPerMeter: _cadUnitsPerMeter,
-                );
-                onApplyDelta(deltaCad.dx / _cadUnitsPerMeter, deltaCad.dy / _cadUnitsPerMeter);
-              }
-            },
-            child: Text(context.l10n.applyClearDistance, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _renameSelectedWall() {
     if (_selectedShearWall == null) return;
@@ -1942,25 +1540,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _duplicateSelectedWall() {
     if (_selectedShearWall == null) return;
-    _pushUndo();
-    final wall = _selectedShearWall!;
-    final active = _project.activeStorey;
-    final offset = Offset(0.25 * _cadUnitsPerMeter, -0.25 * _cadUnitsPerMeter);
-    final nextName = _generateNextShearWallName(active.shearWalls);
-    final dup = StructuralShearWall(
-      id: 'wall_${DateTime.now().millisecondsSinceEpoch}',
-      name: nextName,
-      start: wall.start + offset,
-      end: wall.end + offset,
-      thickness: wall.thickness,
-      isFlipped: wall.isFlipped,
-    );
-    final updatedWalls = List<StructuralShearWall>.from(active.shearWalls)..add(dup);
-    _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
-    setState(() {
-      _selectedShearWall = dup;
-    });
-    HapticFeedback.mediumImpact();
+    _startDuplicateDrag(_selectedShearWall!);
   }
 
   String _generateNextBeamName(List<StructuralBeam> existing, {required bool isBulgarian}) {
@@ -2063,27 +1643,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _duplicateSelectedBeam() {
     if (_selectedBeam == null) return;
-    _pushUndo();
-    final beam = _selectedBeam!;
-    final active = _project.activeStorey;
-    final offset = Offset(0.25 * _cadUnitsPerMeter, -0.25 * _cadUnitsPerMeter);
-    final isBg = Localizations.localeOf(context).languageCode == 'bg';
-    final nextName = _generateNextBeamName(active.beams, isBulgarian: isBg);
-    final dup = StructuralBeam(
-      id: 'beam_${DateTime.now().millisecondsSinceEpoch}',
-      name: nextName,
-      start: beam.start + offset,
-      end: beam.end + offset,
-      width: beam.width,
-      depth: beam.depth,
-      isSecondary: beam.isSecondary,
-    );
-    final updatedBeams = List<StructuralBeam>.from(active.beams)..add(dup);
-    _updateActiveStorey(active.copyWith(beams: updatedBeams));
-    setState(() {
-      _selectedBeam = dup;
-    });
-    HapticFeedback.mediumImpact();
+    _startDuplicateDrag(_selectedBeam!);
   }
 
   void _updateSelectedBeamLength(double deltaMeters) {
@@ -2560,182 +2120,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.lightImpact();
   }
 
-  void _showGridAxisOffsetDialog() {
-    if (_selectedGridAxis == null) return;
-    final axis = _selectedGridAxis!;
-    final controller = TextEditingController(text: _axisOffsetDistanceMeters.toStringAsFixed(2));
-
-    final angle = axis.angleRad;
-    final isVertical = (math.cos(angle).abs() < math.sin(angle).abs());
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            double currentDist = double.tryParse(controller.text) ?? _axisOffsetDistanceMeters;
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1E1E24),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
-              ),
-              title: Row(
-                children: [
-                  const Icon(Icons.straighten_rounded, color: Color(0xFF00E5FF), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      context.l10n.offsetWithDuplication(context.l10n.gridAxisTitle(axis.name)),
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: controller,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                      decoration: InputDecoration(
-                        labelText: context.l10n.distanceMeters,
-                        labelStyle: const TextStyle(color: Color(0xFF00E5FF)),
-                        suffixText: 'm',
-                        suffixStyle: const TextStyle(color: Colors.white70),
-                        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
-                        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2)),
-                      ),
-                      onChanged: (val) {
-                        final parsed = double.tryParse(val);
-                        if (parsed != null && parsed > 0) {
-                          setDialogState(() {
-                            currentDist = parsed;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    // Quick distance chips
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0].map((d) {
-                        final isSel = (currentDist - d).abs() < 1e-3;
-                        return ChoiceChip(
-                          label: Text('${d.toStringAsFixed(1)} m'),
-                          selected: isSel,
-                          selectedColor: const Color(0xFF00E5FF),
-                          backgroundColor: Colors.white12,
-                          labelStyle: TextStyle(
-                            color: isSel ? Colors.black : Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          onSelected: (_) {
-                            controller.text = d.toStringAsFixed(2);
-                            setDialogState(() {
-                              currentDist = d;
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      context.l10n.duplicationDirection,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    // Direction buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white12,
-                              foregroundColor: const Color(0xFF00E5FF),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: const BorderSide(color: Color(0xFF00E5FF)),
-                              ),
-                            ),
-                            icon: Icon(isVertical ? Icons.arrow_back_rounded : Icons.arrow_upward_rounded, size: 16),
-                            label: Text(
-                              isVertical ? context.l10n.directionLeft : context.l10n.directionUp,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                            onPressed: () {
-                              final d = double.tryParse(controller.text) ?? currentDist;
-                              Navigator.of(dialogCtx).pop();
-                              _applyAxisOffset(axis, d, isVertical ? -1.0 : 1.0);
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white12,
-                              foregroundColor: const Color(0xFF00E5FF),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: const BorderSide(color: Color(0xFF00E5FF)),
-                              ),
-                            ),
-                            icon: Icon(isVertical ? Icons.arrow_forward_rounded : Icons.arrow_downward_rounded, size: 16),
-                            label: Text(
-                              isVertical ? context.l10n.directionRight : context.l10n.directionDown,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                            onPressed: () {
-                              final d = double.tryParse(controller.text) ?? currentDist;
-                              Navigator.of(dialogCtx).pop();
-                              _applyAxisOffset(axis, d, isVertical ? 1.0 : -1.0);
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        side: const BorderSide(color: Colors.white24),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.touch_app_outlined, size: 16),
-                      label: Text(
-                        context.l10n.specifyDirectionByDrag,
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      onPressed: () {
-                        final d = double.tryParse(controller.text) ?? currentDist;
-                        Navigator.of(dialogCtx).pop();
-                        _startAxisOffsetDragMode(axis, d);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+  Future<void> _showGridAxisOffsetDialog() async {
+    final element = _selectedGridAxis;
+    if (element == null) return;
+    final distance = await showStructuralOffsetDialog(context, centimeters: false);
+    if (!mounted || distance == null) return;
+    _startAxisOffsetDragMode(element, distance);
   }
 
   String _getNextColumnName(String baseName) {
@@ -2898,218 +2288,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     HapticFeedback.lightImpact();
   }
 
-  void _showColumnOffsetDialog() {
-    if (_selectedColumn == null) return;
-    final col = _selectedColumn!;
-    final double initialDistCm = (_columnOffsetDistanceMeters * 100).roundToDouble();
-    final controller = TextEditingController(text: initialDistCm.toInt().toString());
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            double currentDistCm = double.tryParse(controller.text) ?? initialDistCm;
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1E1E24),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
-              ),
-              title: Row(
-                children: [
-                  const Icon(Icons.straighten_rounded, color: Color(0xFF00E5FF), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      context.l10n.offsetWithDuplication(col.displayName),
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: controller,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                      decoration: InputDecoration(
-                        labelText: context.l10n.distanceCentimeters,
-                        labelStyle: const TextStyle(color: Color(0xFF00E5FF)),
-                        suffixText: 'cm',
-                        suffixStyle: const TextStyle(color: Colors.white70),
-                        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
-                        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF), width: 2)),
-                      ),
-                      onChanged: (val) {
-                        final parsed = double.tryParse(val);
-                        if (parsed != null && parsed > 0) {
-                          setDialogState(() {
-                            currentDistCm = parsed;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [50.0, 100.0, 150.0, 200.0, 300.0, 400.0].map((d) {
-                        final isSel = (currentDistCm - d).abs() < 1e-1;
-                        return ChoiceChip(
-                          label: Text('${d.toInt()} cm'),
-                          selected: isSel,
-                          selectedColor: const Color(0xFF00E5FF),
-                          backgroundColor: Colors.white12,
-                          labelStyle: TextStyle(
-                            color: isSel ? Colors.black : Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          onSelected: (_) {
-                            controller.text = d.toInt().toString();
-                            setDialogState(() {
-                              currentDistCm = d;
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      context.l10n.duplicationDirection,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white12,
-                              foregroundColor: const Color(0xFF00E5FF),
-                              padding: const EdgeInsets.symmetric(vertical: 9),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: const BorderSide(color: Color(0xFF00E5FF)),
-                              ),
-                            ),
-                            icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                            label: Text('← ${context.l10n.directionLeft}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            onPressed: () {
-                              final dM = (double.tryParse(controller.text) ?? currentDistCm) / 100.0;
-                              Navigator.of(dialogCtx).pop();
-                              _applyColumnOffset(col, dM, const Offset(-1, 0));
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white12,
-                              foregroundColor: const Color(0xFF00E5FF),
-                              padding: const EdgeInsets.symmetric(vertical: 9),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: const BorderSide(color: Color(0xFF00E5FF)),
-                              ),
-                            ),
-                            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                            label: Text('→ ${context.l10n.directionRight}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            onPressed: () {
-                              final dM = (double.tryParse(controller.text) ?? currentDistCm) / 100.0;
-                              Navigator.of(dialogCtx).pop();
-                              _applyColumnOffset(col, dM, const Offset(1, 0));
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white12,
-                              foregroundColor: const Color(0xFF00E5FF),
-                              padding: const EdgeInsets.symmetric(vertical: 9),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: const BorderSide(color: Color(0xFF00E5FF)),
-                              ),
-                            ),
-                            icon: const Icon(Icons.arrow_upward_rounded, size: 16),
-                            label: Text('↑ ${context.l10n.directionUp}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            onPressed: () {
-                              final dM = (double.tryParse(controller.text) ?? currentDistCm) / 100.0;
-                              Navigator.of(dialogCtx).pop();
-                              _applyColumnOffset(col, dM, const Offset(0, 1));
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white12,
-                              foregroundColor: const Color(0xFF00E5FF),
-                              padding: const EdgeInsets.symmetric(vertical: 9),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: const BorderSide(color: Color(0xFF00E5FF)),
-                              ),
-                            ),
-                            icon: const Icon(Icons.arrow_downward_rounded, size: 16),
-                            label: Text('↓ ${context.l10n.directionDown}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            onPressed: () {
-                              final dM = (double.tryParse(controller.text) ?? currentDistCm) / 100.0;
-                              Navigator.of(dialogCtx).pop();
-                              _applyColumnOffset(col, dM, const Offset(0, -1));
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        side: const BorderSide(color: Colors.white24),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.touch_app_outlined, size: 16),
-                      label: Text(
-                        context.l10n.specifyDirectionByDrag,
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      onPressed: () {
-                        final dM = (double.tryParse(controller.text) ?? currentDistCm) / 100.0;
-                        Navigator.of(dialogCtx).pop();
-                        _startColumnOffsetDragMode(col, dM);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: Text(context.l10n.cancel, style: const TextStyle(color: Colors.white54)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+  Future<void> _showColumnOffsetDialog() async {
+    final element = _selectedColumn;
+    if (element == null) return;
+    final distance = await showStructuralOffsetDialog(context, centimeters: true);
+    if (!mounted || distance == null) return;
+    _startColumnOffsetDragMode(element, distance);
   }
 
   void _showCustomColumnDialog() {
@@ -3875,6 +3059,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _activePointersCount++;
     _activePointerKind = event.kind;
     if (_activePointersCount > 1) {
+      if (_duplicateDraft != null) _cancelDuplicateDrag();
       _measurementHoldTimer?.cancel();
       _isMultiTouchGesture = true;
       if (_isPlacingWithHold) {
@@ -3944,7 +3129,25 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
     _isMultiTouchGesture = false;
+    _placementPointerHandled = false;
+    if (_duplicateDraft != null) {
+      _placementPointerHandled = true;
+      _elementGrabOffsetCad = StructuralPointerInteraction.grabOffset(
+        _duplicateOrigin!, _screenToCad(event.localPosition));
+      _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      return;
+    }
     _elementGrabOffsetCad = null;
+    if (_isOffsettingAxisWithDrag && _axisBeingOffset != null) {
+      _placementPointerHandled = true;
+      _updateAxisOffsetDrag(event.localPosition);
+      return;
+    }
+    if (_isOffsettingColumnWithDrag && _columnBeingOffset != null) {
+      _placementPointerHandled = true;
+      _updateColumnOffsetDrag(event.localPosition);
+      return;
+    }
 
     if (_activeTool == StructuralDrawTool.measure) {
       // Touch stays available to the pan recognizer until a hold wins.
@@ -4331,6 +3534,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
+    if (_duplicateDraft != null) {
+      _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      return;
+    }
 
     if (_activeTool == StructuralDrawTool.measure) {
       _measurementTouchPosition = event.localPosition;
@@ -5508,6 +4715,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
+    if (_duplicateDraft != null && _placementPointerHandled) {
+      _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
+      _commitDuplicateDrag();
+      return;
+    }
+
     // Grid axis offset drag mode commit on release
     if (_isOffsettingAxisWithDrag && _axisBeingOffset != null) {
       final axis = _axisBeingOffset!;
@@ -5872,6 +5085,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
+    if (_duplicateDraft != null) _cancelDuplicateDrag();
     _measurementHoldTimer?.cancel();
     _activePointersCount = 0;
     _activePointerKind = null;
@@ -5903,6 +5117,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleLongPressStart(LongPressStartDetails details) {
+    if (_duplicateDraft != null || _placementPointerHandled) return;
     if (_activeTool == StructuralDrawTool.measure) return;
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isExtrudingEdge || _activeGrip != null) return;
@@ -6114,6 +5329,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
+    if (_duplicateDraft != null || _placementPointerHandled) return;
     if (_activeTool == StructuralDrawTool.measure) return;
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isDraggingAxisHandle && _selectedGridAxis != null) {
@@ -6180,6 +5396,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleLongPressEnd(LongPressEndDetails details) {
+    if (_duplicateDraft != null || _placementPointerHandled) return;
     if (_activeTool == StructuralDrawTool.measure) return;
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_draggingSlabVertexIndex != null && _editingSlab != null) {
@@ -6383,6 +5600,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleLongPressCancel() {
+    if (_duplicateDraft != null || _placementPointerHandled) return;
     if (_activeTool == StructuralDrawTool.measure) return;
     if (_isMovingColumn) {
       setState(() {
@@ -6452,6 +5670,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handleTapUp(TapUpDetails details) {
+    if (_placementPointerHandled || _duplicateDraft != null) return;
     if (_activeTool == StructuralDrawTool.measure) {
       if (details.kind == PointerDeviceKind.mouse || _isMultiTouchGesture ||
           _activePointersCount > 1 || _isPlacingWithHold || _measurementHeldGesture) {
@@ -7105,156 +6324,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _generateInitialScheme() async {
-    var snapshot = _project;
-    var analysisSnapshot = snapshot.copyWith(storeys: snapshot.ceilingStoreys);
-    final scale = _cadUnitsPerMeter;
-    final editing =
-        _isEditingSlab ||
-        _slabPointsCad.isNotEmpty ||
-        _openingPointsCad.isNotEmpty ||
-        _openingStartCad != null ||
-        _wallStartCad != null ||
-        _beamStartCad != null;
-    if (!StructuralSchemeReadiness.evaluate(
-      analysisSnapshot,
-      scale,
-      editing: editing,
-    ).geometryReady) {
-      await showDialog<void>(
-        context: context,
-        builder: (_) => StructuralSchemeReadinessDialog(
-          project: analysisSnapshot,
-          scale: scale,
-          editing: editing,
-        ),
-      );
-      return;
-    }
-    if (widget.bimContext != null) {
-      final targets = StaircaseAutomaticOpenings.detect(
-        snapshot,
-        _staircaseDocuments,
-        scale,
-      );
-      final missing = StaircaseAutomaticOpenings.missing(
-        snapshot,
-        targets,
-        scale,
-      );
-      if (missing.isNotEmpty) {
-        final levels = [
-          for (final floor in snapshot.storeys)
-            if (missing.contains(floor.id)) floor.elevationLabel,
-        ].join(', ');
-        final cut = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(context.l10n.openingStaircaseTitle),
-            content: Text(context.l10n.staircaseAutoMissing(levels)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(context.l10n.cancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(context.l10n.staircaseAutoGenerate),
-              ),
-            ],
-          ),
-        );
-        if (!mounted || cut != true || !identical(snapshot, _project)) return;
-        final result = StaircaseAutomaticOpenings.apply(
-          snapshot,
-          targets,
-          scale,
-          storeyIds: missing,
-        );
-        _applyAutomaticStairCuts(result);
-        if (StaircaseAutomaticOpenings.missing(
-          _project,
-          targets,
-          scale,
-        ).isNotEmpty) {
-          final unresolved = StaircaseAutomaticOpenings.missing(
-            _project,
-            targets,
-            scale,
-          );
-          final arrival =
-              _project.storeys.where((s) => unresolved.contains(s.id)).toList()
-                ..sort((a, b) => a.elevation.compareTo(b.elevation));
-          if (arrival.isNotEmpty) {
-            setState(() {
-              _project = _project.copyWith(
-                activeStoreyIndex: _project.storeys.indexWhere(
-                  (s) => s.id == arrival.first.id,
-                ),
-              );
-              _activeTool = StructuralDrawTool.slabOpening;
-              _selectedOpeningPreset = 'staircase';
-              _selectedColumn = null;
-              _selectedShearWall = null;
-              _selectedBeam = null;
-              _selectedGridAxis = null;
-              _originalLayerVisibility.clear();
-              for (final entry in _document.layers.entries) {
-                _originalLayerVisibility[entry.key] = entry.value.isVisible;
-              }
-              if (_underlayFilterActive) _applyUnderlayFilter(true);
-              _runAnalysis();
-            });
-            _saveProject();
-          }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.l10n.staircaseAutoNotFound)),
-          );
-          return;
-        }
-        snapshot = _project;
-        analysisSnapshot = snapshot.copyWith(storeys: snapshot.ceilingStoreys);
-      }
-    }
-    final detection = WallAxisDetector.detect(
-      _document,
-      forceScaleFactor: scale / 1000,
-    );
-    final proposal = await showDialog<InitialSchemeProposal>(
-      context: context,
-      builder: (_) => InitialSchemeDialog(
-        project: analysisSnapshot,
-        sourceProject: snapshot,
-        pairs: detection.selectedWallPairs,
-        wallOpenings: GeometricWindowDetector.detect(
-          _document,
-          detection.selectedWallPairs,
-          scale / 1000,
-        ),
-        closureSegments: detection.closureSegments,
-        scale: scale,
-        options: InitialSchemeOptions(
-          columnShape: _currentColumnPreset.shape,
-          columnThicknessM: _currentColumnPreset.thickness,
-          columnWidthM: _currentColumnPreset.width,
-          columnDepthM: _currentColumnPreset.height,
-          wallLengthM: _currentWallLength,
-          wallThicknessM: _currentWallThickness,
-        ),
-      ),
-    );
-    if (!mounted || proposal == null || proposal.isEmpty) return;
-    if (!identical(_project, snapshot)) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.l10n.schemeStale)));
-      return;
-    }
-    _pushUndo();
-    _updateActiveStorey(proposal.apply(_project.activeStorey));
-    _runAnalysis();
   }
 
   Future<void> _generateSlabSeeds() async {
@@ -8146,6 +7215,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _selectTool(StructuralDrawTool tool) {
+    if (_duplicateDraft != null) _cancelDuplicateDrag();
     _measurementHoldTimer?.cancel();
     if (_isEditingSlab) _cancelSlabCorrection();
     setState(() {
@@ -8874,14 +7944,14 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     onPointerCancel: _handlePointerCancel,
                     child: InteractiveViewer(
                       transformationController: _transformController,
-                      panEnabled: !_isPlacingWithHold &&
+                      panEnabled: _duplicateDraft == null && !_isOffsettingAxisWithDrag && !_isOffsettingColumnWithDrag && !_isPlacingWithHold &&
                           !_isExtrudingEdge &&
                           !_isMovingColumn &&
                           !_isMovingShearWall &&
                           !_isMovingOpening &&
                           _draggingSlabVertexIndex == null &&
                           _draggingOpeningVertexIndex == null,
-                      scaleEnabled: !_isPlacingWithHold &&
+                      scaleEnabled: _duplicateDraft == null && !_isOffsettingAxisWithDrag && !_isOffsettingColumnWithDrag && !_isPlacingWithHold &&
                           !_isExtrudingEdge &&
                           !_isMovingColumn &&
                           !_isMovingShearWall &&
@@ -8980,7 +8050,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             Positioned.fill(
                               child: CustomPaint(
                                 painter: Structural2dPainter(
-                                  currentStorey: _project.activeStorey,
+                                  currentStorey: _withDuplicate(_project.activeStorey),
                                   showSlabs: _showBimSlabs,
                                   showFloorSlabs: widget.bimContext == null || _isEditingSlab,
                                   showGridAxes: _showBimAxes,
@@ -9319,7 +8389,16 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                child: _isEditingSlab
+                child: _duplicateDraft != null
+                    ? Material(
+                        color: const Color(0xFA1E1E24),
+                        child: SafeArea(top: false, child: Row(children: [
+                          const SizedBox(width: 12),
+                          Expanded(child: Text(context.l10n.dragDuplicateHint, style: const TextStyle(color: Colors.white))),
+                          TextButton(onPressed: _cancelDuplicateDrag, child: Text(context.l10n.cancel)),
+                        ])),
+                      )
+                    : _isEditingSlab
                     ? _buildSlabCorrectionBottomBar(context)
                     : (_isMovingColumn || _isMovingShearWall)
                         ? _buildFloatingMoveBottomBar(context)
@@ -9372,7 +8451,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         onUpdateSlabThickness: (t) {
                           setState(() => _currentSlabThickness = t);
                         },
-                        onGenerateSupports: _generateInitialScheme,
                         onManageUnderlays: widget.bimContext?.onManageStoreys,
                         onGenerateSlabs: _generateSlabSeeds,
                         onGenerateStaircaseOpenings: _generateStaircaseOpenings,
@@ -9528,18 +8606,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           onTap: _startMovingSelectedColumn,
         ),
         _buildDockActionButton(
-          icon: Icons.tune_rounded,
-          label: context.l10n.finePositionTitle,
-          color: const Color(0xFF00E5FF),
-          onTap: () => _showFinePositionSheet(context, isColumn: true),
-        ),
-        _buildDockActionButton(
-          icon: Icons.space_bar_rounded,
-          label: context.l10n.setClearDistanceAction,
-          color: const Color(0xFF64B5F6),
-          onTap: () => _showFinePositionSheet(context, isColumn: true),
-        ),
-        _buildDockActionButton(
           icon: Icons.straighten_rounded,
           label: context.l10n.offsetAction,
           color: const Color(0xFF00E5FF),
@@ -9559,7 +8625,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         _buildDockActionButton(
           icon: Icons.copy_rounded,
-          label: context.l10n.duplicateElement,
+          label: context.l10n.dragDuplicateAction,
           color: const Color(0xFF448AFF),
           onTap: _duplicateSelectedColumn,
         ),
@@ -9590,18 +8656,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           onTap: _startMovingSelectedWall,
         ),
         _buildDockActionButton(
-          icon: Icons.tune_rounded,
-          label: context.l10n.finePositionTitle,
-          color: const Color(0xFF00E5FF),
-          onTap: () => _showFinePositionSheet(context, isColumn: false),
-        ),
-        _buildDockActionButton(
-          icon: Icons.space_bar_rounded,
-          label: context.l10n.setClearDistanceAction,
-          color: const Color(0xFF64B5F6),
-          onTap: () => _showFinePositionSheet(context, isColumn: false),
-        ),
-        _buildDockActionButton(
           icon: Icons.line_weight_rounded,
           label: _getShearWallRefLineLabel(context, wall.referenceLine),
           color: const Color(0xFFFFB300),
@@ -9621,7 +8675,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         _buildDockActionButton(
           icon: Icons.copy_rounded,
-          label: context.l10n.duplicateElement,
+          label: context.l10n.dragDuplicateAction,
           color: const Color(0xFFB388FF),
           onTap: _duplicateSelectedWall,
         ),
@@ -9715,7 +8769,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         ),
         _buildDockActionButton(
           icon: Icons.copy_rounded,
-          label: context.l10n.duplicateElement,
+          label: context.l10n.dragDuplicateAction,
           color: const Color(0xFFB388FF),
           onTap: _duplicateSelectedBeam,
         ),
@@ -10265,8 +9319,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 6),
-                _buildFloatingAxisLockChips(context),
               ],
             ),
             const SizedBox(height: 8),
@@ -10291,29 +9343,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Fine Position & Clear Distance Button
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showFinePositionSheet(context, isColumn: _isMovingColumn),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF00E5FF),
-                      side: const BorderSide(color: Color(0xFF00E5FF), width: 1.2),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    icon: const Icon(Icons.tune_rounded, size: 16),
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        context.l10n.finePositionTitle,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
+                const Spacer(),
                 // Confirm Button
                 ElevatedButton.icon(
                   onPressed: _confirmCurrentMove,
@@ -10340,46 +9370,4 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
-  Widget _buildFloatingAxisLockChips(BuildContext context) {
-    final modes = [
-      (StructuralAxisLockMode.autoMode, context.l10n.axisLockAuto),
-      (StructuralAxisLockMode.lockX, context.l10n.axisLockX),
-      (StructuralAxisLockMode.lockY, context.l10n.axisLockY),
-    ];
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: modes.map((m) {
-        final isSelected = _axisLockMode == m.$1;
-        return Padding(
-          padding: const EdgeInsets.only(left: 3),
-          child: InkWell(
-            onTap: () {
-              setState(() => _axisLockMode = m.$1);
-              HapticFeedback.selectionClick();
-            },
-            borderRadius: BorderRadius.circular(6),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF00E5FF).withValues(alpha: 0.25) : Colors.white10,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: isSelected ? const Color(0xFF00E5FF) : Colors.white24,
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                m.$2,
-                style: TextStyle(
-                  color: isSelected ? const Color(0xFF00E5FF) : Colors.white70,
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
 }

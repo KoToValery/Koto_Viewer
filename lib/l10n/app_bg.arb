@@ -959,7 +959,7 @@
       }
     }
   },
-  "bimUnderlayReviewNeeded": "Променена подложка или подравняване на {levels}. Запазените конструктивни елементи и отвори изискват преглед.",
+  "bimUnderlayReviewNeeded": "Данните на подложката са променени на {levels}. Провери запазените конструктивни елементи и отвори.",
   "@bimUnderlayReviewNeeded": {
     "placeholders": {
       "levels": {
@@ -1449,5 +1449,10 @@
   "architectEdgeSelectHint": "Избери ръб",
   "architectEdgeDistanceHint": "Задай разстоянието чрез преместване на избрания ръб.",
   "architectEdgeMoveHint": "Мести ръба успоредно, заедно с двата му края.",
-  "architectEdgePullHint": "Изтегли ръба със запазване на старите върхове."
+  "architectEdgePullHint": "Изтегли ръба със запазване на старите върхове.",
+  "dragDuplicateAction": "Drag+",
+  "dragDuplicateHint": "Плъзни, за да поставиш копието",
+  "structuralBeamNamePrefix": "Г",
+  "bimUnderlayReviewCompleteAction": "Проверено",
+  "bimUnderlayReviewCompleteTooltip": "Отбележи запазените елементи и отвори като проверени"
 }

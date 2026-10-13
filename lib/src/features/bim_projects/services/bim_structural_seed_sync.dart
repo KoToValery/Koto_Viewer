@@ -18,6 +18,54 @@ import '../../structural_designer/analysis/project_grid_axes.dart';
 /// Source revisions and alignment are independent from manual structural edits.
 /// Store the last generated geometry to distinguish untouched seeds from edits.
 class BimStructuralSeedSync {
+  static bool _sameData(dynamic a, dynamic b) {
+    if (a is num && b is num) return (a - b).abs() <= 1e-7;
+    if (a is List && b is List) {
+      return a.length == b.length &&
+          List.generate(a.length, (i) => _sameData(a[i], b[i])).every((v) => v);
+    }
+    if (a is Map && b is Map) {
+      return a.length == b.length &&
+          a.keys.every((k) => b.containsKey(k) && _sameData(a[k], b[k]));
+    }
+    return a == b;
+  }
+
+  /// Cache versions and other storeys can change without revising this source.
+  /// Axis snapshots have already been rebased to the current alignment.
+  static bool _sourceChanged(BimStoreyUnderlay source, Map old, Map meta) {
+    try {
+      final previous = jsonDecode(old['key'] as String) as List;
+      final pathIndex = previous.indexWhere(
+        (v) => v is String && v.endsWith('.kcad'),
+      );
+      if (pathIndex < 0 || previous.length <= pathIndex + 5) return true;
+      final fingerprint = source.processing['fingerprint'];
+      final oldFingerprint = previous[pathIndex + 1];
+      if (fingerprint != oldFingerprint ||
+          (fingerprint == null &&
+              previous[pathIndex] != source.underlayFileName)) {
+        return true;
+      }
+      List<dynamic> axisGeometry(dynamic axes) => [
+        for (final a in axes as List? ?? [])
+          [
+            a['start'],
+            a['end'],
+            a['bubbleAtStart'] ?? true,
+            a['bubbleAtEnd'] ?? true,
+          ],
+      ];
+      final savedAxes = old['axes'] ?? previous[pathIndex + 3];
+      return !_sameData(axisGeometry(savedAxes), axisGeometry(meta['axes'])) ||
+          !_sameData(previous[pathIndex + 4], meta['slabEnvelope']) ||
+          !_sameData(previous[pathIndex + 5], meta['slabProjections']);
+    } catch (_) {
+      // Unknown legacy histories still require review on a cache miss.
+      return true;
+    }
+  }
+
   static (BimWorkProject, StructuralProject) refresh(
     BimWorkProject project,
     StructuralProject structural,
@@ -83,27 +131,18 @@ class BimStructuralSeedSync {
             .toList(),
       ]);
       if (old?['key'] == key) {
-        updated.add(floor.copyWith(slabs: SlabZoneGrouping.attach(floor.slabs,units,owner:floor)));
+        updated.add(
+          floor.copyWith(
+            slabs: SlabZoneGrouping.attach(floor.slabs, units, owner: floor),
+          ),
+        );
         underlays.add(source);
         continue;
       }
-      var alignmentOnly = false;
-      if (rebased.moved.contains(floor.id) && old?['key'] is String) {
-        try {
-          final previousKey = jsonDecode(old!['key'] as String) as List;
-          final pathIndex = previousKey.indexWhere(
-            (v) => v == source.underlayFileName,
-          );
-          alignmentOnly =
-              pathIndex >= 0 &&
-              previousKey[pathIndex + 1] == source.processing['fingerprint'];
-        } catch (_) {
-          /* A source revision keeps the review flag. */
-        }
-      }
+      final sourceChanged = old == null || _sourceChanged(source, old, meta);
       var review =
           source.processing['structuralReviewRequired'] == true ||
-          (!alignmentOnly &&
+          (sourceChanged &&
               (old != null || project.axisSeedsConsumed) &&
               (floor.columns.isNotEmpty ||
                   floor.shearWalls.isNotEmpty ||
@@ -123,8 +162,11 @@ class BimStructuralSeedSync {
       final colored = [
         for (var i = 0; i < generated.length; i++)
           generated[i].copyWith(
-            colorValue: SlabColors.forSlab(generated[i], fallback: Structural2dPainter
-                .slabPalette[i % Structural2dPainter.slabPalette.length]).toARGB32(),
+            colorValue: SlabColors.forSlab(
+              generated[i],
+              fallback: Structural2dPainter
+                  .slabPalette[i % Structural2dPainter.slabPalette.length],
+            ).toARGB32(),
           ),
       ];
       final oldSlabs = {
@@ -173,7 +215,7 @@ class BimStructuralSeedSync {
             snapshots.add(next.toJson());
           }
         } else {
-          review = review || (!alignmentOnly && old != null);
+          review = review || (sourceChanged && old != null);
           snapshots.add(snapshot ?? slab.toJson());
         }
       }
@@ -220,7 +262,11 @@ class BimStructuralSeedSync {
       };
       processing['structuralReviewRequired'] = review;
       underlays.add(source.copyWith(processing: processing));
-      updated.add(floor.copyWith(slabs: SlabZoneGrouping.attach(pending,units,owner:floor)));
+      updated.add(
+        floor.copyWith(
+          slabs: SlabZoneGrouping.attach(pending, units, owner: floor),
+        ),
+      );
     }
     // Axis origins and owner mappings refresh even when slab processing is
     // cached. Numbers are global; source snapshots keep deletion tombstones.

@@ -3134,7 +3134,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String bimUnderlayReviewNeeded(String levels) {
-    return 'Променена подложка или подравняване на $levels. Запазените конструктивни елементи и отвори изискват преглед.';
+    return 'Данните на подложката са променени на $levels. Провери запазените конструктивни елементи и отвори.';
   }
 
   @override
@@ -4485,4 +4485,20 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get architectEdgePullHint =>
       'Изтегли ръба със запазване на старите върхове.';
+
+  @override
+  String get dragDuplicateAction => 'Drag+';
+
+  @override
+  String get dragDuplicateHint => 'Плъзни, за да поставиш копието';
+
+  @override
+  String get structuralBeamNamePrefix => 'Г';
+
+  @override
+  String get bimUnderlayReviewCompleteAction => 'Проверено';
+
+  @override
+  String get bimUnderlayReviewCompleteTooltip =>
+      'Отбележи запазените елементи и отвори като проверени';
 }

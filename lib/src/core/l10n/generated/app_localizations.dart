@@ -5360,7 +5360,7 @@ abstract class AppLocalizations {
   /// No description provided for @bimUnderlayReviewNeeded.
   ///
   /// In en, this message translates to:
-  /// **'Underlay or alignment changed at {levels}. Review the preserved structural elements and openings.'**
+  /// **'Underlay data changed at {levels}. Review the preserved structural elements and openings.'**
   String bimUnderlayReviewNeeded(String levels);
 
   /// No description provided for @bimFloorSlabReference.
@@ -7858,6 +7858,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pull the edge and retain its original corners.'**
   String get architectEdgePullHint;
+
+  /// No description provided for @dragDuplicateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag+'**
+  String get dragDuplicateAction;
+
+  /// No description provided for @dragDuplicateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to place the copy'**
+  String get dragDuplicateHint;
+
+  /// No description provided for @structuralBeamNamePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'B'**
+  String get structuralBeamNamePrefix;
+
+  /// No description provided for @bimUnderlayReviewCompleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviewed'**
+  String get bimUnderlayReviewCompleteAction;
+
+  /// No description provided for @bimUnderlayReviewCompleteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark the preserved elements and openings as reviewed'**
+  String get bimUnderlayReviewCompleteTooltip;
 }
 
 class _AppLocalizationsDelegate

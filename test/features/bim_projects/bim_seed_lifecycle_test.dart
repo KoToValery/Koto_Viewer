@@ -73,6 +73,88 @@ Map<String, DxfDocument> docs(BimWorkProject p) => {
   for (final s in p.storeys) s.storeyId: drawing(),
 };
 void main() {
+  test(
+    'other floor changes do not invalidate unchanged supports or edited slabs',
+    () {
+      final p = project([0]);
+      var (updated, s) = BimStructuralSeedSync.refresh(p, model(p), docs(p));
+      s = s.copyWith(
+        storeys: [
+          s.activeStorey.copyWith(
+            columns: [const StructuralColumn(id: 'c', center: Offset(3, 3))],
+            slabs: [s.activeStorey.slabs.single.copyWith(polygon: ring(9))],
+          ),
+        ],
+      );
+      updated = updated.copyWith(
+        storeys: [
+          ...updated.storeys,
+          const BimStoreyUnderlay(
+            storeyId: 's1',
+            name: 'S1',
+            elevation: 3,
+            underlayFileName: 's1.kcad',
+          ),
+        ],
+      );
+      (updated, s) = BimStructuralSeedSync.refresh(updated, s, docs(updated));
+      expect(
+        updated.storeys.first.processing['structuralReviewRequired'],
+        false,
+      );
+      expect(s.storeys.first.slabs.single.polygon, ring(9));
+      updated = updated.copyWith(storeys: [updated.storeys.first]);
+      (updated, s) = BimStructuralSeedSync.refresh(updated, s, docs(updated));
+      expect(
+        updated.storeys.first.processing['structuralReviewRequired'],
+        false,
+      );
+    },
+  );
+
+  test('same fingerprint in a new revision path does not require review', () {
+    var p = project([0]);
+    p = p.copyWith(
+      storeys: [
+        p.storeys.single.copyWith(processing: {'fingerprint': 'same'}),
+      ],
+    );
+    var (updated, s) = BimStructuralSeedSync.refresh(p, model(p), docs(p));
+    s = s.copyWith(
+      storeys: [
+        s.activeStorey.copyWith(
+          columns: [const StructuralColumn(id: 'c', center: Offset(3, 3))],
+        ),
+      ],
+    );
+    updated = updated.copyWith(
+      storeys: [
+        updated.storeys.single.copyWith(underlayFileName: 'revision/new.kcad'),
+      ],
+    );
+    (updated, s) = BimStructuralSeedSync.refresh(updated, s, docs(updated));
+    expect(
+      updated.storeys.single.processing['structuralReviewRequired'],
+      false,
+    );
+    final revision = updated.copyWith(
+      storeys: [
+        updated.storeys.single.copyWith(
+          processing: {
+            ...updated.storeys.single.processing,
+            'fingerprint': 'changed',
+          },
+        ),
+      ],
+    );
+    final (changed, _) = BimStructuralSeedSync.refresh(
+      revision,
+      s,
+      docs(revision),
+    );
+    expect(changed.storeys.single.processing['structuralReviewRequired'], true);
+  });
+
   test('Automatic slabs belong to every loaded creation floor', () {
     final p = project([0, 2.85, 5.6]);
     final (_, s) = BimStructuralSeedSync.refresh(p, model(p), docs(p));

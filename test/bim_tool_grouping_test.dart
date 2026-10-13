@@ -59,8 +59,13 @@ void main() {
         );
         await tester.pumpAndSettle();
         final l = await AppLocalizations.delegate.load(Locale(locale));
-        await tester.tap(find.byKey(const ValueKey('bim-generate-supports')));
-        expect(supports, 1);
+        expect(
+          find.byKey(const ValueKey('bim-generate-supports')),
+          findsNothing,
+        );
+        expect(supports, 0);
+        expect(find.text(l.axisLockX), findsNothing);
+        expect(find.text(l.axisLockY), findsNothing);
         expect(find.text(l.layersTabTitle), findsNothing);
         await tester.tap(find.byKey(const ValueKey('bim-tool-group-underlay')));
         await tester.pumpAndSettle();

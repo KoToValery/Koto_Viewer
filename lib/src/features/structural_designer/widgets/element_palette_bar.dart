@@ -497,12 +497,6 @@ class ElementPaletteBar extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          if (onGenerateSupports != null)
-            Padding(padding: const EdgeInsets.only(right: 5), child: ActionChip(
-              key: const ValueKey('bim-generate-supports'),
-              avatar: const Icon(Icons.auto_awesome, size: 14),
-              label: Text(context.l10n.bimGenerateSupportsAction, style: const TextStyle(fontSize: 11)),
-              onPressed: onGenerateSupports, visualDensity: VisualDensity.compact)),
           Padding(
             padding: const EdgeInsets.only(right: 5),
             child: ChoiceChip(
@@ -552,45 +546,9 @@ class ElementPaletteBar extends StatelessWidget {
               visualDensity: VisualDensity.compact,
             ),
           ],
-          ..._buildAxisLockChips(context),
         ],
       ),
     );
-  }
-
-  List<Widget> _buildAxisLockChips(BuildContext context) {
-    if (onUpdateAxisLockMode == null) return const [];
-    return [
-      const SizedBox(width: 6),
-      Container(width: 1, height: 20, color: Colors.white24),
-      const SizedBox(width: 6),
-      ChoiceChip(
-        label: Text(context.l10n.axisLockAuto),
-        selected: axisLockMode == StructuralAxisLockMode.autoMode,
-        onSelected: (sel) {
-          if (sel) onUpdateAxisLockMode!(StructuralAxisLockMode.autoMode);
-        },
-        visualDensity: VisualDensity.compact,
-      ),
-      const SizedBox(width: 4),
-      ChoiceChip(
-        label: Text(context.l10n.axisLockX),
-        selected: axisLockMode == StructuralAxisLockMode.lockX,
-        onSelected: (sel) {
-          if (sel) onUpdateAxisLockMode!(StructuralAxisLockMode.lockX);
-        },
-        visualDensity: VisualDensity.compact,
-      ),
-      const SizedBox(width: 4),
-      ChoiceChip(
-        label: Text(context.l10n.axisLockY),
-        selected: axisLockMode == StructuralAxisLockMode.lockY,
-        onSelected: (sel) {
-          if (sel) onUpdateAxisLockMode!(StructuralAxisLockMode.lockY);
-        },
-        visualDensity: VisualDensity.compact,
-      ),
-    ];
   }
 
   Widget _buildWallOptionsBar(BuildContext context) {
@@ -611,12 +569,6 @@ class ElementPaletteBar extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          if (onGenerateSupports != null)
-            Padding(padding: const EdgeInsets.only(right: 5), child: ActionChip(
-              key: const ValueKey('bim-generate-supports'),
-              avatar: const Icon(Icons.auto_awesome, size: 14),
-              label: Text(context.l10n.bimGenerateSupportsAction, style: const TextStyle(fontSize: 11)),
-              onPressed: onGenerateSupports, visualDensity: VisualDensity.compact)),
           Padding(
             padding: const EdgeInsets.only(right: 5),
             child: ChoiceChip(
@@ -671,7 +623,6 @@ class ElementPaletteBar extends StatelessWidget {
               visualDensity: VisualDensity.compact,
             ),
           ],
-          ..._buildAxisLockChips(context),
         ],
       ),
     );

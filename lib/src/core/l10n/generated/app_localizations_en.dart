@@ -3122,7 +3122,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bimUnderlayReviewNeeded(String levels) {
-    return 'Underlay or alignment changed at $levels. Review the preserved structural elements and openings.';
+    return 'Underlay data changed at $levels. Review the preserved structural elements and openings.';
   }
 
   @override
@@ -4469,4 +4469,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get architectEdgePullHint =>
       'Pull the edge and retain its original corners.';
+
+  @override
+  String get dragDuplicateAction => 'Drag+';
+
+  @override
+  String get dragDuplicateHint => 'Drag to place the copy';
+
+  @override
+  String get structuralBeamNamePrefix => 'B';
+
+  @override
+  String get bimUnderlayReviewCompleteAction => 'Reviewed';
+
+  @override
+  String get bimUnderlayReviewCompleteTooltip =>
+      'Mark the preserved elements and openings as reviewed';
 }
