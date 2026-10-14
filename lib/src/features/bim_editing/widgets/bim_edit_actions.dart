@@ -12,6 +12,7 @@ enum BimEditAction {
   properties,
   split,
   offset,
+  newPoint,
 }
 
 class BimEditActions {
@@ -26,6 +27,7 @@ class BimEditActions {
         BimEditAction.properties => l.architectRadialProperties,
         BimEditAction.split => l.architectRadialSplit,
         BimEditAction.offset => l.offsetAction,
+        BimEditAction.newPoint => l.bimNewPoint,
       };
   static IconData icon(BimEditAction action) => switch (action) {
     BimEditAction.move => Icons.open_with_rounded,
@@ -37,6 +39,7 @@ class BimEditActions {
     BimEditAction.properties => Icons.tune_rounded,
     BimEditAction.split => Icons.content_cut,
     BimEditAction.offset => Icons.straighten_rounded,
+    BimEditAction.newPoint => Icons.add_location_alt_outlined,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};
@@ -53,6 +56,7 @@ class BimEditActions {
           caps.contains(BimEditingCapability.endpoints))
         BimEditAction.edit,
       if (caps.contains(BimEditingCapability.offset)) BimEditAction.offset,
+      if (caps.contains(BimEditingCapability.contour)) BimEditAction.newPoint,
     };
   }
 }

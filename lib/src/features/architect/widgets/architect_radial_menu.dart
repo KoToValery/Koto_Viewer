@@ -11,12 +11,14 @@ class ArchitectRadialMenuItem {
   final IconData icon;
   final String label;
   final Color color;
+  final String? tooltip;
 
   const ArchitectRadialMenuItem({
     required this.action,
     required this.icon,
     required this.label,
     required this.color,
+    this.tooltip,
   });
 }
 
@@ -178,53 +180,56 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
         scale: _scaleAnim,
         child: Material(
           type: MaterialType.transparency,
-          child: InkWell(
-            key: ValueKey('architect-radial-${item.action.name}'),
-            onTap: () => _select(item.action),
-            borderRadius: BorderRadius.circular(btnSize / 2),
-            child: Container(
-              width: btnSize,
-              height: btnSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xF21C1E26),
-                border: Border.all(
-                  color: item.color.withValues(alpha: 0.85),
-                  width: 1.8,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+          child: Tooltip(
+            message: item.tooltip ?? item.label,
+            child: InkWell(
+              key: ValueKey('architect-radial-${item.action.name}'),
+              onTap: () => _select(item.action),
+              borderRadius: BorderRadius.circular(btnSize / 2),
+              child: Container(
+                width: btnSize,
+                height: btnSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xF21C1E26),
+                  border: Border.all(
+                    color: item.color.withValues(alpha: 0.85),
+                    width: 1.8,
                   ),
-                  BoxShadow(
-                    color: item.color.withValues(alpha: 0.25),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(item.icon, size: 19, color: item.color),
-                  const SizedBox(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: Text(
-                      item.label,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.95),
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.2,
-                      ),
-                      maxLines: 2,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
-                  ),
-                ],
+                    BoxShadow(
+                      color: item.color.withValues(alpha: 0.25),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(item.icon, size: 19, color: item.color),
+                    const SizedBox(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(
+                        item.label,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

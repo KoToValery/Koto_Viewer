@@ -1309,7 +1309,7 @@
   "architectWallInsertPoint": "Точка",
   "architectWallParallel": "Успоредно",
   "architectWallDraftHint": "Задръж → точка · 2 пръста → мащаб",
-  "architectEditHoldHint": "Задръж → редакция",
+  "architectEditHoldHint": "Задръж → редакция · по-дълго → меню",
   "architectNavigationHint": "Местене / мащаб",
   "architectWallEditRejected": "Отвор или твърде къса стена.",
   "architectSaveFailed": "Записът не успя. Проверете паметта.",
@@ -1444,7 +1444,7 @@
   "architectRadialRotate": "Завърти",
   "architectRadialFlip": "Обърни",
   "architectRadialProperties": "Свойства",
-  "architectRadialSplit": "Раздели",
+  "architectRadialSplit": "Срежи",
   "architectRadialOffset": "Офсет",
   "architectEdgeDistance": "Разстояние",
   "architectEdgeSelectHint": "Избери ръб",
@@ -1455,5 +1455,8 @@
   "dragDuplicateHint": "Плъзни, за да поставиш копието",
   "structuralBeamNamePrefix": "Г",
   "bimUnderlayReviewCompleteAction": "Проверено",
-  "bimUnderlayReviewCompleteTooltip": "Отбележи запазените елементи и отвори като проверени"
+  "bimUnderlayReviewCompleteTooltip": "Отбележи запазените елементи и отвори като проверени",
+  "bimNewPoint": "Нова точка",
+  "bimNewPointHint": "Докосни ръб за нова точка",
+  "bimWallNewPointHelp": "Добавя свързани сегменти. Срежи прекъсва връзката."
 }

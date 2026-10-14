@@ -7016,7 +7016,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectEditHoldHint.
   ///
   /// In en, this message translates to:
-  /// **'Hold → edit'**
+  /// **'Hold → edit · longer → menu'**
   String get architectEditHoldHint;
 
   /// No description provided for @architectNavigationHint.
@@ -7894,6 +7894,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mark the preserved elements and openings as reviewed'**
   String get bimUnderlayReviewCompleteTooltip;
+
+  /// No description provided for @bimNewPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'New point'**
+  String get bimNewPoint;
+
+  /// No description provided for @bimNewPointHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap an edge to add a point'**
+  String get bimNewPointHint;
+
+  /// No description provided for @bimWallNewPointHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds connected wall segments. Split cuts and disconnects them.'**
+  String get bimWallNewPointHelp;
 }
 
 class _AppLocalizationsDelegate

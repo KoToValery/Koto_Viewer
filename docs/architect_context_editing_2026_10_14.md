@@ -33,8 +33,33 @@ Pure translation пази ratios точно, без floating-point re-projection
 краища, T returns, detached cut parts, preview/cancel/commit, hosted identity,
 invalid shortening и single Undo/Redo. Чист статичен анализ.
 
-## Нова точка
+## Нова точка — завършено
 
-Следва: обща контекстна команда за приложимите контури и стени. При стена
-точката дели геометрията на свързани сегменти; „Срежи“ остава отделна операция
-за прекъсване с cutting stroke.
+Общ BimEditAction.newPoint и localized BG/EN labels/hints/tooltips. Контекстът
+показва командата за стени, греди, CAD линии/правоъгълници, плочи, зони и отвори.
+Профили, кръгове, оси, врати/прозорци и annotations нямат произволни междинни
+редактируеми vertices и не получават неподдържана команда.
+
+BimLineGeometry.insertion намира най-близката проекция върху open/closed path.
+UI използва общата input precision и capture band. Native command запазва ID,
+свойства, winding и площ на contour; добавеният collinear vertex остава за
+следваща редакция. Греда/CAD линия се разделя на два native сегмента със запазени
+размери и стилове. Opening boundary използва същия polygon editor и painter.
+
+При стена New point разделя на свързани сегменти (connectEnd/connectStart=true).
+Hosted openings се прехвърлят с правилни parent IDs/ratios, без загуба на styles.
+Split/„Срежи“ използва cutting stroke и прекъсва връзката. Това разграничение е
+в localized tooltip. Невалидна точка, endpoint или split през отвор не добавя
+Undo. Pending insertion има Cancel и се отменя при смяна на tool/floor.
+Zone editing cache се синхронизира при commit/Undo, за да не рисува стар contour.
+
+Проверки: 17 нови native/property/interaction сценария, включително BG phone с
+осем context targets, всички седем tool families, cancel, invalid point и Undo.
+Финална серия: 99 BIM тестови файла, 846 успешни теста и 2 предварително пропуснати
+external CAD scenarios. В първия разширен run имаше transient pumpAndSettle timeout
+в floor-control I/O тест; той мина изолирано и в последващия пълен run. Чист
+статичен анализ и git diff --check. Логове: build/architect_context_all_verified.log
+и build/architect_context_all_analyze.log.
+
+Големите корекции са качени поотделно в origin/main: 590c83f (размери/hold/fan),
+03ff66c (connected stretching) и финалният New point commit.

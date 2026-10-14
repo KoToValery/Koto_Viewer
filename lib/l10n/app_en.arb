@@ -3020,7 +3020,7 @@
   "architectWallInsertPoint": "Point",
   "architectWallParallel": "Parallel",
   "architectWallDraftHint": "Hold → point · 2 fingers → zoom",
-  "architectEditHoldHint": "Hold → edit",
+  "architectEditHoldHint": "Hold → edit · longer → menu",
   "architectNavigationHint": "Pan / zoom",
   "architectWallEditRejected": "Opening or wall too short.",
   "architectSaveFailed": "Save failed. Check storage.",
@@ -3245,5 +3245,8 @@
   "dragDuplicateHint": "Drag to place the copy",
   "structuralBeamNamePrefix": "B",
   "bimUnderlayReviewCompleteAction": "Reviewed",
-  "bimUnderlayReviewCompleteTooltip": "Mark the preserved elements and openings as reviewed"
+  "bimUnderlayReviewCompleteTooltip": "Mark the preserved elements and openings as reviewed",
+  "bimNewPoint": "New point",
+  "bimNewPointHint": "Tap an edge to add a point",
+  "bimWallNewPointHelp": "Adds connected wall segments. Split cuts and disconnects them."
 }

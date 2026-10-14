@@ -1,6 +1,33 @@
 import 'dart:ui';
 
 class BimLineGeometry {
+  /// Nearest insertion on an open or closed path, preserving source vertices.
+  static ({int edge, Offset point, double distance})? insertion(
+    List<Offset> points,
+    Offset pick, {
+    bool closed = false,
+  }) {
+    if (points.length < 2 || !pick.dx.isFinite || !pick.dy.isFinite) {
+      return null;
+    }
+    var best = double.infinity;
+    int? edge;
+    Offset? point;
+    final count = closed ? points.length : points.length - 1;
+    for (var i = 0; i < count; i++) {
+      final a = points[i], b = points[(i + 1) % points.length];
+      if ((b - a).distance < 1e-9) continue;
+      final candidate = closest(pick, a, b);
+      final distance = (pick - candidate).distance;
+      if (distance < best) {
+        best = distance;
+        edge = i;
+        point = candidate;
+      }
+    }
+    return edge == null ? null : (edge: edge, point: point!, distance: best);
+  }
+
   /// Clip a finite measurement to the visible drawing without changing its
   /// actual endpoints or measured value. Works at every line orientation.
   static (Offset, Offset)? visibleSegment(Offset a, Offset b, Rect view) {

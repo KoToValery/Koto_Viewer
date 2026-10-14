@@ -4051,7 +4051,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallDraftHint => 'Задръж → точка · 2 пръста → мащаб';
 
   @override
-  String get architectEditHoldHint => 'Задръж → редакция';
+  String get architectEditHoldHint => 'Задръж → редакция · по-дълго → меню';
 
   @override
   String get architectNavigationHint => 'Местене / мащаб';
@@ -4466,7 +4466,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRadialProperties => 'Свойства';
 
   @override
-  String get architectRadialSplit => 'Раздели';
+  String get architectRadialSplit => 'Срежи';
 
   @override
   String get architectRadialOffset => 'Офсет';
@@ -4504,4 +4504,14 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get bimUnderlayReviewCompleteTooltip =>
       'Отбележи запазените елементи и отвори като проверени';
+
+  @override
+  String get bimNewPoint => 'Нова точка';
+
+  @override
+  String get bimNewPointHint => 'Докосни ръб за нова точка';
+
+  @override
+  String get bimWallNewPointHelp =>
+      'Добавя свързани сегменти. Срежи прекъсва връзката.';
 }

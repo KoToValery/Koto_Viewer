@@ -415,6 +415,9 @@ class Architect2dPainter extends CustomPainter {
     for (final slab in _project.activeStorey.slabs) {
       if (slab.id == selectedElementId) polygon = slab.polygon;
     }
+    for (final opening in _project.activeStorey.openings) {
+      if (opening.id == selectedElementId) polygon = opening.boundary;
+    }
     if (polygon == null) return;
     ArchitectPolygonPainter.draw(
       canvas: canvas,

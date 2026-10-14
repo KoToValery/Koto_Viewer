@@ -4037,7 +4037,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallDraftHint => 'Hold → point · 2 fingers → zoom';
 
   @override
-  String get architectEditHoldHint => 'Hold → edit';
+  String get architectEditHoldHint => 'Hold → edit · longer → menu';
 
   @override
   String get architectNavigationHint => 'Pan / zoom';
@@ -4488,4 +4488,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bimUnderlayReviewCompleteTooltip =>
       'Mark the preserved elements and openings as reviewed';
+
+  @override
+  String get bimNewPoint => 'New point';
+
+  @override
+  String get bimNewPointHint => 'Tap an edge to add a point';
+
+  @override
+  String get bimWallNewPointHelp =>
+      'Adds connected wall segments. Split cuts and disconnects them.';
 }

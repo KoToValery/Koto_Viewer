@@ -23,6 +23,7 @@ Architect и Construction използват това ядро за еквива
 | Explicit legacy/import repair, extend, merge | `geometry/bim_contour_repair.dart` |
 | Draft cleanup, orthogonal guides, squarify, whole-boundary offset | `geometry/bim_contour_drafting_geometry.dart` |
 | Line projection/intersection и hosted fit | `geometry/bim_line_geometry.dart` |
+| Visible measurement segment и closest edge за New point | `geometry/bim_line_geometry.dart` |
 | Общи действия, keypad, numeric validation, compact offset | `widgets/`, `properties/` |
 | Touch anchor, snap marks, ghost, dimension badge | `rendering/bim_pointer_marks.dart` |
 

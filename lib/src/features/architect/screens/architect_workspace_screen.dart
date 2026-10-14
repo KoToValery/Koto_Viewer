@@ -221,6 +221,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _cancelActiveDrags();
       _interactionEpoch++;
     }
+    if (_selectedZoneId != null && _zoneTool.isEditingZone) {
+      final zone = _project.activeStorey.zones.firstWhere((z) => z.id == _selectedZoneId);
+      if (!identical(_zoneTool.editingZone, zone)) _zoneTool.startEditingZone(zone);
+    }
     setState(() {});
     _saveBiMProjectIfAttached();
   }
@@ -247,7 +251,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _wallExtendId = null;
     _multiSelect = false;
     _moveSelection = false;
-    _wallInsertPointId = null;
+    _insertPointId = null;
     _interactionEpoch++;
     _cancelActiveDrags();
     _zoneTool.cancelAll();
@@ -309,7 +313,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _wallDragStart = false;
   Offset _wallGrabOffset = Offset.zero;
   bool _wallParallelMove = false;
-  String? _wallInsertPointId;
+  String? _insertPointId;
 
   ArchitectWall? get _selectedWall {
     for (final wall in _project.activeStorey.walls) {
@@ -653,6 +657,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (_polygonDistanceOpen) return;
+    if (_insertPointId != null) {
+      _cursorModel = rawModel;
+      _repaintPreview();
+      return;
+    }
     if (_polygonEditId != null) _selectPolygonEdge(rawModel);
     if (_activeTool == ArchitectTool.wall &&
         event.kind == PointerDeviceKind.mouse &&
@@ -733,7 +742,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _repaintPreview();
     }
     if (_activeTool == ArchitectTool.wall && _selectedWall != null) {
-      if (_wallInsertPointId != null) return;
+      if (_insertPointId != null) return;
       final wall = _selectedWall!;
       for (final atStart in [true, false]) {
         final point = atStart ? wall.startPoint : wall.endPoint;
@@ -914,7 +923,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_effectiveSelection.isNotEmpty &&
         _wallCutIds.isEmpty &&
         _wallExtendId == null &&
-        _wallInsertPointId == null) {
+        _insertPointId == null) {
       // A hold on empty space resumes placement with the same active tool.
       setState(() {
         _selectionIds.clear();
@@ -931,7 +940,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool get _canPlaceWithMarker =>
-      _activeTool != ArchitectTool.select &&
+      _insertPointId == null && _activeTool != ArchitectTool.select &&
       !_wallDirectionLocked &&
       _polygonEditId == null &&
       _pendingShape == null;
@@ -1037,6 +1046,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     for (final zone in _project.activeStorey.zones) {
       if (zone.id == id) return zone.polygon;
     }
+    for (final opening in _project.activeStorey.openings) {
+      if (opening.id == id) return opening.boundary;
+    }
     return null;
   }
 
@@ -1048,6 +1060,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     _cursorModel = rawModel;
+    if (_insertPointId != null) {
+      _repaintPreview();
+      return;
+    }
     if (_polygonEditor.active) {
       _polygonEditor.update(
         rawModel,
@@ -1680,6 +1696,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _handleTap(Offset rawModel) {
     if (_pendingShape != null || _polygonDistanceOpen) return;
+    if (_insertPointId != null) {
+      final id = _insertPointId!;
+      final path = InsertArchitectElementPoint.pathOf(_project.activeStorey, id);
+      final pick = ArchitectSnapHelper.precision(_project).inputPoint(rawModel);
+      final hit = path == null ? null : BimLineGeometry.insertion(path.points, pick, closed: path.closed);
+      if (hit != null && hit.distance <= path!.width / 2 + 20 / _currentScale) {
+        final before = _project;
+        _executeWallEdit(InsertArchitectElementPoint(
+          storeyId: _project.activeStoreyId, elementId: id,
+          point: hit.point, newElementId: ArchitectElementId.next('point'),
+        ));
+        if (!identical(before, _project)) {
+          setState(() {
+            _insertPointId = null;
+            if (path.closed) {
+              _polygonEditId = id;
+              _polygonSelectedEdge = hit.edge;
+              if (_selectedZoneId == id) {
+                _zoneTool.startEditingZone(_project.activeStorey.zones.firstWhere((z) => z.id == id));
+              }
+            }
+          });
+        }
+      }
+      return;
+    }
     if (_polygonEditId != null) {
       _selectPolygonEdge(rawModel);
       return;
@@ -1768,25 +1810,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    if (_wallInsertPointId != null && _activeTool == ArchitectTool.wall) {
-      final wall = _selectedWall;
-      _wallInsertPointId = null;
-      if (wall != null) {
-        final (ratio, distance) = wall.projectPoint(rawModel);
-        if (distance <= wall.thickness / 2 + 20 / _currentScale) {
-          _executeWallEdit(
-            SplitArchitectWall(
-              storeyId: _project.activeStorey.id,
-              wallId: wall.id,
-              newWallId: ArchitectElementId.next('wall'),
-              ratio: ratio,
-            ),
-          );
-        }
-      }
-      setState(() {});
-      return;
-    }
     // 1. In Axis tool
     if (_activeTool == ArchitectTool.axis) {
       final isBg = Localizations.localeOf(context).languageCode == 'bg';
@@ -2392,7 +2415,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _draftEnd = null;
         _wallStartAttachment = null;
         _wallDirectionLocked = false;
-        _wallInsertPointId = null;
+        _insertPointId = null;
         _activeSnapLabel = null;
       }
     });
@@ -2875,6 +2898,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     try {
       _commands.execute(command);
     } on ArgumentError {
+      if (command is InsertArchitectElementPoint) {
+        _operationError();
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.architectWallEditRejected)),
       );
@@ -3039,7 +3066,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool _onSelectionHold(Offset screenPoint) {
-    if (_wallCutIds.isNotEmpty || _polygonEditId != null) return false;
+    if (_wallCutIds.isNotEmpty || _polygonEditId != null || _insertPointId != null) return false;
     if (_isActivelyDraggingHandle) return false;
     if (_draftStart != null ||
         _wallDirectionLocked ||
@@ -3052,7 +3079,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool _onContextHold(Offset screenPoint) {
-    if (_handleMoved || _wallCutIds.isNotEmpty || _polygonEditId != null ||
+    if (_handleMoved || _wallCutIds.isNotEmpty || _insertPointId != null ||
         _draftStart != null || _wallDirectionLocked || _zoneTool.isDrafting ||
         _axisTool.isDrafting || _elementTool.slabDraftPoints.isNotEmpty) {
       return false;
@@ -3079,6 +3106,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     icon: BimEditActions.icon(action),
     label: BimEditActions.label(action, context.l10n),
     color: color,
+    tooltip: action == BimEditAction.newPoint
+        ? (_selectedWall != null ? context.l10n.bimWallNewPointHelp : context.l10n.bimNewPointHint)
+        : null,
   );
 
   List<ArchitectRadialMenuItem> _buildRadialMenuItems(String elementId) {
@@ -3257,6 +3287,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       );
     }
 
+    if (InsertArchitectElementPoint.pathOf(storey, elementId) != null) {
+      items.add(_radialItem(action: ArchitectRadialAction.newPoint,
+        color: const Color(0xFF80CBC4)));
+    }
+
     items.add(
       _radialItem(
         action: ArchitectRadialAction.delete,
@@ -3266,6 +3301,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
 
     return items;
+  }
+
+  void _startPointInsertion(String id) {
+    _cancelActiveDrags();
+    setState(() {
+      _insertPointId = id;
+      _polygonEditId = null;
+      _polygonSelectedEdge = null;
+      _moveSelection = false;
+      _wallCutIds = {};
+      _wallCutStart = null;
+      _wallExtendId = null;
+      _draftStart = null;
+      _draftEnd = null;
+    });
   }
 
   void _handleRadialAction(ArchitectRadialAction action) {
@@ -3322,6 +3372,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _commands.commit(_project.updateActiveStorey(nextStorey));
         _saveBiMProjectIfAttached();
         HapticFeedback.mediumImpact();
+        break;
+
+      case ArchitectRadialAction.newPoint:
+        _startPointInsertion(id);
         break;
 
       case ArchitectRadialAction.split:
@@ -3451,6 +3505,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _multiSelect = false;
       _moveSelection = false;
       _wallExtendId = null;
+      _insertPointId = null;
       _wallCutIds = {};
       _wallCutStart = null;
     });
@@ -3570,7 +3625,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       _wallCutIds = Set.of(wallIds);
                       _wallCutStart = null;
                       _wallExtendId = null;
-                      _wallInsertPointId = null;
+                      _insertPointId = null;
                     });
                   } else if (action == 'mirror') {
                     _executeWallEdit(
@@ -3601,7 +3656,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   } else if (action == 'length') {
                     _editWallLength();
                   } else if (action == 'point') {
-                    setState(() => _wallInsertPointId = wallIds.single);
+                    _startPointInsertion(wallIds.single);
                   } else if (action == 'parallel') {
                     setState(() => _wallParallelMove = !_wallParallelMove);
                   }
@@ -3640,7 +3695,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     ),
                     PopupMenuItem(
                       value: 'point',
-                      child: Text(l.architectWallInsertPoint),
+                      child: Text(l.bimNewPoint),
                     ),
                     PopupMenuItem(
                       value: 'parallel',
@@ -3954,7 +4009,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       setState(() {
         _project = newProj;
         _wallDirectionLocked = false;
-        _wallInsertPointId = null;
+        _insertPointId = null;
         if (_project.wallTypes.isNotEmpty) {
           _activeWallType = _project.wallTypes.first;
           _wallThickness = _activeWallType!.totalThickness;
@@ -4130,7 +4185,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     _draftStart = null;
                     _draftEnd = null;
                     _wallDirectionLocked = false;
-                    _wallInsertPointId = null;
+                    _insertPointId = null;
                     _activeMagneticGuides = [];
                     _activeSnapLabel = null;
                   }),
@@ -4441,7 +4496,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             (!_multiSelect || _moveSelection) &&
             _wallCutIds.isEmpty &&
             _wallExtendId == null &&
-            _wallInsertPointId == null,
+            _insertPointId == null,
         touchHoldToPlace: _canPlaceWithMarker,
         onToolHoldStart: _beginPlacementHold,
         onSelectionHold: _duplicateMove == null ? _onSelectionHold : null,
@@ -4561,7 +4616,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(8),
                       child: Text(
-                        _wallCutIds.isNotEmpty
+                        _insertPointId != null
+                            ? context.l10n.bimNewPointHint
+                            : _wallCutIds.isNotEmpty
                             ? (_wallCutStroke
                                   ? context.l10n.architectWallSplitHint
                                   : context.l10n.architectWallCutHint)
@@ -4591,6 +4648,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ],
         ),
       ),
+      if (_insertPointId != null)
+        Positioned(
+          top: 8, left: 8,
+          child: IconButton.filledTonal(
+            key: const ValueKey('architect-new-point-cancel'),
+            tooltip: context.l10n.cancel,
+            icon: const Icon(Icons.close),
+            onPressed: () => setState(() => _insertPointId = null),
+          ),
+        ),
       if (_radialMenuScreenPosition != null && _radialMenuItems.isNotEmpty)
         Positioned.fill(
           child: ArchitectRadialMenu(

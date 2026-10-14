@@ -1129,7 +1129,10 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
       (s) => s.id == elementId && s.type == CadPrimitiveType.rect,
     );
     final zone = floor.zones.any((z) => z.id == elementId);
-    if (!slab && !rect && !zone) throw ArgumentError('Unknown polygon element');
+    final opening = floor.openings.any((o) => o.id == elementId);
+    if (!slab && !rect && !zone && !opening) {
+      throw ArgumentError('Unknown polygon element');
+    }
     final points = List<Offset>.unmodifiable(polygon);
     final bounds = ArchitectSceneGeometry.boundsOf(points);
     return ArchitectModelCommand.replace(
@@ -1152,6 +1155,128 @@ class UpdateArchitectPolygon extends ArchitectModelCommand {
         zones: [
           for (final z in floor.zones)
             z.id == elementId ? z.copyWith(polygon: points) : z,
+        ],
+        openings: [
+          for (final o in floor.openings)
+            o.id == elementId ? o.copyWith(boundary: points) : o,
+        ],
+      ),
+    );
+  }
+}
+
+/// A vertex on a contour, or a connected segmentation point on a native line.
+/// Cutting walls is a separate command with detachCut=true.
+class InsertArchitectElementPoint extends ArchitectModelCommand {
+  const InsertArchitectElementPoint({
+    required this.storeyId,
+    required this.elementId,
+    required this.point,
+    required this.newElementId,
+  });
+  final String storeyId, elementId, newElementId;
+  final Offset point;
+
+  static ({List<Offset> points, bool closed, double width})? pathOf(
+    ArchitectStorey storey,
+    String id,
+  ) {
+    for (final w in storey.walls) {
+      if (w.id == id) {
+        return (
+          points: [w.startPoint, w.endPoint],
+          closed: false,
+          width: w.thickness,
+        );
+      }
+    }
+    for (final b in storey.beams) {
+      if (b.id == id) {
+        return (
+          points: [b.startPoint, b.endPoint],
+          closed: false,
+          width: b.width,
+        );
+      }
+    }
+    for (final p in storey.cadPrimitives) {
+      if (p.id != id || p.type == CadPrimitiveType.circle) continue;
+      return (
+        points: p.type == CadPrimitiveType.rect
+            ? p.polygonCorners
+            : [p.startPoint, p.endPoint],
+        closed: p.type == CadPrimitiveType.rect,
+        width: 0,
+      );
+    }
+    for (final s in storey.slabs) {
+      if (s.id == id) return (points: s.polygon, closed: true, width: 0);
+    }
+    for (final z in storey.zones) {
+      if (z.id == id) return (points: z.polygon, closed: true, width: 0);
+    }
+    for (final o in storey.openings) {
+      if (o.id == id) return (points: o.boundary, closed: true, width: 0);
+    }
+    return null;
+  }
+
+  @override
+  ArchitectProject apply(ArchitectProject project) {
+    ArchitectModelCommand.point(point);
+    final storey = ArchitectModelCommand.storey(project, storeyId);
+    final path = pathOf(storey, elementId);
+    if (path == null) throw ArgumentError('Element has no editable path');
+    final hit = BimLineGeometry.insertion(
+      path.points,
+      point,
+      closed: path.closed,
+    );
+    if (hit == null ||
+        path.points.any((p) => (p - hit.point).distance < .001)) {
+      throw ArgumentError('Point already exists or segment is too short');
+    }
+    if (path.closed) {
+      final points = List<Offset>.of(path.points)
+        ..insert(hit.edge + 1, hit.point);
+      return UpdateArchitectPolygon(
+        storeyId: storeyId,
+        elementId: elementId,
+        polygon: points,
+      ).apply(project);
+    }
+    ArchitectModelCommand.newId(project, newElementId);
+    if (storey.walls.any((w) => w.id == elementId)) {
+      final wall = storey.walls.firstWhere((w) => w.id == elementId);
+      return SplitArchitectWall(
+        storeyId: storeyId,
+        wallId: elementId,
+        newWallId: newElementId,
+        ratio: BimLineGeometry.parameter(
+          hit.point,
+          wall.startPoint,
+          wall.endPoint,
+        ),
+      ).apply(project);
+    }
+    return ArchitectModelCommand.replace(
+      project,
+      storey.copyWith(
+        beams: [
+          for (final b in storey.beams)
+            if (b.id == elementId) ...[
+              b.copyWith(endPoint: hit.point),
+              b.copyWith(id: newElementId, startPoint: hit.point),
+            ] else
+              b,
+        ],
+        cadPrimitives: [
+          for (final p in storey.cadPrimitives)
+            if (p.id == elementId) ...[
+              p.copyWith(endPoint: hit.point),
+              p.copyWith(id: newElementId, startPoint: hit.point),
+            ] else
+              p,
         ],
       ),
     );
