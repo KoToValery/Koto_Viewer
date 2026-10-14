@@ -428,6 +428,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   bool _wallDragStart = false;
   Offset _wallGrabOffset = Offset.zero;
   bool _wallParallelMove = false;
+  void _toggleParallelMove() {
+    _cancelActiveDrags();
+    setState(() {
+      _wallParallelMove = !_wallParallelMove;
+      _moveSelection = _wallParallelMove;
+      _polygonEditId = null;
+      _wallCutIds = {};
+    });
+  }
+
+  Offset _parallelDelta(Offset delta, Set<String> ids) {
+    if (!_wallParallelMove || ids.length != 1) return delta;
+    final wall = (_elementMoveOriginal ?? _project).activeStorey.walls
+        .where((w) => ids.contains(w.id))
+        .firstOrNull;
+    if (wall == null) return delta;
+    final normal = wall.normalVector;
+    return normal * (delta.dx * normal.dx + delta.dy * normal.dy);
+  }
 
   ArchitectWall? get _selectedWall {
     for (final wall in _project.activeStorey.walls) {
@@ -565,6 +584,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   /// Whether gestures should be captured exclusively by the tool instead of panning.
   bool get _isActivelyDraggingHandle =>
+      _draftCancelPointer != null ||
       _isDraggingVertexOrHandle ||
       _wallCutIds.isNotEmpty ||
       _wallExtendId != null;
@@ -763,6 +783,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // === SECTION: 2D POINTER & TOUCH HANDLING (TOOL INPUT FROM ARCHITECT VIEWPORT) ===
 
   void _onPointerDown(PointerDownEvent event) {
+    if (_draftCancelRect?.contains(event.localPosition) == true) {
+      _draftCancelPointer = event.pointer;
+      return;
+    }
     if (_radialMenuScreenPosition != null) {
       setState(() => _radialMenuScreenPosition = null);
     }
@@ -1037,6 +1061,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _onPointerMove(PointerMoveEvent event) {
+    if (_draftCancelPointer == event.pointer) return;
     if (_touchInput &&
         _isActivelyDraggingHandle &&
         !_handleMoved &&
@@ -1055,6 +1080,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _beginPlacementHold(Offset point) {
+    if (_draftCancelPointer != null) return;
     if (!_canPlaceWithMarker) return;
     if (_effectiveSelection.isNotEmpty &&
         _wallCutIds.isEmpty &&
@@ -1303,6 +1329,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       var delta = ArchitectSnapHelper.precision(
         _project,
       ).inputPoint(rawModel - _elementMoveStart!);
+      delta = _parallelDelta(delta, _groupDragIds);
       if (_magnetEnabled &&
           _elementMoveOriginal!.activeStorey.walls.any(
             (w) => _groupDragIds.contains(w.id),
@@ -1312,12 +1339,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _groupDragIds,
           delta,
           _currentScale,
+          parallelOnly: _wallParallelMove,
         );
         delta = alignment.$1;
         _activeMagneticGuides = alignment.$2;
       } else {
         delta = _snapMovingElements(delta, _groupDragIds);
       }
+      delta = _parallelDelta(delta, _groupDragIds);
       try {
         _elementMovePreview = MoveArchitectElements(
           storeyId: _project.activeStoreyId,
@@ -1355,14 +1384,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         if ((snapDelta - delta).distance > 1e-4) {
           delta = snapDelta;
         } else {
-          _activeMagneticGuides = [
-            ..._activeMagneticGuides,
-            ...alignment.$2,
-          ];
+          _activeMagneticGuides = [..._activeMagneticGuides, ...alignment.$2];
         }
       } else {
         delta = _snapMovingElements(delta, {_draggingElementId!});
       }
+      delta = _parallelDelta(delta, {_draggingElementId!});
       _elementMoveDelta = delta;
       if (selectedWall != null) {
         try {
@@ -1560,6 +1587,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _onPointerUp(PointerUpEvent event) {
+    if (_draftCancelPointer == event.pointer) {
+      _draftCancelPointer = null;
+      return;
+    }
     if (_controlTrimClick) {
       _controlTrimClick = false;
       return;
@@ -1620,6 +1651,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelActiveDrags() {
+    _draftCancelPointer = null;
     _duplicateMove?.cancel();
     _duplicateMove = null;
     _duplicateMoveId = null;
@@ -1882,6 +1914,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
+  bool _selectDraftingElement(Offset point) {
+    final id = _hitSelection(point);
+    if (id == null) return false;
+    final wall = _project.activeStorey.walls
+        .where((w) => w.id == id)
+        .firstOrNull;
+    if (wall != null &&
+        !wall.containsPoint(point, tolerance: math.min(6 / _currentScale, .08))) {
+      return false;
+    }
+    return _selectAt(point);
+  }
+
   void _handleTap(Offset rawModel) {
     if (_pendingShape != null || _polygonDistanceOpen) return;
     if (_polygonEditId != null) {
@@ -1991,6 +2036,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
     if (_activeTool != ArchitectTool.select && _multiSelect) {
       _selectAt(rawModel);
+      return;
+    }
+
+    if (_draftStart == null &&
+        !_axisTool.isDrafting &&
+        !_zoneTool.isDrafting &&
+        _elementTool.slabDraftPoints.isEmpty &&
+        !(_touchInput && _placingWithHold) &&
+        _effectiveSelection.isEmpty &&
+        _activeTool != ArchitectTool.select &&
+        _selectDraftingElement(rawModel)) {
       return;
     }
 
@@ -2582,6 +2638,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       endPoint: p2,
       thickness: _wallThickness,
       height: _activeWallType?.customHeight ?? _project.activeStorey.height,
+      followStoreyHeight: _activeWallType?.isParapet != true,
       wallTypeId: _activeWallType?.id,
       parapetFinish: _activeWallType?.parapetFinish,
       referenceLine: _wallReference,
@@ -3858,249 +3915,284 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     void clear() => _clearSelection();
     return Material(
       color: const Color(0xFF1E1E26),
-      child: SizedBox(
-        height: 44,
-        child: Row(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  ids.length == 1 && _selectedElementId != null
-                      ? _selectedElementLabel
-                      : '${ids.length}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.cyanAccent),
+      child: Wrap(
+        children: [
+          SizedBox(
+            height: 44,
+            width: MediaQuery.sizeOf(context).width < 600 ? 70 : 160,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                ids.length == 1 && _selectedElementId != null
+                    ? _selectedElementLabel
+                    : '${ids.length}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.cyanAccent),
+              ),
+            ),
+          ),
+          if (wallIds.isNotEmpty) ...[
+            IconButton(
+              key: const ValueKey('architect-wall-flip'),
+              tooltip: l.architectWallFlipSide,
+              icon: const Icon(Icons.flip, color: Colors.white70),
+              onPressed: () => _executeWallEdit(
+                MirrorArchitectWalls(
+                  storeyId: _project.activeStoreyId,
+                  wallIds: wallIds,
                 ),
               ),
             ),
             IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              key: const ValueKey('architect-multi-select'),
-              tooltip: l.architectSelectionMulti,
+              key: const ValueKey('architect-wall-cut'),
+              tooltip: l.architectWallCut,
               icon: Icon(
-                Icons.library_add_check_outlined,
-                color: _multiSelect ? Colors.amber : Colors.white70,
+                Icons.content_cut,
+                color: _wallCutIds.isNotEmpty ? Colors.amber : Colors.white70,
               ),
-              onPressed: () => setState(() {
-                _radialMenuScreenPosition = null;
-                _polygonEditId = null;
-                _polygonSelectedEdge = null;
-                if (!_multiSelect) {
-                  _selectionIds
-                    ..clear()
-                    ..addAll(ids);
-                  _multiSelect = true;
-                } else {
-                  _multiSelect = false;
-                  _selectionIds.clear();
-                }
-                _moveSelection = false;
-              }),
-            ),
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              key: const ValueKey('architect-selection-move'),
-              tooltip: l.architectSelectionMove,
-              icon: Icon(
-                Icons.open_with,
-                color: _moveSelection ? Colors.amber : Colors.white70,
-              ),
-              onPressed: () => setState(() {
-                _radialMenuScreenPosition = null;
-                _polygonEditId = null;
-                _polygonSelectedEdge = null;
-                _moveSelection = !_moveSelection;
-              }),
-            ),
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              key: const ValueKey('architect-selection-properties'),
-              tooltip: l.architectProperties,
-              icon: const Icon(Icons.tune, color: Colors.white70),
               onPressed: () {
-                setState(() => _radialMenuScreenPosition = null);
-                _showProperties();
+                _cancelActiveDrags();
+                setState(() {
+                  _wallCutIds = _wallCutIds.isEmpty ? wallIds : {};
+                  _wallCutStroke = false;
+                  _wallCutStart = null;
+                  _wallCutConfirmedDir = null;
+                  _moveSelection = false;
+                  _wallParallelMove = false;
+                });
               },
             ),
-            if (wallIds.isNotEmpty)
+            if (wallIds.length == 1)
               IconButton(
-                key: const ValueKey('wall-detach'),
-                constraints: const BoxConstraints.tightFor(
-                  width: 40,
-                  height: 44,
+                key: const ValueKey('architect-wall-parallel'),
+                tooltip: l.architectWallParallel,
+                icon: Icon(
+                  Icons.swap_vert,
+                  color: _wallParallelMove ? Colors.amber : Colors.white70,
                 ),
-                padding: EdgeInsets.zero,
-                tooltip:
+                onPressed: _toggleParallelMove,
+              ),
+          ],
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+            padding: EdgeInsets.zero,
+            key: const ValueKey('architect-multi-select'),
+            tooltip: l.architectSelectionMulti,
+            icon: Icon(
+              Icons.library_add_check_outlined,
+              color: _multiSelect ? Colors.amber : Colors.white70,
+            ),
+            onPressed: () => setState(() {
+              _radialMenuScreenPosition = null;
+              _polygonEditId = null;
+              _polygonSelectedEdge = null;
+              if (!_multiSelect) {
+                _selectionIds
+                  ..clear()
+                  ..addAll(ids);
+                _multiSelect = true;
+              } else {
+                _multiSelect = false;
+                _selectionIds.clear();
+              }
+              _moveSelection = false;
+            }),
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+            padding: EdgeInsets.zero,
+            key: const ValueKey('architect-selection-move'),
+            tooltip: l.architectSelectionMove,
+            icon: Icon(
+              Icons.open_with,
+              color: _moveSelection ? Colors.amber : Colors.white70,
+            ),
+            onPressed: () => setState(() {
+              _radialMenuScreenPosition = null;
+              _polygonEditId = null;
+              _polygonSelectedEdge = null;
+              _moveSelection = !_moveSelection;
+            }),
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+            padding: EdgeInsets.zero,
+            key: const ValueKey('architect-selection-properties'),
+            tooltip: l.architectProperties,
+            icon: const Icon(Icons.tune, color: Colors.white70),
+            onPressed: () {
+              setState(() => _radialMenuScreenPosition = null);
+              _showProperties();
+            },
+          ),
+          if (wallIds.isNotEmpty)
+            IconButton(
+              key: const ValueKey('wall-detach'),
+              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+              padding: EdgeInsets.zero,
+              tooltip:
+                  _project.activeStorey.walls
+                      .where((w) => wallIds.contains(w.id))
+                      .every((w) => w.isDetached)
+                  ? l.architectWallAttach
+                  : l.architectWallDetach,
+              icon: Icon(
+                Icons.link_off,
+                color:
                     _project.activeStorey.walls
                         .where((w) => wallIds.contains(w.id))
                         .every((w) => w.isDetached)
-                    ? l.architectWallAttach
-                    : l.architectWallDetach,
-                icon: Icon(
-                  Icons.link_off,
-                  color:
-                      _project.activeStorey.walls
-                          .where((w) => wallIds.contains(w.id))
-                          .every((w) => w.isDetached)
-                      ? Colors.amber
-                      : Colors.white70,
-                ),
-                onPressed: () => _executeWallEdit(
-                  SetArchitectWallConnection(
-                    storeyId: _project.activeStoreyId,
-                    wallIds: wallIds,
-                    connected: _project.activeStorey.walls
-                        .where((w) => wallIds.contains(w.id))
-                        .every((w) => w.isDetached),
-                  ),
+                    ? Colors.amber
+                    : Colors.white70,
+              ),
+              onPressed: () => _executeWallEdit(
+                SetArchitectWallConnection(
+                  storeyId: _project.activeStoreyId,
+                  wallIds: wallIds,
+                  connected: _project.activeStorey.walls
+                      .where((w) => wallIds.contains(w.id))
+                      .every((w) => w.isDetached),
                 ),
               ),
-            if (wallIds.isNotEmpty)
-              PopupMenuButton<String>(
-                key: const ValueKey('architect-wall-actions'),
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.more_horiz, color: Colors.white70),
-                onSelected: (action) {
-                  if (action == 'cut' || action == 'splitStroke') {
-                    setState(() {
-                      _wallCutStroke = action == 'splitStroke';
-                      _wallCutIds = Set.of(wallIds);
-                      _wallCutStart = null;
-                      _wallCutConfirmedDir = null;
-                      _wallExtendId = null;
-                    });
-                  } else if (action == 'mirror') {
-                    _executeWallEdit(
-                      MirrorArchitectWalls(
+            ),
+          if (wallIds.isNotEmpty)
+            PopupMenuButton<String>(
+              key: const ValueKey('architect-wall-actions'),
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.more_horiz, color: Colors.white70),
+              onSelected: (action) {
+                if (action == 'cut' || action == 'splitStroke') {
+                  setState(() {
+                    _wallCutStroke = action == 'splitStroke';
+                    _wallCutIds = Set.of(wallIds);
+                    _wallCutStart = null;
+                    _wallCutConfirmedDir = null;
+                    _wallExtendId = null;
+                  });
+                } else if (action == 'mirror') {
+                  _executeWallEdit(
+                    MirrorArchitectWalls(
+                      storeyId: _project.activeStoreyId,
+                      wallIds: wallIds,
+                    ),
+                  );
+                } else if (action == 'magnet') {
+                  setState(() {
+                    _magnetEnabled = !_magnetEnabled;
+                    _activeMagneticGuides = [];
+                  });
+                } else if (action == 'join') {
+                  try {
+                    _commands.execute(
+                      JoinArchitectWalls(
                         storeyId: _project.activeStoreyId,
                         wallIds: wallIds,
                       ),
                     );
-                  } else if (action == 'magnet') {
-                    setState(() {
-                      _magnetEnabled = !_magnetEnabled;
-                      _activeMagneticGuides = [];
-                    });
-                  } else if (action == 'join') {
-                    try {
-                      _commands.execute(
-                        JoinArchitectWalls(
-                          storeyId: _project.activeStoreyId,
-                          wallIds: wallIds,
-                        ),
-                      );
-                      _saveBiMProjectIfAttached();
-                    } on ArgumentError {
-                      _operationError();
-                    }
-                  } else if (action == 'extend') {
-                    setState(() => _wallExtendId = wallIds.single);
-                  } else if (action == 'length') {
-                    _editWallLength();
-                  } else if (action == 'point') {
-                    _insertMidpoint(wallIds.single);
-                  } else if (action == 'parallel') {
-                    setState(() => _wallParallelMove = !_wallParallelMove);
+                    _saveBiMProjectIfAttached();
+                  } on ArgumentError {
+                    _operationError();
                   }
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    key: const ValueKey('wall-cut'),
-                    value: 'cut',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.content_cut, size: 18),
-                        const SizedBox(width: 8),
-                        Text(l.architectWallCut),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    key: const ValueKey('wall-split-stroke'),
-                    value: 'splitStroke',
-                    child: Text(l.architectWallSplit),
-                  ),
-                  PopupMenuItem(
-                    key: const ValueKey('wall-mirror'),
-                    value: 'mirror',
-                    child: Text(l.architectWallMirror),
-                  ),
-                  CheckedPopupMenuItem(
-                    value: 'magnet',
-                    checked: _magnetEnabled,
-                    child: Text(l.architectWallMagnet),
-                  ),
-                  if (wallIds.length == 1 && !_multiSelect) ...[
-                    PopupMenuItem(
-                      value: 'length',
-                      child: Text(l.architectWallLength),
-                    ),
-                    PopupMenuItem(
-                      value: 'point',
-                      child: Text(l.bimNewPoint),
-                    ),
-                    PopupMenuItem(
-                      value: 'parallel',
-                      child: Text(l.architectWallParallel),
-                    ),
-                    PopupMenuItem(
-                      key: const ValueKey('wall-extend'),
-                      value: 'extend',
-                      child: Text(l.architectWallExtend),
-                    ),
-                  ],
-                  if (wallIds.length >= 2)
-                    PopupMenuItem(
-                      key: const ValueKey('wall-join'),
-                      value: 'join',
-                      child: Text(l.architectWallJoin),
-                    ),
-                ],
-              ),
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              tooltip: l.delete,
-              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-              onPressed: () {
-                var storey = _project.activeStorey;
-                for (final id in ids) {
-                  storey = _elementTool.deleteElementById(storey, id);
+                } else if (action == 'extend') {
+                  setState(() => _wallExtendId = wallIds.single);
+                } else if (action == 'length') {
+                  _editWallLength();
+                } else if (action == 'point') {
+                  _insertMidpoint(wallIds.single);
+                } else if (action == 'parallel') {
+                  _toggleParallelMove();
                 }
-                _commands.commit(
-                  _project
-                      .updateActiveStorey(
-                        storey.copyWith(
-                          zones: storey.zones
-                              .where((z) => !ids.contains(z.id))
-                              .toList(),
-                        ),
-                      )
-                      .copyWithGridAxes(
-                        _project.gridAxes
-                            .where((a) => !ids.contains(a.id))
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  key: const ValueKey('wall-cut'),
+                  value: 'cut',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.content_cut, size: 18),
+                      const SizedBox(width: 8),
+                      Text(l.architectWallCut),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  key: const ValueKey('wall-split-stroke'),
+                  value: 'splitStroke',
+                  child: Text(l.architectWallSplit),
+                ),
+                PopupMenuItem(
+                  key: const ValueKey('wall-mirror'),
+                  value: 'mirror',
+                  child: Text(l.architectWallMirror),
+                ),
+                CheckedPopupMenuItem(
+                  value: 'magnet',
+                  checked: _magnetEnabled,
+                  child: Text(l.architectWallMagnet),
+                ),
+                if (wallIds.length == 1 && !_multiSelect) ...[
+                  PopupMenuItem(
+                    value: 'length',
+                    child: Text(l.architectWallLength),
+                  ),
+                  PopupMenuItem(value: 'point', child: Text(l.bimNewPoint)),
+                  PopupMenuItem(
+                    value: 'parallel',
+                    child: Text(l.architectWallParallel),
+                  ),
+                  PopupMenuItem(
+                    key: const ValueKey('wall-extend'),
+                    value: 'extend',
+                    child: Text(l.architectWallExtend),
+                  ),
+                ],
+                if (wallIds.length >= 2)
+                  PopupMenuItem(
+                    key: const ValueKey('wall-join'),
+                    value: 'join',
+                    child: Text(l.architectWallJoin),
+                  ),
+              ],
+            ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+            padding: EdgeInsets.zero,
+            tooltip: l.delete,
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            onPressed: () {
+              var storey = _project.activeStorey;
+              for (final id in ids) {
+                storey = _elementTool.deleteElementById(storey, id);
+              }
+              _commands.commit(
+                _project
+                    .updateActiveStorey(
+                      storey.copyWith(
+                        zones: storey.zones
+                            .where((z) => !ids.contains(z.id))
                             .toList(),
                       ),
-                );
-                _saveBiMProjectIfAttached();
-                clear();
-              },
-            ),
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              key: const ValueKey('architect-clear-selection'),
-              tooltip: l.close,
-              icon: const Icon(Icons.close, color: Colors.white70),
-              onPressed: clear,
-            ),
-          ],
-        ),
+                    )
+                    .copyWithGridAxes(
+                      _project.gridAxes
+                          .where((a) => !ids.contains(a.id))
+                          .toList(),
+                    ),
+              );
+              _saveBiMProjectIfAttached();
+              clear();
+            },
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+            padding: EdgeInsets.zero,
+            key: const ValueKey('architect-clear-selection'),
+            tooltip: l.close,
+            icon: const Icon(Icons.close, color: Colors.white70),
+            onPressed: clear,
+          ),
+        ],
       ),
     );
   }
@@ -4857,6 +4949,51 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   // === SECTION: 2D CANVAS VIEWPORT (LAYERED MODEL SPACE) ===
 
+  Offset? get _draftCancelAnchor =>
+      _draftStart ??
+      _axisTool.draftStart ??
+      _zoneTool.draftPoints.firstOrNull ??
+      _elementTool.slabDraftPoints.firstOrNull;
+  int? _draftCancelPointer;
+  Rect? get _draftCancelRect {
+    final anchor = _draftCancelAnchor;
+    if (anchor == null ||
+        _viewport.size.width < 48 ||
+        _viewport.size.height < 48) {
+      return null;
+    }
+    final point = _viewport.toScreen(anchor);
+    return Rect.fromLTWH(
+      (point.dx + 16).clamp(4.0, _viewport.size.width - 44),
+      (point.dy - 52).clamp(4.0, _viewport.size.height - 44),
+      44,
+      44,
+    );
+  }
+
+  Widget _buildDraftCancel() => AnimatedBuilder(
+    animation: Listenable.merge([_viewport, _previewRevision]),
+    builder: (context, _) {
+      final rect = _draftCancelRect;
+      if (rect == null) return const SizedBox.shrink();
+      return Stack(
+        children: [
+          Positioned(
+            left: rect.left,
+            top: rect.top,
+            child: IconButton.filledTonal(
+              key: const ValueKey('architect-draft-cancel'),
+              constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+              tooltip: context.l10n.cancel,
+              icon: const Icon(Icons.close),
+              onPressed: _cancelDrafting,
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
   Widget _build2DCanvas() => Stack(
     children: [
       ArchitectViewport(
@@ -4983,6 +5120,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 ),
               ),
             ),
+            Positioned.fill(child: _buildDraftCancel()),
             Positioned(
               left: 12,
               right: 12,

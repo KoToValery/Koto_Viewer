@@ -627,7 +627,14 @@ void main() {
           .camera(tester)
           .fit(const Rect.fromLTWH(-2, -2, 5, 5), padding: 40);
       await tester.pump();
-      await workspace.wallTap(tester, const Offset(-1, -.5));
+      // A quick tap on the existing wall now selects it. An aimed hold starts
+      // an attached wall without bypassing that selection behavior.
+      final start = await tester.startGesture(
+        workspace.screen(tester, const Offset(-1, -.5)) + const Offset(0, 64),
+      );
+      await tester.pump(const Duration(milliseconds: 281));
+      await start.up();
+      await tester.pump();
       if (const bool.fromEnvironment('UPDATE_ARCHITECT_WALL_PREVIEW')) {
         final held = await tester.startGesture(
           workspace.screen(tester, const Offset(-1, 1.5)) + const Offset(0, 64),

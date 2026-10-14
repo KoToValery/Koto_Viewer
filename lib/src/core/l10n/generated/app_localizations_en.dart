@@ -4106,7 +4106,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectPropertyThickness => 'Thk.';
 
   @override
-  String get architectPropertyCore => 'Brick';
+  String get architectPropertyCore => 'Core';
 
   @override
   String get architectPropertyInsulation => 'Insul.';
@@ -4520,4 +4520,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectWallType => 'Wall type';
+
+  @override
+  String get architectWallFollowStorey => 'Follow storey';
+
+  @override
+  String get architectWallLeadingLine => 'Leading line';
+
+  @override
+  String get architectWallCoreThickness => 'Core thickness';
+
+  @override
+  String get architectPropertyTotal => 'Total';
+
+  @override
+  String get architectMaterialBrick => 'Brick';
+
+  @override
+  String get architectMaterialConcrete => 'Concrete';
+
+  @override
+  String get architectMaterialTimber => 'Timber';
+
+  @override
+  String get architectMaterialPanel => 'Thermal panel';
+
+  @override
+  String get architectInsulationXps => 'XPS';
+
+  @override
+  String get architectInsulationEps => 'EPS';
+
+  @override
+  String get architectInsulationStoneWool => 'Stone wool';
 }

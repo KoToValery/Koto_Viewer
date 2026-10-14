@@ -4,6 +4,7 @@ import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_wall.dart';
+import '../models/architect_wall_type.dart';
 import '../rendering/architect_scene_geometry.dart';
 import 'architect_command_controller.dart';
 
@@ -245,10 +246,28 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'referenceLine',
               'exteriorSide',
               'styleId',
+              'followStoreyHeight',
+              'coreMaterial',
+              'insulationMaterial',
             }.contains(value.key)) {
           throw ArgumentError('Unsupported property');
         }
-        e[value.key] = value.value;
+        if (value.key == 'followStoreyHeight') {
+          if (!{'true', 'false'}.contains(value.value)) {
+            throw ArgumentError('Invalid height mode');
+          }
+          e[value.key] = value.value == 'true';
+        } else {
+          e[value.key] = value.value;
+        }
+        if (value.key == 'coreMaterial' &&
+                !WallCoreMaterial.values.any((m) => m.name == value.value) ||
+            value.key == 'insulationMaterial' &&
+                !WallInsulationMaterial.values.any(
+                  (m) => m.name == value.value,
+                )) {
+          throw ArgumentError('Invalid wall material');
+        }
         if (value.key == 'referenceLine' &&
                 !WallReferenceLine.values.any((r) => r.name == value.value) ||
             value.key == 'exteriorSide' &&
@@ -262,6 +281,13 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         final old = project.activeStorey.walls.firstWhere(
           (w) => w.id == e['id'],
         );
+        if (values.containsKey('height') &&
+            !textValues.containsKey('followStoreyHeight')) {
+          e['followStoreyHeight'] = false;
+        }
+        if (e['followStoreyHeight'] == true && !old.isParapet) {
+          e['height'] = project.activeStorey.height;
+        }
         final insulation =
             values['insulationThicknessOverride'] ?? old.insulationThickness;
         final core =

@@ -1,6 +1,10 @@
 // === SECTION: ARCHITECTURAL WALL TYPE MODELS ===
 import 'dart:ui';
 
+enum WallCoreMaterial { brick, concrete, timber, panel }
+
+enum WallInsulationMaterial { xps, eps, stoneWool }
+
 /// Semantic usage and classification of an architectural wall.
 enum WallUsage {
   /// Exterior façade wall (e.g. 25 cm brick + thermal insulation EPS).

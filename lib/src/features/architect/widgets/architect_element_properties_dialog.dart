@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
+import '../models/architect_wall_type.dart';
+import 'architect_wall_material_label.dart';
 import '../models/architect_fenestration_style.dart';
 import '../services/fenestration_library_service.dart';
 import '../services/architect_selection.dart';
@@ -80,9 +82,13 @@ class _ArchitectElementPropertiesDialogState
       'height' => l.architectPropertyHeight,
       'width' => l.architectPropertyWidth,
       'depth' => l.architectPropertyDepth,
-      'thickness' || 'strokeWidth' => l.architectPropertyThickness,
-      'coreThickness' => l.architectPropertyCore,
-      'insulationThicknessOverride' => l.architectPropertyInsulation,
+      'thickness' =>
+        records.every((e) => e.containsKey('referenceLine'))
+            ? l.architectPropertyTotal
+            : l.architectPropertyThickness,
+      'strokeWidth' => l.architectPropertyThickness,
+      'coreThickness' => l.architectWallCoreThickness,
+      'insulationThicknessOverride' => l.architectPropertyThickness,
       'rotationDeg' => l.architectPropertyAngle,
       'stepCount' => l.architectPropertySteps,
       'sillHeight' => l.architectPropertySill,
@@ -94,6 +100,12 @@ class _ArchitectElementPropertiesDialogState
 
   bool metric(String key) => key != 'rotationDeg' && key != 'stepCount';
   double? fieldValue(String key) {
+    if (key == 'height' &&
+        records.every((e) => e.containsKey('referenceLine')) &&
+        followsHeight &&
+        normalWalls) {
+      return widget.project.activeStorey.height;
+    }
     if (key == 'thickness' &&
         fields.containsKey('coreThickness') &&
         (values.containsKey('coreThickness') ||
@@ -113,7 +125,7 @@ class _ArchitectElementPropertiesDialogState
         : key == 'rotationDeg'
         ? '°'
         : '';
-    final value = values[key] ?? fields[key] ?? 0;
+    final value = fieldValue(key) ?? 0;
     var draft = metric(key) ? widget.project.units.toUnit(value) : value;
     await showDialog<void>(
       context: context,
@@ -152,16 +164,72 @@ class _ArchitectElementPropertiesDialogState
     );
   }
 
+  bool get followsHeight =>
+      texts['followStoreyHeight'] == 'true' ||
+      (!texts.containsKey('followStoreyHeight') &&
+          records.every((e) => e['followStoreyHeight'] == true));
+  bool get normalWalls =>
+      records.every((e) => !ArchitectWall.fromJson(e).isParapet);
+  Widget numberField(String key, bool walls) => ListTile(
+    key: ValueKey('architect-property-$key'),
+    dense: true,
+    contentPadding: EdgeInsets.zero,
+    title: Text(label(key)),
+    trailing: Text(
+      fieldValue(key) == null
+          ? '—'
+          : metric(key)
+          ? widget.project.units.format(fieldValue(key)!, decimals: 3)
+          : fieldValue(key)!.toStringAsFixed(key == 'stepCount' ? 0 : 1),
+    ),
+    onTap:
+        (walls && key == 'thickness') ||
+            (walls && key == 'height' && followsHeight)
+        ? null
+        : () => editNumber(key),
+  );
+
+  Widget materialField(String key) {
+    final l = context.l10n;
+    final core = key == 'coreMaterial';
+    final options = core
+        ? WallCoreMaterial.values.map((m) => (m.name, m.label(l)))
+        : WallInsulationMaterial.values.map((m) => (m.name, m.label(l)));
+    final names = records.map((e) => e[key]).toSet();
+    return DropdownButtonFormField<String>(
+      key: ValueKey('architect-property-$key'),
+      isExpanded: true,
+      initialValue:
+          texts[key] ?? (names.length == 1 ? names.first as String? : null),
+      decoration: InputDecoration(
+        labelText: core
+            ? l.architectPropertyCore
+            : l.architectPropertyInsulation,
+      ),
+      items: [
+        for (final option in options)
+          DropdownMenuItem(value: option.$1, child: Text(option.$2)),
+      ],
+      onChanged: (value) {
+        if (value != null) setState(() => texts[key] = value);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
     final walls = records.every((e) => e.containsKey('referenceLine'));
-    final isDoor = records.isNotEmpty &&
-        records.every((e) =>
-            e.containsKey('offsetRatio') && e.containsKey('isHingeLeft'));
-    final isWindow = records.isNotEmpty &&
-        records.every((e) =>
-            e.containsKey('offsetRatio') && e.containsKey('panesCount'));
+    final isDoor =
+        records.isNotEmpty &&
+        records.every(
+          (e) => e.containsKey('offsetRatio') && e.containsKey('isHingeLeft'),
+        );
+    final isWindow =
+        records.isNotEmpty &&
+        records.every(
+          (e) => e.containsKey('offsetRatio') && e.containsKey('panesCount'),
+        );
     return AlertDialog(
       title: Text(l.architectProperties),
       content: SizedBox(
@@ -217,31 +285,52 @@ class _ArchitectElementPropertiesDialogState
                 ),
                 const SizedBox(height: 8),
               ],
-              for (final entry in fields.entries)
-                ListTile(
-                  key: ValueKey('architect-property-${entry.key}'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(label(entry.key)),
-                  trailing: Text(
-                    fieldValue(entry.key) == null
-                        ? '—'
-                        : metric(entry.key)
-                        ? widget.project.units.format(
-                            fieldValue(entry.key)!,
-                            decimals: 3,
-                          )
-                        : fieldValue(
-                            entry.key,
-                          )!.toStringAsFixed(entry.key == 'stepCount' ? 0 : 1),
-                  ),
-                  onTap: walls && entry.key == 'thickness'
-                      ? null
-                      : () => editNumber(entry.key),
-                ),
+              if (!walls)
+                for (final key in fields.keys) numberField(key, false),
               if (walls) ...[
+                numberField('height', true),
+                if (normalWalls)
+                  CheckboxListTile(
+                    key: const ValueKey(
+                      'architect-property-followStoreyHeight',
+                    ),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l.architectWallFollowStorey),
+                    value: followsHeight,
+                    onChanged: (value) => setState(() {
+                      texts['followStoreyHeight'] = '$value';
+                      if (value == true) values.remove('height');
+                    }),
+                  ),
+                materialField('coreMaterial'),
+                numberField('coreThickness', true),
+                materialField('insulationMaterial'),
+                numberField('insulationThicknessOverride', true),
+                numberField('thickness', true),
+                IconButton(
+                  key: const ValueKey('architect-property-flipSide'),
+                  tooltip: l.architectWallFlipSide,
+                  icon: Icon(
+                    Icons.flip,
+                    color: texts.containsKey('exteriorSide')
+                        ? Colors.amber
+                        : null,
+                  ),
+                  onPressed: () => setState(
+                    () => texts['exteriorSide'] =
+                        (texts['exteriorSide'] ??
+                                records.first['exteriorSide']) ==
+                            'right'
+                        ? 'left'
+                        : 'right',
+                  ),
+                ),
                 DropdownButtonFormField<String>(
                   key: const ValueKey('architect-property-referenceLine'),
+                  decoration: InputDecoration(
+                    labelText: l.architectWallLeadingLine,
+                  ),
                   initialValue: records.map(reference).toSet().length == 1
                       ? reference(records.first)
                       : null,
@@ -265,24 +354,6 @@ class _ArchitectElementPropertiesDialogState
                   onChanged: (v) {
                     if (v != null) texts['referenceLine'] = v;
                   },
-                ),
-                IconButton(
-                  key: const ValueKey('architect-property-flipSide'),
-                  tooltip: l.architectWallFlipSide,
-                  icon: Icon(
-                    Icons.flip,
-                    color: texts.containsKey('exteriorSide')
-                        ? Colors.amber
-                        : null,
-                  ),
-                  onPressed: () => setState(
-                    () => texts['exteriorSide'] =
-                        (texts['exteriorSide'] ??
-                                records.first['exteriorSide']) ==
-                            'right'
-                        ? 'left'
-                        : 'right',
-                  ),
                 ),
               ],
               for (final key in [

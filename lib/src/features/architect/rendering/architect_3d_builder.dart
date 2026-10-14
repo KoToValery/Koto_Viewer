@@ -16,7 +16,11 @@ class Architect3dBuilder {
     bool hasWalls = false;
 
     for (final storey in project.storeys) {
-      for (final wall in storey.walls) {
+      final walls = [
+        for (final wall in storey.walls)
+          wall.copyWith(height: wall.effectiveHeight(storey.height)),
+      ];
+      for (final wall in walls) {
         hasWalls = true;
         minX = math.min(minX, math.min(wall.startPoint.dx, wall.endPoint.dx));
         maxX = math.max(maxX, math.max(wall.startPoint.dx, wall.endPoint.dx));
@@ -29,7 +33,7 @@ class Architect3dBuilder {
 
       // Fill physical mitres at the same junctions used by the plan view.
       for (final (points, height) in ArchitectWallNetwork.junctions(
-        storey.walls,
+        walls,
         solidOnly: true,
       )) {
         const color = Color(0xFFECEFF1);

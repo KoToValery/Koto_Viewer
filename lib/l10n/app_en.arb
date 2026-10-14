@@ -3046,7 +3046,7 @@
   "architectPropertyWidth": "Width",
   "architectPropertyDepth": "Depth",
   "architectPropertyThickness": "Thk.",
-  "architectPropertyCore": "Brick",
+  "architectPropertyCore": "Core",
   "architectPropertyInsulation": "Insul.",
   "architectPropertyAngle": "Angle",
   "architectPropertySteps": "Steps",
@@ -3265,5 +3265,16 @@
   "bimWallNewPointHelp": "Adds connected wall segments. Split cuts and disconnects them.",
   "architectCanvasLight": "Light background",
   "architectCanvasDark": "Dark background",
-  "architectWallType": "Wall type"
+  "architectWallType": "Wall type",
+  "architectWallFollowStorey": "Follow storey",
+  "architectWallLeadingLine": "Leading line",
+  "architectWallCoreThickness": "Core thickness",
+  "architectPropertyTotal": "Total",
+  "architectMaterialBrick": "Brick",
+  "architectMaterialConcrete": "Concrete",
+  "architectMaterialTimber": "Timber",
+  "architectMaterialPanel": "Thermal panel",
+  "architectInsulationXps": "XPS",
+  "architectInsulationEps": "EPS",
+  "architectInsulationStoneWool": "Stone wool"
 }

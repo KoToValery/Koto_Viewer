@@ -1332,7 +1332,7 @@
   "architectPropertyWidth": "Шир.",
   "architectPropertyDepth": "Дълб.",
   "architectPropertyThickness": "Деб.",
-  "architectPropertyCore": "Тухла",
+  "architectPropertyCore": "Ядро",
   "architectPropertyInsulation": "Изол.",
   "architectPropertyAngle": "Ъгъл",
   "architectPropertySteps": "Стъпала",
@@ -1465,5 +1465,16 @@
   "bimWallNewPointHelp": "Добавя свързани сегменти. Срежи прекъсва връзката.",
   "architectCanvasLight": "Светъл фон",
   "architectCanvasDark": "Тъмен фон",
-  "architectWallType": "Тип стена"
+  "architectWallType": "Тип стена",
+  "architectWallFollowStorey": "По етаж",
+  "architectWallLeadingLine": "Водеща линия",
+  "architectWallCoreThickness": "Дебелина ядро",
+  "architectPropertyTotal": "Общо",
+  "architectMaterialBrick": "Тухла",
+  "architectMaterialConcrete": "Бетон",
+  "architectMaterialTimber": "Дърво",
+  "architectMaterialPanel": "Термопанел",
+  "architectInsulationXps": "XPS",
+  "architectInsulationEps": "EPS",
+  "architectInsulationStoneWool": "Каменна вата"
 }

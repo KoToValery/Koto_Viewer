@@ -4120,7 +4120,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectPropertyThickness => 'Деб.';
 
   @override
-  String get architectPropertyCore => 'Тухла';
+  String get architectPropertyCore => 'Ядро';
 
   @override
   String get architectPropertyInsulation => 'Изол.';
@@ -4536,4 +4536,37 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectWallType => 'Тип стена';
+
+  @override
+  String get architectWallFollowStorey => 'По етаж';
+
+  @override
+  String get architectWallLeadingLine => 'Водеща линия';
+
+  @override
+  String get architectWallCoreThickness => 'Дебелина ядро';
+
+  @override
+  String get architectPropertyTotal => 'Общо';
+
+  @override
+  String get architectMaterialBrick => 'Тухла';
+
+  @override
+  String get architectMaterialConcrete => 'Бетон';
+
+  @override
+  String get architectMaterialTimber => 'Дърво';
+
+  @override
+  String get architectMaterialPanel => 'Термопанел';
+
+  @override
+  String get architectInsulationXps => 'XPS';
+
+  @override
+  String get architectInsulationEps => 'EPS';
+
+  @override
+  String get architectInsulationStoneWool => 'Каменна вата';
 }

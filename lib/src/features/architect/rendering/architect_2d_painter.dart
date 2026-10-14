@@ -15,6 +15,7 @@ import 'architect_zone_painter_helper.dart';
 import 'architect_scene_geometry.dart';
 import 'architect_wall_network.dart';
 import 'architect_wall_layers.dart';
+import 'architect_wall_hatch.dart';
 import '../models/architect_wall.dart';
 import 'architect_dimension_layout.dart';
 import '../services/architect_selection.dart';
@@ -709,27 +710,12 @@ class Architect2dPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = .7 / zoomScale,
     );
-    canvas.save();
-    canvas.clipPath(layers.core);
-    final bounds = layers.core.getBounds().intersect(
-      canvas.getLocalClipBounds(),
-    );
-    final spacing = math.max(.12, 8 / zoomScale);
-    final hatch = Paint()
-      ..color = hatchColor
-      ..strokeWidth = .6 / zoomScale;
-    for (
-      double x = ((bounds.left - bounds.height) / spacing).floor() * spacing;
-      x < bounds.right;
-      x += spacing
-    ) {
-      canvas.drawLine(
-        Offset(x, bounds.bottom),
-        Offset(x + bounds.height, bounds.top),
-        hatch,
-      );
+    for (final wall in layers.walls) {
+      final region = layers.coreRegions[wall.id];
+      if (region != null) {
+        ArchitectWallHatch.paint(canvas, wall, region, zoomScale, hatchColor);
+      }
     }
-    canvas.restore();
     canvas.drawPath(layers.core, border);
   }
 

@@ -7154,7 +7154,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectPropertyCore.
   ///
   /// In en, this message translates to:
-  /// **'Brick'**
+  /// **'Core'**
   String get architectPropertyCore;
 
   /// No description provided for @architectPropertyInsulation.
@@ -7954,6 +7954,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wall type'**
   String get architectWallType;
+
+  /// No description provided for @architectWallFollowStorey.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow storey'**
+  String get architectWallFollowStorey;
+
+  /// No description provided for @architectWallLeadingLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Leading line'**
+  String get architectWallLeadingLine;
+
+  /// No description provided for @architectWallCoreThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Core thickness'**
+  String get architectWallCoreThickness;
+
+  /// No description provided for @architectPropertyTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get architectPropertyTotal;
+
+  /// No description provided for @architectMaterialBrick.
+  ///
+  /// In en, this message translates to:
+  /// **'Brick'**
+  String get architectMaterialBrick;
+
+  /// No description provided for @architectMaterialConcrete.
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete'**
+  String get architectMaterialConcrete;
+
+  /// No description provided for @architectMaterialTimber.
+  ///
+  /// In en, this message translates to:
+  /// **'Timber'**
+  String get architectMaterialTimber;
+
+  /// No description provided for @architectMaterialPanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Thermal panel'**
+  String get architectMaterialPanel;
+
+  /// No description provided for @architectInsulationXps.
+  ///
+  /// In en, this message translates to:
+  /// **'XPS'**
+  String get architectInsulationXps;
+
+  /// No description provided for @architectInsulationEps.
+  ///
+  /// In en, this message translates to:
+  /// **'EPS'**
+  String get architectInsulationEps;
+
+  /// No description provided for @architectInsulationStoneWool.
+  ///
+  /// In en, this message translates to:
+  /// **'Stone wool'**
+  String get architectInsulationStoneWool;
 }
 
 class _AppLocalizationsDelegate

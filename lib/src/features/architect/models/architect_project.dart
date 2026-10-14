@@ -80,7 +80,12 @@ class ArchitectStorey {
     elevation: elevation ?? this.elevation,
     height: height ?? this.height,
     floorFinishThickness: floorFinishThickness ?? this.floorFinishThickness,
-    walls: walls ?? this.walls,
+    walls: height == null
+        ? (walls ?? this.walls)
+        : [
+            for (final wall in walls ?? this.walls)
+              wall.copyWith(height: wall.effectiveHeight(height)),
+          ],
     zones: zones ?? this.zones,
     columns: columns ?? this.columns,
     beams: beams ?? this.beams,
@@ -99,7 +104,9 @@ class ArchitectStorey {
     'elevation': elevation,
     'height': height,
     'floorFinishThickness': floorFinishThickness,
-    'walls': walls.map((w) => w.toJson()).toList(),
+    'walls': walls
+        .map((w) => w.copyWith(height: w.effectiveHeight(height)).toJson())
+        .toList(),
     'zones': zones.map((z) => z.toJson()).toList(),
     'columns': columns.map((c) => c.toJson()).toList(),
     'beams': beams.map((b) => b.toJson()).toList(),
@@ -123,7 +130,15 @@ class ArchitectStorey {
         (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
     walls:
         (json['walls'] as List<dynamic>?)
-            ?.map((w) => ArchitectWall.fromJson(w as Map<String, dynamic>))
+            ?.map(
+              (w) => ArchitectWall.fromJson({
+                ...w as Map<String, dynamic>,
+                if (!w.containsKey('followStoreyHeight'))
+                  'followStoreyHeight':
+                      ((w['height'] as num?)?.toDouble() ?? 2.80) ==
+                      ((json['height'] as num?)?.toDouble() ?? 2.80),
+              }),
+            )
             .toList() ??
         const [],
     zones:

@@ -62,6 +62,9 @@ class ArchitectWall {
   final Offset endPoint;
   final double thickness; // in meters (default 0.25 m = 25 cm)
   final double height; // in meters (default 2.80 m or 1.05/1.20 m for parapets)
+  final bool followStoreyHeight;
+  final WallCoreMaterial? coreMaterialOverride;
+  final WallInsulationMaterial insulationMaterial;
   final WallReferenceLine referenceLine;
   final WallExteriorSide exteriorSide;
   final double? insulationThicknessOverride;
@@ -78,6 +81,9 @@ class ArchitectWall {
     required this.endPoint,
     this.thickness = 0.25,
     this.height = 2.80,
+    this.followStoreyHeight = true,
+    this.coreMaterialOverride,
+    this.insulationMaterial = WallInsulationMaterial.eps,
     this.referenceLine = WallReferenceLine.center,
     this.exteriorSide = WallExteriorSide.left,
     this.insulationThicknessOverride,
@@ -91,6 +97,13 @@ class ArchitectWall {
 
   bool get isParapet =>
       height < 1.50 || (wallTypeId != null && wallTypeId!.contains('parapet'));
+  double effectiveHeight(double storeyHeight) =>
+      followStoreyHeight && !isParapet ? storeyHeight : height;
+  WallCoreMaterial get coreMaterial =>
+      coreMaterialOverride ??
+      (wallTypeId == 'bearing_25_concrete'
+          ? WallCoreMaterial.concrete
+          : WallCoreMaterial.brick);
 
   double get length => (endPoint - startPoint).distance;
 
@@ -147,6 +160,9 @@ class ArchitectWall {
     Offset? endPoint,
     double? thickness,
     double? height,
+    bool? followStoreyHeight,
+    WallCoreMaterial? coreMaterial,
+    WallInsulationMaterial? insulationMaterial,
     WallReferenceLine? referenceLine,
     WallExteriorSide? exteriorSide,
     double? insulationThicknessOverride,
@@ -162,6 +178,9 @@ class ArchitectWall {
     endPoint: endPoint ?? this.endPoint,
     thickness: thickness ?? this.thickness,
     height: height ?? this.height,
+    followStoreyHeight: followStoreyHeight ?? this.followStoreyHeight,
+    coreMaterialOverride: coreMaterial ?? coreMaterialOverride,
+    insulationMaterial: insulationMaterial ?? this.insulationMaterial,
     referenceLine: referenceLine ?? this.referenceLine,
     exteriorSide: exteriorSide ?? this.exteriorSide,
     insulationThicknessOverride:
@@ -249,6 +268,9 @@ class ArchitectWall {
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'thickness': thickness,
     'height': height,
+    'followStoreyHeight': followStoreyHeight && !isParapet,
+    'coreMaterial': coreMaterial.name,
+    'insulationMaterial': insulationMaterial.name,
     'referenceLine': referenceLine.name,
     'exteriorSide': exteriorSide.name,
     'insulationThicknessOverride': insulationThicknessOverride,
@@ -272,6 +294,15 @@ class ArchitectWall {
     ),
     thickness: (json['thickness'] as num?)?.toDouble() ?? 0.25,
     height: (json['height'] as num?)?.toDouble() ?? 2.80,
+    followStoreyHeight: json['followStoreyHeight'] as bool? ?? false,
+    coreMaterialOverride: WallCoreMaterial.values
+        .where((m) => m.name == json['coreMaterial'])
+        .firstOrNull,
+    insulationMaterial:
+        WallInsulationMaterial.values
+            .where((m) => m.name == json['insulationMaterial'])
+            .firstOrNull ??
+        WallInsulationMaterial.eps,
     referenceLine: WallReferenceLine.values.firstWhere(
       (value) => value.name == json['referenceLine'],
       orElse: () => WallReferenceLine.center,
