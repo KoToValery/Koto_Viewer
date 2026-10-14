@@ -163,7 +163,7 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  test('Translation keeps unselected T branches stationary', () {
+  test('Translation stretches attached T ends while keeping their far ends', () {
     final model = workspace.commands();
     addTearDown(model.dispose);
     model.execute(
@@ -191,10 +191,11 @@ void main() {
         delta: Offset(0, 1),
       ),
     );
-    expect(model.project.activeStorey.walls[1].startPoint, const Offset(2, 0));
+    expect(model.project.activeStorey.walls[1].startPoint, const Offset(2, 1));
+    expect(model.project.activeStorey.walls[1].endPoint, const Offset(2, 3));
     expect(
       model.project.activeStorey.walls[2].startPoint,
-      const Offset(3, -.2),
+      const Offset(3, .8),
     );
     model.undo();
     expect(

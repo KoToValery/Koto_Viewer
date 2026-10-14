@@ -657,20 +657,20 @@ class MoveArchitectElement extends ArchitectModelCommand {
   }
 }
 
-/// Move selected elements while keeping unselected supports stationary.
+/// Move selected elements and stretch attached walls to retain their joints.
 class MoveArchitectElements extends ArchitectModelCommand {
   final String storeyId;
   final Set<String> elementIds;
   final Offset delta;
 
-  /// Numeric clearance edits may extend an attached support past its old end.
-  /// Pointer dragging keeps the existing stationary-support constraint.
+  /// Stretch attached supports beyond their old ends. Explicit false retains
+  /// the constrained edit contract for callers that require fixed supports.
   final bool extendSupports;
   const MoveArchitectElements({
     required this.storeyId,
     required this.elementIds,
     required this.delta,
-    this.extendSupports = false,
+    this.extendSupports = true,
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
@@ -679,7 +679,7 @@ class MoveArchitectElements extends ArchitectModelCommand {
     final movedWalls = storey.walls
         .where((w) => elementIds.contains(w.id))
         .toList();
-    // Only selected elements move. Connected ends slide on stationary supports.
+    // Selected walls move; their attached returns and T ends follow the joint.
     final nextWalls = {for (final w in storey.walls) w.id: w};
     for (final wall in movedWalls) {
       var moved = const ArchitectWallEditingAdapter().translate(wall, delta);
@@ -690,13 +690,7 @@ class MoveArchitectElements extends ArchitectModelCommand {
               !support.connectsAt(oldPoint)) {
             continue;
           }
-          final faces = [
-            (support.startPoint, support.endPoint),
-            (support.polygonCorners[0], support.polygonCorners[1]),
-            (support.polygonCorners[3], support.polygonCorners[2]),
-            (support.coreCorners[0], support.coreCorners[1]),
-            (support.coreCorners[3], support.coreCorners[2]),
-          ];
+          final faces = _wallConnectionFaces(support);
           for (final face in faces) {
             final u = face.$2 - face.$1;
             final d = oldPoint - face.$1;
@@ -761,6 +755,107 @@ class MoveArchitectElements extends ArchitectModelCommand {
       );
       nextWalls[wall.id] = _wallOpeningsAfterEdit(translated, moved);
     }
+    if (extendSupports) {
+      for (final support in storey.walls) {
+        if (elementIds.contains(support.id) || support.isDetached) continue;
+        Offset follow(Offset oldPoint, Offset current, bool connected) {
+          if (!connected) return current;
+          for (final source in movedWalls) {
+            if (!source.connectsAt(oldPoint)) continue;
+            final oldFaces = _wallConnectionFaces(source);
+            final newFaces = _wallConnectionFaces(nextWalls[source.id]!);
+            for (var i = 0; i < oldFaces.length; i++) {
+              final face = oldFaces[i];
+              final u = face.$2 - face.$1;
+              final t = BimLineGeometry.parameter(
+                oldPoint,
+                face.$1,
+                face.$2,
+                finite: false,
+              );
+              if (t < -1e-8 ||
+                  t > 1 + 1e-8 ||
+                  (oldPoint - (face.$1 + u * t)).distance > 1e-8) {
+                continue;
+              }
+              return BimLineGeometry.intersection(
+                    support.startPoint,
+                    support.endPoint,
+                    newFaces[i].$1,
+                    newFaces[i].$2,
+                  ) ??
+                  oldPoint + delta;
+            }
+          }
+          return current;
+        }
+
+        final previous = nextWalls[support.id]!;
+        final start = follow(
+          support.startPoint,
+          previous.startPoint,
+          support.connectStart,
+        );
+        final end = follow(
+          support.endPoint,
+          previous.endPoint,
+          support.connectEnd,
+        );
+        if ((start - previous.startPoint).distance > 1e-8 ||
+            (end - previous.endPoint).distance > 1e-8) {
+          nextWalls[support.id] = previous.copyWith(
+            startPoint: start,
+            endPoint: end,
+          );
+        }
+      }
+      // Shared unselected junctions follow once, without translating their
+      // complete network or revisiting selected walls.
+      final junctions = <(Offset, Offset)>[];
+      final visited = <(String, bool)>{};
+      for (final wall in storey.walls) {
+        if (elementIds.contains(wall.id)) continue;
+        final next = nextWalls[wall.id]!;
+        for (final (atStart, old, point, connected) in [
+          (true, wall.startPoint, next.startPoint, wall.connectStart),
+          (false, wall.endPoint, next.endPoint, wall.connectEnd),
+        ]) {
+          if (connected && (point - old).distance > 1e-8) {
+            visited.add((wall.id, atStart));
+            junctions.add((old, point));
+          }
+        }
+      }
+      for (var cursor = 0; cursor < junctions.length; cursor++) {
+        final (old, point) = junctions[cursor];
+        for (final wall in storey.walls) {
+          if (elementIds.contains(wall.id) || wall.isDetached) continue;
+          for (final (atStart, endpoint, connected) in [
+            (true, wall.startPoint, wall.connectStart),
+            (false, wall.endPoint, wall.connectEnd),
+          ]) {
+            if (!connected ||
+                (endpoint - old).distance > 1e-8 ||
+                !visited.add((wall.id, atStart))) {
+              continue;
+            }
+            final previous = nextWalls[wall.id]!;
+            nextWalls[wall.id] = atStart
+                ? previous.copyWith(startPoint: point)
+                : previous.copyWith(endPoint: point);
+            junctions.add((endpoint, point));
+          }
+        }
+      }
+      for (final wall in storey.walls) {
+        if (!elementIds.contains(wall.id)) {
+          final next = nextWalls[wall.id]!;
+          if (!identical(wall, next)) {
+            nextWalls[wall.id] = _wallOpeningsAfterEdit(wall, next);
+          }
+        }
+      }
+    }
     var result = ArchitectModelCommand.replace(
       project,
       storey.copyWith(walls: [for (final w in storey.walls) nextWalls[w.id]!]),
@@ -783,12 +878,21 @@ class MoveArchitectElements extends ArchitectModelCommand {
   }
 }
 
+List<(Offset, Offset)> _wallConnectionFaces(ArchitectWall wall) => [
+  (wall.startPoint, wall.endPoint),
+  (wall.polygonCorners[0], wall.polygonCorners[1]),
+  (wall.polygonCorners[3], wall.polygonCorners[2]),
+  (wall.coreCorners[0], wall.coreCorners[1]),
+  (wall.coreCorners[3], wall.coreCorners[2]),
+];
+
 ArchitectWall _wallOpeningsAfterEdit(ArchitectWall old, ArchitectWall next) {
   if (identical(old, next)) return next;
   if (next.length < .001) throw ArgumentError('Wall too short');
   final translation = next.startPoint - old.startPoint;
   final translated =
       ((next.endPoint - old.endPoint) - translation).distance < 1e-8;
+  if (translated) return next;
   double ratio(double oldRatio, double width) {
     final point =
         old.startPoint +

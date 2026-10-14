@@ -19,10 +19,19 @@ targets. Цялото меню се измества във viewport вмест�
 Проверки: 349 успешни Architect/shared BIM/Construction interaction теста;
 още 7 viewport cancellation сценария. Чист статичен анализ.
 
-## Свързани стени
+## Свързани стени — завършено
 
-Следва: изтегляне извън старите граници на свързаните стени със запазени
-връзки, hosted openings и една атомарна Undo операция.
+Pointer и numeric движения използват същата операция с разрешено extension на
+attached supports. Returns и T endpoints следват новото положение на свързаната
+стена; shared unselected junctions се пренасят веднъж. Другите краища остават
+фиксирани, detached walls остават независими. Вратите/прозорците в удължаваните
+стени пазят физическите си места, IDs и styles; в преместената стена се местят с
+нея. Ако скъсяване изведе отвор извън host, цялата операция се отхвърля атомарно.
+Pure translation пази ratios точно, без floating-point re-projection.
+
+Проверки: 114 успешни теста; три wall orientations, outward pull отвъд старите
+краища, T returns, detached cut parts, preview/cancel/commit, hosted identity,
+invalid shortening и single Undo/Redo. Чист статичен анализ.
 
 ## Нова точка
 
