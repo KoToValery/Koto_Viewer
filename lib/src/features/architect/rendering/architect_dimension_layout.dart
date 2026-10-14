@@ -1,8 +1,21 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import '../models/architect_wall.dart';
+import '../models/architect_elements.dart';
 
 class ArchitectDimensionLayout {
+  static (Offset, Offset)? overallSegment(
+    ArchitectDimension dimension,
+    double scale,
+  ) {
+    if (!dimension.showOverall || dimension.dimensionPoints.length < 3) {
+      return null;
+    }
+    final outward = dimension.normal * (dimension.offsetDistance < 0 ? -1 : 1);
+    final shift = outward * math.max(.35, 28 / scale);
+    return (dimension.lineStart + shift, dimension.lineEnd + shift);
+  }
+
   static Offset clearTextPosition(
     Offset preferred,
     Size pixels,

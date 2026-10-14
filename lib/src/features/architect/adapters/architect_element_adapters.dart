@@ -243,7 +243,17 @@ class ArchitectDimensionEditingAdapter
   static ArchitectDimension _withPoints(
     ArchitectDimension source,
     List<Offset> points,
-  ) => source.copyWith(startPoint: points[0], endPoint: points[1]);
+  ) {
+    // Dimension dragging changes only its perpendicular line offset. Witness
+    // points remain attached to the measured geometry, even for legacy lines.
+    final delta = points[0] - source.startPoint;
+    return source.copyWith(
+      offsetDistance:
+          source.offsetDistance +
+          delta.dx * source.normal.dx +
+          delta.dy * source.normal.dy,
+    );
+  }
 }
 
 class ArchitectAnnotationEditingAdapter

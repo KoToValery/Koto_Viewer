@@ -32,7 +32,11 @@ class ArchitectSceneGeometry {
       for (final slab in s.slabs) ...slab.polygon,
       for (final opening in s.openings) ...opening.boundary,
       for (final stair in s.stairs) ...[stair.startPoint, stair.endPoint],
-      for (final dim in s.dimensions) ...[dim.startPoint, dim.endPoint],
+      for (final dim in s.dimensions) ...[
+        ...dim.witnessPoints,
+        dim.lineStart,
+        dim.lineEnd,
+      ],
       for (final e in s.elevationMarkers) e.position,
       for (final e in s.annotations) e.position,
       for (final e in s.cadPrimitives) ...[
@@ -80,8 +84,7 @@ class ArchitectSceneGeometry {
           .toList(),
       dimensions: s.dimensions
           .where(
-            (e) =>
-                intersects([e.startPoint, e.endPoint], e.offsetDistance.abs()),
+            (e) => intersects([...e.witnessPoints, e.lineStart, e.lineEnd]),
           )
           .toList(),
       // Text can extend far beyond its anchor; leave it to canvas clipping.

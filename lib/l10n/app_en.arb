@@ -2587,8 +2587,8 @@
   "@architectGridSpacingX": { "description": "Spacing between X axes" },
   "architectGridSpacingY": "Spacing Y (m)",
   "@architectGridSpacingY": { "description": "Spacing between Y axes" },
-  "architectToolSelect": "Pan",
-  "@architectToolSelect": { "description": "Navigation tool" },
+  "architectToolSelect": "Select",
+  "@architectToolSelect": { "description": "Selection and navigation tool" },
   "architectToolWall": "Wall",
   "@architectToolWall": { "description": "Wall tool" },
   "architectToolDoor": "Door",
@@ -3285,5 +3285,14 @@
   "architectAxesFromWallsHelp": "Create axes through wall cores on this storey. Set the core thickness in Settings.",
   "architectAxesNoMatchingWalls": "No walls match the selected core thickness.",
   "architectAxesGenerated": "Added {count} axes",
-  "@architectAxesGenerated": {"placeholders": {"count": {"type": "int"}}}
+  "@architectAxesGenerated": {"placeholders": {"count": {"type": "int"}}},
+  "architectDimensionChain": "Chain",
+  "architectDimensionContinue": "Continue",
+  "architectDimensionFinish": "Finish",
+  "architectDimensionPlace": "Place",
+  "architectDimensionChainHint": "Select parallel walls or element points. Tap empty space to continue or finish.",
+  "architectDimensionDirectionHint": "Select a wall or line parallel to the dimension line.",
+  "architectDimensionPositionHint": "Tap to position the chain, or enter an exact offset.",
+  "architectSelectionCycleHelp": "Tap again to cycle overlapping elements. Tap the selection label for actions.",
+  "architectDimensionOverall": "Overall dimension"
 }

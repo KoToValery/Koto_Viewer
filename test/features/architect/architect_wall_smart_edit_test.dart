@@ -274,7 +274,7 @@ void main() {
     expect(identical(model.project, old), isTrue);
   });
   testWidgets(
-    'Quick touch neither selects nor moves; swipe pans; hold enables editing',
+    'Quick touch selects without moving; swipe pans; hold enables editing',
     (tester) async {
       final a = editing.wall('a', Offset.zero, const Offset(4, 0));
       final model = editing.seeded(
@@ -287,7 +287,7 @@ void main() {
       await tester.pumpAndSettle();
       final old = model.project;
       await workspace.wallTap(tester, const Offset(2, 0));
-      expect(workspace.overlay(tester).selectedElementId, isNull);
+      expect(workspace.overlay(tester).selectedElementId, 'a');
       final translation = workspace.camera(tester).translation;
       final swipe = await tester.startGesture(
         workspace.screen(tester, const Offset(2, 0)),

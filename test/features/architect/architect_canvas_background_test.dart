@@ -23,10 +23,16 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        final commands = ArchitectCommandController(ArchitectProject(
-          id: 'p', name: 'Plan', createdAt: DateTime(2026), updatedAt: DateTime(2026),
-          activeStoreyId: 's', storeys: [ArchitectStorey(id: 's', name: 'Floor')],
-        ));
+        final commands = ArchitectCommandController(
+          ArchitectProject(
+            id: 'p',
+            name: 'Plan',
+            createdAt: DateTime(2026),
+            updatedAt: DateTime(2026),
+            activeStoreyId: 's',
+            storeys: [ArchitectStorey(id: 's', name: 'Floor')],
+          ),
+        );
         addTearDown(commands.dispose);
         final app = MaterialApp(
           locale: Locale(language),
@@ -50,7 +56,11 @@ void main() {
             await tester.pumpAndSettle();
           }
           final button = find.byKey(
-            const ValueKey('architect-canvas-background'),
+            ValueKey(
+              width < 600
+                  ? 'architect-canvas-background-menu'
+                  : 'architect-canvas-background',
+            ),
           );
           final l10n = AppLocalizations.of(tester.element(button))!;
           if (width < 600) {
@@ -116,7 +126,13 @@ void main() {
           await tester.pumpAndSettle();
         }
         await tester.tap(
-          find.byKey(const ValueKey('architect-canvas-background')),
+          find.byKey(
+            ValueKey(
+              width < 600
+                  ? 'architect-canvas-background-menu'
+                  : 'architect-canvas-background',
+            ),
+          ),
         );
         await tester.pumpAndSettle();
         expect(

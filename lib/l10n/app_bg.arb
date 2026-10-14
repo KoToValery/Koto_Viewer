@@ -1075,7 +1075,7 @@
   "architectGridAxesY": "Оси по Y",
   "architectGridSpacingX": "Разстояние X (m)",
   "architectGridSpacingY": "Разстояние Y (m)",
-  "architectToolSelect": "Навиг.",
+  "architectToolSelect": "Избор",
   "architectToolWall": "Стена",
   "architectToolDoor": "Врата",
   "architectToolMeasure": "Измерване",
@@ -1485,5 +1485,14 @@
   "architectAxesFromWallsHelp": "Постави оси през ядрата на стените на този етаж. Задай дебелината на ядрото в Настройки.",
   "architectAxesNoMatchingWalls": "Няма стени с избраната дебелина на ядрото.",
   "architectAxesGenerated": "Добавени оси: {count}",
-  "@architectAxesGenerated": {"placeholders": {"count": {"type": "int"}}}
+  "@architectAxesGenerated": {"placeholders": {"count": {"type": "int"}}},
+  "architectDimensionChain": "Верига",
+  "architectDimensionContinue": "Продължи",
+  "architectDimensionFinish": "Завърши",
+  "architectDimensionPlace": "Постави",
+  "architectDimensionChainHint": "Избери успоредни стени или точки на елементи. Клик на празно: продължи или завърши.",
+  "architectDimensionDirectionHint": "Избери стена или линия, успоредна на размерната линия.",
+  "architectDimensionPositionHint": "Кликни за поставяне на веригата или въведи точно отстояние.",
+  "architectSelectionCycleHelp": "Повторен клик обхожда застъпените елементи. Кликни върху избора за действия.",
+  "architectDimensionOverall": "Общ размер"
 }

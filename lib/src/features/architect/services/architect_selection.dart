@@ -85,6 +85,11 @@ class ArchitectSelection {
         }
       }
     }
+    for (final d in s.dimensions) {
+      if (d.id == id) {
+        return Rect.fromPoints(d.lineStart, d.lineEnd).inflate(.02);
+      }
+    }
     final e = record(project, id);
     Offset point(dynamic json) =>
         Offset((json['x'] as num).toDouble(), (json['y'] as num).toDouble());
@@ -119,6 +124,13 @@ class ArchitectSelection {
   static Path outline(ArchitectProject project, String id) {
     final s = project.activeStorey;
     final path = Path();
+    for (final d in s.dimensions) {
+      if (d.id == id) {
+        return path
+          ..moveTo(d.lineStart.dx, d.lineStart.dy)
+          ..lineTo(d.lineEnd.dx, d.lineEnd.dy);
+      }
+    }
     for (final w in s.walls) {
       if (w.id == id) return path..addPolygon(w.polygonCorners, true);
       for (final o in [

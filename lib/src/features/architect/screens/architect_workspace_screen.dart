@@ -45,6 +45,8 @@ import '../services/architect_polygon_geometry.dart';
 import '../widgets/architect_polygon_distance_overlay.dart';
 import '../widgets/architect_shape_dimension_panel.dart';
 import '../services/architect_selection.dart';
+import '../services/architect_dimension_chain.dart';
+import '../rendering/architect_dimension_chain_preview.dart';
 import '../services/architect_wall_relations.dart';
 import '../rendering/architect_dimension_layout.dart';
 import '../rendering/architect_wall_network.dart';
@@ -124,6 +126,313 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   final ValueNotifier<int> _previewRevision = ValueNotifier(0);
   Object? _toolUiState;
   int _interactionEpoch = 0;
+  bool _dimensionChainMode = false;
+  final List<ArchitectDimensionAnchor> _dimensionAnchors = [];
+  Offset? _dimensionDirection;
+  bool _dimensionPlacing = false;
+  bool _dimensionChoosingDirection = false;
+  bool _dimensionAllowPoint = false;
+  bool _dimensionQuestionOpen = false;
+  double _dimensionOffset = .5;
+  bool _dimensionShowOverall = true;
+  ArchitectDimensionAnchor? _singleDimensionStartAnchor;
+  Offset? _selectionCyclePoint;
+  List<String> _selectionCycleIds = [];
+  int _selectionCycleIndex = -1;
+
+  void _resetDimensionDraft() {
+    _singleDimensionStartAnchor = null;
+    _dimensionAnchors.clear();
+    _dimensionDirection = null;
+    _dimensionPlacing = false;
+    _dimensionChoosingDirection = false;
+    _dimensionAllowPoint = false;
+  }
+
+  ArchitectDimension? get _dimensionDraft {
+    if (_dimensionAnchors.length < 2 || _dimensionDirection == null) {
+      return null;
+    }
+    return ArchitectDimensionChain.build(
+      id: 'dimension-preview',
+      anchors: _dimensionAnchors,
+      direction: _dimensionDirection!,
+      offset: _dimensionOffset,
+    ).copyWith(showOverall: _dimensionShowOverall);
+  }
+
+  List<String> _selectionCandidates(Offset point) {
+    final first = _hitSelection(point);
+    return <String>{
+      ?first,
+      ..._elementTool.hitTestElements(
+        _project.activeStorey,
+        point,
+        _currentScale,
+      ),
+      for (final zone in _project.activeStorey.zones)
+        if ((Path()..addPolygon(zone.polygon, true)).contains(point)) zone.id,
+      for (final axis in _project.gridAxes)
+        if ((point - BimLineGeometry.closest(point, axis.start, axis.end))
+                .distance <=
+            14 / _currentScale)
+          axis.id,
+    }.toList();
+  }
+
+  String? _nextSelection(Offset point, {bool advance = true}) {
+    final ids = _selectionCandidates(point);
+    if (ids.isEmpty) {
+      _selectionCyclePoint = null;
+      return null;
+    }
+    // Stable candidate ordering is independent of the current primary tool hit.
+    final same =
+        _selectionCyclePoint != null &&
+        (point - _selectionCyclePoint!).distance * _currentScale <= 12 &&
+        ids.length == _selectionCycleIds.length &&
+        ids.every(_selectionCycleIds.contains);
+    if (!same) {
+      _selectionCyclePoint = point;
+      _selectionCycleIds = ids;
+      _selectionCycleIndex = -1;
+    }
+    if (advance || _selectionCycleIndex < 0) {
+      _selectionCycleIndex =
+          (_selectionCycleIndex + 1) % _selectionCycleIds.length;
+      if (_multiSelect) {
+        for (var step = 0; step < _selectionCycleIds.length; step++) {
+          final index =
+              (_selectionCycleIndex + step) % _selectionCycleIds.length;
+          if (!_effectiveSelection.contains(_selectionCycleIds[index])) {
+            _selectionCycleIndex = index;
+            break;
+          }
+        }
+      }
+    }
+    return _selectionCycleIds[_selectionCycleIndex];
+  }
+
+  void _commitDimensionDraft() {
+    final draft = _dimensionDraft;
+    if (draft == null || draft.length < .001) {
+      _operationError();
+      return;
+    }
+    final dimension = draft.copyWith(id: ArchitectElementId.next('dimension'));
+    _commands.commit(
+      _project.updateActiveStorey(
+        _project.activeStorey.copyWith(
+          dimensions: [..._project.activeStorey.dimensions, dimension],
+        ),
+      ),
+    );
+    setState(_resetDimensionDraft);
+    _saveBiMProjectIfAttached();
+    HapticFeedback.lightImpact();
+  }
+
+  ArchitectDimensionAnchor _dimensionPointAnchor(Offset point) {
+    final candidates = _selectionCandidates(point);
+    for (final id in candidates) {
+      final wall = _project.activeStorey.walls
+          .where((w) => w.id == id)
+          .firstOrNull;
+      if (wall != null) {
+        final ratio = BimLineGeometry.parameter(
+          point,
+          wall.centerStart,
+          wall.centerEnd,
+        );
+        final center =
+            wall.centerStart + (wall.centerEnd - wall.centerStart) * ratio;
+        return ArchitectDimensionAnchor(
+          point: point,
+          elementId: id,
+          feature: 'wallFace',
+          ratio: ratio,
+          side:
+              ArchitectDimensionChain.dot(point - center, wall.normalVector) /
+              wall.thickness,
+        );
+      }
+      final anchor = ArchitectDimensionChain.pickElement(_project, id, point);
+      if (anchor != null &&
+          (anchor.point - point).distance <= 16 / _currentScale) {
+        return anchor;
+      }
+    }
+    return ArchitectDimensionAnchor(point: point);
+  }
+
+  Future<void> _askDimensionFinish() async {
+    if (_dimensionQuestionOpen) return;
+    _dimensionQuestionOpen = true;
+    final epoch = _interactionEpoch;
+    final finish = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const ValueKey('architect-dimension-finish-dialog'),
+        title: Text(context.l10n.architectDimensionChain),
+        actions: [
+          TextButton(
+            key: const ValueKey('architect-dimension-continue'),
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.architectDimensionContinue),
+          ),
+          FilledButton(
+            key: const ValueKey('architect-dimension-finish'),
+            onPressed: _dimensionDraft == null
+                ? null
+                : () => Navigator.pop(context, true),
+            child: Text(context.l10n.architectDimensionFinish),
+          ),
+        ],
+      ),
+    );
+    _dimensionQuestionOpen = false;
+    if (!mounted || epoch != _interactionEpoch || finish == null) return;
+    setState(() {
+      _dimensionPlacing = finish;
+      _dimensionAllowPoint = !finish;
+    });
+  }
+
+  Future<void> _setDimensionDistance() async {
+    if (_dimensionDraft == null) return;
+    final epoch = _interactionEpoch;
+    final unit = _project.units;
+    double? distance;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.architectPropertyOffset),
+        content: ArchitectShapeDimensionPanel(
+          values: [unit.toUnit(_dimensionOffset)],
+          labels: [context.l10n.architectPropertyOffset],
+          unit: unit.symbol,
+          signed: true,
+          minimum: -double.maxFinite,
+          onChanged: (_, value) => distance = unit.fromUnit(value),
+          onSave: () => Navigator.pop(context, true),
+          onCancel: () => Navigator.pop(context, false),
+        ),
+      ),
+    );
+    if (!mounted || epoch != _interactionEpoch || accepted != true) return;
+    _dimensionOffset = distance ?? _dimensionOffset;
+    _commitDimensionDraft();
+  }
+
+  void _handleDimensionChainTap(Offset raw) {
+    if (_dimensionQuestionOpen) return;
+    if (_dimensionChoosingDirection) {
+      final surface = _findNearestSurface(raw);
+      if (surface == null) {
+        _operationError();
+        return;
+      }
+      final referenceWall = _project.activeStorey.walls
+          .where((w) => w.containsPoint(raw, tolerance: 8 / _currentScale))
+          .firstOrNull;
+      final direction = referenceWall?.unitVector ?? surface.direction;
+      final proposed = ArchitectDimensionChain.build(
+        id: 'preview',
+        anchors: _dimensionAnchors,
+        direction: direction,
+      );
+      if (_dimensionAnchors.length >= 2 && proposed.length < .001) {
+        _operationError();
+        return;
+      }
+      setState(() {
+        _dimensionDirection = direction;
+        _dimensionChoosingDirection = false;
+        _dimensionPlacing = _dimensionAnchors.length >= 2;
+      });
+      return;
+    }
+    if (_dimensionPlacing) {
+      final draft = _dimensionDraft;
+      if (draft == null) return;
+      _dimensionOffset = ArchitectDimensionChain.dot(
+        raw - draft.startPoint,
+        draft.normal,
+      );
+      _commitDimensionDraft();
+      return;
+    }
+    final ids = _selectionCandidates(raw);
+    final wall = _project.activeStorey.walls
+        .where((w) => ids.contains(w.id))
+        .firstOrNull;
+    final snap = _snapElement(raw);
+    final anchors = <ArchitectDimensionAnchor>[];
+    if (wall != null) {
+      final previousWall = _project.activeStorey.walls
+          .where(
+            (w) => _dimensionAnchors.any(
+              (a) => a.elementId == w.id && a.feature == 'wallFace',
+            ),
+          )
+          .firstOrNull;
+      if (previousWall != null &&
+          BimLineGeometry.cross(
+                wall.unitVector,
+                previousWall.unitVector,
+              ).abs() >
+              .01) {
+        _operationError();
+        return;
+      }
+      _dimensionDirection ??= wall.normalVector;
+      anchors.addAll(ArchitectDimensionChain.wallFaces(wall, raw));
+    } else {
+      for (final id in ids) {
+        final anchor = ArchitectDimensionChain.pickElement(
+          _project,
+          id,
+          snap.point,
+        );
+        if (anchor != null) {
+          anchors.add(anchor);
+          break;
+        }
+      }
+      if (anchors.isEmpty) {
+        if (_dimensionAnchors.isNotEmpty &&
+            !_dimensionAllowPoint &&
+            !snap.isSnapped) {
+          _askDimensionFinish();
+          return;
+        }
+        anchors.add(ArchitectDimensionAnchor(point: snap.point));
+      }
+    }
+    setState(() {
+      _dimensionAllowPoint = false;
+      for (final a in anchors) {
+        if (!_dimensionAnchors.any(
+          (b) =>
+              a.elementId == b.elementId &&
+              a.feature == b.feature &&
+              a.index == b.index &&
+              a.side == b.side &&
+              (a.point - b.point).distance < 1e-6,
+        )) {
+          _dimensionAnchors.add(a);
+        }
+      }
+      if (_dimensionDirection == null && _dimensionAnchors.length >= 2) {
+        final delta =
+            _dimensionAnchors.last.point - _dimensionAnchors.first.point;
+        if (delta.distance > .001) _dimensionDirection = delta / delta.distance;
+      }
+    });
+    HapticFeedback.selectionClick();
+  }
+
   void _repaintPreview() {
     _previewRevision.value++;
     // Tool configuration/selection changes refresh controls; pointer coordinates
@@ -429,6 +738,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelDrafting() {
+    _resetDimensionDraft();
+    _selectionCyclePoint = null;
     _polygonEditId = null;
     _polygonSelectedEdge = null;
     _pendingShape = null;
@@ -681,9 +992,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectProject? get _elementMovePreview => _elementMovePreviewValue;
   set _elementMovePreview(ArchitectProject? project) {
-    _elementMovePreviewValue = project;
-    if (project != null) {
-      _elementMoveSession?.update(_elementMoveContext, (_) => project);
+    final normalized = project == null
+        ? null
+        : ArchitectDimensionChain.resolve(project);
+    _elementMovePreviewValue = normalized;
+    if (normalized != null) {
+      _elementMoveSession?.update(_elementMoveContext, (_) => normalized);
     }
   }
 
@@ -938,6 +1252,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _isHandleEngaged = false;
 
     final rawModel = _screenToModel(event.localPosition);
+    if (_activeTool == ArchitectTool.dimension &&
+        _dimensionChainMode &&
+        _effectiveSelection.isEmpty) {
+      return;
+    }
     if (_activeTool == ArchitectTool.axis && !_axisTool.isDrafting) {
       final wall = _wallForAxis(rawModel);
       final axis = _axisTool.getSelectedAxis(_project);
@@ -1210,7 +1529,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_effectiveSelection.isNotEmpty &&
-        (_moveSelection || _activeTool != ArchitectTool.select) &&
+        (_moveSelection ||
+            _activeTool != ArchitectTool.select ||
+            _project.activeStorey.dimensions.any(
+              (d) => _effectiveSelection.contains(d.id),
+            )) &&
         _tryStartElementDrag(rawModel)) {
       return;
     }
@@ -1383,6 +1706,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     _cursorModel = rawModel;
+    if (_activeTool == ArchitectTool.dimension &&
+        _dimensionChainMode &&
+        _dimensionAnchors.isNotEmpty &&
+        !_isActivelyDraggingHandle) {
+      final draft = _dimensionDraft;
+      if (_dimensionPlacing && draft != null) {
+        _dimensionOffset = ArchitectDimensionChain.dot(
+          rawModel - draft.startPoint,
+          draft.normal,
+        );
+      }
+      _repaintPreview();
+      return;
+    }
     if (_polygonEditor.active) {
       _polygonEditor.update(
         rawModel,
@@ -1762,6 +2099,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _selectPolygonEdge(_screenToModel(event.localPosition));
       }
       _cancelActiveDrags();
+      if (_polygonEditId == null && !_moveSelection) {
+        _selectAt(_screenToModel(event.localPosition), toggle: _multiSelect);
+      }
       _repaintPreview();
       return;
     }
@@ -2094,6 +2434,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   void _handleTap(Offset rawModel) {
     if (_pendingShape != null || _polygonDistanceOpen) return;
+    if (_activeTool == ArchitectTool.dimension &&
+        _dimensionChainMode &&
+        !_multiSelect &&
+        _effectiveSelection.isEmpty) {
+      _handleDimensionChainTap(rawModel);
+      return;
+    }
     if (_polygonEditId != null) {
       _selectPolygonEdge(rawModel);
       return;
@@ -2378,8 +2725,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // Navigation never captures an element; selection belongs to its tool.
-    if (_activeTool == ArchitectTool.select) return;
+    if (_activeTool == ArchitectTool.select) {
+      _selectAt(rawModel);
+      return;
+    }
 
     // 4. In Wall tool
     if (_activeTool == ArchitectTool.wall) {
@@ -2620,6 +2969,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (_draftStart == null) {
         final snap = _snapElement(rawModel);
         setState(() {
+          _singleDimensionStartAnchor = _dimensionPointAnchor(snap.point);
           _draftStart = snap.point;
           _draftEnd = snap.point;
         });
@@ -2632,7 +2982,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         );
         if (res != null) {
           setState(() {
-            _project = _project.updateActiveStorey(res.$1);
+            final linked = ArchitectDimensionChain.build(
+              id: res.$2.id,
+              anchors: [
+                _singleDimensionStartAnchor ??
+                    ArchitectDimensionAnchor(point: _draftStart!),
+                _dimensionPointAnchor(snap.point),
+              ],
+              direction: snap.point - _draftStart!,
+              offset: res.$2.offsetDistance,
+            );
+            _project = _project.updateActiveStorey(
+              _project.activeStorey.copyWith(
+                dimensions: [..._project.activeStorey.dimensions, linked],
+              ),
+            );
+            _singleDimensionStartAnchor = null;
             _draftStart = null;
             _draftEnd = null;
           });
@@ -2967,6 +3332,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       for (var i = 0; i < poly.length; i++) {
         testSegment(poly[i], poly[(i + 1) % poly.length]);
       }
+    }
+
+    for (final line in storey.cadPrimitives) {
+      if (line.type == CadPrimitiveType.line) {
+        testSegment(line.startPoint, line.endPoint);
+      }
+    }
+    for (final beam in storey.beams) {
+      testSegment(beam.startPoint, beam.endPoint);
     }
 
     return bestHit;
@@ -3597,6 +3971,21 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   String? _hitSelection(Offset point) {
+    if (_activeTool == ArchitectTool.select || _multiSelect) {
+      return _elementTool.hitTestElement(
+            _project.activeStorey,
+            point,
+            _currentScale,
+          ) ??
+          _axisTool
+              .hitTestAxis(
+                point,
+                _project.gridAxes,
+                tolerance: 14 / _currentScale,
+              )
+              ?.id ??
+          _findZoneAt(point)?.id;
+    }
     if (_activeTool == ArchitectTool.axis) {
       return _axisTool
           .hitTestAxis(point, _project.gridAxes, tolerance: 14 / _currentScale)
@@ -3621,6 +4010,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _elementTool.slabDraftPoints.isNotEmpty) {
       return false;
     }
+    if (_dimensionAnchors.isNotEmpty) return false;
     return _selectAt(_screenToModel(screenPoint), invalidateGesture: false);
   }
 
@@ -3634,7 +4024,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _elementTool.slabDraftPoints.isNotEmpty) {
       return false;
     }
-    final ok = _selectAt(_screenToModel(screenPoint), invalidateGesture: false);
+    if (_dimensionAnchors.isNotEmpty) return false;
+    final candidates = _selectionCandidates(_screenToModel(screenPoint));
+    final ok =
+        candidates.any(_effectiveSelection.contains) ||
+        _selectAt(_screenToModel(screenPoint), invalidateGesture: false);
     if (ok) {
       final id = _selectedElementId ?? _selectedZoneId;
       if (id != null) {
@@ -3665,6 +4059,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   List<ArchitectRadialMenuItem> _buildRadialMenuItems(String elementId) {
     final items = <ArchitectRadialMenuItem>[];
+    if (_effectiveSelection.length > 1) {
+      return [
+        _radialItem(
+          action: ArchitectRadialAction.move,
+          color: const Color(0xFFFFB300),
+        ),
+        _radialItem(
+          action: ArchitectRadialAction.properties,
+          color: const Color(0xFFB388FF),
+        ),
+        if (_selectedWallIds.length == _effectiveSelection.length)
+          _radialItem(
+            action: ArchitectRadialAction.flip,
+            color: const Color(0xFF40C4FF),
+          ),
+        _radialItem(
+          action: ArchitectRadialAction.delete,
+          color: const Color(0xFFFF5252),
+        ),
+      ];
+    }
 
     final storey = _project.activeStorey;
     final isBeam = storey.beams.any((b) => b.id == elementId);
@@ -3905,6 +4320,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
     if (id == null) return;
 
+    if (_effectiveSelection.length > 1 &&
+        action == ArchitectRadialAction.delete) {
+      _deleteSelection();
+      return;
+    }
+    if (_effectiveSelection.length > 1 &&
+        action == ArchitectRadialAction.flip) {
+      var next = _project.activeStorey;
+      for (final selected in _effectiveSelection) {
+        next = _elementTool.flipElementById(next, selected);
+      }
+      _commands.commit(_project.updateActiveStorey(next));
+      _saveBiMProjectIfAttached();
+      return;
+    }
+
     switch (action) {
       case ArchitectRadialAction.edit:
         final polygon = _selectedPolygon;
@@ -4007,7 +4438,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     bool invalidateGesture = true,
     bool toggle = false,
   }) {
-    final id = _hitSelection(point);
+    final id = _nextSelection(point, advance: invalidateGesture);
     if (id == null) return false;
     _cancelActiveDrags();
     _polygonEditId = null;
@@ -4018,49 +4449,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       if (invalidateGesture) _interactionEpoch++;
       _draftStart = null;
       _draftEnd = null;
-      _selectedElementId = null;
-      _selectedZoneId = null;
       if (_multiSelect) {
         if (toggle && _selectionIds.contains(id)) {
           _selectionIds.remove(id);
-          if (_selectedElementId == id) {
-            _selectedElementId = _selectionIds.isNotEmpty
-                ? _selectionIds.last
-                : null;
-          }
-          if (_selectedZoneId == id) {
-            _selectedZoneId = null;
-          }
         } else {
           _selectionIds.add(id);
-          if (_project.activeStorey.zones.any((e) => e.id == id)) {
-            _selectedZoneId = id;
-            _selectedElementId = id;
-            _zoneTool.startEditingZone(
-              _project.activeStorey.zones.firstWhere((e) => e.id == id),
-            );
-          } else if (_project.gridAxes.any((e) => e.id == id)) {
-            _axisTool.selectAxis(id);
-            _selectedElementId = id;
-          } else {
-            _selectedElementId = id;
-          }
         }
       } else {
         _selectionIds
           ..clear()
           ..add(id);
-        if (_project.activeStorey.zones.any((e) => e.id == id)) {
-          _selectedZoneId = id;
-          _selectedElementId = id;
-          _zoneTool.startEditingZone(
-            _project.activeStorey.zones.firstWhere((e) => e.id == id),
-          );
-        } else if (_project.gridAxes.any((e) => e.id == id)) {
-          _axisTool.selectAxis(id);
-          _selectedElementId = id;
-        } else {
-          _selectedElementId = id;
+      }
+      final primary = _selectionIds.contains(id)
+          ? id
+          : _selectionIds.lastOrNull;
+      _selectedElementId = primary;
+      _selectedZoneId = null;
+      if (primary != null) {
+        final zone = _project.activeStorey.zones
+            .where((e) => e.id == primary)
+            .firstOrNull;
+        if (zone != null) {
+          _selectedZoneId = primary;
+          _zoneTool.startEditingZone(zone);
+        } else if (_project.gridAxes.any((e) => e.id == primary)) {
+          _axisTool.selectAxis(primary);
         }
       }
     });
@@ -4171,6 +4584,126 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     );
   }
 
+  void _openSelectionContext() {
+    final id =
+        _selectedElementId ??
+        _selectedZoneId ??
+        _effectiveSelection.firstOrNull;
+    if (id == null) return;
+    setState(() {
+      _radialMenuElementId = id;
+      _radialMenuScreenPosition = _selectionCyclePoint == null
+          ? Offset(_viewport.size.width / 2, _viewport.size.height / 2)
+          : _viewport.toScreen(_selectionCyclePoint!);
+      _radialMenuItems = _buildRadialMenuItems(id);
+    });
+  }
+
+  void _deleteSelection() {
+    final ids = _effectiveSelection;
+    var storey = _project.activeStorey;
+    for (final id in ids) {
+      storey = _elementTool.deleteElementById(storey, id);
+    }
+    _commands.commit(
+      _project
+          .updateActiveStorey(
+            storey.copyWith(
+              zones: storey.zones.where((z) => !ids.contains(z.id)).toList(),
+            ),
+          )
+          .copyWithGridAxes(
+            _project.gridAxes.where((a) => !ids.contains(a.id)).toList(),
+          ),
+    );
+    _saveBiMProjectIfAttached();
+    _clearSelection();
+  }
+
+  Widget _buildDimensionBar() {
+    final l = context.l10n;
+    return Material(
+      color: const Color(0xEE1E242C),
+      borderRadius: BorderRadius.circular(8),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          for (final chain in [false, true])
+            TextButton(
+              key: ValueKey(
+                chain
+                    ? 'architect-dimension-chain'
+                    : 'architect-dimension-single',
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: chain == _dimensionChainMode
+                    ? Colors.cyanAccent
+                    : Colors.white70,
+              ),
+              onPressed: () => setState(() {
+                _resetDimensionDraft();
+                _draftStart = null;
+                _draftEnd = null;
+                _dimensionChainMode = chain;
+              }),
+              child: Text(
+                chain ? l.architectDimensionChain : l.architectWallSingle,
+              ),
+            ),
+          if (_dimensionChainMode && _dimensionAnchors.isNotEmpty) ...[
+            IconButton(
+              key: const ValueKey('architect-dimension-overall'),
+              tooltip: l.architectDimensionOverall,
+              icon: Icon(
+                Icons.straighten,
+                color: _dimensionShowOverall
+                    ? Colors.cyanAccent
+                    : Colors.white70,
+              ),
+              onPressed: () => setState(
+                () => _dimensionShowOverall = !_dimensionShowOverall,
+              ),
+            ),
+            IconButton(
+              key: const ValueKey('architect-dimension-direction'),
+              tooltip: l.architectDimensionDirectionHint,
+              icon: Icon(
+                Icons.align_horizontal_left,
+                color: _dimensionChoosingDirection
+                    ? Colors.amber
+                    : Colors.white70,
+              ),
+              onPressed: () => setState(() {
+                _dimensionChoosingDirection = !_dimensionChoosingDirection;
+                _dimensionPlacing = false;
+              }),
+            ),
+            IconButton(
+              key: const ValueKey('architect-dimension-distance'),
+              tooltip: l.architectPropertyOffset,
+              icon: const Icon(Icons.space_bar, color: Colors.white70),
+              onPressed: _dimensionDraft == null ? null : _setDimensionDistance,
+            ),
+            IconButton(
+              key: const ValueKey('architect-dimension-place'),
+              tooltip: l.architectDimensionFinish,
+              icon: Icon(
+                Icons.check,
+                color: _dimensionPlacing ? Colors.amber : Colors.white70,
+              ),
+              onPressed: _dimensionDraft == null
+                  ? null
+                  : () => setState(() {
+                      _dimensionPlacing = true;
+                      _dimensionChoosingDirection = false;
+                    }),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildSelectionBar() {
     final l = context.l10n;
     final ids = _effectiveSelection;
@@ -4179,9 +4712,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF1E1E26),
-        border: Border(
-          top: BorderSide(color: Colors.white12, width: 1.0),
-        ),
+        border: Border(top: BorderSide(color: Colors.white12, width: 1.0)),
       ),
       child: Material(
         key: const ValueKey('architect-selection-bar'),
@@ -4190,249 +4721,279 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           data: const IconButtonThemeData(
             style: ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
           ),
-        child: Wrap(
-          children: [
-            SizedBox(
-              height: 44,
-              width: MediaQuery.sizeOf(context).width < 600 ? 70 : 160,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  ids.length == 1 && _selectedElementId != null
-                      ? _selectedElementLabel
-                      : '${ids.length}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.cyanAccent),
+          child: Wrap(
+            children: [
+              SizedBox(
+                height: 44,
+                width: MediaQuery.sizeOf(context).width < 600 ? 70 : 160,
+                child: InkWell(
+                  key: const ValueKey('architect-selection-context'),
+                  onTap: () => _openSelectionContext(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            ids.length == 1 && _selectedElementId != null
+                                ? _selectedElementLabel
+                                : '${ids.length}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.cyanAccent),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.more_horiz,
+                          color: Colors.cyanAccent,
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              key: const ValueKey('architect-multi-select'),
-              tooltip: l.architectSelectionMulti,
-              icon: Icon(
-                Icons.library_add_check_outlined,
-                color: _multiSelect ? Colors.amber : Colors.white70,
-              ),
-              onPressed: () => setState(() {
-                _radialMenuScreenPosition = null;
-                _polygonEditId = null;
-                _polygonSelectedEdge = null;
-                if (!_multiSelect) {
-                  _selectionIds
-                    ..clear()
-                    ..addAll(ids);
-                  _multiSelect = true;
-                } else {
-                  _multiSelect = false;
-                  _selectionIds.clear();
-                }
-                _moveSelection = false;
-              }),
-            ),
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              key: const ValueKey('architect-selection-move'),
-              tooltip: l.architectSelectionMove,
-              icon: Icon(
-                Icons.open_with,
-                color: _moveSelection ? Colors.amber : Colors.white70,
-              ),
-              onPressed: () => setState(() {
-                _radialMenuScreenPosition = null;
-                _polygonEditId = null;
-                _polygonSelectedEdge = null;
-                _moveSelection = !_moveSelection;
-              }),
-            ),
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              key: const ValueKey('architect-selection-properties'),
-              tooltip: l.architectProperties,
-              icon: const Icon(Icons.tune, color: Colors.white70),
-              onPressed: () {
-                setState(() => _radialMenuScreenPosition = null);
-                _showProperties();
-              },
-            ),
-            if (wallIds.isNotEmpty)
               IconButton(
-                key: const ValueKey('wall-detach'),
                 constraints: const BoxConstraints.tightFor(
                   width: 40,
                   height: 44,
                 ),
                 padding: EdgeInsets.zero,
-                tooltip:
-                    _project.activeStorey.walls
-                        .where((w) => wallIds.contains(w.id))
-                        .every((w) => w.isDetached)
-                    ? l.architectWallAttach
-                    : l.architectWallDetach,
+                key: const ValueKey('architect-multi-select'),
+                tooltip: l.architectSelectionMulti,
                 icon: Icon(
-                  Icons.link_off,
-                  color:
+                  Icons.library_add_check_outlined,
+                  color: _multiSelect ? Colors.amber : Colors.white70,
+                ),
+                onPressed: () => setState(() {
+                  _radialMenuScreenPosition = null;
+                  _polygonEditId = null;
+                  _polygonSelectedEdge = null;
+                  if (!_multiSelect) {
+                    _selectionIds
+                      ..clear()
+                      ..addAll(ids);
+                    _multiSelect = true;
+                  } else {
+                    _multiSelect = false;
+                    _selectionIds.clear();
+                  }
+                  _moveSelection = false;
+                }),
+              ),
+              IconButton(
+                constraints: const BoxConstraints.tightFor(
+                  width: 40,
+                  height: 44,
+                ),
+                padding: EdgeInsets.zero,
+                key: const ValueKey('architect-selection-move'),
+                tooltip: l.architectSelectionMove,
+                icon: Icon(
+                  Icons.open_with,
+                  color: _moveSelection ? Colors.amber : Colors.white70,
+                ),
+                onPressed: () => setState(() {
+                  _radialMenuScreenPosition = null;
+                  _polygonEditId = null;
+                  _polygonSelectedEdge = null;
+                  _moveSelection = !_moveSelection;
+                }),
+              ),
+              IconButton(
+                constraints: const BoxConstraints.tightFor(
+                  width: 40,
+                  height: 44,
+                ),
+                padding: EdgeInsets.zero,
+                key: const ValueKey('architect-selection-properties'),
+                tooltip: l.architectProperties,
+                icon: const Icon(Icons.tune, color: Colors.white70),
+                onPressed: () {
+                  setState(() => _radialMenuScreenPosition = null);
+                  _showProperties();
+                },
+              ),
+              if (wallIds.isNotEmpty)
+                IconButton(
+                  key: const ValueKey('wall-detach'),
+                  constraints: const BoxConstraints.tightFor(
+                    width: 40,
+                    height: 44,
+                  ),
+                  padding: EdgeInsets.zero,
+                  tooltip:
                       _project.activeStorey.walls
                           .where((w) => wallIds.contains(w.id))
                           .every((w) => w.isDetached)
-                      ? Colors.amber
-                      : Colors.white70,
-                ),
-                onPressed: () => _executeWallEdit(
-                  SetArchitectWallConnection(
-                    storeyId: _project.activeStoreyId,
-                    wallIds: wallIds,
-                    connected: _project.activeStorey.walls
-                        .where((w) => wallIds.contains(w.id))
-                        .every((w) => w.isDetached),
+                      ? l.architectWallAttach
+                      : l.architectWallDetach,
+                  icon: Icon(
+                    Icons.link_off,
+                    color:
+                        _project.activeStorey.walls
+                            .where((w) => wallIds.contains(w.id))
+                            .every((w) => w.isDetached)
+                        ? Colors.amber
+                        : Colors.white70,
+                  ),
+                  onPressed: () => _executeWallEdit(
+                    SetArchitectWallConnection(
+                      storeyId: _project.activeStoreyId,
+                      wallIds: wallIds,
+                      connected: _project.activeStorey.walls
+                          .where((w) => wallIds.contains(w.id))
+                          .every((w) => w.isDetached),
+                    ),
                   ),
                 ),
-              ),
-            if (wallIds.isNotEmpty)
-              PopupMenuButton<String>(
-                key: const ValueKey('architect-wall-actions'),
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.more_horiz, color: Colors.white70),
-                onSelected: (action) {
-                  if (action == 'cut' || action == 'splitStroke') {
-                    setState(() {
-                      _wallCutStroke = action == 'splitStroke';
-                      _wallCutIds = Set.of(wallIds);
-                      _wallCutStart = null;
-                      _wallCutConfirmedDir = null;
-                      _wallExtendId = null;
-                    });
-                  } else if (action == 'mirror') {
-                    _executeWallEdit(
-                      MirrorArchitectWalls(
-                        storeyId: _project.activeStoreyId,
-                        wallIds: wallIds,
-                      ),
-                    );
-                  } else if (action == 'magnet') {
-                    _changeViewPreference(
-                      () => _magnetEnabled = !_magnetEnabled,
-                    );
-                  } else if (action == 'join') {
-                    try {
-                      _commands.execute(
-                        JoinArchitectWalls(
+              if (wallIds.isNotEmpty)
+                PopupMenuButton<String>(
+                  key: const ValueKey('architect-wall-actions'),
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.more_horiz, color: Colors.white70),
+                  onSelected: (action) {
+                    if (action == 'cut' || action == 'splitStroke') {
+                      setState(() {
+                        _wallCutStroke = action == 'splitStroke';
+                        _wallCutIds = Set.of(wallIds);
+                        _wallCutStart = null;
+                        _wallCutConfirmedDir = null;
+                        _wallExtendId = null;
+                      });
+                    } else if (action == 'mirror') {
+                      _executeWallEdit(
+                        MirrorArchitectWalls(
                           storeyId: _project.activeStoreyId,
                           wallIds: wallIds,
                         ),
                       );
-                      _saveBiMProjectIfAttached();
-                    } on ArgumentError {
-                      _operationError();
+                    } else if (action == 'magnet') {
+                      _changeViewPreference(
+                        () => _magnetEnabled = !_magnetEnabled,
+                      );
+                    } else if (action == 'join') {
+                      try {
+                        _commands.execute(
+                          JoinArchitectWalls(
+                            storeyId: _project.activeStoreyId,
+                            wallIds: wallIds,
+                          ),
+                        );
+                        _saveBiMProjectIfAttached();
+                      } on ArgumentError {
+                        _operationError();
+                      }
+                    } else if (action == 'extend') {
+                      setState(() => _wallExtendId = wallIds.single);
+                    } else if (action == 'length') {
+                      _editWallLength();
+                    } else if (action == 'point') {
+                      _insertMidpoint(wallIds.single);
+                    } else if (action == 'parallel') {
+                      _toggleParallelMove();
                     }
-                  } else if (action == 'extend') {
-                    setState(() => _wallExtendId = wallIds.single);
-                  } else if (action == 'length') {
-                    _editWallLength();
-                  } else if (action == 'point') {
-                    _insertMidpoint(wallIds.single);
-                  } else if (action == 'parallel') {
-                    _toggleParallelMove();
-                  }
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    key: const ValueKey('wall-cut'),
-                    value: 'cut',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.content_cut, size: 18),
-                        const SizedBox(width: 8),
-                        Text(l.architectWallCut),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    key: const ValueKey('wall-split-stroke'),
-                    value: 'splitStroke',
-                    child: Text(l.architectWallSplit),
-                  ),
-                  PopupMenuItem(
-                    key: const ValueKey('wall-mirror'),
-                    value: 'mirror',
-                    child: Text(l.architectWallMirror),
-                  ),
-                  CheckedPopupMenuItem(
-                    value: 'magnet',
-                    checked: _magnetEnabled,
-                    child: Text(l.architectWallMagnet),
-                  ),
-                  if (wallIds.length == 1 && !_multiSelect) ...[
+                  },
+                  itemBuilder: (_) => [
                     PopupMenuItem(
-                      value: 'length',
-                      child: Text(l.architectWallLength),
-                    ),
-                    PopupMenuItem(value: 'point', child: Text(l.bimNewPoint)),
-                    PopupMenuItem(
-                      value: 'parallel',
-                      child: Text(l.architectWallParallel),
+                      key: const ValueKey('wall-cut'),
+                      value: 'cut',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.content_cut, size: 18),
+                          const SizedBox(width: 8),
+                          Text(l.architectWallCut),
+                        ],
+                      ),
                     ),
                     PopupMenuItem(
-                      key: const ValueKey('wall-extend'),
-                      value: 'extend',
-                      child: Text(l.architectWallExtend),
+                      key: const ValueKey('wall-split-stroke'),
+                      value: 'splitStroke',
+                      child: Text(l.architectWallSplit),
                     ),
+                    PopupMenuItem(
+                      key: const ValueKey('wall-mirror'),
+                      value: 'mirror',
+                      child: Text(l.architectWallMirror),
+                    ),
+                    CheckedPopupMenuItem(
+                      value: 'magnet',
+                      checked: _magnetEnabled,
+                      child: Text(l.architectWallMagnet),
+                    ),
+                    if (wallIds.length == 1 && !_multiSelect) ...[
+                      PopupMenuItem(
+                        value: 'length',
+                        child: Text(l.architectWallLength),
+                      ),
+                      PopupMenuItem(value: 'point', child: Text(l.bimNewPoint)),
+                      PopupMenuItem(
+                        value: 'parallel',
+                        child: Text(l.architectWallParallel),
+                      ),
+                      PopupMenuItem(
+                        key: const ValueKey('wall-extend'),
+                        value: 'extend',
+                        child: Text(l.architectWallExtend),
+                      ),
+                    ],
+                    if (wallIds.length >= 2)
+                      PopupMenuItem(
+                        key: const ValueKey('wall-join'),
+                        value: 'join',
+                        child: Text(l.architectWallJoin),
+                      ),
                   ],
-                  if (wallIds.length >= 2)
-                    PopupMenuItem(
-                      key: const ValueKey('wall-join'),
-                      value: 'join',
-                      child: Text(l.architectWallJoin),
-                    ),
-                ],
-              ),
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              tooltip: l.delete,
-              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-              onPressed: () {
-                var storey = _project.activeStorey;
-                for (final id in ids) {
-                  storey = _elementTool.deleteElementById(storey, id);
-                }
-                _commands.commit(
-                  _project
-                      .updateActiveStorey(
-                        storey.copyWith(
-                          zones: storey.zones
-                              .where((z) => !ids.contains(z.id))
+                ),
+              IconButton(
+                constraints: const BoxConstraints.tightFor(
+                  width: 40,
+                  height: 44,
+                ),
+                padding: EdgeInsets.zero,
+                tooltip: l.delete,
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                onPressed: () {
+                  var storey = _project.activeStorey;
+                  for (final id in ids) {
+                    storey = _elementTool.deleteElementById(storey, id);
+                  }
+                  _commands.commit(
+                    _project
+                        .updateActiveStorey(
+                          storey.copyWith(
+                            zones: storey.zones
+                                .where((z) => !ids.contains(z.id))
+                                .toList(),
+                          ),
+                        )
+                        .copyWithGridAxes(
+                          _project.gridAxes
+                              .where((a) => !ids.contains(a.id))
                               .toList(),
                         ),
-                      )
-                      .copyWithGridAxes(
-                        _project.gridAxes
-                            .where((a) => !ids.contains(a.id))
-                            .toList(),
-                      ),
-                );
-                _saveBiMProjectIfAttached();
-                clear();
-              },
-            ),
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
-              padding: EdgeInsets.zero,
-              key: const ValueKey('architect-clear-selection'),
-              tooltip: l.close,
-              icon: const Icon(Icons.close, color: Colors.white70),
-              onPressed: clear,
-            ),
-          ],
+                  );
+                  _saveBiMProjectIfAttached();
+                  clear();
+                },
+              ),
+              IconButton(
+                constraints: const BoxConstraints.tightFor(
+                  width: 40,
+                  height: 44,
+                ),
+                padding: EdgeInsets.zero,
+                key: const ValueKey('architect-clear-selection'),
+                tooltip: l.close,
+                icon: const Icon(Icons.close, color: Colors.white70),
+                onPressed: clear,
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   bool _tryStartElementDrag(Offset point) {
     final storey = _project.activeStorey;
@@ -4792,7 +5353,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       IconButton(
                         key: const ValueKey('architect-settings'),
                         tooltip: l10n.architectSettings,
-                        icon: const Icon(Icons.settings_outlined, color: Colors.white),
+                        icon: const Icon(
+                          Icons.settings_outlined,
+                          color: Colors.white,
+                        ),
                         onPressed: _showWorkspaceSettings,
                       ),
                       if (!compactActions)
@@ -4805,7 +5369,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               : null,
                           icon: Icon(
                             Icons.deselect_outlined,
-                            color: (_effectiveSelection.isNotEmpty || _multiSelect)
+                            color:
+                                (_effectiveSelection.isNotEmpty || _multiSelect)
                                 ? Colors.white
                                 : Colors.white38,
                           ),
@@ -4828,7 +5393,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       if (!compactActions)
                         IconButton(
                           tooltip: l10n.architectResetView,
-                          icon: const Icon(Icons.center_focus_strong_rounded, color: Colors.white),
+                          icon: const Icon(
+                            Icons.center_focus_strong_rounded,
+                            color: Colors.white,
+                          ),
                           onPressed: _resetWorkspaceView,
                         ),
                       // Canvas Background (Theme Toggle) Button - Always accessible
@@ -4851,14 +5419,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       if (!compactActions)
                         IconButton(
                           tooltip: l10n.architectNewProject,
-                          icon: const Icon(Icons.add_business_rounded, color: Colors.white),
+                          icon: const Icon(
+                            Icons.add_business_rounded,
+                            color: Colors.white,
+                          ),
                           onPressed: _openNewProjectWizard,
                         ),
                       // Diagnostic Logs Dialog Button
                       if (!compactActions)
                         IconButton(
                           tooltip: l10n.architectDebugLogs,
-                          icon: const Icon(Icons.bug_report_rounded, color: Colors.white),
+                          icon: const Icon(
+                            Icons.bug_report_rounded,
+                            color: Colors.white,
+                          ),
                           onPressed: _showDebugLogsDialog,
                         ),
                       // CAD Underlay Toggle Button (if underlays are present)
@@ -4880,7 +5454,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       if (compactActions)
                         PopupMenuButton<String>(
                           key: const ValueKey('architect-more'),
-                          icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                          icon: const Icon(
+                            Icons.more_vert_rounded,
+                            color: Colors.white,
+                          ),
                           onSelected: (action) {
                             switch (action) {
                               case 'grid':
@@ -4940,7 +5517,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             if (!_is3DView)
                               PopupMenuItem(
                                 key: const ValueKey(
-                                  'architect-canvas-background',
+                                  'architect-canvas-background-menu',
                                 ),
                                 value: 'background',
                                 child: Row(
@@ -4991,6 +5568,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               : ArchitectToolPalette(
                   activeTool: _activeTool,
                   onToolChanged: (tool) => setState(() {
+                    _resetDimensionDraft();
+                    _selectionCyclePoint = null;
+                    _selectionIds.clear();
                     _interactionEpoch++;
                     _cancelActiveDrags();
                     _zoneTool.cancelAll();
@@ -5298,6 +5878,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   // === SECTION: 2D CANVAS VIEWPORT (LAYERED MODEL SPACE) ===
 
   Offset? get _draftCancelAnchor =>
+      _dimensionAnchors.firstOrNull?.point ??
       _draftStart ??
       _axisTool.draftStart ??
       _zoneTool.draftPoints.firstOrNull ??
@@ -5503,6 +6084,22 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               ),
             ),
             Positioned.fill(child: _buildDraftCancel()),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _previewRevision,
+                  builder: (_, revision, child) => CustomPaint(
+                    key: const ValueKey('architect-dimension-chain-preview'),
+                    painter: ArchitectDimensionChainPreview(
+                      dimension: _dimensionDraft,
+                      viewport: _viewport,
+                      units: _project.units,
+                      palette: _canvasPalette,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Positioned(
               left: 12,
               right: 12,
@@ -5526,7 +6123,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(8),
                       child: Text(
-                        _wallCutIds.isNotEmpty
+                        _activeTool == ArchitectTool.dimension &&
+                                _dimensionChainMode
+                            ? (_dimensionChoosingDirection
+                                  ? context.l10n.architectDimensionDirectionHint
+                                  : _dimensionPlacing
+                                  ? context.l10n.architectDimensionPositionHint
+                                  : context.l10n.architectDimensionChainHint)
+                            : _wallCutIds.isNotEmpty
                             ? (_wallCutStroke
                                   ? (_wallCutStart == null
                                         ? context
@@ -5540,6 +6144,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             ? context.l10n.architectWallExtendHint
                             : _effectiveSelection.isNotEmpty
                             ? context.l10n.architectEditHoldHint
+                            : _activeTool == ArchitectTool.select
+                            ? context.l10n.architectSelectionCycleHelp
                             : _canPlaceWithMarker &&
                                   !_placingWithHold &&
                                   !_wallDirectionLocked
@@ -5612,6 +6218,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _buildWallClearanceOverlay(),
       _buildPolygonDistanceOverlay(),
       _buildShapeDimensionOverlay(),
+      if (_activeTool == ArchitectTool.dimension &&
+          !_multiSelect &&
+          _effectiveSelection.isEmpty)
+        Positioned(top: 8, left: 8, right: 8, child: _buildDimensionBar()),
       if (_selectedWallIds.isNotEmpty)
         Positioned(
           top: 8,

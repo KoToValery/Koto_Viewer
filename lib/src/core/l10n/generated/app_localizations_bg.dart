@@ -3444,7 +3444,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectGridSpacingY => 'Разстояние Y (m)';
 
   @override
-  String get architectToolSelect => 'Навиг.';
+  String get architectToolSelect => 'Избор';
 
   @override
   String get architectToolWall => 'Стена';
@@ -4597,4 +4597,35 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectAxesGenerated(int count) {
     return 'Добавени оси: $count';
   }
+
+  @override
+  String get architectDimensionChain => 'Верига';
+
+  @override
+  String get architectDimensionContinue => 'Продължи';
+
+  @override
+  String get architectDimensionFinish => 'Завърши';
+
+  @override
+  String get architectDimensionPlace => 'Постави';
+
+  @override
+  String get architectDimensionChainHint =>
+      'Избери успоредни стени или точки на елементи. Клик на празно: продължи или завърши.';
+
+  @override
+  String get architectDimensionDirectionHint =>
+      'Избери стена или линия, успоредна на размерната линия.';
+
+  @override
+  String get architectDimensionPositionHint =>
+      'Кликни за поставяне на веригата или въведи точно отстояние.';
+
+  @override
+  String get architectSelectionCycleHelp =>
+      'Повторен клик обхожда застъпените елементи. Кликни върху избора за действия.';
+
+  @override
+  String get architectDimensionOverall => 'Общ размер';
 }

@@ -13,6 +13,7 @@ import 'architect_zone_tool.dart';
 import '../rendering/architect_wall_network.dart';
 import 'architect_element_id.dart';
 import 'architect_wall_relations.dart';
+import 'architect_dimension_chain.dart';
 export 'architect_element_id.dart';
 
 /// Commands accept model metres, never screen coordinates or a camera scale.
@@ -1396,6 +1397,10 @@ class ArchitectCommandController
         restoreView: _retainViewedStorey,
       );
   ArchitectProject get project => value;
+
+  @override
+  void commit(ArchitectProject next) =>
+      super.commit(ArchitectDimensionChain.resolve(next));
 
   static bool _sameModel(ArchitectProject a, ArchitectProject b) {
     if (identical(a, b)) return true;

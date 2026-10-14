@@ -3431,7 +3431,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectGridSpacingY => 'Spacing Y (m)';
 
   @override
-  String get architectToolSelect => 'Pan';
+  String get architectToolSelect => 'Select';
 
   @override
   String get architectToolWall => 'Wall';
@@ -4581,4 +4581,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectAxesGenerated(int count) {
     return 'Added $count axes';
   }
+
+  @override
+  String get architectDimensionChain => 'Chain';
+
+  @override
+  String get architectDimensionContinue => 'Continue';
+
+  @override
+  String get architectDimensionFinish => 'Finish';
+
+  @override
+  String get architectDimensionPlace => 'Place';
+
+  @override
+  String get architectDimensionChainHint =>
+      'Select parallel walls or element points. Tap empty space to continue or finish.';
+
+  @override
+  String get architectDimensionDirectionHint =>
+      'Select a wall or line parallel to the dimension line.';
+
+  @override
+  String get architectDimensionPositionHint =>
+      'Tap to position the chain, or enter an exact offset.';
+
+  @override
+  String get architectSelectionCycleHelp =>
+      'Tap again to cycle overlapping elements. Tap the selection label for actions.';
+
+  @override
+  String get architectDimensionOverall => 'Overall dimension';
 }

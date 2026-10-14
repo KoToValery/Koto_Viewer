@@ -501,7 +501,7 @@ void main() {
           ),
         ],
       ),
-      Offset.zero,
+      const Offset(0, .5),
     ),
     (
       'level',
@@ -573,7 +573,12 @@ void main() {
       model.undo();
       final original = ArchitectSelection.bounds(model.project, ids.first)!;
       expect(
-        (moved.center - original.center - const Offset(1, .5)).distance,
+        (moved.center -
+                original.center -
+                (c.$1 == 'dimension'
+                    ? const Offset(0, .5)
+                    : const Offset(1, .5)))
+            .distance,
         lessThan(1e-7),
       );
     });

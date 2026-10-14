@@ -48,15 +48,14 @@ class ArchitectBeam {
     double? width,
     double? depth,
     String? label,
-  }) =>
-      ArchitectBeam(
-        id: id ?? this.id,
-        startPoint: startPoint ?? this.startPoint,
-        endPoint: endPoint ?? this.endPoint,
-        width: width ?? this.width,
-        depth: depth ?? this.depth,
-        label: label ?? this.label,
-      );
+  }) => ArchitectBeam(
+    id: id ?? this.id,
+    startPoint: startPoint ?? this.startPoint,
+    endPoint: endPoint ?? this.endPoint,
+    width: width ?? this.width,
+    depth: depth ?? this.depth,
+    label: label ?? this.label,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -137,13 +136,12 @@ class ArchitectSlab {
     List<Offset>? polygon,
     double? thickness,
     String? label,
-  }) =>
-      ArchitectSlab(
-        id: id ?? this.id,
-        polygon: polygon ?? this.polygon,
-        thickness: thickness ?? this.thickness,
-        label: label ?? this.label,
-      );
+  }) => ArchitectSlab(
+    id: id ?? this.id,
+    polygon: polygon ?? this.polygon,
+    thickness: thickness ?? this.thickness,
+    label: label ?? this.label,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -154,8 +152,14 @@ class ArchitectSlab {
 
   factory ArchitectSlab.fromJson(Map<String, dynamic> json) => ArchitectSlab(
     id: json['id'] as String,
-    polygon: (json['polygon'] as List<dynamic>?)
-            ?.map((p) => Offset((p['x'] as num).toDouble(), (p['y'] as num).toDouble()))
+    polygon:
+        (json['polygon'] as List<dynamic>?)
+            ?.map(
+              (p) => Offset(
+                (p['x'] as num).toDouble(),
+                (p['y'] as num).toDouble(),
+              ),
+            )
             .toList() ??
         const [],
     thickness: (json['thickness'] as num?)?.toDouble() ?? 0.20,
@@ -167,9 +171,11 @@ class ArchitectSlab {
     bool inside = false;
     for (int i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
       if (((polygon[i].dy > pt.dy) != (polygon[j].dy > pt.dy)) &&
-          (pt.dx < (polygon[j].dx - polygon[i].dx) * (pt.dy - polygon[i].dy) /
-                  (polygon[j].dy - polygon[i].dy) +
-              polygon[i].dx)) {
+          (pt.dx <
+              (polygon[j].dx - polygon[i].dx) *
+                      (pt.dy - polygon[i].dy) /
+                      (polygon[j].dy - polygon[i].dy) +
+                  polygon[i].dx)) {
         inside = !inside;
       }
     }
@@ -211,13 +217,12 @@ class ArchitectOpening {
     List<Offset>? boundary,
     String? label,
     OpeningType? type,
-  }) =>
-      ArchitectOpening(
-        id: id ?? this.id,
-        boundary: boundary ?? this.boundary,
-        label: label ?? this.label,
-        type: type ?? this.type,
-      );
+  }) => ArchitectOpening(
+    id: id ?? this.id,
+    boundary: boundary ?? this.boundary,
+    label: label ?? this.label,
+    type: type ?? this.type,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -226,18 +231,25 @@ class ArchitectOpening {
     'type': type.name,
   };
 
-  factory ArchitectOpening.fromJson(Map<String, dynamic> json) => ArchitectOpening(
-    id: json['id'] as String,
-    boundary: (json['boundary'] as List<dynamic>?)
-            ?.map((p) => Offset((p['x'] as num).toDouble(), (p['y'] as num).toDouble()))
-            .toList() ??
-        const [],
-    label: json['label'] as String? ?? 'Шахта',
-    type: OpeningType.values.firstWhere(
-      (t) => t.name == json['type'],
-      orElse: () => OpeningType.shaft,
-    ),
-  );
+  factory ArchitectOpening.fromJson(Map<String, dynamic> json) =>
+      ArchitectOpening(
+        id: json['id'] as String,
+        boundary:
+            (json['boundary'] as List<dynamic>?)
+                ?.map(
+                  (p) => Offset(
+                    (p['x'] as num).toDouble(),
+                    (p['y'] as num).toDouble(),
+                  ),
+                )
+                .toList() ??
+            const [],
+        label: json['label'] as String? ?? 'Шахта',
+        type: OpeningType.values.firstWhere(
+          (t) => t.name == json['type'],
+          orElse: () => OpeningType.shaft,
+        ),
+      );
 }
 
 // ===========================================================================
@@ -286,15 +298,14 @@ class ArchitectStair {
     double? width,
     int? stepCount,
     bool? hasLanding,
-  }) =>
-      ArchitectStair(
-        id: id ?? this.id,
-        startPoint: startPoint ?? this.startPoint,
-        endPoint: endPoint ?? this.endPoint,
-        width: width ?? this.width,
-        stepCount: stepCount ?? this.stepCount,
-        hasLanding: hasLanding ?? this.hasLanding,
-      );
+  }) => ArchitectStair(
+    id: id ?? this.id,
+    startPoint: startPoint ?? this.startPoint,
+    endPoint: endPoint ?? this.endPoint,
+    width: width ?? this.width,
+    stepCount: stepCount ?? this.stepCount,
+    hasLanding: hasLanding ?? this.hasLanding,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -325,12 +336,62 @@ class ArchitectStair {
 // 5. ARCHITECTURAL DIMENSION LINE (РАЗМЕРНА ЛИНИЯ)
 // ===========================================================================
 
+/// A persistent witness point. Unattached points retain their model coordinates.
+/// Attached points resolve against the element on every model transaction.
+class ArchitectDimensionAnchor {
+  final Offset point;
+  final String? elementId;
+  final String feature;
+  final int index;
+  final double ratio;
+  final double side;
+  const ArchitectDimensionAnchor({
+    required this.point,
+    this.elementId,
+    this.feature = 'point',
+    this.index = 0,
+    this.ratio = 0,
+    this.side = 0,
+  });
+  ArchitectDimensionAnchor at(Offset value) => ArchitectDimensionAnchor(
+    point: value,
+    elementId: elementId,
+    feature: feature,
+    index: index,
+    ratio: ratio,
+    side: side,
+  );
+  Map<String, dynamic> toJson() => {
+    'point': {'x': point.dx, 'y': point.dy},
+    'elementId': elementId,
+    'feature': feature,
+    'index': index,
+    'ratio': ratio,
+    'side': side,
+  };
+  factory ArchitectDimensionAnchor.fromJson(Map<String, dynamic> json) =>
+      ArchitectDimensionAnchor(
+        point: Offset(
+          (json['point']['x'] as num).toDouble(),
+          (json['point']['y'] as num).toDouble(),
+        ),
+        elementId: json['elementId'] as String?,
+        feature: json['feature'] as String? ?? 'point',
+        index: json['index'] as int? ?? 0,
+        ratio: (json['ratio'] as num?)?.toDouble() ?? 0,
+        side: (json['side'] as num?)?.toDouble() ?? 0,
+      );
+}
+
 class ArchitectDimension {
   final String id;
   final Offset startPoint;
   final Offset endPoint;
   final double offsetDistance; // perpendicular offset in meters
   final String? customText;
+  final List<ArchitectDimensionAnchor> anchors;
+  final Offset? direction;
+  final bool showOverall;
 
   const ArchitectDimension({
     required this.id,
@@ -338,7 +399,34 @@ class ArchitectDimension {
     required this.endPoint,
     this.offsetDistance = 0.50,
     this.customText,
+    this.anchors = const [],
+    this.direction,
+    this.showOverall = true,
   });
+
+  bool get isChain => anchors.isNotEmpty;
+  Offset get unitVector =>
+      direction ??
+      (length > 1e-8 ? (endPoint - startPoint) / length : const Offset(1, 0));
+  Offset get normal => Offset(-unitVector.dy, unitVector.dx);
+  Offset get lineStart => startPoint + normal * offsetDistance;
+  Offset get lineEnd => endPoint + normal * offsetDistance;
+  List<Offset> get witnessPoints =>
+      isChain ? anchors.map((a) => a.point).toList() : [startPoint, endPoint];
+  List<Offset> get dimensionPoints {
+    final u = unitVector;
+    final values = witnessPoints.map((p) {
+      final d = p - startPoint;
+      return d.dx * u.dx + d.dy * u.dy;
+    }).toList()..sort();
+    final unique = <double>[];
+    for (final value in values) {
+      if (unique.isEmpty || (value - unique.last).abs() > 1e-6) {
+        unique.add(value);
+      }
+    }
+    return unique.map((t) => lineStart + u * t).toList();
+  }
 
   double get length => (endPoint - startPoint).distance;
 
@@ -355,14 +443,19 @@ class ArchitectDimension {
     Offset? endPoint,
     double? offsetDistance,
     String? customText,
-  }) =>
-      ArchitectDimension(
-        id: id ?? this.id,
-        startPoint: startPoint ?? this.startPoint,
-        endPoint: endPoint ?? this.endPoint,
-        offsetDistance: offsetDistance ?? this.offsetDistance,
-        customText: customText ?? this.customText,
-      );
+    List<ArchitectDimensionAnchor>? anchors,
+    Offset? direction,
+    bool? showOverall,
+  }) => ArchitectDimension(
+    id: id ?? this.id,
+    startPoint: startPoint ?? this.startPoint,
+    endPoint: endPoint ?? this.endPoint,
+    offsetDistance: offsetDistance ?? this.offsetDistance,
+    customText: customText ?? this.customText,
+    anchors: anchors ?? this.anchors,
+    direction: direction ?? this.direction,
+    showOverall: showOverall ?? this.showOverall,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -370,21 +463,39 @@ class ArchitectDimension {
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'offsetDistance': offsetDistance,
     'customText': customText,
+    if (anchors.isNotEmpty) 'anchors': anchors.map((a) => a.toJson()).toList(),
+    if (direction != null)
+      'direction': {'x': direction!.dx, 'y': direction!.dy},
+    if (anchors.isNotEmpty) 'showOverall': showOverall,
   };
 
-  factory ArchitectDimension.fromJson(Map<String, dynamic> json) => ArchitectDimension(
-    id: json['id'] as String,
-    startPoint: Offset(
-      (json['startPoint']['x'] as num).toDouble(),
-      (json['startPoint']['y'] as num).toDouble(),
-    ),
-    endPoint: Offset(
-      (json['endPoint']['x'] as num).toDouble(),
-      (json['endPoint']['y'] as num).toDouble(),
-    ),
-    offsetDistance: (json['offsetDistance'] as num?)?.toDouble() ?? 0.50,
-    customText: json['customText'] as String?,
-  );
+  factory ArchitectDimension.fromJson(Map<String, dynamic> json) =>
+      ArchitectDimension(
+        id: json['id'] as String,
+        startPoint: Offset(
+          (json['startPoint']['x'] as num).toDouble(),
+          (json['startPoint']['y'] as num).toDouble(),
+        ),
+        endPoint: Offset(
+          (json['endPoint']['x'] as num).toDouble(),
+          (json['endPoint']['y'] as num).toDouble(),
+        ),
+        offsetDistance: (json['offsetDistance'] as num?)?.toDouble() ?? 0.50,
+        customText: json['customText'] as String?,
+        showOverall: json['showOverall'] as bool? ?? true,
+        anchors: (json['anchors'] as List? ?? [])
+            .map(
+              (a) =>
+                  ArchitectDimensionAnchor.fromJson(a as Map<String, dynamic>),
+            )
+            .toList(),
+        direction: json['direction'] == null
+            ? null
+            : Offset(
+                (json['direction']['x'] as num).toDouble(),
+                (json['direction']['y'] as num).toDouble(),
+              ),
+      );
 }
 
 // ===========================================================================
@@ -415,13 +526,12 @@ class ArchitectElevationMarker {
     Offset? position,
     double? elevation,
     String? label,
-  }) =>
-      ArchitectElevationMarker(
-        id: id ?? this.id,
-        position: position ?? this.position,
-        elevation: elevation ?? this.elevation,
-        label: label ?? this.label,
-      );
+  }) => ArchitectElevationMarker(
+    id: id ?? this.id,
+    position: position ?? this.position,
+    elevation: elevation ?? this.elevation,
+    label: label ?? this.label,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -464,13 +574,12 @@ class ArchitectAnnotation {
     Offset? position,
     String? text,
     double? fontSize,
-  }) =>
-      ArchitectAnnotation(
-        id: id ?? this.id,
-        position: position ?? this.position,
-        text: text ?? this.text,
-        fontSize: fontSize ?? this.fontSize,
-      );
+  }) => ArchitectAnnotation(
+    id: id ?? this.id,
+    position: position ?? this.position,
+    text: text ?? this.text,
+    fontSize: fontSize ?? this.fontSize,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -479,15 +588,16 @@ class ArchitectAnnotation {
     'fontSize': fontSize,
   };
 
-  factory ArchitectAnnotation.fromJson(Map<String, dynamic> json) => ArchitectAnnotation(
-    id: json['id'] as String,
-    position: Offset(
-      (json['position']['x'] as num).toDouble(),
-      (json['position']['y'] as num).toDouble(),
-    ),
-    text: json['text'] as String? ?? '',
-    fontSize: (json['fontSize'] as num?)?.toDouble() ?? 0.30,
-  );
+  factory ArchitectAnnotation.fromJson(Map<String, dynamic> json) =>
+      ArchitectAnnotation(
+        id: json['id'] as String,
+        position: Offset(
+          (json['position']['x'] as num).toDouble(),
+          (json['position']['y'] as num).toDouble(),
+        ),
+        text: json['text'] as String? ?? '',
+        fontSize: (json['fontSize'] as num?)?.toDouble() ?? 0.30,
+      );
 }
 
 // ===========================================================================

@@ -5897,10 +5897,10 @@ abstract class AppLocalizations {
   /// **'Spacing Y (m)'**
   String get architectGridSpacingY;
 
-  /// Navigation tool
+  /// Selection and navigation tool
   ///
   /// In en, this message translates to:
-  /// **'Pan'**
+  /// **'Select'**
   String get architectToolSelect;
 
   /// Wall tool
@@ -8068,6 +8068,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Added {count} axes'**
   String architectAxesGenerated(int count);
+
+  /// No description provided for @architectDimensionChain.
+  ///
+  /// In en, this message translates to:
+  /// **'Chain'**
+  String get architectDimensionChain;
+
+  /// No description provided for @architectDimensionContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get architectDimensionContinue;
+
+  /// No description provided for @architectDimensionFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get architectDimensionFinish;
+
+  /// No description provided for @architectDimensionPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Place'**
+  String get architectDimensionPlace;
+
+  /// No description provided for @architectDimensionChainHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select parallel walls or element points. Tap empty space to continue or finish.'**
+  String get architectDimensionChainHint;
+
+  /// No description provided for @architectDimensionDirectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a wall or line parallel to the dimension line.'**
+  String get architectDimensionDirectionHint;
+
+  /// No description provided for @architectDimensionPositionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to position the chain, or enter an exact offset.'**
+  String get architectDimensionPositionHint;
+
+  /// No description provided for @architectSelectionCycleHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap again to cycle overlapping elements. Tap the selection label for actions.'**
+  String get architectSelectionCycleHelp;
+
+  /// No description provided for @architectDimensionOverall.
+  ///
+  /// In en, this message translates to:
+  /// **'Overall dimension'**
+  String get architectDimensionOverall;
 }
 
 class _AppLocalizationsDelegate

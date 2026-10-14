@@ -420,19 +420,15 @@ class ArchitectElementsPainterHelper {
     required double zoomScale,
     String? selectedElementId,
     Path? wallObstacles,
+    ArchitectUnit unit = ArchitectUnit.meters,
   }) {
     for (final dim in storey.dimensions) {
       final isSelected = dim.id == selectedElementId;
-      final delta = dim.endPoint - dim.startPoint;
-      final len = delta.distance;
-      if (len < 1e-4) return;
-
-      final u = delta / len;
-      final n = Offset(-u.dy, u.dx);
-      final offVec = n * dim.offsetDistance;
-
-      final p1 = dim.startPoint + offVec;
-      final p2 = dim.endPoint + offVec;
+      if (dim.length < 1e-4) continue;
+      final u = dim.unitVector;
+      final n = dim.normal;
+      final points = dim.dimensionPoints;
+      if (points.length < 2) continue;
 
       final dimPaint = Paint()
         ..color = isSelected
@@ -448,54 +444,100 @@ class ArchitectElementsPainterHelper {
 
       // Witness extension lines
       final extVec = n * (dim.offsetDistance >= 0 ? 0.08 : -0.08);
-      canvas.drawLine(dim.startPoint, p1 + extVec, witnessPaint);
-      canvas.drawLine(dim.endPoint, p2 + extVec, witnessPaint);
+      for (final witness in dim.witnessPoints) {
+        final d = witness - dim.startPoint;
+        final projected = dim.lineStart + u * (d.dx * u.dx + d.dy * u.dy);
+        canvas.drawLine(witness, projected + extVec, witnessPaint);
+      }
 
       // Main dimension line
-      canvas.drawLine(p1, p2, dimPaint);
+      canvas.drawLine(points.first, points.last, dimPaint);
 
       // Architectural 45-degree ticks
       const tickSize = 0.08;
       final tickVec = (u + n) * (tickSize / 1.414);
-      canvas.drawLine(p1 - tickVec, p1 + tickVec, dimPaint);
-      canvas.drawLine(p2 - tickVec, p2 + tickVec, dimPaint);
+      for (final point in points) {
+        canvas.drawLine(point - tickVec, point + tickVec, dimPaint);
+      }
+
+      final overall = ArchitectDimensionLayout.overallSegment(dim, zoomScale);
+      if (overall != null) {
+        canvas.drawLine(overall.$1, overall.$2, dimPaint);
+        canvas.drawLine(points.first, overall.$1 + extVec, witnessPaint);
+        canvas.drawLine(points.last, overall.$2 + extVec, witnessPaint);
+        for (final p in [overall.$1, overall.$2]) {
+          canvas.drawLine(p - tickVec, p + tickVec, dimPaint);
+        }
+      }
+      final segments = [
+        for (var i = 0; i < points.length - 1; i++) (points[i], points[i + 1]),
+        ?overall,
+      ];
+      final labelObstacles = Path()
+        ..addPath(
+          wallObstacles ?? ArchitectWallNetwork.body(storey.walls),
+          Offset.zero,
+        );
+      final outward = n * (dim.offsetDistance < 0 ? -1 : 1);
 
       // Dimension text
-      final preferredMid = (p1 + p2) / 2.0 + n * 0.10;
-      final tp = TextPainter(
-        text: TextSpan(
-          text: dim.displayText,
-          style: TextStyle(
-            color: isSelected
-                ? const Color(0xFF00E5FF)
-                : palette.foreground(const Color(0xFF263238)),
-            fontFamily: 'Roboto',
-            fontSize: 12.0,
-            fontWeight: FontWeight.bold,
+      for (final segment in segments) {
+        final p1 = segment.$1, p2 = segment.$2;
+        final preferredMid =
+            (p1 + p2) / 2.0 + outward * math.max(.1, 9 / zoomScale);
+        final tp = TextPainter(
+          text: TextSpan(
+            text:
+                segments.length == 1 &&
+                    dim.customText?.trim().isNotEmpty == true
+                ? dim.customText!
+                : unit
+                      .toUnit((p2 - p1).distance)
+                      .toStringAsFixed(
+                        unit == ArchitectUnit.centimeters ||
+                                unit == ArchitectUnit.millimeters
+                            ? 0
+                            : 2,
+                      ),
+            style: TextStyle(
+              color: isSelected
+                  ? const Color(0xFF00E5FF)
+                  : palette.foreground(const Color(0xFF263238)),
+              fontFamily: 'Roboto',
+              fontSize: 12.0,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
+          textDirection: TextDirection.ltr,
+        )..layout();
 
-      final envelope = Size(
-        tp.width * u.dx.abs() + tp.height * u.dy.abs() + 8,
-        tp.width * u.dy.abs() + tp.height * u.dx.abs() + 8,
-      );
-      final mid = ArchitectDimensionLayout.clearTextPosition(
-        preferredMid,
-        envelope,
-        zoomScale,
-        n * (dim.offsetDistance < 0 ? -1 : 1),
-        wallObstacles ?? ArchitectWallNetwork.body(storey.walls),
-      );
-      canvas.save();
-      canvas.translate(mid.dx, mid.dy);
-      double angle = math.atan2(u.dy, u.dx);
-      if (angle > math.pi / 2 || angle < -math.pi / 2) angle += math.pi;
-      canvas.rotate(angle);
-      canvas.scale(1.0 / zoomScale);
-      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-      canvas.restore();
+        final envelope = Size(
+          tp.width * u.dx.abs() + tp.height * u.dy.abs() + 8,
+          tp.width * u.dy.abs() + tp.height * u.dx.abs() + 8,
+        );
+        final mid = ArchitectDimensionLayout.clearTextPosition(
+          preferredMid,
+          envelope,
+          zoomScale,
+          outward,
+          labelObstacles,
+        );
+        labelObstacles.addRect(
+          Rect.fromCenter(
+            center: mid,
+            width: envelope.width / zoomScale,
+            height: envelope.height / zoomScale,
+          ),
+        );
+        canvas.save();
+        canvas.translate(mid.dx, mid.dy);
+        double angle = math.atan2(u.dy, u.dx);
+        if (angle > math.pi / 2 || angle < -math.pi / 2) angle += math.pi;
+        canvas.rotate(angle);
+        canvas.scale(1.0 / zoomScale);
+        tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+        canvas.restore();
+      }
     }
   }
 

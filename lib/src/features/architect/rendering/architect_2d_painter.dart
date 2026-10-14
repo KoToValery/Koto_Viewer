@@ -301,6 +301,7 @@ class Architect2dPainter extends CustomPainter {
     }
     if (layer != ArchitectPaintLayer.interaction) {
       ArchitectElementsPainterHelper.drawDimensions(
+        unit: _project.units,
         palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,

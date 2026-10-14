@@ -172,39 +172,40 @@ void main() {
     },
   );
 
-  testWidgets('Hold selects only the active type and leaves that tool active', (
-    tester,
-  ) async {
-    final model = editing.seeded(
-      ArchitectStorey(
-        id: 's',
-        name: 's',
-        walls: [editing.wall('w', const Offset(-2, 0), const Offset(2, 0))],
-        columns: const [ArchitectColumn(id: 'c', position: Offset.zero)],
-      ),
-    );
-    addTearDown(model.dispose);
-    await workspace.open(tester, model);
-    final old = model.project;
-    await tester.tap(find.byIcon(Icons.pan_tool_rounded));
-    await tester.pumpAndSettle();
-    await editing.hold(tester, Offset.zero);
-    expect(workspace.overlay(tester).selectedElementId, isNull);
-    await editing.selectTool(tester, 'wall');
-    await editing.hold(tester, Offset.zero);
-    expect(workspace.overlay(tester).selectedElementId, 'w');
-    expect(
-      tester
-          .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
-          .activeTool,
-      ArchitectTool.wall,
-    );
-    await editing.selectTool(tester, 'column');
-    await editing.hold(tester, Offset.zero);
-    expect(workspace.overlay(tester).selectedElementId, 'c');
-    expect(identical(model.project, old), isTrue);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'Selection tool chooses overlaps; drafting tools prioritize their own type',
+    (tester) async {
+      final model = editing.seeded(
+        ArchitectStorey(
+          id: 's',
+          name: 's',
+          walls: [editing.wall('w', const Offset(-2, 0), const Offset(2, 0))],
+          columns: const [ArchitectColumn(id: 'c', position: Offset.zero)],
+        ),
+      );
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      final old = model.project;
+      await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+      await tester.pumpAndSettle();
+      await editing.hold(tester, Offset.zero);
+      expect(workspace.overlay(tester).selectedElementId, 'c');
+      await editing.selectTool(tester, 'wall');
+      await editing.hold(tester, Offset.zero);
+      expect(workspace.overlay(tester).selectedElementId, 'w');
+      expect(
+        tester
+            .widget<ArchitectToolPalette>(find.byType(ArchitectToolPalette))
+            .activeTool,
+        ArchitectTool.wall,
+      );
+      await editing.selectTool(tester, 'column');
+      await editing.hold(tester, Offset.zero);
+      expect(workspace.overlay(tester).selectedElementId, 'c');
+      expect(identical(model.project, old), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final entry in {
     'wall': Icons.line_weight_rounded,

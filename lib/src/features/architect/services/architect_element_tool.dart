@@ -5,6 +5,7 @@ import 'architect_element_id.dart';
 import '../adapters/architect_element_adapters.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
+import '../rendering/architect_dimension_layout.dart';
 import '../models/architect_project.dart';
 import '../models/architect_door.dart';
 import '../models/architect_wall.dart';
@@ -436,13 +437,20 @@ class ArchitectElementTool extends ChangeNotifier {
     return id;
   }
 
-  String? hitTestElement(ArchitectStorey storey, Offset point, double scale) {
+  String? hitTestElement(ArchitectStorey storey, Offset point, double scale) =>
+      hitTestElements(storey, point, scale).firstOrNull;
+
+  Iterable<String> hitTestElements(
+    ArchitectStorey storey,
+    Offset point,
+    double scale,
+  ) sync* {
     final tolerance = 14.0 / scale;
 
     // Check Columns
     for (final col in storey.columns) {
       if (col.containsPoint(point, tolerance: tolerance)) {
-        return col.id;
+        yield col.id;
       }
     }
 
@@ -453,7 +461,7 @@ class ArchitectElementTool extends ChangeNotifier {
             wall.centerStart +
             (wall.centerEnd - wall.centerStart) * win.offsetRatio;
         if ((point - winCenter).distance <= win.width / 2.0 + tolerance) {
-          return win.id;
+          yield win.id;
         }
       }
       for (final door in wall.doors) {
@@ -461,7 +469,7 @@ class ArchitectElementTool extends ChangeNotifier {
             wall.centerStart +
             (wall.centerEnd - wall.centerStart) * door.offsetRatio;
         if ((point - doorCenter).distance <= door.width / 2.0 + tolerance) {
-          return door.id;
+          yield door.id;
         }
       }
     }
@@ -474,7 +482,7 @@ class ArchitectElementTool extends ChangeNotifier {
         beam.endPoint,
       );
       if (dist <= beam.width / 2.0 + tolerance) {
-        return beam.id;
+        yield beam.id;
       }
     }
 
@@ -486,7 +494,7 @@ class ArchitectElementTool extends ChangeNotifier {
         stair.endPoint,
       );
       if (dist <= stair.width / 2.0 + tolerance) {
-        return stair.id;
+        yield stair.id;
       }
     }
 
@@ -498,30 +506,34 @@ class ArchitectElementTool extends ChangeNotifier {
           op.boundary[2 % op.boundary.length],
         ).inflate(tolerance);
         if (r.contains(point)) {
-          return op.id;
+          yield op.id;
         }
       }
     }
 
     // Check Dimensions
     for (final dim in storey.dimensions) {
-      final dist = _pointToSegmentDistance(point, dim.startPoint, dim.endPoint);
-      if (dist <= tolerance) {
-        return dim.id;
+      final dist = _pointToSegmentDistance(point, dim.lineStart, dim.lineEnd);
+      final overall = ArchitectDimensionLayout.overallSegment(dim, scale);
+      if (dist <= tolerance ||
+          overall != null &&
+              _pointToSegmentDistance(point, overall.$1, overall.$2) <=
+                  tolerance) {
+        yield dim.id;
       }
     }
 
     // Check Elevation Markers
     for (final el in storey.elevationMarkers) {
       if ((point - el.position).distance <= 0.40 + tolerance) {
-        return el.id;
+        yield el.id;
       }
     }
 
     // Check Annotations
     for (final ann in storey.annotations) {
       if ((point - ann.position).distance <= 0.60 + tolerance) {
-        return ann.id;
+        yield ann.id;
       }
     }
 
@@ -530,12 +542,12 @@ class ArchitectElementTool extends ChangeNotifier {
       if (prim.type == CadPrimitiveType.line) {
         if (_pointToSegmentDistance(point, prim.startPoint, prim.endPoint) <=
             tolerance) {
-          return prim.id;
+          yield prim.id;
         }
       } else if (prim.type == CadPrimitiveType.rect) {
         final points = prim.polygonCorners;
         final path = Path()..addPolygon(points, true);
-        if (path.contains(point)) return prim.id;
+        if (path.contains(point)) yield prim.id;
         for (var i = 0; i < points.length; i++) {
           if (_pointToSegmentDistance(
                 point,
@@ -543,31 +555,29 @@ class ArchitectElementTool extends ChangeNotifier {
                 points[(i + 1) % points.length],
               ) <=
               tolerance) {
-            return prim.id;
+            yield prim.id;
           }
         }
       } else if (prim.type == CadPrimitiveType.circle) {
         final rad = (prim.endPoint - prim.startPoint).distance;
         final d = (point - prim.startPoint).distance;
-        if ((d - rad).abs() <= tolerance) return prim.id;
+        if ((d - rad).abs() <= tolerance) yield prim.id;
       }
     }
 
     // Check Walls
     for (final wall in storey.walls) {
       if (wall.containsPoint(point)) {
-        return wall.id;
+        yield wall.id;
       }
     }
 
     // Check Slabs
     for (final slab in storey.slabs) {
       if (slab.containsPoint(point)) {
-        return slab.id;
+        yield slab.id;
       }
     }
-
-    return null;
   }
 
   // ===========================================================================
