@@ -377,6 +377,24 @@ void main() {
       await tester.tap(find.byIcon(Icons.undo_rounded).first);
       await tester.pumpAndSettle();
       expect(plan().currentStorey.toJson(), initial.toJson());
+      if (kind == 'beam') {
+        final beforeMove = changed.length;
+        final move = await tester.startGesture(
+          point(const Offset(5, 5)),
+          kind: PointerDeviceKind.mouse,
+        );
+        await move.moveTo(point(const Offset(6, 6)));
+        await tester.pump();
+        expect(changed.length, beforeMove);
+        expect(plan().currentStorey.beams.single.start, const Offset(5, 6));
+        await move.up();
+        await tester.pumpAndSettle();
+        expect(changed.length, beforeMove + 1);
+        expect(changed.last.activeStorey.beams.single.end, const Offset(7, 6));
+        await tester.tap(find.byIcon(Icons.undo_rounded).first);
+        await tester.pumpAndSettle();
+        expect(plan().currentStorey.toJson(), initial.toJson());
+      }
       expect(tester.takeException(), isNull);
     });
   }

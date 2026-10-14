@@ -1,6 +1,8 @@
 // === SECTION: ARCHITECTURAL ELEMENT TOOL ===
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'architect_element_id.dart';
+import '../adapters/architect_element_adapters.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
@@ -608,14 +610,16 @@ class ArchitectElementTool extends ChangeNotifier {
     String elementId, {
     Offset offset = const Offset(0.5, 0.5),
   }) {
-    final timestamp = DateTime.now().millisecondsSinceEpoch % 1000000;
-    final newId = '${elementId}_c$timestamp';
+    final newId = ArchitectElementId.next('copy');
 
     // 1. Column
     final colIndex = storey.columns.indexWhere((c) => c.id == elementId);
     if (colIndex != -1) {
       final col = storey.columns[colIndex];
-      final newCol = col.copyWith(id: newId, position: col.position + offset);
+      final newCol = const ArchitectColumnEditingAdapter().translate(
+        col.copyWith(id: newId),
+        offset,
+      );
       return (storey.copyWith(columns: [...storey.columns, newCol]), newId);
     }
 
@@ -637,9 +641,9 @@ class ArchitectElementTool extends ChangeNotifier {
     final slabIndex = storey.slabs.indexWhere((s) => s.id == elementId);
     if (slabIndex != -1) {
       final slab = storey.slabs[slabIndex];
-      final newSlab = slab.copyWith(
-        id: newId,
-        polygon: slab.polygon.map((p) => p + offset).toList(),
+      final newSlab = const ArchitectSlabEditingAdapter().translate(
+        slab.copyWith(id: newId),
+        offset,
       );
       return (storey.copyWith(slabs: [...storey.slabs, newSlab]), newId);
     }
@@ -663,9 +667,9 @@ class ArchitectElementTool extends ChangeNotifier {
     final zoneIndex = storey.zones.indexWhere((z) => z.id == elementId);
     if (zoneIndex != -1) {
       final zone = storey.zones[zoneIndex];
-      final newZone = zone.copyWith(
-        id: newId,
-        polygon: zone.polygon.map((p) => p + offset).toList(),
+      final newZone = const ArchitectZoneEditingAdapter().translate(
+        zone.copyWith(id: newId),
+        offset,
       );
       return (storey.copyWith(zones: [...storey.zones, newZone]), newId);
     }
@@ -674,10 +678,9 @@ class ArchitectElementTool extends ChangeNotifier {
     final beamIndex = storey.beams.indexWhere((b) => b.id == elementId);
     if (beamIndex != -1) {
       final beam = storey.beams[beamIndex];
-      final newBeam = beam.copyWith(
-        id: newId,
-        startPoint: beam.startPoint + offset,
-        endPoint: beam.endPoint + offset,
+      final newBeam = const ArchitectBeamEditingAdapter().translate(
+        beam.copyWith(id: newId),
+        offset,
       );
       return (storey.copyWith(beams: [...storey.beams, newBeam]), newId);
     }
@@ -691,12 +694,21 @@ class ArchitectElementTool extends ChangeNotifier {
     if (colIndex != -1) {
       final col = storey.columns[colIndex];
       final newCols = List<ArchitectColumn>.from(storey.columns);
-      newCols[colIndex] = col.copyWith(
-        width: col.depth,
-        depth: col.width,
-        rotationDeg: (col.rotationDeg + 90) % 360,
+      newCols[colIndex] = const ArchitectColumnEditingAdapter().rotate(
+        col,
+        math.pi / 2,
       );
       return storey.copyWith(columns: newCols);
+    }
+
+    final beamIndex = storey.beams.indexWhere((b) => b.id == elementId);
+    if (beamIndex != -1) {
+      final beams = List<ArchitectBeam>.from(storey.beams);
+      beams[beamIndex] = const ArchitectBeamEditingAdapter().rotate(
+        beams[beamIndex],
+        math.pi / 2,
+      );
+      return storey.copyWith(beams: beams);
     }
 
     // 2. Wall (rotate 90 degrees around center)

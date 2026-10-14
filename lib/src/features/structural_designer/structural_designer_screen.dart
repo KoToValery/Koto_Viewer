@@ -12,6 +12,7 @@ import '../bim_editing/operations/bim_axis_naming.dart';
 import '../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../bim_editing/commands/bim_edit_history.dart';
 import '../bim_editing/interaction/bim_edit_session.dart';
+import '../bim_editing/interaction/bim_drag_session.dart';
 import '../bim_editing/interaction/bim_transform_navigation.dart';
 import '../bim_editing/widgets/bim_editing_viewport.dart';
 import 'dart:math' as math;
@@ -107,7 +108,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     onResize: (size) => _viewportSize = size,
   );
   bool _viewportHeld = false;
-  bool get _viewportDragging => _duplicateDraft != null || _placementPointerHandled ||
+  bool get _viewportDragging => _beamMove != null || _duplicateDraft != null || _placementPointerHandled ||
       _isPlacingWithHold || _isOffsettingAxisWithDrag || _isOffsettingColumnWithDrag ||
       _isExtrudingEdge || _isMovingColumn || _isMovingShearWall || _isMovingOpening ||
       _isDraggingAxisHandle || _activeGrip != null || _activeOpeningGrip != null ||
@@ -229,12 +230,50 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StructuralColumn? _selectedColumn;
   StructuralShearWall? _selectedShearWall;
   StructuralBeam? _selectedBeam;
-  BimEditSession<Object>? _duplicateSession;
+  BimDragSession<StructuralBeam>? _beamMove;
+  void _beginBeamMove(StructuralBeam beam, Offset screen) {
+    _beamMove = BimDragSession(context: _duplicateContext, original: beam,
+      anchor: (beam.start + beam.end) / (2 * _cadUnitsPerMeter),
+      translate: StructuralBeamEditingAdapter(frame: BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter)).translate);
+    _beamMove!.grabAt(_screenToCad(screen) / _cadUnitsPerMeter);
+    _selectedBeam = beam;
+    _selectedColumn = null;
+    _selectedShearWall = null;
+    _selectedGridAxis = null;
+  }
+  void _previewBeamMove(Offset screen, {required bool isMouse}) {
+    final session = _beamMove;
+    if (session == null) return;
+    var target = session.targetForPointer(_screenToCad(screen) / _cadUnitsPerMeter);
+    if (_snapEnabled) {
+      final radius = StructuralPointerInteraction.snapToleranceCad(isMouse: isMouse,
+        pixelsPerCadUnit: _getCadFitScale() * _transformController.value.getMaxScaleOnAxis(),
+        cadUnitsPerMeter: _cadUnitsPerMeter);
+      final snap = _findStructuralSnap(target * _cadUnitsPerMeter, radius,
+        excludedElementIds: {session.original.id});
+      if (snap != null) target = snap.point / _cadUnitsPerMeter;
+    }
+    setState(() => session.updateTarget(_duplicateContext, target));
+  }
+  StoreyLevel _withBeamMove(StoreyLevel floor) {
+    final preview = _beamMove?.preview;
+    if (preview == null) return floor;
+    return floor.copyWith(beams: [for (final beam in floor.beams) beam.id == preview.id ? preview : beam]);
+  }
+  void _finishBeamMove(Offset screen, {required bool isMouse}) {
+    _previewBeamMove(screen, isMouse: isMouse);
+    final preview = _beamMove?.finish(_duplicateContext);
+    _beamMove = null;
+    if (preview == null) return;
+    _pushUndo();
+    _updateActiveStorey(_project.activeStorey.copyWith(beams: [
+      for (final beam in _project.activeStorey.beams) beam.id == preview.id ? preview : beam]));
+    setState(() => _selectedBeam = preview);
+  }
+  BimDragSession<Object>? _duplicateSession;
   Object? get _duplicateDraft => _duplicateSession?.original;
   Object get _duplicateContext => (_project, _project.activeStorey.id, _activeTool);
   String? _duplicateStoreyId;
-  Offset? _duplicateOrigin;
-  Offset? _duplicateTarget;
   bool _placementPointerHandled = false;
 
   (String, int)? _selectedOpening;
@@ -1085,9 +1124,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _pushUndo();
     final active = _project.activeStorey;
     final col = _selectedColumn!;
-    final updatedCol = col.copyWith(
-      rotationRad: (col.rotationRad + math.pi / 2.0) % (2 * math.pi),
-    );
+    final updatedCol = const StructuralColumnEditingAdapter().rotate(col, math.pi / 2);
     final updatedCols = active.columns
         .map((c) => c.id == updatedCol.id ? updatedCol : c)
         .toList();
@@ -1323,10 +1360,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _ => Offset.zero,
     };
     setState(() {
-      _duplicateSession = BimEditSession(context: _duplicateContext, original: draft);
+      _duplicateSession = BimDragSession(context: _duplicateContext, original: draft,
+        anchor: center / _cadUnitsPerMeter, translate: _translatedDuplicate);
       _duplicateStoreyId = active.id;
-      _duplicateOrigin = center;
-      _duplicateTarget = center;
       _elementGrabOffsetCad = null;
     });
     HapticFeedback.selectionClick();
@@ -1334,8 +1370,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   Object? get _positionedDuplicate => _duplicateSession?.preview;
 
-  Object _translatedDuplicate(Object original) {
-    final delta = ((_duplicateTarget ?? Offset.zero) - (_duplicateOrigin ?? Offset.zero)) / _cadUnitsPerMeter;
+  Object _translatedDuplicate(Object original, Offset delta) {
     final frame = BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter);
     return switch (original) {
       StructuralColumn c => StructuralColumnEditingAdapter(frame: frame).translate(c, delta),
@@ -1356,8 +1391,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       };
 
   void _updateDuplicateDrag(Offset screenPos, {required bool isMouse}) {
-    var target =
-        _screenToCad(screenPos) + (_elementGrabOffsetCad ?? Offset.zero);
+    var target = (_duplicateSession!.targetForPointer(_screenToCad(screenPos) / _cadUnitsPerMeter)) * _cadUnitsPerMeter;
     if (_snapEnabled) {
       final tolerance = StructuralPointerInteraction.snapToleranceCad(
         isMouse: isMouse,
@@ -1375,8 +1409,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       if (snap != null) target = snap.point;
     }
     setState(() {
-      _duplicateTarget = target;
-      _duplicateSession?.update(_duplicateContext, _translatedDuplicate);
+      _duplicateSession?.updateTarget(_duplicateContext, target / _cadUnitsPerMeter);
     });
   }
 
@@ -1385,8 +1418,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _duplicateSession?.cancel();
       _duplicateSession = null;
       _duplicateStoreyId = null;
-      _duplicateOrigin = null;
-      _duplicateTarget = null;
     });
   }
 
@@ -1395,10 +1426,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _cancelDuplicateDrag();
       return;
     }
-    final copy = _duplicateSession?.finish(
-      _duplicateContext,
-      changed: ((_duplicateTarget ?? Offset.zero) - (_duplicateOrigin ?? Offset.zero)).distance > 1e-9 * _cadUnitsPerMeter,
-    );
+    final copy = _duplicateSession?.finish(_duplicateContext);
     if (copy == null) {
       _cancelDuplicateDrag();
       return;
@@ -1414,8 +1442,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       _duplicateSession?.cancel();
       _duplicateSession = null;
       _duplicateStoreyId = null;
-      _duplicateOrigin = null;
-      _duplicateTarget = null;
     });
     HapticFeedback.mediumImpact();
   }
@@ -3081,8 +3107,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _placementPointerHandled = false;
     if (_duplicateDraft != null) {
       _placementPointerHandled = true;
-      _elementGrabOffsetCad = StructuralPointerInteraction.grabOffset(
-        _duplicateOrigin!, _screenToCad(event.localPosition));
+      _duplicateSession!.grabAt(_screenToCad(event.localPosition) / _cadUnitsPerMeter);
       _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
       return;
     }
@@ -3286,6 +3311,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
+    if (event.kind == PointerDeviceKind.mouse && (_activeTool == StructuralDrawTool.beam || _activeTool == StructuralDrawTool.select)) {
+      final beam = _hitTestBeam(event.localPosition);
+      if (beam != null) { setState(() => _beginBeamMove(beam, event.localPosition)); return; }
+    }
+
     // 3. Selection / Moving taps scoped strictly to active tool
     if (_activeTool == StructuralDrawTool.column) {
       final hitCol = _hitTestColumn(event.localPosition);
@@ -3477,6 +3507,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
     if (_isMultiTouchGesture || _activePointersCount != 1) return;
+    if (_beamMove != null) { _previewBeamMove(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse); return; }
     if (_duplicateDraft != null) {
       _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
       return;
@@ -4418,12 +4449,12 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     return null;
   }
 
-  DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad, {bool cornersOnly = false, String? excludedSlabId}) {
+  DxfSnapResult? _findStructuralSnap(Offset cadPt, double toleranceCad, {bool cornersOnly = false, String? excludedSlabId, Set<String> excludedElementIds = const {}}) {
     final frame = BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter);
     final raw = frame.toModel(cadPt), radius = toleranceCad / _cadUnitsPerMeter;
     final resolver = BimSnapResolver<StructuralSnapFeature>(raw: raw, radius: radius);
     for (final feature in StructuralSnapScene.of(_project, _cadUnitsPerMeter).query(raw, radius)) {
-      if (feature.owner == excludedSlabId ||
+      if (excludedElementIds.contains(feature.owner) || feature.owner == excludedSlabId ||
           (_isMovingColumn && feature.owner == _selectedColumn?.id) ||
           (_isMovingShearWall && feature.owner == _selectedShearWall?.id) ||
           (cornersOnly && feature.kind == BimSnapKind.midpoint)) { continue; }
@@ -4468,6 +4499,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
+    if (_beamMove != null) { _finishBeamMove(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse); return; }
     if (_duplicateDraft != null && _placementPointerHandled) {
       _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
       _commitDuplicateDrag();
@@ -4836,6 +4868,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
+    _beamMove?.cancel();
+    _beamMove = null;
     _cancelAxisGesture();
     if (_duplicateDraft != null) _cancelDuplicateDrag();
     _activePointersCount = 0;
@@ -5032,6 +5066,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           return;
         }
       }
+    }
+
+    if (_activeTool == StructuralDrawTool.beam || _activeTool == StructuralDrawTool.select) {
+      final beam = _hitTestBeam(details.localPosition);
+      if (beam != null) { setState(() => _beginBeamMove(beam, details.localPosition)); return; }
     }
 
     // 1g. Check if holding on an existing slab opening -> move opening!
@@ -6951,6 +6990,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _selectTool(StructuralDrawTool tool) {
+    _beamMove?.cancel();
+    _beamMove = null;
     _cancelAxisGesture();
     if (_duplicateDraft != null) _cancelDuplicateDrag();
     if (_isEditingSlab) _cancelSlabCorrection();
@@ -7709,7 +7750,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                             Positioned.fill(
                               child: CustomPaint(
                                 painter: Structural2dPainter(
-                                  currentStorey: _withDuplicate((_axisPreviewProject ?? _project).activeStorey),
+                                  currentStorey: _withBeamMove(_withDuplicate((_axisPreviewProject ?? _project).activeStorey)),
                                   showSlabs: _showBimSlabs,
                                   showFloorSlabs: widget.bimContext == null || _isEditingSlab,
                                   showGridAxes: _showBimAxes,

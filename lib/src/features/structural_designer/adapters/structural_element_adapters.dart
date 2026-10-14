@@ -1,4 +1,5 @@
 import 'dart:ui';
+import '../../bim_editing/geometry/bim_transform_2d.dart';
 import '../../bim_editing/scene/bim_element_adapter.dart';
 import '../models/structural_element.dart';
 
@@ -17,6 +18,12 @@ class StructuralColumnEditingAdapter
       deltaMetres == Offset.zero
       ? source
       : source.copyWith(center: translatedPoint(source.center, deltaMetres));
+  StructuralColumn rotate(StructuralColumn source, double radians) =>
+      radians == 0
+      ? source
+      : source.copyWith(
+          rotationRad: BimTransform2D.angle(source.rotationRad, radians),
+        );
   @override
   BimElementSnapshot describe(
     StructuralColumn source,
@@ -85,6 +92,15 @@ class StructuralBeamEditingAdapter extends BimElementAdapter<StructuralBeam> {
           start: translatedPoint(source.start, deltaMetres),
           end: translatedPoint(source.end, deltaMetres),
         );
+  StructuralBeam rotate(StructuralBeam source, double radians) {
+    if (radians == 0) return source;
+    final pivot = (source.start + source.end) / 2;
+    return source.copyWith(
+      start: BimTransform2D.rotate(source.start, pivot, radians),
+      end: BimTransform2D.rotate(source.end, pivot, radians),
+    );
+  }
+
   @override
   BimElementSnapshot describe(
     StructuralBeam source,

@@ -70,46 +70,49 @@ void main() {
   });
 
   group('ArchitectPolygonEditor Offset Leader Handles', () {
-    test('Calculates outward offset handles and generates live leader line on drag', () {
-      final editor = ArchitectPolygonEditor();
-      final rect = [
-        const Offset(0, 0),
-        const Offset(4, 0),
-        const Offset(4, 3),
-        const Offset(0, 3),
-      ];
+    test(
+      'Calculates outward offset handles and generates live leader line on drag',
+      () {
+        final editor = ArchitectPolygonEditor();
+        final rect = [
+          const Offset(0, 0),
+          const Offset(4, 0),
+          const Offset(4, 3),
+          const Offset(0, 3),
+        ];
 
-      // Verify offset handles are outside polygon bounds
-      final hv0 = ArchitectPolygonEditor.offsetVertexHandle(rect, 0, 1.0);
-      final he0 = ArchitectPolygonEditor.offsetEdgeHandle(rect, 0, 1.0);
+        // Verify offset handles are outside polygon bounds
+        final hv0 = ArchitectPolygonEditor.offsetVertexHandle(rect, 0, 1.0);
+        final he0 = ArchitectPolygonEditor.offsetEdgeHandle(rect, 0, 1.0);
 
-      // Vertex 0 bisector points away (dx < 0 or dy < 0)
-      expect(hv0.dx <= 0 || hv0.dy <= 0, isTrue);
+        // Vertex 0 bisector points away (dx < 0 or dy < 0)
+        expect(hv0.dx <= 0 || hv0.dy <= 0, isTrue);
 
-      // Edge 0 (y=0) normal points down in canvas coordinates (dy < 0)
-      expect(he0.dy < 0, isTrue);
+        // Edge 0 (y=0) normal points down in canvas coordinates (dy < 0)
+        expect(he0.dy < 0, isTrue);
 
-      // Starting drag directly from the offset handle
-      final started = editor.start('test-rect', rect, he0, 1.0);
-      expect(started, isTrue);
-      expect(editor.isOffsetHandle, isTrue);
+        // Starting drag directly from the offset handle
+        final started = editor.start('test-rect', rect, he0, 1.0);
+        expect(started, isTrue);
+        expect(editor.isOffsetHandle, isTrue);
 
-      // Dragging offset handle
-      editor.update(
-        he0 + const Offset(0, -1.0),
-        (pt) => ArchitectSnapResult(point: pt),
-        0.1,
-      );
+        // Dragging offset handle
+        editor.update(
+          he0 + const Offset(0, -1.0),
+          (pt) => ArchitectSnapResult(point: pt),
+          0.1,
+        );
 
-      final leader = editor.leaderLine;
-      expect(leader, isNotNull);
-      // The leader line starts from the actual edge and points to the dragged position
-      expect(leader!.$2.dy < leader.$1.dy, isTrue);
+        final leader = editor.leaderLine;
+        expect(leader, isNotNull);
+        // The leader line starts from the actual edge and points to the dragged position
+        expect(leader!.$2.dy < leader.$1.dy, isTrue);
 
-      editor.cancel();
-      expect(editor.active, isFalse);
-      expect(editor.leaderLine, isNull);
-    });
+        editor.cancel();
+        expect(editor.active, isFalse);
+        expect(editor.leaderLine, isNull);
+      },
+    );
   });
 
   group('ArchitectElementTool Transforms (Duplicate, Rotate, Flip)', () {
@@ -119,9 +122,7 @@ void main() {
       const initial = ArchitectStorey(
         id: 's1',
         name: 'Storey 1',
-        columns: [
-          ArchitectColumn(id: 'col_1', position: Offset(2, 2)),
-        ],
+        columns: [ArchitectColumn(id: 'col_1', position: Offset(2, 2))],
       );
 
       final (updated, newId) = tool.duplicateElementById(
@@ -153,8 +154,8 @@ void main() {
 
       final updated = tool.rotateElementById(initial, 'col_1');
       final rotated = updated.columns.first;
-      expect(rotated.width, 0.50);
-      expect(rotated.depth, 0.25);
+      expect(rotated.width, 0.25);
+      expect(rotated.depth, 0.50);
       expect(rotated.rotationDeg, 90.0);
     });
 

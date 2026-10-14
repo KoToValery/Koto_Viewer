@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import '../../bim_editing/geometry/bim_transform_2d.dart';
 import '../../bim_editing/scene/bim_element_adapter.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
@@ -13,6 +14,17 @@ class ArchitectColumnEditingAdapter extends BimElementAdapter<ArchitectColumn> {
       ? source
       : source.copyWith(
           position: translatedPoint(source.position, deltaMetres),
+        );
+  ArchitectColumn rotate(ArchitectColumn source, double radians) => radians == 0
+      ? source
+      : source.copyWith(
+          rotationDeg:
+              BimTransform2D.angle(
+                source.rotationDeg * math.pi / 180,
+                radians,
+              ) *
+              180 /
+              math.pi,
         );
   @override
   BimElementSnapshot describe(
@@ -60,6 +72,15 @@ class ArchitectBeamEditingAdapter extends BimElementAdapter<ArchitectBeam> {
           startPoint: translatedPoint(source.startPoint, deltaMetres),
           endPoint: translatedPoint(source.endPoint, deltaMetres),
         );
+  ArchitectBeam rotate(ArchitectBeam source, double radians) {
+    if (radians == 0) return source;
+    final pivot = (source.startPoint + source.endPoint) / 2;
+    return source.copyWith(
+      startPoint: BimTransform2D.rotate(source.startPoint, pivot, radians),
+      endPoint: BimTransform2D.rotate(source.endPoint, pivot, radians),
+    );
+  }
+
   @override
   BimElementSnapshot describe(
     ArchitectBeam source,
@@ -75,6 +96,7 @@ class ArchitectBeamEditingAdapter extends BimElementAdapter<ArchitectBeam> {
     capabilities: {
       BimEditingCapability.translate,
       BimEditingCapability.duplicate,
+      BimEditingCapability.rotate,
     },
     revision: revision,
     readOnly: readOnly,

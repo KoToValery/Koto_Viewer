@@ -10,6 +10,7 @@ import '../../dxf_viewer/models/dxf_models.dart';
 import '../../bim_projects/models/bim_work_project.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../../bim_editing/interaction/bim_edit_session.dart';
+import '../../bim_editing/interaction/bim_drag_session.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
 import '../../structural_designer/analysis/structural_pointer_interaction.dart';
 import '../../structural_designer/rendering/structural_pointer_painter.dart';
@@ -331,6 +332,60 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   String? _draggingElementId;
   Offset? _elementMoveStart;
   Offset? _elementMoveDelta;
+  BimDragSession<ArchitectProject>? _duplicateMove;
+  String? _duplicateMoveId, _duplicateSourceId;
+  void _beginDuplicateMove(String id) {
+    _cancelActiveDrags();
+    final (floor, copyId) = _elementTool.duplicateElementById(
+      _project.activeStorey,
+      id,
+      offset: Offset.zero,
+    );
+    if (copyId == null) return;
+    final draft = _project.updateActiveStorey(floor);
+    final bounds = ArchitectSelection.bounds(draft, copyId);
+    if (bounds == null) return;
+    final storeyId = _project.activeStoreyId;
+    setState(() {
+      _polygonEditId = null;
+      _duplicateMoveId = copyId;
+      _duplicateSourceId = id;
+      _duplicateMove = BimDragSession(
+        context: _elementMoveContext,
+        original: draft,
+        anchor: bounds.center,
+        translate: (original, delta) => MoveArchitectElement(
+          storeyId: storeyId,
+          elementId: copyId,
+          delta: delta,
+        ).apply(original),
+      );
+    });
+  }
+
+  void _previewDuplicateMove(Offset model) {
+    final session = _duplicateMove;
+    if (session == null) return;
+    var delta = ArchitectSnapHelper.precision(
+      _project,
+    ).inputPoint(session.targetForPointer(model) - session.anchor);
+    final snap = ArchitectSnapHelper.snapTranslation(
+      project: session.original,
+      elementIds: {_duplicateMoveId!, _duplicateSourceId!},
+      delta: delta,
+      tolerance: (_touchInput ? 12 : 8) / _currentScale,
+      magnetic: _magnetEnabled,
+      underlay: _currentUnderlayDoc,
+      frame: widget.underlayFrame,
+      visibility: _underlayLayerVisibility,
+    );
+    delta = snap.point;
+    session.updateTarget(_elementMoveContext, session.anchor + delta);
+    _activeSnapLabel = snap.snapLabel;
+    _activeMagneticGuides = snap.magneticGuides;
+    _repaintPreview();
+  }
+
   BimEditSession<ArchitectProject>? _elementMoveSession;
   ArchitectProject? _elementMovePreviewValue;
   Object get _elementMoveContext =>
@@ -375,6 +430,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   /// is actively being dragged. ArchitectViewport routes captured handles exclusively to the tool.
   bool get _isActivelyDraggingHandle =>
       _isHandleEngaged ||
+      _duplicateMove != null ||
       _polygonEditor.active ||
       _draggingElementId != null ||
       _draggingVertexIndex != null ||
@@ -588,6 +644,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _isHandleEngaged = false;
 
     final rawModel = _screenToModel(event.localPosition);
+    if (_duplicateMove != null) {
+      _duplicateMove!.grabAt(rawModel);
+      _isHandleEngaged = true;
+      return;
+    }
     if (_polygonDistanceOpen) return;
     if (_polygonEditId != null) _selectPolygonEdge(rawModel);
     if (_activeTool == ArchitectTool.wall &&
@@ -979,6 +1040,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   void _updatePointerPreview(Offset screenPosition) {
     if (_pendingShape != null) return;
     final rawModel = _screenToModel(screenPosition);
+    if (_duplicateMove != null) {
+      _previewDuplicateMove(rawModel);
+      return;
+    }
     _cursorModel = rawModel;
     if (_polygonEditor.active) {
       _polygonEditor.update(
@@ -1348,6 +1413,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _cancelActiveDrags() {
+    _duplicateMove?.cancel();
+    _duplicateMove = null;
+    _duplicateMoveId = null;
+    _duplicateSourceId = null;
     _polygonEditor.cancel();
     _radialMenuScreenPosition = null;
     _controlTrimClick = false;
@@ -1386,6 +1455,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   void _commitActiveHandleDrag(Offset screenPos) {
+    if (_duplicateMove != null) {
+      final id = _duplicateMoveId;
+      final preview = _duplicateMove!.finish(_elementMoveContext);
+      _cancelActiveDrags();
+      if (preview != null) {
+        _commands.commit(preview);
+        setState(() {
+          _selectedElementId = id;
+          _selectedZoneId = null;
+        });
+        _saveBiMProjectIfAttached();
+      }
+      return;
+    }
     if (_polygonEditor.active) {
       final id = _polygonEditor.elementId!, points = _polygonEditor.preview!;
       final original = _polygonEditor.original!;
@@ -2969,6 +3052,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final items = <ArchitectRadialMenuItem>[];
 
     final storey = _project.activeStorey;
+    final isBeam = storey.beams.any((b) => b.id == elementId);
     final isCol = storey.columns.any((c) => c.id == elementId);
     final isWall = storey.walls.any((w) => w.id == elementId);
     final isDoor = storey.walls.any(
@@ -2982,7 +3066,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final isZone = storey.zones.any((z) => z.id == elementId);
     final isAxis = _project.gridAxes.any((a) => a.id == elementId);
 
-    if (isCol) {
+    if (isCol || isBeam) {
       items.add(
         ArchitectRadialMenuItem(
           action: ArchitectRadialAction.move,
@@ -3003,7 +3087,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ArchitectRadialMenuItem(
           action: ArchitectRadialAction.duplicate,
           icon: Icons.copy_all,
-          label: l10n.architectRadialDuplicate,
+          label: l10n.dragDuplicateAction,
           color: const Color(0xFF64FFDA),
         ),
       );
@@ -3104,7 +3188,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ArchitectRadialMenuItem(
           action: ArchitectRadialAction.duplicate,
           icon: Icons.copy_all,
-          label: l10n.architectRadialDuplicate,
+          label: l10n.dragDuplicateAction,
           color: const Color(0xFF64FFDA),
         ),
       );
@@ -3197,19 +3281,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         break;
 
       case ArchitectRadialAction.duplicate:
-        final (nextStorey, newId) = _elementTool.duplicateElementById(
-          _project.activeStorey,
-          id,
-        );
-        if (newId != null) {
-          _commands.commit(_project.updateActiveStorey(nextStorey));
-          _saveBiMProjectIfAttached();
-          setState(() {
-            _selectedElementId = newId;
-            _selectedZoneId = null;
-          });
-          HapticFeedback.mediumImpact();
-        }
+        _beginDuplicateMove(id);
         break;
 
       case ArchitectRadialAction.rotate:
@@ -4344,6 +4416,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
         singlePointerPan: true,
         holdToEdit:
+            _duplicateMove == null &&
             _effectiveSelection.isNotEmpty &&
             (!_multiSelect || _moveSelection) &&
             _wallCutIds.isEmpty &&
@@ -4351,7 +4424,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _wallInsertPointId == null,
         touchHoldToPlace: _canPlaceWithMarker,
         onToolHoldStart: _beginPlacementHold,
-        onSelectionHold: _onSelectionHold,
+        onSelectionHold: _duplicateMove == null ? _onSelectionHold : null,
         onEditTap: _polygonEditId == null
             ? null
             : (position) => _selectPolygonEdge(_screenToModel(position)),
@@ -4504,6 +4577,36 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             items: _radialMenuItems,
             onActionSelected: _handleRadialAction,
             onDismiss: () => setState(() => _radialMenuScreenPosition = null),
+          ),
+        ),
+      if (_duplicateMove != null)
+        Positioned(
+          top: 8,
+          left: 8,
+          right: 64,
+          child: Material(
+            color: const Color(0xE61E1E26),
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    context.l10n.dragDuplicateHint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(_cancelActiveDrags);
+                    _repaintPreview();
+                  },
+                  child: Text(context.l10n.cancel),
+                ),
+              ],
+            ),
           ),
         ),
       _buildWallClearanceOverlay(),
@@ -4932,7 +5035,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   ArchitectProject get _drawingProject {
-    final project = _elementMovePreview ?? _project;
+    final project = _duplicateMove?.preview ?? _elementMovePreview ?? _project;
     return _axisTool.isDraggingHandle || _axisTool.isMovingAxis
         ? project.copyWithGridAxes(_axisTool.previewAxes(project.gridAxes))
         : project;

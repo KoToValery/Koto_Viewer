@@ -11,7 +11,7 @@
 | 3. Общ viewport | Завършен | Един BimEditingViewport за двата режима, два camera adapters. 36 успешни теста; чист анализ. |
 | 4. Общ snap и scene index | Завършена основа и native providers | Обща bounded/deterministic selection и metre point/bounds indices. Съществуващи серии: 54 и 45 успешни теста. |
 | 5. Оси — пълен пилот | Завършен | Общ axis model/geometry/naming/extents, canvas-side offset, compact dialog и Construction transactional endpoint/body drag. 34 финални теста. |
-| 6. Колони/греди и Drag+ | Предстои | |
+| 6. Колони/греди и Drag+ | Завършен | Общ BimDragSession, native transform adapters, Architect Drag+ и Construction beam move. Серии 52 и 16 успешни теста. |
 | 7. Контури | Предстои | |
 | 8. Стени и специални hosts | Предстои | |
 | 9. UI и rendering завършване | Предстои | |
@@ -78,3 +78,13 @@ Construction endpoint и axis-body drag използват BimEditSession: ед�
 Диалогът за разстояние е общ BimOffsetDialog, празен, без заглавие, presets и arrows. Architect използва избраната unit scale/symbol, Construction своята native m/cm настройка. Контекстна смяна при активен pointer отменя и native preview.
 
 Проверки: 49 съществуващи workspace/alignment/ownership теста и финална серия 34/34, включително oblique/reversed offset, .30 m minimum, reverse parallel extents, compact Architect dialog и Construction endpoint/body preview/cancel/commit/Undo в 1 и 1000 CAD units/metre. Анализът е чист.
+
+## Етап 6
+
+Move/Drag+ използва `BimDragSession` с model-metre anchor, grab offset, baseline preview и еднократно finish. Construction Drag+ е пренесен към него; Architect Drag+ създава clone project само за preview и превежда само новия element ID през native command adapter. ID се създава веднъж и е стабилен при всички preview движения. Cancel, stale context и no-op не добавят Undo.
+
+Architect column/beam radial actions показват краткия ARB Drag+ и общото указание/cancel. Използва се latest Architect translation snap extension; native underlay providers остават специфични. Construction beam body вече може да се мести с mouse/touch hold през същата сесия, без междинен autosave. При commit/Undo се пазят native beam настройки. Column placement/normal move използват общите pointer правила и native translation адаптери, със съществуващите property panels до UI етапа.
+
+Ротацията е в общ BimTransform2D и typed column/beam adapters. Architect column вече сменя само pose rotation, вместо едновременно dimensions swap + rotation (двойна физическа промяна). Vertical height и local width/depth остават запазени; Construction L profile и mirror flag също.
+
+Проверки: 52/52 core/workspace/compact-control сценария и финални 16/16 с реален Architect Drag+ за column/beam, стабилна identity, preview/cancel/commit/Undo, profile rotation и Construction beam body preview/commit/Undo. Анализът е чист.
