@@ -74,7 +74,6 @@ class ArchitectPolygonDistanceOverlay extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                         side: const BorderSide(color: Colors.white24),
                       ),
-                      borderRadius: BorderRadius.circular(6),
                       child: InkWell(
                         key: ValueKey('polygon-distance-${dimension.key}'),
                         onTap: () => onEdit(dimension),

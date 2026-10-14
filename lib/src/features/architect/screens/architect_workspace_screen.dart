@@ -3072,7 +3072,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           borderRadius: BorderRadius.circular(6),
                           side: const BorderSide(color: Colors.white24),
                         ),
-                        borderRadius: BorderRadius.circular(6),
                         child: InkWell(
                           key: ValueKey('wall-clearance-${gap.neighborId}'),
                           onTap: () {
@@ -3195,7 +3194,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   borderRadius: BorderRadius.circular(8),
                   side: const BorderSide(color: Colors.white24),
                 ),
-                borderRadius: BorderRadius.circular(8),
                 child: Row(
                   mainAxisSize: MainAxisSize.max,
                   children: [
@@ -5641,7 +5639,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   borderRadius: BorderRadius.circular(8),
                   side: const BorderSide(color: Colors.white24),
                 ),
-                borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(

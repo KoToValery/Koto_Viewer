@@ -71,7 +71,6 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Colors.white24),
       ),
-      borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Column(

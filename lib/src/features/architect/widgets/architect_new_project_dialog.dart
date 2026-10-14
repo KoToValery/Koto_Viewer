@@ -62,7 +62,10 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
     return Dialog(
 
       backgroundColor: const Color(0xFF1E1E24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: Colors.white24),
+      ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
         child: Padding(

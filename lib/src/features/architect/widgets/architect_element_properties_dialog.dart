@@ -314,8 +314,10 @@ class _ArchitectElementPropertiesDialogState
                   icon: Icon(
                     Icons.flip,
                     color: texts.containsKey('exteriorSide')
-                        ? Colors.amber
-                        : Colors.white70,
+                        ? (Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF00E5FF)
+                            : Theme.of(context).colorScheme.primary)
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                   onPressed: () => setState(
                     () => texts['exteriorSide'] =
