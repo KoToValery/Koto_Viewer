@@ -5,6 +5,8 @@ import '../../bim_editing/scene/bim_element_adapter.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
 import '../models/architect_zone.dart';
+import '../models/architect_wall.dart';
+import '../../bim_editing/scene/bim_path_editing_adapter.dart';
 
 class ArchitectColumnEditingAdapter extends BimElementAdapter<ArchitectColumn> {
   const ArchitectColumnEditingAdapter();
@@ -158,5 +160,131 @@ class ArchitectZoneEditingAdapter extends BimElementAdapter<ArchitectZone> {
     },
     revision: revision,
     readOnly: readOnly,
+  );
+}
+
+class ArchitectWallEditingAdapter extends BimElementAdapter<ArchitectWall> {
+  const ArchitectWallEditingAdapter();
+  @override
+  ArchitectWall translate(ArchitectWall source, Offset deltaMetres) =>
+      deltaMetres == Offset.zero
+      ? source
+      : source.copyWith(
+          startPoint: translatedPoint(source.startPoint, deltaMetres),
+          endPoint: translatedPoint(source.endPoint, deltaMetres),
+        );
+  ArchitectWall rotate(ArchitectWall source, double radians) {
+    final pivot = (source.startPoint + source.endPoint) / 2;
+    return source.copyWith(
+      startPoint: BimTransform2D.rotate(source.startPoint, pivot, radians),
+      endPoint: BimTransform2D.rotate(source.endPoint, pivot, radians),
+    );
+  }
+
+  @override
+  BimElementSnapshot describe(
+    ArchitectWall source,
+    BimElementRef reference, {
+    Object? revision,
+    bool readOnly = false,
+  }) => BimElementSnapshot(
+    reference: reference,
+    kind: BimEditingGeometryKind.line,
+    anchor: (source.startPoint + source.endPoint) / 2,
+    outline: source.polygonCorners,
+    referenceLines: [
+      (source.startPoint, source.endPoint),
+      (source.coreCenterStart, source.coreCenterEnd),
+    ],
+    capabilities: {
+      BimEditingCapability.translate,
+      BimEditingCapability.rotate,
+      BimEditingCapability.duplicate,
+      BimEditingCapability.endpoints,
+    },
+    revision: revision,
+    readOnly: readOnly,
+  );
+}
+
+class ArchitectOpeningEditingAdapter
+    extends BimPathEditingAdapter<ArchitectOpening> {
+  const ArchitectOpeningEditingAdapter()
+    : super(points: _points, withPoints: _withPoints, closed: true);
+  static List<Offset> _points(ArchitectOpening source) => source.boundary;
+  static ArchitectOpening _withPoints(
+    ArchitectOpening source,
+    List<Offset> points,
+  ) => source.copyWith(boundary: points);
+}
+
+class ArchitectStairEditingAdapter
+    extends BimPathEditingAdapter<ArchitectStair> {
+  const ArchitectStairEditingAdapter()
+    : super(points: _points, withPoints: _withPoints);
+  static List<Offset> _points(ArchitectStair source) => [
+    source.startPoint,
+    source.endPoint,
+  ];
+  static ArchitectStair _withPoints(
+    ArchitectStair source,
+    List<Offset> points,
+  ) => source.copyWith(startPoint: points[0], endPoint: points[1]);
+}
+
+class ArchitectDimensionEditingAdapter
+    extends BimPathEditingAdapter<ArchitectDimension> {
+  const ArchitectDimensionEditingAdapter()
+    : super(points: _points, withPoints: _withPoints);
+  static List<Offset> _points(ArchitectDimension source) => [
+    source.startPoint,
+    source.endPoint,
+  ];
+  static ArchitectDimension _withPoints(
+    ArchitectDimension source,
+    List<Offset> points,
+  ) => source.copyWith(startPoint: points[0], endPoint: points[1]);
+}
+
+class ArchitectAnnotationEditingAdapter
+    extends BimPathEditingAdapter<ArchitectAnnotation> {
+  const ArchitectAnnotationEditingAdapter()
+    : super(points: _points, withPoints: _withPoints);
+  static List<Offset> _points(ArchitectAnnotation source) => [source.position];
+  static ArchitectAnnotation _withPoints(
+    ArchitectAnnotation source,
+    List<Offset> points,
+  ) => source.copyWith(position: points[0]);
+}
+
+class ArchitectElevationEditingAdapter
+    extends BimPathEditingAdapter<ArchitectElevationMarker> {
+  const ArchitectElevationEditingAdapter()
+    : super(points: _points, withPoints: _withPoints);
+  static List<Offset> _points(ArchitectElevationMarker source) => [
+    source.position,
+  ];
+  static ArchitectElevationMarker _withPoints(
+    ArchitectElevationMarker source,
+    List<Offset> points,
+  ) => source.copyWith(position: points[0]);
+}
+
+class ArchitectCadEditingAdapter
+    extends BimPathEditingAdapter<ArchitectCadPrimitive> {
+  const ArchitectCadEditingAdapter()
+    : super(points: _points, withPoints: _withPoints);
+  static List<Offset> _points(ArchitectCadPrimitive source) => [
+    source.startPoint,
+    source.endPoint,
+    ...?source.polygon,
+  ];
+  static ArchitectCadPrimitive _withPoints(
+    ArchitectCadPrimitive source,
+    List<Offset> points,
+  ) => source.copyWith(
+    startPoint: points[0],
+    endPoint: points[1],
+    polygon: source.polygon == null ? null : points.skip(2).toList(),
   );
 }

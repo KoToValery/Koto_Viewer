@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import 'architect_door.dart';
@@ -224,12 +225,10 @@ class ArchitectWall {
   (double ratio, double dist) projectPoint(Offset point) {
     final len = length;
     if (len < 1e-4) return (0.0, (point - startPoint).distance);
-    final u = unitVector;
-    final v = point - centerStart;
-    final dot = v.dx * u.dx + v.dy * u.dy;
-    final ratio = (dot / len).clamp(0.0, 1.0);
-    final proj = centerStart + u * (ratio * len);
-    final dist = (point - proj).distance;
+    final ratio = BimLineGeometry.parameter(point, centerStart, centerEnd);
+    final dist =
+        (point - BimLineGeometry.closest(point, centerStart, centerEnd))
+            .distance;
     return (ratio, dist);
   }
 

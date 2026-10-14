@@ -358,6 +358,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           storeyId: storeyId,
           elementId: copyId,
           delta: delta,
+          carryConnections: false,
         ).apply(original),
       );
     });
@@ -3100,6 +3101,15 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
       );
     } else if (isWall) {
+      items.add(
+        ArchitectRadialMenuItem(
+          action: ArchitectRadialAction.duplicate,
+          icon: Icons.copy_all,
+          label: l10n.dragDuplicateAction,
+          color: const Color(0xFF64FFDA),
+        ),
+      );
+
       items.add(
         ArchitectRadialMenuItem(
           action: ArchitectRadialAction.edit,

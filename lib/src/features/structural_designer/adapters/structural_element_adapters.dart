@@ -64,6 +64,15 @@ class StructuralWallEditingAdapter
           start: translatedPoint(source.start, deltaMetres),
           end: translatedPoint(source.end, deltaMetres),
         );
+  StructuralShearWall rotate(StructuralShearWall source, double radians) {
+    if (radians == 0) return source;
+    final pivot = (source.start + source.end) / 2;
+    return source.copyWith(
+      start: BimTransform2D.rotate(source.start, pivot, radians),
+      end: BimTransform2D.rotate(source.end, pivot, radians),
+    );
+  }
+
   @override
   BimElementSnapshot describe(
     StructuralShearWall source,

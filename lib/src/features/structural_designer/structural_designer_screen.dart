@@ -1,3 +1,4 @@
+import '../bim_editing/geometry/bim_line_geometry.dart';
 import 'analysis/slab_zone_grouping.dart';
 import 'rendering/slab_colors.dart';
 import 'rendering/grid_axis_bubble_layout.dart';
@@ -973,7 +974,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     for (final axis in _project.activeStorey.gridAxes.reversed) {
       final p1 = _cadToScreen(axis.start);
       final p2 = _cadToScreen(axis.end);
-      final closest = DxfSnapHelper.closestPointOnSegment(screenPos, p1, p2);
+      final closest = BimLineGeometry.closest(screenPos, p1, p2);
       if ((screenPos - closest).distance <= hitMarginScreen) {
         return axis;
       }
@@ -1524,14 +1525,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_selectedShearWall == null) return;
     _pushUndo();
     final wall = _selectedShearWall!;
-    final center = (wall.start + wall.end) / 2.0;
-    final halfLen = wall.length / 2.0;
-    final newAngle = (wall.angleRad + math.pi / 2.0) % (2 * math.pi);
-    final newDir = Offset(math.cos(newAngle), math.sin(newAngle));
-    final updated = wall.copyWith(
-      start: center - newDir * halfLen,
-      end: center + newDir * halfLen,
-    );
+    final updated = const StructuralWallEditingAdapter().rotate(wall, math.pi / 2);
     final active = _project.activeStorey;
     final updatedWalls = active.shearWalls
         .map((w) => w.id == updated.id ? updated : w)
@@ -2687,7 +2681,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     (Offset, Offset)? bestSeg;
 
     void checkSegment(Offset p1, Offset p2) {
-      final closest = DxfSnapHelper.closestPointOnSegment(cadPt, p1, p2);
+      final closest = BimLineGeometry.closest(cadPt, p1, p2);
       final d = (cadPt - closest).distance;
       if (d < minDistance) {
         minDistance = d;
@@ -2978,7 +2972,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         if (slab.id == excludedSlabId &&
             (i + 1) % slab.polygon.length == excludedVertex) { continue; }
         edges.add((a, b));
-        final point = DxfSnapHelper.closestPointOnSegment(raw, a, b);
+        final point = BimLineGeometry.closest(raw, a, b);
         if ((raw - point).distance <= tolerance) { candidates.add(DxfSnapResult(
           point: point, type: DxfSnapType.nearest, distance: (raw - point).distance)); }
       }

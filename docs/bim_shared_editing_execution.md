@@ -13,7 +13,7 @@
 | 5. Оси — пълен пилот | Завършен | Общ axis model/geometry/naming/extents, canvas-side offset, compact dialog и Construction transactional endpoint/body drag. 34 финални теста. |
 | 6. Колони/греди и Drag+ | Завършен | Общ BimDragSession, native transform adapters, Architect Drag+ и Construction beam move. Серии 52 и 16 успешни теста. |
 | 7. Контури | Завършен | Общ BimPolygonEditor/geometry, explicit legacy repair extension, shared outer/hole edge+merge operations. Серии 77 и 53 успешни теста. |
-| 8. Стени и специални hosts | Предстои | |
+| 8. Стени и специални hosts | Завършен | Common line projections/intersections/host-fit; typed wall/path adapters; wall Drag+ carries independent hosted identities. 112 успешни теста. |
 | 9. UI и rendering завършване | Предстои | |
 | 10. Премахване на остатъците | Предстои | |
 
@@ -98,3 +98,13 @@ Construction contour repair, dynamic neighbor-preserving extension и merge са
 Общи са insert/remove/move vertex и point-in-polygon; stable signedArea работи при далечен origin. Поправена е StructuralSlab.rotate — върти и holes около същия pivot, като пази кота/дебелина/типове/ownership.
 
 Проверки: 77 съществуващи polygon distance/handles/linked-edge/topology сценария, финални 53/53 с actual Construction ownership editing и common/native vertex agreement, outer/opening extension, invalid crossing, hole rotation и area при 1e10 origin. Статичният анализ е чист.
+
+## Етап 8
+
+Общ BimLineGeometry управлява finite/reference projection/intersection и hosted interval fit. Архитектурният wall network и snap, както и Construction hit testing използват него. Typed wall adapters пазят reference line, exterior/insulation, connection flags и embedded openings. Native wall connectivity and wall-layer validation остават след базовата трансформация.
+
+Добавен е generic typed BimPathEditingAdapter за native point/line/contour fields. Architect opening/stair/dimension/annotation/elevation/CAD movement вече използва него вместо отделни point+delta реализации; explicit CAD polygons се превеждат заедно с endpoints. Construction wall rotation използва shared transform adapter.
+
+Architect wall Drag+ копира embedded doors/windows със stable newly generated IDs/UUIDs и нов wallId. Style, ratios и specifications се пазят. Само clone translation bypass-ва старите supports, за да не мести/разтяга оригинала; normal wall moves запазват native connections. Hosted children на преместващите се стени са изключени от self-snap.
+
+Проверки: final 112/112 за wall smart edit, insulation/core, supports/openings, placement, snap, special paths и slab ownership. Новите host тестове проверяват copied child rebinding/identity/properties и source wall immutability. Анализът е чист.

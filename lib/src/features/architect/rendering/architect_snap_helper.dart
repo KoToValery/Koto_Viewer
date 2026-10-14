@@ -1,3 +1,4 @@
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../../bim_editing/snapping/bim_snap_resolver.dart';
@@ -159,8 +160,17 @@ class ArchitectSnapHelper {
     final excludeJoints = project.activeStorey.walls.any(
       (w) => excludedIds.contains(w.id),
     );
+    final excludedOwners = {
+      ...excludedIds,
+      for (final wall in project.activeStorey.walls.where(
+        (w) => excludedIds.contains(w.id),
+      )) ...[
+        ...wall.doors.map((door) => door.id),
+        ...wall.windows.map((window) => window.id),
+      ],
+    };
     bool excluded(String owner) =>
-        excludedIds.contains(owner) ||
+        excludedOwners.contains(owner) ||
         (owner == '@wall-joints' && excludeJoints) ||
         (owner == '@axes' &&
             project.gridAxes.any((a) => excludedIds.contains(a.id)));
@@ -181,11 +191,7 @@ class ArchitectSnapHelper {
     final nearby = <(Offset, Offset)>[];
     for (final edge in geometry.nearbyEdges(raw, radius)) {
       if (excluded(edge.owner)) continue;
-      final projection = DxfSnapHelper.closestPointOnSegment(
-        raw,
-        edge.a,
-        edge.b,
-      );
+      final projection = BimLineGeometry.closest(raw, edge.a, edge.b);
       if ((projection - raw).distance <= radius) nearby.add((edge.a, edge.b));
     }
     if (underlay != null) {
@@ -203,10 +209,7 @@ class ArchitectSnapHelper {
       consider(edge.$1, 'Endpoint');
       consider(edge.$2, 'Endpoint');
       consider((edge.$1 + edge.$2) / 2, 'Midpoint');
-      consider(
-        DxfSnapHelper.closestPointOnSegment(raw, edge.$1, edge.$2),
-        'Edge',
-      );
+      consider(BimLineGeometry.closest(raw, edge.$1, edge.$2), 'Edge');
       if (anchor != null) {
         final u = edge.$2 - edge.$1;
         final t = _dot(anchor - edge.$1, u) / u.distanceSquared;

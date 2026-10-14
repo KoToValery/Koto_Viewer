@@ -627,12 +627,28 @@ class ArchitectElementTool extends ChangeNotifier {
     final wallIndex = storey.walls.indexWhere((w) => w.id == elementId);
     if (wallIndex != -1) {
       final wall = storey.walls[wallIndex];
-      final newWall = wall.copyWith(
+      final clone = wall.copyWith(
         id: newId,
-        startPoint: wall.startPoint + offset,
-        endPoint: wall.endPoint + offset,
-        doors: [],
-        windows: [],
+        doors: [
+          for (final door in wall.doors)
+            door.copyWith(
+              id: ArchitectElementId.next('door'),
+              wallId: newId,
+              uuid: ArchitectElementId.next('UUID'),
+            ),
+        ],
+        windows: [
+          for (final window in wall.windows)
+            window.copyWith(
+              id: ArchitectElementId.next('window'),
+              wallId: newId,
+              uuid: ArchitectElementId.next('UUID'),
+            ),
+        ],
+      );
+      final newWall = const ArchitectWallEditingAdapter().translate(
+        clone,
+        offset,
       );
       return (storey.copyWith(walls: [...storey.walls, newWall]), newId);
     }
@@ -652,10 +668,9 @@ class ArchitectElementTool extends ChangeNotifier {
     final cadIndex = storey.cadPrimitives.indexWhere((c) => c.id == elementId);
     if (cadIndex != -1) {
       final prim = storey.cadPrimitives[cadIndex];
-      final newPrim = prim.copyWith(
-        id: newId,
-        startPoint: prim.startPoint + offset,
-        endPoint: prim.endPoint + offset,
+      final newPrim = const ArchitectCadEditingAdapter().translate(
+        prim.copyWith(id: newId),
+        offset,
       );
       return (
         storey.copyWith(cadPrimitives: [...storey.cadPrimitives, newPrim]),

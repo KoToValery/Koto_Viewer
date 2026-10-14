@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_wall.dart';
 
 /// Plan solids are joined by their physical faces, not by axis position.
@@ -197,15 +198,14 @@ class ArchitectWallNetwork {
     Offset endB, {
     bool finite = false,
   }) {
-    final u = endA - a, v = endB - b;
-    double cross(Offset x, Offset y) => x.dx * y.dy - x.dy * y.dx;
-    final den = cross(u, v);
-    if (den.abs() <= 1e-10 * u.distance * v.distance) return null;
-    final t = cross(b - a, v) / den, s = cross(b - a, u) / den;
-    if (finite && (t < -1e-8 || t > 1 + 1e-8 || s < -1e-8 || s > 1 + 1e-8)) {
-      return null;
-    }
-    return a + u * t;
+    return BimLineGeometry.intersection(
+      a,
+      endA,
+      b,
+      endB,
+      firstFinite: finite,
+      secondFinite: finite,
+    );
   }
 
   static List<Offset> _hull(List<Offset> points) {

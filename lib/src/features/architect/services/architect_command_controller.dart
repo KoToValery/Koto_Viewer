@@ -1,6 +1,7 @@
 import 'dart:ui';
 import '../adapters/architect_element_adapters.dart';
 import '../../bim_editing/commands/bim_edit_history.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../models/architect_column.dart';
 import '../models/architect_project.dart';
 import '../models/architect_elements.dart';
@@ -498,10 +499,12 @@ class MoveArchitectElement extends ArchitectModelCommand {
   final String storeyId;
   final String elementId;
   final Offset delta;
+  final bool carryConnections;
   const MoveArchitectElement({
     required this.storeyId,
     required this.elementId,
     required this.delta,
+    this.carryConnections = true,
   });
   @override
   ArchitectProject apply(ArchitectProject project) {
@@ -509,6 +512,21 @@ class MoveArchitectElement extends ArchitectModelCommand {
     final s = ArchitectModelCommand.storey(project, storeyId);
     final walls = s.walls.where((w) => w.id == elementId);
     if (walls.isNotEmpty) {
+      if (!carryConnections) {
+        final nextWall = const ArchitectWallEditingAdapter().translate(
+          walls.first,
+          delta,
+        );
+        return ArchitectModelCommand.replace(
+          project,
+          s.copyWith(
+            walls: [
+              for (final wall in s.walls)
+                wall.id == elementId ? nextWall : wall,
+            ],
+          ),
+        );
+      }
       return MoveArchitectElements(
         storeyId: storeyId,
         elementIds: {elementId},
@@ -527,8 +545,11 @@ class MoveArchitectElement extends ArchitectModelCommand {
               : windows.first.offsetRatio) +
           along / host.length;
       final width = doors.isNotEmpty ? doors.first.width : windows.first.width;
-      if (ratio * host.length < width / 2 ||
-          ratio * host.length > host.length - width / 2) {
+      if (!BimLineGeometry.hostedFits(
+        length: host.length,
+        width: width,
+        ratio: ratio,
+      )) {
         throw ArgumentError('Opening would leave its host');
       }
       final next = host.copyWith(
@@ -557,17 +578,11 @@ class MoveArchitectElement extends ArchitectModelCommand {
       return false;
     }
 
-    List<Offset> polygon(List<Offset> points) => [
-      for (final p in points) p + delta,
-    ];
     final next = s.copyWith(
       walls: [
         for (final e in s.walls)
           matches(e.id)
-              ? e.copyWith(
-                  startPoint: e.startPoint + delta,
-                  endPoint: e.endPoint + delta,
-                )
+              ? const ArchitectWallEditingAdapter().translate(e, delta)
               : e,
       ],
       columns: [
@@ -596,42 +611,38 @@ class MoveArchitectElement extends ArchitectModelCommand {
       ],
       openings: [
         for (final e in s.openings)
-          matches(e.id) ? e.copyWith(boundary: polygon(e.boundary)) : e,
+          matches(e.id)
+              ? const ArchitectOpeningEditingAdapter().translate(e, delta)
+              : e,
       ],
       stairs: [
         for (final e in s.stairs)
           matches(e.id)
-              ? e.copyWith(
-                  startPoint: e.startPoint + delta,
-                  endPoint: e.endPoint + delta,
-                )
+              ? const ArchitectStairEditingAdapter().translate(e, delta)
               : e,
       ],
       dimensions: [
         for (final e in s.dimensions)
           matches(e.id)
-              ? e.copyWith(
-                  startPoint: e.startPoint + delta,
-                  endPoint: e.endPoint + delta,
-                )
+              ? const ArchitectDimensionEditingAdapter().translate(e, delta)
               : e,
       ],
       annotations: [
         for (final e in s.annotations)
-          matches(e.id) ? e.copyWith(position: e.position + delta) : e,
+          matches(e.id)
+              ? const ArchitectAnnotationEditingAdapter().translate(e, delta)
+              : e,
       ],
       elevationMarkers: [
         for (final e in s.elevationMarkers)
-          matches(e.id) ? e.copyWith(position: e.position + delta) : e,
+          matches(e.id)
+              ? const ArchitectElevationEditingAdapter().translate(e, delta)
+              : e,
       ],
       cadPrimitives: [
         for (final e in s.cadPrimitives)
           matches(e.id)
-              ? e.copyWith(
-                  startPoint: e.startPoint + delta,
-                  endPoint: e.endPoint + delta,
-                  polygon: e.polygon == null ? null : polygon(e.polygon!),
-                )
+              ? const ArchitectCadEditingAdapter().translate(e, delta)
               : e,
       ],
     );
@@ -671,10 +682,7 @@ class MoveArchitectElements extends ArchitectModelCommand {
     // Only selected elements move. Connected ends slide on stationary supports.
     final nextWalls = {for (final w in storey.walls) w.id: w};
     for (final wall in movedWalls) {
-      var moved = wall.copyWith(
-        startPoint: wall.startPoint + delta,
-        endPoint: wall.endPoint + delta,
-      );
+      var moved = const ArchitectWallEditingAdapter().translate(wall, delta);
       Offset supported(Offset oldPoint, Offset translated, bool connected) {
         if (!connected || wall.isDetached) return translated;
         for (final support in storey.walls) {
