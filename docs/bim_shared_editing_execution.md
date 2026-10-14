@@ -12,7 +12,7 @@
 | 4. Общ snap и scene index | Завършена основа и native providers | Обща bounded/deterministic selection и metre point/bounds indices. Съществуващи серии: 54 и 45 успешни теста. |
 | 5. Оси — пълен пилот | Завършен | Общ axis model/geometry/naming/extents, canvas-side offset, compact dialog и Construction transactional endpoint/body drag. 34 финални теста. |
 | 6. Колони/греди и Drag+ | Завършен | Общ BimDragSession, native transform adapters, Architect Drag+ и Construction beam move. Серии 52 и 16 успешни теста. |
-| 7. Контури | Предстои | |
+| 7. Контури | Завършен | Общ BimPolygonEditor/geometry, explicit legacy repair extension, shared outer/hole edge+merge operations. Серии 77 и 53 успешни теста. |
 | 8. Стени и специални hosts | Предстои | |
 | 9. UI и rendering завършване | Предстои | |
 | 10. Премахване на остатъците | Предстои | |
@@ -88,3 +88,13 @@ Architect column/beam radial actions показват краткия ARB Drag+ �
 Ротацията е в общ BimTransform2D и typed column/beam adapters. Architect column вече сменя само pose rotation, вместо едновременно dimensions swap + rotation (двойна физическа промяна). Vertical height и local width/depth остават запазени; Construction L profile и mirror flag също.
 
 Проверки: 52/52 core/workspace/compact-control сценария и финални 16/16 с реален Architect Drag+ за column/beam, стабилна identity, preview/cancel/commit/Undo, profile rotation и Construction beam body preview/commit/Undo. Анализът е чист.
+
+## Етап 7
+
+Latest Architect polygon geometry и gesture resolver са в общия модул като BimPolygonGeometry/BimPolygonEditor. Native Architect facade само адаптира snap payload. Construction slab/opening vertex previews вече използват същия editor в метри и неговите resolved polygons на release; feature providers и валидирането на owner/contact topology остават native.
+
+Construction contour repair, dynamic neighbor-preserving extension и merge са общи pure geometry операции. Outer contour и opening извикват една реализация; native copyWith/updateOpening запазват openingTypes и slab properties. Legacy/import cleanup е explicit BimContourRepair policy; нормалните редакции използват strict BimPolygonGeometry. Така import heuristics не се прилагат скрито върху нови Architect контури.
+
+Общи са insert/remove/move vertex и point-in-polygon; stable signedArea работи при далечен origin. Поправена е StructuralSlab.rotate — върти и holes около същия pivot, като пази кота/дебелина/типове/ownership.
+
+Проверки: 77 съществуващи polygon distance/handles/linked-edge/topology сценария, финални 53/53 с actual Construction ownership editing и common/native vertex agreement, outer/opening extension, invalid crossing, hole rotation и area при 1e10 origin. Статичният анализ е чист.

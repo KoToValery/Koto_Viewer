@@ -13,6 +13,7 @@ import '../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../bim_editing/commands/bim_edit_history.dart';
 import '../bim_editing/interaction/bim_edit_session.dart';
 import '../bim_editing/interaction/bim_drag_session.dart';
+import '../bim_editing/interaction/bim_polygon_editor.dart';
 import '../bim_editing/interaction/bim_transform_navigation.dart';
 import '../bim_editing/widgets/bim_editing_viewport.dart';
 import 'dart:math' as math;
@@ -142,6 +143,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     } else {
       _handleTapUp(TapUpDetails(localPosition: event.localPosition, kind: event.kind));
     }
+    _cancelContourEditors();
   }
 
   void _cancelViewportTool() {
@@ -230,6 +232,23 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   StructuralColumn? _selectedColumn;
   StructuralShearWall? _selectedShearWall;
   StructuralBeam? _selectedBeam;
+  final _slabVertexEditor = BimPolygonEditor<DxfSnapResult>(pointOf: (snap) => snap.point, isSnapped: (snap) => snap.distance.isFinite);
+  final _openingVertexEditor = BimPolygonEditor<DxfSnapResult>(pointOf: (snap) => snap.point, isSnapped: (snap) => snap.distance.isFinite);
+  Object? _contourRevision;
+  void _previewContourVertex(BimPolygonEditor<DxfSnapResult> editor, String partId,
+      List<Offset> nativePoints, int vertex, Offset raw, Offset target, DxfSnapResult? snap) {
+    if (!identical(_contourRevision, _project)) {
+      _slabVertexEditor.cancel(); _openingVertexEditor.cancel(); _contourRevision = _project;
+    }
+    if (!editor.active || editor.elementId != partId || editor.index != vertex) {
+      editor.startVertex(partId, nativePoints.map((p) => p / _cadUnitsPerMeter).toList(), vertex);
+    }
+    editor.update(raw / _cadUnitsPerMeter, (_) => DxfSnapResult(
+      point: target / _cadUnitsPerMeter, type: snap?.type ?? DxfSnapType.nearest,
+      distance: snap == null ? double.infinity : snap.distance / _cadUnitsPerMeter),
+      _slabSnapTolerance(merge: true) / _cadUnitsPerMeter);
+  }
+  void _cancelContourEditors() { _slabVertexEditor.cancel(); _openingVertexEditor.cancel(); _contourRevision = null; }
   BimDragSession<StructuralBeam>? _beamMove;
   void _beginBeamMove(StructuralBeam beam, Offset screen) {
     _beamMove = BimDragSession(context: _duplicateContext, original: beam,
@@ -3041,6 +3060,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       HapticFeedback.selectionClick();
     }
 
+    _previewContourVertex(_slabVertexEditor, _editingSlab!.id, _editingSlab!.polygon,
+      idx, rawCad, effectiveCad, snap);
     final snappedScreen = snap != null ? _cadToScreen(effectiveCad) : null;
 
     setState(() {
@@ -3085,6 +3106,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       HapticFeedback.selectionClick();
     }
 
+    _previewContourVertex(_openingVertexEditor, '$slabId/$opIdx', op,
+      idx, rawCad, effectiveCad, snap);
     final snappedScreen = snap != null ? _cadToScreen(effectiveCad) : null;
 
     setState(() {
@@ -4555,8 +4578,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           );
         }
       } else if (_draggingSlabVertexCad != null) {
-        final testPts = List<Offset>.from(_editingSlab!.polygon);
-        testPts[idx] = _draggingSlabVertexCad!;
+        final testPts = _slabVertexEditor.active && !_slabVertexEditor.invalid
+            ? _slabVertexEditor.preview!.map((p) => p * _cadUnitsPerMeter).toList()
+            : (List<Offset>.from(_editingSlab!.polygon)..[idx] = _draggingSlabVertexCad!);
         final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
         if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
           _pushSlabCorrectionUndo();
@@ -4868,6 +4892,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
+    _cancelContourEditors();
     _beamMove?.cancel();
     _beamMove = null;
     _cancelAxisGesture();
@@ -5192,8 +5217,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           HapticFeedback.heavyImpact();
         }
       } else if (_draggingSlabVertexCad != null) {
-        final testPts = List<Offset>.from(_editingSlab!.polygon);
-        testPts[idx] = _draggingSlabVertexCad!;
+        final testPts = _slabVertexEditor.active && !_slabVertexEditor.invalid
+            ? _slabVertexEditor.preview!.map((p) => p * _cadUnitsPerMeter).toList()
+            : (List<Offset>.from(_editingSlab!.polygon)..[idx] = _draggingSlabVertexCad!);
         final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
         if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
           _pushSlabCorrectionUndo();
@@ -5245,8 +5271,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             HapticFeedback.heavyImpact();
           }
         } else if (_draggingOpeningVertexCad != null) {
-          final testPts = List<Offset>.from(active.slabs[slabIdx].openings[opIdx]);
-          testPts[idx] = _draggingOpeningVertexCad!;
+          final testPts = _openingVertexEditor.active && !_openingVertexEditor.invalid
+              ? _openingVertexEditor.preview!.map((p) => p * _cadUnitsPerMeter).toList()
+              : (List<Offset>.from(active.slabs[slabIdx].openings[opIdx])..[idx] = _draggingOpeningVertexCad!);
           final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
           if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
             _updateOpeningInStorey((slabId, opIdx), cleanedPts, allowTransfer: false);
@@ -6990,6 +7017,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _selectTool(StructuralDrawTool tool) {
+    _cancelContourEditors();
     _beamMove?.cancel();
     _beamMove = null;
     _cancelAxisGesture();
