@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../bim_editing/properties/bim_numeric_rule.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/structural_element.dart';
 import '../services/slab_edge_offset.dart';
@@ -84,7 +85,7 @@ class _SlabEdgeOffsetDialogState extends State<SlabEdgeOffsetDialog> {
         ),
         FilledButton(
           onPressed: () {
-            final cm = double.tryParse(distance.text.replaceAll(',', '.'));
+            final cm = const BimNumericRule().parse(distance.text);
             final result = cm == null
                 ? null
                 : SlabEdgeOffset.move(

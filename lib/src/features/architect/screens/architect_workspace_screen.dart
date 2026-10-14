@@ -1,3 +1,4 @@
+import '../../bim_editing/widgets/bim_edit_actions.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -3048,8 +3049,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return ok;
   }
 
+  ArchitectRadialMenuItem _radialItem({
+    required BimEditAction action,
+    required Color color,
+  }) => ArchitectRadialMenuItem(
+    action: action,
+    icon: BimEditActions.icon(action),
+    label: BimEditActions.label(action, context.l10n),
+    color: color,
+  );
+
   List<ArchitectRadialMenuItem> _buildRadialMenuItems(String elementId) {
-    final l10n = context.l10n;
     final items = <ArchitectRadialMenuItem>[];
 
     final storey = _project.activeStorey;
@@ -3069,188 +3079,166 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
     if (isCol || isBeam) {
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.move,
-          icon: Icons.open_with,
-          label: l10n.architectRadialMove,
+
           color: const Color(0xFFFFB300),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.rotate,
-          icon: Icons.rotate_right,
-          label: l10n.architectRadialRotate,
+
           color: const Color(0xFF40C4FF),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.duplicate,
-          icon: Icons.copy_all,
-          label: l10n.dragDuplicateAction,
+
           color: const Color(0xFF64FFDA),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.properties,
-          icon: Icons.tune,
-          label: l10n.architectRadialProperties,
+
           color: const Color(0xFFB388FF),
         ),
       );
     } else if (isWall) {
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.duplicate,
-          icon: Icons.copy_all,
-          label: l10n.dragDuplicateAction,
+
           color: const Color(0xFF64FFDA),
         ),
       );
 
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.edit,
-          icon: Icons.edit_outlined,
-          label: l10n.architectRadialEdit,
+
           color: const Color(0xFF00E5FF),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.move,
-          icon: Icons.open_with,
-          label: l10n.architectRadialMove,
+
           color: const Color(0xFFFFB300),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.split,
-          icon: Icons.content_cut,
-          label: l10n.architectRadialSplit,
+
           color: const Color(0xFFFF9100),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.flip,
-          icon: Icons.flip,
-          label: l10n.architectRadialFlip,
+
           color: const Color(0xFF40C4FF),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.properties,
-          icon: Icons.tune,
-          label: l10n.architectRadialProperties,
+
           color: const Color(0xFFB388FF),
         ),
       );
     } else if (isDoor || isWindow) {
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.move,
-          icon: Icons.open_with,
-          label: l10n.architectRadialMove,
+
           color: const Color(0xFFFFB300),
         ),
       );
       if (isDoor) {
         items.add(
-          ArchitectRadialMenuItem(
+          _radialItem(
             action: ArchitectRadialAction.flip,
-            icon: Icons.flip,
-            label: l10n.architectRadialFlip,
+
             color: const Color(0xFF40C4FF),
           ),
         );
       }
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.properties,
-          icon: Icons.tune,
-          label: l10n.architectRadialProperties,
+
           color: const Color(0xFFB388FF),
         ),
       );
     } else if (isSlab || isCadPrim || isZone) {
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.edit,
-          icon: Icons.edit_outlined,
-          label: l10n.architectRadialEdit,
+
           color: const Color(0xFF00E5FF),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.move,
-          icon: Icons.open_with,
-          label: l10n.architectRadialMove,
+
           color: const Color(0xFFFFB300),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.duplicate,
-          icon: Icons.copy_all,
-          label: l10n.dragDuplicateAction,
+
           color: const Color(0xFF64FFDA),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.properties,
-          icon: Icons.tune,
-          label: l10n.architectRadialProperties,
+
           color: const Color(0xFFB388FF),
         ),
       );
     } else if (isAxis) {
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.move,
-          icon: Icons.open_with,
-          label: l10n.architectRadialMove,
+
           color: const Color(0xFFFFB300),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.properties,
-          icon: Icons.tune,
-          label: l10n.architectRadialProperties,
+
           color: const Color(0xFFB388FF),
         ),
       );
     } else {
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.move,
-          icon: Icons.open_with,
-          label: l10n.architectRadialMove,
+
           color: const Color(0xFFFFB300),
         ),
       );
       items.add(
-        ArchitectRadialMenuItem(
+        _radialItem(
           action: ArchitectRadialAction.properties,
-          icon: Icons.tune,
-          label: l10n.architectRadialProperties,
+
           color: const Color(0xFFB388FF),
         ),
       );
     }
 
     items.add(
-      ArchitectRadialMenuItem(
+      _radialItem(
         action: ArchitectRadialAction.delete,
-        icon: Icons.delete_outline,
-        label: l10n.architectRadialDelete,
+
         color: const Color(0xFFFF5252),
       ),
     );

@@ -1,18 +1,10 @@
 // === SECTION: ARCHITECT RADIAL CONTEXT MENU ===
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../bim_editing/widgets/bim_edit_actions.dart';
+export '../../bim_editing/widgets/bim_edit_actions.dart' show BimEditAction;
 
-enum ArchitectRadialAction {
-  move,
-  edit,
-  delete,
-  duplicate,
-  rotate,
-  flip,
-  properties,
-  split,
-  offset,
-}
+typedef ArchitectRadialAction = BimEditAction;
 
 class ArchitectRadialMenuItem {
   final ArchitectRadialAction action;
@@ -60,10 +52,7 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
       vsync: this,
       duration: const Duration(milliseconds: 220),
     );
-    _scaleAnim = CurvedAnimation(
-      parent: _animCtrl,
-      curve: Curves.easeOutBack,
-    );
+    _scaleAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutBack);
     _animCtrl.forward();
   }
 
@@ -139,9 +128,7 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
                   color: Colors.black38,
                   border: Border.all(color: Colors.white38, width: 1.5),
                 ),
-                child: const Center(
-                  child: ContainerDot(),
-                ),
+                child: const Center(child: ContainerDot()),
               ),
             ),
           ),
@@ -212,11 +199,7 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    item.icon,
-                    size: 19,
-                    color: item.color,
-                  ),
+                  Icon(item.icon, size: 19, color: item.color),
                   const SizedBox(height: 1),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 2),

@@ -1,3 +1,4 @@
+import '../../bim_editing/rendering/bim_pointer_marks.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/l10n/l10n_extensions.dart';
@@ -117,36 +118,7 @@ class StructuralPointerPainter extends CustomPainter {
         ? const Color(0xFF00E5FF)
         : const Color(0xFFFFB300);
 
-    // 1. Touch Anchor Circle directly beneath user's finger
-    final touchFill = Paint()
-      ..color = themeColor.withValues(alpha: 0.15)
-      ..style = PaintingStyle.fill;
-    final touchBorder = Paint()
-      ..color = themeColor.withValues(alpha: 0.7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    final touchDot = Paint()
-      ..color = themeColor
-      ..style = PaintingStyle.fill;
-
-    canvas.drawCircle(touchPos, 18, touchFill);
-    canvas.drawCircle(touchPos, 18, touchBorder);
-    canvas.drawCircle(touchPos, 3.5, touchDot);
-
-    // One reference point connects the finger, ghost and committed geometry.
-    final guideConnectionPoint = effectiveTip;
-
-    final stemPaint = Paint()
-      ..color = themeColor.withValues(alpha: 0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..isAntiAlias = true;
-
-    final stemPath = Path()
-      ..moveTo(touchPos.dx, touchPos.dy - 18)
-      ..lineTo(guideConnectionPoint.dx, guideConnectionPoint.dy);
-
-    canvas.drawPath(stemPath, stemPaint);
+    BimPointerMarks.touchAndStem(canvas, touchPos, effectiveTip, themeColor);
 
     // 3. Snap Markers at all snapped positions (supports simultaneous multi-point snap)
     if (snappedPositions != null && snappedPositions!.isNotEmpty) {
@@ -243,7 +215,8 @@ class StructuralPointerPainter extends CustomPainter {
 
         final bool isClose =
             openingPoints!.length >= 3 &&
-            (effectiveTip - openingPoints!.first).distance <= math.min(12.0, .10 * scale);
+            (effectiveTip - openingPoints!.first).distance <=
+                math.min(12.0, .10 * scale);
 
         if (isClose) {
           final closeLine = Paint()
@@ -391,15 +364,7 @@ class StructuralPointerPainter extends CustomPainter {
       canvas.drawPath(path, colBorder);
     }
     if (previewElementPolygon != null && previewElementPolygon!.length >= 3) {
-      final path = Path()..addPolygon(previewElementPolygon!, true);
-      canvas.drawPath(path, Paint()..color = themeColor.withValues(alpha: .22));
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = themeColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2,
-      );
+      BimPointerMarks.ghost(canvas, previewElementPolygon!, themeColor);
     }
     if (activeTool == StructuralDrawTool.column ||
         activeTool == StructuralDrawTool.shearWall) {
@@ -464,14 +429,21 @@ class StructuralPointerPainter extends CustomPainter {
         DxfSnapType.midpoint => l10n?.snapMidpoint,
         DxfSnapType.center => l10n?.snapCenter,
         DxfSnapType.nearest => l10n?.snapNearest,
-        DxfSnapType.perpendicular => measurementParallel ? '∥' : l10n?.snapPerpendicular,
+        DxfSnapType.perpendicular =>
+          measurementParallel ? '∥' : l10n?.snapPerpendicular,
         DxfSnapType.point => l10n?.snapPoint,
         null => null,
       };
       final text = [?liveDimensionText, ?snapLabel].join(' • ');
       if (text.isNotEmpty) {
-        _drawDimensionBadge(canvas, effectiveTip, effectiveTip, text,
-            badgeCenter: effectiveTip - const Offset(0, 32), viewport: size);
+        _drawDimensionBadge(
+          canvas,
+          effectiveTip,
+          effectiveTip,
+          text,
+          badgeCenter: effectiveTip - const Offset(0, 32),
+          viewport: size,
+        );
       }
     } else if (liveDimensionText != null) {
       final startPos =
@@ -499,124 +471,31 @@ class StructuralPointerPainter extends CustomPainter {
     Offset pos,
     DxfSnapType type,
     Color color, {
-    double strokeWidth = 2.0,
-  }) {
-    final snapPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
+    double strokeWidth = 2,
+  }) => BimPointerMarks.snap(
+    canvas,
+    pos,
+    BimSnapGlyph.values.byName(type.name),
+    color,
+    strokeWidth: strokeWidth,
+    measurementParallel: measurementParallel,
+  );
 
-    const double s = 8.0;
-    switch (type) {
-      case DxfSnapType.intersection:
-        canvas.drawLine(pos - const Offset(7, 7), pos + const Offset(7, 7), snapPaint);
-        canvas.drawLine(pos - const Offset(7, -7), pos + const Offset(7, -7), snapPaint);
-        break;
-      case DxfSnapType.endpoint:
-        canvas.drawRect(
-          Rect.fromCenter(center: pos, width: s * 2, height: s * 2),
-          snapPaint,
-        );
-        break;
-      case DxfSnapType.midpoint:
-        final path = Path()
-          ..moveTo(pos.dx, pos.dy - s)
-          ..lineTo(pos.dx + s, pos.dy + s)
-          ..lineTo(pos.dx - s, pos.dy + s)
-          ..close();
-        canvas.drawPath(path, snapPaint);
-        break;
-      case DxfSnapType.center:
-        canvas.drawCircle(pos, s, snapPaint);
-        break;
-      case DxfSnapType.nearest:
-        // Hourglass shape
-        final path = Path()
-          ..moveTo(pos.dx - s, pos.dy - s)
-          ..lineTo(pos.dx + s, pos.dy - s)
-          ..lineTo(pos.dx - s, pos.dy + s)
-          ..lineTo(pos.dx + s, pos.dy + s)
-          ..close();
-        canvas.drawPath(path, snapPaint);
-        break;
-      case DxfSnapType.perpendicular:
-        if (measurementParallel) {
-          canvas.drawLine(pos + const Offset(-5, 7), pos + const Offset(1, -7), snapPaint);
-          canvas.drawLine(pos + const Offset(1, 7), pos + const Offset(7, -7), snapPaint);
-        } else {
-          canvas.drawPath(Path()
-            ..moveTo(pos.dx - s, pos.dy - s)
-            ..lineTo(pos.dx - s, pos.dy + s)
-            ..lineTo(pos.dx + s, pos.dy + s)
-            ..moveTo(pos.dx - s, pos.dy)
-            ..lineTo(pos.dx, pos.dy)
-            ..lineTo(pos.dx, pos.dy + s), snapPaint);
-        }
-        break;
-      default:
-        canvas.drawCircle(pos, s, snapPaint);
-    }
-  }
-
-  void _drawDimensionBadge(Canvas canvas, Offset p1, Offset p2, String text,
-      {Offset? badgeCenter, Size? viewport}) {
-    final mid = Offset((p1.dx + p2.dx) / 2.0, (p1.dy + p2.dy) / 2.0);
-    final dx = p2.dx - p1.dx;
-    final dy = p2.dy - p1.dy;
-    final len = math.sqrt(dx * dx + dy * dy);
-    Offset offsetMid = mid;
-    if (len > 1e-4) {
-      final nx = -dy / len * 22.0;
-      final ny = dx / len * 22.0;
-      offsetMid = Offset(mid.dx + nx, mid.dy + ny);
-    }
-
-    final tp = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: const TextStyle(
-          color: Color(0xFF00E5FF),
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    if (badgeCenter != null && viewport != null) {
-      offsetMid = Offset(
-        badgeCenter.dx.clamp(tp.width / 2 + 8,
-            math.max(tp.width / 2 + 8, viewport.width - tp.width / 2 - 8)),
-        badgeCenter.dy.clamp(tp.height / 2 + 8,
-            math.max(tp.height / 2 + 8, viewport.height - tp.height / 2 - 8)),
-      );
-    }
-
-    final badgeOffset = Offset(
-      offsetMid.dx - tp.width / 2.0,
-      offsetMid.dy - tp.height / 2.0,
-    );
-
-    final bgRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        badgeOffset.dx - 6,
-        badgeOffset.dy - 3,
-        tp.width + 12,
-        tp.height + 6,
-      ),
-      const Radius.circular(6),
-    );
-
-    final bgPaint = Paint()..color = const Color(0xE61A1C23);
-    final borderPaint = Paint()
-      ..color = const Color(0xFF00E5FF)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    canvas.drawRRect(bgRect, bgPaint);
-    canvas.drawRRect(bgRect, borderPaint);
-    tp.paint(canvas, badgeOffset);
-  }
+  void _drawDimensionBadge(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    String text, {
+    Offset? badgeCenter,
+    Size? viewport,
+  }) => BimPointerMarks.dimension(
+    canvas,
+    p1,
+    p2,
+    text,
+    badgeCenter: badgeCenter,
+    viewport: viewport,
+  );
 
   void _drawStaircaseTreads(
     Canvas canvas,

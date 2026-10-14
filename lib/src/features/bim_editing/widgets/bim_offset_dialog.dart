@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../properties/bim_numeric_rule.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
 /// Only the distance is entered here; the canvas determines the direction.
@@ -41,7 +42,7 @@ class _BimOffsetDialogState extends State<_BimOffsetDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final value = double.tryParse(controller.text.replaceAll(',', '.'));
+    final value = const BimNumericRule().parse(controller.text);
     final valid = value != null && value.isFinite && value > 0;
     void submit() {
       if (valid) {

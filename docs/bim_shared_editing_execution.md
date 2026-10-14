@@ -14,7 +14,7 @@
 | 6. Колони/греди и Drag+ | Завършен | Общ BimDragSession, native transform adapters, Architect Drag+ и Construction beam move. Серии 52 и 16 успешни теста. |
 | 7. Контури | Завършен | Общ BimPolygonEditor/geometry, explicit legacy repair extension, shared outer/hole edge+merge operations. Серии 77 и 53 успешни теста. |
 | 8. Стени и специални hosts | Завършен | Common line projections/intersections/host-fit; typed wall/path adapters; wall Drag+ carries independent hosted identities. 112 успешни теста. |
-| 9. UI и rendering завършване | Предстои | |
+| 9. UI и rendering завършване | Завършен | Общ action catalog/dock control, units, numeric rules/keypads/panels и pointer marks. 148 + 5 успешни теста. |
 | 10. Премахване на остатъците | Предстои | |
 
 ## Правила за следващите промени
@@ -108,3 +108,13 @@ Construction contour repair, dynamic neighbor-preserving extension и merge са
 Architect wall Drag+ копира embedded doors/windows със stable newly generated IDs/UUIDs и нов wallId. Style, ratios и specifications се пазят. Само clone translation bypass-ва старите supports, за да не мести/разтяга оригинала; normal wall moves запазват native connections. Hosted children на преместващите се стени са изключени от self-snap.
 
 Проверки: final 112/112 за wall smart edit, insulation/core, supports/openings, placement, snap, special paths и slab ownership. Новите host тестове проверяват copied child rebinding/identity/properties и source wall immutability. Анализът е чист.
+
+## Етап 9
+
+BimEditAction/BimEditActions са общ action ID/label/icon/capability договор. Architect radial factory и Construction dock използват него; специфичните native действия (opening type, L-profile mirror cycle, wall topology) остават адаптирани. BimActionButton е общият кратък dock control с ARB Drag+ tooltip.
+
+BimDistanceUnit, BimNumericRule, BimNumericKeypad, BimShapeDimensionPanel и BimDistanceDraftingPanel са единствени реализации. Старите Architect имена са alias-и. Construction offset/linked slab offset и Architect local panels използват общото finite parsing/validation. Native property catalogs пазят различните 2D/vertical semantics и localized field labels.
+
+Touch anchor/stem, snap glyphs, ghost contour и dimension badges са в BimPointerMarks. Native painter подава screen-space geometry, localized dimension text и специфичните previews; същите marks обслужват двата BIM режима.
+
+Проверки: 148/148 interaction/phone/pointer/core сценария и 5/5 unit serialization, display/model bounds, integer/nonfinite input, BG/EN action ARB и read-only capability проверки. Анализът е чист. Не са добавяни hardcoded product UI думи; common labels използват съществуващите ARB messages.

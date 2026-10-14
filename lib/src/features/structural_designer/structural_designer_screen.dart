@@ -1,3 +1,4 @@
+import '../bim_editing/widgets/bim_edit_actions.dart';
 import '../bim_editing/geometry/bim_line_geometry.dart';
 import 'analysis/slab_zone_grouping.dart';
 import 'rendering/slab_colors.dart';
@@ -8320,21 +8321,15 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           color: const Color(0xFFFF5252),
           onTap: _deleteSelectedColumn,
         ),
-        _buildDockActionButton(
-          icon: Icons.open_with_rounded,
-          label: context.l10n.moveElement,
+        _buildDockActionButton(action: BimEditAction.move,
           color: const Color(0xFF69F0AE),
           onTap: _startMovingSelectedColumn,
         ),
-        _buildDockActionButton(
-          icon: Icons.straighten_rounded,
-          label: context.l10n.offsetAction,
+        _buildDockActionButton(action: BimEditAction.offset,
           color: const Color(0xFF00E5FF),
           onTap: _showColumnOffsetDialog,
         ),
-        _buildDockActionButton(
-          icon: Icons.rotate_right_rounded,
-          label: context.l10n.rotateElement,
+        _buildDockActionButton(action: BimEditAction.rotate,
           color: const Color(0xFFFFB300),
           onTap: _rotateSelectedColumn,
         ),
@@ -8344,9 +8339,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           color: const Color(0xFFB388FF),
           onTap: _mirrorSelectedColumn,
         ),
-        _buildDockActionButton(
-          icon: Icons.copy_rounded,
-          label: context.l10n.dragDuplicateAction,
+        _buildDockActionButton(action: BimEditAction.duplicate,
           color: const Color(0xFF448AFF),
           onTap: _duplicateSelectedColumn,
         ),
@@ -8370,9 +8363,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           color: const Color(0xFFFF5252),
           onTap: _deleteSelectedWall,
         ),
-        _buildDockActionButton(
-          icon: Icons.open_with_rounded,
-          label: context.l10n.moveElement,
+        _buildDockActionButton(action: BimEditAction.move,
           color: const Color(0xFF69F0AE),
           onTap: _startMovingSelectedWall,
         ),
@@ -8388,15 +8379,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           color: const Color(0xFF00E5FF),
           onTap: _flipSelectedWall,
         ),
-        _buildDockActionButton(
-          icon: Icons.rotate_right_rounded,
-          label: context.l10n.rotateElement,
+        _buildDockActionButton(action: BimEditAction.rotate,
           color: const Color(0xFFFFB300),
           onTap: _rotateSelectedWall,
         ),
-        _buildDockActionButton(
-          icon: Icons.copy_rounded,
-          label: context.l10n.dragDuplicateAction,
+        _buildDockActionButton(action: BimEditAction.duplicate,
           color: const Color(0xFFB388FF),
           onTap: _duplicateSelectedWall,
         ),
@@ -8488,9 +8475,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             ),
           ),
         ),
-        _buildDockActionButton(
-          icon: Icons.copy_rounded,
-          label: context.l10n.dragDuplicateAction,
+        _buildDockActionButton(action: BimEditAction.duplicate,
           color: const Color(0xFFB388FF),
           onTap: _duplicateSelectedBeam,
         ),
@@ -8553,15 +8538,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
             _updateOpeningTypeInStorey(_selectedOpening!, nextType);
           },
         ),
-        _buildDockActionButton(
-          icon: Icons.rotate_90_degrees_ccw_rounded,
-          label: context.l10n.rotateElement,
+        _buildDockActionButton(action: BimEditAction.rotate,
           color: primaryColor,
           onTap: _rotateSelectedOpening,
         ),
-        _buildDockActionButton(
-          icon: Icons.open_with_rounded,
-          label: context.l10n.moveElement,
+        _buildDockActionButton(action: BimEditAction.move,
           color: const Color(0xFF00E5FF),
           onTap: () {
             if (_selectedOpening != null) {
@@ -8601,9 +8582,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           color: const Color(0xFFFF5252),
           onTap: _deleteSelectedGridAxis,
         ),
-        _buildDockActionButton(
-          icon: Icons.straighten_rounded,
-          label: context.l10n.offsetAction,
+        _buildDockActionButton(action: BimEditAction.offset,
           color: const Color(0xFF00E5FF),
           onTap: _showGridAxisOffsetDialog,
         ),
@@ -8712,40 +8691,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     );
   }
 
-  Widget _buildDockActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color, width: 1.0),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: color),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildDockActionButton({IconData? icon, String? label, BimEditAction? action,
+    required Color color, required VoidCallback onTap}) => BimActionButton(
+      icon: icon ?? BimEditActions.icon(action!), label: label ?? BimEditActions.label(action!, context.l10n),
+      color: color, onTap: onTap, tooltip: action == BimEditAction.duplicate ? context.l10n.dragDuplicateHint : null);
 
   void _cleanEditingSlabContour() {
     if (_editingSlab == null) return;
