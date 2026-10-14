@@ -4527,4 +4527,10 @@ class AppLocalizationsBg extends AppLocalizations {
   @override
   String get bimWallNewPointHelp =>
       'Добавя свързани сегменти. Срежи прекъсва връзката.';
+
+  @override
+  String get architectCanvasLight => 'Светъл фон';
+
+  @override
+  String get architectCanvasDark => 'Тъмен фон';
 }

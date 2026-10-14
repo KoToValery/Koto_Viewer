@@ -4510,4 +4510,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bimWallNewPointHelp =>
       'Adds connected wall segments. Split cuts and disconnects them.';
+
+  @override
+  String get architectCanvasLight => 'Light background';
+
+  @override
+  String get architectCanvasDark => 'Dark background';
 }

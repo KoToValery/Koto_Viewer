@@ -7936,6 +7936,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Adds connected wall segments. Split cuts and disconnects them.'**
   String get bimWallNewPointHelp;
+
+  /// No description provided for @architectCanvasLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light background'**
+  String get architectCanvasLight;
+
+  /// No description provided for @architectCanvasDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark background'**
+  String get architectCanvasDark;
 }
 
 class _AppLocalizationsDelegate

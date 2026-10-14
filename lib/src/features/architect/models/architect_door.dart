@@ -1,3 +1,4 @@
+import '../rendering/architect_canvas_palette.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
@@ -134,6 +135,7 @@ class ArchitectDoor {
   /// dimension label (W/H), sill height, and specification badge.
   void paint2D({
     required Canvas canvas,
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Offset wallStart,
     required Offset wallEnd,
     required double wallThickness,
@@ -146,6 +148,7 @@ class ArchitectDoor {
     final effectiveStyle = resolvedStyle;
     if (effectiveStyle != null) {
       effectiveStyle.paintPlan2D(
+        palette: palette,
         canvas: canvas,
         wallStart: wallStart,
         wallEnd: wallEnd,
@@ -180,20 +183,20 @@ class ArchitectDoor {
 
     // Paints
     final framePaint = Paint()
-      ..color = const Color(0xFF263238)
+      ..color = palette.foreground(const Color(0xFF263238))
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : Colors.black
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black)
       ..strokeWidth = (isSelected ? 2.0 : 1.2) / zoomScale
       ..style = PaintingStyle.stroke;
 
     final leafPaint = Paint()
-      ..color = const Color(0xFF8D6E63)
+      ..color = palette.foreground(const Color(0xFF8D6E63))
       ..style = PaintingStyle.fill;
 
     final swingArcPaint = Paint()
-      ..color = (isSelected ? const Color(0xFF00E5FF) : Colors.black87)
+      ..color = (isSelected ? const Color(0xFF00E5FF) : palette.foreground(Colors.black87))
           .withValues(alpha: 0.6)
       ..strokeWidth = 1.0 / zoomScale
       ..style = PaintingStyle.stroke;
@@ -288,8 +291,8 @@ class ArchitectDoor {
     final textPainter = TextPainter(
       text: TextSpan(
         text: label,
-        style: const TextStyle(
-          color: Colors.black87,
+        style: TextStyle(
+          color: palette.foreground(Colors.black87),
           fontSize: 9.0,
           fontWeight: FontWeight.bold,
           height: 1.1,

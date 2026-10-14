@@ -1462,5 +1462,7 @@
   "bimUnderlayReviewCompleteTooltip": "Отбележи запазените елементи и отвори като проверени",
   "bimNewPoint": "Нова точка",
   "bimNewPointHint": "Докосни ръб за нова точка",
-  "bimWallNewPointHelp": "Добавя свързани сегменти. Срежи прекъсва връзката."
+  "bimWallNewPointHelp": "Добавя свързани сегменти. Срежи прекъсва връзката.",
+  "architectCanvasLight": "Светъл фон",
+  "architectCanvasDark": "Тъмен фон"
 }

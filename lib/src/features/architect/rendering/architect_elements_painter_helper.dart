@@ -1,3 +1,4 @@
+import 'architect_canvas_palette.dart';
 // === SECTION: ARCHITECTURAL ELEMENTS PAINTER HELPER ===
 import 'dart:math' as math;
 import 'architect_polygon_painter.dart';
@@ -22,6 +23,7 @@ class ArchitectElementsPainterHelper {
   // ===========================================================================
 
   static void drawUnderlay({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required DxfDocument? underlayDoc,
     required double zoomScale,
@@ -31,8 +33,7 @@ class ArchitectElementsPainterHelper {
     if (underlayDoc == null || underlayDoc.entities.isEmpty) return;
 
     final underlayPaint = Paint()
-      ..color =
-          const Color(0x3A00838F) // faint cyan/teal CAD underlay blueprint tone
+      ..color = palette.underlay
       ..strokeWidth = 0.8 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -104,6 +105,7 @@ class ArchitectElementsPainterHelper {
   // ===========================================================================
 
   static void drawSlabs({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
@@ -114,7 +116,7 @@ class ArchitectElementsPainterHelper {
       ..style = PaintingStyle.fill;
 
     final slabBorderPaint = Paint()
-      ..color = const Color(0xFF546E7A)
+      ..color = palette.foreground(const Color(0xFF546E7A))
       ..strokeWidth = 1.4 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -146,7 +148,7 @@ class ArchitectElementsPainterHelper {
           text: TextSpan(
             text: '${slab.label}\n${slab.area.toStringAsFixed(1)} m²',
             style: TextStyle(
-              color: const Color(0xFF37474F),
+              color: palette.foreground(const Color(0xFF37474F)),
               fontFamily: 'Roboto',
               fontSize: 12.0,
               fontWeight: FontWeight.w600,
@@ -166,13 +168,14 @@ class ArchitectElementsPainterHelper {
   // ===========================================================================
 
   static void drawBeams({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
     String? selectedElementId,
   }) {
     final beamDashPaint = Paint()
-      ..color = const Color(0xFF37474F)
+      ..color = palette.foreground(const Color(0xFF37474F))
       ..strokeWidth = 1.4 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -215,7 +218,7 @@ class ArchitectElementsPainterHelper {
             style: TextStyle(
               color: isSelected
                   ? const Color(0xFF00E5FF)
-                  : const Color(0xFF263238),
+                  : palette.foreground(const Color(0xFF263238)),
               fontFamily: 'Roboto',
               fontSize: 11.0,
               fontWeight: FontWeight.bold,
@@ -234,6 +237,7 @@ class ArchitectElementsPainterHelper {
   // ===========================================================================
 
   static void drawColumns({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
@@ -241,6 +245,7 @@ class ArchitectElementsPainterHelper {
   }) {
     for (final col in storey.columns) {
       col.paint2D(
+        palette: palette,
         canvas: canvas,
         zoomScale: zoomScale,
         isSelected: col.id == selectedElementId,
@@ -253,18 +258,21 @@ class ArchitectElementsPainterHelper {
   // ===========================================================================
 
   static void drawOpenings({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
     String? selectedElementId,
   }) {
     final borderPaint = Paint()
-      ..color = const Color(0xFFBF360C)
+      ..color = palette.foreground(const Color(0xFFBF360C))
       ..strokeWidth = 1.4 / zoomScale
       ..style = PaintingStyle.stroke;
 
     final crossPaint = Paint()
-      ..color = const Color(0xFFD84315).withValues(alpha: 0.7)
+      ..color = palette
+          .foreground(const Color(0xFFD84315))
+          .withValues(alpha: 0.7)
       ..strokeWidth = 1.0 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -307,7 +315,7 @@ class ArchitectElementsPainterHelper {
           text: TextSpan(
             text: op.label,
             style: TextStyle(
-              color: const Color(0xFFBF360C),
+              color: palette.foreground(const Color(0xFFBF360C)),
               fontFamily: 'Roboto',
               fontSize: 12.0,
               fontWeight: FontWeight.bold,
@@ -326,23 +334,24 @@ class ArchitectElementsPainterHelper {
   // ===========================================================================
 
   static void drawStairs({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
     String? selectedElementId,
   }) {
     final borderPaint = Paint()
-      ..color = const Color(0xFF1B5E20)
+      ..color = palette.foreground(const Color(0xFF1B5E20))
       ..strokeWidth = 1.5 / zoomScale
       ..style = PaintingStyle.stroke;
 
     final treadPaint = Paint()
-      ..color = const Color(0xFF2E7D32)
+      ..color = palette.foreground(const Color(0xFF2E7D32))
       ..strokeWidth = 1.0 / zoomScale
       ..style = PaintingStyle.stroke;
 
     final arrowPaint = Paint()
-      ..color = const Color(0xFF1B5E20)
+      ..color = palette.foreground(const Color(0xFF1B5E20))
       ..strokeWidth = 1.6 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -387,7 +396,7 @@ class ArchitectElementsPainterHelper {
         midStart,
         3.0 / zoomScale,
         Paint()
-          ..color = const Color(0xFF1B5E20)
+          ..color = palette.foreground(const Color(0xFF1B5E20))
           ..style = PaintingStyle.fill,
       );
       canvas.drawLine(midStart, midEnd, arrowPaint);
@@ -405,6 +414,7 @@ class ArchitectElementsPainterHelper {
   // ===========================================================================
 
   static void drawDimensions({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
@@ -425,12 +435,14 @@ class ArchitectElementsPainterHelper {
       final p2 = dim.endPoint + offVec;
 
       final dimPaint = Paint()
-        ..color = isSelected ? const Color(0xFF00E5FF) : const Color(0xFF37474F)
+        ..color = isSelected
+            ? const Color(0xFF00E5FF)
+            : palette.foreground(const Color(0xFF37474F))
         ..strokeWidth = (isSelected ? 2.0 : 1.0) / zoomScale
         ..style = PaintingStyle.stroke;
 
       final witnessPaint = Paint()
-        ..color = const Color(0xFF78909C)
+        ..color = palette.foreground(const Color(0xFF78909C))
         ..strokeWidth = 0.8 / zoomScale
         ..style = PaintingStyle.stroke;
 
@@ -456,7 +468,7 @@ class ArchitectElementsPainterHelper {
           style: TextStyle(
             color: isSelected
                 ? const Color(0xFF00E5FF)
-                : const Color(0xFF263238),
+                : palette.foreground(const Color(0xFF263238)),
             fontFamily: 'Roboto',
             fontSize: 12.0,
             fontWeight: FontWeight.bold,
@@ -492,6 +504,7 @@ class ArchitectElementsPainterHelper {
   // ===========================================================================
 
   static void drawElevationMarkers({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
@@ -502,7 +515,7 @@ class ArchitectElementsPainterHelper {
       final p = marker.position;
       final color = isSelected
           ? const Color(0xFF00E5FF)
-          : const Color(0xFFD81B60);
+          : palette.foreground(const Color(0xFFD81B60));
 
       final markerPaint = Paint()
         ..color = color
@@ -542,6 +555,7 @@ class ArchitectElementsPainterHelper {
   }
 
   static void drawAnnotations({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
@@ -558,7 +572,7 @@ class ArchitectElementsPainterHelper {
           style: TextStyle(
             color: isSelected
                 ? const Color(0xFF00E5FF)
-                : const Color(0xFF212121),
+                : palette.foreground(const Color(0xFF212121)),
             fontFamily: 'Roboto',
             fontSize: ann.fontSize * zoomScale,
             fontWeight: FontWeight.w600,
@@ -576,6 +590,7 @@ class ArchitectElementsPainterHelper {
   // ===========================================================================
 
   static void drawCadPrimitives({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectStorey storey,
     required double zoomScale,
@@ -584,7 +599,9 @@ class ArchitectElementsPainterHelper {
     for (final prim in storey.cadPrimitives) {
       final isSelected = prim.id == selectedElementId;
       final paint = Paint()
-        ..color = isSelected ? const Color(0xFF00E5FF) : Color(prim.colorValue)
+        ..color = isSelected
+            ? const Color(0xFF00E5FF)
+            : palette.foreground(Color(prim.colorValue))
         ..strokeWidth = (isSelected ? 2.4 : prim.strokeWidth) / zoomScale
         ..style = PaintingStyle.stroke;
 

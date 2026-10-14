@@ -1,3 +1,4 @@
+import 'architect_canvas_palette.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
@@ -55,6 +56,7 @@ class Architect2dPainter extends CustomPainter {
   final BimViewportController? viewport;
   final ArchitectPaintLayer layer;
   final bool paintGrid;
+  final ArchitectCanvasPalette palette;
   final ArchitectTool activeTool;
   final Offset? activeDraftStart;
   final Offset? activeDraftEnd;
@@ -135,6 +137,7 @@ class Architect2dPainter extends CustomPainter {
     this.viewport,
     this.layer = ArchitectPaintLayer.all,
     this.paintGrid = true,
+    this.palette = const ArchitectCanvasPalette.light(),
     required this.activeTool,
     this.insertPointId,
     this.activeDraftStart,
@@ -220,6 +223,7 @@ class Architect2dPainter extends CustomPainter {
     if (layer != ArchitectPaintLayer.interaction) {
       if (underlayDoc != null) {
         ArchitectElementsPainterHelper.drawUnderlay(
+          palette: palette,
           canvas: canvas,
           underlayDoc: underlayDoc,
           zoomScale: zoomScale,
@@ -229,6 +233,7 @@ class Architect2dPainter extends CustomPainter {
       if (paintGrid) _drawDraftingGrid(canvas, size);
       _drawGridAxes(canvas);
       ArchitectElementsPainterHelper.drawSlabs(
+        palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
@@ -236,6 +241,7 @@ class Architect2dPainter extends CustomPainter {
       );
       _drawZones(canvas);
       ArchitectElementsPainterHelper.drawBeams(
+        palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
@@ -243,24 +249,28 @@ class Architect2dPainter extends CustomPainter {
       );
       _drawWalls(canvas);
       ArchitectElementsPainterHelper.drawColumns(
+        palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
       ArchitectElementsPainterHelper.drawOpenings(
+        palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
       ArchitectElementsPainterHelper.drawStairs(
+        palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
       ArchitectElementsPainterHelper.drawCadPrimitives(
+        palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
@@ -295,6 +305,7 @@ class Architect2dPainter extends CustomPainter {
     }
     if (layer != ArchitectPaintLayer.interaction) {
       ArchitectElementsPainterHelper.drawDimensions(
+        palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
@@ -304,12 +315,14 @@ class Architect2dPainter extends CustomPainter {
             ArchitectWallNetwork.body(_project.activeStorey.walls),
       );
       ArchitectElementsPainterHelper.drawElevationMarkers(
+        palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
         selectedElementId: selectedElementId,
       );
       ArchitectElementsPainterHelper.drawAnnotations(
+        palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
         zoomScale: zoomScale,
@@ -386,6 +399,7 @@ class Architect2dPainter extends CustomPainter {
     final selected = _filterElements(project.activeStorey, selectedOnly: true);
     if (selected.slabs.isNotEmpty) {
       ArchitectElementsPainterHelper.drawSlabs(
+        palette: palette,
         canvas: canvas,
         storey: selected,
         zoomScale: zoomScale,
@@ -395,6 +409,7 @@ class Architect2dPainter extends CustomPainter {
     }
     if (selected.cadPrimitives.any((p) => p.type == CadPrimitiveType.rect)) {
       ArchitectElementsPainterHelper.drawCadPrimitives(
+        palette: palette,
         canvas: canvas,
         storey: selected,
         zoomScale: zoomScale,
@@ -403,6 +418,7 @@ class Architect2dPainter extends CustomPainter {
       return;
     }
     Architect2dPainter(
+      palette: palette,
       project: project.updateActiveStorey(selected).copyWithGridAxes([]),
       dimensionWallObstacles: ArchitectWallNetwork.body(
         _project.activeStorey.walls,
@@ -444,6 +460,7 @@ class Architect2dPainter extends CustomPainter {
 
   void _drawZones(Canvas canvas) {
     ArchitectZonePainterHelper.drawZones(
+      palette: palette,
       canvas: canvas,
       project: _zoneLayerProject,
       zoomScale: zoomScale,
@@ -514,11 +531,11 @@ class Architect2dPainter extends CustomPainter {
 
   void _drawDraftingGrid(Canvas canvas, Size size) {
     final gridPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.05)
+      ..color = palette.grid.withValues(alpha: 0.05)
       ..strokeWidth = 0.5 / zoomScale;
 
     final majorGridPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.12)
+      ..color = palette.grid.withValues(alpha: 0.12)
       ..strokeWidth = 1.0 / zoomScale;
 
     final view = viewport?.visibleRect ?? const Rect.fromLTRB(-40, -40, 40, 40);
@@ -560,6 +577,7 @@ class Architect2dPainter extends CustomPainter {
 
   void _drawGridAxes(Canvas canvas) {
     ArchitectGridAxisPainterHelper.drawAxes(
+      palette: palette,
       canvas: canvas,
       project: layer == ArchitectPaintLayer.all
           ? project
@@ -598,7 +616,7 @@ class Architect2dPainter extends CustomPainter {
     final activeStorey = project.activeStorey;
 
     final wallBorderPaint = Paint()
-      ..color = const Color(0xFF212121)
+      ..color = palette.foreground(const Color(0xFF212121))
       ..strokeWidth = 1.5 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -608,7 +626,7 @@ class Architect2dPainter extends CustomPainter {
       ..color = const Color(0x99B0BEC5)
       ..style = PaintingStyle.fill;
     final midBorderPaint = Paint()
-      ..color = const Color(0x66000000)
+      ..color = palette.foreground(const Color(0x66000000))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8 / zoomScale;
 
@@ -653,6 +671,7 @@ class Architect2dPainter extends CustomPainter {
       }
       for (final door in wall.doors) {
         door.paint2D(
+          palette: palette,
           canvas: canvas,
           wallStart: wall.centerStart,
           wallEnd: wall.centerEnd,
@@ -666,6 +685,7 @@ class Architect2dPainter extends CustomPainter {
       }
       for (final window in wall.windows) {
         window.paint2D(
+          palette: palette,
           canvas: canvas,
           wallStart: wall.centerStart,
           wallEnd: wall.centerEnd,
@@ -729,7 +749,7 @@ class Architect2dPainter extends CustomPainter {
       );
       final tick = wall.unitVector * (4 / zoomScale);
       final paint = Paint()
-        ..color = const Color(0xFF008C9E)
+        ..color = palette.foreground(const Color(0xFF008C9E))
         ..strokeWidth = 1 / zoomScale;
       canvas.drawLine(gap.start, gap.end, paint);
       for (final point in [gap.start, gap.end]) {
@@ -864,6 +884,7 @@ class Architect2dPainter extends CustomPainter {
     }
     if (activeTool == ArchitectTool.column && columnPreview != null) {
       ArchitectElementsPainterHelper.drawColumns(
+        palette: palette,
         canvas: canvas,
         storey: project.activeStorey.copyWith(columns: [columnPreview!]),
         zoomScale: zoomScale,
@@ -983,6 +1004,7 @@ class Architect2dPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant Architect2dPainter oldDelegate) =>
+      palette.isDark != oldDelegate.palette.isDark ||
       layer != oldDelegate.layer ||
       layer != ArchitectPaintLayer.model ||
       !identical(_project, oldDelegate._project) ||

@@ -1,3 +1,4 @@
+import 'architect_canvas_palette.dart';
 // === SECTION: TABLE OF CONTENTS ===
 // 1. IMPORTS & DEFINITIONS
 // 2. MAIN AXIS RENDERING (drawAxes)
@@ -16,6 +17,7 @@ import '../models/architect_project.dart';
 /// High-performance canvas drawing routines for dynamic architectural grid axes.
 class ArchitectGridAxisPainterHelper {
   static void drawAxes({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectProject project,
     required double zoomScale,
@@ -32,7 +34,9 @@ class ArchitectGridAxisPainterHelper {
   }) {
     // Normal axis paint
     final normalAxisPaint = Paint()
-      ..color = const Color(0xFFC62828).withValues(alpha: 0.80)
+      ..color = palette
+          .foreground(const Color(0xFFC62828))
+          .withValues(alpha: 0.80)
       ..strokeWidth = 1.2 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -68,6 +72,7 @@ class ArchitectGridAxisPainterHelper {
       // Draw bubbles
       if (renderAxis.bubbleAtStart) {
         _drawBubble(
+          palette: palette,
           canvas: canvas,
           center: renderAxis.start,
           label: renderAxis.name,
@@ -77,6 +82,7 @@ class ArchitectGridAxisPainterHelper {
       }
       if (renderAxis.bubbleAtEnd) {
         _drawBubble(
+          palette: palette,
           canvas: canvas,
           center: renderAxis.end,
           label: renderAxis.name,
@@ -234,6 +240,7 @@ class ArchitectGridAxisPainterHelper {
   // === SECTION: DASH-DOT & BUBBLE ROUTINES ===
 
   static void _drawBubble({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required Offset center,
     required String label,
@@ -257,7 +264,7 @@ class ArchitectGridAxisPainterHelper {
           ? const Color(0xFF00E5FF)
           : isSelected
           ? const Color(0xFFFF9F0A)
-          : const Color(0xFFC62828)
+          : palette.foreground(const Color(0xFFC62828))
       ..strokeWidth = (isSelected ? 2.0 : 1.2) / zoomScale
       ..style = PaintingStyle.stroke;
 

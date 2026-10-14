@@ -1,3 +1,4 @@
+import 'architect_canvas_palette.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../../bim_projects/controllers/bim_viewport_controller.dart';
@@ -8,11 +9,13 @@ import 'architect_elements_painter_helper.dart';
 /// Independent static layer: pointer previews never repaint the CAD document.
 class ArchitectUnderlayPainter extends CustomPainter {
   final DxfDocument? document;
+  final ArchitectCanvasPalette palette;
   final BimCoordinateFrame frame;
   final BimViewportController viewport;
   final Map<String, bool> visibility;
   ArchitectUnderlayPainter({
     required this.document,
+    this.palette = const ArchitectCanvasPalette.light(),
     required this.frame,
     required this.viewport,
     required this.visibility,
@@ -26,6 +29,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
     canvas.translate(-frame.origin.dx, -frame.origin.dy);
     ArchitectElementsPainterHelper.drawUnderlay(
       canvas: canvas,
+      palette: palette,
       underlayDoc: document,
       zoomScale: viewport.scale / frame.unitsPerMeter,
       layerVisibility: visibility,
@@ -38,6 +42,7 @@ class ArchitectUnderlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ArchitectUnderlayPainter oldDelegate) =>
+      palette.isDark != oldDelegate.palette.isDark ||
       document != oldDelegate.document ||
       frame != oldDelegate.frame ||
       viewport != oldDelegate.viewport ||

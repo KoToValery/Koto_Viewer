@@ -1,3 +1,4 @@
+import '../rendering/architect_canvas_palette.dart';
 // === SECTION: ARCHITECTURAL PARAMETRIC FENESTRATION MODEL ===
 // Table of Contents:
 // 1. ENUMS (FenestrationKind, PaneType, GlazingType, CasingPlacement)
@@ -673,6 +674,7 @@ class ArchitectFenestrationStyle {
   /// Draws the horizontal 2D architectural CAD plan cut of the window/door in the wall.
   void paintPlan2D({
     required Canvas canvas,
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Offset wallStart,
     required Offset wallEnd,
     required double wallThickness,
@@ -702,11 +704,11 @@ class ArchitectFenestrationStyle {
 
     // Paints
     final openingCutPaint = Paint()
-      ..color = Colors.white
+      ..color = palette.background
       ..style = PaintingStyle.fill;
 
     final framePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : const Color(0xFF263238)
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF263238))
       ..strokeWidth = (isSelected ? 2.2 : 1.4) / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -715,12 +717,12 @@ class ArchitectFenestrationStyle {
       ..style = PaintingStyle.fill;
 
     final glassPaint = Paint()
-      ..color = const Color(0xFF0288D1)
+      ..color = palette.foreground(const Color(0xFF0288D1))
       ..strokeWidth = 1.2 / zoomScale
       ..style = PaintingStyle.stroke;
 
     final casingPaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : const Color(0xFF546E7A)
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF546E7A))
       ..strokeWidth = 1.5 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -729,7 +731,7 @@ class ArchitectFenestrationStyle {
       ..style = PaintingStyle.fill;
 
     final sillPaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : const Color(0xFF78909C)
+      ..color = isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF78909C))
       ..strokeWidth = 1.1 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -883,7 +885,7 @@ class ArchitectFenestrationStyle {
         text: TextSpan(
           text: text,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF0277BD),
+            color: isSelected ? const Color(0xFF00E5FF) : palette.foreground(const Color(0xFF0277BD)),
             fontSize: 11.5,
             fontWeight: FontWeight.bold,
             height: 1.1,

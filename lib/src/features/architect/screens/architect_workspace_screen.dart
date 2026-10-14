@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../../dxf_3d_viewer/rendering/cad_3d_camera.dart';
 import '../../dxf_3d_viewer/rendering/cad_3d_mesh_painter.dart';
@@ -26,6 +27,7 @@ import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 import '../models/architect_zone.dart';
 import '../rendering/architect_2d_painter.dart';
+import '../rendering/architect_canvas_palette.dart';
 import '../rendering/architect_3d_builder.dart';
 import '../rendering/architect_snap_helper.dart';
 import '../rendering/architect_wall_snap.dart';
@@ -149,6 +151,39 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   ArchitectTool _activeTool = ArchitectTool.zone;
   bool _is3DView = false;
+  ArchitectCanvasPalette _canvasPalette = const ArchitectCanvasPalette.light();
+  static const _darkCanvasPreference = 'architect_dark_canvas';
+  bool _canvasPreferenceChanged = false;
+
+  Future<void> _loadCanvasPreference() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      if (!mounted || _canvasPreferenceChanged) return;
+      setState(() {
+        _canvasPalette = preferences.getBool(_darkCanvasPreference) == true
+            ? const ArchitectCanvasPalette.dark()
+            : const ArchitectCanvasPalette.light();
+      });
+    } catch (error) {
+      debugPrint('Architect canvas preference: $error');
+    }
+  }
+
+  Future<void> _toggleCanvasBackground() async {
+    _canvasPreferenceChanged = true;
+    final isDark = !_canvasPalette.isDark;
+    setState(() {
+      _canvasPalette = isDark
+          ? const ArchitectCanvasPalette.dark()
+          : const ArchitectCanvasPalette.light();
+    });
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool(_darkCanvasPreference, isDark);
+    } catch (error) {
+      debugPrint('Architect canvas preference: $error');
+    }
+  }
 
   // Zone Drafting & Dynamic Slab-style Editing State
   ArchitectZoneCategory _activeZoneCategory = ArchitectZoneCategory.living;
@@ -494,6 +529,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadCanvasPreference());
     _commands =
         widget.commandController ??
         ArchitectCommandController(
@@ -4322,6 +4358,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           backgroundColor: const Color(0xFF141419),
           appBar: AppBar(
             backgroundColor: const Color(0xFF1E1E26),
+            foregroundColor: Colors.white,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -4343,22 +4380,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 key: const ValueKey('architect-undo'),
                 tooltip: l10n.architectZoneUndoAction,
                 onPressed: _commands.canUndo ? _undoModel : null,
-                icon: Badge(
-                  isLabelVisible: _commands.canUndo && _commands.undoCount > 0,
-                  label: Text(
-                    _commands.undoCount > 99 ? '99' : '${_commands.undoCount}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  child: const Icon(Icons.undo),
-                ),
+                color: Colors.white,
+                disabledColor: Colors.white38,
+                icon: const Icon(Icons.undo),
               ),
               IconButton(
                 key: const ValueKey('architect-redo'),
                 tooltip: l10n.architectZoneRedoAction,
                 onPressed: _commands.canRedo ? _redoModel : null,
+                color: Colors.white,
+                disabledColor: Colors.white38,
                 icon: const Icon(Icons.redo),
               ),
               IconButton(
@@ -4402,6 +4433,19 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 },
               ),
               // New Project Wizard Button
+              if (!compactActions && !_is3DView)
+                IconButton(
+                  key: const ValueKey('architect-canvas-background'),
+                  tooltip: _canvasPalette.isDark
+                      ? l10n.architectCanvasLight
+                      : l10n.architectCanvasDark,
+                  icon: Icon(
+                    _canvasPalette.isDark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
+                  ),
+                  onPressed: _toggleCanvasBackground,
+                ),
               if (!compactActions)
                 IconButton(
                   tooltip: l10n.architectNewProject,
@@ -4435,6 +4479,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   key: const ValueKey('architect-more'),
                   onSelected: (action) {
                     switch (action) {
+                      case 'background':
+                        unawaited(_toggleCanvasBackground());
+                        break;
                       case 'new':
                         _openNewProjectWizard();
                         break;
@@ -4447,6 +4494,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     }
                   },
                   itemBuilder: (context) => [
+                    if (!_is3DView)
+                      PopupMenuItem(
+                        key: const ValueKey('architect-canvas-background'),
+                        value: 'background',
+                        child: Text(
+                          _canvasPalette.isDark
+                              ? l10n.architectCanvasLight
+                              : l10n.architectCanvasDark,
+                        ),
+                      ),
                     PopupMenuItem(
                       value: 'new',
                       child: Text(l10n.architectNewProject),
@@ -4822,10 +4879,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            const ColoredBox(color: Color(0xFFF3F5F7)),
+            ColoredBox(
+              key: const ValueKey('architect-canvas'),
+              color: _canvasPalette.background,
+            ),
             RepaintBoundary(
               child: CustomPaint(
                 painter: ArchitectUnderlayPainter(
+                  palette: _canvasPalette,
                   document: _currentUnderlayDoc,
                   frame: widget.underlayFrame,
                   viewport: _viewport,
@@ -5433,6 +5494,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Architect2dPainter _makePainter(ArchitectPaintLayer layer) =>
       Architect2dPainter(
+        palette: _canvasPalette,
         project: _drawingProject,
         viewport: _viewport,
         layer: layer,

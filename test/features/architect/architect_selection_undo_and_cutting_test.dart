@@ -68,8 +68,10 @@ Future<void> hold(WidgetTester tester, Offset point) async {
 }
 
 void main() {
-  group('Selection, Undo badge, and Cutting mechanics', () {
-    testWidgets('Undo button has badge with count up to 99', (tester) async {
+  group('Selection, Undo/Redo, and Cutting mechanics', () {
+    testWidgets('Undo and Redo show visible arrows without counters', (
+      tester,
+    ) async {
       final w1 = ArchitectWall(
         id: 'w1',
         startPoint: const Offset(0, 0),
@@ -78,18 +80,29 @@ void main() {
       );
       final model = seededController(walls: [w1]);
       addTearDown(model.dispose);
-
       await openWorkspace(tester, model);
 
-      // Initially 0 undos: Badge label should not be visible
-      final undoFinder = find.byKey(const ValueKey('architect-undo'));
-      expect(undoFinder, findsOneWidget);
-      final badgeFinder = find.descendant(of: undoFinder, matching: find.byType(Badge));
-      expect(badgeFinder, findsOneWidget);
-      Badge badgeWidget = tester.widget(badgeFinder);
-      expect(badgeWidget.isLabelVisible, isFalse);
+      final undo = find.byKey(const ValueKey('architect-undo'));
+      final redo = find.byKey(const ValueKey('architect-redo'));
+      for (final button in [undo, redo]) {
+        expect(
+          find.descendant(of: button, matching: find.byType(Badge)),
+          findsNothing,
+        );
+        final widget = tester.widget<IconButton>(button);
+        expect(widget.onPressed, isNull);
+        expect(widget.color, Colors.white);
+        expect(widget.disabledColor, Colors.white38);
+      }
+      expect(
+        find.descendant(of: undo, matching: find.byIcon(Icons.undo)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: redo, matching: find.byIcon(Icons.redo)),
+        findsOneWidget,
+      );
 
-      // Perform a model command (e.g. split wall)
       model.execute(
         const SplitArchitectWall(
           storeyId: 's',
@@ -99,18 +112,28 @@ void main() {
         ),
       );
       await tester.pump();
-
-      expect(model.undoCount, 1);
-      badgeWidget = tester.widget(badgeFinder);
-      expect(badgeWidget.isLabelVisible, isTrue);
-      expect(find.descendant(of: undoFinder, matching: find.text('1')), findsOneWidget);
-
-      // Deselect button is always visible
-      final deselectFinder = find.byKey(const ValueKey('architect-deselect'));
-      expect(deselectFinder, findsOneWidget);
+      expect(tester.widget<IconButton>(undo).onPressed, isNotNull);
+      expect(
+        find.descendant(of: undo, matching: find.byType(Text)),
+        findsNothing,
+      );
+      await tester.tap(undo);
+      await tester.pump();
+      expect(model.project.activeStorey.walls, hasLength(1));
+      expect(tester.widget<IconButton>(redo).onPressed, isNotNull);
+      await tester.tap(redo);
+      await tester.pump();
+      expect(model.project.activeStorey.walls, hasLength(2));
+      expect(
+        find.descendant(of: redo, matching: find.byType(Text)),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('architect-deselect')), findsOneWidget);
     });
 
-    testWidgets('Deselect button and empty space tap clear selection', (tester) async {
+    testWidgets('Deselect button and empty space tap clear selection', (
+      tester,
+    ) async {
       final w1 = ArchitectWall(
         id: 'w1',
         startPoint: const Offset(0, 0),

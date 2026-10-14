@@ -2,12 +2,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/architect_project.dart';
 import '../models/architect_zone.dart';
+import 'architect_canvas_palette.dart';
 
 /// Specialized rendering helper for architectural functional zones,
 /// dynamic vertex handles, midpoint grips, and magnetic guide lines.
 class ArchitectZonePainterHelper {
   /// Renders all functional zones for the active storey.
   static void drawZones({
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Canvas canvas,
     required ArchitectProject project,
     required double zoomScale,
@@ -27,6 +29,7 @@ class ArchitectZonePainterHelper {
     for (final zone in activeStorey.zones) {
       final isSelected = zone.id == selectedZoneId;
       _drawSingleZone(
+        palette: palette,
         canvas: canvas,
         zone: zone,
         isSelected: isSelected,
@@ -46,6 +49,7 @@ class ArchitectZonePainterHelper {
   }
 
   static void _drawSingleZone({
+    required ArchitectCanvasPalette palette,
     required Canvas canvas,
     required ArchitectZone zone,
     required bool isSelected,
@@ -91,7 +95,7 @@ class ArchitectZonePainterHelper {
         ? const Color(0xFFFF5252)
         : (isSelected
               ? const Color(0xFF00E5FF)
-              : zone.color.withValues(alpha: 0.85));
+              : palette.foreground(zone.color).withValues(alpha: 0.85));
     final borderPaint = Paint()
       ..color = borderColor
       ..strokeWidth = (isSelected ? 2.2 : 1.2) / zoomScale

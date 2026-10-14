@@ -1,3 +1,4 @@
+import '../rendering/architect_canvas_palette.dart';
 // === SECTION: ARCHITECTURAL COLUMN MODEL & RENDERING ===
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -94,11 +95,14 @@ class ArchitectColumn {
 
   void paint2D({
     required Canvas canvas,
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required double zoomScale,
     bool isSelected = false,
   }) {
     final borderPaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : const Color(0xFF212121)
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(const Color(0xFF212121))
       ..strokeWidth = (isSelected ? 2.5 : 1.5) / zoomScale
       ..style = PaintingStyle.stroke;
 

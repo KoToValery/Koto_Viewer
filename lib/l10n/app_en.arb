@@ -3262,5 +3262,7 @@
   "bimUnderlayReviewCompleteTooltip": "Mark the preserved elements and openings as reviewed",
   "bimNewPoint": "New point",
   "bimNewPointHint": "Tap an edge to add a point",
-  "bimWallNewPointHelp": "Adds connected wall segments. Split cuts and disconnects them."
+  "bimWallNewPointHelp": "Adds connected wall segments. Split cuts and disconnects them.",
+  "architectCanvasLight": "Light background",
+  "architectCanvasDark": "Dark background"
 }

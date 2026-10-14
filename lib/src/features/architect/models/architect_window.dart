@@ -1,3 +1,4 @@
+import '../rendering/architect_canvas_palette.dart';
 // === SECTION: ARCHITECTURAL WINDOW MODEL & RENDERING ===
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -103,7 +104,8 @@ class ArchitectWindow {
         styleId: json['styleId'] as String?,
         style: json['style'] != null
             ? ArchitectFenestrationStyle.fromJson(
-                json['style'] as Map<String, dynamic>)
+                json['style'] as Map<String, dynamic>,
+              )
             : null,
       );
 
@@ -113,6 +115,7 @@ class ArchitectWindow {
 
   void paint2D({
     required Canvas canvas,
+    ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required Offset wallStart,
     required Offset wallEnd,
     required double wallThickness,
@@ -125,6 +128,7 @@ class ArchitectWindow {
     final effectiveStyle = resolvedStyle;
     if (effectiveStyle != null) {
       effectiveStyle.paintPlan2D(
+        palette: palette,
         canvas: canvas,
         wallStart: wallStart,
         wallEnd: wallEnd,
@@ -158,21 +162,25 @@ class ArchitectWindow {
 
     // Paints
     final openingCutPaint = Paint()
-      ..color = Colors.white
+      ..color = palette.background
       ..style = PaintingStyle.fill;
 
     final framePaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : const Color(0xFF37474F)
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(const Color(0xFF37474F))
       ..strokeWidth = (isSelected ? 2.5 : 1.5) / zoomScale
       ..style = PaintingStyle.stroke;
 
     final glassPaint = Paint()
-      ..color = const Color(0xFF0288D1)
+      ..color = palette.foreground(const Color(0xFF0288D1))
       ..strokeWidth = 1.2 / zoomScale
       ..style = PaintingStyle.stroke;
 
     final sillPaint = Paint()
-      ..color = isSelected ? const Color(0xFF00E5FF) : const Color(0xFF78909C)
+      ..color = isSelected
+          ? const Color(0xFF00E5FF)
+          : palette.foreground(const Color(0xFF78909C))
       ..strokeWidth = 1.0 / zoomScale
       ..style = PaintingStyle.stroke;
 
@@ -261,7 +269,7 @@ class ArchitectWindow {
           style: TextStyle(
             color: isSelected
                 ? const Color(0xFF00E5FF)
-                : const Color(0xFF0277BD),
+                : palette.foreground(const Color(0xFF0277BD)),
             fontFamily: 'Roboto',
             fontSize: 12.0,
             fontWeight: FontWeight.bold,
