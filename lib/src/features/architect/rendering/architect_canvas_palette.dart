@@ -12,10 +12,17 @@ class ArchitectCanvasPalette {
   Color get underlay =>
       isDark ? const Color(0x805CD6E0) : const Color(0x3A00838F);
 
-  /// Keep the hue and opacity while lifting dark line/text colours on dark CAD.
+  /// Keep the hue and opacity while lifting dark line/text colours on dark CAD,
+  /// and darkening excessively bright colours on light CAD so elements never blend with the base.
   Color foreground(Color color) {
-    if (!isDark || color.computeLuminance() >= .4) return color;
-    final hsl = HSLColor.fromColor(color);
-    return hsl.withLightness(.75).toColor();
+    if (isDark) {
+      if (color.computeLuminance() >= .4) return color;
+      final hsl = HSLColor.fromColor(color);
+      return hsl.withLightness(.75).toColor();
+    } else {
+      if (color.computeLuminance() <= .75) return color;
+      final hsl = HSLColor.fromColor(color);
+      return hsl.withLightness(.35).toColor();
+    }
   }
 }

@@ -66,6 +66,11 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
     return Material(
       color: const Color(0xF51E242C),
       elevation: 8,
+      shadowColor: Colors.black54,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Colors.white24),
+      ),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.all(8),
@@ -81,7 +86,11 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                         ? IconButton(
                             tooltip: l10n.architectWallDirection,
                             onPressed: widget.onUnlock,
-                            icon: const Icon(Icons.explore_outlined, size: 20),
+                            icon: const Icon(
+                              Icons.explore_outlined,
+                              size: 20,
+                              color: Colors.cyanAccent,
+                            ),
                           )
                         : Text(
                             widget.title ?? '',

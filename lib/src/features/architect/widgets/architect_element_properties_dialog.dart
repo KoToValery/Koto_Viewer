@@ -315,7 +315,7 @@ class _ArchitectElementPropertiesDialogState
                     Icons.flip,
                     color: texts.containsKey('exteriorSide')
                         ? Colors.amber
-                        : null,
+                        : Colors.white70,
                   ),
                   onPressed: () => setState(
                     () => texts['exteriorSide'] =

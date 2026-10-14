@@ -563,7 +563,7 @@ void main() {
   });
 
   testWidgets(
-    'Phone line endpoint snap works with the offset pointer and compact magnet',
+    'Phone line endpoint snap works with the offset pointer and shared header magnet',
     (tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1;
@@ -591,7 +591,8 @@ void main() {
       final magnetRect = tester.getRect(
         find.byKey(const ValueKey('architect-magnet')),
       );
-      expect(inputRect.contains(magnetRect.center), isTrue);
+      expect(tester.getRect(find.byType(AppBar)).contains(magnetRect.center), isTrue);
+      expect(inputRect.contains(magnetRect.center), isFalse);
       final finger =
           workspace.screen(tester, const Offset(.03, .04)) +
           const Offset(0, 64);

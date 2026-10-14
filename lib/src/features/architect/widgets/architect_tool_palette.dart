@@ -135,11 +135,19 @@ class ArchitectToolPalette extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xF5181A22),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-        border: Border.all(color: Colors.white10),
+    return Theme(
+      data: ThemeData.dark().copyWith(
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF00E5FF),
+          secondary: Color(0xFF00E5FF),
+          surface: Color(0xFF262630),
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xF5181A22),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+          border: Border.all(color: Colors.white12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.6),
@@ -277,8 +285,9 @@ class ArchitectToolPalette extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildToolButton({
     required ArchitectTool tool,

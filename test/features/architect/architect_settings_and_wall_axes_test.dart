@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:ui' as ui;
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -234,26 +233,40 @@ void main() {
       'Phone quick settings, units and small cancel control in $language',
       (tester) async {
         const previewKey = ValueKey('architect-settings-preview');
-        final capture = language == 'bg' && const bool.fromEnvironment('UPDATE_ARCHITECT_SETTINGS_PREVIEW');
+        final capture =
+            language == 'bg' &&
+            const bool.fromEnvironment('UPDATE_ARCHITECT_SETTINGS_PREVIEW');
         if (capture) {
           await tester.runAsync(() async {
-            final font = FontLoader('Roboto')..addFont(Future.value(
-              ByteData.sublistView(await File('C:/Windows/Fonts/arial.ttf').readAsBytes())));
+            final font = FontLoader('Roboto')
+              ..addFont(
+                Future.value(
+                  ByteData.sublistView(
+                    await File('C:/Windows/Fonts/arial.ttf').readAsBytes(),
+                  ),
+                ),
+              );
             await font.load();
-            final icons = FontLoader('MaterialIcons')..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+            final icons = FontLoader('MaterialIcons')
+              ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
             await icons.load();
           });
         }
         Future<void> preview(String path) async {
           if (!capture) return;
-          final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(previewKey));
+          final boundary = tester.renderObject<RenderRepaintBoundary>(
+            find.byKey(previewKey),
+          );
           await tester.runAsync(() async {
             final image = await boundary.toImage(pixelRatio: 2);
-            final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+            final bytes = (await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            ))!;
             await File(path).writeAsBytes(bytes.buffer.asUint8List());
             image.dispose();
           });
         }
+
         final model = workspace.commands();
         addTearDown(model.dispose);
         final floors = model.project.copyWith(
@@ -279,7 +292,8 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
         final app = MaterialApp(
-          theme: ThemeData.dark(), debugShowCheckedModeBanner: false,
+          theme: ThemeData.dark(),
+          debugShowCheckedModeBanner: false,
           locale: Locale(language),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,

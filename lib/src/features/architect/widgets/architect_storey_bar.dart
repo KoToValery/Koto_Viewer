@@ -19,7 +19,10 @@ class ArchitectStoreyBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E26),
         border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: .08)),
+          bottom: BorderSide(
+            color: Colors.white.withValues(alpha: .18),
+            width: 1,
+          ),
         ),
       ),
       child: ListView.separated(
@@ -39,20 +42,31 @@ class ArchitectStoreyBar extends StatelessWidget {
             child: Material(
               color: active ? const Color(0xFF00E5FF) : const Color(0xFF282834),
               borderRadius: BorderRadius.circular(6),
-              child: InkWell(
-                onTap: () => onStoreySelected(storey.id),
-                borderRadius: BorderRadius.circular(6),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: active
+                        ? const Color(0xFF00E5FF)
+                        : Colors.white.withValues(alpha: 0.14),
+                    width: 1.0,
                   ),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: active ? Colors.black : Colors.white70,
-                      fontSize: 12,
-                      fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                ),
+                child: InkWell(
+                  onTap: () => onStoreySelected(storey.id),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: active ? Colors.black : Colors.white,
+                        fontSize: 12,
+                        fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),

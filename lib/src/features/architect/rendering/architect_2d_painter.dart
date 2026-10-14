@@ -527,12 +527,12 @@ class Architect2dPainter extends CustomPainter {
 
   void _drawDraftingGrid(Canvas canvas, Size size) {
     final gridPaint = Paint()
-      ..color = palette.grid.withValues(alpha: 0.05)
-      ..strokeWidth = 0.5 / zoomScale;
+      ..color = palette.grid.withValues(alpha: palette.isDark ? 0.08 : 0.09)
+      ..strokeWidth = 0.6 / zoomScale;
 
     final majorGridPaint = Paint()
-      ..color = palette.grid.withValues(alpha: 0.12)
-      ..strokeWidth = 1.0 / zoomScale;
+      ..color = palette.grid.withValues(alpha: palette.isDark ? 0.18 : 0.18)
+      ..strokeWidth = 1.2 / zoomScale;
 
     final view = viewport?.visibleRect ?? const Rect.fromLTRB(-40, -40, 40, 40);
     final exponent = (math.log(24 / zoomScale) / math.ln10).floor();

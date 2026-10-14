@@ -3066,6 +3066,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       message: context.l10n.architectWallClearance,
                       child: Material(
                         color: const Color(0xEE1E242C),
+                        elevation: 3,
+                        shadowColor: Colors.black54,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          side: const BorderSide(color: Colors.white24),
+                        ),
                         borderRadius: BorderRadius.circular(6),
                         child: InkWell(
                           key: ValueKey('wall-clearance-${gap.neighborId}'),
@@ -3183,6 +3189,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               right: 64,
               child: Material(
                 color: const Color(0xEE1E242C),
+                elevation: 4,
+                shadowColor: Colors.black54,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: const BorderSide(color: Colors.white24),
+                ),
                 borderRadius: BorderRadius.circular(8),
                 child: Row(
                   mainAxisSize: MainAxisSize.max,
@@ -3205,7 +3217,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           size: 20,
                           color: _polygonEdgeMode == mode
                               ? Colors.cyanAccent
-                              : Colors.white54,
+                              : Colors.white70,
                         ),
                         onPressed: _polygonDistanceOpen || _polygonEditor.active
                             ? null
@@ -3221,10 +3233,17 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                 context.l10n.architectEdgeSelectHint,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               ),
                             )
                           : TextButton.icon(
                               key: const ValueKey('polygon-edge-offset'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.cyanAccent,
+                              ),
                               onPressed: _polygonDistanceOpen
                                   ? null
                                   : () => _editPolygonDistance(null),
@@ -3250,7 +3269,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               _polygonEditId = null;
                               _polygonSelectedEdge = null;
                             }),
-                      icon: const Icon(Icons.check, size: 20),
+                      icon: const Icon(
+                        Icons.check,
+                        size: 20,
+                        color: Colors.cyanAccent,
+                      ),
                     ),
                   ],
                 ),
@@ -4094,50 +4117,58 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       key: const ValueKey('architect-wall-floating-actions'),
       color: const Color(0xEE1E242C),
       borderRadius: BorderRadius.circular(8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            key: const ValueKey('architect-wall-flip'),
-            tooltip: l.architectWallFlipSide,
-            icon: const Icon(Icons.flip, color: Colors.white70),
-            onPressed: () => _executeWallEdit(
-              MirrorArchitectWalls(
-                storeyId: _project.activeStoreyId,
-                wallIds: wallIds,
-              ),
-            ),
-          ),
-          IconButton(
-            key: const ValueKey('architect-wall-cut'),
-            tooltip: l.architectWallCut,
-            icon: Icon(
-              Icons.content_cut,
-              color: _wallCutIds.isNotEmpty ? Colors.amber : Colors.white70,
-            ),
-            onPressed: () {
-              _cancelActiveDrags();
-              setState(() {
-                _wallCutIds = _wallCutIds.isEmpty ? wallIds : {};
-                _wallCutStroke = false;
-                _wallCutStart = null;
-                _wallCutConfirmedDir = null;
-                _moveSelection = false;
-                _wallParallelMove = false;
-              });
-            },
-          ),
-          if (wallIds.length == 1)
+      elevation: 4,
+      shadowColor: Colors.black54,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white24, width: 1.0),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             IconButton(
-              key: const ValueKey('architect-wall-parallel'),
-              tooltip: l.architectWallParallel,
-              icon: Icon(
-                Icons.swap_vert,
-                color: _wallParallelMove ? Colors.amber : Colors.white70,
+              key: const ValueKey('architect-wall-flip'),
+              tooltip: l.architectWallFlipSide,
+              icon: const Icon(Icons.flip, color: Color(0xFF00E5FF)),
+              onPressed: () => _executeWallEdit(
+                MirrorArchitectWalls(
+                  storeyId: _project.activeStoreyId,
+                  wallIds: wallIds,
+                ),
               ),
-              onPressed: _toggleParallelMove,
             ),
-        ],
+            IconButton(
+              key: const ValueKey('architect-wall-cut'),
+              tooltip: l.architectWallCut,
+              icon: Icon(
+                Icons.content_cut,
+                color: _wallCutIds.isNotEmpty ? Colors.amber : Colors.white,
+              ),
+              onPressed: () {
+                _cancelActiveDrags();
+                setState(() {
+                  _wallCutIds = _wallCutIds.isEmpty ? wallIds : {};
+                  _wallCutStroke = false;
+                  _wallCutStart = null;
+                  _wallCutConfirmedDir = null;
+                  _moveSelection = false;
+                  _wallParallelMove = false;
+                });
+              },
+            ),
+            if (wallIds.length == 1)
+              IconButton(
+                key: const ValueKey('architect-wall-parallel'),
+                tooltip: l.architectWallParallel,
+                icon: Icon(
+                  Icons.swap_vert,
+                  color: _wallParallelMove ? Colors.amber : Colors.white,
+                ),
+                onPressed: _toggleParallelMove,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -4147,13 +4178,20 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     final ids = _effectiveSelection;
     final wallIds = _selectedWallIds;
     void clear() => _clearSelection();
-    return Material(
-      key: const ValueKey('architect-selection-bar'),
-      color: const Color(0xFF1E1E26),
-      child: IconButtonTheme(
-        data: const IconButtonThemeData(
-          style: ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E1E26),
+        border: Border(
+          top: BorderSide(color: Colors.white12, width: 1.0),
         ),
+      ),
+      child: Material(
+        key: const ValueKey('architect-selection-bar'),
+        color: Colors.transparent,
+        child: IconButtonTheme(
+          data: const IconButtonThemeData(
+            style: ButtonStyle(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          ),
         child: Wrap(
           children: [
             SizedBox(
@@ -4278,7 +4316,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       ),
                     );
                   } else if (action == 'magnet') {
-                    _changeViewPreference(() => _magnetEnabled = !_magnetEnabled);
+                    _changeViewPreference(
+                      () => _magnetEnabled = !_magnetEnabled,
+                    );
                   } else if (action == 'join') {
                     try {
                       _commands.execute(
@@ -4392,8 +4432,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   bool _tryStartElementDrag(Offset point) {
     final storey = _project.activeStorey;
@@ -4673,9 +4714,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         child: Scaffold(
           backgroundColor: const Color(0xFF141419),
           appBar: AppBar(
-            toolbarHeight: compactActions ? 44 : 48,
             backgroundColor: const Color(0xFF1E1E26),
             foregroundColor: Colors.white,
+            iconTheme: const IconThemeData(color: Colors.white),
+            actionsIconTheme: const IconThemeData(color: Colors.white),
             title: Text(
               _project.name,
               maxLines: 1,
@@ -4713,19 +4755,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           () => _showGhostStoreys = !_showGhostStoreys,
                         ),
                       ),
-                      IconButton(
-                        key: const ValueKey('architect-snap-toggle'),
-                        tooltip: _magnetEnabled
-                            ? l10n.snapEnabledTooltip
-                            : l10n.snapDisabledTooltip,
-                        icon: Icon(
-                          Icons.sensors,
-                          color: _magnetEnabled
-                              ? Colors.cyanAccent
-                              : Colors.white54,
+                      KeyedSubtree(
+                        key: ValueKey(
+                          _activeTool == ArchitectTool.wall
+                              ? 'wall-magnet'
+                              : 'architect-magnet',
                         ),
-                        onPressed: () => _changeViewPreference(
-                          () => _magnetEnabled = !_magnetEnabled,
+                        child: IconButton(
+                          key: const ValueKey('architect-snap-toggle'),
+                          tooltip: _magnetEnabled
+                              ? l10n.snapEnabledTooltip
+                              : l10n.snapDisabledTooltip,
+                          icon: Icon(
+                            Icons.sensors,
+                            color: _magnetEnabled
+                                ? Colors.cyanAccent
+                                : Colors.white54,
+                          ),
+                          onPressed: () => _changeViewPreference(
+                            () => _magnetEnabled = !_magnetEnabled,
+                          ),
                         ),
                       ),
                       if (!compactActions)
@@ -4745,7 +4794,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       IconButton(
                         key: const ValueKey('architect-settings'),
                         tooltip: l10n.architectSettings,
-                        icon: const Icon(Icons.settings_outlined),
+                        icon: const Icon(Icons.settings_outlined, color: Colors.white),
                         onPressed: _showWorkspaceSettings,
                       ),
                       if (!compactActions)
@@ -4756,7 +4805,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               _effectiveSelection.isNotEmpty || _multiSelect
                               ? _clearSelection
                               : null,
-                          icon: const Icon(Icons.deselect_outlined),
+                          icon: Icon(
+                            Icons.deselect_outlined,
+                            color: (_effectiveSelection.isNotEmpty || _multiSelect)
+                                ? Colors.white
+                                : Colors.white38,
+                          ),
                         ),
                       // 2D / 3D Toggle Button
                       if (!compactActions)
@@ -4776,11 +4830,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       if (!compactActions)
                         IconButton(
                           tooltip: l10n.architectResetView,
-                          icon: const Icon(Icons.center_focus_strong_rounded),
+                          icon: const Icon(Icons.center_focus_strong_rounded, color: Colors.white),
                           onPressed: _resetWorkspaceView,
                         ),
-                      // New Project Wizard Button
-                      if (!compactActions && !_is3DView)
+                      // Canvas Background (Theme Toggle) Button - Always accessible
+                      if (!_is3DView)
                         IconButton(
                           key: const ValueKey('architect-canvas-background'),
                           tooltip: _canvasPalette.isDark
@@ -4788,22 +4842,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               : l10n.architectCanvasDark,
                           icon: Icon(
                             _canvasPalette.isDark
-                                ? Icons.light_mode_outlined
-                                : Icons.dark_mode_outlined,
+                                ? Icons.light_mode_rounded
+                                : Icons.dark_mode_rounded,
+                            color: _canvasPalette.isDark
+                                ? const Color(0xFFFFD54F)
+                                : const Color(0xFF81D4FA),
                           ),
                           onPressed: _toggleCanvasBackground,
                         ),
                       if (!compactActions)
                         IconButton(
                           tooltip: l10n.architectNewProject,
-                          icon: const Icon(Icons.add_business_rounded),
+                          icon: const Icon(Icons.add_business_rounded, color: Colors.white),
                           onPressed: _openNewProjectWizard,
                         ),
                       // Diagnostic Logs Dialog Button
                       if (!compactActions)
                         IconButton(
                           tooltip: l10n.architectDebugLogs,
-                          icon: const Icon(Icons.bug_report_rounded),
+                          icon: const Icon(Icons.bug_report_rounded, color: Colors.white),
                           onPressed: _showDebugLogsDialog,
                         ),
                       // CAD Underlay Toggle Button (if underlays are present)
@@ -4818,12 +4875,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                 ? const Color(0xFF00E5FF)
                                 : Colors.white38,
                           ),
-                          onPressed: () =>
-                              _changeViewPreference(() => _showUnderlay = !_showUnderlay),
+                          onPressed: () => _changeViewPreference(
+                            () => _showUnderlay = !_showUnderlay,
+                          ),
                         ),
                       if (compactActions)
                         PopupMenuButton<String>(
                           key: const ValueKey('architect-more'),
+                          icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
                           onSelected: (action) {
                             switch (action) {
                               case 'grid':
@@ -4886,10 +4945,24 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                                   'architect-canvas-background',
                                 ),
                                 value: 'background',
-                                child: Text(
-                                  _canvasPalette.isDark
-                                      ? l10n.architectCanvasLight
-                                      : l10n.architectCanvasDark,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _canvasPalette.isDark
+                                          ? Icons.light_mode_rounded
+                                          : Icons.dark_mode_rounded,
+                                      color: _canvasPalette.isDark
+                                          ? const Color(0xFFFFD54F)
+                                          : const Color(0xFF81D4FA),
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _canvasPalette.isDark
+                                          ? l10n.architectCanvasLight
+                                          : l10n.architectCanvasDark,
+                                    ),
+                                  ],
                                 ),
                               ),
                             PopupMenuItem(
@@ -5443,6 +5516,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xE61E1E26),
                       borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.white24, width: 1.0),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black38,
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(8),
@@ -5500,53 +5581,39 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           child: Material(
             color: const Color(0xE61E1E26),
             borderRadius: BorderRadius.circular(8),
-            child: Row(
-              children: [
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    context.l10n.dragDuplicateHint,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+            elevation: 4,
+            shadowColor: Colors.black54,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white24, width: 1.0),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      context.l10n.dragDuplicateHint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(_cancelActiveDrags);
-                    _repaintPreview();
-                  },
-                  child: Text(context.l10n.cancel),
-                ),
-              ],
+                  TextButton(
+                    onPressed: () {
+                      setState(_cancelActiveDrags);
+                      _repaintPreview();
+                    },
+                    child: Text(context.l10n.cancel),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       _buildWallClearanceOverlay(),
       _buildPolygonDistanceOverlay(),
       _buildShapeDimensionOverlay(),
-      if (_activeTool != ArchitectTool.wall &&
-          _activeTool != ArchitectTool.select)
-        Positioned(
-          top: 8,
-          right: 8,
-          child: Material(
-            color: const Color(0xEE1E242C),
-            borderRadius: BorderRadius.circular(8),
-            child: IconButton(
-              key: const ValueKey('architect-magnet'),
-              tooltip: _magnetEnabled
-                  ? context.l10n.snapEnabledTooltip
-                  : context.l10n.snapDisabledTooltip,
-              icon: Icon(
-                Icons.sensors,
-                size: 20,
-                color: _magnetEnabled ? Colors.cyanAccent : Colors.white54,
-              ),
-              onPressed: () => _changeViewPreference(() => _magnetEnabled = !_magnetEnabled),
-            ),
-          ),
-        ),
       if (_selectedWallIds.isNotEmpty)
         Positioned(
           top: 8,
@@ -5568,6 +5635,12 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               width: 380,
               child: Material(
                 color: const Color(0xEE1E242C),
+                elevation: 4,
+                shadowColor: Colors.black54,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: const BorderSide(color: Colors.white24),
+                ),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -5579,6 +5652,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           isExpanded: true,
                           value: _wallReference,
                           dropdownColor: const Color(0xFF1E242C),
+                          iconEnabledColor: Colors.white,
+                          iconDisabledColor: Colors.white38,
                           underline: const SizedBox.shrink(),
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: Colors.white, fontSize: 12),
@@ -5624,7 +5699,13 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                         padding: EdgeInsets.zero,
                         key: const ValueKey('wall-flip-side'),
                         tooltip: context.l10n.architectWallFlipSide,
-                        icon: const Icon(Icons.flip, size: 20),
+                        icon: Icon(
+                          Icons.flip,
+                          size: 20,
+                          color: _wallExteriorSide == WallExteriorSide.right
+                              ? const Color(0xFF00E5FF)
+                              : Colors.white,
+                        ),
                         onPressed: () => setState(() {
                           _wallStartAttachment = null;
                           _wallExteriorSide =
@@ -5633,23 +5714,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                               : WallExteriorSide.left;
                         }),
                       ),
-                      IconButton(
-                        key: const ValueKey('wall-magnet'),
-                        constraints: const BoxConstraints.tightFor(
-                          width: 32,
-                          height: 40,
-                        ),
-                        padding: EdgeInsets.zero,
-                        tooltip: context.l10n.architectWallMagnet,
-                        icon: Icon(
-                          Icons.sensors,
-                          size: 18,
-                          color: _magnetEnabled
-                              ? Colors.cyanAccent
-                              : Colors.white54,
-                        ),
-                        onPressed: () => _changeViewPreference(() => _magnetEnabled = !_magnetEnabled),
-                      ),
+
                       TextButton(
                         key: const ValueKey('wall-dimension-mode'),
                         style: TextButton.styleFrom(
@@ -5707,7 +5772,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           size: 20,
                           color: _wallMode == WallDraftingMode.chained
                               ? Colors.cyanAccent
-                              : Colors.white54,
+                              : Colors.white70,
                         ),
                       ),
                       if (_draftStart != null)
@@ -5722,7 +5787,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                           onPressed: _finishChainedWall,
                           icon: const Icon(
                             Icons.close,
-                            color: Colors.white70,
+                            color: Colors.white,
                             size: 18,
                           ),
                         ),

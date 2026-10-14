@@ -256,7 +256,9 @@ class ArchitectGridAxisPainterHelper {
     final double bubbleRadius = 12.0 / zoomScale;
 
     final bgPaint = Paint()
-      ..color = isGhost ? const Color(0xAA1E2A38) : const Color(0xFF1E1E24)
+      ..color = isGhost
+          ? (palette.isDark ? const Color(0xAA1E2A38) : const Color(0xAAFFFFFF))
+          : (palette.isDark ? const Color(0xFF262A34) : Colors.white)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
@@ -264,8 +266,10 @@ class ArchitectGridAxisPainterHelper {
           ? const Color(0xFF00E5FF)
           : isSelected
           ? const Color(0xFFFF9F0A)
-          : palette.foreground(const Color(0xFFC62828))
-      ..strokeWidth = (isSelected ? 2.0 : 1.2) / zoomScale
+          : (palette.isDark
+              ? palette.foreground(const Color(0xFFC62828))
+              : const Color(0xFFC62828))
+      ..strokeWidth = (isSelected ? 2.2 : 1.4) / zoomScale
       ..style = PaintingStyle.stroke;
 
     canvas.drawCircle(center, bubbleRadius, bgPaint);
@@ -274,7 +278,9 @@ class ArchitectGridAxisPainterHelper {
     final textSpan = TextSpan(
       text: label,
       style: TextStyle(
-        color: isGhost ? const Color(0xFF00E5FF) : Colors.white,
+        color: isGhost
+            ? const Color(0xFF00E5FF)
+            : (palette.isDark ? Colors.white : const Color(0xFFC62828)),
         fontFamily: 'Roboto',
         fontSize: 10.5 / zoomScale,
         fontWeight: FontWeight.bold,

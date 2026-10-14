@@ -68,6 +68,12 @@ class ArchitectPolygonDistanceOverlay extends StatelessWidget {
                     message: context.l10n.architectEdgeDistanceHint,
                     child: Material(
                       color: const Color(0xEE1E242C),
+                      elevation: 3,
+                      shadowColor: Colors.black54,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        side: const BorderSide(color: Colors.white24),
+                      ),
                       borderRadius: BorderRadius.circular(6),
                       child: InkWell(
                         key: ValueKey('polygon-distance-${dimension.key}'),
