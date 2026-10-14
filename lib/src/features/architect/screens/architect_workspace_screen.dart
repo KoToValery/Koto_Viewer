@@ -267,6 +267,23 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     });
   }
 
+  void _clearSelection() {
+    setState(() {
+      _cancelActiveDrags();
+      _selectionIds.clear();
+      _selectedElementId = null;
+      _selectedZoneId = null;
+      _axisTool.deselect();
+      _zoneTool.cancelEditingZone();
+      _multiSelect = false;
+      _moveSelection = false;
+      _wallExtendId = null;
+      _insertPointId = null;
+      _wallCutIds = {};
+      _wallCutStart = null;
+    });
+  }
+
   // Wall Drafting State
   double _wallThickness = 0.25; // 25 cm default
   ArchitectWallType? _activeWallType;
@@ -435,9 +452,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     return null;
   }
 
-  /// Whether an element handle (vertex, extrusion edge, axis handle/move, or whole zone move)
-  /// is actively being dragged. ArchitectViewport routes captured handles exclusively to the tool.
-  bool get _isActivelyDraggingHandle =>
+  /// Whether a geometric vertex or handle is currently being dragged.
+  bool get _isDraggingVertexOrHandle =>
       _isHandleEngaged ||
       _duplicateMove != null ||
       _polygonEditor.active ||
@@ -448,7 +464,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _zoneMoveStartPoint != null ||
       _axisTool.isDraggingHandle ||
       _axisTool.isMovingAxis ||
-      _axisTool.isOffsettingWithDrag;
+      _axisTool.isOffsettingWithDrag ||
+      _wallEndpointOriginal != null ||
+      _groupDragIds.isNotEmpty;
+
+  /// Whether gestures should be captured exclusively by the tool instead of panning.
+  bool get _isActivelyDraggingHandle =>
+      _isDraggingVertexOrHandle ||
+      _insertPointId != null ||
+      _wallCutIds.isNotEmpty ||
+      _wallExtendId != null;
 
   @override
   void initState() {
@@ -966,7 +991,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   }
 
   bool get _canPlaceWithMarker =>
-      _insertPointId == null && _activeTool != ArchitectTool.select &&
+      _insertPointId == null &&
+      _activeTool != ArchitectTool.select &&
       !_wallDirectionLocked &&
       _polygonEditId == null &&
       _pendingShape == null;
@@ -1459,7 +1485,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _controlTrimClick = false;
       return;
     }
-    if (_isActivelyDraggingHandle && !_handleMoved) {
+    if (_isDraggingVertexOrHandle && !_handleMoved) {
       if (_polygonEditId != null) {
         _selectPolygonEdge(_screenToModel(event.localPosition));
       }
@@ -1470,7 +1496,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     // Resolve again at release: touch has no hover and the final event can
     // differ from the last move. Preview and commit share the same resolver.
     _updatePointerPreview(_placementPosition(event.localPosition));
-    if (_isActivelyDraggingHandle) {
+    if (_wallCutIds.isNotEmpty && _wallCutStart != null) {
+      final modelPos = _screenToModel(_placementPosition(event.localPosition));
+      if ((_wallCutStart! - modelPos).distance > 15 / _currentScale) {
+        _executeWallEdit(
+          CutArchitectWalls(
+            storeyId: _project.activeStoreyId,
+            wallIds: Set.of(_wallCutIds),
+            start: _wallCutStart!,
+            end: modelPos,
+          ),
+        );
+        setState(() {
+          _wallCutStart = null;
+          _wallCutIds = {};
+        });
+        _repaintPreview();
+        return;
+      }
+    }
+    if (_isDraggingVertexOrHandle) {
       _commitActiveHandleDrag(event.localPosition);
       _isHandleEngaged = false;
       _repaintPreview();
@@ -1780,23 +1825,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (_wallCutIds.isNotEmpty) {
-      if (!_wallCutStroke) {
-        final span = _trimSpanAt(rawModel);
-        if (span == null) return;
-        final before = _project;
-        _executeWallEdit(
-          TrimArchitectWall(
-            storeyId: _project.activeStoreyId,
-            wallId: span.wall.id,
-            pick: rawModel,
-          ),
-        );
-        if (!identical(before, _project)) setState(() => _wallCutIds = {});
-        return;
-      }
-      if (_wallCutStart == null) {
-        setState(() => _wallCutStart = rawModel);
-      } else {
+      if (_wallCutStart != null && (_wallCutStart! - rawModel).distance > 10 / _currentScale) {
         _executeWallEdit(
           CutArchitectWalls(
             storeyId: _project.activeStoreyId,
@@ -1809,7 +1838,71 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _wallCutStart = null;
           _wallCutIds = {};
         });
+        return;
       }
+      // Tap on selected wall to split directly at that point
+      final hitWall = _project.activeStorey.walls
+          .where((w) => _wallCutIds.contains(w.id))
+          .cast<ArchitectWall?>()
+          .firstWhere(
+            (w) =>
+                w != null &&
+                (rawModel -
+                        BimLineGeometry.closest(
+                          rawModel,
+                          w.startPoint,
+                          w.endPoint,
+                        ))
+                    .distance <=
+                w.thickness / 2 + 25 / _currentScale,
+            orElse: () => null,
+          );
+      if (hitWall != null) {
+        final ratio = BimLineGeometry.parameter(
+          rawModel,
+          hitWall.startPoint,
+          hitWall.endPoint,
+        );
+        if (ratio > 0.01 && ratio < 0.99) {
+          _executeWallEdit(
+            SplitArchitectWall(
+              storeyId: _project.activeStoreyId,
+              wallId: hitWall.id,
+              newWallId: ArchitectElementId.next('wall'),
+              ratio: ratio,
+            ),
+          );
+          setState(() {
+            _wallCutStart = null;
+            _wallCutIds = {};
+          });
+          return;
+        }
+      }
+      if (!_wallCutStroke) {
+        final span = _trimSpanAt(rawModel);
+        if (span != null) {
+          final before = _project;
+          _executeWallEdit(
+            TrimArchitectWall(
+              storeyId: _project.activeStoreyId,
+              wallId: span.wall.id,
+              pick: rawModel,
+            ),
+          );
+          if (!identical(before, _project)) setState(() => _wallCutIds = {});
+          return;
+        }
+      }
+      if (_wallCutStroke && _wallCutStart == null) {
+        setState(() => _wallCutStart = rawModel);
+        return;
+      }
+      // Tap in empty space cancels cut mode
+      setState(() {
+        _wallCutStart = null;
+        _wallCutIds = {};
+      });
       return;
     }
     if (_wallExtendId != null) {
@@ -2015,21 +2108,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // Active selection tap handling: additive selection or cancel on empty space
+    // Active selection tap handling: toggle in multi-select, replace in single-select, or cancel on empty space
     if (_effectiveSelection.isNotEmpty) {
-      final hit = _selectAt(rawModel, toggle: true);
+      final hit = _selectAt(rawModel, toggle: _multiSelect);
       if (!hit) {
-        setState(() {
-          _selectionIds.clear();
-          _selectedElementId = null;
-          _selectedZoneId = null;
-          _axisTool.deselect();
-          _moveSelection = false;
-          _insertPointId = null;
-          _wallCutIds = {};
-          _wallExtendId = null;
-          _cancelActiveDrags();
-        });
+        _clearSelection();
       }
       return;
     }
@@ -3508,17 +3591,35 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _draftEnd = null;
       _selectedElementId = null;
       _selectedZoneId = null;
-      if (toggle && _selectionIds.contains(id)) {
-        _selectionIds.remove(id);
-        if (_selectedElementId == id) {
-          _selectedElementId =
-              _selectionIds.isNotEmpty ? _selectionIds.last : null;
-        }
-        if (_selectedZoneId == id) {
-          _selectedZoneId = null;
+      if (_multiSelect) {
+        if (toggle && _selectionIds.contains(id)) {
+          _selectionIds.remove(id);
+          if (_selectedElementId == id) {
+            _selectedElementId =
+                _selectionIds.isNotEmpty ? _selectionIds.last : null;
+          }
+          if (_selectedZoneId == id) {
+            _selectedZoneId = null;
+          }
+        } else {
+          _selectionIds.add(id);
+          if (_project.activeStorey.zones.any((e) => e.id == id)) {
+            _selectedZoneId = id;
+            _selectedElementId = id;
+            _zoneTool.startEditingZone(
+              _project.activeStorey.zones.firstWhere((e) => e.id == id),
+            );
+          } else if (_project.gridAxes.any((e) => e.id == id)) {
+            _axisTool.selectAxis(id);
+            _selectedElementId = id;
+          } else {
+            _selectedElementId = id;
+          }
         }
       } else {
-        _selectionIds.add(id);
+        _selectionIds
+          ..clear()
+          ..add(id);
         if (_project.activeStorey.zones.any((e) => e.id == id)) {
           _selectedZoneId = id;
           _selectedElementId = id;
@@ -3577,20 +3678,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         .where((w) => ids.contains(w.id))
         .map((w) => w.id)
         .toSet();
-    void clear() => setState(() {
-      _cancelActiveDrags();
-      _selectionIds.clear();
-      _selectedElementId = null;
-      _selectedZoneId = null;
-      _axisTool.deselect();
-      _zoneTool.cancelEditingZone();
-      _multiSelect = false;
-      _moveSelection = false;
-      _wallExtendId = null;
-      _insertPointId = null;
-      _wallCutIds = {};
-      _wallCutStart = null;
-    });
+    void clear() => _clearSelection();
     return Material(
       color: const Color(0xFF1E1E26),
       child: SizedBox(
@@ -4144,13 +4232,31 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                 key: const ValueKey('architect-undo'),
                 tooltip: l10n.architectZoneUndoAction,
                 onPressed: _commands.canUndo ? _undoModel : null,
-                icon: const Icon(Icons.undo),
+                icon: Badge(
+                  isLabelVisible: _commands.canUndo && _commands.undoCount > 0,
+                  label: Text(
+                    _commands.undoCount > 99 ? '99' : '${_commands.undoCount}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  child: const Icon(Icons.undo),
+                ),
               ),
               IconButton(
                 key: const ValueKey('architect-redo'),
                 tooltip: l10n.architectZoneRedoAction,
                 onPressed: _commands.canRedo ? _redoModel : null,
                 icon: const Icon(Icons.redo),
+              ),
+              IconButton(
+                key: const ValueKey('architect-deselect'),
+                tooltip: l10n.architectDeselect,
+                onPressed: _effectiveSelection.isNotEmpty || _multiSelect
+                    ? _clearSelection
+                    : null,
+                icon: const Icon(Icons.deselect_outlined),
               ),
               // 2D / 3D Toggle Button
               IconButton(

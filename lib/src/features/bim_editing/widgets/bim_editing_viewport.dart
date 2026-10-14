@@ -239,8 +239,11 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
         !_navigation &&
         _pointers.length == 1) {
       widget.onEditTap?.call(event.localPosition);
-    }
-    if (_pendingEditDown == null &&
+      final down = _pendingEditDown!;
+      _pendingEditDown = null;
+      widget.onToolDown(down);
+      widget.onToolUp(event);
+    } else if (_pendingEditDown == null &&
         !_suppressRelease &&
         !_navigation &&
         _pointers.length == 1) {

@@ -1323,6 +1323,7 @@
   "architectWallFlipSide": "Обърни външната страна",
   "architectSelectionMulti": "Много",
   "architectSelectionMove": "Влачене",
+  "architectDeselect": "Деселектирай",
   "architectProperties": "Свойства",
   "architectWallExtend": "Удължи",
   "architectWallJoin": "Свържи",

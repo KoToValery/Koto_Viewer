@@ -101,6 +101,9 @@ class ArchitectWall {
   double get insulationThickness =>
       (insulationThicknessOverride ?? _standardInsulation[wallTypeId] ?? 0)
           .clamp(0.0, math.max(0.0, thickness - .001));
+  bool get hasInsulation => insulationThickness > 1e-4;
+  bool get isInterior => !hasInsulation;
+  bool get isExterior => hasInsulation;
   double get coreThickness => thickness - insulationThickness;
   double get exteriorSign => exteriorSide == WallExteriorSide.left ? 1 : -1;
   Offset get exteriorNormal => normalVector * exteriorSign;

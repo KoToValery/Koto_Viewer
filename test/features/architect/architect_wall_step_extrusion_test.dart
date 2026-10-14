@@ -66,5 +66,55 @@ void main() {
       expect(r1, isNotNull);
       expect(r2, isNotNull);
     });
+
+    test('Internal wall without insulation does not move or stretch connected external wall with insulation', () {
+      // External wall with 10cm insulation from (0, 0) to (10, 0)
+      final extWall = ArchitectWall(
+        id: 'ext',
+        startPoint: const Offset(0, 0),
+        endPoint: const Offset(10, 0),
+        thickness: 0.35,
+        insulationThicknessOverride: 0.10,
+        connectStart: true,
+        connectEnd: true,
+      );
+      // Internal wall without insulation touching at (5, 0) and running down to (5, -4)
+      final intWall = ArchitectWall(
+        id: 'int',
+        startPoint: const Offset(5, 0),
+        endPoint: const Offset(5, -4),
+        thickness: 0.15,
+        connectStart: true,
+        connectEnd: true,
+      );
+
+      final model = editing.seeded(
+        ArchitectStorey(
+          id: 's',
+          name: 's',
+          walls: [extWall, intWall],
+        ),
+      );
+      addTearDown(model.dispose);
+
+      // Move internal wall horizontally by dx = 2
+      model.execute(
+        const MoveArchitectElements(
+          storeyId: 's',
+          elementIds: {'int'},
+          delta: Offset(2, 0),
+        ),
+      );
+
+      final storey = model.project.activeStorey;
+      final postExt = storey.walls.firstWhere((w) => w.id == 'ext');
+      // The external wall must NOT stretch or move its endpoints!
+      expect(postExt.startPoint, const Offset(0, 0));
+      expect(postExt.endPoint, const Offset(10, 0));
+
+      final postInt = storey.walls.firstWhere((w) => w.id == 'int');
+      expect(postInt.startPoint, const Offset(7, 0));
+      expect(postInt.endPoint, const Offset(7, -4));
+    });
   });
 }

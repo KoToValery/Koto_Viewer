@@ -4079,6 +4079,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSelectionMove => 'Drag';
 
   @override
+  String get architectDeselect => 'Deselect';
+
+  @override
   String get architectProperties => 'Properties';
 
   @override

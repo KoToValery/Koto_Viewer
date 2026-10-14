@@ -710,6 +710,9 @@ class MoveArchitectElements extends ArchitectModelCommand {
               final v = point - face.$1;
               final along = (v.dx * u.dx + v.dy * u.dy) / u.distanceSquared;
               if (along < -1e-8 || along > 1 + 1e-8) {
+                if (!wall.hasInsulation && support.hasInsulation) {
+                  return translated;
+                }
                 if (!extendSupports) {
                   throw ArgumentError('Detach before leaving the support');
                 }
@@ -762,6 +765,10 @@ class MoveArchitectElements extends ArchitectModelCommand {
           if (!connected) return current;
           for (final source in movedWalls) {
             if (!source.connectsAt(oldPoint)) continue;
+            // Internal walls (without insulation) do not move/stretch connected external walls (with insulation)
+            if (!source.hasInsulation && support.hasInsulation) {
+              return current;
+            }
             final isCollinear = (source.unitVector.dx * support.unitVector.dy -
                     source.unitVector.dy * support.unitVector.dx)
                 .abs() <

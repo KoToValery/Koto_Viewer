@@ -7097,6 +7097,12 @@ abstract class AppLocalizations {
   /// **'Drag'**
   String get architectSelectionMove;
 
+  /// Deselect active selection
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect'**
+  String get architectDeselect;
+
   /// No description provided for @architectProperties.
   ///
   /// In en, this message translates to:

@@ -3034,6 +3034,10 @@
   "architectWallFlipSide": "Flip exterior side",
   "architectSelectionMulti": "Multi",
   "architectSelectionMove": "Drag",
+  "architectDeselect": "Deselect",
+  "@architectDeselect": {
+    "description": "Deselect active selection"
+  },
   "architectProperties": "Properties",
   "architectWallExtend": "Extend",
   "architectWallJoin": "Join",

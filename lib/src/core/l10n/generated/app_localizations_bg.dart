@@ -4093,6 +4093,9 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSelectionMove => 'Влачене';
 
   @override
+  String get architectDeselect => 'Деселектирай';
+
+  @override
   String get architectProperties => 'Свойства';
 
   @override

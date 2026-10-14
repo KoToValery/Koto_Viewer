@@ -15,6 +15,8 @@ class BimEditHistory<T> {
   bool _hasStaged = false;
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
+  int get undoCount => _undo.length;
+  int get redoCount => _redo.length;
 
   /// Native hosts can stage a baseline before validation, then publish only
   /// after an accepted edit. Staging alone never changes Undo or Redo.
@@ -88,6 +90,8 @@ class BimTransactionController<T> extends ChangeNotifier {
   T get value => _value;
   bool get canUndo => history.canUndo;
   bool get canRedo => history.canRedo;
+  int get undoCount => history.undoCount;
+  int get redoCount => history.redoCount;
 
   void commit(T next) {
     if (!history.record(_value, next)) return;
