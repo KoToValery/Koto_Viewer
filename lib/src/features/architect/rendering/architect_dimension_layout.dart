@@ -8,19 +8,22 @@ class ArchitectDimensionLayout {
     Size pixels,
     double scale,
     Offset normal,
-    Path obstacles,
-  ) {
-    bool clear(Offset center) => Path.combine(
-      PathOperation.intersect,
-      obstacles,
-      Path()..addRect(
-        Rect.fromCenter(
-          center: center,
-          width: pixels.width / scale,
-          height: pixels.height / scale,
-        ),
-      ),
-    ).computeMetrics().isEmpty;
+    Path obstacles, {
+    Rect? visibleBounds,
+  }) {
+    bool clear(Offset center) =>
+        (visibleBounds == null || visibleBounds.contains(center)) &&
+        Path.combine(
+          PathOperation.intersect,
+          obstacles,
+          Path()..addRect(
+            Rect.fromCenter(
+              center: center,
+              width: pixels.width / scale,
+              height: pixels.height / scale,
+            ),
+          ),
+        ).computeMetrics().isEmpty;
     if (clear(preferred)) return preferred;
     final bounds = obstacles.getBounds();
     final limit =
@@ -31,7 +34,9 @@ class ArchitectDimensionLayout {
         if (clear(candidate)) return candidate;
       }
     }
-    return preferred + normal * (limit * 24 / scale);
+    return visibleBounds != null
+        ? preferred
+        : preferred + normal * (limit * 24 / scale);
   }
 
   /// Axis-aligned screen text stays clear of a wall at every angle and zoom.

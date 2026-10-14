@@ -45,6 +45,7 @@ import '../rendering/architect_dimension_layout.dart';
 import '../rendering/architect_wall_network.dart';
 import '../widgets/architect_element_properties_dialog.dart';
 import '../widgets/architect_radial_menu.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
 import '../services/architect_grid_axis_tool.dart';
 import '../services/architect_logger.dart';
 import '../services/architect_zone_tool.dart';
@@ -2456,8 +2457,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   List<ArchitectWallClearance> get _wallClearances {
     final ids = _effectiveSelection;
-    if (_activeTool != ArchitectTool.wall ||
-        ids.length != 1 ||
+    if (ids.length != 1 ||
         _wallCutIds.isNotEmpty) {
       return [];
     }
@@ -2482,12 +2482,25 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
               Builder(
                 builder: (context) {
                   final wall = walls.firstWhere((w) => w.id == gap.wallId);
+                  if (_viewport.size.width <= 88 || _viewport.size.height <= 36) {
+                    return const SizedBox.shrink();
+                  }
+                  final visible = _viewport.visibleRect;
+                  final labelBounds = Rect.fromLTRB(
+                    visible.left + 44 / _currentScale,
+                    visible.top + 18 / _currentScale,
+                    visible.right - 44 / _currentScale,
+                    visible.bottom - 18 / _currentScale,
+                  );
+                  final segment = BimLineGeometry.visibleSegment(gap.start, gap.end, labelBounds);
+                  if (segment == null) return const SizedBox.shrink();
                   final position = ArchitectDimensionLayout.clearTextPosition(
-                    gap.midpoint,
+                    (segment.$1 + segment.$2) / 2,
                     const Size(88, 36),
                     _currentScale,
                     wall.unitVector,
                     body,
+                    visibleBounds: labelBounds,
                   );
                   final screen = _viewport.toScreen(position);
                   if (screen.dx < 44 ||
@@ -3035,7 +3048,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _elementTool.slabDraftPoints.isNotEmpty) {
       return false;
     }
-    final ok = _selectAt(_screenToModel(screenPoint));
+    return _selectAt(_screenToModel(screenPoint), invalidateGesture: false);
+  }
+
+  bool _onContextHold(Offset screenPoint) {
+    if (_handleMoved || _wallCutIds.isNotEmpty || _polygonEditId != null ||
+        _draftStart != null || _wallDirectionLocked || _zoneTool.isDrafting ||
+        _axisTool.isDrafting || _elementTool.slabDraftPoints.isNotEmpty) {
+      return false;
+    }
+    final ok = _selectAt(_screenToModel(screenPoint), invalidateGesture: false);
     if (ok) {
       final id = _selectedElementId ?? _selectedZoneId;
       if (id != null) {
@@ -3346,7 +3368,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
-  bool _selectAt(Offset point) {
+  bool _selectAt(Offset point, {bool invalidateGesture = true}) {
     final id = _hitSelection(point);
     if (id == null) return false;
     _cancelActiveDrags();
@@ -3355,7 +3377,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _zoneTool.cancelAll();
     _axisTool.cancelAll();
     setState(() {
-      _interactionEpoch++;
+      if (invalidateGesture) _interactionEpoch++;
       _draftStart = null;
       _draftEnd = null;
       _selectedElementId = null;
@@ -4423,6 +4445,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         touchHoldToPlace: _canPlaceWithMarker,
         onToolHoldStart: _beginPlacementHold,
         onSelectionHold: _duplicateMove == null ? _onSelectionHold : null,
+        onContextHold: _duplicateMove == null ? _onContextHold : null,
         onEditTap: _polygonEditId == null
             ? null
             : (position) => _selectPolygonEdge(_screenToModel(position)),

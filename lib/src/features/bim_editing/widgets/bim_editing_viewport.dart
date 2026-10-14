@@ -18,6 +18,10 @@ class BimEditingViewport extends StatefulWidget {
   final ValueChanged<Offset>? onEditTap;
   final ValueChanged<Offset>? onToolHoldStart;
   final bool Function(Offset)? onSelectionHold;
+
+  /// A stationary longer hold opens context after selection/edit activation.
+  /// The host cancels its pending preview when it handles this callback.
+  final bool Function(Offset)? onContextHold;
   final bool Function() isDraggingHandle;
   final ValueChanged<PointerDownEvent> onToolDown;
   final ValueChanged<PointerMoveEvent> onToolMove;
@@ -39,6 +43,7 @@ class BimEditingViewport extends StatefulWidget {
     this.onEditTap,
     this.onToolHoldStart,
     this.onSelectionHold,
+    this.onContextHold,
     required this.isDraggingHandle,
     required this.onToolDown,
     required this.onToolMove,
@@ -60,6 +65,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
   Offset? _down;
   bool _laidOut = false;
   Timer? _holdTimer;
+  Timer? _contextHoldTimer;
   bool _held = false;
   PointerDownEvent? _pendingEditDown;
 
@@ -71,6 +77,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
             (oldWidget.touchHoldToPlace != widget.touchHoldToPlace ||
                 oldWidget.holdToEdit != widget.holdToEdit))) {
       _holdTimer?.cancel();
+      _contextHoldTimer?.cancel();
       _held = false;
       _pendingEditDown = null;
       // A release from an earlier tool/floor can never execute the new tool.
@@ -98,6 +105,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
     _pointers[event.pointer] = event.localPosition;
     if (_pointers.length > 1) {
       _holdTimer?.cancel();
+      _contextHoldTimer?.cancel();
       _held = false;
       widget.onToolCancel();
       _navigation = true;
@@ -114,6 +122,18 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
         event.kind == PointerDeviceKind.touch;
     _pendingEditDown = deferredEdit ? event : null;
     if (!_navigation && !deferredEdit) widget.onToolDown(event);
+    if (!_navigation && widget.onContextHold != null) {
+      _contextHoldTimer = Timer(const Duration(milliseconds: 700), () {
+        if (!mounted || _pointers.length != 1 || _navigation) return;
+        if (widget.onContextHold?.call(_focal) == true) {
+          _holdTimer?.cancel();
+          _pendingEditDown = null;
+          _held = true;
+          _canPan = false;
+          _suppressRelease = true;
+        }
+      });
+    }
     _canPan =
         _navigation ||
         (widget.singlePointerPan &&
@@ -128,7 +148,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
                 (!widget.isDraggingHandle() || widget.holdExistingHandles))) {
       _holdTimer?.cancel();
       _holdTimer = Timer(
-        deferredEdit
+        deferredEdit || widget.onContextHold != null
             ? const Duration(milliseconds: 280)
             : widget.touchHoldToPlace &&
                   (!widget.isDraggingHandle() || widget.holdExistingHandles)
@@ -171,6 +191,9 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
     final previousFocal = _focal;
     final previousSpan = _span;
     _pointers[event.pointer] = event.localPosition;
+    if (_down != null && (event.localPosition - _down!).distance > 8) {
+      _contextHoldTimer?.cancel();
+    }
     if (!_held &&
         _down != null &&
         (event.localPosition - _down!).distance > 8) {
@@ -210,6 +233,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
   void _upEvent(PointerUpEvent event) {
     if (!_pointers.containsKey(event.pointer)) return;
     _holdTimer?.cancel();
+    _contextHoldTimer?.cancel();
     if (_pendingEditDown != null &&
         !_suppressRelease &&
         !_navigation &&
@@ -228,6 +252,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
 
   void _reset() {
     _holdTimer?.cancel();
+    _contextHoldTimer?.cancel();
     _pendingEditDown = null;
     _held = false;
     _navigation = false;
@@ -238,6 +263,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
 
   void _cancel(PointerCancelEvent event) {
     _holdTimer?.cancel();
+    _contextHoldTimer?.cancel();
     _pointers.remove(event.pointer);
     _suppressRelease = true;
     widget.onToolCancel();
@@ -250,6 +276,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
       final scroll = resolved as PointerScrollEvent;
       if (_pointers.isNotEmpty) {
         _holdTimer?.cancel();
+        _contextHoldTimer?.cancel();
         _suppressRelease = true;
         widget.onToolCancel();
       }
@@ -287,6 +314,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
           onPointerSignal: _signal,
           onPointerPanZoomStart: (_) {
             _holdTimer?.cancel();
+            _contextHoldTimer?.cancel();
             widget.onToolCancel();
             _suppressRelease = true;
             _lastTrackpadScale = 1;
@@ -314,6 +342,7 @@ class _BimEditingViewportState extends State<BimEditingViewport> {
   @override
   void dispose() {
     _holdTimer?.cancel();
+    _contextHoldTimer?.cancel();
     super.dispose();
   }
 }

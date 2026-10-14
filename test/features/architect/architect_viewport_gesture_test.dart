@@ -10,7 +10,7 @@ void main() {
   ) async {
     final camera = BimViewportController();
     addTearDown(camera.dispose);
-    var key = 1, holds = 0, releases = 0;
+    var key = 1, holds = 0, releases = 0, contexts = 0;
     late StateSetter rebuild;
     await tester.pumpWidget(
       MaterialApp(
@@ -24,6 +24,7 @@ void main() {
               touchHoldToPlace: true,
               isDraggingHandle: () => false,
               onToolHoldStart: (_) => holds++,
+              onContextHold: (_) { contexts++; return true; },
               onToolDown: (_) {},
               onToolMove: (_) {},
               onToolHover: (_) {},
@@ -40,10 +41,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     rebuild(() => key++);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 750));
     await old.up();
     expect(holds, 0);
     expect(releases, 0);
+    expect(contexts, 0);
     final fresh = await tester.startGesture(const Offset(100, 200));
     await tester.pump(const Duration(milliseconds: 281));
     await fresh.up();
@@ -56,7 +58,7 @@ void main() {
     (tester) async {
       final camera = BimViewportController();
       addTearDown(camera.dispose);
-      var holds = 0, releases = 0;
+      var holds = 0, releases = 0, contexts = 0;
       await tester.pumpWidget(
         MaterialApp(
           home: ArchitectViewport(
@@ -65,6 +67,7 @@ void main() {
             touchHoldToPlace: true,
             isDraggingHandle: () => false,
             onToolHoldStart: (_) => holds++,
+            onContextHold: (_) { contexts++; return true; },
             onToolDown: (_) {},
             onToolMove: (_) {},
             onToolHover: (_) {},
@@ -84,11 +87,12 @@ void main() {
         const Offset(300, 200),
         pointer: 52,
       );
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 750));
       await second.up();
       await first.up();
       expect(holds, 0);
       expect(releases, 0);
+      expect(contexts, 0);
       await tester.tapAt(const Offset(100, 200));
       expect(releases, 1);
     },

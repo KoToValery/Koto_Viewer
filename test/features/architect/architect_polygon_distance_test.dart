@@ -123,7 +123,7 @@ void main() {
           tester,
           slab ? Icons.layers_rounded : Icons.crop_square_rounded,
         );
-        await editing.hold(tester, const Offset(3, 2));
+        await editing.contextHold(tester, const Offset(3, 2));
         await tester.pumpAndSettle();
         expect(find.byType(ArchitectRadialMenu), findsOneWidget);
         await tester.tap(find.text('Edit'));
@@ -250,7 +250,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await shapes.tool(tester, Icons.crop_square_rounded);
-      await editing.hold(tester, const Offset(3, 2));
+      await editing.contextHold(tester, const Offset(3, 2));
       await tester.pumpAndSettle();
       final menu = tester.widget<ArchitectRadialMenu>(
         find.byType(ArchitectRadialMenu),
@@ -464,7 +464,7 @@ void main() {
           tester,
           slab ? Icons.layers_rounded : Icons.crop_square_rounded,
         );
-        await editing.hold(tester, const Offset(3, 2));
+        await editing.contextHold(tester, const Offset(3, 2));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Edit'));
         await tester.pumpAndSettle();

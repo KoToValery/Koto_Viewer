@@ -69,109 +69,117 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
   @override
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) return const SizedBox.shrink();
-
-    final media = MediaQuery.of(context);
-    final screenSize = media.size;
-    final center = widget.center;
-
-    // Determine fan orientation:
-    // Palm naturally covers below the finger, so default orientation is upward (-90°).
-    // If finger is close to top of screen, fan downwards (+90°).
-    final isTopHalf = center.dy < screenSize.height * 0.38;
-    final isNearLeft = center.dx < 110;
-    final isNearRight = center.dx > screenSize.width - 110;
-
-    double baseAngle;
-    double sweepAngle;
-
-    if (isTopHalf) {
-      if (isNearLeft) {
-        baseAngle = 10 * math.pi / 180;
-        sweepAngle = 80 * math.pi / 180;
-      } else if (isNearRight) {
-        baseAngle = 90 * math.pi / 180;
-        sweepAngle = 80 * math.pi / 180;
-      } else {
-        baseAngle = 20 * math.pi / 180;
-        sweepAngle = 140 * math.pi / 180;
-      }
-    } else {
-      if (isNearLeft) {
-        baseAngle = -85 * math.pi / 180;
-        sweepAngle = 80 * math.pi / 180;
-      } else if (isNearRight) {
-        baseAngle = -175 * math.pi / 180;
-        sweepAngle = 80 * math.pi / 180;
-      } else {
-        baseAngle = -160 * math.pi / 180;
-        sweepAngle = 140 * math.pi / 180;
-      }
-    }
-
-    final n = widget.items.length;
-    const double radius = 78.0;
-
-    return Stack(
-      children: [
-        // Central target ring around the touch point
-        Positioned(
-          left: center.dx - 18,
-          top: center.dy - 18,
-          child: IgnorePointer(
-            child: ScaleTransition(
-              scale: _scaleAnim,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.black38,
-                  border: Border.all(color: Colors.white38, width: 1.5),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest;
+        final center = widget.center;
+        final n = widget.items.length;
+        const buttonSize = 52.0, margin = 12.0, separation = 60.0;
+        final radius = n < 2
+            ? 92.0
+            : math.max(
+                92.0,
+                separation / (2 * math.sin(math.pi / (2 * (n - 1)))),
+              );
+        // A full semicircle keeps neighboring targets separate, including edges.
+        // Shift the complete fan into view; never clamp buttons individually.
+        final nearLeft = center.dx < radius / 2;
+        final nearRight = center.dx > size.width - radius / 2;
+        final base = nearLeft
+            ? -math.pi / 2
+            : nearRight
+            ? math.pi / 2
+            : center.dy < size.height * .38
+            ? 0.0
+            : math.pi;
+        var targets = List<Offset>.generate(n, (i) {
+          final angle = base + (n == 1 ? math.pi / 2 : i * math.pi / (n - 1));
+          return center + Offset(math.cos(angle), math.sin(angle)) * radius;
+        });
+        var bounds = Rect.fromCenter(
+          center: targets.first,
+          width: buttonSize,
+          height: buttonSize,
+        );
+        for (final target in targets.skip(1)) {
+          bounds = bounds.expandToInclude(
+            Rect.fromCenter(
+              center: target,
+              width: buttonSize,
+              height: buttonSize,
+            ),
+          );
+        }
+        if (bounds.width > size.width - 2 * margin ||
+            bounds.height > size.height - 2 * margin) {
+          // Very narrow/short viewports retain separate touch targets in rows.
+          final columns = math.max(
+            1,
+            ((size.width - 2 * margin) / separation).floor(),
+          );
+          final count = math.min(columns, n);
+          targets = List.generate(
+            n,
+            (i) => Offset(
+              margin + buttonSize / 2 + (i % count) * separation,
+              margin + buttonSize / 2 + (i ~/ count) * separation,
+            ),
+          );
+        } else {
+          double shift(double low, double high, double maximum) => low < margin
+              ? margin - low
+              : high > maximum - margin
+              ? maximum - margin - high
+              : 0;
+          final delta = Offset(
+            shift(bounds.left, bounds.right, size.width),
+            shift(bounds.top, bounds.bottom, size.height),
+          );
+          targets = targets.map((point) => point + delta).toList();
+        }
+        return Stack(
+          children: [
+            Positioned(
+              left: center.dx - 18,
+              top: center.dy - 18,
+              child: IgnorePointer(
+                child: ScaleTransition(
+                  scale: _scaleAnim,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black38,
+                      border: Border.all(color: Colors.white38, width: 1.5),
+                    ),
+                    child: const Center(child: ContainerDot()),
+                  ),
                 ),
-                child: const Center(child: ContainerDot()),
               ),
             ),
-          ),
-        ),
-        // Radial menu buttons
-        for (var i = 0; i < n; i++) ...[
-          _buildRadialButton(
-            item: widget.items[i],
-            center: center,
-            angle: n == 1
-                ? baseAngle + sweepAngle / 2
-                : baseAngle + (i / (n - 1)) * sweepAngle,
-            radius: radius,
-            screenSize: screenSize,
-          ),
-        ],
-      ],
+            for (var i = 0; i < n; i++)
+              _buildRadialButton(item: widget.items[i], target: targets[i]),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildRadialButton({
     required ArchitectRadialMenuItem item,
-    required Offset center,
-    required double angle,
-    required double radius,
-    required Size screenSize,
+    required Offset target,
   }) {
-    const btnSize = 48.0;
-    final targetX = center.dx + radius * math.cos(angle) - btnSize / 2;
-    final targetY = center.dy + radius * math.sin(angle) - btnSize / 2;
-
-    // Clamp button position within safe screen margins
-    final clampedX = targetX.clamp(12.0, screenSize.width - btnSize - 12.0);
-    final clampedY = targetY.clamp(32.0, screenSize.height - btnSize - 32.0);
-
+    const btnSize = 52.0;
     return Positioned(
-      left: clampedX,
-      top: clampedY,
+      left: target.dx - btnSize / 2,
+      top: target.dy - btnSize / 2,
       child: ScaleTransition(
         scale: _scaleAnim,
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
+            key: ValueKey('architect-radial-${item.action.name}'),
             onTap: () => _select(item.action),
             borderRadius: BorderRadius.circular(btnSize / 2),
             child: Container(
@@ -207,11 +215,12 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
                       item.label,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.95),
-                        fontSize: 8.5,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w600,
                         letterSpacing: -0.2,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

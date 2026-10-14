@@ -154,7 +154,7 @@ void main() {
             find.byType(BimEditingViewport),
           );
           expect(
-            viewport.onSelectionHold!(plan().viewport!.toScreen(anchor)),
+            viewport.onContextHold!(plan().viewport!.toScreen(anchor)),
             isTrue,
           );
           await tester.pumpAndSettle();

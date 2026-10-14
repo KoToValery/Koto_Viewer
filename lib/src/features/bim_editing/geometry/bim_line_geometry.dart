@@ -1,6 +1,31 @@
 import 'dart:ui';
 
 class BimLineGeometry {
+  /// Clip a finite measurement to the visible drawing without changing its
+  /// actual endpoints or measured value. Works at every line orientation.
+  static (Offset, Offset)? visibleSegment(Offset a, Offset b, Rect view) {
+    if (!view.isFinite || view.isEmpty) return null;
+    var low = 0.0, high = 1.0;
+    final delta = b - a;
+    for (final (start, direction, minimum, maximum) in [
+      (a.dx, delta.dx, view.left, view.right),
+      (a.dy, delta.dy, view.top, view.bottom),
+    ]) {
+      if (direction.abs() < 1e-12) {
+        if (start < minimum || start > maximum) return null;
+        continue;
+      }
+      final first = (minimum - start) / direction;
+      final second = (maximum - start) / direction;
+      final near = first < second ? first : second;
+      final far = first > second ? first : second;
+      if (near > low) low = near;
+      if (far < high) high = far;
+      if (low > high) return null;
+    }
+    return (a + delta * low, a + delta * high);
+  }
+
   static double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
   static double cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
   static double parameter(

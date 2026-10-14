@@ -77,6 +77,13 @@ Future<void> hold(WidgetTester tester, Offset point) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> contextHold(WidgetTester tester, Offset point) async {
+  final gesture = await tester.startGesture(workspace.screen(tester, point));
+  await tester.pump(const Duration(milliseconds: 701));
+  await gesture.up();
+  await tester.pumpAndSettle();
+}
+
 void main() {
   test(
     'Axis lies in brick; inner/outer and flipped exterior are physical faces',
