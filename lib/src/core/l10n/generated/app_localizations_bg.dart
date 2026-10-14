@@ -4569,4 +4569,32 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectInsulationStoneWool => 'Каменна вата';
+
+  @override
+  String get architectSettings => 'Настройки';
+
+  @override
+  String get architectGhostStoreys => 'Съседни етажи';
+
+  @override
+  String get architectDrawingGrid => 'Мрежа';
+
+  @override
+  String get architectSnap => 'Прилепване';
+
+  @override
+  String get architectAxesWallThickness => 'Ядро за оси';
+
+  @override
+  String get architectAxesFromWallsHelp =>
+      'Постави оси през ядрата на стените на този етаж. Задай дебелината на ядрото в Настройки.';
+
+  @override
+  String get architectAxesNoMatchingWalls =>
+      'Няма стени с избраната дебелина на ядрото.';
+
+  @override
+  String architectAxesGenerated(int count) {
+    return 'Добавени оси: $count';
+  }
 }

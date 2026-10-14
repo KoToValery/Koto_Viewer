@@ -769,9 +769,10 @@ class MoveArchitectElements extends ArchitectModelCommand {
             if (!source.hasInsulation && support.hasInsulation) {
               return current;
             }
-            final isCollinear = (source.unitVector.dx * support.unitVector.dy -
-                    source.unitVector.dy * support.unitVector.dx)
-                .abs() <
+            final isCollinear =
+                (source.unitVector.dx * support.unitVector.dy -
+                        source.unitVector.dy * support.unitVector.dx)
+                    .abs() <
                 1e-4;
             if (isCollinear) {
               return oldPoint;
@@ -825,39 +826,39 @@ class MoveArchitectElements extends ArchitectModelCommand {
       }
       for (final source in movedWalls) {
         final movedWall = nextWalls[source.id]!;
-        final perpDist = (delta.dx * source.normalVector.dx +
-                delta.dy * source.normalVector.dy)
-            .abs();
+        final perpDist =
+            (delta.dx * source.normalVector.dx +
+                    delta.dy * source.normalVector.dy)
+                .abs();
         if (perpDist < 1e-3) continue;
 
         for (final (atStart, oldPoint, newPoint) in [
           (true, source.startPoint, movedWall.startPoint),
           (false, source.endPoint, movedWall.endPoint),
         ]) {
-          final isConnectedAtEnd =
-              atStart ? source.connectStart : source.connectEnd;
+          final isConnectedAtEnd = atStart
+              ? source.connectStart
+              : source.connectEnd;
           if (!isConnectedAtEnd) continue;
           if ((newPoint - oldPoint).distance < 1e-3) continue;
-          final hasCollinearSupport = storey.walls.any(
-            (w) {
-              if (elementIds.contains(w.id) || w.isDetached) return false;
-              final touchesAtStart = (w.startPoint - oldPoint).distance < 1e-4;
-              final touchesAtEnd = (w.endPoint - oldPoint).distance < 1e-4;
-              if (!touchesAtStart && !touchesAtEnd) return false;
-              final isConnected =
-                  touchesAtStart ? w.connectStart : w.connectEnd;
-              if (!isConnected) return false;
-              return (source.unitVector.dx * w.unitVector.dy -
-                          source.unitVector.dy * w.unitVector.dx)
-                      .abs() <
-                  1e-4;
-            },
-          );
+          final hasCollinearSupport = storey.walls.any((w) {
+            if (elementIds.contains(w.id) || w.isDetached) return false;
+            final touchesAtStart = (w.startPoint - oldPoint).distance < 1e-4;
+            final touchesAtEnd = (w.endPoint - oldPoint).distance < 1e-4;
+            if (!touchesAtStart && !touchesAtEnd) return false;
+            final isConnected = touchesAtStart ? w.connectStart : w.connectEnd;
+            if (!isConnected) return false;
+            return (source.unitVector.dx * w.unitVector.dy -
+                        source.unitVector.dy * w.unitVector.dx)
+                    .abs() <
+                1e-4;
+          });
           if (hasCollinearSupport) {
             var count = 1;
             String newId;
             do {
-              newId = 'wall_step_${DateTime.now().microsecondsSinceEpoch}_$count';
+              newId =
+                  'wall_step_${DateTime.now().microsecondsSinceEpoch}_$count';
               count++;
             } while (nextWalls.containsKey(newId) ||
                 project.storeys.any((s) => s.walls.any((w) => w.id == newId)));
@@ -865,22 +866,24 @@ class MoveArchitectElements extends ArchitectModelCommand {
             // Preserve insulation orientation on the connecting step wall:
             // The connecting wall's exterior normal must point away from the moved
             // protrusion (or into the indent) so insulation stays on the building's exterior.
-            final collinearDir =
-                atStart ? -source.unitVector : source.unitVector;
-            final dotDeltaE = delta.dx * source.exteriorNormal.dx +
+            final collinearDir = atStart
+                ? -source.unitVector
+                : source.unitVector;
+            final dotDeltaE =
+                delta.dx * source.exteriorNormal.dx +
                 delta.dy * source.exteriorNormal.dy;
             final desiredExteriorNormal =
                 collinearDir * (dotDeltaE >= 0 ? 1.0 : -1.0);
             final connectingVec = newPoint - oldPoint;
             final connectingNormal =
                 Offset(-connectingVec.dy, connectingVec.dx) /
-                    connectingVec.distance;
+                connectingVec.distance;
             final connectingExteriorSide =
                 (desiredExteriorNormal.dx * connectingNormal.dx +
-                            desiredExteriorNormal.dy * connectingNormal.dy) >=
-                        0
-                    ? WallExteriorSide.left
-                    : WallExteriorSide.right;
+                        desiredExteriorNormal.dy * connectingNormal.dy) >=
+                    0
+                ? WallExteriorSide.left
+                : WallExteriorSide.right;
 
             final connectingWall = ArchitectWall(
               id: newId,
@@ -1418,14 +1421,22 @@ class ArchitectCommandController
     }
   }
 
+  /// Display units change formatting, never geometry or its Undo history.
+  void setUnits(ArchitectUnit units) {
+    if (project.units != units) replaceView(project.copyWith(units: units));
+  }
+
   static ArchitectProject _retainViewedStorey(
     ArchitectProject snapshot,
     ArchitectProject current,
   ) {
     final id = current.activeStoreyId;
-    return id == snapshot.activeStoreyId ||
-            !snapshot.storeys.any((s) => s.id == id)
-        ? snapshot
-        : snapshot.copyWith(activeStoreyId: id);
+    final viewed = snapshot.storeys.any((s) => s.id == id)
+        ? id
+        : snapshot.activeStoreyId;
+    if (viewed == snapshot.activeStoreyId && current.units == snapshot.units) {
+      return snapshot;
+    }
+    return snapshot.copyWith(activeStoreyId: viewed, units: current.units);
   }
 }

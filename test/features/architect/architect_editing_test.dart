@@ -598,6 +598,7 @@ void main() {
           find.byKey(const ValueKey('architect-properties-save')),
           findsOneWidget,
         );
+        expect(model.project, same(old));
         expect(tester.takeException(), isNull);
       },
     );
@@ -828,6 +829,42 @@ void main() {
     await tester.pumpAndSettle();
     await selectTool(tester, 'wall');
     await hold(tester, Offset.zero);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('architect-selection-bar')))
+          .height,
+      lessThanOrEqualTo(48),
+    );
+    if (const bool.fromEnvironment('UPDATE_ARCHITECT_EDIT_PREVIEW')) {
+      final boundary = tester.renderObject<RenderRepaintBoundary>(
+        find.byKey(key),
+      );
+      await tester.runAsync(() async {
+        final image = await boundary.toImage(pixelRatio: 2);
+        final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+        await File(
+          'docs/images/architect_wall_actions_phone.png',
+        ).writeAsBytes(bytes.buffer.asUint8List());
+        image.dispose();
+      });
+    }
+    for (final key in [
+      'architect-wall-flip',
+      'architect-wall-cut',
+      'architect-wall-parallel',
+    ]) {
+      final button = find.byKey(ValueKey(key));
+      final rect = tester.getRect(button);
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(360));
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('architect-wall-floating-actions')),
+          matching: button,
+        ),
+        findsOneWidget,
+      );
+    }
     for (final id in [
       'architect-multi-select',
       'architect-selection-properties',

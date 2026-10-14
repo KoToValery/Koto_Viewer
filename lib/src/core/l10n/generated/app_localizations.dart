@@ -8020,6 +8020,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stone wool'**
   String get architectInsulationStoneWool;
+
+  /// No description provided for @architectSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get architectSettings;
+
+  /// No description provided for @architectGhostStoreys.
+  ///
+  /// In en, this message translates to:
+  /// **'Ghost storeys'**
+  String get architectGhostStoreys;
+
+  /// No description provided for @architectDrawingGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get architectDrawingGrid;
+
+  /// No description provided for @architectSnap.
+  ///
+  /// In en, this message translates to:
+  /// **'Snap'**
+  String get architectSnap;
+
+  /// No description provided for @architectAxesWallThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall core for axes'**
+  String get architectAxesWallThickness;
+
+  /// No description provided for @architectAxesFromWallsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Create axes through wall cores on this storey. Set the core thickness in Settings.'**
+  String get architectAxesFromWallsHelp;
+
+  /// No description provided for @architectAxesNoMatchingWalls.
+  ///
+  /// In en, this message translates to:
+  /// **'No walls match the selected core thickness.'**
+  String get architectAxesNoMatchingWalls;
+
+  /// No description provided for @architectAxesGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {count} axes'**
+  String architectAxesGenerated(int count);
 }
 
 class _AppLocalizationsDelegate

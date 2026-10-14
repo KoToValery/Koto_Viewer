@@ -357,6 +357,92 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     );
   }
 
+  /// One axis per core alignment on the viewed storey. Matching collinear
+  /// wall fragments share an axis; automatic parallel groups share extents.
+  ({ArchitectProject project, int added, int walls}) generateOnWalls({
+    required ArchitectProject project,
+    required double coreThickness,
+    required bool isBulgarian,
+    double thicknessTolerance = .001,
+  }) {
+    if (!coreThickness.isFinite ||
+        coreThickness < .001 ||
+        !thicknessTolerance.isFinite ||
+        thicknessTolerance < 0) {
+      throw ArgumentError('Invalid wall thickness');
+    }
+    final walls =
+        project.activeStorey.walls
+            .where(
+              (wall) =>
+                  wall.length >= .30 &&
+                  (wall.coreThickness - coreThickness).abs() <=
+                      thicknessTolerance,
+            )
+            .toList()
+          ..sort((a, b) => a.id.compareTo(b.id));
+    if (walls.isEmpty) return (project: project, added: 0, walls: 0);
+    final axes = [...project.gridAxes];
+    bool automatic(StructuralGridAxis axis) =>
+        axis.id.startsWith('axis_auto_') || axis.id.startsWith('bim_axis_');
+    var added = 0;
+    for (final wall in walls) {
+      final raw = StructuralGridAxis(
+        id: 'candidate',
+        name: '',
+        start: wall.coreCenterStart,
+        end: wall.coreCenterEnd,
+      );
+      final existing = axes.indexWhere(
+        (axis) =>
+            axis.length >= .001 &&
+            axis.isParallelTo(raw, toleranceRad: 1e-6) &&
+            (axis.projectPoint(raw.start) - raw.start).distance < 1e-6,
+      );
+      if (existing >= 0) {
+        final axis = axes[existing];
+        if (automatic(axis)) {
+          double along(Offset p) =>
+              (p - axis.start).dx * axis.direction.dx +
+              (p - axis.start).dy * axis.direction.dy;
+          final lo = math.min(0.0, math.min(along(raw.start), along(raw.end)));
+          final hi = math.max(
+            axis.length,
+            math.max(along(raw.start), along(raw.end)),
+          );
+          axes[existing] = axis.copyWith(
+            start: axis.start + axis.direction * lo,
+            end: axis.start + axis.direction * hi,
+          );
+        }
+        continue;
+      }
+      axes.add(
+        raw.copyWith(id: 'axis_auto_${ArchitectElementId.next('axis')}'),
+      );
+      added++;
+    }
+    // Manual axes remain editable references. Include their extents in the
+    // shared alignment without overwriting extents the user set explicitly.
+    final referenceAxes = [
+      for (final axis in axes)
+        automatic(axis)
+            ? axis
+            : axis.copyWith(id: 'axis_auto_reference_${axis.id}'),
+    ];
+    final groupExtents = ProjectGridAxes.alignExtents(referenceAxes);
+    final aligned = [
+      for (var i = 0; i < axes.length; i++)
+        automatic(axes[i]) ? groupExtents[i].copyWith(id: axes[i].id) : axes[i],
+    ];
+    final named = resequenceAxes(aligned, isBulgarian);
+    return (
+      project: project.copyWithGridAxes(named),
+      added: added,
+      walls: walls.length,
+    );
+  }
+
   void startHandleDrag(StructuralGridAxis axis, bool isStart) {
     _isDraggingHandle = true;
     _isStartHandle = isStart;

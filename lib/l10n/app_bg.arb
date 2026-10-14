@@ -1476,5 +1476,14 @@
   "architectMaterialPanel": "Термопанел",
   "architectInsulationXps": "XPS",
   "architectInsulationEps": "EPS",
-  "architectInsulationStoneWool": "Каменна вата"
+  "architectInsulationStoneWool": "Каменна вата",
+  "architectSettings": "Настройки",
+  "architectGhostStoreys": "Съседни етажи",
+  "architectDrawingGrid": "Мрежа",
+  "architectSnap": "Прилепване",
+  "architectAxesWallThickness": "Ядро за оси",
+  "architectAxesFromWallsHelp": "Постави оси през ядрата на стените на този етаж. Задай дебелината на ядрото в Настройки.",
+  "architectAxesNoMatchingWalls": "Няма стени с избраната дебелина на ядрото.",
+  "architectAxesGenerated": "Добавени оси: {count}",
+  "@architectAxesGenerated": {"placeholders": {"count": {"type": "int"}}}
 }

@@ -3276,5 +3276,14 @@
   "architectMaterialPanel": "Thermal panel",
   "architectInsulationXps": "XPS",
   "architectInsulationEps": "EPS",
-  "architectInsulationStoneWool": "Stone wool"
+  "architectInsulationStoneWool": "Stone wool",
+  "architectSettings": "Settings",
+  "architectGhostStoreys": "Ghost storeys",
+  "architectDrawingGrid": "Grid",
+  "architectSnap": "Snap",
+  "architectAxesWallThickness": "Wall core for axes",
+  "architectAxesFromWallsHelp": "Create axes through wall cores on this storey. Set the core thickness in Settings.",
+  "architectAxesNoMatchingWalls": "No walls match the selected core thickness.",
+  "architectAxesGenerated": "Added {count} axes",
+  "@architectAxesGenerated": {"placeholders": {"count": {"type": "int"}}}
 }

@@ -9,6 +9,7 @@ import 'package:kotoview/src/features/architect/rendering/architect_3d_builder.d
 import 'package:kotoview/src/features/architect/rendering/architect_wall_hatch.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_wall_layers.dart';
 import 'package:kotoview/src/features/architect/services/architect_selection.dart';
+import 'package:kotoview/src/features/architect/widgets/architect_storey_bar.dart';
 import 'architect_editing_test.dart' as editing;
 import 'architect_new_point_test.dart' as points;
 import 'architect_workspace_interaction_test.dart' as workspace;
@@ -301,6 +302,26 @@ void main() {
         'architect-wall-parallel',
       ]) {
         expect(find.byKey(ValueKey(key)), findsOneWidget);
+      }
+      final floating = find.byKey(
+        const ValueKey('architect-wall-floating-actions'),
+      );
+      final selection = find.byKey(const ValueKey('architect-selection-bar'));
+      expect(
+        tester.getTopLeft(floating).dy,
+        closeTo(
+          tester.getBottomLeft(find.byType(ArchitectStoreyBar)).dy + 8,
+          .1,
+        ),
+      );
+      for (final key in [
+        'architect-wall-flip',
+        'architect-wall-cut',
+        'architect-wall-parallel',
+      ]) {
+        final button = find.byKey(ValueKey(key));
+        expect(find.descendant(of: floating, matching: button), findsOneWidget);
+        expect(find.descendant(of: selection, matching: button), findsNothing);
       }
       await tester.tap(find.byKey(const ValueKey('architect-wall-parallel')));
       await tester.pump();

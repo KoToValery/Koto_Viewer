@@ -4553,4 +4553,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectInsulationStoneWool => 'Stone wool';
+
+  @override
+  String get architectSettings => 'Settings';
+
+  @override
+  String get architectGhostStoreys => 'Ghost storeys';
+
+  @override
+  String get architectDrawingGrid => 'Grid';
+
+  @override
+  String get architectSnap => 'Snap';
+
+  @override
+  String get architectAxesWallThickness => 'Wall core for axes';
+
+  @override
+  String get architectAxesFromWallsHelp =>
+      'Create axes through wall cores on this storey. Set the core thickness in Settings.';
+
+  @override
+  String get architectAxesNoMatchingWalls =>
+      'No walls match the selected core thickness.';
+
+  @override
+  String architectAxesGenerated(int count) {
+    return 'Added $count axes';
+  }
 }

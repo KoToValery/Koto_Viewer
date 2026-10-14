@@ -16,6 +16,7 @@ class ArchitectGridAxisBar extends StatelessWidget {
   final int axisCount;
   final VoidCallback onResequence;
   final VoidCallback onAlignAll;
+  final VoidCallback? onGenerateFromWalls;
 
   const ArchitectGridAxisBar({
     super.key,
@@ -23,6 +24,7 @@ class ArchitectGridAxisBar extends StatelessWidget {
     required this.axisCount,
     required this.onResequence,
     required this.onAlignAll,
+    this.onGenerateFromWalls,
   });
 
   @override
@@ -56,137 +58,60 @@ class ArchitectGridAxisBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Tool indicator icon
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFC62828).withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.grid_on_rounded,
-              color: Color(0xFFFF5252),
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 10),
-
-          // Title & prompt
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Text(
+            child: Tooltip(
+              message: l10n.architectAxisDrawPrompt,
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.grid_on_rounded,
+                    color: Color(0xFFFF5252),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
                       l10n.architectToolAxis,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '$axisCount',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  l10n.architectAxisDrawPrompt,
-                  style: const TextStyle(color: Colors.white54, fontSize: 11),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Action 1: Resequence all axes
-          InkWell(
-            onTap: onResequence,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.format_list_numbered_rounded,
-                    size: 14,
-                    color: Color(0xFF00E5FF),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   Text(
-                    l10n.resequenceGridAxesAction,
-                    style: const TextStyle(
-                      color: Color(0xFF00E5FF),
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    '$axisCount',
+                    style: const TextStyle(color: Colors.white70),
                   ),
                 ],
               ),
             ),
           ),
-
-          const SizedBox(width: 6),
-
-          // Action 2: Align all axes
-          InkWell(
-            onTap: onAlignAll,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.white12,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white24),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.align_horizontal_left_rounded,
-                    size: 14,
-                    color: Colors.white70,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    l10n.alignGridAxesAction,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+          if (onGenerateFromWalls != null)
+            IconButton(
+              key: const ValueKey('architect-axes-from-walls'),
+              tooltip: l10n.architectAxesFromWallsHelp,
+              icon: const Icon(Icons.auto_awesome, color: Colors.cyanAccent),
+              onPressed: onGenerateFromWalls,
             ),
+          IconButton(
+            key: const ValueKey('architect-axes-resequence'),
+            tooltip: l10n.resequenceGridAxesAction,
+            icon: const Icon(
+              Icons.format_list_numbered_rounded,
+              color: Colors.cyanAccent,
+            ),
+            onPressed: onResequence,
+          ),
+          IconButton(
+            key: const ValueKey('architect-axes-align'),
+            tooltip: l10n.alignGridAxesAction,
+            icon: const Icon(
+              Icons.align_horizontal_left_rounded,
+              color: Colors.white70,
+            ),
+            onPressed: onAlignAll,
           ),
         ],
       ),
