@@ -61,27 +61,15 @@ Future<void> pump(
   await tester.pumpAndSettle();
 }
 
-Future<void> menu(WidgetTester tester, String label) async {
-  final l = await AppLocalizations.delegate.load(const Locale('en'));
+Future<void> generateStairs(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('bim-navigation')));
   await tester.pumpAndSettle();
-  final staircase = label == l.staircaseAutoGenerate;
-  tester
-      .widget<ElementPaletteBar>(find.byType(ElementPaletteBar))
-      .onSelectTool(
-        staircase ? StructuralDrawTool.slabOpening : StructuralDrawTool.column,
-      );
+  tester.widget<ElementPaletteBar>(find.byType(ElementPaletteBar))
+      .onSelectTool(StructuralDrawTool.slabOpening);
   await tester.pumpAndSettle();
-  await tester.ensureVisible(
-    find.byKey(
-      ValueKey(staircase ? 'auto-staircase-openings' : 'bim-generate-supports'),
-    ),
-  );
-  await tester.tap(
-    find.byKey(
-      ValueKey(staircase ? 'auto-staircase-openings' : 'bim-generate-supports'),
-    ),
-  );
+  final button = find.byKey(const ValueKey('auto-staircase-openings'));
+  await tester.ensureVisible(button);
+  await tester.tap(button);
   await tester.pumpAndSettle();
 }
 
@@ -91,8 +79,7 @@ void main() {
     (tester) async {
       var saved = f.building();
       await pump(tester, saved, (p) => saved = p);
-      final l = await AppLocalizations.delegate.load(const Locale('en'));
-      await menu(tester, l.staircaseAutoGenerate);
+      await generateStairs(tester);
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(StaircaseSetupDialog), findsNothing);
       expect(saved.storeys[1].slabs.single.openings, hasLength(1));
@@ -100,7 +87,7 @@ void main() {
       expect(saved.storeys.last.slabs.single.openings, isEmpty);
       expect(saved.staircases, isEmpty);
       expect(saved.storeys.every((s) => s.staircaseZones.isEmpty), isTrue);
-      await menu(tester, l.staircaseAutoGenerate);
+      await generateStairs(tester);
       expect(saved.storeys[1].slabs.single.openings, hasLength(1));
       await tester.tap(
         find.descendant(
@@ -114,36 +101,32 @@ void main() {
     },
   );
   testWidgets(
-    'column generation accepts a manual arrival cut without a review or zones',
+    'automatic stairs preserve a manual arrival cut without a setup dialog',
     (tester) async {
       var saved = f.building(manual: true);
       await pump(tester, saved, (p) => saved = p);
       final l = await AppLocalizations.delegate.load(const Locale('en'));
-      await menu(tester, l.schemeGenerate);
+      await generateStairs(tester);
       expect(find.byType(StaircaseSetupDialog), findsNothing);
-      expect(find.byType(InitialSchemeDialog), findsOneWidget);
+      expect(find.byType(InitialSchemeDialog), findsNothing);
       expect(find.text(l.staircaseAutoMissing('+2.80')), findsNothing);
       expect(saved.storeys.first.slabs.single.openings, isEmpty);
       expect(tester.takeException(), isNull);
     },
   );
   testWidgets(
-    'missing arrival cut has one short prompt; generate cuts it and continues columns',
+    'automatic stairs cut the arrival floor without opening a column generator',
     (tester) async {
       var saved = f.building();
       await pump(tester, saved, (p) => saved = p);
       final l = await AppLocalizations.delegate.load(const Locale('en'));
-      await menu(tester, l.schemeGenerate);
+      await generateStairs(tester);
       expect(find.byType(StaircaseSetupDialog), findsNothing);
-      expect(find.text(l.staircaseAutoMissing('+2.80')), findsOneWidget);
+      expect(find.text(l.staircaseAutoAdded(1)), findsOneWidget);
       expect(find.text(l.staircaseAutoMissing('±0.00')), findsNothing);
-      await tester.tap(
-        find.widgetWithText(FilledButton, l.staircaseAutoGenerate),
-      );
-      await tester.pumpAndSettle();
       expect(saved.storeys[1].slabs.single.openings, hasLength(1));
       expect(saved.storeys.first.slabs.single.openings, isEmpty);
-      expect(find.byType(InitialSchemeDialog), findsOneWidget);
+      expect(find.byType(InitialSchemeDialog), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -170,19 +153,15 @@ void main() {
     },
   );
   testWidgets(
-    'an unresolved cut opens manual drawing on the arrival level, not the first slab',
+    'an unresolved automatic cut preserves floors and leaves opening drawing available',
     (tester) async {
       var saved = f.building();
       final docs = f.drawings();
       docs['f'] = geometry.doc(geometry.run());
       await pump(tester, saved, (p) => saved = p, source: docs);
       final l = await AppLocalizations.delegate.load(const Locale('en'));
-      await menu(tester, l.schemeGenerate);
-      await tester.tap(
-        find.widgetWithText(FilledButton, l.staircaseAutoGenerate),
-      );
-      await tester.pumpAndSettle();
-      expect(saved.activeStorey.id, 'f');
+      await generateStairs(tester);
+      expect(saved.activeStorey.id, 'g');
       expect(
         saved.storeys.every((s) => s.slabs.every((p) => p.openings.isEmpty)),
         isTrue,

@@ -15,7 +15,7 @@
 | 7. Контури | Завършен | Общ BimPolygonEditor/geometry, explicit legacy repair extension, shared outer/hole edge+merge operations. Серии 77 и 53 успешни теста. |
 | 8. Стени и специални hosts | Завършен | Common line projections/intersections/host-fit; typed wall/path adapters; wall Drag+ carries independent hosted identities. 112 успешни теста. |
 | 9. UI и rendering завършване | Завършен | Общ action catalog/dock control, units, numeric rules/keypads/panels и pointer marks. 148 + 5 успешни теста. |
-| 10. Премахване на остатъците | Предстои | |
+| 10. Премахване на остатъците | Завършен | Отстранени transform-only InteractiveViewer и дублираните Construction move/release/cancel handlers; zone math е в core. Staged native history, dependency/file-isolation contracts и maintenance guide. Финална серия: 815 успешни теста, 2 пропуснати. |
 
 ## Правила за следващите промени
 
@@ -118,3 +118,60 @@ BimDistanceUnit, BimNumericRule, BimNumericKeypad, BimShapeDimensionPanel и Bim
 Touch anchor/stem, snap glyphs, ghost contour и dimension badges са в BimPointerMarks. Native painter подава screen-space geometry, localized dimension text и специфичните previews; същите marks обслужват двата BIM режима.
 
 Проверки: 148/148 interaction/phone/pointer/core сценария и 5/5 unit serialization, display/model bounds, integer/nonfinite input, BG/EN action ARB и read-only capability проверки. Анализът е чист. Не са добавяни hardcoded product UI думи; common labels използват съществуващите ARB messages.
+
+## Етап 10
+
+Construction използва BimTransformRenderer за fitted scene; InteractiveViewer,
+старият pointer counter и multi-touch flag са премахнати. BimEditingViewport
+управлява навигацията и lifecycle. Native tool input има един move/release/cancel
+път за мишка и touch hold; премахнати са над 300 реда дублирани long-press handlers.
+Normal column/wall move използва typed translation adapters и пази wall reference
+baseline. Cancel изчиства и opening grips/vertex/edge previews. Axis no-op сравнява
+с метрична numerical tolerance, за да не добавя Undo от CAD round-trip шум.
+
+Историята на Construction използва staged baseline/publish. Подготовката,
+невалидният резултат и semantic no-op не променят Undo/Redo и не изместват реална
+стъпка от ограничения буфер. Сравнението игнорира гледания етаж. Вътрешните slab
+correction стъпки остават native workflow до Save; финалната операция има една
+Undo baseline. Премахнати са и неизползваните palette параметри за Lock X/Y и
+Generate supports.
+
+Останалата ArchitectZoneGeometry е compatibility alias към общата
+BimContourDraftingGeometry: orthogonal guides, whole-boundary offset, squarify,
+chain intersection и legacy drafting repair. Area/normal/rotate/line intersection
+използват същите primitives като останалите контури. Draft repair запазва своята
+policy и не прилага imported stray-origin heuristic. Area и normals са проверени
+при origin 1e10. Специфичният zone controller продължава да управлява собствените
+drafting/properties и документа си.
+
+Разширените тестове откриха повторно умножаване на Construction beam.depth в
+3D при CAD units/metre != 1. Поправено е: depth вече е native CAD размер и се
+изважда директно от CAD zTop. Съществуващият тест за сантиметри проверява таван
+275 cm и долен ръб 225 cm.
+
+Добавени са dependency guard и реален disk persistence contract: shared core не
+импортира native features; edit/save/Undo в Architect не променя structural.json,
+а Construction save не променя architectural.json, включително при еднакви IDs.
+Обновени са остарелите тестове за отстранения генератор и кратките общи действия.
+Hold polygon тестът има видима touch anchor над долния dock; не натиска върху
+контролите при проверка на рисуване.
+
+Финална разширена серия: 96 тестови файла, 815 успешни теста, 2 предварително
+пропуснати external CAD scenarios (липсващ fixture / изключен integration run).
+След последното премахване на unused palette параметри: още 56 успешни проверки.
+Статичен анализ на bim_editing, Architect, Construction, bim_projects и засегнатите
+тестове; git diff --check. Логовете са в build/bim_editing_stage10_*.log.
+
+Ръководство за поддръжка: [bim_editing/README.md](../lib/src/features/bim_editing/README.md).
+Native модели, wall/support topology, slab ownership/contacts/linked offsets,
+analysis, persistence и property schemas са запазени. Compatibility aliases и
+typed boundary adapters са постоянни интерфейси; няма втори алгоритъм за
+извлечените механизми. Новите общи корекции се правят в bim_editing и се проверяват
+през реалните потребители в двата режима.
+
+## Git етапи
+
+Всички завършени големи промени са commit-нати и качени поотделно в origin/main:
+02aa94c, 732013e, da3d94e, 6d5417c, 3abdb6d, fae3ec7, 129324e, f854f8e,
+a059a9d, 992e4f7 и финалният cleanup commit. Чуждата корекция 259609f е запазена
+като отделен commit и не е включвана в нашите етапи.

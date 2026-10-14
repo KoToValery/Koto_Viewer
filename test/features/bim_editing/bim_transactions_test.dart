@@ -5,6 +5,38 @@ import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/services/architect_command_controller.dart';
 
 void main() {
+  test('native validation failure and no-op preserve Undo and Redo', () {
+    final history = BimEditHistory<int>(equivalent: (a, b) => a == b);
+    history.record(0, 1);
+    expect(history.undo(1), 0);
+    history.stage(0);
+    history.cancelStaged();
+    expect(history.canUndo, isFalse);
+    expect(history.canRedo, isTrue);
+    history.stage(0);
+    expect(history.publish(0), isFalse);
+    expect(history.canRedo, isTrue);
+    history.stage(0);
+    history.stage(10); // Nested handlers retain the original baseline.
+    expect(history.publish(2), isTrue);
+    expect(history.publish(2), isFalse);
+    expect(history.canRedo, isFalse);
+    expect(history.undo(2), 0);
+  });
+
+  test('staged no-ops do not evict bounded native history', () {
+    final history = BimEditHistory<int>(limit: 1, equivalent: (a, b) => a == b);
+    history.record(0, 1);
+    for (var i = 0; i < 5; i++) {
+      history.stage(1);
+      history.publish(1);
+    }
+    expect(history.undo(1), 0);
+    history.stage(0);
+    history.clear();
+    expect(history.publish(3), isFalse);
+  });
+
   test('batch publishes once; failure and no-op publish nothing', () {
     final controller = BimTransactionController<int>(
       0,

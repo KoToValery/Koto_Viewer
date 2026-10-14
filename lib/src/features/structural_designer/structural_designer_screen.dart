@@ -13,6 +13,7 @@ import '../bim_editing/operations/bim_axis_operations.dart';
 import '../bim_editing/operations/bim_axis_naming.dart';
 import '../bim_editing/geometry/bim_coordinate_frame.dart';
 import '../bim_editing/commands/bim_edit_history.dart';
+import '../bim_editing/widgets/bim_transform_renderer.dart';
 import '../bim_editing/interaction/bim_edit_session.dart';
 import '../bim_editing/interaction/bim_drag_session.dart';
 import '../bim_editing/interaction/bim_polygon_editor.dart';
@@ -131,18 +132,13 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _moveViewportTool(PointerMoveEvent event) {
     _handlePointerMove(event);
-    if (_viewportHeld) {
-      _handleLongPressMoveUpdate(LongPressMoveUpdateDetails(localPosition: event.localPosition));
-    }
   }
 
   void _releaseViewportTool(PointerUpEvent event) {
     final held = _viewportHeld;
     _viewportHeld = false;
     _handlePointerUp(event);
-    if (held) {
-      _handleLongPressEnd(LongPressEndDetails(localPosition: event.localPosition));
-    } else {
+    if (!held) {
       _handleTapUp(TapUpDetails(localPosition: event.localPosition, kind: event.kind));
     }
     _cancelContourEditors();
@@ -150,7 +146,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _cancelViewportTool() {
     _viewportHeld = false;
-    _handleLongPressCancel();
     _handlePointerCancel(const PointerCancelEvent());
   }
 
@@ -359,7 +354,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     final session = _axisGesture;
     final changed = session != null && session.original.any((axis) {
       final preview = session.preview.firstWhere((a) => a.id == axis.id);
-      return axis.start != preview.start || axis.end != preview.end;
+      final epsilon = _cadUnitsPerMeter * 1e-9;
+      return (axis.start - preview.start).distance > epsilon ||
+          (axis.end - preview.end).distance > epsilon;
     });
     final axes = session?.finish(_duplicateContext, changed: changed);
     _cancelAxisGesture();
@@ -372,7 +369,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   bool _hasMovedSelectedColumn = false;
   bool _isMovingShearWall = false;
   bool _hasMovedSelectedShearWall = false;
-  StructuralAxisLockMode _axisLockMode = StructuralAxisLockMode.autoMode;
   Offset? _elementGrabOffsetCad;
   Offset? _elementMoveOriginalCenter;
   List<(Offset, Offset)>? _activeMagneticGuides;
@@ -418,13 +414,19 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   Offset? _midpointTouchDownPos;
 
   // History for Undo
-  final _history = BimEditHistory<StructuralProject>(limit: 20);
+  final _history = BimEditHistory<StructuralProject>(
+    limit: 20,
+    equivalent: (a, b) {
+      final left = a.toJson()..remove('activeStoreyIndex');
+      final right = b.toJson()..remove('activeStoreyIndex');
+      return bimValuesEqual(left, right);
+    },
+  );
 
   // Viewport & Scale
   Size _viewportSize = Size.zero;
-  int _activePointersCount = 0;
+  bool _toolPointerActive = false;
   PointerDeviceKind? _activePointerKind;
-  bool _isMultiTouchGesture = false;
   double _renderScale = 1.0;
   Timer? _scaleSettleTimer;
 
@@ -607,7 +609,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _pushUndo() {
-    _history.checkpoint(_project);
+    _history.stage(_project);
   }
 
   void _undo() {
@@ -2899,8 +2901,11 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _saveSlabCorrection() {
     if (_editingSlab == null) return;
-    _history.checkpoint(_initialSlabCorrectionProject ?? _project);
-    if (!_updateActiveStoreySlab(_editingSlab!)) return;
+    _history.stage(_initialSlabCorrectionProject ?? _project);
+    if (!_updateActiveStoreySlab(_editingSlab!)) {
+      _history.cancelStaged();
+      return;
+    }
     setState(() {
       _editingSlab = null;
       _initialSlabBeforeCorrection = null;
@@ -3119,9 +3124,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
 
   void _handlePointerDown(PointerDownEvent event) {
     _slabBadgeSelectionHandled = false;
-    _activePointersCount = 1;
+    _toolPointerActive = true;
     _activePointerKind = event.kind;
-    _isMultiTouchGesture = false;
     _placementPointerHandled = false;
     if (_duplicateDraft != null) {
       _placementPointerHandled = true;
@@ -3520,11 +3524,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
-    if (_activePointersCount > 1) {
-      _isMultiTouchGesture = true;
-      return;
-    }
-    if (_isMultiTouchGesture || _activePointersCount != 1) return;
+    if (!_toolPointerActive) return;
     if (_beamMove != null) { _previewBeamMove(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse); return; }
     if (_duplicateDraft != null) {
       _updateDuplicateDrag(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
@@ -3595,11 +3595,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    // C. Moving column with mouse
-    if (event.kind == PointerDeviceKind.mouse &&
-        _isMovingColumn &&
+    // C. Moving column
+    if (_isMovingColumn &&
         _selectedColumn != null) {
-      _updatePointer(event.localPosition, isMouse: true);
+      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
       final effectiveCad = _currentCadCoord;
       if (effectiveCad != null) {
         final dist = (effectiveCad - _selectedColumn!.center).distance;
@@ -3610,11 +3609,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    // C1b. Moving shear wall with mouse
-    if (event.kind == PointerDeviceKind.mouse &&
-        _isMovingShearWall &&
+    // C1b. Moving shear wall
+    if (_isMovingShearWall &&
         _selectedShearWall != null) {
-      _updatePointer(event.localPosition, isMouse: true);
+      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
       final effectiveCad = _currentCadCoord;
       if (effectiveCad != null) {
         final dist = (effectiveCad - _selectedShearWall!.center).distance;
@@ -3625,11 +3623,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    // C2. Moving opening with mouse
-    if (event.kind == PointerDeviceKind.mouse &&
-        _isMovingOpening &&
+    // C2. Moving opening
+    if (_isMovingOpening &&
         _selectedOpening != null) {
-      _updatePointer(event.localPosition, isMouse: true);
+      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
       final effectiveCad = _currentCadCoord;
       if (effectiveCad != null && _movingOpeningOriginalCenter != null) {
         final dist = (effectiveCad - _movingOpeningOriginalCenter!).distance;
@@ -3640,9 +3637,9 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    // D. Placing element with mouse hold
-    if (event.kind == PointerDeviceKind.mouse && _isPlacingWithHold) {
-      _updatePointer(event.localPosition, isMouse: true);
+    // D. Placing element after mouse down or touch hold
+    if (_isPlacingWithHold) {
+      _updatePointer(event.localPosition, isMouse: event.kind == PointerDeviceKind.mouse);
     }
   }
 
@@ -3780,7 +3777,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       rawCad = StructuralPointerInteraction.dragTarget(pointerCad, _elementGrabOffsetCad!);
       targetPos = _cadToScreen(rawCad);
     }
-    StructuralAxisLockMode effectiveLockMode = _axisLockMode;
+    StructuralAxisLockMode effectiveLockMode = StructuralAxisLockMode.autoMode;
     final anchor = _elementMoveOriginalCenter ?? _selectedColumn?.center ?? _selectedShearWall?.center;
     if (HardwareKeyboard.instance.isShiftPressed && anchor != null) {
       effectiveLockMode = (rawCad.dx-anchor.dx).abs() > (rawCad.dy-anchor.dy).abs()
@@ -4493,12 +4490,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerUp(PointerUpEvent event) {
-    _activePointersCount = math.max(0, _activePointersCount - 1);
-    if (_activePointersCount == 0) _activePointerKind = null;
-    if (_isMultiTouchGesture) {
-      if (_activePointersCount == 0) _isMultiTouchGesture = false;
-      return;
-    }
+    _toolPointerActive = false;
+    _activePointerKind = null;
 
     if (_activeTool == StructuralDrawTool.measure && _isPlacingWithHold) {
       _updateMeasurementPointer(event.localPosition,
@@ -4773,9 +4766,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final newCenter = _currentCadCoord;
         if (newCenter != null) {
           _pushUndo();
-          final updatedCol = _selectedColumn!.copyWith(
-            center: newCenter,
-          );
+          final updatedCol = StructuralColumnEditingAdapter(
+            frame: BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter),
+          ).translate(_selectedColumn!,
+            (newCenter - _selectedColumn!.center) / _cadUnitsPerMeter);
           final active = _project.activeStorey;
           final updatedCols = active.columns
               .map((c) => c.id == updatedCol.id ? updatedCol : c)
@@ -4809,13 +4803,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
         final newCenter = _currentCadCoord;
         if (newCenter != null) {
           _pushUndo();
-          final halfLen = _selectedShearWall!.length / 2.0;
-          final rot = _selectedShearWall!.rotationRad;
-          final u = Offset(math.cos(rot), math.sin(rot));
-          final updatedWall = _selectedShearWall!.copyWith(
-            start: newCenter - u * halfLen,
-            end: newCenter + u * halfLen,
-          );
+          final updatedWall = StructuralWallEditingAdapter(
+            frame: BimCoordinateFrame(unitsPerMeter: _cadUnitsPerMeter),
+          ).translate(_selectedShearWall!,
+            (newCenter - (_selectedShearWall!.start + _selectedShearWall!.end) / 2) / _cadUnitsPerMeter);
           final active = _project.activeStorey;
           final updatedWalls = active.shearWalls
               .map((w) => w.id == updatedWall.id ? updatedWall : w)
@@ -4867,8 +4858,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
       return;
     }
 
-    // 4. Placing element with mouse hold release
-    if (event.kind == PointerDeviceKind.mouse && _isPlacingWithHold) {
+    // 4. One release path for mouse placement and held touch placement
+    if (_isPlacingWithHold) {
       final cadToPlace = _currentCadCoord;
       if (cadToPlace != null) {
         _commitPlacement(cadToPlace);
@@ -4887,16 +4878,22 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
+    _history.cancelStaged();
     _cancelContourEditors();
     _beamMove?.cancel();
     _beamMove = null;
     _cancelAxisGesture();
     if (_duplicateDraft != null) _cancelDuplicateDrag();
-    _activePointersCount = 0;
+    _toolPointerActive = false;
     _activePointerKind = null;
-    _isMultiTouchGesture = false;
     _isDraggingAxisHandle = false;
     setState(() {
+      _activeOpeningGrip = null;
+      _draggingOpeningVertexIndex = null;
+      _draggingOpeningVertexCad = null;
+      _mergeCandidateOpeningVertexIndex = null;
+      _previewOpeningOffsetPolygon = null;
+      _previewSlabOffsetPolygon = null;
       _isPlacingWithHold = false;
       _isMovingColumn = false;
       _isMovingShearWall = false;
@@ -4927,7 +4924,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     if (_activeTool == StructuralDrawTool.measure) return;
     if (_activePointerKind == PointerDeviceKind.mouse) return;
     if (_isExtrudingEdge || _activeGrip != null) return;
-    if (_isMultiTouchGesture || _activePointersCount > 1) return;
 
     // -1. If Layers tab is active: holding on an element triggers layer context sheet (hide/isolate)
     if (_activeTool == StructuralDrawTool.layers) {
@@ -5136,341 +5132,10 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
     _updatePointer(details.localPosition, isMouse: false);
   }
 
-  void _handleLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
-    if (_duplicateDraft != null || _placementPointerHandled) return;
-    if (_activeTool == StructuralDrawTool.measure) return;
-    if (_activePointerKind == PointerDeviceKind.mouse) return;
-    if (_isDraggingAxisHandle && _selectedGridAxis != null) {
-      _previewAxisHandle(details.localPosition);
-      return;
-    }
-    if (_draggingSlabVertexIndex != null && _editingSlab != null) {
-      _updateSlabVertexDrag(details.localPosition);
-      return;
-    }
-    if (_draggingOpeningVertexIndex != null && _selectedOpening != null) {
-      _updateOpeningVertexDrag(details.localPosition);
-      return;
-    }
-    if (_isMovingColumn && _selectedColumn != null) {
-      _updatePointer(details.localPosition, isMouse: false);
-      final effectiveCad = _currentCadCoord;
-      if (effectiveCad != null) {
-        final dist = (effectiveCad - _selectedColumn!.center).distance;
-        if (dist > 0.05 * _cadUnitsPerMeter) {
-          _hasMovedSelectedColumn = true;
-        }
-      }
-      return;
-    }
-    if (_isMovingShearWall && _selectedShearWall != null) {
-      _updatePointer(details.localPosition, isMouse: false);
-      final effectiveCad = _currentCadCoord;
-      if (effectiveCad != null) {
-        final dist = (effectiveCad - _selectedShearWall!.center).distance;
-        if (dist > 0.05 * _cadUnitsPerMeter) {
-          _hasMovedSelectedShearWall = true;
-        }
-      }
-      return;
-    }
-    if (_isMovingOpening && _selectedOpening != null) {
-      _updatePointer(details.localPosition, isMouse: false);
-      final effectiveCad = _currentCadCoord;
-      if (effectiveCad != null && _movingOpeningOriginalCenter != null) {
-        final dist = (effectiveCad - _movingOpeningOriginalCenter!).distance;
-        if (dist > 0.05 * _cadUnitsPerMeter) {
-          _hasMovedSelectedOpening = true;
-        }
-      }
-      return;
-    }
-    if (_isPlacingWithHold) {
-      _updatePointer(details.localPosition, isMouse: false);
-    }
-  }
-
-  void _handleLongPressEnd(LongPressEndDetails details) {
-    if (_duplicateDraft != null || _placementPointerHandled) return;
-    if (_activeTool == StructuralDrawTool.measure) return;
-    if (_activePointerKind == PointerDeviceKind.mouse) return;
-    if (_draggingSlabVertexIndex != null && _editingSlab != null) {
-      final idx = _draggingSlabVertexIndex!;
-      final candidate = _mergeCandidateSlabVertexIndex;
-      if (candidate != null && _editingSlab!.polygon.length > 3) {
-        _pushSlabCorrectionUndo();
-        final updated = _editingSlab!.mergeVertices(
-          fromIndex: idx,
-          toIndex: candidate,
-          minDistanceCad: 0.005 * _cadUnitsPerMeter,
-        );
-        if (updated != null) {
-          final cleaned = _cleanSlabPolygon(updated);
-          _editingSlab = cleaned;
-          _updateActiveStoreySlab(cleaned);
-          _saveProject();
-          HapticFeedback.heavyImpact();
-        }
-      } else if (_draggingSlabVertexCad != null) {
-        final testPts = _slabVertexEditor.active && !_slabVertexEditor.invalid
-            ? _slabVertexEditor.preview!.map((p) => p * _cadUnitsPerMeter).toList()
-            : (List<Offset>.from(_editingSlab!.polygon)..[idx] = _draggingSlabVertexCad!);
-        final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
-        if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
-          _pushSlabCorrectionUndo();
-          final updated = _editingSlab!.copyWith(polygon: cleanedPts);
-          _editingSlab = updated;
-          _updateActiveStoreySlab(updated);
-          _saveProject();
-          HapticFeedback.mediumImpact();
-        } else if (!StructuralSlab.hasSelfIntersections(testPts)) {
-          _pushSlabCorrectionUndo();
-          final updated = _editingSlab!.moveVertex(idx, _draggingSlabVertexCad!);
-          final cleaned = _cleanSlabPolygon(updated);
-          _editingSlab = cleaned;
-          _updateActiveStoreySlab(cleaned);
-          _saveProject();
-          HapticFeedback.mediumImpact();
-        }
-      }
-      setState(() {
-        _draggingSlabVertexIndex = null;
-        _draggingSlabVertexCad = null;
-        _mergeCandidateSlabVertexIndex = null;
-        _activeMagneticGuides = [];
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _snappedScreenPositions = [];
-        _activeSnap = null;
-      });
-      return;
-    }
-    if (_draggingOpeningVertexIndex != null && _selectedOpening != null) {
-      final (slabId, opIdx) = _selectedOpening!;
-      final active = _project.activeStorey;
-      final slabIdx = active.slabs.indexWhere((s) => s.id == slabId);
-      if (slabIdx != -1 && opIdx < active.slabs[slabIdx].openings.length) {
-        final idx = _draggingOpeningVertexIndex!;
-        final candidate = _mergeCandidateOpeningVertexIndex;
-        if (candidate != null && active.slabs[slabIdx].openings[opIdx].length > 3) {
-          final updatedSlab = active.slabs[slabIdx].mergeOpeningVertices(
-            openingIndex: opIdx,
-            fromIndex: idx,
-            toIndex: candidate,
-            minDistanceCad: 0.005 * _cadUnitsPerMeter,
-          );
-          if (updatedSlab != null) {
-            _updateOpeningInStorey((slabId, opIdx), updatedSlab.openings[opIdx], allowTransfer: false);
-            _saveProject();
-            HapticFeedback.heavyImpact();
-          }
-        } else if (_draggingOpeningVertexCad != null) {
-          final testPts = _openingVertexEditor.active && !_openingVertexEditor.invalid
-              ? _openingVertexEditor.preview!.map((p) => p * _cadUnitsPerMeter).toList()
-              : (List<Offset>.from(active.slabs[slabIdx].openings[opIdx])..[idx] = _draggingOpeningVertexCad!);
-          final cleanedPts = StructuralSlab.cleanPolygon(testPts, minDistance: 0.005 * _cadUnitsPerMeter);
-          if (cleanedPts.length >= 3 && !StructuralSlab.hasSelfIntersections(cleanedPts)) {
-            _updateOpeningInStorey((slabId, opIdx), cleanedPts, allowTransfer: false);
-            _saveProject();
-            HapticFeedback.mediumImpact();
-          }
-        }
-      }
-      setState(() {
-        _draggingOpeningVertexIndex = null;
-        _draggingOpeningVertexCad = null;
-        _mergeCandidateOpeningVertexIndex = null;
-        _activeMagneticGuides = [];
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _snappedScreenPositions = [];
-        _activeSnap = null;
-      });
-      return;
-    }
-    if (_isDraggingAxisHandle) {
-      setState(() {
-        _isDraggingAxisHandle = false;
-      });
-      HapticFeedback.lightImpact();
-      return;
-    }
-    if (_isMovingColumn && _selectedColumn != null) {
-      if (_hasMovedSelectedColumn) {
-        final newCenter = _currentCadCoord;
-        if (newCenter != null) {
-          _pushUndo();
-          final updatedCol = _selectedColumn!.copyWith(
-            center: newCenter,
-          );
-          final active = _project.activeStorey;
-          final updatedCols = active.columns
-              .map((c) => c.id == updatedCol.id ? updatedCol : c)
-              .toList();
-          _updateActiveStorey(active.copyWith(columns: updatedCols));
-          _selectedColumn = updatedCol;
-          HapticFeedback.mediumImpact();
-        }
-      }
-      setState(() {
-        _isMovingColumn = false;
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _activeSnap = null;
-        _activeMagneticGuides = null;
-      });
-      return;
-    }
-
-    if (_isMovingShearWall && _selectedShearWall != null) {
-      if (_hasMovedSelectedShearWall) {
-        final newCenter = _currentCadCoord;
-        if (newCenter != null) {
-          _pushUndo();
-          final halfLen = _selectedShearWall!.length / 2.0;
-          final rot = _selectedShearWall!.rotationRad;
-          final u = Offset(math.cos(rot), math.sin(rot));
-          final updatedWall = _selectedShearWall!.copyWith(
-            start: newCenter - u * halfLen,
-            end: newCenter + u * halfLen,
-          );
-          final active = _project.activeStorey;
-          final updatedWalls = active.shearWalls
-              .map((w) => w.id == updatedWall.id ? updatedWall : w)
-              .toList();
-          _updateActiveStorey(active.copyWith(shearWalls: updatedWalls));
-          _selectedShearWall = updatedWall;
-          HapticFeedback.mediumImpact();
-        }
-      }
-      setState(() {
-        _isMovingShearWall = false;
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _activeSnap = null;
-        _activeMagneticGuides = null;
-      });
-      return;
-    }
-
-    if (_isMovingOpening && _selectedOpening != null) {
-      if (_hasMovedSelectedOpening && _movingOpeningRelativeOffsets != null) {
-        final newCenter = _currentCadCoord;
-        if (newCenter != null) {
-          final newPoly = _movingOpeningRelativeOffsets!
-              .map((r) => newCenter + r)
-              .toList();
-          _updateOpeningInStorey(_selectedOpening!, newPoly);
-          HapticFeedback.mediumImpact();
-        }
-      }
-      setState(() {
-        _isMovingOpening = false;
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _activeSnap = null;
-      });
-      return;
-    }
-
-    if (_isPlacingWithHold) {
-      final cadToPlace = _currentCadCoord;
-      if (cadToPlace != null) {
-        _commitPlacement(cadToPlace);
-      }
-      setState(() {
-        _isPlacingWithHold = false;
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _activeSnap = null;
-        _activeMagneticGuides = null;
-        _liveDimensionText = null;
-        _activeDynamicDimensionLine = null;
-      });
-    }
-  }
-
-  void _handleLongPressCancel() {
-    if (_duplicateDraft != null || _placementPointerHandled) return;
-    if (_activeTool == StructuralDrawTool.measure) return;
-    if (_isMovingColumn) {
-      setState(() {
-        _isMovingColumn = false;
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _activeSnap = null;
-        _activeMagneticGuides = null;
-      });
-    }
-    if (_draggingSlabVertexIndex != null) {
-      setState(() {
-        _draggingSlabVertexIndex = null;
-        _draggingSlabVertexCad = null;
-        _mergeCandidateSlabVertexIndex = null;
-        _activeMagneticGuides = [];
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _snappedScreenPositions = [];
-        _activeSnap = null;
-      });
-    }
-    if (_draggingOpeningVertexIndex != null) {
-      setState(() {
-        _draggingOpeningVertexIndex = null;
-        _draggingOpeningVertexCad = null;
-        _mergeCandidateOpeningVertexIndex = null;
-        _activeMagneticGuides = [];
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _snappedScreenPositions = [];
-        _activeSnap = null;
-      });
-    }
-    if (_isMovingShearWall) {
-      setState(() {
-        _isMovingShearWall = false;
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _activeSnap = null;
-        _activeMagneticGuides = null;
-      });
-    }
-    if (_isMovingOpening) {
-      setState(() {
-        _isMovingOpening = false;
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _activeSnap = null;
-      });
-    }
-    if (_isPlacingWithHold && _activePointersCount <= 1) {
-      setState(() {
-        _isPlacingWithHold = false;
-        _touchScreenPos = null;
-        _targetScreenPos = null;
-        _snappedScreenPos = null;
-        _activeSnap = null;
-        _activeMagneticGuides = null;
-      });
-    }
-  }
-
   void _handleTapUp(TapUpDetails details) {
     if (_placementPointerHandled || _duplicateDraft != null) return;
     if (_activeTool == StructuralDrawTool.measure) {
-      if (details.kind == PointerDeviceKind.mouse || _isMultiTouchGesture ||
-          _activePointersCount > 1 || _isPlacingWithHold || _measurementHeldGesture) {
+      if (details.kind == PointerDeviceKind.mouse || _isPlacingWithHold || _measurementHeldGesture) {
         return;
       }
       // A quick tap selects its actual location; holds use the offset tip.
@@ -6280,6 +5945,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
   }
 
   void _saveProject() {
+    _history.publish(_project);
     if (widget.bimContext != null) {
       widget.bimContext!.onProjectChanged(_project);
       return;
@@ -7709,8 +7375,7 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
           return Stack(
             fit: StackFit.expand,
             children: [
-              // One shared owner routes tools and camera; the native viewer
-              // temporarily remains a transform-only rendering bridge.
+              // One shared owner routes tools and camera; rendering adds no gestures.
               Positioned.fill(
                 child: BimEditingViewport(
                   controller: _viewportNavigation,
@@ -7726,13 +7391,8 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                   onToolUp: _releaseViewportTool,
                   onToolHoldStart: _beginViewportHold,
                   onToolCancel: _cancelViewportTool,
-                  child: InteractiveViewer(
+                  child: BimTransformRenderer(
                     transformationController: _transformController,
-                    panEnabled: false,
-                    scaleEnabled: false,
-                    minScale: .001,
-                    maxScale: 1000,
-                    boundaryMargin: const EdgeInsets.all(double.infinity),
                       child: Container(
                         color: _canvasTheme.bgColor,
                         width: _viewportSize.width,
@@ -8127,8 +7787,6 @@ class _StructuralDesignerScreenState extends State<StructuralDesignerScreen> {
                         : (_hasSelectedElement && !_isMovingColumn && !_isMovingShearWall && !_isMovingOpening && !_isPlacingWithHold)
                             ? _buildContextualElementBottomDock(context)
                             : ElementPaletteBar(
-                        axisLockMode: _axisLockMode,
-                        onUpdateAxisLockMode: (mode) => setState(() => _axisLockMode = mode),
                         activeTool: _activeTool,
                         onSelectTool: _selectTool,
                         currentColumnPreset: _currentColumnPreset,

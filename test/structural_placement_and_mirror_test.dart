@@ -1,3 +1,4 @@
+import 'package:kotoview/src/features/bim_editing/widgets/bim_transform_renderer.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -56,7 +57,7 @@ void main() {
     expect(mirroredPts[3], const Offset(10, 5));
   });
 
-  testWidgets('StructuralDesignerScreen renders and edit card contains Mirror button when column selected', (tester) async {
+  testWidgets('StructuralDesignerScreen renders a compact element palette', (tester) async {
     final doc = DxfDocument(
       entities: [
         const DxfLine(
@@ -97,7 +98,6 @@ void main() {
     expect(find.text('Колона'), findsOneWidget);
     expect(find.text('Шайба'), findsOneWidget);
     expect(find.text('Плоча'), findsOneWidget);
-    expect(find.byIcon(Icons.pan_tool_rounded), findsNothing);
     expect(find.text('Навигация'), findsNothing);
   });
 
@@ -712,15 +712,15 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap on the placed column (center of canvas) to select it
-    await tester.tap(find.byType(InteractiveViewer));
+    await tester.tap(find.byType(BimTransformRenderer));
     await tester.pumpAndSettle();
 
     // When the column is selected, the Contextual Bottom Action Dock replaces the palette!
-    // It contains the actions: Изтрий, Завърти 90°, Огледало, Офсет, Дублирай
+    final l10n = await AppLocalizations.delegate.load(const Locale('bg'));
     expect(find.text('Офсет'), findsOneWidget);
-    expect(find.text('Завърти 90°'), findsOneWidget);
+    expect(find.text(l10n.architectRadialRotate), findsOneWidget);
     expect(find.text('Огледало'), findsOneWidget);
-    expect(find.text('Дублирай'), findsOneWidget);
+    expect(find.text(l10n.dragDuplicateAction), findsOneWidget);
     expect(find.text('Изтрий'), findsOneWidget);
 
     // Verify there are no overflows
@@ -1483,7 +1483,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('ElementPaletteBar displays 2-point prompt and opposite corner tag for staircase opening', (tester) async {
+  testWidgets('ElementPaletteBar displays contour guidance and cancel for staircase opening', (tester) async {
     tester.view.physicalSize = const Size(1200, 600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -1522,7 +1522,7 @@ void main() {
                 onUpdateOpeningPreset: (_) {},
                 isDrawingOpening: true,
                 hasOpeningStartCorner: hasStart,
-                openingPointCount: 0,
+                openingPointCount: hasStart ? 1 : 0,
                 onClearOpening: () {
                   cleared = true;
                   setState(() => hasStart = false);
@@ -1546,15 +1546,16 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // 1. When hasOpeningStartCorner == false: shows 2-point placement guidance prompt
-    expect(find.text('Докоснете 1-ви ъгъл, след това 2-ри за стълбище'), findsOneWidget);
-    expect(find.text('Отвор: избери срещуположен ъгъл'), findsNothing);
+    final l10n = await AppLocalizations.delegate.load(const Locale('bg'));
+    // Empty contours expose shared point-by-point guidance.
+    expect(find.text(l10n.openingPointByPointPrompt), findsOneWidget);
+    expect(find.text('1 ${l10n.pointsAbbr}'), findsNothing);
 
-    // 2. Switch hasOpeningStartCorner to true: shows opposite corner tag and cancel button
+    // The first vertex exposes point count and cancellation.
     stateSetter!(() => hasStart = true);
     await tester.pumpAndSettle();
 
-    expect(find.text('Отвор: избери срещуположен ъгъл'), findsOneWidget);
+    expect(find.text('1 ${l10n.pointsAbbr}'), findsOneWidget);
     final closeBtn = find.byIcon(Icons.close);
     expect(closeBtn, findsOneWidget);
 
@@ -1563,7 +1564,7 @@ void main() {
     await tester.tap(closeBtn);
     await tester.pumpAndSettle();
     expect(cleared, isTrue);
-    expect(find.text('Докоснете 1-ви ъгъл, след това 2-ри за стълбище'), findsOneWidget);
+    expect(find.text(l10n.openingPointByPointPrompt), findsOneWidget);
   });
 
   testWidgets('StructuralPointerPainter paints rubber-band rectangle with staircase treads for 2-point staircase placement', (tester) async {

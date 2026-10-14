@@ -1,3 +1,4 @@
+import 'package:kotoview/src/features/bim_editing/widgets/bim_transform_renderer.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,7 +105,7 @@ void main() {
     final selectTool = palette().onSelectTool;
     selectTool(StructuralDrawTool.column);
     await tester.pumpAndSettle();
-    final origin = tester.getTopLeft(find.byType(InteractiveViewer).first);
+    final origin = tester.getTopLeft(find.byType(BimTransformRenderer).first);
     await tester.tapAt(origin + plan().cadToScene(const Offset(3, 5)));
     await tester.pumpAndSettle();
     expect(find.textContaining('25 x 30 cm'), findsOneWidget);

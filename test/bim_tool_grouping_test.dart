@@ -16,7 +16,7 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
         var tool = StructuralDrawTool.column;
-        var supports = 0, slabs = 0, stairs = 0, reports = 0, align = 0;
+        var slabs = 0, stairs = 0, reports = 0, align = 0;
         await tester.pumpWidget(
           MaterialApp(
             locale: Locale(locale),
@@ -48,7 +48,6 @@ void main() {
                   onOpenCantileverReport: () => reports++,
                   onOpenVerticalCapacityReport: () => reports++,
                   onOpenSeismicReport: () => reports++,
-                  onGenerateSupports: () => supports++,
                   onGenerateSlabs: () => slabs++,
                   onGenerateStaircaseOpenings: () => stairs++,
                   onManageUnderlays: () => align++,
@@ -63,7 +62,6 @@ void main() {
           find.byKey(const ValueKey('bim-generate-supports')),
           findsNothing,
         );
-        expect(supports, 0);
         expect(find.text(l.axisLockX), findsNothing);
         expect(find.text(l.axisLockY), findsNothing);
         expect(find.text(l.layersTabTitle), findsNothing);

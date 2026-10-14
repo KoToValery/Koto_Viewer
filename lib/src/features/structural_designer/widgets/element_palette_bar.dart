@@ -6,7 +6,6 @@ import '../models/cantilever_analysis_models.dart';
 import '../models/seismic_analysis_models.dart';
 import '../models/structural_element.dart';
 import '../models/vertical_capacity_models.dart';
-import '../analysis/structural_magnetic_alignment_helper.dart';
 import '../rendering/structural_pointer_painter.dart';
 
 /// Bottom dock palette bar for choosing structural elements (columns, walls, slabs, beams, axes),
@@ -62,7 +61,6 @@ class ElementPaletteBar extends StatelessWidget {
   final VoidCallback? onCustomWallThickness;
   final VoidCallback? onCustomBeamDimensions;
   final VoidCallback? onCustomSlabThickness;
-  final VoidCallback? onGenerateSupports;
   final VoidCallback? onManageUnderlays;
   final VoidCallback? onGenerateSlabs;
   final VoidCallback? onGenerateStaircaseOpenings;
@@ -71,8 +69,6 @@ class ElementPaletteBar extends StatelessWidget {
   final VoidCallback? onOpenUnderlayFilterConfig;
   final VoidCallback? onShowAllLayers;
   final VoidCallback? onIsolateWhiteLayers;
-  final StructuralAxisLockMode axisLockMode;
-  final ValueChanged<StructuralAxisLockMode>? onUpdateAxisLockMode;
 
   const ElementPaletteBar({
     super.key,
@@ -126,7 +122,6 @@ class ElementPaletteBar extends StatelessWidget {
     this.onCustomWallThickness,
     this.onCustomBeamDimensions,
     this.onCustomSlabThickness,
-    this.onGenerateSupports,
     this.onManageUnderlays,
     this.onGenerateSlabs,
     this.onGenerateStaircaseOpenings,
@@ -135,8 +130,6 @@ class ElementPaletteBar extends StatelessWidget {
     this.onOpenUnderlayFilterConfig,
     this.onShowAllLayers,
     this.onIsolateWhiteLayers,
-    this.axisLockMode = StructuralAxisLockMode.autoMode,
-    this.onUpdateAxisLockMode,
   });
 
   @override

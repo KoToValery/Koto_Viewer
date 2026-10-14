@@ -5,7 +5,123 @@ import 'bim_polygon_geometry.dart';
 /// Compatibility repair policy for imported/legacy contours. Domain adapters
 /// choose it explicitly; normal edits use BimPolygonGeometry's strict policy.
 class BimContourRepair {
-  static bool doSegmentsIntersect(Offset p1, Offset p2, Offset p3, Offset p4) {
+  /// Legacy drafting cleanup; preserves valid origin vertices and accepts the
+  /// caller's collinear threshold. Imported stray-origin repair is separate.
+  static List<Offset> cleanDraftPolygon(
+    List<Offset> polygon, {
+    double minDistance = 0.05,
+    double minCollinearDistance = 0.02,
+  }) {
+    final nonNanPts = polygon
+        .where((p) => p.dx.isFinite && p.dy.isFinite)
+        .toList();
+
+    if (nonNanPts.length < 3) return nonNanPts;
+
+    final validPts = List<Offset>.from(nonNanPts);
+    bool changed = true;
+    int maxPasses = 15;
+
+    while (changed && validPts.length > 3 && maxPasses-- > 0) {
+      changed = false;
+
+      // 1. Collapse adjacent duplicate points (< minDistance)
+      for (int i = 0; i < validPts.length && validPts.length > 3; i++) {
+        final next = (i + 1) % validPts.length;
+        if ((validPts[i] - validPts[next]).distance < minDistance) {
+          validPts.removeAt(next);
+          changed = true;
+          break;
+        }
+      }
+      if (changed) continue;
+
+      // 2. Remove collinear points (orphan points sitting on straight edges)
+      for (int i = 0; i < validPts.length && validPts.length > 3; i++) {
+        final prev = (i - 1 + validPts.length) % validPts.length;
+        final next = (i + 1) % validPts.length;
+        final v1 = validPts[i] - validPts[prev];
+        final v2 = validPts[next] - validPts[i];
+        final l1 = v1.distance;
+        final l2 = v2.distance;
+
+        if (l1 > 1e-4 && l2 > 1e-4) {
+          final cross = (v1.dx * v2.dy - v1.dy * v2.dx) / (l1 * l2);
+          final dot = (v1.dx * v2.dx + v1.dy * v2.dy) / (l1 * l2);
+
+          final chord = validPts[next] - validPts[prev];
+          final chordLen = chord.distance;
+          final double distToChord;
+          if (chordLen > 1e-4) {
+            final t =
+                (((validPts[i].dx - validPts[prev].dx) * chord.dx +
+                            (validPts[i].dy - validPts[prev].dy) * chord.dy) /
+                        (chordLen * chordLen))
+                    .clamp(0.0, 1.0);
+            final proj = validPts[prev] + chord * t;
+            distToChord = (validPts[i] - proj).distance;
+          } else {
+            distToChord = (validPts[i] - validPts[prev]).distance;
+          }
+
+          // Collinear redundant vertex
+          if ((cross.abs() < 0.04 &&
+                  dot > 0.96 &&
+                  distToChord < minCollinearDistance) ||
+              (distToChord < minCollinearDistance && dot > 0.5)) {
+            validPts.removeAt(i);
+            changed = true;
+            break;
+          }
+
+          // Acute needle fold-back / spike
+          if (cross.abs() < 0.08 && dot < -0.85) {
+            validPts.removeAt(i);
+            changed = true;
+            break;
+          }
+
+          // Slit where chord is almost closed
+          if (chordLen < minDistance * 1.5 && dot < -0.5) {
+            validPts.removeAt(i);
+            changed = true;
+            break;
+          }
+        }
+      }
+      if (changed) continue;
+
+      // 3. Non-adjacent pinch duplicate collapse
+      for (int i = 0; i < validPts.length && validPts.length > 3; i++) {
+        for (int j = i + 2; j < validPts.length; j++) {
+          if (i == 0 && j == validPts.length - 1) continue;
+          if ((validPts[i] - validPts[j]).distance < minDistance) {
+            final loop1Len = j - i;
+            final loop2Len = validPts.length - loop1Len;
+            if (loop1Len <= loop2Len) {
+              validPts.removeRange(i + 1, j + 1);
+            } else {
+              validPts.removeRange(j + 1, validPts.length);
+              validPts.removeRange(0, i);
+            }
+            changed = true;
+            break;
+          }
+        }
+        if (changed) break;
+      }
+    }
+
+    return validPts;
+  }
+
+  static bool doSegmentsIntersect(
+    Offset p1,
+    Offset p2,
+    Offset p3,
+    Offset p4, {
+    double epsilon = 1e-6,
+  }) {
     double ccw(Offset a, Offset b, Offset c) {
       return (b.dx - a.dx) * (c.dy - a.dy) - (b.dy - a.dy) * (c.dx - a.dx);
     }
@@ -15,14 +131,14 @@ class BimContourRepair {
     final d3 = ccw(p1, p2, p3);
     final d4 = ccw(p1, p2, p4);
 
-    if (((d1 > 1e-6 && d2 < -1e-6) || (d1 < -1e-6 && d2 > 1e-6)) &&
-        ((d3 > 1e-6 && d4 < -1e-6) || (d3 < -1e-6 && d4 > 1e-6))) {
+    if (((d1 > epsilon && d2 < -epsilon) || (d1 < -epsilon && d2 > epsilon)) &&
+        ((d3 > epsilon && d4 < -epsilon) || (d3 < -epsilon && d4 > epsilon))) {
       return true;
     }
     return false;
   }
 
-  static bool hasSelfIntersections(List<Offset> pts) {
+  static bool hasSelfIntersections(List<Offset> pts, {double epsilon = 1e-6}) {
     final n = pts.length;
     if (n < 4) return false;
     for (int i = 0; i < n; i++) {
@@ -32,7 +148,7 @@ class BimContourRepair {
         if (i == 0 && j == n - 1) continue;
         final p3 = pts[j];
         final p4 = pts[(j + 1) % n];
-        if (doSegmentsIntersect(p1, p2, p3, p4)) {
+        if (doSegmentsIntersect(p1, p2, p3, p4, epsilon: epsilon)) {
           return true;
         }
       }

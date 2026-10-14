@@ -1,3 +1,4 @@
+import 'package:kotoview/src/features/bim_editing/widgets/bim_transform_renderer.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -180,7 +181,7 @@ void main() {
             .map((w) => w.painter)
             .whereType<StructuralPointerPainter>()
             .first;
-        final origin = tester.getTopLeft(find.byType(InteractiveViewer).first);
+        final origin = tester.getTopLeft(find.byType(BimTransformRenderer).first);
         final oldScreen = model().cadToScene(column.center);
         final gesture = await tester.startGesture(
           origin + oldScreen + const Offset(7, 4),
@@ -274,7 +275,7 @@ void main() {
           .whereType<StructuralPointerPainter>()
           .first;
       final start = model().cadToScene(wall.center);
-      final origin = tester.getTopLeft(find.byType(InteractiveViewer).first);
+      final origin = tester.getTopLeft(find.byType(BimTransformRenderer).first);
       final gesture = await tester.startGesture(
         origin + start + const Offset(5, 2),
       );
@@ -342,7 +343,7 @@ void main() {
           .map((w) => w.painter)
           .whereType<StructuralPointerPainter>()
           .first;
-      final origin = tester.getTopLeft(find.byType(InteractiveViewer).first);
+      final origin = tester.getTopLeft(find.byType(BimTransformRenderer).first);
       final gesture = await tester.startGesture(
         origin + model().cadToScene(const Offset(5.14, 5.16)),
         kind: PointerDeviceKind.mouse,

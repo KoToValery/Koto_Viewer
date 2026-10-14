@@ -163,7 +163,7 @@ class Structural3dMeshBuilder {
       // 2b. Extrude Beams (reinforced concrete beams underneath the slab at ceiling level)
       for (final beam in storey.beams) {
         final double beamZTop = zTop;
-        final double beamZBottom = zTop - beam.depth * cadUnitsPerMeter;
+        final double beamZBottom = zTop - beam.depth;
         final beamTris = _extrudePolygon(
           beam.polygonVertices,
           beamZBottom,

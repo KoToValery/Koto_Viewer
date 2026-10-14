@@ -1,9 +1,41 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kotoview/src/features/architect/services/architect_zone_tool.dart';
 import 'package:kotoview/src/features/bim_editing/geometry/bim_polygon_geometry.dart';
 import 'package:kotoview/src/features/bim_editing/interaction/bim_polygon_editor.dart';
 import 'package:kotoview/src/features/structural_designer/models/structural_element.dart';
 
 void main() {
+  test(
+    'zone drafting shares stable area, normals and rotation at far origin',
+    () {
+      const origin = Offset(1e10, -1e10);
+      final polygon = [
+        origin,
+        origin + const Offset(8, 0),
+        origin + const Offset(8, 6),
+        origin + const Offset(0, 6),
+      ];
+      expect(ArchitectZoneGeometry.calculateArea(polygon), 48);
+      expect(
+        ArchitectZoneGeometry.calculateOutwardNormal(polygon, 0),
+        const Offset(0, -1),
+      );
+      final rotated = ArchitectZoneGeometry.rotatePolygon(polygon, 90, origin);
+      expect(rotated[1], origin + const Offset(0, 8));
+      expect(ArchitectZoneGeometry.calculateArea(rotated), 48);
+      // Draft repair must not apply the imported stray-origin heuristic.
+      expect(
+        ArchitectZoneGeometry.cleanPolygon([
+          const Offset(0, 0),
+          const Offset(10, 0),
+          const Offset(11, 10),
+          const Offset(10, 11),
+        ]).first,
+        Offset.zero,
+      );
+    },
+  );
+
   const outer = [Offset(0, 0), Offset(8, 0), Offset(8, 6), Offset(0, 6)];
   const hole = [Offset(1, 1), Offset(2, 1), Offset(2, 2), Offset(1, 2)];
 

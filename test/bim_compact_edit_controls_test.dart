@@ -1,3 +1,4 @@
+import 'package:kotoview/src/features/bim_editing/widgets/bim_transform_renderer.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -117,8 +118,8 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Offset'));
       await tester.pumpAndSettle();
       final transform = tester
-          .widget<InteractiveViewer>(find.byType(InteractiveViewer))
-          .transformationController!
+          .widget<BimTransformRenderer>(find.byType(BimTransformRenderer))
+          .transformationController
           .value
           .clone();
       final gesture = await tester.startGesture(point(const Offset(5, 5)));
@@ -131,8 +132,8 @@ void main() {
       }
       expect(
         tester
-            .widget<InteractiveViewer>(find.byType(InteractiveViewer))
-            .transformationController!
+            .widget<BimTransformRenderer>(find.byType(BimTransformRenderer))
+            .transformationController
             .value,
         transform,
       );
@@ -327,8 +328,8 @@ void main() {
       await tester.tap(find.text('Drag+'));
       await tester.pump();
       final transform = tester
-          .widget<InteractiveViewer>(find.byType(InteractiveViewer))
-          .transformationController!
+          .widget<BimTransformRenderer>(find.byType(BimTransformRenderer))
+          .transformationController
           .value
           .clone();
       final gesture = await tester.startGesture(
@@ -342,8 +343,8 @@ void main() {
       expect(changed.length, before);
       expect(
         tester
-            .widget<InteractiveViewer>(find.byType(InteractiveViewer))
-            .transformationController!
+            .widget<BimTransformRenderer>(find.byType(BimTransformRenderer))
+            .transformationController
             .value,
         transform,
       );

@@ -11,8 +11,30 @@ class BimEditHistory<T> {
   final bool Function(T, T) equivalent;
   final List<T> _undo = [];
   final List<T> _redo = [];
+  T? _staged;
+  bool _hasStaged = false;
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
+
+  /// Native hosts can stage a baseline before validation, then publish only
+  /// after an accepted edit. Staging alone never changes Undo or Redo.
+  void stage(T before) {
+    if (_hasStaged) return;
+    _staged = before;
+    _hasStaged = true;
+  }
+
+  bool publish(T after) {
+    if (!_hasStaged) return false;
+    final before = _staged as T;
+    cancelStaged();
+    return record(before, after);
+  }
+
+  void cancelStaged() {
+    _staged = null;
+    _hasStaged = false;
+  }
 
   /// Bridge for hosts that still checkpoint before mutating their document.
   void checkpoint(T before) {
@@ -28,6 +50,7 @@ class BimEditHistory<T> {
   }
 
   T undo(T current) {
+    cancelStaged();
     while (_undo.isNotEmpty && equivalent(_undo.last, current)) {
       _undo.removeLast();
     }
@@ -37,12 +60,14 @@ class BimEditHistory<T> {
   }
 
   T redo(T current) {
+    cancelStaged();
     if (_redo.isEmpty) return current;
     _undo.add(current);
     return _redo.removeLast();
   }
 
   void clear() {
+    cancelStaged();
     _undo.clear();
     _redo.clear();
   }

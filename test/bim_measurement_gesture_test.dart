@@ -1,3 +1,4 @@
+import 'package:kotoview/src/features/bim_editing/widgets/bim_transform_renderer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,7 +83,7 @@ void main() {
       await tester.pump();
       expect(plan().measurementStartCad, start);
 
-      final controller = tester.widget<InteractiveViewer>(find.byType(InteractiveViewer)).transformationController!;
+      final controller = tester.widget<BimTransformRenderer>(find.byType(BimTransformRenderer)).transformationController;
       final beforePan = controller.value.clone();
       await tester.dragFrom(const Offset(450, 400), const Offset(80, 30));
       await tester.pumpAndSettle();

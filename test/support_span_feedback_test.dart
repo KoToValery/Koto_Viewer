@@ -1,3 +1,4 @@
+import 'package:kotoview/src/features/bim_editing/widgets/bim_transform_renderer.dart';
 import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -471,7 +472,7 @@ void main() {
         );
         await tester.tap(find.text(l.toolColumn));
         await tester.pumpAndSettle();
-        final origin = tester.getTopLeft(find.byType(InteractiveViewer).first);
+        final origin = tester.getTopLeft(find.byType(BimTransformRenderer).first);
         final position = model().cadToScene(const Offset(3, 0));
         final gesture = await tester.startGesture(
           origin + position + Offset(0, mouse ? 0 : 64),

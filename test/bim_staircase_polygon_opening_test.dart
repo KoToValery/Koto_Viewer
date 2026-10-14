@@ -113,6 +113,10 @@ void main() {
               document: doc,
               initialProject: saved,
               initialCadBounds: doc.bounds,
+              // Keep the 64px hold anchor above the overlaid tool dock.
+              initialTransform: mode == 'hold'
+                  ? Matrix4.translationValues(0, -120, 0)
+                  : null,
               title: 'Staircase',
               bimContext: StructuralBimContext(
                 underlaysByStorey: {'g': doc, 'f': doc},
