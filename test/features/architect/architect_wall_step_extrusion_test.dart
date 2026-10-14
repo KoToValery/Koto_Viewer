@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
@@ -115,6 +114,81 @@ void main() {
       final postInt = storey.walls.firstWhere((w) => w.id == 'int');
       expect(postInt.startPoint, const Offset(7, 0));
       expect(postInt.endPoint, const Offset(7, -4));
+    });
+
+    test('Extruding an external wall segment with insulation preserves insulation on connecting walls without inversion', () {
+      // 3 collinear external walls along Y = 0 with insulation facing upwards (exteriorSide: left, normal (0, 1)):
+      // w1: (0, 0) -> (2, 0)
+      // w2: (2, 0) -> (4, 0)  <-- we extrude this outwards by dy = 2 (in direction of exterior)
+      // w3: (4, 0) -> (6, 0)
+      final w1 = ArchitectWall(
+        id: 'w1',
+        startPoint: const Offset(0, 0),
+        endPoint: const Offset(2, 0),
+        thickness: 0.35,
+        exteriorSide: WallExteriorSide.left,
+        insulationThicknessOverride: 0.10,
+        connectStart: true,
+        connectEnd: true,
+      );
+      final w2 = ArchitectWall(
+        id: 'w2',
+        startPoint: const Offset(2, 0),
+        endPoint: const Offset(4, 0),
+        thickness: 0.35,
+        exteriorSide: WallExteriorSide.left,
+        insulationThicknessOverride: 0.10,
+        connectStart: true,
+        connectEnd: true,
+      );
+      final w3 = ArchitectWall(
+        id: 'w3',
+        startPoint: const Offset(4, 0),
+        endPoint: const Offset(6, 0),
+        thickness: 0.35,
+        exteriorSide: WallExteriorSide.left,
+        insulationThicknessOverride: 0.10,
+        connectStart: true,
+        connectEnd: true,
+      );
+
+      final model = editing.seeded(
+        ArchitectStorey(
+          id: 's',
+          name: 's',
+          walls: [w1, w2, w3],
+        ),
+      );
+      addTearDown(model.dispose);
+
+      // Extrude w2 outwards by delta (0, 2)
+      model.execute(
+        const MoveArchitectElements(
+          storeyId: 's',
+          elementIds: {'w2'},
+          delta: Offset(0, 2),
+        ),
+      );
+
+      final storey = model.project.activeStorey;
+      expect(storey.walls.length, 5);
+
+      final returnWalls = storey.walls.where((w) => w.id != 'w1' && w.id != 'w2' && w.id != 'w3').toList();
+      expect(returnWalls.length, 2);
+
+      // Return wall at x=2 connecting (2, 0) to (2, 2):
+      // Its exterior normal must point to the left (dx < 0, away from the protrusion)
+      final leftReturn = returnWalls.firstWhere(
+        (w) => (w.startPoint.dx - 2.0).abs() < 1e-4 && (w.endPoint.dx - 2.0).abs() < 1e-4,
+      );
+      expect(leftReturn.exteriorNormal.dx, lessThan(0.0), reason: 'Left return wall insulation must face outside (left)');
+
+      // Return wall at x=4 connecting (4, 0) to (4, 2):
+      // Its exterior normal must point to the right (dx > 0, away from the protrusion)
+      final rightReturn = returnWalls.firstWhere(
+        (w) => (w.startPoint.dx - 4.0).abs() < 1e-4 && (w.endPoint.dx - 4.0).abs() < 1e-4,
+      );
+      expect(rightReturn.exteriorNormal.dx, greaterThan(0.0), reason: 'Right return wall insulation must face outside (right)');
     });
   });
 }

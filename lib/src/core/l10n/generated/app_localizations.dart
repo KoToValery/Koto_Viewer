@@ -7259,6 +7259,18 @@ abstract class AppLocalizations {
   /// **'Split: two points across walls'**
   String get architectWallSplitHint;
 
+  /// Hint for first click in split tool to confirm surface
+  ///
+  /// In en, this message translates to:
+  /// **'Click to confirm surface'**
+  String get architectWallSplitSurfaceHint;
+
+  /// Hint for second click in split tool for cut direction
+  ///
+  /// In en, this message translates to:
+  /// **'Click for cut direction'**
+  String get architectWallSplitDirectionHint;
+
   /// No description provided for @architectWallClearance.
   ///
   /// In en, this message translates to:

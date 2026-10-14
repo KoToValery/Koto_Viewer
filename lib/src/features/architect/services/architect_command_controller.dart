@@ -862,6 +862,26 @@ class MoveArchitectElements extends ArchitectModelCommand {
             } while (nextWalls.containsKey(newId) ||
                 project.storeys.any((s) => s.walls.any((w) => w.id == newId)));
 
+            // Preserve insulation orientation on the connecting step wall:
+            // The connecting wall's exterior normal must point away from the moved
+            // protrusion (or into the indent) so insulation stays on the building's exterior.
+            final collinearDir =
+                atStart ? -source.unitVector : source.unitVector;
+            final dotDeltaE = delta.dx * source.exteriorNormal.dx +
+                delta.dy * source.exteriorNormal.dy;
+            final desiredExteriorNormal =
+                collinearDir * (dotDeltaE >= 0 ? 1.0 : -1.0);
+            final connectingVec = newPoint - oldPoint;
+            final connectingNormal =
+                Offset(-connectingVec.dy, connectingVec.dx) /
+                    connectingVec.distance;
+            final connectingExteriorSide =
+                (desiredExteriorNormal.dx * connectingNormal.dx +
+                            desiredExteriorNormal.dy * connectingNormal.dy) >=
+                        0
+                    ? WallExteriorSide.left
+                    : WallExteriorSide.right;
+
             final connectingWall = ArchitectWall(
               id: newId,
               startPoint: oldPoint,
@@ -869,7 +889,7 @@ class MoveArchitectElements extends ArchitectModelCommand {
               thickness: source.thickness,
               height: source.height,
               referenceLine: source.referenceLine,
-              exteriorSide: source.exteriorSide,
+              exteriorSide: connectingExteriorSide,
               insulationThicknessOverride: source.insulationThicknessOverride,
               wallTypeId: source.wallTypeId,
               parapetFinish: source.parapetFinish,

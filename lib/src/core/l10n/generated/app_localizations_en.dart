@@ -4160,6 +4160,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectWallSplitHint => 'Split: two points across walls';
 
   @override
+  String get architectWallSplitSurfaceHint => 'Click to confirm surface';
+
+  @override
+  String get architectWallSplitDirectionHint => 'Click for cut direction';
+
+  @override
   String get architectWallClearance => 'Clearance';
 
   @override

@@ -172,14 +172,21 @@ void main() {
       // Select wall w1 with hold
       await hold(tester, const Offset(2, 0));
 
-      // Open wall actions popup menu and select 'cut'
+      // Open wall actions popup menu and select Split tool
       await tester.tap(find.byKey(const ValueKey('architect-wall-actions')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('wall-cut')));
+      await tester.tap(find.byKey(const ValueKey('wall-split-stroke')));
       await tester.pumpAndSettle();
 
-      // In cut mode, tap directly on the wall at (1, 0)
+      // Click 1 confirms the surface on wall w1 at (1, 0)
       await tester.tapAt(screen(tester, const Offset(1, 0)));
+      await tester.pumpAndSettle();
+
+      // Wall is not yet split after click 1 (waiting for cut direction)
+      expect(model.project.activeStorey.walls.length, 1);
+
+      // Click 2 sets cut direction (perpendicular cut across the wall towards (1, 1))
+      await tester.tapAt(screen(tester, const Offset(1, 1)));
       await tester.pumpAndSettle();
 
       // Wall is split into 2 walls!

@@ -98,6 +98,19 @@ class ArchitectWorkspaceScreen extends StatefulWidget {
       _ArchitectWorkspaceScreenState();
 }
 
+class _ArchitectSurfaceHit {
+  final Offset anchor;
+  final Offset direction;
+  final Offset normal;
+  final double distance;
+  const _ArchitectSurfaceHit({
+    required this.anchor,
+    required this.direction,
+    required this.normal,
+    required this.distance,
+  });
+}
+
 // === SECTION: STATE & TOOL CONTROLLERS ===
 class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   late final ArchitectCommandController _commands;
@@ -248,6 +261,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     _selectionIds.clear();
     _wallCutIds = {};
     _wallCutStart = null;
+    _wallCutConfirmedDir = null;
     _wallStartAttachment = null;
     _wallExtendId = null;
     _multiSelect = false;
@@ -281,6 +295,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _insertPointId = null;
       _wallCutIds = {};
       _wallCutStart = null;
+      _wallCutConfirmedDir = null;
     });
   }
 
@@ -307,6 +322,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   String? _wallExtendId;
   Set<String> _wallCutIds = {};
   Offset? _wallCutStart;
+  Offset? _wallCutConfirmedDir;
   bool _magnetEnabled = true;
   bool _wallCutStroke = false;
   bool _controlTrimClick = false;
@@ -1499,16 +1515,29 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     if (_wallCutIds.isNotEmpty && _wallCutStart != null) {
       final modelPos = _screenToModel(_placementPosition(event.localPosition));
       if ((_wallCutStart! - modelPos).distance > 15 / _currentScale) {
+        final Offset cutStart;
+        final Offset cutEnd;
+        if (_wallCutConfirmedDir != null) {
+          final delta = modelPos - _wallCutStart!;
+          final cutDir = _snappedCutDirection(delta);
+          final extend = math.max(delta.distance + 50 / _currentScale, 10.0);
+          cutStart = _wallCutStart! - cutDir * extend;
+          cutEnd = _wallCutStart! + cutDir * extend;
+        } else {
+          cutStart = _wallCutStart!;
+          cutEnd = modelPos;
+        }
         _executeWallEdit(
           CutArchitectWalls(
             storeyId: _project.activeStoreyId,
             wallIds: Set.of(_wallCutIds),
-            start: _wallCutStart!,
-            end: modelPos,
+            start: cutStart,
+            end: cutEnd,
           ),
         );
         setState(() {
           _wallCutStart = null;
+          _wallCutConfirmedDir = null;
           _wallCutIds = {};
         });
         _repaintPreview();
@@ -1825,60 +1854,6 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (_wallCutIds.isNotEmpty) {
-      if (_wallCutStart != null && (_wallCutStart! - rawModel).distance > 10 / _currentScale) {
-        _executeWallEdit(
-          CutArchitectWalls(
-            storeyId: _project.activeStoreyId,
-            wallIds: Set.of(_wallCutIds),
-            start: _wallCutStart!,
-            end: rawModel,
-          ),
-        );
-        setState(() {
-          _wallCutStart = null;
-          _wallCutIds = {};
-        });
-        return;
-      }
-      // Tap on selected wall to split directly at that point
-      final hitWall = _project.activeStorey.walls
-          .where((w) => _wallCutIds.contains(w.id))
-          .cast<ArchitectWall?>()
-          .firstWhere(
-            (w) =>
-                w != null &&
-                (rawModel -
-                        BimLineGeometry.closest(
-                          rawModel,
-                          w.startPoint,
-                          w.endPoint,
-                        ))
-                    .distance <=
-                w.thickness / 2 + 25 / _currentScale,
-            orElse: () => null,
-          );
-      if (hitWall != null) {
-        final ratio = BimLineGeometry.parameter(
-          rawModel,
-          hitWall.startPoint,
-          hitWall.endPoint,
-        );
-        if (ratio > 0.01 && ratio < 0.99) {
-          _executeWallEdit(
-            SplitArchitectWall(
-              storeyId: _project.activeStoreyId,
-              wallId: hitWall.id,
-              newWallId: ArchitectElementId.next('wall'),
-              ratio: ratio,
-            ),
-          );
-          setState(() {
-            _wallCutStart = null;
-            _wallCutIds = {};
-          });
-          return;
-        }
-      }
       if (!_wallCutStroke) {
         final span = _trimSpanAt(rawModel);
         if (span != null) {
@@ -1894,16 +1869,44 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           return;
         }
       }
-      if (_wallCutStroke && _wallCutStart == null) {
-        setState(() => _wallCutStart = rawModel);
+      if (_wallCutStart == null) {
+        // Step 1: Click 1 confirms the surface (or sets first point in space)
+        final surface = _findNearestSurface(rawModel);
+        setState(() {
+          _wallCutStart = surface?.anchor ?? rawModel;
+          _wallCutConfirmedDir = surface?.direction;
+        });
+        return;
+      } else {
+        // Step 2: Click 2 determines cut direction and slices
+        final Offset cutStart;
+        final Offset cutEnd;
+        if (_wallCutConfirmedDir != null) {
+          final delta = rawModel - _wallCutStart!;
+          final cutDir = _snappedCutDirection(delta);
+          final extend = math.max(delta.distance + 50 / _currentScale, 10.0);
+          cutStart = _wallCutStart! - cutDir * extend;
+          cutEnd = _wallCutStart! + cutDir * extend;
+        } else {
+          cutStart = _wallCutStart!;
+          cutEnd = rawModel;
+        }
+
+        _executeWallEdit(
+          CutArchitectWalls(
+            storeyId: _project.activeStoreyId,
+            wallIds: Set.of(_wallCutIds),
+            start: cutStart,
+            end: cutEnd,
+          ),
+        );
+        setState(() {
+          _wallCutStart = null;
+          _wallCutConfirmedDir = null;
+          _wallCutIds = {};
+        });
         return;
       }
-      // Tap in empty space cancels cut mode
-      setState(() {
-        _wallCutStart = null;
-        _wallCutIds = {};
-      });
-      return;
     }
     if (_wallExtendId != null) {
       final wall = _project.activeStorey.walls.firstWhere(
@@ -2629,6 +2632,117 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         : ArchitectWallTrimSpan.at(picked, _project.activeStorey.walls, point);
   }
 
+  // === SECTION: WALL SPLIT & SURFACE DETECTION ===
+  _ArchitectSurfaceHit? _findNearestSurface(Offset rawPoint) {
+    _ArchitectSurfaceHit? bestHit;
+    double bestDist = 30 / _currentScale;
+
+    void testSegment(Offset p1, Offset p2) {
+      final seg = p2 - p1;
+      final segLen = seg.distance;
+      if (segLen < 0.001) return;
+      final proj = BimLineGeometry.closest(rawPoint, p1, p2);
+      final dist = (rawPoint - proj).distance;
+      if (dist < bestDist) {
+        bestDist = dist;
+        final dir = seg / segLen;
+        final normal = Offset(-dir.dy, dir.dx);
+        bestHit = _ArchitectSurfaceHit(
+          anchor: proj,
+          direction: dir,
+          normal: normal,
+          distance: dist,
+        );
+      }
+    }
+
+    final storey = _project.activeStorey;
+    // 1. Walls: prioritize selected walls if any, or all walls
+    final wallsToTest = _wallCutIds.isNotEmpty
+        ? storey.walls.where((w) => _wallCutIds.contains(w.id))
+        : storey.walls;
+    for (final wall in wallsToTest) {
+      testSegment(wall.startPoint, wall.endPoint);
+      final corners = wall.polygonCorners;
+      for (var i = 0; i < corners.length; i++) {
+        testSegment(corners[i], corners[(i + 1) % corners.length]);
+      }
+    }
+
+    // 2. Slabs
+    for (final slab in storey.slabs) {
+      final poly = slab.polygon;
+      for (var i = 0; i < poly.length; i++) {
+        testSegment(poly[i], poly[(i + 1) % poly.length]);
+      }
+    }
+
+    // 3. Grid axes
+    for (final axis in _project.gridAxes) {
+      testSegment(axis.start, axis.end);
+    }
+
+    // 4. Columns
+    for (final col in storey.columns) {
+      if (col.shape == ColumnShape.rectangular) {
+        final halfW = col.width / 2.0;
+        final halfD = col.depth / 2.0;
+        final angle = col.rotationDeg * math.pi / 180;
+        final cosA = math.cos(angle);
+        final sinA = math.sin(angle);
+        Offset rot(double lx, double ly) => col.position + Offset(
+          lx * cosA - ly * sinA,
+          lx * sinA + ly * cosA,
+        );
+        final c1 = rot(-halfW, -halfD);
+        final c2 = rot(halfW, -halfD);
+        final c3 = rot(halfW, halfD);
+        final c4 = rot(-halfW, halfD);
+        testSegment(c1, c2);
+        testSegment(c2, c3);
+        testSegment(c3, c4);
+        testSegment(c4, c1);
+      }
+    }
+
+    // 5. Zones
+    for (final zone in storey.zones) {
+      final poly = zone.polygon;
+      for (var i = 0; i < poly.length; i++) {
+        testSegment(poly[i], poly[(i + 1) % poly.length]);
+      }
+    }
+
+    return bestHit;
+  }
+
+  Offset _snappedCutDirection(Offset rawDelta) {
+    if (rawDelta.distance < 1e-4) {
+      if (_wallCutConfirmedDir != null) {
+        return Offset(-_wallCutConfirmedDir!.dy, _wallCutConfirmedDir!.dx);
+      }
+      return const Offset(0, 1);
+    }
+    final u = rawDelta / rawDelta.distance;
+    if (_wallCutConfirmedDir != null) {
+      final sDir = _wallCutConfirmedDir!;
+      final nDir = Offset(-sDir.dy, sDir.dx);
+      final dotN = u.dx * nDir.dx + u.dy * nDir.dy;
+      final dotS = u.dx * sDir.dx + u.dy * sDir.dy;
+      if (dotN.abs() >= 0.906) {
+        return dotN >= 0 ? nDir : -nDir;
+      }
+      if (dotS.abs() >= 0.939) {
+        return dotS >= 0 ? sDir : -sDir;
+      }
+      return u;
+    } else {
+      if (u.dx.abs() >= 0.939) return Offset(u.dx.sign, 0);
+      if (u.dy.abs() >= 0.939) return Offset(0, u.dy.sign);
+      return u;
+    }
+  }
+
   List<ArchitectWallClearance> get _wallClearances {
     final ids = _effectiveSelection;
     if (ids.length != 1 ||
@@ -3318,13 +3432,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         ),
       );
 
-      items.add(
-        _radialItem(
-          action: ArchitectRadialAction.edit,
 
-          color: const Color(0xFF00E5FF),
-        ),
-      );
       items.add(
         _radialItem(
           action: ArchitectRadialAction.move,
@@ -3463,6 +3571,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _moveSelection = false;
       _wallCutIds = {};
       _wallCutStart = null;
+      _wallCutConfirmedDir = null;
       _wallExtendId = null;
       _draftStart = null;
       _draftEnd = null;
@@ -3534,6 +3643,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _wallCutStroke = true;
           _wallCutIds = {id};
           _wallCutStart = null;
+          _wallCutConfirmedDir = null;
         });
         break;
 
@@ -3794,6 +3904,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                       _wallCutStroke = action == 'splitStroke';
                       _wallCutIds = Set.of(wallIds);
                       _wallCutStart = null;
+                      _wallCutConfirmedDir = null;
                       _wallExtendId = null;
                       _insertPointId = null;
                     });
@@ -4809,7 +4920,9 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                             ? context.l10n.bimNewPointHint
                             : _wallCutIds.isNotEmpty
                             ? (_wallCutStroke
-                                  ? context.l10n.architectWallSplitHint
+                                  ? (_wallCutStart == null
+                                      ? context.l10n.architectWallSplitSurfaceHint
+                                      : context.l10n.architectWallSplitDirectionHint)
                                   : context.l10n.architectWallCutHint)
                             : _wallExtendId != null
                             ? context.l10n.architectWallExtendHint
@@ -5351,10 +5464,36 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             _wallCutIds.isNotEmpty && !_wallCutStroke && _cursorModel != null
             ? _trimSpanAt(_cursorModel!)
             : null,
-        wallCutLine:
-            _wallCutStroke && _wallCutStart != null && _cursorModel != null
-            ? (_wallCutStart!, _cursorModel!)
-            : null,
+        wallCutGuideLine: () {
+          if (_wallCutIds.isEmpty || _wallCutStart != null) return null;
+          final pos = _cursorModel;
+          if (pos == null) return null;
+          final surface = _findNearestSurface(pos);
+          final anchor = surface?.anchor ?? pos;
+          final dir = surface?.direction ?? const Offset(1, 0);
+          final guideLen = math.max(120 / _currentScale, 3.0);
+          return (anchor - dir * guideLen, anchor + dir * guideLen);
+        }(),
+        wallCutAnchor: () {
+          if (_wallCutIds.isEmpty) return null;
+          if (_wallCutStart != null) return _wallCutStart;
+          final pos = _cursorModel;
+          if (pos == null) return null;
+          final surface = _findNearestSurface(pos);
+          return surface?.anchor ?? pos;
+        }(),
+        wallCutLine: () {
+          if (_wallCutIds.isEmpty || _wallCutStart == null) return null;
+          final pos = _cursorModel ?? _wallCutStart!;
+          if (_wallCutConfirmedDir != null) {
+            final delta = pos - _wallCutStart!;
+            final dir = _snappedCutDirection(delta);
+            final cutLen = math.max(delta.distance + 40 / _currentScale, 4.0);
+            return (_wallCutStart! - dir * cutLen, _wallCutStart! + dir * cutLen);
+          } else {
+            return (_wallCutStart!, pos);
+          }
+        }(),
         activeWallInsulation: _activeWallType?.insulationThickness,
         activeWallTypeId: _activeWallType?.id,
         activeSnapLabel: _localizedSnapLabel(_activeSnapLabel),

@@ -1350,6 +1350,8 @@
   "architectWallMirror": "Обърни",
   "architectWallSplit": "Раздели",
   "architectWallSplitHint": "Срез: две точки през стените",
+  "architectWallSplitSurfaceHint": "Кликнете за потвърждение на повърхността",
+  "architectWallSplitDirectionHint": "Кликнете за посока на среза",
   "architectWallClearance": "Светло",
   "architectGridNone": "Без оси",
   "architectGridCustom": "Свободно",

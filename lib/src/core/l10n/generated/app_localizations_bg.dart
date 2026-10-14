@@ -4174,6 +4174,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectWallSplitHint => 'Срез: две точки през стените';
 
   @override
+  String get architectWallSplitSurfaceHint =>
+      'Кликнете за потвърждение на повърхността';
+
+  @override
+  String get architectWallSplitDirectionHint => 'Кликнете за посока на среза';
+
+  @override
   String get architectWallClearance => 'Светло';
 
   @override

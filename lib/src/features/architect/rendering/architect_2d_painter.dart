@@ -64,6 +64,8 @@ class Architect2dPainter extends CustomPainter {
   final WallExteriorSide activeWallExteriorSide;
   final double? activeWallInsulation;
   final bool showWallCursor;
+  final (Offset, Offset)? wallCutGuideLine;
+  final Offset? wallCutAnchor;
   final (Offset, Offset)? wallCutLine;
   final ArchitectWallTrimSpan? wallTrimSpan;
   final List<ArchitectWallClearance> wallClearances;
@@ -143,6 +145,8 @@ class Architect2dPainter extends CustomPainter {
     this.activeWallExteriorSide = WallExteriorSide.left,
     this.activeWallInsulation,
     this.showWallCursor = true,
+    this.wallCutGuideLine,
+    this.wallCutAnchor,
     this.wallCutLine,
     this.wallTrimSpan,
     this.wallClearances = const [],
@@ -761,18 +765,54 @@ class Architect2dPainter extends CustomPainter {
         );
       }
     }
-    if (wallCutLine != null) {
-      canvas.drawLine(
-        wallCutLine!.$1,
-        wallCutLine!.$2,
+    if (wallCutGuideLine != null) {
+      _drawDashedLine(
+        canvas,
+        wallCutGuideLine!.$1,
+        wallCutGuideLine!.$2,
         Paint()
-          ..color = Colors.redAccent
+          ..color = const Color(0xFFFF9100)
+          ..strokeWidth = 1.8 / zoomScale,
+        zoomScale,
+      );
+    }
+    if (wallCutAnchor != null) {
+      canvas.drawCircle(
+        wallCutAnchor!,
+        5 / zoomScale,
+        Paint()
+          ..color = const Color(0xFFFF9100)
+          ..style = PaintingStyle.stroke
           ..strokeWidth = 1.5 / zoomScale,
       );
       canvas.drawCircle(
+        wallCutAnchor!,
+        2.5 / zoomScale,
+        Paint()..color = const Color(0xFFFF9100),
+      );
+    }
+    if (wallCutLine != null) {
+      _drawDashedLine(
+        canvas,
         wallCutLine!.$1,
+        wallCutLine!.$2,
+        Paint()
+          ..color = const Color(0xFFFF3D00)
+          ..strokeWidth = 2.0 / zoomScale,
+        zoomScale,
+      );
+      canvas.drawCircle(
+        wallCutLine!.$1,
+        4 / zoomScale,
+        Paint()..color = const Color(0xFFFF3D00),
+      );
+      canvas.drawCircle(
+        wallCutLine!.$2,
         3 / zoomScale,
-        Paint()..color = Colors.redAccent,
+        Paint()
+          ..color = const Color(0xFFFF3D00)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5 / zoomScale,
       );
     }
     if (insertPointId != null && cursorPosition != null) {
@@ -920,6 +960,27 @@ class Architect2dPainter extends CustomPainter {
     }
   }
 
+  static void _drawDashedLine(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    Paint paint,
+    double zoomScale,
+  ) {
+    final diff = p2 - p1;
+    final totalLen = diff.distance;
+    if (totalLen <= 0.0001) return;
+    final dir = diff / totalLen;
+    final dashLen = 8.0 / zoomScale;
+    final gapLen = 5.0 / zoomScale;
+    double current = 0.0;
+    while (current < totalLen) {
+      final next = math.min(current + dashLen, totalLen);
+      canvas.drawLine(p1 + dir * current, p1 + dir * next, paint);
+      current += dashLen + gapLen;
+    }
+  }
+
   @override
   bool shouldRepaint(covariant Architect2dPainter oldDelegate) =>
       layer != oldDelegate.layer ||
@@ -931,6 +992,9 @@ class Architect2dPainter extends CustomPainter {
       selectedElementId != oldDelegate.selectedElementId ||
       insertPointId != oldDelegate.insertPointId ||
       polygonLeaderLine != oldDelegate.polygonLeaderLine ||
+      wallCutGuideLine != oldDelegate.wallCutGuideLine ||
+      wallCutAnchor != oldDelegate.wallCutAnchor ||
+      wallCutLine != oldDelegate.wallCutLine ||
       _zoomScale != oldDelegate._zoomScale ||
       underlayDoc != oldDelegate.underlayDoc;
 }

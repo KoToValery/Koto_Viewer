@@ -3064,6 +3064,14 @@
   "architectWallMirror": "Flip",
   "architectWallSplit": "Split",
   "architectWallSplitHint": "Split: two points across walls",
+  "architectWallSplitSurfaceHint": "Click to confirm surface",
+  "@architectWallSplitSurfaceHint": {
+    "description": "Hint for first click in split tool to confirm surface"
+  },
+  "architectWallSplitDirectionHint": "Click for cut direction",
+  "@architectWallSplitDirectionHint": {
+    "description": "Hint for second click in split tool for cut direction"
+  },
   "architectWallClearance": "Clearance",
   "architectGridNone": "None",
   "architectGridCustom": "Custom",
