@@ -266,7 +266,9 @@ class ArchitectSnapHelper {
     }
     for (final axis in project.gridAxes) {
       if (excluded(axis.id)) continue;
-      consider(axis.projectPoint(raw), 'Axis ${axis.name}');
+      if (anchor == null) {
+        consider(axis.projectPoint(raw), 'Axis ${axis.name}');
+      }
       for (final edge in nearby) {
         // Axes are reference lines; object edges remain finite.
         final p = _axisCrossing(axis.start, axis.end, edge);
@@ -295,6 +297,30 @@ class ArchitectSnapHelper {
         if ((angle - target).abs() <= threshold &&
             (projection - raw).distance <= radius + 1e-9) {
           final degrees = (target * 180 / math.pi + 360) % 360;
+          for (final axis in project.gridAxes) {
+            if (excluded(axis.id)) continue;
+            final inter = BimLineGeometry.intersection(
+              anchor,
+              anchor + u,
+              axis.start,
+              axis.end,
+              firstFinite: false,
+              secondFinite: false,
+            );
+            if (inter == null) continue;
+            final t = (inter - anchor).dx * u.dx + (inter - anchor).dy * u.dy;
+            if (t <= 1e-4) continue;
+            final dist = (inter - projection).distance;
+            if (dist <= math.max(radius, 0.25)) {
+              return ArchitectSnapResult(
+                point: inter,
+                isSnapped: true,
+                snapLabel: 'Axis ${axis.name}',
+                angleDeg: degrees,
+                magneticGuides: [(anchor, inter), (axis.start, axis.end)],
+              );
+            }
+          }
           return ArchitectSnapResult(
             point: projection,
             isSnapped: true,
@@ -322,6 +348,18 @@ class ArchitectSnapHelper {
             }
           }
         }
+      }
+    }
+    for (final axis in project.gridAxes) {
+      if (excluded(axis.id)) continue;
+      final proj = axis.projectPoint(raw);
+      if ((proj - raw).distance <= radius) {
+        return ArchitectSnapResult(
+          point: proj,
+          isSnapped: true,
+          snapLabel: 'Axis ${axis.name}',
+          magneticGuides: anchor == null ? [(axis.start, axis.end)] : [(anchor, proj), (axis.start, axis.end)],
+        );
       }
     }
     if (alignment) {

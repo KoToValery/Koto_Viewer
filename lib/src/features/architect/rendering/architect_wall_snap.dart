@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
+import '../../bim_editing/geometry/bim_grid_axis.dart';
 import '../../bim_projects/models/bim_coordinate_frame.dart';
 import '../../dxf_viewer/models/dxf_models.dart';
 import '../../dxf_viewer/rendering/dxf_segment_snap.dart';
@@ -108,6 +110,7 @@ class ArchitectWallSnap {
         ? project.gridAxes
         : project.gridAxes.take(0).toList();
     for (var i = 0; i < axes.length; i++) {
+      consider(axes[i].projectPoint(raw), 'Axis ${axes[i].name}', 2);
       for (final b in axes.skip(i + 1)) {
         final point = ArchitectWallNetwork.intersection(
           axes[i].start,
@@ -199,6 +202,15 @@ class ArchitectWallSnap {
       if ((angle - target).abs() <= threshold &&
           (projected - raw).distance <= directionRadius) {
         final degrees = (target * 180 / math.pi + 360) % 360;
+        final axisCrossing = _axisCrossingOnRay(
+          anchor: anchor,
+          u: u,
+          projected: projected,
+          degrees: degrees,
+          axes: project.gridAxes,
+          tolerance: math.max(directionRadius, 24 / scale),
+        );
+        if (axisCrossing != null) return axisCrossing;
         return ArchitectSnapResult(
           point: projected,
           isSnapped: true,
@@ -220,6 +232,15 @@ class ArchitectWallSnap {
             final degrees =
                 (math.atan2(direction.dy, direction.dx) * 180 / math.pi + 360) %
                 360;
+            final axisCrossing = _axisCrossingOnRay(
+              anchor: anchor,
+              u: direction,
+              projected: projected,
+              degrees: degrees,
+              axes: project.gridAxes,
+              tolerance: math.max(radius, 24 / scale),
+            );
+            if (axisCrossing != null) return axisCrossing;
             return ArchitectSnapResult(
               point: projected,
               isSnapped: true,
@@ -249,4 +270,42 @@ class ArchitectWallSnap {
       point: ArchitectSnapHelper.precision(project).inputPoint(raw),
     );
   }
+
+  static ArchitectSnapResult? _axisCrossingOnRay({
+    required Offset anchor,
+    required Offset u,
+    required Offset projected,
+    required double degrees,
+    required List<BimGridAxis> axes,
+    required double tolerance,
+  }) {
+    ArchitectSnapResult? best;
+    double bestDist = tolerance;
+    for (final axis in axes) {
+      final inter = BimLineGeometry.intersection(
+        anchor,
+        anchor + u,
+        axis.start,
+        axis.end,
+        firstFinite: false,
+        secondFinite: false,
+      );
+      if (inter == null) continue;
+      final t = (inter - anchor).dx * u.dx + (inter - anchor).dy * u.dy;
+      if (t <= 1e-4) continue;
+      final d = (inter - projected).distance;
+      if (d <= bestDist) {
+        bestDist = d;
+        best = ArchitectSnapResult(
+          point: inter,
+          isSnapped: true,
+          snapLabel: 'Axis ${axis.name}',
+          angleDeg: degrees,
+          magneticGuides: [(anchor, inter), (axis.start, axis.end)],
+        );
+      }
+    }
+    return best;
+  }
 }
+

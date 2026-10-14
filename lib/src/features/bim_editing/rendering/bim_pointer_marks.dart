@@ -52,6 +52,47 @@ class BimPointerMarks {
     canvas.drawPath(stemPath, stemPaint);
   }
 
+  /// Unified offset leader handle: element target point, connecting leader stem,
+  /// and outward touch grip ending with an inner/outer circle and central dot.
+  static void offsetLeaderHandle(
+    Canvas canvas,
+    Offset elementPoint,
+    Offset handlePoint,
+    Color color, {
+    double scale = 1.0,
+    bool isScreenSpace = false,
+  }) {
+    final s = isScreenSpace ? 1.0 : scale;
+    final strokeW = 1.2 / s;
+    final stemPaint = Paint()
+      ..color = color.withValues(alpha: 0.6)
+      ..strokeWidth = strokeW
+      ..style = PaintingStyle.stroke;
+
+    // Leader line connecting element point to touch handle
+    canvas.drawLine(elementPoint, handlePoint, stemPaint);
+
+    // Target point on the element
+    canvas.drawCircle(elementPoint, 3.5 / s, Paint()..color = color);
+
+    // Outer touch grip circle
+    canvas.drawCircle(
+      handlePoint,
+      6.0 / s,
+      Paint()..color = const Color(0xFF1E1E26),
+    );
+    canvas.drawCircle(
+      handlePoint,
+      6.0 / s,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5 / s,
+    );
+    // Center dot in handle
+    canvas.drawCircle(handlePoint, 2.5 / s, Paint()..color = color);
+  }
+
   static void ghost(Canvas canvas, List<Offset> polygon, Color color) {
     final path = Path()..addPolygon(polygon, true);
     canvas.drawPath(path, Paint()..color = color.withValues(alpha: .22));

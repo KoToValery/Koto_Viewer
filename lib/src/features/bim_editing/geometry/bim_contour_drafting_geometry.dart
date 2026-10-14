@@ -207,7 +207,101 @@ class BimContourDraftingGeometry {
     );
   }
 
+  /// Calculates perpendicular closure alignment between the current drafting point,
+  /// the previous point ([points.last]), and the initial point ([points.first]).
+  /// Works in the general case for any polygon with 3 or more existing points (e.g. 3, 5, 9 points).
+  static ({
+    Offset point,
+    bool isSnapped,
+    List<(Offset, Offset)> magneticGuides,
+    String? snapLabel,
+  }) calculatePolygonClosureOrthoSnap({
+    required List<Offset> points,
+    required Offset raw,
+    required double tolerance,
+  }) {
+    if (points.length < 3) {
+      return (
+        point: raw,
+        isSnapped: false,
+        magneticGuides: const [],
+        snapLabel: null,
+      );
+    }
+
+    final pFirst = points.first;
+    final pLast = points.last;
+
+    // Check candidate orthogonal intersections with pFirst
+    // Candidate 1: Horizontal from pLast (Y = pLast.dy), Vertical into pFirst (X = pFirst.dx)
+    final c1 = Offset(pFirst.dx, pLast.dy);
+    // Candidate 2: Vertical from pLast (X = pLast.dx), Horizontal into pFirst (Y = pFirst.dy)
+    final c2 = Offset(pLast.dx, pFirst.dy);
+
+    Offset? bestCandidate;
+    double bestDist = tolerance;
+
+    for (final c in [c1, c2]) {
+      if ((c - pLast).distance < 1e-4 || (c - pFirst).distance < 1e-4) continue;
+      final dist = (c - raw).distance;
+      if (dist <= bestDist) {
+        bestDist = dist;
+        bestCandidate = c;
+      }
+    }
+
+    // Also check arbitrary rotation if first edge is rotated
+    if (bestCandidate == null && points.length >= 2) {
+      final pSecond = points[1];
+      final edge1 = pSecond - pFirst;
+      if (edge1.distance > 1e-4) {
+        final u1 = edge1 / edge1.distance;
+        final n1 = Offset(-u1.dy, u1.dx);
+        for (final dirLast in [u1, n1, -u1, -n1]) {
+          for (final dirFirst in [n1, -n1, u1, -u1]) {
+            final cross = dirLast.dx * dirFirst.dy - dirLast.dy * dirFirst.dx;
+            if (cross.abs() < 0.7) continue;
+            final inter = BimLineGeometry.intersection(
+              pLast,
+              pLast + dirLast,
+              pFirst,
+              pFirst + dirFirst,
+              firstFinite: false,
+              secondFinite: false,
+            );
+            if (inter == null) continue;
+            final dist = (inter - raw).distance;
+            if (dist <= bestDist) {
+              bestDist = dist;
+              bestCandidate = inter;
+            }
+          }
+        }
+      }
+    }
+
+    if (bestCandidate != null) {
+      return (
+        point: bestCandidate,
+        isSnapped: true,
+        magneticGuides: [
+          (pLast, bestCandidate),
+          (pFirst, bestCandidate),
+        ],
+        snapLabel: 'Alignment with Point 1',
+      );
+    }
+
+    return (
+      point: raw,
+      isSnapped: false,
+      magneticGuides: const [],
+      snapLabel: null,
+    );
+  }
+
   /// Computes the arithmetic centroid (center of mass) of polygon vertices.
+
   static Offset calculateCentroid(List<Offset> points) {
     if (points.isEmpty) return Offset.zero;
     double sumX = 0.0;

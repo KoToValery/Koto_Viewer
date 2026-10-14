@@ -762,6 +762,13 @@ class MoveArchitectElements extends ArchitectModelCommand {
           if (!connected) return current;
           for (final source in movedWalls) {
             if (!source.connectsAt(oldPoint)) continue;
+            final isCollinear = (source.unitVector.dx * support.unitVector.dy -
+                    source.unitVector.dy * support.unitVector.dx)
+                .abs() <
+                1e-4;
+            if (isCollinear) {
+              return oldPoint;
+            }
             final oldFaces = _wallConnectionFaces(source);
             final newFaces = _wallConnectionFaces(nextWalls[source.id]!);
             for (var i = 0; i < oldFaces.length; i++) {
@@ -807,6 +814,63 @@ class MoveArchitectElements extends ArchitectModelCommand {
             startPoint: start,
             endPoint: end,
           );
+        }
+      }
+      for (final source in movedWalls) {
+        final movedWall = nextWalls[source.id]!;
+        final perpDist = (delta.dx * source.normalVector.dx +
+                delta.dy * source.normalVector.dy)
+            .abs();
+        if (perpDist < 1e-3) continue;
+
+        for (final (atStart, oldPoint, newPoint) in [
+          (true, source.startPoint, movedWall.startPoint),
+          (false, source.endPoint, movedWall.endPoint),
+        ]) {
+          final isConnectedAtEnd =
+              atStart ? source.connectStart : source.connectEnd;
+          if (!isConnectedAtEnd) continue;
+          if ((newPoint - oldPoint).distance < 1e-3) continue;
+          final hasCollinearSupport = storey.walls.any(
+            (w) {
+              if (elementIds.contains(w.id) || w.isDetached) return false;
+              final touchesAtStart = (w.startPoint - oldPoint).distance < 1e-4;
+              final touchesAtEnd = (w.endPoint - oldPoint).distance < 1e-4;
+              if (!touchesAtStart && !touchesAtEnd) return false;
+              final isConnected =
+                  touchesAtStart ? w.connectStart : w.connectEnd;
+              if (!isConnected) return false;
+              return (source.unitVector.dx * w.unitVector.dy -
+                          source.unitVector.dy * w.unitVector.dx)
+                      .abs() <
+                  1e-4;
+            },
+          );
+          if (hasCollinearSupport) {
+            var count = 1;
+            String newId;
+            do {
+              newId = 'wall_step_${DateTime.now().microsecondsSinceEpoch}_$count';
+              count++;
+            } while (nextWalls.containsKey(newId) ||
+                project.storeys.any((s) => s.walls.any((w) => w.id == newId)));
+
+            final connectingWall = ArchitectWall(
+              id: newId,
+              startPoint: oldPoint,
+              endPoint: newPoint,
+              thickness: source.thickness,
+              height: source.height,
+              referenceLine: source.referenceLine,
+              exteriorSide: source.exteriorSide,
+              insulationThicknessOverride: source.insulationThicknessOverride,
+              wallTypeId: source.wallTypeId,
+              parapetFinish: source.parapetFinish,
+              connectStart: true,
+              connectEnd: true,
+            );
+            nextWalls[newId] = connectingWall;
+          }
         }
       }
       // Shared unselected junctions follow once, without translating their
@@ -858,7 +922,7 @@ class MoveArchitectElements extends ArchitectModelCommand {
     }
     var result = ArchitectModelCommand.replace(
       project,
-      storey.copyWith(walls: [for (final w in storey.walls) nextWalls[w.id]!]),
+      storey.copyWith(walls: nextWalls.values.toList()),
     );
     final carried = {
       for (final w in movedWalls) ...[

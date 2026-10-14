@@ -4090,7 +4090,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSelectionMulti => 'Много';
 
   @override
-  String get architectSelectionMove => 'Мести';
+  String get architectSelectionMove => 'Влачене';
 
   @override
   String get architectProperties => 'Свойства';
@@ -4445,7 +4445,10 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectFenestrationWithCasing => 'С обрамчване';
 
   @override
-  String get architectRadialMove => 'Местене';
+  String get architectRadialMove => 'Влачене';
+
+  @override
+  String get snapAlignPoint1 => 'Подравняване с Точка 1';
 
   @override
   String get architectRadialEdit => 'Редакция';

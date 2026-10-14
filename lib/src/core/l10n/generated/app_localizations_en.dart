@@ -4076,7 +4076,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSelectionMulti => 'Multi';
 
   @override
-  String get architectSelectionMove => 'Move';
+  String get architectSelectionMove => 'Drag';
 
   @override
   String get architectProperties => 'Properties';
@@ -4429,7 +4429,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectFenestrationWithCasing => 'With casing';
 
   @override
-  String get architectRadialMove => 'Move';
+  String get architectRadialMove => 'Drag';
+
+  @override
+  String get snapAlignPoint1 => 'Alignment with Point 1';
 
   @override
   String get architectRadialEdit => 'Edit';

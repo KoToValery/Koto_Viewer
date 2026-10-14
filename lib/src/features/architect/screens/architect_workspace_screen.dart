@@ -1,4 +1,5 @@
 import '../../bim_editing/widgets/bim_edit_actions.dart';
+import '../../bim_editing/geometry/bim_contour_drafting_geometry.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -297,13 +298,14 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
   Set<String> _groupDragIds = {};
   bool _multiSelect = false;
   bool _moveSelection = false;
-  Set<String> get _effectiveSelection => _multiSelect
-      ? Set.of(_selectionIds)
-      : {
-          ?_selectedElementId,
-          ?_selectedZoneId,
-          if (_axisTool.selectedAxisId != null) _axisTool.selectedAxisId!,
-        };
+  Set<String> get _effectiveSelection {
+    if (_selectionIds.isNotEmpty) return Set.of(_selectionIds);
+    return {
+      ?_selectedElementId,
+      ?_selectedZoneId,
+      if (_axisTool.selectedAxisId != null) _axisTool.selectedAxisId!,
+    };
+  }
   bool _touchInput = false;
   bool _placingWithHold = false;
   bool _wallPrecisionMode = true;
@@ -685,8 +687,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     if (_wallExtendId != null) return;
-    if (_activeTool != ArchitectTool.select &&
-        (_multiSelect || _moveSelection)) {
+    if (_moveSelection ||
+        (_activeTool != ArchitectTool.select && _multiSelect)) {
       final id = _hitSelection(rawModel);
       if (_moveSelection && id != null && _effectiveSelection.contains(id)) {
         _groupDragIds = _effectiveSelection;
@@ -696,8 +698,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         _elementMoveOriginal = _project;
         _elementMovePreview = _project;
         _isHandleEngaged = true;
+        return;
       }
-      return;
     }
     final polygon = _selectedPolygon;
     final movableEdge =
@@ -754,6 +756,30 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _isHandleEngaged = true;
           return;
         }
+      }
+    }
+
+    // Midpoint handle check for selected wall (extrusion / step move)
+    if (_selectedWall != null &&
+        _insertPointId == null &&
+        _wallCutIds.isEmpty &&
+        _wallExtendId == null) {
+      final wall = _selectedWall!;
+      final mid = (wall.startPoint + wall.endPoint) / 2;
+      final midTol = math.min(16 / _currentScale, 0.35);
+      if ((rawModel - mid).distance <= midTol) {
+        _draggingElementId = wall.id;
+        _elementMoveStart = rawModel;
+        _elementMoveDelta = Offset.zero;
+        _elementMoveOriginal = _project;
+        _elementMovePreview = _project;
+        _isHandleEngaged = true;
+        HapticFeedback.mediumImpact();
+        ArchitectLogger.log(
+          'HANDLE',
+          'Wall ${wall.id} midpoint extrusion engaged',
+        );
+        return;
       }
     }
 
@@ -888,7 +914,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
 
     if (_effectiveSelection.isNotEmpty &&
-        _activeTool != ArchitectTool.select &&
+        (_moveSelection || _activeTool != ArchitectTool.select) &&
         _tryStartElementDrag(rawModel)) {
       return;
     }
@@ -1220,8 +1246,16 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           parallelOnly: _wallParallelMove,
         );
         delta = alignment.$1;
-        _activeMagneticGuides = alignment.$2;
-      } else if (selectedWall == null) {
+        final snapDelta = _snapMovingElements(delta, {selectedWall.id});
+        if ((snapDelta - delta).distance > 1e-4) {
+          delta = snapDelta;
+        } else {
+          _activeMagneticGuides = [
+            ..._activeMagneticGuides,
+            ...alignment.$2,
+          ];
+        }
+      } else {
         delta = _snapMovingElements(delta, {_draggingElementId!});
       }
       _elementMoveDelta = delta;
@@ -1391,11 +1425,28 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
 
   Offset _resolveSlabPoint(Offset raw) {
     final points = _elementTool.slabDraftPoints;
-    if (points.length >= 3 &&
-        (raw - points.first).distance <= math.min(16 / _currentScale, .20)) {
-      return points.first;
+    if (points.length >= 3) {
+      if ((raw - points.first).distance <= math.min(16 / _currentScale, .20)) {
+        _activeSnapLabel = context.l10n.architectZonePointSnapStart;
+        _activeMagneticGuides = [];
+        return points.first;
+      }
+      final closure =
+          BimContourDraftingGeometry.calculatePolygonClosureOrthoSnap(
+        points: points,
+        raw: raw,
+        tolerance: math.max(16 / _currentScale, 0.30),
+      );
+      if (closure.isSnapped) {
+        _activeSnapLabel = context.l10n.snapAlignPoint1;
+        _activeMagneticGuides = closure.magneticGuides;
+        return closure.point;
+      }
     }
-    return _snapElement(raw, anchor: points.lastOrNull).point;
+    final snap = _snapElement(raw, anchor: points.lastOrNull);
+    _activeSnapLabel = snap.snapLabel;
+    _activeMagneticGuides = snap.magneticGuides;
+    return snap.point;
   }
 
   void _onPointerHover(PointerHoverEvent event) {
@@ -1719,6 +1770,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             }
           });
         }
+      } else {
+        setState(() => _insertPointId = null);
       }
       return;
     }
@@ -1962,12 +2015,27 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
 
-    // Navigation never captures an element; selection belongs to its tool.
-    if (_activeTool == ArchitectTool.select) return;
+    // Active selection tap handling: additive selection or cancel on empty space
     if (_effectiveSelection.isNotEmpty) {
-      _selectAt(rawModel);
+      final hit = _selectAt(rawModel, toggle: true);
+      if (!hit) {
+        setState(() {
+          _selectionIds.clear();
+          _selectedElementId = null;
+          _selectedZoneId = null;
+          _axisTool.deselect();
+          _moveSelection = false;
+          _insertPointId = null;
+          _wallCutIds = {};
+          _wallExtendId = null;
+          _cancelActiveDrags();
+        });
+      }
       return;
     }
+
+    // Navigation never captures an element; selection belongs to its tool.
+    if (_activeTool == ArchitectTool.select) return;
 
     // 4. In Wall tool
     if (_activeTool == ArchitectTool.wall) {
@@ -3422,7 +3490,11 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     }
   }
 
-  bool _selectAt(Offset point, {bool invalidateGesture = true}) {
+  bool _selectAt(
+    Offset point, {
+    bool invalidateGesture = true,
+    bool toggle = false,
+  }) {
     final id = _hitSelection(point);
     if (id == null) return false;
     _cancelActiveDrags();
@@ -3436,16 +3508,26 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _draftEnd = null;
       _selectedElementId = null;
       _selectedZoneId = null;
-      if (_multiSelect) {
-        if (!_selectionIds.add(id)) _selectionIds.remove(id);
+      if (toggle && _selectionIds.contains(id)) {
+        _selectionIds.remove(id);
+        if (_selectedElementId == id) {
+          _selectedElementId =
+              _selectionIds.isNotEmpty ? _selectionIds.last : null;
+        }
+        if (_selectedZoneId == id) {
+          _selectedZoneId = null;
+        }
       } else {
+        _selectionIds.add(id);
         if (_project.activeStorey.zones.any((e) => e.id == id)) {
           _selectedZoneId = id;
+          _selectedElementId = id;
           _zoneTool.startEditingZone(
             _project.activeStorey.zones.firstWhere((e) => e.id == id),
           );
         } else if (_project.gridAxes.any((e) => e.id == id)) {
           _axisTool.selectAxis(id);
+          _selectedElementId = id;
         } else {
           _selectedElementId = id;
         }
@@ -4493,7 +4575,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         holdToEdit:
             _duplicateMove == null &&
             _effectiveSelection.isNotEmpty &&
-            (!_multiSelect || _moveSelection) &&
+            !_multiSelect &&
+            !_moveSelection &&
             _wallCutIds.isEmpty &&
             _wallExtendId == null &&
             _insertPointId == null,
@@ -5138,6 +5221,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             ? _activeTool
             : ArchitectTool.select,
         cursorPosition: _cursorModel,
+        insertPointId: _insertPointId,
         columnPreview:
             _activeTool == ArchitectTool.column &&
                 _effectiveSelection.isEmpty &&
@@ -5168,8 +5252,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
         activeWallInsulation: _activeWallType?.insulationThickness,
         activeWallTypeId: _activeWallType?.id,
         activeSnapLabel: _localizedSnapLabel(_activeSnapLabel),
-        selectedElementId: _multiSelect ? null : _selectedElementId,
-        selectedElementIds: _multiSelect ? _selectionIds : const {},
+        selectedElementId: _selectedElementId,
+        selectedElementIds: _effectiveSelection,
         selectedZoneId: _selectedZoneId,
         activeZoneCategory: _activeZoneCategory,
         draggingVertexIndex: _draggingVertexIndex,

@@ -306,6 +306,33 @@ class ArchitectZoneTool extends ChangeNotifier {
         notifyListeners();
         return;
       }
+
+      if (magnetic) {
+        final closure =
+            BimContourDraftingGeometry.calculatePolygonClosureOrthoSnap(
+          points: _draftPoints,
+          raw: rawModelPoint,
+          tolerance: math.max(16.0 / currentScale, 0.30),
+        );
+        if (closure.isSnapped) {
+          _snappedPoint = closure.point;
+          _candidatePoint = closure.point;
+          _isClosingSnap = false;
+          _orthoGuide = null;
+          _orthoLabel = closure.snapLabel;
+          _magneticGuides = closure.magneticGuides;
+          final isIntersecting = ArchitectZoneGeometry.segmentIntersectsChain(
+            lastPoint,
+            closure.point,
+            _draftPoints,
+          );
+          _pointStatus = isIntersecting
+              ? ZoneDraftingPointStatus.selfIntersects
+              : ZoneDraftingPointStatus.valid;
+          notifyListeners();
+          return;
+        }
+      }
     }
     _isClosingSnap = false;
 

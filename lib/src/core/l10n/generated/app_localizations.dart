@@ -7094,7 +7094,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectSelectionMove.
   ///
   /// In en, this message translates to:
-  /// **'Move'**
+  /// **'Drag'**
   String get architectSelectionMove;
 
   /// No description provided for @architectProperties.
@@ -7784,8 +7784,14 @@ abstract class AppLocalizations {
   /// Radial menu move action
   ///
   /// In en, this message translates to:
-  /// **'Move'**
+  /// **'Drag'**
   String get architectRadialMove;
+
+  /// Snap helper label for orthogonal alignment with 1st point of polygon
+  ///
+  /// In en, this message translates to:
+  /// **'Alignment with Point 1'**
+  String get snapAlignPoint1;
 
   /// Radial menu edit action
   ///

@@ -18,6 +18,9 @@ import '../models/architect_wall.dart';
 import 'architect_dimension_layout.dart';
 import '../services/architect_selection.dart';
 import '../services/architect_wall_relations.dart';
+import '../services/architect_command_controller.dart';
+import '../../bim_editing/geometry/bim_line_geometry.dart';
+import '../../bim_editing/rendering/bim_pointer_marks.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
 
@@ -123,6 +126,7 @@ class Architect2dPainter extends CustomPainter {
   final Offset? slabCandidatePoint;
   final bool polygonEditInvalid;
   final (Offset, Offset)? polygonLeaderLine;
+  final String? insertPointId;
 
   Architect2dPainter({
     required ArchitectProject project,
@@ -130,6 +134,7 @@ class Architect2dPainter extends CustomPainter {
     this.layer = ArchitectPaintLayer.all,
     this.paintGrid = true,
     required this.activeTool,
+    this.insertPointId,
     this.activeDraftStart,
     this.activeDraftEnd,
     this.activeWallThickness = 0.25,
@@ -595,8 +600,17 @@ class Architect2dPainter extends CustomPainter {
 
     final layers = ArchitectWallLayers.forProject(_project);
     _drawWallLayers(canvas, layers, wallBorderPaint);
+    final midDotPaint = Paint()
+      ..color = const Color(0x99B0BEC5)
+      ..style = PaintingStyle.fill;
+    final midBorderPaint = Paint()
+      ..color = const Color(0x66000000)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8 / zoomScale;
+
     for (final wall in activeStorey.walls) {
-      final isSelected = wall.id == selectedElementId;
+      final isSelected =
+          wall.id == selectedElementId || selectedElementIds.contains(wall.id);
       final borderPaint = isSelected
           ? (Paint()
               ..color = const Color(0xFF00E5FF)
@@ -613,6 +627,11 @@ class Architect2dPainter extends CustomPainter {
           canvas.drawCircle(point, 3 / zoomScale, Paint()..color = Colors.cyan);
         }
       }
+
+      // Unobtrusive midpoint edit handle for extrusion/step move
+      final midPoint = (wall.startPoint + wall.endPoint) / 2;
+      canvas.drawCircle(midPoint, 3.2 / zoomScale, midDotPaint);
+      canvas.drawCircle(midPoint, 3.2 / zoomScale, midBorderPaint);
       // A detached end remains visibly capped even when bodies touch.
       for (final end in [true, false]) {
         if (end ? wall.connectStart : wall.connectEnd) continue;
@@ -756,6 +775,28 @@ class Architect2dPainter extends CustomPainter {
         Paint()..color = Colors.redAccent,
       );
     }
+    if (insertPointId != null && cursorPosition != null) {
+      final path = InsertArchitectElementPoint.pathOf(
+        project.activeStorey,
+        insertPointId!,
+      );
+      if (path != null) {
+        final hit = BimLineGeometry.insertion(
+          path.points,
+          cursorPosition!,
+          closed: path.closed,
+        );
+        if (hit != null) {
+          BimPointerMarks.offsetLeaderHandle(
+            canvas,
+            hit.point,
+            cursorPosition!,
+            Colors.cyanAccent,
+            scale: zoomScale,
+          );
+        }
+      }
+    }
     if (activeTool == ArchitectTool.wall && cursorPosition != null) {
       // Exact aim point sits at the tip, ahead of the offset pointer/ruler.
       canvas.drawCircle(
@@ -888,6 +929,7 @@ class Architect2dPainter extends CustomPainter {
       selectedZoneId != oldDelegate.selectedZoneId ||
       selectedAxisId != oldDelegate.selectedAxisId ||
       selectedElementId != oldDelegate.selectedElementId ||
+      insertPointId != oldDelegate.insertPointId ||
       polygonLeaderLine != oldDelegate.polygonLeaderLine ||
       _zoomScale != oldDelegate._zoomScale ||
       underlayDoc != oldDelegate.underlayDoc;
