@@ -343,53 +343,81 @@ class ArchitectToolPalette extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text(
-              l10n.architectWallThickness,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-          ),
           if (wallTypes != null && wallTypes!.isNotEmpty)
-            for (final wt in wallTypes!)
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: ChoiceChip(
-                  avatar: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: wt.color,
-                      shape: BoxShape.circle,
+            PopupMenuButton<ArchitectWallType>(
+              key: const ValueKey('architect-wall-type-picker'),
+              tooltip: l10n.architectWallType,
+              position: PopupMenuPosition.over,
+              // The bottom toolbar anchors the list above the selected type.
+              offset: Offset(0, -(wallTypes!.length * 48.0 + 16)),
+              color: const Color(0xFF282B34),
+              onSelected: (type) {
+                onWallTypeSelected?.call(type);
+                onWallThicknessChanged(type.totalThickness);
+              },
+              itemBuilder: (_) => [
+                for (final type in wallTypes!)
+                  PopupMenuItem(
+                    key: ValueKey('architect-wall-type-${type.id}'),
+                    value: type,
+                    child: Row(
+                      children: [
+                        Icon(Icons.circle, size: 8, color: type.color),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            type.compactLabel(l10n),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        if (type.id == activeWallType?.id) ...[
+                          const SizedBox(width: 12),
+                          const Icon(Icons.check, size: 18, color: Colors.cyan),
+                        ],
+                      ],
                     ),
                   ),
-                  label: Text(wt.compactLabel(l10n)),
-                  selected:
-                      activeWallType?.id == wt.id ||
-                      (activeWallType == null &&
-                          (wallThickness - wt.totalThickness).abs() < 1e-3),
-                  onSelected: (sel) {
-                    if (sel) {
-                      onWallTypeSelected?.call(wt);
-                      onWallThicknessChanged(wt.totalThickness);
-                    }
-                  },
-                  visualDensity: VisualDensity.compact,
+              ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
                 ),
-              )
-          else
-            for (final t in [0.12, 0.15, 0.20, 0.25, 0.38])
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: ChoiceChip(
-                  label: Text('${(t * 100).round()} cm'),
-                  selected: (wallThickness - t).abs() < 1e-3,
-                  onSelected: (sel) {
-                    if (sel) onWallThicknessChanged(t);
-                  },
-                  visualDensity: VisualDensity.compact,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF282B34),
+                  border: Border.all(color: Colors.white24),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      size: 8,
+                      color: (activeWallType ?? wallTypes!.first).color,
+                    ),
+                    const SizedBox(width: 6),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 130),
+                      child: Text(
+                        (activeWallType ?? wallTypes!.first).compactLabel(l10n),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.expand_less,
+                      size: 18,
+                      color: Colors.white70,
+                    ),
+                  ],
                 ),
               ),
+            ),
           const SizedBox(width: 8),
           ChoiceChip(
             avatar: const Icon(Icons.show_chart_rounded, size: 14),

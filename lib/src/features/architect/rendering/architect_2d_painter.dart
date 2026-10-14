@@ -19,9 +19,6 @@ import '../models/architect_wall.dart';
 import 'architect_dimension_layout.dart';
 import '../services/architect_selection.dart';
 import '../services/architect_wall_relations.dart';
-import '../services/architect_command_controller.dart';
-import '../../bim_editing/geometry/bim_line_geometry.dart';
-import '../../bim_editing/rendering/bim_pointer_marks.dart';
 
 enum ArchitectPaintLayer { all, model, interaction }
 
@@ -130,7 +127,6 @@ class Architect2dPainter extends CustomPainter {
   final Offset? slabCandidatePoint;
   final bool polygonEditInvalid;
   final (Offset, Offset)? polygonLeaderLine;
-  final String? insertPointId;
 
   Architect2dPainter({
     required ArchitectProject project,
@@ -139,7 +135,6 @@ class Architect2dPainter extends CustomPainter {
     this.paintGrid = true,
     this.palette = const ArchitectCanvasPalette.light(),
     required this.activeTool,
-    this.insertPointId,
     this.activeDraftStart,
     this.activeDraftEnd,
     this.activeWallThickness = 0.25,
@@ -835,28 +830,6 @@ class Architect2dPainter extends CustomPainter {
           ..strokeWidth = 1.5 / zoomScale,
       );
     }
-    if (insertPointId != null && cursorPosition != null) {
-      final path = InsertArchitectElementPoint.pathOf(
-        project.activeStorey,
-        insertPointId!,
-      );
-      if (path != null) {
-        final hit = BimLineGeometry.insertion(
-          path.points,
-          cursorPosition!,
-          closed: path.closed,
-        );
-        if (hit != null) {
-          BimPointerMarks.offsetLeaderHandle(
-            canvas,
-            hit.point,
-            cursorPosition!,
-            Colors.cyanAccent,
-            scale: zoomScale,
-          );
-        }
-      }
-    }
     if (activeTool == ArchitectTool.wall && cursorPosition != null) {
       // Exact aim point sits at the tip, ahead of the offset pointer/ruler.
       canvas.drawCircle(
@@ -1012,7 +985,6 @@ class Architect2dPainter extends CustomPainter {
       selectedZoneId != oldDelegate.selectedZoneId ||
       selectedAxisId != oldDelegate.selectedAxisId ||
       selectedElementId != oldDelegate.selectedElementId ||
-      insertPointId != oldDelegate.insertPointId ||
       polygonLeaderLine != oldDelegate.polygonLeaderLine ||
       wallCutGuideLine != oldDelegate.wallCutGuideLine ||
       wallCutAnchor != oldDelegate.wallCutAnchor ||

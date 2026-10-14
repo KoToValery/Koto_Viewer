@@ -7928,7 +7928,7 @@ abstract class AppLocalizations {
   /// No description provided for @bimNewPointHint.
   ///
   /// In en, this message translates to:
-  /// **'Tap an edge to add a point'**
+  /// **'Add a point at the middle of the indicated edge'**
   String get bimNewPointHint;
 
   /// No description provided for @bimWallNewPointHelp.
@@ -7948,6 +7948,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dark background'**
   String get architectCanvasDark;
+
+  /// No description provided for @architectWallType.
+  ///
+  /// In en, this message translates to:
+  /// **'Wall type'**
+  String get architectWallType;
 }
 
 class _AppLocalizationsDelegate

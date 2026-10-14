@@ -1264,9 +1264,11 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     required this.elementId,
     required this.point,
     required this.newElementId,
+    this.atMidpoint = false,
   });
   final String storeyId, elementId, newElementId;
   final Offset point;
+  final bool atMidpoint;
 
   static ({List<Offset> points, bool closed, double width})? pathOf(
     ArchitectStorey storey,
@@ -1318,18 +1320,25 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
     final storey = ArchitectModelCommand.storey(project, storeyId);
     final path = pathOf(storey, elementId);
     if (path == null) throw ArgumentError('Element has no editable path');
+    // The pick identifies the segment; midpoint insertion ignores its distance
+    // along that segment and works equally for open paths and closing edges.
     final hit = BimLineGeometry.insertion(
       path.points,
       point,
       closed: path.closed,
     );
-    if (hit == null ||
-        path.points.any((p) => (p - hit.point).distance < .001)) {
+    if (hit == null) throw ArgumentError('Element has no editable segment');
+    final insertion = atMidpoint
+        ? (path.points[hit.edge] +
+                  path.points[(hit.edge + 1) % path.points.length]) /
+              2
+        : hit.point;
+    if (path.points.any((p) => (p - insertion).distance < .001)) {
       throw ArgumentError('Point already exists or segment is too short');
     }
     if (path.closed) {
       final points = List<Offset>.of(path.points)
-        ..insert(hit.edge + 1, hit.point);
+        ..insert(hit.edge + 1, insertion);
       return UpdateArchitectPolygon(
         storeyId: storeyId,
         elementId: elementId,
@@ -1344,7 +1353,7 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         wallId: elementId,
         newWallId: newElementId,
         ratio: BimLineGeometry.parameter(
-          hit.point,
+          insertion,
           wall.startPoint,
           wall.endPoint,
         ),
@@ -1356,16 +1365,16 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
         beams: [
           for (final b in storey.beams)
             if (b.id == elementId) ...[
-              b.copyWith(endPoint: hit.point),
-              b.copyWith(id: newElementId, startPoint: hit.point),
+              b.copyWith(endPoint: insertion),
+              b.copyWith(id: newElementId, startPoint: insertion),
             ] else
               b,
         ],
         cadPrimitives: [
           for (final p in storey.cadPrimitives)
             if (p.id == elementId) ...[
-              p.copyWith(endPoint: hit.point),
-              p.copyWith(id: newElementId, startPoint: hit.point),
+              p.copyWith(endPoint: insertion),
+              p.copyWith(id: newElementId, startPoint: insertion),
             ] else
               p,
         ],

@@ -1461,8 +1461,9 @@
   "bimUnderlayReviewCompleteAction": "Проверено",
   "bimUnderlayReviewCompleteTooltip": "Отбележи запазените елементи и отвори като проверени",
   "bimNewPoint": "Нова точка",
-  "bimNewPointHint": "Докосни ръб за нова точка",
+  "bimNewPointHint": "Добави точка в средата на посочения ръб",
   "bimWallNewPointHelp": "Добавя свързани сегменти. Срежи прекъсва връзката.",
   "architectCanvasLight": "Светъл фон",
-  "architectCanvasDark": "Тъмен фон"
+  "architectCanvasDark": "Тъмен фон",
+  "architectWallType": "Тип стена"
 }

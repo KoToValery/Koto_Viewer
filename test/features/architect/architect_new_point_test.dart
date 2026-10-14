@@ -149,6 +149,100 @@ void main() {
     });
   }
 
+  for (final kind in kinds) {
+    test(
+      'Midpoint insertion identifies the $kind segment from an off-center pick',
+      () {
+        final model = editing.seeded(fixture(kind));
+        addTearDown(model.dispose);
+        final original = model.project;
+        model.execute(
+          const InsertArchitectElementPoint(
+            storeyId: 's',
+            elementId: 'p',
+            point: Offset(1, .02),
+            newElementId: 'next',
+            atMidpoint: true,
+          ),
+        );
+        final path = InsertArchitectElementPoint.pathOf(
+          model.project.activeStorey,
+          'p',
+        )!;
+        expect(path.points, contains(const Offset(4, 0)));
+        if (path.closed) expect(BimPolygonGeometry.signedArea(path.points), 48);
+        model.undo();
+        expect(model.project, same(original));
+        expect(model.canUndo, isFalse);
+        model.redo();
+        expect(
+          InsertArchitectElementPoint.pathOf(
+            model.project.activeStorey,
+            'p',
+          )!.points,
+          contains(const Offset(4, 0)),
+        );
+      },
+    );
+  }
+
+  test('Midpoint insertion includes a polygon closing edge', () {
+    final model = editing.seeded(fixture('slab'));
+    addTearDown(model.dispose);
+    model.execute(
+      const InsertArchitectElementPoint(
+        storeyId: 's',
+        elementId: 'p',
+        point: Offset(.02, 4.7),
+        newElementId: 'next',
+        atMidpoint: true,
+      ),
+    );
+    expect(model.project.activeStorey.slabs.single.polygon, [
+      ...polygon,
+      const Offset(0, 3),
+    ]);
+  });
+
+  test('Midpoint insertion preserves an oblique native line', () {
+    final model = editing.seeded(
+      fixture('line').copyWith(
+        cadPrimitives: const [
+          ArchitectCadPrimitive(
+            id: 'p',
+            type: CadPrimitiveType.line,
+            startPoint: Offset(2, 1),
+            endPoint: Offset(10, 9),
+            strokeWidth: 3,
+          ),
+        ],
+      ),
+    );
+    addTearDown(model.dispose);
+    model.execute(
+      const InsertArchitectElementPoint(
+        storeyId: 's',
+        elementId: 'p',
+        point: Offset(3, 2.1),
+        newElementId: 'next',
+        atMidpoint: true,
+      ),
+    );
+    expect(
+      model.project.activeStorey.cadPrimitives.first.endPoint,
+      const Offset(6, 5),
+    );
+    expect(
+      model.project.activeStorey.cadPrimitives.last.startPoint,
+      const Offset(6, 5),
+    );
+    expect(
+      model.project.activeStorey.cadPrimitives.last.endPoint,
+      const Offset(10, 9),
+    );
+    expect(model.project.activeStorey.cadPrimitives.last.strokeWidth, 3);
+  });
+
   test(
     'New point and Split have different connection semantics; invalid points are atomic',
     () {
@@ -189,7 +283,7 @@ void main() {
 
   for (final kind in kinds) {
     testWidgets(
-      'context New point inserts on $kind with quick touch and can cancel',
+      'context New point inserts at the indicated midpoint on $kind immediately',
       (tester) async {
         final model = editing.seeded(fixture(kind));
         addTearDown(model.dispose);
@@ -205,35 +299,19 @@ void main() {
         }
         // For polygons select inside; for native lines select the body.
         final select = ['rect', 'slab', 'zone', 'opening'].contains(kind)
-            ? const Offset(2, 2)
+            ? const Offset(3, .1)
             : const Offset(1, 0);
+        final original = model.project;
         await editing.contextHold(tester, select);
         final action = find.byKey(const ValueKey('architect-radial-newPoint'));
         expect(action, findsOneWidget);
         await tester.tap(action);
         await tester.pumpAndSettle();
-        final original = model.project;
-        expect(
-          find.byKey(const ValueKey('architect-new-point-cancel')),
-          findsOneWidget,
-        );
-        await tester.tap(
-          find.byKey(const ValueKey('architect-new-point-cancel')),
-        );
-        await tester.pumpAndSettle();
-        expect(identical(model.project, original), isTrue);
-        await editing.contextHold(tester, select);
-        await tester.tap(action);
-        await tester.pumpAndSettle();
-        workspace.camera(tester).fit(const Rect.fromLTWH(-1, -1, 10, 8));
-        await tester.pumpAndSettle();
-        await workspace.wallTap(tester, const Offset(3, 0));
-        await tester.pumpAndSettle();
         final path = InsertArchitectElementPoint.pathOf(
           model.project.activeStorey,
           'p',
         )!;
-        expect(path.points, contains(const Offset(3, 0)));
+        expect(path.points, contains(const Offset(4, 0)));
         expect(model.canUndo, isTrue);
         expect(
           find.byKey(const ValueKey('architect-new-point-cancel')),
@@ -300,9 +378,12 @@ void main() {
       }
       await tester.tap(find.byKey(const ValueKey('architect-radial-newPoint')));
       await tester.pumpAndSettle();
-      await workspace.wallTap(tester, const Offset(3, 0));
       expect(model.project.activeStorey.walls, hasLength(2));
       expect(model.project.activeStorey.walls.first.connectEnd, isTrue);
+      expect(
+        model.project.activeStorey.walls.first.endPoint,
+        const Offset(4, 0),
+      );
       expect(tester.takeException(), isNull);
     },
   );

@@ -4522,7 +4522,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get bimNewPoint => 'Нова точка';
 
   @override
-  String get bimNewPointHint => 'Докосни ръб за нова точка';
+  String get bimNewPointHint => 'Добави точка в средата на посочения ръб';
 
   @override
   String get bimWallNewPointHelp =>
@@ -4533,4 +4533,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectCanvasDark => 'Тъмен фон';
+
+  @override
+  String get architectWallType => 'Тип стена';
 }

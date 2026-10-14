@@ -4505,7 +4505,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bimNewPoint => 'New point';
 
   @override
-  String get bimNewPointHint => 'Tap an edge to add a point';
+  String get bimNewPointHint =>
+      'Add a point at the middle of the indicated edge';
 
   @override
   String get bimWallNewPointHelp =>
@@ -4516,4 +4517,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectCanvasDark => 'Dark background';
+
+  @override
+  String get architectWallType => 'Wall type';
 }
