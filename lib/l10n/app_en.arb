@@ -3123,6 +3123,34 @@
   "architectPropertySteps": "Steps",
   "architectPropertySill": "Sill",
   "architectPropertyOffset": "Offset",
+  "architectPropertyBaseOffset": "Base H",
+  "@architectPropertyBaseOffset": {
+    "description": "Element base elevation offset above storey level"
+  },
+  "architectPropertyCutDisplay": "Cut View",
+  "@architectPropertyCutDisplay": {
+    "description": "Floor plan cut display mode"
+  },
+  "architectCutDisplayAuto": "Auto",
+  "@architectCutDisplayAuto": {
+    "description": "Automatic cut calculation based on cut plane"
+  },
+  "architectCutDisplayProjected": "Projected",
+  "@architectCutDisplayProjected": {
+    "description": "Always display uncut in projection"
+  },
+  "architectCutDisplayCut": "Cut",
+  "@architectCutDisplayCut": {
+    "description": "Always display as cut"
+  },
+  "architectCutDisplayOverhead": "Overhead",
+  "@architectCutDisplayOverhead": {
+    "description": "Display as overhead element"
+  },
+  "architectStoreyCutPlane": "Cut H",
+  "@architectStoreyCutPlane": {
+    "description": "Storey floor plan cut plane height"
+  },
   "architectPropertySize": "Size",
   "architectPropertyName": "Name",
   "architectWallExtendHint": "Pick target",
@@ -3471,6 +3499,72 @@
       "thickness": { "type": "int" },
       "height": { "type": "String" }
     }
-  }
+  },
+  "stairShape": "Shape",
+  "stairStraight": "Straight",
+  "stairQuarterTurn": "L-shaped",
+  "stairHalfTurn": "U-shaped",
+  "stairSpiral": "Spiral",
+  "stairTurnLeft": "Turn left",
+  "stairTurnRight": "Turn right",
+  "stairPlaceHelp": "Place the first riser, then point the ascent direction. Length and steps are calculated from the floor levels.",
+  "stairCode": "Regulations",
+  "stairCodeBulgaria": "Bulgaria · BG-2025.1",
+  "stairCodeGeometry": "Geometry only",
+  "stairUse": "Use",
+  "stairUsePrivate": "Within a dwelling",
+  "stairUseCommon": "New shared residential",
+  "stairUsePublic": "Public building",
+  "stairUseAssembly": "Public, over 200 people",
+  "stairUseOutdoor": "New urban route",
+  "stairEvacuation": "Evacuation",
+  "stairUnspecified": "Unspecified",
+  "stairNoEvacuation": "Not an escape stair",
+  "stairUpTo15": "Up to 15 people",
+  "stair16To50": "16–50 people",
+  "stairOver50": "Over 50 people",
+  "stairRise": "Floor rise",
+  "stairFollowStoreys": "From floor levels",
+  "stairUpperStorey": "Upper floor",
+  "stairFloorHeight": "Floor height",
+  "stairClearWidth": "Clear width",
+  "stairRisers": "Risers",
+  "stairRiser": "Riser height",
+  "stairGoing": "Going",
+  "stairLanding": "Landing depth",
+  "stairInnerRadius": "Clear inner radius",
+  "stairSweep": "Turn angle",
+  "stairAutomatic": "Auto",
+  "stairFit": "Recalculate",
+  "stairFitHelp": "Choose risers, going, width and inner radius for the selected profile. The existing height and direction are retained.",
+  "stairAdvanced": "Dimensions",
+  "stairChecks": "Checks",
+  "stairCheckPass": "Pass",
+  "stairCheckError": "Violation",
+  "stairCheckAdvice": "Comfort advice",
+  "stairCheckReview": "Not verified",
+  "stairDraft": "Save as draft",
+  "stairDraftHelp": "Drafts may contain violations and are drawn in red.",
+  "stairIncomplete": "Geometric checks only. Headroom, handrails, finishes and the complete escape route require a project review.",
+  "stairCheckSlope": "Flight slope",
+  "stairCheckFlightRise": "Rise per flight",
+  "stairCheckInner30": "Going at 30 cm",
+  "stairCheckInner": "Going at inner edge",
+  "stairCheckDiameter": "Clear inner diameter",
+  "stairCheckComfort": "Comfort · 2h + b",
+  "stairCheckCapacity": "Escape capacity and fire class",
+  "stairCheckHeadroom": "Headroom and floor opening",
+  "stairCheckHandrails": "Guards and handrails",
+  "stairCheckFinishes": "Nosings, tactile strips and finishes",
+  "stairCheckAccessibility": "Accessible use of spiral treads",
+  "stairCheckScope": "Additional applicable requirements",
+  "stairCheckVersion": "Unrecognised rules version",
+  "stairCheckUpperStorey": "Upper floor missing or below start",
+  "stairRulesSources": "Regulatory sources",
+  "stairFireSource": "Fire safety · Iз-1971, consolidated 2025",
+  "stairAccessSource": "Accessibility · РД-02-20-2/2021, Articles 18 and 55",
+  "stairClearDimensionsHelp": "Use finished clear widths between limiting handrail projections. For a spiral, the inner radius starts at the limiting inner edge or handrail projection.",
+  "stairUnsupported": "This combination cannot be drawn. Adjust the height or riser count.",
+  "stairLegacy": "Schematic stair. Recalculate to convert it to a parametric stair.",
+  "stairCheckGroupSteps": "Risers per group"
 }
-

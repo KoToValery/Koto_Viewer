@@ -33,8 +33,9 @@ class ArchitectElementTool extends ChangeNotifier {
   double beamDepth = 0.40;
 
   // Stair options
-  double stairWidth = 1.00;
+  double stairWidth = 1.20;
   int stairSteps = 16;
+  ArchitectStairDesign stairDesign = const ArchitectStairDesign();
 
   // Opening options
   OpeningType openingType = OpeningType.shaft;
@@ -84,9 +85,10 @@ class ArchitectElementTool extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setStairParams({double? width, int? steps}) {
+  void setStairParams({double? width, int? steps, ArchitectStairDesign? design}) {
     if (width != null) stairWidth = width;
     if (steps != null) stairSteps = steps;
+    if (design != null) stairDesign = design;
     notifyListeners();
   }
 
@@ -488,12 +490,7 @@ class ArchitectElementTool extends ChangeNotifier {
 
     // Check Stairs
     for (final stair in storey.stairs) {
-      final dist = _pointToSegmentDistance(
-        point,
-        stair.startPoint,
-        stair.endPoint,
-      );
-      if (dist <= stair.width / 2.0 + tolerance) {
+      if (stair.plan.contains(point, tolerance)) {
         yield stair.id;
       }
     }

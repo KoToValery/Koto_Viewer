@@ -68,6 +68,43 @@ class Architect3dBuilder {
         }
       }
 
+      // Add 3D stair presentation.
+      for (final stair in storey.stairs) {
+        // Presentation surfaces only. They do not define a structural stair
+        // slab or automatically cut an opening in a floor plate.
+        final color = stair.design?.isDraft == true
+            ? const Color(0xFFD32F2F) : const Color(0xFF90A4AE);
+        if (stair.design != null) {
+          for (var i = 0; i < stair.plan.nosings.length; i++) {
+            final (a, b) = stair.plan.nosings[i];
+            final low = storey.elevation + i * stair.design!.riser;
+            final high = low + stair.design!.riser;
+            final a0 = Vector3(a.dx, a.dy, low), b0 = Vector3(b.dx, b.dy, low);
+            final a1 = Vector3(a.dx, a.dy, high), b1 = Vector3(b.dx, b.dy, high);
+            allTris.add(Triangle3D(v0: a0, v1: b0, v2: b1, color: color));
+            allTris.add(Triangle3D(v0: a0, v1: b1, v2: a1, color: color));
+          }
+        }
+        for (final surface in stair.plan.surfaces) {
+          final points = surface.polygon;
+          final z = storey.elevation + surface.elevation;
+          final previousZ = z - (stair.design?.riser ?? .15);
+          Vector3 top(Offset p) => Vector3(p.dx, p.dy, z);
+          Vector3 bottom(Offset p) => Vector3(p.dx, p.dy, previousZ);
+          for (var i = 1; i < points.length - 1; i++) {
+            allTris.add(Triangle3D(v0: top(points[0]), v1: top(points[i]),
+              v2: top(points[i + 1]), color: color));
+            allTris.add(Triangle3D(v0: bottom(points[0]), v1: bottom(points[i + 1]),
+              v2: bottom(points[i]), color: color));
+          }
+          for (var i = 0; i < points.length; i++) {
+            final a = points[i], b = points[(i + 1) % points.length];
+            allTris.add(Triangle3D(v0: bottom(a), v1: bottom(b), v2: top(b), color: color));
+            allTris.add(Triangle3D(v0: bottom(a), v1: top(b), v2: top(a), color: color));
+          }
+        }
+      }
+
       // Add 3D columns
       for (final col in storey.columns) {
         allTris.addAll(

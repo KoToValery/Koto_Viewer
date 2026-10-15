@@ -3,6 +3,7 @@ import '../rendering/architect_canvas_palette.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
+import 'architect_elements.dart' show ArchitectCutDisplayMode;
 
 enum ColumnShape { rectangular, circular }
 
@@ -15,6 +16,8 @@ class ArchitectColumn {
   final double depth; // in meters (default 0.25 m = 25 cm)
   final double rotationDeg;
   final double? height;
+  final double baseOffset; // in meters relative to storey elevation (default 0.0 m)
+  final ArchitectCutDisplayMode cutDisplayMode;
   final String label;
 
   const ArchitectColumn({
@@ -25,9 +28,32 @@ class ArchitectColumn {
     this.depth = 0.25,
     this.rotationDeg = 0.0,
     this.height,
+    this.baseOffset = 0.0,
+    this.cutDisplayMode = ArchitectCutDisplayMode.auto,
     this.label = 'C1',
   });
 
+  bool isCutAt(double storeyCutPlane, [double defaultHeight = 2.80]) {
+    return switch (cutDisplayMode) {
+      ArchitectCutDisplayMode.cut => true,
+      ArchitectCutDisplayMode.projected => false,
+      ArchitectCutDisplayMode.overhead => false,
+      ArchitectCutDisplayMode.auto => () {
+        final colHeight = height ?? defaultHeight;
+        final zLow = baseOffset;
+        final zHigh = baseOffset + colHeight;
+        return zLow <= storeyCutPlane && storeyCutPlane <= zHigh;
+      }(),
+    };
+  }
+
+  bool isOverheadAt(double storeyCutPlane) {
+    return switch (cutDisplayMode) {
+      ArchitectCutDisplayMode.overhead => true,
+      ArchitectCutDisplayMode.auto => baseOffset > storeyCutPlane,
+      _ => false,
+    };
+  }
 
   ArchitectColumn copyWith({
     String? id,
@@ -37,6 +63,8 @@ class ArchitectColumn {
     double? depth,
     double? rotationDeg,
     double? height,
+    double? baseOffset,
+    ArchitectCutDisplayMode? cutDisplayMode,
     String? label,
   }) => ArchitectColumn(
     id: id ?? this.id,
@@ -46,6 +74,8 @@ class ArchitectColumn {
     depth: depth ?? this.depth,
     rotationDeg: rotationDeg ?? this.rotationDeg,
     height: height ?? this.height,
+    baseOffset: baseOffset ?? this.baseOffset,
+    cutDisplayMode: cutDisplayMode ?? this.cutDisplayMode,
     label: label ?? this.label,
   );
 
@@ -57,6 +87,8 @@ class ArchitectColumn {
     'depth': depth,
     'rotationDeg': rotationDeg,
     'height': height,
+    'baseOffset': baseOffset,
+    'cutDisplayMode': cutDisplayMode.name,
     'label': label,
   };
 
@@ -75,9 +107,12 @@ class ArchitectColumn {
         depth: (json['depth'] as num?)?.toDouble() ?? 0.25,
         rotationDeg: (json['rotationDeg'] as num?)?.toDouble() ?? 0.0,
         height: (json['height'] as num?)?.toDouble(),
+        baseOffset: (json['baseOffset'] as num?)?.toDouble() ?? 0.0,
+        cutDisplayMode: ArchitectCutDisplayMode.fromName(
+          json['cutDisplayMode'] as String?,
+        ),
         label: json['label'] as String? ?? 'C1',
       );
-
 
   bool containsPoint(Offset pt, {double tolerance = 0.10}) {
     if (shape == ColumnShape.circular) {
@@ -100,12 +135,21 @@ class ArchitectColumn {
     ArchitectCanvasPalette palette = const ArchitectCanvasPalette.light(),
     required double zoomScale,
     bool isSelected = false,
+    double cutPlaneHeight = 1.20,
+    double defaultStoreyHeight = 2.80,
   }) {
+    final isCut = isCutAt(cutPlaneHeight, defaultStoreyHeight);
+    final strokeWidth = isSelected
+        ? 2.5
+        : (isCut
+            ? ArchitectLineWeights.cutHeavy
+            : ArchitectLineWeights.projection);
+
     final borderPaint = Paint()
       ..color = isSelected
           ? const Color(0xFF00E5FF)
           : palette.foreground(const Color(0xFF212121))
-      ..strokeWidth = (isSelected ? 2.5 : 1.5) / zoomScale
+      ..strokeWidth = strokeWidth / zoomScale
       ..style = PaintingStyle.stroke;
 
     final fillPaint = Paint()
@@ -179,8 +223,8 @@ class ArchitectColumn {
     required double storeyHeight,
   }) {
     final List<Triangle3D> tris = [];
-    final zMin = storeyElevation;
-    final zMax = storeyElevation + (height ?? storeyHeight);
+    final zMin = storeyElevation + baseOffset;
+    final zMax = zMin + (height ?? storeyHeight);
     const colColor = Color(0xFFB0BEC5);
 
     if (shape == ColumnShape.circular) {

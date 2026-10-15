@@ -39,6 +39,8 @@ import '../rendering/architect_underlay_painter.dart';
 import '../rendering/architect_scene_geometry.dart';
 import '../services/architect_command_controller.dart';
 import '../services/architect_element_tool.dart';
+import '../services/architect_stair_rules.dart';
+import '../widgets/architect_stair_properties_dialog.dart';
 import '../services/architect_polygon_editor.dart';
 import '../services/architect_polygon_dimensions.dart';
 import '../services/architect_polygon_geometry.dart';
@@ -563,7 +565,7 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       _elementTool.beamWidth,
       _elementTool.beamDepth,
       _elementTool.stairWidth,
-      _elementTool.stairSteps,
+      _elementTool.stairDesign,
       _elementTool.openingType,
     );
     if (state != _toolUiState && mounted) {
@@ -3215,31 +3217,32 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
           _draftEnd = point;
         });
       } else {
-        final res = _elementTool.placeStair(
-          storey: _project.activeStorey,
-          start: _draftStart!,
-          end: _draftEnd ?? rawModel,
+        if ((_snapElement(rawModel, anchor: _draftStart).point - _draftStart!).distance < .05) return;
+        final stair = _stairAt(
+          _draftStart!,
+          _snapElement(rawModel, anchor: _draftStart).point,
+          id: ArchitectElementId.next('stair'),
         );
-        if (res != null) {
-          setState(() {
-            _project = _project.updateActiveStorey(res.$1);
-            _draftStart = null;
-            _draftEnd = null;
-          });
-          _saveBiMProjectIfAttached();
-          HapticFeedback.mediumImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.architectStairPlaced),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        } else {
-          setState(() {
-            _draftStart = null;
-            _draftEnd = null;
-          });
+        if (ArchitectStairRules.check(
+              stair,
+            ).any((c) => c.state == StairCheckState.error) &&
+            !stair.design!.isDraft) {
+          _showStairProperties(stair: stair, create: true);
+          return;
         }
+        _commands.execute(
+          PutArchitectStair(
+            storeyId: _project.activeStoreyId,
+            stair: stair,
+            create: true,
+          ),
+        );
+        setState(() {
+          _draftStart = null;
+          _draftEnd = null;
+        });
+        _saveBiMProjectIfAttached();
+        HapticFeedback.mediumImpact();
       }
       return;
     }
@@ -4918,9 +4921,73 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
     SnackBar(content: Text(context.l10n.architectOperationRejected)),
   );
 
+  ArchitectStair _stairAt(Offset start, Offset end, {String id = 'preview'}) {
+    final delta = end - start;
+    final endPoint = delta.distance < .001 ? start + const Offset(1, 0) : end;
+    return ArchitectStair(
+      id: id,
+      startPoint: start,
+      endPoint: endPoint,
+      width: _elementTool.stairWidth,
+      design: ArchitectStairRules.resolveDesign(
+        _project,
+        _project.activeStorey,
+        _elementTool.stairDesign,
+      ),
+    );
+  }
+
+  void _showStairProperties({ArchitectStair? stair, bool create = false}) {
+    final defaults = stair == null;
+    final initial = stair ?? _stairAt(Offset.zero, const Offset(1, 0));
+    showDialog<void>(
+      context: context,
+      builder: (_) => ArchitectStairPropertiesDialog(
+        project: _project,
+        stair: initial,
+        onApply: (next) {
+          try {
+            if (defaults) {
+              _elementTool.setStairParams(
+                width: next.width,
+                design: next.design,
+              );
+            } else {
+              _commands.execute(
+                PutArchitectStair(
+                  storeyId: _project.activeStoreyId,
+                  stair: next,
+                  create: create,
+                ),
+              );
+              if (create) {
+                setState(() {
+                  _draftStart = null;
+                  _draftEnd = null;
+                });
+              }
+              _saveBiMProjectIfAttached();
+            }
+            return true;
+          } on ArgumentError {
+            _operationError();
+            return false;
+          }
+        },
+      ),
+    );
+  }
+
   void _showProperties() {
     final ids = _effectiveSelection;
     if (ids.isEmpty) return;
+    if (ids.length == 1) {
+      final stairs = _project.activeStorey.stairs.where((s) => ids.contains(s.id));
+      if (stairs.isNotEmpty) {
+        _showStairProperties(stair: stairs.first);
+        return;
+      }
+    }
     showDialog<void>(
       context: context,
       builder: (_) => ArchitectElementPropertiesDialog(
@@ -6212,6 +6279,10 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
                   beamDepth: _elementTool.beamDepth,
                   onBeamDepthChanged: (bd) =>
                       _elementTool.setBeamParams(depth: bd),
+                  stairDesign: _elementTool.stairDesign,
+                  onStairShapeChanged: (shape) => _elementTool.setStairParams(
+                    design: _elementTool.stairDesign.copyWith(shape: shape, autoRisers: true)),
+                  onStairProperties: () => _showStairProperties(),
                   stairWidth: _elementTool.stairWidth,
                   onStairWidthChanged: (sw) =>
                       _elementTool.setStairParams(width: sw),
@@ -7344,6 +7415,8 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
             : null,
         activeDraftStart: _activeTool == ArchitectTool.dimension ? null : _draftStart,
         activeDraftEnd: _activeTool == ArchitectTool.dimension ? null : _draftEnd,
+        stairPreview: _activeTool == ArchitectTool.stair && _draftStart != null
+            ? _stairAt(_draftStart!, _draftEnd ?? _draftStart!) : null,
         activeWallThickness: _wallThickness,
         activeWallReference: _wallReference,
         activeWallExteriorSide: _wallExteriorSide,

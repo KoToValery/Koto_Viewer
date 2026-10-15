@@ -7,6 +7,7 @@ import '../models/architect_wall.dart';
 import '../models/architect_wall_type.dart';
 import '../rendering/architect_scene_geometry.dart';
 import 'architect_command_controller.dart';
+import 'architect_stair_rules.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 
 /// A shared property schema for all persisted architectural element kinds.
@@ -23,6 +24,7 @@ class ArchitectSelection {
     'elevation',
     'offsetDistance',
     'strokeWidth',
+    'baseOffset',
   };
   static Iterable<Map<String, dynamic>> records(
     Map<String, dynamic> json,
@@ -61,6 +63,11 @@ class ArchitectSelection {
       fields['height'] =
           (e['height'] as num?)?.toDouble() ?? project.activeStorey.height;
     }
+    if (e.containsKey('referenceLine') ||
+        project.activeStorey.columns.any((c) => c.id == id) ||
+        project.activeStorey.beams.any((b) => b.id == id)) {
+      fields['baseOffset'] = (e['baseOffset'] as num?)?.toDouble() ?? 0.0;
+    }
     if (e.containsKey('referenceLine')) {
       final wall = ArchitectWall.fromJson(e);
       fields['coreThickness'] = wall.coreThickness;
@@ -71,6 +78,9 @@ class ArchitectSelection {
 
   static Rect? bounds(ArchitectProject project, String id) {
     final s = project.activeStorey;
+    for (final stair in s.stairs) {
+      if (stair.id == id) return stair.plan.bounds;
+    }
     for (final w in s.walls) {
       if (w.id == id) return ArchitectSceneGeometry.boundsOf(w.polygonCorners);
       for (final o in [
@@ -181,7 +191,7 @@ class ArchitectSelection {
       if (opening.id == id) return path..addPolygon(opening.boundary, true);
     }
     for (final stair in s.stairs) {
-      if (stair.id == id) return path..addPolygon(stair.polygonCorners, true);
+      if (stair.id == id) return stair.plan.path;
     }
     for (final axis in project.gridAxes) {
       if (axis.id == id) {
@@ -263,7 +273,7 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
     for (final entry in values.entries) {
       final value = entry.value;
       if (!value.isFinite) throw ArgumentError('Invalid property');
-      if (!{'rotationDeg', 'elevation', 'offsetDistance'}.contains(entry.key) &&
+      if (!{'rotationDeg', 'elevation', 'offsetDistance', 'baseOffset'}.contains(entry.key) &&
           value <
               (entry.key == 'sillHeight' ||
                       entry.key == 'insulationThicknessOverride'
@@ -293,9 +303,12 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
         e[value.key] = value.key == 'stepCount'
             ? value.value.toInt()
             : value.value;
+        if (value.key == 'stepCount' && e['design'] is Map) {
+          (e['design'] as Map)['manualRisers'] = value.value.toInt();
+        }
       }
       for (final value in textValues.entries) {
-        if ((!e.containsKey(value.key) && value.key != 'styleId') ||
+        if ((!e.containsKey(value.key) && value.key != 'styleId' && value.key != 'cutDisplayMode') ||
             !{
               'text',
               'label',
@@ -308,8 +321,13 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
               'followStoreyHeight',
               'coreMaterial',
               'insulationMaterial',
+              'cutDisplayMode',
             }.contains(value.key)) {
           throw ArgumentError('Unsupported property');
+        }
+        if (value.key == 'cutDisplayMode' &&
+            !ArchitectCutDisplayMode.values.any((m) => m.name == value.value)) {
+          throw ArgumentError('Invalid cut display mode');
         }
         if (value.key == 'followStoreyHeight') {
           if (!{'true', 'false'}.contains(value.value)) {
@@ -363,6 +381,12 @@ class SetArchitectElementProperties extends ArchitectModelCommand {
       }
     }
     final next = ArchitectProject.fromJson(json);
+    for (final stair in next.activeStorey.stairs.where((s) => elementIds.contains(s.id))) {
+      if (stair.design != null && !stair.design!.isDraft &&
+          ArchitectStairRules.check(stair).any((c) => c.state == StairCheckState.error)) {
+        throw ArgumentError('Stair violates selected geometric rules');
+      }
+    }
     for (final wall in next.activeStorey.walls) {
       if (wall.insulationThicknessOverride != null &&
           wall.thickness <= wall.insulationThicknessOverride!) {

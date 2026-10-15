@@ -10,30 +10,40 @@ class ArchitectWallLayers {
   final Path body;
   final Path core;
   final Path insulation;
+  final Path uncutBody;
   final List<ArchitectWall> walls;
   final Map<String, Path> coreRegions;
-  const ArchitectWallLayers(
+  ArchitectWallLayers(
     this.body,
     this.core,
     this.insulation, {
+    Path? uncutBody,
     this.walls = const [],
     this.coreRegions = const {},
-  });
+  }) : uncutBody = uncutBody ?? Path();
   static final _cache = Expando<ArchitectWallLayers>();
   static final _defaults = {
     for (final type in ArchitectWallType.standardCatalog()) type.id: type,
   };
 
   static ArchitectWallLayers forProject(ArchitectProject project) =>
-      _cache[project] ??= build(project.activeStorey.walls, project.wallTypes);
+      _cache[project] ??= build(
+        project.activeStorey.walls,
+        project.wallTypes,
+        cutPlaneHeight: project.activeStorey.cutPlaneHeight,
+      );
 
   static ArchitectWallLayers build(
     List<ArchitectWall> walls,
-    List<ArchitectWallType> types,
-  ) {
+    List<ArchitectWallType> types, {
+    double cutPlaneHeight = 1.20,
+  }) {
     final catalog = {..._defaults, for (final type in types) type.id: type};
+    final cutWalls = walls.where((w) => w.isCutAt(cutPlaneHeight)).toList();
+    final uncutWalls = walls.where((w) => !w.isCutAt(cutPlaneHeight)).toList();
+
     final faces = <String, (double, double)>{};
-    for (final wall in walls) {
+    for (final wall in cutWalls) {
       final type = catalog[wall.wallTypeId];
       final insulation =
           (wall.insulationThicknessOverride ??
@@ -48,14 +58,17 @@ class ArchitectWallLayers {
         offset + wall.thickness / 2 - (wall.exteriorSign > 0 ? insulation : 0),
       );
     }
-    final body = ArchitectWallNetwork.body(walls);
-    final core = ArchitectWallNetwork.body(walls, faceOffsets: faces);
+    final body = ArchitectWallNetwork.body(cutWalls);
+    final core = ArchitectWallNetwork.body(cutWalls, faceOffsets: faces);
+    final uncutBody = ArchitectWallNetwork.body(uncutWalls);
+
     return ArchitectWallLayers(
       body,
       core,
       Path.combine(PathOperation.difference, body, core),
-      walls: walls,
-      coreRegions: _partitionCores(walls, faces, core),
+      uncutBody: uncutBody,
+      walls: cutWalls,
+      coreRegions: _partitionCores(cutWalls, faces, core),
     );
   }
 

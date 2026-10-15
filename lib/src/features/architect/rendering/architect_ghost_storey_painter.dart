@@ -82,7 +82,7 @@ class ArchitectGhostStoreyPainter extends CustomPainter {
         polygon(beam.polygonCorners);
       }
       for (final stair in storey.stairs) {
-        polygon(stair.polygonCorners);
+        canvas.drawPath(stair.plan.path, stroke);
       }
       for (final column in storey.columns) {
         canvas.save();

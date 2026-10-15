@@ -105,8 +105,10 @@ class ArchitectSnapGeometry {
       polygon(beam.polygonCorners, beam.id);
     }
     for (final stair in floor.stairs) {
-      edge(stair.startPoint, stair.endPoint, stair.id);
-      polygon(stair.polygonCorners, stair.id);
+      if (stair.design == null) edge(stair.startPoint, stair.endPoint, stair.id);
+      for (final footprint in stair.plan.footprints) {
+        polygon(footprint, stair.id);
+      }
     }
     for (final column in floor.columns) {
       if (column.shape == ColumnShape.circular) {

@@ -4229,6 +4229,27 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectPropertyOffset => 'Отстъп';
 
   @override
+  String get architectPropertyBaseOffset => 'Кота H';
+
+  @override
+  String get architectPropertyCutDisplay => 'Срез';
+
+  @override
+  String get architectCutDisplayAuto => 'Авто';
+
+  @override
+  String get architectCutDisplayProjected => 'Поглед';
+
+  @override
+  String get architectCutDisplayCut => 'Срязан';
+
+  @override
+  String get architectCutDisplayOverhead => 'Над срез';
+
+  @override
+  String get architectStoreyCutPlane => 'Разрез H';
+
+  @override
   String get architectPropertySize => 'Размер';
 
   @override
@@ -4914,4 +4935,212 @@ class AppLocalizationsBg extends AppLocalizations {
   String architectWallParapetCap(int thickness, String height) {
     return 'Борд $thickness cm (шапка h=${height}m)';
   }
+
+  @override
+  String get stairShape => 'Форма';
+
+  @override
+  String get stairStraight => 'Право';
+
+  @override
+  String get stairQuarterTurn => 'Г-образно';
+
+  @override
+  String get stairHalfTurn => 'П-образно';
+
+  @override
+  String get stairSpiral => 'Вито';
+
+  @override
+  String get stairTurnLeft => 'Завой наляво';
+
+  @override
+  String get stairTurnRight => 'Завой надясно';
+
+  @override
+  String get stairPlaceHelp =>
+      'Посочи първия подстъп, после посоката на изкачване. Дължината и стъпалата се изчисляват от котите.';
+
+  @override
+  String get stairCode => 'Нормативна база';
+
+  @override
+  String get stairCodeBulgaria => 'България · BG-2025.1';
+
+  @override
+  String get stairCodeGeometry => 'Само геометрия';
+
+  @override
+  String get stairUse => 'Предназначение';
+
+  @override
+  String get stairUsePrivate => 'В жилище';
+
+  @override
+  String get stairUseCommon => 'Ново общо жилищно';
+
+  @override
+  String get stairUsePublic => 'Обществена сграда';
+
+  @override
+  String get stairUseAssembly => 'Обществено, над 200 души';
+
+  @override
+  String get stairUseOutdoor => 'Нов градски маршрут';
+
+  @override
+  String get stairEvacuation => 'Евакуация';
+
+  @override
+  String get stairUnspecified => 'Неуточнено';
+
+  @override
+  String get stairNoEvacuation => 'Извън евакуационен път';
+
+  @override
+  String get stairUpTo15 => 'До 15 души';
+
+  @override
+  String get stair16To50 => '16–50 души';
+
+  @override
+  String get stairOver50 => 'Над 50 души';
+
+  @override
+  String get stairRise => 'Между коти';
+
+  @override
+  String get stairFollowStoreys => 'От котите';
+
+  @override
+  String get stairUpperStorey => 'Горен етаж';
+
+  @override
+  String get stairFloorHeight => 'Височина на етажа';
+
+  @override
+  String get stairClearWidth => 'Светла широчина';
+
+  @override
+  String get stairRisers => 'Подстъпи';
+
+  @override
+  String get stairRiser => 'Височина на стъпало';
+
+  @override
+  String get stairGoing => 'Широчина на стъпало';
+
+  @override
+  String get stairLanding => 'Дълбочина на площадка';
+
+  @override
+  String get stairInnerRadius => 'Светъл вътрешен радиус';
+
+  @override
+  String get stairSweep => 'Ъгъл на завъртане';
+
+  @override
+  String get stairAutomatic => 'Авто';
+
+  @override
+  String get stairFit => 'Преизчисли';
+
+  @override
+  String get stairFitHelp =>
+      'Подбира подстъпи, стъпка, широчина и вътрешен радиус за избрания профил. Запазва височината и посоката.';
+
+  @override
+  String get stairAdvanced => 'Размери';
+
+  @override
+  String get stairChecks => 'Проверки';
+
+  @override
+  String get stairCheckPass => 'Изпълнено';
+
+  @override
+  String get stairCheckError => 'Нарушение';
+
+  @override
+  String get stairCheckAdvice => 'Препоръка за удобство';
+
+  @override
+  String get stairCheckReview => 'Непроверено';
+
+  @override
+  String get stairDraft => 'Запази като чернова';
+
+  @override
+  String get stairDraftHelp =>
+      'Черновите могат да съдържат нарушения и се чертаят в червено.';
+
+  @override
+  String get stairIncomplete =>
+      'Проверява се геометрията. Просветът, парапетите, настилките и целият евакуационен път изискват проектна проверка.';
+
+  @override
+  String get stairCheckSlope => 'Наклон на рамото';
+
+  @override
+  String get stairCheckFlightRise => 'Височина на рамо';
+
+  @override
+  String get stairCheckInner30 => 'Стъпало на 30 см';
+
+  @override
+  String get stairCheckInner => 'Стъпало при тесния край';
+
+  @override
+  String get stairCheckDiameter => 'Светъл вътрешен диаметър';
+
+  @override
+  String get stairCheckComfort => 'Удобство · 2h + b';
+
+  @override
+  String get stairCheckCapacity => 'Капацитет и пожарен клас';
+
+  @override
+  String get stairCheckHeadroom => 'Просвет и отвор в плочата';
+
+  @override
+  String get stairCheckHandrails => 'Парапети и ръкохватки';
+
+  @override
+  String get stairCheckFinishes => 'Чела, тактилни ивици и настилки';
+
+  @override
+  String get stairCheckAccessibility => 'Достъпност на вити стъпала';
+
+  @override
+  String get stairCheckScope => 'Други приложими изисквания';
+
+  @override
+  String get stairCheckVersion => 'Непозната версия на нормите';
+
+  @override
+  String get stairCheckUpperStorey => 'Горният етаж липсва или е под началото';
+
+  @override
+  String get stairRulesSources => 'Нормативни източници';
+
+  @override
+  String get stairFireSource => 'Пожарна безопасност · Iз-1971, редакция 2025';
+
+  @override
+  String get stairAccessSource => 'Достъпност · РД-02-20-2/2021, чл. 18 и 55';
+
+  @override
+  String get stairClearDimensionsHelp =>
+      'Размерите са светли, между ограничаващите проекции на ръкохватките. Вътрешният радиус започва от ограничаващия вътрешен ръб или проекцията на парапета.';
+
+  @override
+  String get stairUnsupported =>
+      'Тази комбинация не може да се изчертае. Промени височината или броя подстъпи.';
+
+  @override
+  String get stairLegacy =>
+      'Схематично стълбище. Преизчисли, за да го превърнеш в параметрично.';
+
+  @override
+  String get stairCheckGroupSteps => 'Подстъпи в група';
 }

@@ -26,3 +26,23 @@ class ArchitectCanvasPalette {
     }
   }
 }
+
+/// Standard lineweights for architectural drafting according to ISO 128 / BIM conventions.
+class ArchitectLineWeights {
+  ArchitectLineWeights._();
+
+  /// Heavy stroke for cut structural core (bearing walls, structural columns, shear walls).
+  static const double cutHeavy = 2.2;
+
+  /// Medium stroke for uncut elements in projection (parapets, slab edges, door swings, stairs).
+  static const double projection = 1.2;
+
+  /// Thin stroke for secondary cut layers (insulation boundary, casing, plaster).
+  static const double cutThin = 0.8;
+
+  /// Very thin / hairline for hatches, grid axes, dimension witness lines, annotations.
+  static const double hairline = 0.5;
+
+  /// Stroke for overhead elements above the cut plane (beams, ceiling voids).
+  static const double overhead = 1.0;
+}

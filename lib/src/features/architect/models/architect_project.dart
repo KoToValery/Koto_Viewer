@@ -4,6 +4,7 @@ import 'dart:ui';
 import '../../structural_designer/models/structural_element.dart';
 import 'architect_column.dart';
 import 'architect_elements.dart';
+export 'architect_elements.dart' show ArchitectCutDisplayMode;
 import 'architect_grid_preset.dart';
 import 'architect_wall.dart';
 import 'architect_wall_type.dart';
@@ -33,6 +34,7 @@ class ArchitectStorey {
   final String name;
   final double elevation; // in meters (кота готов под)
   final double height; // clear floor-to-floor height in meters
+  final double cutPlaneHeight; // floor plan cut plane height above storey elevation (default 1.20 m)
   final double floorFinishThickness; // default 0.05 m
   final List<ArchitectWall> walls;
   final List<ArchitectZone> zones;
@@ -51,6 +53,7 @@ class ArchitectStorey {
     required this.name,
     this.elevation = 0.0,
     this.height = 2.80,
+    this.cutPlaneHeight = 1.20,
     this.floorFinishThickness = 0.05,
     this.walls = const [],
     this.zones = const [],
@@ -76,6 +79,7 @@ class ArchitectStorey {
     String? name,
     double? elevation,
     double? height,
+    double? cutPlaneHeight,
     double? floorFinishThickness,
     List<ArchitectWall>? walls,
     List<ArchitectZone>? zones,
@@ -93,6 +97,7 @@ class ArchitectStorey {
     name: name ?? this.name,
     elevation: elevation ?? this.elevation,
     height: height ?? this.height,
+    cutPlaneHeight: cutPlaneHeight ?? this.cutPlaneHeight,
     floorFinishThickness: floorFinishThickness ?? this.floorFinishThickness,
     walls: height == null
         ? (walls ?? this.walls)
@@ -117,6 +122,7 @@ class ArchitectStorey {
     'name': name,
     'elevation': elevation,
     'height': height,
+    'cutPlaneHeight': cutPlaneHeight,
     'floorFinishThickness': floorFinishThickness,
     'walls': walls
         .map((w) => w.copyWith(height: w.effectiveHeight(height)).toJson())
@@ -140,6 +146,7 @@ class ArchitectStorey {
     name: json['name'] as String,
     elevation: (json['elevation'] as num?)?.toDouble() ?? 0.0,
     height: (json['height'] as num?)?.toDouble() ?? 2.80,
+    cutPlaneHeight: (json['cutPlaneHeight'] as num?)?.toDouble() ?? 1.20,
     floorFinishThickness:
         (json['floorFinishThickness'] as num?)?.toDouble() ?? 0.05,
     walls:

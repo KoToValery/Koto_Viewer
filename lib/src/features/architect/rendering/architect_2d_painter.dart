@@ -58,6 +58,7 @@ class Architect2dPainter extends CustomPainter {
   final ArchitectTool activeTool;
   final Offset? activeDraftStart;
   final Offset? activeDraftEnd;
+  final ArchitectStair? stairPreview;
   final double activeWallThickness;
   final WallReferenceLine activeWallReference;
   final String? activeWallTypeId;
@@ -139,6 +140,7 @@ class Architect2dPainter extends CustomPainter {
     required this.activeTool,
     this.activeDraftStart,
     this.activeDraftEnd,
+    this.stairPreview,
     this.activeWallThickness = 0.25,
     this.activeWallReference = WallReferenceLine.center,
     this.activeWallTypeId,
@@ -298,6 +300,7 @@ class Architect2dPainter extends CustomPainter {
         activeTool: activeTool,
         draftStart: activeDraftStart,
         draftEnd: activeDraftEnd,
+        stairPreview: stairPreview,
         zoomScale: zoomScale,
         unit: _project.units,
       );
@@ -626,7 +629,7 @@ class Architect2dPainter extends CustomPainter {
 
     final wallBorderPaint = Paint()
       ..color = palette.foreground(const Color(0xFF212121))
-      ..strokeWidth = 1.5 / zoomScale
+      ..strokeWidth = ArchitectLineWeights.cutHeavy / zoomScale
       ..style = PaintingStyle.stroke;
 
     final layers = ArchitectWallLayers.forProject(_project);
@@ -669,14 +672,25 @@ class Architect2dPainter extends CustomPainter {
         final corners = wall.polygonCorners;
         final core = wall.coreCorners;
         final i = end ? 0 : 1, j = end ? 3 : 2;
-        canvas.drawLine(
-          corners[i],
-          corners[j],
-          Paint()
-            ..color = wallBorderPaint.color
-            ..strokeWidth = .7 / zoomScale,
-        );
-        canvas.drawLine(core[i], core[j], wallBorderPaint);
+        final isCut = wall.isCutAt(activeStorey.cutPlaneHeight);
+        if (isCut) {
+          canvas.drawLine(
+            corners[i],
+            corners[j],
+            Paint()
+              ..color = wallBorderPaint.color
+              ..strokeWidth = ArchitectLineWeights.cutThin / zoomScale,
+          );
+          canvas.drawLine(core[i], core[j], wallBorderPaint);
+        } else {
+          canvas.drawLine(
+            corners[i],
+            corners[j],
+            Paint()
+              ..color = wallBorderPaint.color
+              ..strokeWidth = ArchitectLineWeights.projection / zoomScale,
+          );
+        }
       }
       for (final door in wall.doors) {
         door.paint2D(
@@ -715,13 +729,13 @@ class Architect2dPainter extends CustomPainter {
     Paint border, {
     Color hatchColor = const Color(0xFF9EA5AC),
   }) {
-    // Thin outer insulation outline; a heavier boundary encloses only the core.
+    // Thin outer insulation outline for cut walls (0.8 px)
     canvas.drawPath(
       layers.body,
       Paint()
         ..color = border.color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = .7 / zoomScale,
+        ..strokeWidth = ArchitectLineWeights.cutThin / zoomScale,
     );
     for (final wall in layers.walls) {
       final region = layers.coreRegions[wall.id];
@@ -729,7 +743,19 @@ class Architect2dPainter extends CustomPainter {
         ArchitectWallHatch.paint(canvas, wall, region, zoomScale, hatchColor);
       }
     }
+    // Thick boundary encloses only the cut core (2.2 px)
     canvas.drawPath(layers.core, border);
+
+    // Medium/thin line for uncut / projection walls (parapets, etc.) (1.2 px)
+    if (layers.uncutBody.computeMetrics().isNotEmpty) {
+      canvas.drawPath(
+        layers.uncutBody,
+        Paint()
+          ..color = border.color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = ArchitectLineWeights.projection / zoomScale,
+      );
+    }
   }
 
   // ===========================================================================

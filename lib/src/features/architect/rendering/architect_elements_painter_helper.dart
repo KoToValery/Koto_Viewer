@@ -173,19 +173,24 @@ class ArchitectElementsPainterHelper {
     required double zoomScale,
     String? selectedElementId,
   }) {
-    final beamDashPaint = Paint()
-      ..color = palette.foreground(const Color(0xFF37474F))
-      ..strokeWidth = 1.4 / zoomScale
-      ..style = PaintingStyle.stroke;
-
     for (final beam in storey.beams) {
       final isSelected = beam.id == selectedElementId;
-      final paint = isSelected
-          ? (Paint()
-              ..color = const Color(0xFF00E5FF)
-              ..strokeWidth = 2.2 / zoomScale
-              ..style = PaintingStyle.stroke)
-          : beamDashPaint;
+      final isCut = beam.isCutAt(storey.cutPlaneHeight);
+      final isOverhead = beam.isOverheadAt(storey.cutPlaneHeight);
+      final strokeW = isSelected
+          ? 2.2
+          : (isCut
+              ? ArchitectLineWeights.cutHeavy
+              : (isOverhead
+                  ? ArchitectLineWeights.overhead
+                  : ArchitectLineWeights.projection));
+
+      final paint = Paint()
+        ..color = isSelected
+            ? const Color(0xFF00E5FF)
+            : palette.foreground(const Color(0xFF37474F))
+        ..strokeWidth = strokeW / zoomScale
+        ..style = PaintingStyle.stroke;
 
       final corners = beam.polygonCorners;
       final path = Path()
@@ -248,6 +253,8 @@ class ArchitectElementsPainterHelper {
         canvas: canvas,
         zoomScale: zoomScale,
         isSelected: col.id == selectedElementId,
+        cutPlaneHeight: storey.cutPlaneHeight,
+        defaultStoreyHeight: storey.height,
       );
     }
   }
@@ -339,73 +346,53 @@ class ArchitectElementsPainterHelper {
     required double zoomScale,
     String? selectedElementId,
   }) {
-    final borderPaint = Paint()
-      ..color = palette.foreground(const Color(0xFF1B5E20))
-      ..strokeWidth = 1.5 / zoomScale
-      ..style = PaintingStyle.stroke;
-
-    final treadPaint = Paint()
-      ..color = palette.foreground(const Color(0xFF2E7D32))
-      ..strokeWidth = 1.0 / zoomScale
-      ..style = PaintingStyle.stroke;
-
-    final arrowPaint = Paint()
-      ..color = palette.foreground(const Color(0xFF1B5E20))
-      ..strokeWidth = 1.6 / zoomScale
-      ..style = PaintingStyle.stroke;
-
     for (final stair in storey.stairs) {
-      final isSelected = stair.id == selectedElementId;
-      final pBorder = isSelected
-          ? (Paint()
-              ..color = const Color(0xFF00E5FF)
-              ..strokeWidth = 2.5 / zoomScale
-              ..style = PaintingStyle.stroke)
-          : borderPaint;
-
-      final corners = stair.polygonCorners;
-      final path = Path()
-        ..moveTo(corners[0].dx, corners[0].dy)
-        ..lineTo(corners[1].dx, corners[1].dy)
-        ..lineTo(corners[2].dx, corners[2].dy)
-        ..lineTo(corners[3].dx, corners[3].dy)
-        ..close();
-
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = const Color(0x144CAF50)
-          ..style = PaintingStyle.fill,
+      drawStair(
+        canvas: canvas,
+        stair: stair,
+        zoomScale: zoomScale,
+        color: stair.id == selectedElementId
+            ? const Color(0xFF00E5FF)
+            : stair.design?.isDraft == true
+            ? const Color(0xFFD32F2F)
+            : palette.foreground(const Color(0xFF1B5E20)),
       );
-      canvas.drawPath(path, pBorder);
-
-      // Tread lines across width
-      final u = stair.unitVector;
-      final n = stair.normalVector * (stair.width / 2.0);
-      final steps = math.max(2, stair.stepCount);
-      for (int i = 1; i < steps; i++) {
-        final along = stair.startPoint + u * (stair.length * (i / steps));
-        canvas.drawLine(along - n, along + n, treadPaint);
-      }
-
-      // Ascent arrow along centerline
-      final midStart = stair.startPoint + u * 0.20;
-      final midEnd = stair.endPoint - u * 0.20;
-      canvas.drawCircle(
-        midStart,
-        3.0 / zoomScale,
-        Paint()
-          ..color = palette.foreground(const Color(0xFF1B5E20))
-          ..style = PaintingStyle.fill,
-      );
-      canvas.drawLine(midStart, midEnd, arrowPaint);
-
-      // Arrowhead at top
-      final arrowBack = midEnd - u * 0.25;
-      final arrowSide = n * 0.20;
-      canvas.drawLine(midEnd, arrowBack - arrowSide, arrowPaint);
-      canvas.drawLine(midEnd, arrowBack + arrowSide, arrowPaint);
     }
+  }
+
+  static void drawStair({
+    required Canvas canvas,
+    required ArchitectStair stair,
+    required double zoomScale,
+    Color color = const Color(0xFF1B5E20),
+  }) {
+    final plan = stair.plan;
+    final stroke = Paint()
+      ..color = color
+      ..strokeWidth = 1.4 / zoomScale
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(plan.path, Paint()..color = color.withValues(alpha: .08));
+    canvas.drawPath(plan.path, stroke);
+    final tread = Paint()
+      ..color = color
+      ..strokeWidth = .9 / zoomScale;
+    for (final line in plan.nosings) {
+      canvas.drawLine(line.$1, line.$2, tread);
+    }
+    final points = plan.walkingLine;
+    if (points.length < 2) return;
+    final arrow = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final p in points.skip(1)) {
+      arrow.lineTo(p.dx, p.dy);
+    }
+    canvas.drawPath(arrow, stroke);
+    canvas.drawCircle(points.first, 2.5 / zoomScale, Paint()..color = color);
+    final end = points.last, delta = end - points[points.length - 2];
+    if (delta.distance < 1e-8) return;
+    final u = delta / delta.distance, n = Offset(-u.dy, u.dx);
+    final size = math.min(.18, stair.width * .18);
+    canvas.drawLine(end, end - u * size + n * size / 2, stroke);
+    canvas.drawLine(end, end - u * size - n * size / 2, stroke);
   }
 
   // ===========================================================================
@@ -655,6 +642,7 @@ class ArchitectElementsPainterHelper {
     required Offset? draftEnd,
     required double zoomScale,
     ArchitectUnit unit = ArchitectUnit.meters,
+    ArchitectStair? stairPreview,
   }) {
     if (draftStart == null || draftEnd == null) return;
     final p1 = draftStart;
@@ -696,19 +684,13 @@ class ArchitectElementsPainterHelper {
         canvas.drawLine(rect.topRight, rect.bottomLeft, previewPaint);
       }
     } else if (activeTool == ArchitectTool.stair) {
-      final delta = p2 - p1;
-      final len = delta.distance;
-      if (len > 0.1) {
-        final u = delta / len;
-        final n = Offset(-u.dy, u.dx) * 0.55;
-        final path = Path()
-          ..moveTo(p1.dx - n.dx, p1.dy - n.dy)
-          ..lineTo(p2.dx - n.dx, p2.dy - n.dy)
-          ..lineTo(p2.dx + n.dx, p2.dy + n.dy)
-          ..lineTo(p1.dx + n.dx, p1.dy + n.dy)
-          ..close();
-        canvas.drawPath(path, fillPreview);
-        canvas.drawPath(path, previewPaint);
+      if (stairPreview != null) {
+        drawStair(
+          canvas: canvas,
+          stair: stairPreview,
+          zoomScale: zoomScale,
+          color: const Color(0xFF00897B),
+        );
       }
     } else if (activeTool == ArchitectTool.dimension) {
       canvas.drawLine(p1, p2, previewPaint);

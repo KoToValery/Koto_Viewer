@@ -4,6 +4,7 @@ import '../../bim_editing/geometry/bim_line_geometry.dart';
 import 'package:flutter/material.dart';
 import '../../dxf_3d_viewer/models/mesh_3d.dart';
 import 'architect_door.dart';
+import 'architect_elements.dart' show ArchitectCutDisplayMode;
 import 'architect_wall_type.dart';
 import 'architect_window.dart';
 
@@ -62,6 +63,7 @@ class ArchitectWall {
   final Offset endPoint;
   final double thickness; // in meters (default 0.25 m = 25 cm)
   final double height; // in meters (default 2.80 m or 1.05/1.20 m for parapets)
+  final double baseOffset; // in meters relative to storey elevation (default 0.0 m)
   final bool followStoreyHeight;
   final WallCoreMaterial? coreMaterialOverride;
   final WallInsulationMaterial insulationMaterial;
@@ -72,6 +74,7 @@ class ArchitectWall {
   final bool connectEnd;
   final String? wallTypeId;
   final ParapetFinish? parapetFinish;
+  final ArchitectCutDisplayMode cutDisplayMode;
   final List<ArchitectDoor> doors;
   final List<ArchitectWindow> windows;
 
@@ -81,6 +84,7 @@ class ArchitectWall {
     required this.endPoint,
     this.thickness = 0.25,
     this.height = 2.80,
+    this.baseOffset = 0.0,
     this.followStoreyHeight = true,
     this.coreMaterialOverride,
     this.insulationMaterial = WallInsulationMaterial.eps,
@@ -91,12 +95,36 @@ class ArchitectWall {
     this.connectEnd = true,
     this.wallTypeId,
     this.parapetFinish,
+    this.cutDisplayMode = ArchitectCutDisplayMode.auto,
     this.doors = const [],
     this.windows = const [],
   });
 
   bool get isParapet =>
       height < 1.50 || (wallTypeId != null && wallTypeId!.contains('parapet'));
+
+  bool isCutAt(double storeyCutPlane) {
+    return switch (cutDisplayMode) {
+      ArchitectCutDisplayMode.cut => true,
+      ArchitectCutDisplayMode.projected => false,
+      ArchitectCutDisplayMode.overhead => false,
+      ArchitectCutDisplayMode.auto => () {
+        if (isParapet) return false;
+        final zLow = baseOffset;
+        final zHigh = baseOffset + height;
+        return zLow <= storeyCutPlane && storeyCutPlane <= zHigh;
+      }(),
+    };
+  }
+
+  bool isOverheadAt(double storeyCutPlane) {
+    return switch (cutDisplayMode) {
+      ArchitectCutDisplayMode.overhead => true,
+      ArchitectCutDisplayMode.auto => baseOffset > storeyCutPlane,
+      _ => false,
+    };
+  }
+
   double effectiveHeight(double storeyHeight) =>
       followStoreyHeight && !isParapet ? storeyHeight : height;
   WallCoreMaterial get coreMaterial =>
@@ -160,6 +188,7 @@ class ArchitectWall {
     Offset? endPoint,
     double? thickness,
     double? height,
+    double? baseOffset,
     bool? followStoreyHeight,
     WallCoreMaterial? coreMaterial,
     WallInsulationMaterial? insulationMaterial,
@@ -170,6 +199,7 @@ class ArchitectWall {
     bool? connectEnd,
     String? wallTypeId,
     ParapetFinish? parapetFinish,
+    ArchitectCutDisplayMode? cutDisplayMode,
     List<ArchitectDoor>? doors,
     List<ArchitectWindow>? windows,
   }) => ArchitectWall(
@@ -178,6 +208,7 @@ class ArchitectWall {
     endPoint: endPoint ?? this.endPoint,
     thickness: thickness ?? this.thickness,
     height: height ?? this.height,
+    baseOffset: baseOffset ?? this.baseOffset,
     followStoreyHeight: followStoreyHeight ?? this.followStoreyHeight,
     coreMaterialOverride: coreMaterial ?? coreMaterialOverride,
     insulationMaterial: insulationMaterial ?? this.insulationMaterial,
@@ -189,6 +220,7 @@ class ArchitectWall {
     connectEnd: connectEnd ?? this.connectEnd,
     wallTypeId: wallTypeId ?? this.wallTypeId,
     parapetFinish: parapetFinish ?? this.parapetFinish,
+    cutDisplayMode: cutDisplayMode ?? this.cutDisplayMode,
     doors: doors ?? this.doors,
     windows: windows ?? this.windows,
   );
@@ -268,6 +300,7 @@ class ArchitectWall {
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'thickness': thickness,
     'height': height,
+    'baseOffset': baseOffset,
     'followStoreyHeight': followStoreyHeight && !isParapet,
     'coreMaterial': coreMaterial.name,
     'insulationMaterial': insulationMaterial.name,
@@ -278,6 +311,7 @@ class ArchitectWall {
     'connectEnd': connectEnd,
     'wallTypeId': wallTypeId,
     'parapetFinish': parapetFinish?.name,
+    'cutDisplayMode': cutDisplayMode.name,
     'doors': doors.map((d) => d.toJson()).toList(),
     'windows': windows.map((w) => w.toJson()).toList(),
   };
@@ -294,6 +328,7 @@ class ArchitectWall {
     ),
     thickness: (json['thickness'] as num?)?.toDouble() ?? 0.25,
     height: (json['height'] as num?)?.toDouble() ?? 2.80,
+    baseOffset: (json['baseOffset'] as num?)?.toDouble() ?? 0.0,
     followStoreyHeight: json['followStoreyHeight'] as bool? ?? false,
     coreMaterialOverride: WallCoreMaterial.values
         .where((m) => m.name == json['coreMaterial'])
@@ -322,6 +357,9 @@ class ArchitectWall {
             orElse: () => ParapetFinish.cap,
           )
         : null,
+    cutDisplayMode: ArchitectCutDisplayMode.fromName(
+      json['cutDisplayMode'] as String?,
+    ),
     doors:
         (json['doors'] as List<dynamic>?)
             ?.map((d) => ArchitectDoor.fromJson(d as Map<String, dynamic>))
@@ -349,8 +387,8 @@ class ArchitectWall {
     final halfThick = thickness / 2.0;
 
     const wallColor = Color(0xFFECEFF1);
-    final zBottom = storeyElevation;
-    final zTop = storeyElevation + height;
+    final zBottom = storeyElevation + baseOffset;
+    final zTop = zBottom + height;
 
     // Extrude a solid rectangular prism segment between two offsets along the baseline
     void addWallPrism(
@@ -424,7 +462,7 @@ class ArchitectWall {
           wallStart: centerStart,
           wallEnd: centerEnd,
           wallThickness: thickness,
-          storeyElevation: storeyElevation,
+          storeyElevation: storeyElevation + baseOffset,
           coreThickness: coreThickness,
           insulationThickness: insulationThickness,
           exteriorSign: exteriorSign.toDouble(),
@@ -442,7 +480,7 @@ class ArchitectWall {
           wallStart: centerStart,
           wallEnd: centerEnd,
           wallThickness: thickness,
-          storeyElevation: storeyElevation,
+          storeyElevation: storeyElevation + baseOffset,
           coreThickness: coreThickness,
           insulationThickness: insulationThickness,
           exteriorSign: exteriorSign.toDouble(),

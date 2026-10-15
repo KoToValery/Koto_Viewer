@@ -4214,6 +4214,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectPropertyOffset => 'Offset';
 
   @override
+  String get architectPropertyBaseOffset => 'Base H';
+
+  @override
+  String get architectPropertyCutDisplay => 'Cut View';
+
+  @override
+  String get architectCutDisplayAuto => 'Auto';
+
+  @override
+  String get architectCutDisplayProjected => 'Projected';
+
+  @override
+  String get architectCutDisplayCut => 'Cut';
+
+  @override
+  String get architectCutDisplayOverhead => 'Overhead';
+
+  @override
+  String get architectStoreyCutPlane => 'Cut H';
+
+  @override
   String get architectPropertySize => 'Size';
 
   @override
@@ -4896,4 +4917,213 @@ class AppLocalizationsEn extends AppLocalizations {
   String architectWallParapetCap(int thickness, String height) {
     return 'Parapet $thickness cm (cap h=${height}m)';
   }
+
+  @override
+  String get stairShape => 'Shape';
+
+  @override
+  String get stairStraight => 'Straight';
+
+  @override
+  String get stairQuarterTurn => 'L-shaped';
+
+  @override
+  String get stairHalfTurn => 'U-shaped';
+
+  @override
+  String get stairSpiral => 'Spiral';
+
+  @override
+  String get stairTurnLeft => 'Turn left';
+
+  @override
+  String get stairTurnRight => 'Turn right';
+
+  @override
+  String get stairPlaceHelp =>
+      'Place the first riser, then point the ascent direction. Length and steps are calculated from the floor levels.';
+
+  @override
+  String get stairCode => 'Regulations';
+
+  @override
+  String get stairCodeBulgaria => 'Bulgaria · BG-2025.1';
+
+  @override
+  String get stairCodeGeometry => 'Geometry only';
+
+  @override
+  String get stairUse => 'Use';
+
+  @override
+  String get stairUsePrivate => 'Within a dwelling';
+
+  @override
+  String get stairUseCommon => 'New shared residential';
+
+  @override
+  String get stairUsePublic => 'Public building';
+
+  @override
+  String get stairUseAssembly => 'Public, over 200 people';
+
+  @override
+  String get stairUseOutdoor => 'New urban route';
+
+  @override
+  String get stairEvacuation => 'Evacuation';
+
+  @override
+  String get stairUnspecified => 'Unspecified';
+
+  @override
+  String get stairNoEvacuation => 'Not an escape stair';
+
+  @override
+  String get stairUpTo15 => 'Up to 15 people';
+
+  @override
+  String get stair16To50 => '16–50 people';
+
+  @override
+  String get stairOver50 => 'Over 50 people';
+
+  @override
+  String get stairRise => 'Floor rise';
+
+  @override
+  String get stairFollowStoreys => 'From floor levels';
+
+  @override
+  String get stairUpperStorey => 'Upper floor';
+
+  @override
+  String get stairFloorHeight => 'Floor height';
+
+  @override
+  String get stairClearWidth => 'Clear width';
+
+  @override
+  String get stairRisers => 'Risers';
+
+  @override
+  String get stairRiser => 'Riser height';
+
+  @override
+  String get stairGoing => 'Going';
+
+  @override
+  String get stairLanding => 'Landing depth';
+
+  @override
+  String get stairInnerRadius => 'Clear inner radius';
+
+  @override
+  String get stairSweep => 'Turn angle';
+
+  @override
+  String get stairAutomatic => 'Auto';
+
+  @override
+  String get stairFit => 'Recalculate';
+
+  @override
+  String get stairFitHelp =>
+      'Choose risers, going, width and inner radius for the selected profile. The existing height and direction are retained.';
+
+  @override
+  String get stairAdvanced => 'Dimensions';
+
+  @override
+  String get stairChecks => 'Checks';
+
+  @override
+  String get stairCheckPass => 'Pass';
+
+  @override
+  String get stairCheckError => 'Violation';
+
+  @override
+  String get stairCheckAdvice => 'Comfort advice';
+
+  @override
+  String get stairCheckReview => 'Not verified';
+
+  @override
+  String get stairDraft => 'Save as draft';
+
+  @override
+  String get stairDraftHelp =>
+      'Drafts may contain violations and are drawn in red.';
+
+  @override
+  String get stairIncomplete =>
+      'Geometric checks only. Headroom, handrails, finishes and the complete escape route require a project review.';
+
+  @override
+  String get stairCheckSlope => 'Flight slope';
+
+  @override
+  String get stairCheckFlightRise => 'Rise per flight';
+
+  @override
+  String get stairCheckInner30 => 'Going at 30 cm';
+
+  @override
+  String get stairCheckInner => 'Going at inner edge';
+
+  @override
+  String get stairCheckDiameter => 'Clear inner diameter';
+
+  @override
+  String get stairCheckComfort => 'Comfort · 2h + b';
+
+  @override
+  String get stairCheckCapacity => 'Escape capacity and fire class';
+
+  @override
+  String get stairCheckHeadroom => 'Headroom and floor opening';
+
+  @override
+  String get stairCheckHandrails => 'Guards and handrails';
+
+  @override
+  String get stairCheckFinishes => 'Nosings, tactile strips and finishes';
+
+  @override
+  String get stairCheckAccessibility => 'Accessible use of spiral treads';
+
+  @override
+  String get stairCheckScope => 'Additional applicable requirements';
+
+  @override
+  String get stairCheckVersion => 'Unrecognised rules version';
+
+  @override
+  String get stairCheckUpperStorey => 'Upper floor missing or below start';
+
+  @override
+  String get stairRulesSources => 'Regulatory sources';
+
+  @override
+  String get stairFireSource => 'Fire safety · Iз-1971, consolidated 2025';
+
+  @override
+  String get stairAccessSource =>
+      'Accessibility · РД-02-20-2/2021, Articles 18 and 55';
+
+  @override
+  String get stairClearDimensionsHelp =>
+      'Use finished clear widths between limiting handrail projections. For a spiral, the inner radius starts at the limiting inner edge or handrail projection.';
+
+  @override
+  String get stairUnsupported =>
+      'This combination cannot be drawn. Adjust the height or riser count.';
+
+  @override
+  String get stairLegacy =>
+      'Schematic stair. Recalculate to convert it to a parametric stair.';
+
+  @override
+  String get stairCheckGroupSteps => 'Risers per group';
 }

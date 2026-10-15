@@ -31,7 +31,7 @@ class ArchitectSceneGeometry {
       for (final b in s.beams) ...b.polygonCorners,
       for (final slab in s.slabs) ...slab.polygon,
       for (final opening in s.openings) ...opening.boundary,
-      for (final stair in s.stairs) ...[stair.startPoint, stair.endPoint],
+      for (final stair in s.stairs) ...stair.polygonCorners,
       for (final dim in s.dimensions) ...[
         ...dim.witnessPoints,
         dim.lineStart,
@@ -80,7 +80,7 @@ class ArchitectSceneGeometry {
       slabs: s.slabs.where((e) => intersects(e.polygon)).toList(),
       openings: s.openings.where((e) => intersects(e.boundary)).toList(),
       stairs: s.stairs
-          .where((e) => intersects([e.startPoint, e.endPoint], e.width))
+          .where((e) => intersects(e.polygonCorners))
           .toList(),
       dimensions: s.dimensions
           .where(

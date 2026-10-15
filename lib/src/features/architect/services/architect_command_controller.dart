@@ -14,6 +14,7 @@ import '../rendering/architect_wall_network.dart';
 import 'architect_element_id.dart';
 import 'architect_wall_relations.dart';
 import 'architect_dimension_chain.dart';
+import 'architect_stair_rules.dart';
 export 'architect_element_id.dart';
 
 /// Commands accept model metres, never screen coordinates or a camera scale.
@@ -1468,8 +1469,9 @@ class InsertArchitectElementPoint extends ArchitectModelCommand {
 class ArchitectCommandController
     extends BimTransactionController<ArchitectProject> {
   static const historyLimit = 100;
-  ArchitectCommandController(super.project)
+  ArchitectCommandController(ArchitectProject project)
     : super(
+        ArchitectStairRules.resolve(project),
         historyLimit: historyLimit,
         equivalent: _sameModel,
         restoreView: _retainViewedStorey,
@@ -1478,7 +1480,7 @@ class ArchitectCommandController
 
   @override
   void commit(ArchitectProject next) =>
-      super.commit(ArchitectDimensionChain.resolve(next));
+      super.commit(ArchitectDimensionChain.resolve(ArchitectStairRules.resolve(next)));
 
   static bool _sameModel(ArchitectProject a, ArchitectProject b) {
     if (identical(a, b)) return true;

@@ -1,6 +1,7 @@
 // === SECTION: ARCHITECTURAL TOOL PALETTE BAR ===
 import 'package:flutter/material.dart';
 import 'architect_wall_type_label.dart';
+import 'architect_stair_labels.dart';
 import '../../../core/l10n/l10n_extensions.dart';
 import '../models/architect_column.dart';
 import '../models/architect_elements.dart';
@@ -104,6 +105,10 @@ class ArchitectToolPalette extends StatefulWidget {
   final double beamDepth;
   final ValueChanged<double>? onBeamDepthChanged;
 
+  final ArchitectStairDesign stairDesign;
+  final ValueChanged<StairShape>? onStairShapeChanged;
+  final VoidCallback? onStairProperties;
+
   // Stair options
   final double stairWidth;
   final ValueChanged<double>? onStairWidthChanged;
@@ -158,6 +163,9 @@ class ArchitectToolPalette extends StatefulWidget {
     this.onBeamWidthChanged,
     this.beamDepth = 0.50,
     this.onBeamDepthChanged,
+    this.stairDesign = const ArchitectStairDesign(),
+    this.onStairShapeChanged,
+    this.onStairProperties,
     this.stairWidth = 1.10,
     this.onStairWidthChanged,
     this.stairSteps = 16,
@@ -986,52 +994,45 @@ class _ArchitectToolPaletteState extends State<ArchitectToolPalette> {
   }
 
   Widget _buildStairSubBar(BuildContext context) {
-    final l10n = context.l10n;
-
+    final l = context.l10n;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text(
-              l10n.architectStairWidth,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
+          DropdownButton<StairShape>(
+            key: const ValueKey('stair-tool-shape'),
+            value: widget.stairDesign.shape,
+            dropdownColor: const Color(0xFF1E242C),
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+            items: [
+              for (final shape in StairShape.values)
+                DropdownMenuItem(
+                  value: shape,
+                  child: Text(stairShapeLabel(l, shape)),
+                ),
+            ],
+            onChanged: (shape) {
+              if (shape != null) widget.onStairShapeChanged?.call(shape);
+            },
           ),
-          for (final w in [1.00, 1.10, 1.20])
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: ChoiceChip(
-                label: Text('${(w * 100).round()} cm'),
-                selected: (stairWidth - w).abs() < 1e-3,
-                onSelected: (sel) {
-                  if (sel) onStairWidthChanged?.call(w);
-                },
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
           const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text(
-              l10n.architectStairSteps,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+          Text(
+            '${(stairWidth * 100).round()} cm',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          IconButton(
+            key: const ValueKey('stair-tool-properties'),
+            tooltip: l.architectProperties,
+            icon: const Icon(Icons.tune, color: Colors.white70),
+            onPressed: widget.onStairProperties,
+          ),
+          Tooltip(
+            message: l.stairPlaceHelp,
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(Icons.help_outline, size: 18, color: Colors.white70),
             ),
           ),
-          for (final n in [14, 16, 18])
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: ChoiceChip(
-                label: Text('$n'),
-                selected: stairSteps == n,
-                onSelected: (sel) {
-                  if (sel) onStairStepsChanged?.call(n);
-                },
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
         ],
       ),
     );

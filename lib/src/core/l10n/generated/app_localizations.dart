@@ -7289,6 +7289,48 @@ abstract class AppLocalizations {
   /// **'Offset'**
   String get architectPropertyOffset;
 
+  /// Element base elevation offset above storey level
+  ///
+  /// In en, this message translates to:
+  /// **'Base H'**
+  String get architectPropertyBaseOffset;
+
+  /// Floor plan cut display mode
+  ///
+  /// In en, this message translates to:
+  /// **'Cut View'**
+  String get architectPropertyCutDisplay;
+
+  /// Automatic cut calculation based on cut plane
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get architectCutDisplayAuto;
+
+  /// Always display uncut in projection
+  ///
+  /// In en, this message translates to:
+  /// **'Projected'**
+  String get architectCutDisplayProjected;
+
+  /// Always display as cut
+  ///
+  /// In en, this message translates to:
+  /// **'Cut'**
+  String get architectCutDisplayCut;
+
+  /// Display as overhead element
+  ///
+  /// In en, this message translates to:
+  /// **'Overhead'**
+  String get architectCutDisplayOverhead;
+
+  /// Storey floor plan cut plane height
+  ///
+  /// In en, this message translates to:
+  /// **'Cut H'**
+  String get architectStoreyCutPlane;
+
   /// No description provided for @architectPropertySize.
   ///
   /// In en, this message translates to:
@@ -8500,6 +8542,408 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Parapet {thickness} cm (cap h={height}m)'**
   String architectWallParapetCap(int thickness, String height);
+
+  /// No description provided for @stairShape.
+  ///
+  /// In en, this message translates to:
+  /// **'Shape'**
+  String get stairShape;
+
+  /// No description provided for @stairStraight.
+  ///
+  /// In en, this message translates to:
+  /// **'Straight'**
+  String get stairStraight;
+
+  /// No description provided for @stairQuarterTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'L-shaped'**
+  String get stairQuarterTurn;
+
+  /// No description provided for @stairHalfTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'U-shaped'**
+  String get stairHalfTurn;
+
+  /// No description provided for @stairSpiral.
+  ///
+  /// In en, this message translates to:
+  /// **'Spiral'**
+  String get stairSpiral;
+
+  /// No description provided for @stairTurnLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn left'**
+  String get stairTurnLeft;
+
+  /// No description provided for @stairTurnRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn right'**
+  String get stairTurnRight;
+
+  /// No description provided for @stairPlaceHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Place the first riser, then point the ascent direction. Length and steps are calculated from the floor levels.'**
+  String get stairPlaceHelp;
+
+  /// No description provided for @stairCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Regulations'**
+  String get stairCode;
+
+  /// No description provided for @stairCodeBulgaria.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulgaria · BG-2025.1'**
+  String get stairCodeBulgaria;
+
+  /// No description provided for @stairCodeGeometry.
+  ///
+  /// In en, this message translates to:
+  /// **'Geometry only'**
+  String get stairCodeGeometry;
+
+  /// No description provided for @stairUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use'**
+  String get stairUse;
+
+  /// No description provided for @stairUsePrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Within a dwelling'**
+  String get stairUsePrivate;
+
+  /// No description provided for @stairUseCommon.
+  ///
+  /// In en, this message translates to:
+  /// **'New shared residential'**
+  String get stairUseCommon;
+
+  /// No description provided for @stairUsePublic.
+  ///
+  /// In en, this message translates to:
+  /// **'Public building'**
+  String get stairUsePublic;
+
+  /// No description provided for @stairUseAssembly.
+  ///
+  /// In en, this message translates to:
+  /// **'Public, over 200 people'**
+  String get stairUseAssembly;
+
+  /// No description provided for @stairUseOutdoor.
+  ///
+  /// In en, this message translates to:
+  /// **'New urban route'**
+  String get stairUseOutdoor;
+
+  /// No description provided for @stairEvacuation.
+  ///
+  /// In en, this message translates to:
+  /// **'Evacuation'**
+  String get stairEvacuation;
+
+  /// No description provided for @stairUnspecified.
+  ///
+  /// In en, this message translates to:
+  /// **'Unspecified'**
+  String get stairUnspecified;
+
+  /// No description provided for @stairNoEvacuation.
+  ///
+  /// In en, this message translates to:
+  /// **'Not an escape stair'**
+  String get stairNoEvacuation;
+
+  /// No description provided for @stairUpTo15.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 15 people'**
+  String get stairUpTo15;
+
+  /// No description provided for @stair16To50.
+  ///
+  /// In en, this message translates to:
+  /// **'16–50 people'**
+  String get stair16To50;
+
+  /// No description provided for @stairOver50.
+  ///
+  /// In en, this message translates to:
+  /// **'Over 50 people'**
+  String get stairOver50;
+
+  /// No description provided for @stairRise.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor rise'**
+  String get stairRise;
+
+  /// No description provided for @stairFollowStoreys.
+  ///
+  /// In en, this message translates to:
+  /// **'From floor levels'**
+  String get stairFollowStoreys;
+
+  /// No description provided for @stairUpperStorey.
+  ///
+  /// In en, this message translates to:
+  /// **'Upper floor'**
+  String get stairUpperStorey;
+
+  /// No description provided for @stairFloorHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Floor height'**
+  String get stairFloorHeight;
+
+  /// No description provided for @stairClearWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear width'**
+  String get stairClearWidth;
+
+  /// No description provided for @stairRisers.
+  ///
+  /// In en, this message translates to:
+  /// **'Risers'**
+  String get stairRisers;
+
+  /// No description provided for @stairRiser.
+  ///
+  /// In en, this message translates to:
+  /// **'Riser height'**
+  String get stairRiser;
+
+  /// No description provided for @stairGoing.
+  ///
+  /// In en, this message translates to:
+  /// **'Going'**
+  String get stairGoing;
+
+  /// No description provided for @stairLanding.
+  ///
+  /// In en, this message translates to:
+  /// **'Landing depth'**
+  String get stairLanding;
+
+  /// No description provided for @stairInnerRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear inner radius'**
+  String get stairInnerRadius;
+
+  /// No description provided for @stairSweep.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn angle'**
+  String get stairSweep;
+
+  /// No description provided for @stairAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get stairAutomatic;
+
+  /// No description provided for @stairFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Recalculate'**
+  String get stairFit;
+
+  /// No description provided for @stairFitHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose risers, going, width and inner radius for the selected profile. The existing height and direction are retained.'**
+  String get stairFitHelp;
+
+  /// No description provided for @stairAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimensions'**
+  String get stairAdvanced;
+
+  /// No description provided for @stairChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks'**
+  String get stairChecks;
+
+  /// No description provided for @stairCheckPass.
+  ///
+  /// In en, this message translates to:
+  /// **'Pass'**
+  String get stairCheckPass;
+
+  /// No description provided for @stairCheckError.
+  ///
+  /// In en, this message translates to:
+  /// **'Violation'**
+  String get stairCheckError;
+
+  /// No description provided for @stairCheckAdvice.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfort advice'**
+  String get stairCheckAdvice;
+
+  /// No description provided for @stairCheckReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Not verified'**
+  String get stairCheckReview;
+
+  /// No description provided for @stairDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as draft'**
+  String get stairDraft;
+
+  /// No description provided for @stairDraftHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafts may contain violations and are drawn in red.'**
+  String get stairDraftHelp;
+
+  /// No description provided for @stairIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Geometric checks only. Headroom, handrails, finishes and the complete escape route require a project review.'**
+  String get stairIncomplete;
+
+  /// No description provided for @stairCheckSlope.
+  ///
+  /// In en, this message translates to:
+  /// **'Flight slope'**
+  String get stairCheckSlope;
+
+  /// No description provided for @stairCheckFlightRise.
+  ///
+  /// In en, this message translates to:
+  /// **'Rise per flight'**
+  String get stairCheckFlightRise;
+
+  /// No description provided for @stairCheckInner30.
+  ///
+  /// In en, this message translates to:
+  /// **'Going at 30 cm'**
+  String get stairCheckInner30;
+
+  /// No description provided for @stairCheckInner.
+  ///
+  /// In en, this message translates to:
+  /// **'Going at inner edge'**
+  String get stairCheckInner;
+
+  /// No description provided for @stairCheckDiameter.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear inner diameter'**
+  String get stairCheckDiameter;
+
+  /// No description provided for @stairCheckComfort.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfort · 2h + b'**
+  String get stairCheckComfort;
+
+  /// No description provided for @stairCheckCapacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Escape capacity and fire class'**
+  String get stairCheckCapacity;
+
+  /// No description provided for @stairCheckHeadroom.
+  ///
+  /// In en, this message translates to:
+  /// **'Headroom and floor opening'**
+  String get stairCheckHeadroom;
+
+  /// No description provided for @stairCheckHandrails.
+  ///
+  /// In en, this message translates to:
+  /// **'Guards and handrails'**
+  String get stairCheckHandrails;
+
+  /// No description provided for @stairCheckFinishes.
+  ///
+  /// In en, this message translates to:
+  /// **'Nosings, tactile strips and finishes'**
+  String get stairCheckFinishes;
+
+  /// No description provided for @stairCheckAccessibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessible use of spiral treads'**
+  String get stairCheckAccessibility;
+
+  /// No description provided for @stairCheckScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional applicable requirements'**
+  String get stairCheckScope;
+
+  /// No description provided for @stairCheckVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Unrecognised rules version'**
+  String get stairCheckVersion;
+
+  /// No description provided for @stairCheckUpperStorey.
+  ///
+  /// In en, this message translates to:
+  /// **'Upper floor missing or below start'**
+  String get stairCheckUpperStorey;
+
+  /// No description provided for @stairRulesSources.
+  ///
+  /// In en, this message translates to:
+  /// **'Regulatory sources'**
+  String get stairRulesSources;
+
+  /// No description provided for @stairFireSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Fire safety · Iз-1971, consolidated 2025'**
+  String get stairFireSource;
+
+  /// No description provided for @stairAccessSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility · РД-02-20-2/2021, Articles 18 and 55'**
+  String get stairAccessSource;
+
+  /// No description provided for @stairClearDimensionsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Use finished clear widths between limiting handrail projections. For a spiral, the inner radius starts at the limiting inner edge or handrail projection.'**
+  String get stairClearDimensionsHelp;
+
+  /// No description provided for @stairUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This combination cannot be drawn. Adjust the height or riser count.'**
+  String get stairUnsupported;
+
+  /// No description provided for @stairLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Schematic stair. Recalculate to convert it to a parametric stair.'**
+  String get stairLegacy;
+
+  /// No description provided for @stairCheckGroupSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'Risers per group'**
+  String get stairCheckGroupSteps;
 }
 
 class _AppLocalizationsDelegate

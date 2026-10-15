@@ -94,6 +94,7 @@ class _ArchitectElementPropertiesDialogState
       'sillHeight' => l.architectPropertySill,
       'elevation' => l.architectToolLevel,
       'offsetDistance' => l.architectPropertyOffset,
+      'baseOffset' => l.architectPropertyBaseOffset,
       _ => l.architectPropertySize,
     };
   }
@@ -141,7 +142,7 @@ class _ArchitectElementPropertiesDialogState
             showContinue: false,
             showDirection: false,
             minimumLength:
-                {'elevation', 'rotationDeg', 'offsetDistance'}.contains(key)
+                {'elevation', 'rotationDeg', 'offsetDistance', 'baseOffset'}.contains(key)
                 ? -double.infinity
                 : {'sillHeight', 'insulationThicknessOverride'}.contains(key)
                 ? 0
@@ -285,9 +286,42 @@ class _ArchitectElementPropertiesDialogState
                 ),
                 const SizedBox(height: 8),
               ],
+              if (records.every((e) =>
+                  e.containsKey('referenceLine') ||
+                  e.containsKey('shape') ||
+                  (e.containsKey('depth') && e.containsKey('width')))) ...[
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('architect-property-cutDisplayMode'),
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: l.architectPropertyCutDisplay,
+                  ),
+                  initialValue: texts['cutDisplayMode'] ??
+                      (records.map((e) => e['cutDisplayMode'] as String? ?? 'auto').toSet().length == 1
+                          ? (records.first['cutDisplayMode'] as String? ?? 'auto')
+                          : null),
+                  items: [
+                    for (final mode in ArchitectCutDisplayMode.values)
+                      DropdownMenuItem(
+                        value: mode.name,
+                        child: Text(switch (mode) {
+                          ArchitectCutDisplayMode.auto => l.architectCutDisplayAuto,
+                          ArchitectCutDisplayMode.projected => l.architectCutDisplayProjected,
+                          ArchitectCutDisplayMode.cut => l.architectCutDisplayCut,
+                          ArchitectCutDisplayMode.overhead => l.architectCutDisplayOverhead,
+                        }),
+                      ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => texts['cutDisplayMode'] = v);
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
               if (!walls)
                 for (final key in fields.keys) numberField(key, false),
               if (walls) ...[
+                numberField('baseOffset', false),
                 numberField('height', true),
                 if (normalWalls)
                   CheckboxListTile(

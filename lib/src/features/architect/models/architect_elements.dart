@@ -1,6 +1,35 @@
 // === SECTION: ARCHITECTURAL ELEMENT MODELS ===
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'architect_stair_design.dart';
+export 'architect_stair_design.dart';
+
+// ===========================================================================
+// 0. CUT DISPLAY MODE (PLAN CUT PLANE / СРЯЗВАЩА РАВНИНА)
+// ===========================================================================
+
+/// Defines how an architectural element is displayed relative to the floor plan cut plane.
+enum ArchitectCutDisplayMode {
+  /// Automatically determined by whether the floor cut plane intersects the element's height range.
+  /// Parapets (< 1.50m or typed as parapet) automatically display in projection (uncut).
+  auto,
+
+  /// Always displayed in projection (uncut) with a medium/thin contour line (ideal for parapets).
+  projected,
+
+  /// Always displayed as cut with heavy core border and thin insulation outline.
+  cut,
+
+  /// Displayed as overhead element (above cut plane, e.g. with dashed line).
+  overhead;
+
+  static ArchitectCutDisplayMode fromName(String? name) {
+    return ArchitectCutDisplayMode.values.firstWhere(
+      (m) => m.name == name,
+      orElse: () => ArchitectCutDisplayMode.auto,
+    );
+  }
+}
 
 // ===========================================================================
 // 1. ARCHITECTURAL BEAM / LINTEL
@@ -12,6 +41,8 @@ class ArchitectBeam {
   final Offset endPoint;
   final double width; // in meters (default 0.25 m = 25 cm)
   final double depth; // in meters (default 0.50 m = 50 cm)
+  final double baseOffset; // in meters relative to storey elevation (default 2.20 m)
+  final ArchitectCutDisplayMode cutDisplayMode;
   final String label;
 
   const ArchitectBeam({
@@ -20,8 +51,31 @@ class ArchitectBeam {
     required this.endPoint,
     this.width = 0.25,
     this.depth = 0.50,
+    this.baseOffset = 2.20,
+    this.cutDisplayMode = ArchitectCutDisplayMode.auto,
     this.label = 'B 25/50',
   });
+
+  bool isCutAt(double storeyCutPlane) {
+    return switch (cutDisplayMode) {
+      ArchitectCutDisplayMode.cut => true,
+      ArchitectCutDisplayMode.projected => false,
+      ArchitectCutDisplayMode.overhead => false,
+      ArchitectCutDisplayMode.auto => () {
+        final zLow = baseOffset;
+        final zHigh = baseOffset + depth;
+        return zLow <= storeyCutPlane && storeyCutPlane <= zHigh;
+      }(),
+    };
+  }
+
+  bool isOverheadAt(double storeyCutPlane) {
+    return switch (cutDisplayMode) {
+      ArchitectCutDisplayMode.overhead => true,
+      ArchitectCutDisplayMode.auto => baseOffset > storeyCutPlane,
+      _ => false,
+    };
+  }
 
   double get length => (endPoint - startPoint).distance;
 
@@ -47,6 +101,8 @@ class ArchitectBeam {
     Offset? endPoint,
     double? width,
     double? depth,
+    double? baseOffset,
+    ArchitectCutDisplayMode? cutDisplayMode,
     String? label,
   }) => ArchitectBeam(
     id: id ?? this.id,
@@ -54,6 +110,8 @@ class ArchitectBeam {
     endPoint: endPoint ?? this.endPoint,
     width: width ?? this.width,
     depth: depth ?? this.depth,
+    baseOffset: baseOffset ?? this.baseOffset,
+    cutDisplayMode: cutDisplayMode ?? this.cutDisplayMode,
     label: label ?? this.label,
   );
 
@@ -63,6 +121,8 @@ class ArchitectBeam {
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'width': width,
     'depth': depth,
+    'baseOffset': baseOffset,
+    'cutDisplayMode': cutDisplayMode.name,
     'label': label,
   };
 
@@ -78,6 +138,10 @@ class ArchitectBeam {
     ),
     width: (json['width'] as num?)?.toDouble() ?? 0.25,
     depth: (json['depth'] as num?)?.toDouble() ?? 0.50,
+    baseOffset: (json['baseOffset'] as num?)?.toDouble() ?? 2.20,
+    cutDisplayMode: ArchitectCutDisplayMode.fromName(
+      json['cutDisplayMode'] as String?,
+    ),
     label: json['label'] as String? ?? 'B 25/50',
   );
 
@@ -261,17 +325,20 @@ class ArchitectStair {
   final Offset startPoint;
   final Offset endPoint;
   final double width; // flight width in meters (default 1.10 m)
-  final int stepCount; // default 16
+  final int _stepCount;
   final bool hasLanding;
+  final ArchitectStairDesign? design;
+  int get stepCount => design?.risers ?? _stepCount;
 
   const ArchitectStair({
     required this.id,
     required this.startPoint,
     required this.endPoint,
     this.width = 1.10,
-    this.stepCount = 16,
+    int stepCount = 16,
     this.hasLanding = false,
-  });
+    this.design,
+  }) : _stepCount = stepCount;
 
   double get length => (endPoint - startPoint).distance;
 
@@ -287,9 +354,42 @@ class ArchitectStair {
   }
 
   List<Offset> get polygonCorners {
+    if (design != null) {
+      final bounds = plan.bounds;
+      return [
+        bounds.topLeft,
+        bounds.topRight,
+        bounds.bottomRight,
+        bounds.bottomLeft,
+      ];
+    }
     final n = normalVector * (width / 2.0);
     return [startPoint - n, endPoint - n, endPoint + n, startPoint + n];
   }
+
+  static final _plans = Expando<ArchitectStairPlan>();
+  ArchitectStairPlan get plan => _plans[this] ??= design == null
+      ? ArchitectStairPlan(
+          [polygonCorners],
+          [
+            for (var i = 1; i < stepCount; i++)
+              (
+                startPoint +
+                    unitVector * (length * i / stepCount) -
+                    normalVector * width / 2,
+                startPoint +
+                    unitVector * (length * i / stepCount) +
+                    normalVector * width / 2,
+              ),
+          ],
+          [startPoint, endPoint],
+        )
+      : ArchitectStairPlan.build(
+          start: startPoint,
+          direction: endPoint - startPoint,
+          width: width,
+          design: design!,
+        );
 
   ArchitectStair copyWith({
     String? id,
@@ -298,6 +398,7 @@ class ArchitectStair {
     double? width,
     int? stepCount,
     bool? hasLanding,
+    ArchitectStairDesign? design,
   }) => ArchitectStair(
     id: id ?? this.id,
     startPoint: startPoint ?? this.startPoint,
@@ -305,6 +406,7 @@ class ArchitectStair {
     width: width ?? this.width,
     stepCount: stepCount ?? this.stepCount,
     hasLanding: hasLanding ?? this.hasLanding,
+    design: design ?? this.design,
   );
 
   Map<String, dynamic> toJson() => {
@@ -314,6 +416,7 @@ class ArchitectStair {
     'width': width,
     'stepCount': stepCount,
     'hasLanding': hasLanding,
+    if (design != null) 'design': design!.toJson(),
   };
 
   factory ArchitectStair.fromJson(Map<String, dynamic> json) => ArchitectStair(
@@ -329,6 +432,11 @@ class ArchitectStair {
     width: (json['width'] as num?)?.toDouble() ?? 1.10,
     stepCount: (json['stepCount'] as num?)?.toInt() ?? 16,
     hasLanding: json['hasLanding'] as bool? ?? false,
+    design: json['design'] is Map
+        ? ArchitectStairDesign.fromJson(
+            Map<String, dynamic>.from(json['design'] as Map),
+          )
+        : null,
   );
 }
 
