@@ -22,6 +22,126 @@ class ArchitectRadialMenuItem {
   });
 }
 
+/// Shared geometry lets nearby drawing readouts avoid the complete menu.
+class ArchitectRadialLayout {
+  final List<Offset> targets;
+  final Rect badge;
+  const ArchitectRadialLayout(this.targets, this.badge);
+
+  List<Rect> get occupied => [
+    badge.inflate(8),
+    for (final target in targets)
+      Rect.fromCenter(center: target, width: 68, height: 68),
+  ];
+
+  static ArchitectRadialLayout compute({
+    required Size size,
+    required Offset center,
+    required int count,
+    bool hasTitle = false,
+  }) {
+    final n = count;
+    const buttonSize = 52.0, margin = 12.0, separation = 60.0;
+    final radius = n < 2
+        ? 92.0
+        : math.max(92.0, separation / (2 * math.sin(math.pi / (2 * (n - 1)))));
+    // A full semicircle keeps neighboring targets separate, including edges.
+    // Shift the complete fan into view; never clamp buttons individually.
+    final nearLeft = center.dx < radius / 2;
+    final nearRight = center.dx > size.width - radius / 2;
+    final base = nearLeft
+        ? -math.pi / 2
+        : nearRight
+        ? math.pi / 2
+        : center.dy < size.height * .38
+        ? 0.0
+        : math.pi;
+    var targets = List<Offset>.generate(n, (i) {
+      final angle = base + (n == 1 ? math.pi / 2 : i * math.pi / (n - 1));
+      return center + Offset(math.cos(angle), math.sin(angle)) * radius;
+    });
+    var bounds = Rect.fromCenter(
+      center: targets.first,
+      width: buttonSize,
+      height: buttonSize,
+    );
+    for (final target in targets.skip(1)) {
+      bounds = bounds.expandToInclude(
+        Rect.fromCenter(center: target, width: buttonSize, height: buttonSize),
+      );
+    }
+    if (bounds.width > size.width - 2 * margin ||
+        bounds.height > size.height - 2 * margin) {
+      // Very narrow/short viewports retain separate touch targets in rows.
+      final columns = math.max(
+        1,
+        ((size.width - 2 * margin) / separation).floor(),
+      );
+      final count = math.min(columns, n);
+      targets = List.generate(
+        n,
+        (i) => Offset(
+          margin + buttonSize / 2 + (i % count) * separation,
+          margin + buttonSize / 2 + (i ~/ count) * separation,
+        ),
+      );
+    } else {
+      double shift(double low, double high, double maximum) => low < margin
+          ? margin - low
+          : high > maximum - margin
+          ? maximum - margin - high
+          : 0;
+      final delta = Offset(
+        shift(bounds.left, bounds.right, size.width),
+        shift(bounds.top, bounds.bottom, size.height),
+      );
+      targets = targets.map((point) => point + delta).toList();
+    }
+    final titleWidth = !hasTitle
+        ? 36.0
+        : math.min(240.0, size.width - 2 * margin);
+    final titleLeft = (center.dx - titleWidth / 2).clamp(
+      margin,
+      size.width - margin - titleWidth,
+    );
+    double titleTop = (center.dy - 18).clamp(
+      margin,
+      math.max(margin, size.height - margin - 36),
+    );
+    if (hasTitle) {
+      final buttons = targets
+          .map(
+            (p) => Rect.fromCenter(
+              center: p,
+              width: buttonSize,
+              height: buttonSize,
+            ),
+          )
+          .toList();
+      for (final top in [
+        titleTop,
+        buttons.map((r) => r.top).reduce(math.min) - 44,
+        buttons.map((r) => r.bottom).reduce(math.max) + 8,
+        margin,
+        size.height - margin - 36,
+      ]) {
+        final clamped = top
+            .clamp(margin, math.max(margin, size.height - margin - 36))
+            .toDouble();
+        final badge = Rect.fromLTWH(titleLeft, clamped, titleWidth, 36);
+        if (!buttons.any((r) => r.overlaps(badge))) {
+          titleTop = clamped;
+          break;
+        }
+      }
+    }
+    return ArchitectRadialLayout(
+      targets,
+      Rect.fromLTWH(titleLeft, titleTop, titleWidth, 36),
+    );
+  }
+}
+
 /// Adaptive fan/radial contextual menu shown on element long-press.
 /// Fans away from user's palm and screen edges.
 class ArchitectRadialMenu extends StatefulWidget {
@@ -75,90 +195,42 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
     if (widget.items.isEmpty) return const SizedBox.shrink();
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = constraints.biggest;
-        final center = widget.center;
-        final n = widget.items.length;
-        const buttonSize = 52.0, margin = 12.0, separation = 60.0;
-        final radius = n < 2
-            ? 92.0
-            : math.max(
-                92.0,
-                separation / (2 * math.sin(math.pi / (2 * (n - 1)))),
-              );
-        // A full semicircle keeps neighboring targets separate, including edges.
-        // Shift the complete fan into view; never clamp buttons individually.
-        final nearLeft = center.dx < radius / 2;
-        final nearRight = center.dx > size.width - radius / 2;
-        final base = nearLeft
-            ? -math.pi / 2
-            : nearRight
-            ? math.pi / 2
-            : center.dy < size.height * .38
-            ? 0.0
-            : math.pi;
-        var targets = List<Offset>.generate(n, (i) {
-          final angle = base + (n == 1 ? math.pi / 2 : i * math.pi / (n - 1));
-          return center + Offset(math.cos(angle), math.sin(angle)) * radius;
-        });
-        var bounds = Rect.fromCenter(
-          center: targets.first,
-          width: buttonSize,
-          height: buttonSize,
+        final layout = ArchitectRadialLayout.compute(
+          size: constraints.biggest,
+          center: widget.center,
+          count: widget.items.length,
+          hasTitle: widget.title != null,
         );
-        for (final target in targets.skip(1)) {
-          bounds = bounds.expandToInclude(
-            Rect.fromCenter(
-              center: target,
-              width: buttonSize,
-              height: buttonSize,
-            ),
-          );
-        }
-        if (bounds.width > size.width - 2 * margin ||
-            bounds.height > size.height - 2 * margin) {
-          // Very narrow/short viewports retain separate touch targets in rows.
-          final columns = math.max(
-            1,
-            ((size.width - 2 * margin) / separation).floor(),
-          );
-          final count = math.min(columns, n);
-          targets = List.generate(
-            n,
-            (i) => Offset(
-              margin + buttonSize / 2 + (i % count) * separation,
-              margin + buttonSize / 2 + (i ~/ count) * separation,
-            ),
-          );
-        } else {
-          double shift(double low, double high, double maximum) => low < margin
-              ? margin - low
-              : high > maximum - margin
-              ? maximum - margin - high
-              : 0;
-          final delta = Offset(
-            shift(bounds.left, bounds.right, size.width),
-            shift(bounds.top, bounds.bottom, size.height),
-          );
-          targets = targets.map((point) => point + delta).toList();
-        }
+        final targets = layout.targets;
+        final titleLeft = layout.badge.left,
+            titleTop = layout.badge.top,
+            titleWidth = layout.badge.width;
+        final n = widget.items.length;
         return Stack(
           children: [
             Positioned(
-              left: center.dx - (widget.title != null ? 40 : 18),
-              top: center.dy - 18,
+              left: titleLeft,
+              top: titleTop,
               child: IgnorePointer(
                 child: ScaleTransition(
                   scale: _scaleAnim,
                   child: Container(
+                    key: const ValueKey('architect-radial-title'),
                     padding: widget.title != null
-                        ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4)
+                        ? const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          )
                         : null,
-                    width: widget.title != null ? null : 36,
+                    width: titleWidth,
                     height: 36,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
                       color: const Color(0xEE1E242C),
-                      border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
+                      border: Border.all(
+                        color: const Color(0xFF00E5FF),
+                        width: 1.5,
+                      ),
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black45,
@@ -169,12 +241,17 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
                     ),
                     child: Center(
                       child: widget.title != null
-                          ? Text(
-                              widget.title!,
-                              style: const TextStyle(
-                                color: Color(0xFF00E5FF),
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
+                          ? Tooltip(
+                              message: widget.title!,
+                              child: Text(
+                                widget.title!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF00E5FF),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             )
                           : const ContainerDot(),

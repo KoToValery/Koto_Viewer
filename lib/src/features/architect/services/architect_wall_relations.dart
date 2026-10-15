@@ -18,6 +18,31 @@ class ArchitectWallClearance {
   });
   Offset get midpoint => (start + end) / 2;
 
+  ArchitectWallClearance nearView(
+    ArchitectWall wall,
+    ArchitectWall neighbor,
+    Rect view,
+  ) {
+    double along(Offset p) {
+      final d = p - wall.centerStart;
+      return d.dx * wall.unitVector.dx + d.dy * wall.unitVector.dy;
+    }
+
+    final extents = neighbor.polygonCorners.map(along).toList();
+    final lo = math.max(0.0, extents.reduce(math.min));
+    final hi = math.min(wall.length, extents.reduce(math.max));
+    final station = along(view.center).clamp(lo, math.max(lo, hi));
+    final shift = wall.unitVector * (station - along(start));
+    return ArchitectWallClearance(
+      wallId: wallId,
+      neighborId: neighborId,
+      side: side,
+      distance: distance,
+      start: start + shift,
+      end: end + shift,
+    );
+  }
+
   /// Finished-face distance to the nearest facing wall on each side.
   static List<ArchitectWallClearance> nearest(
     ArchitectWall wall,

@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -43,7 +44,7 @@ void main() {
           );
           await tester.pumpWidget(app);
           await tester.pumpAndSettle();
-          await tester.tap(find.byIcon(Icons.line_weight_rounded));
+          await tool_ui.choose(tester, Icons.line_weight_rounded);
           await tester.pumpAndSettle();
           final picker = find.byKey(
             const ValueKey('architect-wall-type-picker'),

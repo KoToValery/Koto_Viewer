@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 
 import '../models/architect_grid_axis.dart';
 import '../models/architect_project.dart';
+import '../services/architect_axis_geometry.dart';
 
 // === SECTION: MAIN AXIS RENDERING ===
 
@@ -120,6 +121,69 @@ class ArchitectGridAxisPainterHelper {
         snapLabel: draftSnapLabel,
         zoomScale: zoomScale,
       );
+    }
+  }
+
+  /// Temporary readouts, painted only in the interaction layer.
+  static void drawNeighborDistances({
+    required Canvas canvas,
+    required ArchitectProject project,
+    required String? selectedAxisId,
+    required double zoomScale,
+    required ArchitectCanvasPalette palette,
+    Rect? visibleRect,
+  }) {
+    final axis = project.gridAxes
+        .where((a) => a.id == selectedAxisId)
+        .firstOrNull;
+    if (axis == null) return;
+    var origin = (axis.start + axis.end) / 2;
+    // Keep the readout near the visible part of a long selected axis.
+    if (visibleRect != null) {
+      final along = ArchitectAxisGeometry.dot(
+        visibleRect.center - axis.start,
+        axis.direction,
+      ).clamp(0.0, axis.length);
+      origin = axis.start + axis.direction * along;
+    }
+    final paint = Paint()
+      ..color = const Color(0xFFFF9F0A)
+      ..strokeWidth = 1 / zoomScale;
+    for (final neighbor in ArchitectAxisGeometry.neighbors(
+      axis,
+      project.gridAxes,
+    )) {
+      final end = origin + axis.normal * neighbor.distance;
+      canvas.drawLine(origin, end, paint);
+      final tick = axis.direction * (4 / zoomScale);
+      for (final p in [origin, end]) {
+        canvas.drawLine(p - tick, p + tick, paint);
+      }
+      final tp = TextPainter(
+        text: TextSpan(
+          text: project.units.format(neighbor.distance.abs()),
+          style: TextStyle(
+            color: palette.foreground(const Color(0xFF8A4800)),
+            fontFamily: 'Roboto',
+            fontSize: 12 / zoomScale,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      canvas.save();
+      canvas.translate((origin.dx + end.dx) / 2, (origin.dy + end.dy) / 2);
+      final label = Rect.fromCenter(
+        center: Offset.zero,
+        width: tp.width + 8 / zoomScale,
+        height: tp.height + 4 / zoomScale,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(label, Radius.circular(3 / zoomScale)),
+        Paint()..color = palette.background,
+      );
+      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      canvas.restore();
     }
   }
 
@@ -267,8 +331,8 @@ class ArchitectGridAxisPainterHelper {
           : isSelected
           ? const Color(0xFFFF9F0A)
           : (palette.isDark
-              ? palette.foreground(const Color(0xFFC62828))
-              : const Color(0xFFC62828))
+                ? palette.foreground(const Color(0xFFC62828))
+                : const Color(0xFFC62828))
       ..strokeWidth = (isSelected ? 2.2 : 1.4) / zoomScale
       ..style = PaintingStyle.stroke;
 

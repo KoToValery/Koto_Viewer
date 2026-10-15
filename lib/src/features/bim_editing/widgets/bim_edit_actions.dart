@@ -13,6 +13,7 @@ enum BimEditAction {
   split,
   offset,
   newPoint,
+  rename,
 }
 
 class BimEditActions {
@@ -28,6 +29,7 @@ class BimEditActions {
         BimEditAction.split => l.architectRadialSplit,
         BimEditAction.offset => l.offsetAction,
         BimEditAction.newPoint => l.bimNewPoint,
+        BimEditAction.rename => l.architectRadialRename,
       };
   static IconData icon(BimEditAction action) => switch (action) {
     BimEditAction.move => Icons.open_with_rounded,
@@ -40,6 +42,7 @@ class BimEditActions {
     BimEditAction.split => Icons.content_cut,
     BimEditAction.offset => Icons.straighten_rounded,
     BimEditAction.newPoint => Icons.add_location_alt_outlined,
+    BimEditAction.rename => Icons.drive_file_rename_outline_rounded,
   };
   static Set<BimEditAction> available(BimElementSnapshot element) {
     if (element.readOnly) return const {};

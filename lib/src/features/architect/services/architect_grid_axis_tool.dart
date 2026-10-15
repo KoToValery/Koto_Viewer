@@ -14,6 +14,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'architect_element_id.dart';
+import 'architect_axis_geometry.dart';
 import '../../bim_editing/operations/bim_axis_operations.dart';
 import '../../bim_editing/operations/bim_axis_naming.dart';
 
@@ -507,22 +508,40 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     notifyListeners();
   }
 
+  (Offset, Offset)? moveWallGuide;
+
   void updateMoving(
     Offset rawModelPoint,
     List<StructuralGridAxis> allAxes,
-    double scale,
-  ) {
+    double scale, {
+    List<ArchitectWall> walls = const [],
+    bool magnetic = true,
+  }) {
     if (!_isMovingAxis ||
         _moveStartPoint == null ||
         _moveOriginalAxis == null) {
       return;
     }
-    _moveCurrentDelta = BimAxisOperations.movingDelta(
-      original: _moveOriginalAxis!,
-      delta: rawModelPoint - _moveStartPoint!,
-      axes: allAxes,
-      captureRadius: math.min(12 / scale, .20),
-    );
+    final rawDelta = rawModelPoint - _moveStartPoint!;
+    final wallSnap = magnetic
+        ? ArchitectAxisGeometry.snapToWall(
+            axis: _moveOriginalAxis!,
+            delta: rawDelta,
+            walls: walls,
+            tolerance: math.min(12 / scale, .20),
+          )
+        : null;
+    moveWallGuide = wallSnap?.guide;
+    _moveCurrentDelta =
+        wallSnap?.delta ??
+        (magnetic
+            ? BimAxisOperations.movingDelta(
+                original: _moveOriginalAxis!,
+                delta: rawDelta,
+                axes: allAxes,
+                captureRadius: math.min(12 / scale, .20),
+              )
+            : rawDelta);
     notifyListeners();
   }
 
@@ -547,6 +566,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     _moveStartPoint = null;
     _moveOriginalAxis = null;
     _moveCurrentDelta = null;
+    moveWallGuide = null;
     _selectedAxisId = movedAxis.id;
     notifyListeners();
 
@@ -558,6 +578,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     _moveStartPoint = null;
     _moveOriginalAxis = null;
     _moveCurrentDelta = null;
+    moveWallGuide = null;
     notifyListeners();
   }
 
@@ -763,6 +784,7 @@ class ArchitectGridAxisTool extends ChangeNotifier {
     _moveStartPoint = null;
     _moveOriginalAxis = null;
     _moveCurrentDelta = null;
+    moveWallGuide = null;
     _isOffsettingWithDrag = false;
     _axisBeingOffset = null;
     notifyListeners();

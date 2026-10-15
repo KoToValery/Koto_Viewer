@@ -237,6 +237,8 @@ void main() {
 
       final mixedSummaryBg = ArchitectSelection.summary(project, {'w1', 'c1'}, l10nBg);
       expect(mixedSummaryBg, contains('2 елемента:'));
+      expect(ArchitectSelection.summary(project, {'w1', 'c1'}, l10nEn, compact: true), '2 items');
+      expect(ArchitectSelection.summary(project, {'w1', 'c1'}, l10nBg, compact: true), '2 елемента');
     });
   });
 
@@ -312,7 +314,7 @@ void main() {
         tester.getTopLeft(find.byKey(const ValueKey('architect-viewport-input'))) +
         camera(tester).toScreen(point);
 
-    testWidgets('Select tool sequentially toggles multiple elements and displays summary bar', (tester) async {
+    testWidgets('Select tool keeps multiple elements with a compact action bar', (tester) async {
       final commands = seededController();
       await openWorkspace(tester, commands);
 
@@ -330,12 +332,15 @@ void main() {
       await tester.tapAt(screen(tester, const Offset(2, 2)));
       await tester.pumpAndSettle();
 
-      // Selection bar should now show mixed count (2 elements)
+      // Selection actions remain available without a count.
       expect(find.byKey(const ValueKey('architect-selection-bar')), findsOneWidget);
-      expect(find.textContaining('2 items:'), findsOneWidget);
+      expect(find.text('2 items'), findsNothing);
+      expect(find.byKey(const ValueKey('architect-context-menu-btn')), findsNothing);
 
-      // Open context menu via selection context button
-      await tester.tap(find.byKey(const ValueKey('architect-context-menu-btn')));
+      // Hold a selected element to open the group context menu.
+      final held = await tester.startGesture(screen(tester, const Offset(1, 0)));
+      await tester.pump(const Duration(milliseconds: 750));
+      await held.up();
       await tester.pumpAndSettle();
 
       // ArchitectRadialMenu should be visible with badge
@@ -360,8 +365,9 @@ void main() {
       await tester.tap(connectedBtn);
       await tester.pumpAndSettle();
 
-      // Selection bar should now show "2 walls"
-      expect(find.textContaining('2 walls'), findsOneWidget);
+      // The connected walls are selected without a bottom count.
+      expect(overlay(tester).selectedElementIds, {'w1', 'w2'});
+      expect(find.textContaining('2 walls'), findsNothing);
     });
 
     testWidgets('Select similar elements expands selection to all of same type', (tester) async {
@@ -382,7 +388,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Both walls are now selected
-      expect(find.textContaining('2 walls'), findsOneWidget);
+      expect(overlay(tester).selectedElementIds, {'w1', 'w2'});
+      expect(find.textContaining('2 walls'), findsNothing);
     });
   });
 }

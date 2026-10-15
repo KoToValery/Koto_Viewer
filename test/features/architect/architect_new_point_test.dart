@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -293,8 +294,8 @@ void main() {
           kind == 'line' || kind == 'rect' ? 'CAD' : kind,
         );
         if (kind == 'rect') {
-          await tester.ensureVisible(find.byIcon(Icons.crop_square_rounded));
-          await tester.tap(find.byIcon(Icons.crop_square_rounded));
+          await tool_ui.prepare(tester, Icons.crop_square_rounded);
+          await tool_ui.choose(tester, Icons.crop_square_rounded);
           await tester.pumpAndSettle();
         }
         // For polygons select inside; for native lines select the body.

@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:io';
@@ -282,7 +283,7 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tester.ensureVisible(find.byIcon(Icons.pan_tool_rounded));
+      await tool_ui.prepare(tester, Icons.pan_tool_rounded);
       await tester.tap(find.byIcon(Icons.pan_tool_rounded));
       await tester.pumpAndSettle();
       final old = model.project;
@@ -348,7 +349,7 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(2, -.125));
       expect(

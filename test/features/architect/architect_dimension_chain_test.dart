@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -75,6 +76,23 @@ ArchitectDimension? preview(WidgetTester tester) =>
           .dimension
     : null;
 
+Future<void> captureDimensionPhone(
+  WidgetTester tester,
+  GlobalKey boundaryKey,
+  String path,
+) async {
+  if (Platform.environment['UPDATE_ARCHITECT_CHAIN_PREVIEW'] != 'true') return;
+  await tester.pumpAndSettle();
+  final boundary =
+      boundaryKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+  await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 2);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    File(path).writeAsBytesSync(bytes!.buffer.asUint8List());
+    image.dispose();
+  });
+}
+
 Future<void> startChain(
   WidgetTester tester,
   ArchitectCommandController model,
@@ -86,7 +104,379 @@ Future<void> startChain(
 }
 
 void main() {
+  test('Interior row uses inward end faces and keeps partition thickness', () {
+    final s = scene();
+    final d = ArchitectDimensionChain.build(
+      id: 'interior',
+      anchors: chain(s).anchors,
+      direction: const Offset(1, 0),
+      style: ArchitectDimensionStyle.interior,
+    );
+    expect(d.startPoint.dx, closeTo(.125, 1e-9));
+    expect(d.endPoint.dx, closeTo(5.875, 1e-9));
+    expect(d.anchors, hasLength(6));
+    expect(d.witnessPoints, hasLength(4));
+    expect(
+      lengths(d),
+      orderedEquals([2.75, .25, 2.75].map((v) => closeTo(v, 1e-9))),
+    );
+    final withOpening = ArchitectDimensionChain.addAnchors(d, const [
+      ArchitectDimensionAnchor(
+        point: Offset(1, 1.5),
+        elementId: 'window',
+        feature: 'opening',
+      ),
+      ArchitectDimensionAnchor(
+        point: Offset(2, 1.5),
+        elementId: 'window',
+        feature: 'opening',
+        side: .5,
+      ),
+    ]);
+    final tiers = ArchitectDimensionLayout.layoutTiers(
+      dimension: withOpening,
+      scale: 100,
+    );
+    expect(tiers, hasLength(1));
+    expect(tiers.single.points, hasLength(6));
+    expect(ArchitectDimensionLayout.overallSegment(withOpening, 100), isNull);
+    final loaded = ArchitectDimension.fromJson(
+      jsonDecode(jsonEncode(d.toJson())),
+    );
+    expect(loaded.style, ArchitectDimensionStyle.interior);
+    expect(lengths(loaded), lengths(d));
+    final old = d.toJson()..remove('style');
+    expect(
+      ArchitectDimension.fromJson(old).style,
+      ArchitectDimensionStyle.exterior,
+    );
+  });
+
+  for (final style in [
+    ArchitectDimensionStyle.exterior,
+    ArchitectDimensionStyle.interior,
+  ]) {
+    test(
+      '$style adding an earlier wall preserves the line and all associations',
+      () {
+        final s = scene();
+        final d = ArchitectDimensionChain.build(
+          id: 'd',
+          anchors: [
+            ...ArchitectDimensionChain.wallFaces(
+              s.walls[1],
+              const Offset(3, 1),
+            ),
+            ...ArchitectDimensionChain.wallFaces(
+              s.walls[2],
+              const Offset(6, 2),
+            ),
+          ],
+          direction: const Offset(1, 0),
+          offset: -2,
+          style: style,
+        ).copyWith(customText: 'custom', showOverall: false);
+        final additions = ArchitectDimensionChain.wallFaces(
+          s.walls.first,
+          const Offset(0, .4),
+        );
+        final extended = ArchitectDimensionChain.addAnchors(d, [
+          ...additions,
+          ...ArchitectDimensionChain.wallFaces(
+            s.walls.first,
+            const Offset(0, 2.5),
+          ),
+        ]);
+        expect(extended.lineStart.dy, closeTo(d.lineStart.dy, 1e-9));
+        expect(extended.anchors, hasLength(6));
+        expect(extended.style, style);
+        expect(extended.customText, 'custom');
+        expect(extended.showOverall, false);
+        final model = editing.seeded(s.copyWith(dimensions: [extended]));
+        addTearDown(model.dispose);
+        model.execute(
+          const MoveArchitectElement(
+            storeyId: 's',
+            elementId: 'b',
+            delta: Offset(.2, 0),
+          ),
+        );
+        expect(model.project.activeStorey.dimensions.single.style, style);
+        expect(
+          lengths(model.project.activeStorey.dimensions.single),
+          contains(closeTo(2.95, 1e-9)),
+        );
+      },
+    );
+
+    testWidgets(
+      '$style adds a missed wall to a saved dimension in one undo step',
+      (tester) async {
+        final s = scene();
+        final d = chain(
+          s.copyWith(walls: [s.walls.first, s.walls.last]),
+        ).copyWith(style: style);
+        final model = editing.seeded(s.copyWith(dimensions: [d]));
+        addTearDown(model.dispose);
+        await workspace.open(tester, model);
+        await tool_ui.prepare(tester, Icons.pan_tool_rounded);
+        await tester.tap(find.byIcon(Icons.pan_tool_rounded));
+        await tester.pump();
+        final before = model.project.activeStorey.dimensions.single;
+        await workspace.wallTap(
+          tester,
+          (before.lineStart + before.lineEnd) / 2 + const Offset(-1, 0),
+        );
+        expect(workspace.overlay(tester).selectedElementIds, {d.id});
+        await tester.tap(
+          find.byKey(const ValueKey('architect-dimension-add-walls')),
+        );
+        await tester.pump();
+        await workspace.wallTap(tester, const Offset(3, .7));
+        await workspace.wallTap(tester, const Offset(3, 2.1));
+        expect(preview(tester)!.anchors, hasLength(6));
+        expect(
+          preview(tester)!.lineStart.dy,
+          closeTo(before.lineStart.dy, 1e-9),
+        );
+        expect(
+          model.project.activeStorey.dimensions.single.anchors,
+          hasLength(4),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('architect-dimension-place')),
+        );
+        await tester.pump();
+        final saved = model.project.activeStorey.dimensions.single;
+        expect(saved.id, d.id);
+        expect(saved.style, style);
+        expect(saved.anchors, hasLength(6));
+        expect(saved.lineStart.dy, closeTo(before.lineStart.dy, 1e-9));
+        expect(model.undoCount, 1);
+        model.undo();
+        expect(
+          model.project.activeStorey.dimensions.single.anchors,
+          hasLength(4),
+        );
+        model.redo();
+        expect(
+          model.project.activeStorey.dimensions.single.anchors,
+          hasLength(6),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('Interior tool places one row between the inward wall faces', (
+    tester,
+  ) async {
+    final model = editing.seeded(scene());
+    addTearDown(model.dispose);
+    await startChain(tester, model);
+    await tester.tap(
+      find.byKey(const ValueKey('architect-dimension-interior')),
+    );
+    await tester.pump();
+    for (final x in [0.0, 3.0, 6.0]) {
+      await workspace.wallTap(tester, Offset(x, 1.5));
+    }
+    expect(preview(tester)!.style, ArchitectDimensionStyle.interior);
+    expect(
+      find.byKey(const ValueKey('architect-dimension-overall')),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const ValueKey('architect-dimension-place')));
+    await tester.pump();
+    await workspace.wallTap(tester, const Offset(2, 2.2));
+    final saved = model.project.activeStorey.dimensions.single;
+    expect(
+      [saved.startPoint.dx, saved.endPoint.dx]..sort(),
+      orderedEquals([closeTo(.125, .001), closeTo(5.875, .001)]),
+    );
+    expect(saved.lineStart.dy, closeTo(2.2, .01));
+    expect(
+      ArchitectDimensionLayout.layoutTiers(dimension: saved, scale: 100),
+      hasLength(1),
+    );
+    expect(model.undoCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Single dimension previews its targets and waits for line placement',
+    (tester) async {
+      final model = editing.seeded(scene());
+      addTearDown(model.dispose);
+      await workspace.open(tester, model);
+      await editing.selectTool(tester, 'dimension');
+      await workspace.wallTap(tester, const Offset(1, 1));
+      final mouse = await tester.createGesture(
+        kind: ui.PointerDeviceKind.mouse,
+      );
+      await mouse.addPointer(
+        location: workspace.screen(tester, const Offset(1, 1)),
+      );
+      await mouse.moveTo(workspace.screen(tester, const Offset(4, 2)));
+      await tester.pump();
+      expect(preview(tester), isNotNull);
+      expect(preview(tester)!.style, ArchitectDimensionStyle.single);
+      await mouse.removePointer();
+      await workspace.wallTap(tester, const Offset(4, 2));
+      expect(model.project.activeStorey.dimensions, isEmpty);
+      final draft = preview(tester)!;
+      final target = const Offset(2, 3.4);
+      await workspace.wallTap(tester, target);
+      final saved = model.project.activeStorey.dimensions.single;
+      expect(saved.style, ArchitectDimensionStyle.single);
+      expect(
+        saved.anchors.map((a) => a.point),
+        draft.anchors.map((a) => a.point),
+      );
+      expect(
+        ArchitectDimensionChain.dot(target - saved.lineStart, saved.normal),
+        closeTo(0, .01),
+      );
+      final tiers = ArchitectDimensionLayout.layoutTiers(
+        dimension: saved,
+        scale: 100,
+      );
+      final witnesses = ArchitectDimensionLayout.witnessSegments(saved, tiers);
+      expect(witnesses, hasLength(2));
+      for (var i = 0; i < witnesses.length; i++) {
+        expect(
+          (witnesses[i].$2 - saved.dimensionPoints[i]).distance,
+          closeTo(.1, 1e-9),
+        );
+        expect((witnesses[i].$2 - witnesses[i].$1).distance, closeTo(.2, 1e-9));
+        expect(
+          (witnesses[i].$1 - saved.witnessPoints[i]).distance,
+          greaterThan(.3),
+        );
+      }
+      expect(model.undoCount, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test(
+    'Witnesses stay compact at every row, orientation and annotation scale',
+    () {
+      for (final style in ArchitectDimensionStyle.values) {
+        for (final direction in [
+          const Offset(1, 0),
+          const Offset(0, 1),
+          const Offset(.6, .8),
+        ]) {
+          for (final offset in [-5.0, 5.0]) {
+            final dimension = ArchitectDimensionChain.build(
+              id: 'compact',
+              direction: direction,
+              offset: offset,
+              style: style,
+              anchors: [
+                for (final distance in [0.0, 3.0, 6.0])
+                  ArchitectDimensionAnchor(point: direction * distance),
+                for (final distance in [1.0, 2.0])
+                  ArchitectDimensionAnchor(
+                    point: direction * distance,
+                    feature: 'opening',
+                  ),
+              ],
+            );
+            for (final scale in ArchitectDimensionScale.values) {
+              final tiers = ArchitectDimensionLayout.layoutTiers(
+                dimension: dimension,
+                scale: 100,
+              );
+              expect(
+                tiers,
+                hasLength(style == ArchitectDimensionStyle.exterior ? 3 : 1),
+              );
+              final segments = ArchitectDimensionLayout.witnessSegments(
+                dimension,
+                tiers,
+                dimensionScale: scale,
+              );
+              final points = tiers.expand((tier) => tier.points).toList();
+              expect(segments, hasLength(points.length));
+              for (var i = 0; i < segments.length; i++) {
+                final segment = segments[i];
+                expect(
+                  ((segment.$1 + segment.$2) / 2 - points[i]).distance,
+                  closeTo(0, 1e-9),
+                );
+                expect(
+                  (segment.$2 - segment.$1).distance / scale.denominator * 1000,
+                  closeTo(2, 1e-9),
+                );
+                expect(
+                  ArchitectDimensionChain.dot(
+                    segment.$2 - segment.$1,
+                    direction,
+                  ),
+                  closeTo(0, 1e-9),
+                );
+                for (final endpoint in [segment.$1, segment.$2]) {
+                  expect(
+                    dimension.witnessPoints.every(
+                      (p) => (endpoint - p).distance > 4,
+                    ),
+                    isTrue,
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+  );
+
+  test(
+    'Dimension text has requested paper sizes and scale survives save and geometry undo',
+    () {
+      expect(ArchitectDimensionScale.scale50.textHeight, closeTo(.075, 1e-9));
+      expect(ArchitectDimensionScale.scale100.textHeight, closeTo(.22, 1e-9));
+      final s = scene();
+      final model = editing.seeded(s.copyWith(dimensions: [chain(s)]));
+      addTearDown(model.dispose);
+      model.setDimensionScale(ArchitectDimensionScale.scale50);
+      expect(model.undoCount, 0);
+      final loaded = ArchitectProject.fromJson(
+        jsonDecode(jsonEncode(model.project.toJson())),
+      );
+      expect(loaded.dimensionScale, ArchitectDimensionScale.scale50);
+      final legacy = loaded.toJson()..remove('dimensionScale');
+      expect(
+        ArchitectProject.fromJson(legacy).dimensionScale,
+        ArchitectDimensionScale.scale100,
+      );
+      model.execute(
+        const MoveArchitectElement(
+          storeyId: 's',
+          elementId: 'b',
+          delta: Offset(.2, 0),
+        ),
+      );
+      model.setDimensionScale(ArchitectDimensionScale.scale100);
+      expect(model.undoCount, 1);
+      model.undo();
+      expect(model.project.dimensionScale, ArchitectDimensionScale.scale100);
+      expect(
+        model.project.activeStorey.walls[1].startPoint,
+        s.walls[1].startPoint,
+      );
+      model.redo();
+      expect(model.project.dimensionScale, ArchitectDimensionScale.scale100);
+      expect(
+        model.project.activeStorey.walls[1].startPoint,
+        s.walls[1].startPoint + const Offset(.2, 0),
+      );
+    },
+  );
 
   test(
     'Wall faces dimension core thicknesses and clear spans without insulation',
@@ -293,7 +683,7 @@ void main() {
       expect(model.undoCount, 1);
       final d = model.project.activeStorey.dimensions.single;
       expect(d.lineStart.dy, closeTo(3.2, .01));
-      await tester.ensureVisible(find.byIcon(Icons.pan_tool_rounded));
+      await tool_ui.prepare(tester, Icons.pan_tool_rounded);
       await tester.tap(find.byIcon(Icons.pan_tool_rounded));
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(2, 3.2));
@@ -485,20 +875,23 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tester.ensureVisible(find.byIcon(Icons.pan_tool_rounded));
+      await tool_ui.prepare(tester, Icons.pan_tool_rounded);
       await tester.tap(find.byIcon(Icons.pan_tool_rounded));
       await tester.pump();
       await workspace.wallTap(tester, Offset.zero);
       expect(workspace.overlay(tester).selectedElementIds, {'column'});
       await workspace.wallTap(tester, Offset.zero);
+      expect(workspace.overlay(tester).selectedElementIds, {'column', 'wall'});
+      await workspace.wallTap(tester, Offset.zero);
       expect(workspace.overlay(tester).selectedElementIds, {'wall'});
-      await tester.tap(find.byKey(const ValueKey('architect-multi-select')));
-      await tester.pump();
+      await workspace.wallTap(tester, Offset.zero);
+      expect(workspace.overlay(tester).selectedElementIds, isEmpty);
+      await workspace.wallTap(tester, Offset.zero);
       await workspace.wallTap(tester, Offset.zero);
       expect(workspace.overlay(tester).selectedElementIds, {'column', 'wall'});
-      await tester.tap(
-        find.byKey(const ValueKey('architect-selection-context')),
-      );
+      final held = await tester.startGesture(workspace.screen(tester, const Offset(1, 0)));
+      await tester.pump(const Duration(milliseconds: 750));
+      await held.up();
       await tester.pumpAndSettle();
       final menu = tester.widget<ArchitectRadialMenu>(
         find.byType(ArchitectRadialMenu),
@@ -584,20 +977,82 @@ void main() {
           await workspace.wallTap(tester, const Offset(2, 3.2));
           model.setUnits(ArchitectUnit.centimeters);
           await tester.pumpAndSettle();
-          final boundary =
-              boundaryKey.currentContext!.findRenderObject()!
-                  as RenderRepaintBoundary;
-          await tester.runAsync(() async {
-            final image = await boundary.toImage(pixelRatio: 2);
-            final bytes = await image.toByteData(
-              format: ui.ImageByteFormat.png,
-            );
-            File(
-              'docs/images/architect_dimension_chain_phone.png',
-            ).writeAsBytesSync(bytes!.buffer.asUint8List());
-            image.dispose();
-          });
+          await captureDimensionPhone(
+            tester,
+            boundaryKey,
+            'docs/images/architect_dimension_chain_phone.png',
+          );
+          model.setDimensionScale(ArchitectDimensionScale.scale50);
+          await tester.pumpAndSettle();
+          await captureDimensionPhone(
+            tester,
+            boundaryKey,
+            'docs/images/architect_dimension_scale50_phone.png',
+          );
+          model.setDimensionScale(ArchitectDimensionScale.scale100);
+          await tester.pumpAndSettle();
         }
+        await tester.tap(
+          find.byKey(const ValueKey('architect-dimension-interior')),
+        );
+        await tester.pump();
+        for (final x in [0.0, 3.0, 6.0]) {
+          await workspace.wallTap(tester, Offset(x, 1.5));
+        }
+        expect(preview(tester)!.style, ArchitectDimensionStyle.interior);
+        expect(
+          find.byKey(const ValueKey('architect-dimension-overall')),
+          findsNothing,
+        );
+        for (final key in [
+          'architect-dimension-direction',
+          'architect-dimension-distance',
+          'architect-dimension-place',
+        ]) {
+          expect(
+            tester.getRect(find.byKey(ValueKey(key))).right,
+            lessThanOrEqualTo(360),
+          );
+        }
+        await tester.tap(
+          find.byKey(const ValueKey('architect-dimension-place')),
+        );
+        await tester.pump();
+        await workspace.wallTap(tester, const Offset(2, 1));
+        if (language == 'bg') {
+          await captureDimensionPhone(
+            tester,
+            boundaryKey,
+            'docs/images/architect_dimension_interior_phone.png',
+          );
+        }
+        await tester.tap(
+          find.byKey(const ValueKey('architect-dimension-single')),
+        );
+        await tester.pump();
+        await workspace.wallTap(tester, const Offset(.125, 2));
+        await workspace.wallTap(tester, const Offset(2.875, 2));
+        expect(preview(tester)!.style, ArchitectDimensionStyle.single);
+        expect(
+          tester
+              .getRect(
+                find.byKey(const ValueKey('architect-dimension-distance')),
+              )
+              .right,
+          lessThanOrEqualTo(360),
+        );
+        if (language == 'bg') {
+          await captureDimensionPhone(
+            tester,
+            boundaryKey,
+            'docs/images/architect_dimension_single_phone.png',
+          );
+        }
+        final count = model.project.activeStorey.dimensions.length;
+        await tester.tap(find.byKey(const ValueKey('architect-draft-cancel')));
+        await tester.pump();
+        expect(preview(tester), isNull);
+        expect(model.project.activeStorey.dimensions, hasLength(count));
         expect(tester.takeException(), isNull);
       },
     );
@@ -625,7 +1080,10 @@ void main() {
       expect(anchors, hasLength(2));
       expect(anchors[0].side, -0.5);
       expect(anchors[1].side, 0.5);
-      expect((anchors[1].point - anchors[0].point).distance, closeTo(1.20, 1e-6));
+      expect(
+        (anchors[1].point - anchors[0].point).distance,
+        closeTo(1.20, 1e-6),
+      );
       expect(anchors[0].point.dx, closeTo(2.40, 1e-6));
       expect(anchors[1].point.dx, closeTo(3.60, 1e-6));
     },
@@ -695,9 +1153,7 @@ void main() {
       // Segments on Tier 2: pier1, win1, pier2, win2, pier3
       final t2Segments = tiers[1].segments;
       expect(t2Segments, hasLength(5));
-      final segLengths = [
-        for (final s in t2Segments) (s.$2 - s.$1).distance,
-      ];
+      final segLengths = [for (final s in t2Segments) (s.$2 - s.$1).distance];
       // sum of all segments must equal wall length (6.0)
       final totalT2 = segLengths.reduce((a, b) => a + b);
       expect(totalT2, closeTo(6.0, 1e-4));
@@ -706,8 +1162,10 @@ void main() {
       expect(segLengths[3], closeTo(1.20, 1e-4));
 
       // Tier 3 is the overall row (length 6.0)
-      expect((tiers[2].points[1] - tiers[2].points[0]).distance, closeTo(6.0, 1e-4));
+      expect(
+        (tiers[2].points[1] - tiers[2].points[0]).distance,
+        closeTo(6.0, 1e-4),
+      );
     },
   );
 }
-

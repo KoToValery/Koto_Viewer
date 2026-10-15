@@ -420,6 +420,7 @@ class ArchitectElementsPainterHelper {
     String? selectedElementId,
     Path? wallObstacles,
     ArchitectUnit unit = ArchitectUnit.meters,
+    ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
   }) {
     for (final dim in storey.dimensions) {
       final isSelected = dim.id == selectedElementId;
@@ -448,29 +449,27 @@ class ArchitectElementsPainterHelper {
         ..strokeWidth = 0.8 / zoomScale
         ..style = PaintingStyle.stroke;
 
-      // Witness extension lines: short marks (~30 cm) at the element
-      final extVec = n * (dim.offsetDistance >= 0 ? 0.08 : -0.08);
-      for (final witness in dim.witnessPoints) {
-        final d = witness - dim.startPoint;
-        final projected = dim.lineStart + u * (d.dx * u.dx + d.dy * u.dy);
-        final toProj = projected - witness;
-        final dist = toProj.distance;
-        if (dist <= 0.30) {
-          canvas.drawLine(witness, projected + extVec, witnessPaint);
-        } else {
-          final markEnd = witness + (toProj / dist) * 0.30;
-          canvas.drawLine(witness, markEnd, witnessPaint);
+      for (final segment in ArchitectDimensionLayout.witnessSegments(
+        dim,
+        tiers,
+        dimensionScale: dimensionScale,
+      )) {
+        canvas.drawLine(segment.$1, segment.$2, witnessPaint);
+      }
+      if (isSelected) {
+        for (final witness in dim.witnessPoints) {
+          canvas.drawCircle(witness, 3 / zoomScale, dimPaint);
         }
       }
 
-      const tickSize = 0.08;
+      final tickSize = dimensionScale.paperToModel(.8);
       final tickVec = (u + n) * (tickSize / 1.414);
       final outward = n * (dim.offsetDistance < 0 ? -1 : 1);
 
-      // Model-space clamped text height so it doesn't inflate on zoom-out
-      final modelTextHeight = math.min(0.14, 11.0 / zoomScale);
+      // Paper-space size converted to model metres, independent of camera zoom.
+      final modelTextHeight = dimensionScale.textHeight;
       final textOffset =
-          outward * (modelTextHeight * 0.55 + math.min(0.04, 3.0 / zoomScale));
+          outward * (modelTextHeight * 0.55 + dimensionScale.paperToModel(.4));
       final textScale = modelTextHeight / 11.0;
 
       for (final tier in tiers) {
@@ -487,17 +486,17 @@ class ArchitectElementsPainterHelper {
           final p1 = segment.$1, p2 = segment.$2;
           final isSingleSegment =
               tier.segments.length == 1 && tier.tierIndex == 1;
-          final text = isSingleSegment &&
-                  dim.customText?.trim().isNotEmpty == true
+          final text =
+              isSingleSegment && dim.customText?.trim().isNotEmpty == true
               ? dim.customText!
               : unit
-                  .toUnit((p2 - p1).distance)
-                  .toStringAsFixed(
-                    unit == ArchitectUnit.centimeters ||
-                            unit == ArchitectUnit.millimeters
-                        ? 0
-                        : 2,
-                  );
+                    .toUnit((p2 - p1).distance)
+                    .toStringAsFixed(
+                      unit == ArchitectUnit.centimeters ||
+                              unit == ArchitectUnit.millimeters
+                          ? 0
+                          : 2,
+                    );
 
           final tp = TextPainter(
             text: TextSpan(

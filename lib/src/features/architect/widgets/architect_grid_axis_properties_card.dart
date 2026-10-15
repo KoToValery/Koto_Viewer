@@ -10,12 +10,11 @@ import '../models/architect_grid_axis.dart';
 // === SECTION: ARCHITECT GRID AXIS PROPERTIES CARD ===
 
 /// Floating inspector dock card displayed when a grid axis is selected.
-/// Provides direct actions for duplicating with offset, auto-aligning, renaming, and deleting.
+/// Provides direct actions for duplicating with offset, auto-aligning and deleting.
 class ArchitectGridAxisPropertiesCard extends StatelessWidget {
   final StructuralGridAxis axis;
   final VoidCallback onOffset;
   final VoidCallback onAlign;
-  final VoidCallback onRename;
   final VoidCallback onDelete;
   final VoidCallback onClose;
 
@@ -24,7 +23,6 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
     required this.axis,
     required this.onOffset,
     required this.onAlign,
-    required this.onRename,
     required this.onDelete,
     required this.onClose,
   });
@@ -98,7 +96,11 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   child: const Padding(
                     padding: EdgeInsets.all(4.0),
-                    child: Icon(Icons.close_rounded, size: 18, color: Colors.white54),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: Colors.white54,
+                    ),
                   ),
                 ),
               ],
@@ -127,15 +129,6 @@ class ArchitectGridAxisPropertiesCard extends StatelessWidget {
                     label: l10n.alignGridAxisAction,
                     color: const Color(0xFF4CAF50),
                     onTap: onAlign,
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Action 3: Rename
-                  _buildActionButton(
-                    icon: Icons.edit_outlined,
-                    label: l10n.renameGridAxis,
-                    color: const Color(0xFFFFB300),
-                    onTap: onRename,
                   ),
                   const SizedBox(width: 8),
 

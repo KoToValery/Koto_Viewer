@@ -336,11 +336,22 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('mm').last);
         await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('architect-settings-dimension-scale')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('1:50').last);
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('architect-settings-grid')));
         await tester.pump();
         await tester.tap(find.byKey(const ValueKey('architect-settings-save')));
         await tester.pumpAndSettle();
         expect(model.project.units, ArchitectUnit.millimeters);
+        expect(model.project.dimensionScale, ArchitectDimensionScale.scale50);
+        expect(
+          workspace.overlay(tester).project.dimensionScale,
+          ArchitectDimensionScale.scale50,
+        );
         expect(model.canUndo, isFalse);
         expect(workspace.overlay(tester).paintGrid, isFalse);
         final preferences = await SharedPreferences.getInstance();

@@ -3444,6 +3444,18 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectGridSpacingY => 'Разстояние Y (m)';
 
   @override
+  String get architectCategoryPlan => 'План';
+
+  @override
+  String get architectCategoryBuild => 'Строеж';
+
+  @override
+  String get architectCategoryDrawing => 'Чертане';
+
+  @override
+  String get architectToolCategories => 'Категории';
+
+  @override
   String get architectToolSelect => 'Избор';
 
   @override
@@ -3878,7 +3890,7 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectCategorySpaces => 'Пространства';
 
   @override
-  String get architectCategoryAnnotations => 'Анотации';
+  String get architectCategoryAnnotations => 'Надписи';
 
   @override
   String get architectCategoryCad => 'CAD Чертане';
@@ -4527,10 +4539,13 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectRadialEdit => 'Редакция';
 
   @override
-  String get architectRadialDelete => 'Изтриване';
+  String get architectRadialDelete => 'Изтрий';
 
   @override
   String get architectRadialDuplicate => 'Дублирай';
+
+  @override
+  String get architectRadialRename => 'Име';
 
   @override
   String get architectRadialRotate => 'Завърти';
@@ -4665,6 +4680,57 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectDimensionChain => 'Верига';
 
   @override
+  String get architectDimensionScale => 'Мащаб на размерите';
+
+  @override
+  String get architectDimensionSingle => 'Единичен';
+
+  @override
+  String get architectDimensionExterior => 'Външен';
+
+  @override
+  String get architectDimensionInterior => 'Вътрешен';
+
+  @override
+  String get architectDimensionInteriorHint =>
+      'Избери крайни стени и прегради, после постави линията.';
+
+  @override
+  String get architectDimensionInteriorHelp =>
+      'Една линия измерва между вътрешните лица на крайните успоредни стени, с двете лица на междинните прегради.';
+
+  @override
+  String get architectDimensionAddWalls => 'Добави стени';
+
+  @override
+  String get architectDimensionEditPoints => 'Редактирай точки';
+
+  @override
+  String get architectDimensionEditPointsHint =>
+      'Тапни стена за добавяне или минус за премахване. Зеленото тикче запазва.';
+
+  @override
+  String get architectDimensionRemoveReference => 'Премахни от размера';
+
+  @override
+  String get architectDimensionKeepReferences =>
+      'Добави друга опорна точка, преди да премахнеш тази; размерът изисква два различни края.';
+
+  @override
+  String get architectDimensionConfirm => 'Запази показания размер';
+
+  @override
+  String get architectDimensionAddWallsHint =>
+      'Избери пропуснатите успоредни стени и потвърди. Размерната линия остава на място.';
+
+  @override
+  String get architectDimensionStartHint => 'Избери първата измервана точка.';
+
+  @override
+  String get architectDimensionEndHint =>
+      'Избери втората измервана точка, после постави размерната линия.';
+
+  @override
   String get architectDimensionContinue => 'Продължи';
 
   @override
@@ -4675,7 +4741,7 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectDimensionChainHint =>
-      'Избери успоредни стени или точки на елементи. Клик на празно: продължи или завърши.';
+      'Избери стени или точки. Зеленото тикче запазва, минусът премахва.';
 
   @override
   String get architectDimensionDirectionHint =>
@@ -4683,11 +4749,11 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectDimensionPositionHint =>
-      'Кликни за поставяне на веригата или въведи точно отстояние.';
+      'Посочи място за размерната линия или въведи точно отстояние.';
 
   @override
   String get architectSelectionCycleHelp =>
-      'Повторен клик обхожда застъпените елементи. Кликни върху избора за действия.';
+      'Тап добавя/изключва; повторен тап обхожда застъпванията. Задръж за меню.';
 
   @override
   String get architectDimensionOverall => 'Общ размер';

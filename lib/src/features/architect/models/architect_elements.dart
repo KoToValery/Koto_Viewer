@@ -23,7 +23,6 @@ class ArchitectBeam {
     this.label = 'B 25/50',
   });
 
-
   double get length => (endPoint - startPoint).distance;
 
   Offset get unitVector {
@@ -82,7 +81,6 @@ class ArchitectBeam {
     label: json['label'] as String? ?? 'B 25/50',
   );
 
-
   bool containsPoint(Offset pt, {double tolerance = 0.15}) {
     final len = length;
     if (len < 1e-4) return (pt - startPoint).distance <= tolerance;
@@ -111,7 +109,6 @@ class ArchitectSlab {
     this.thickness = 0.20,
     this.label = 'Slab d=20cm',
   });
-
 
   double get area {
     if (polygon.length < 3) return 0.0;
@@ -169,7 +166,6 @@ class ArchitectSlab {
     label: json['label'] as String? ?? 'Slab d=20cm',
   );
 
-
   bool containsPoint(Offset pt) {
     if (polygon.length < 3) return false;
     bool inside = false;
@@ -205,7 +201,6 @@ class ArchitectOpening {
     this.label = 'Shaft',
     this.type = OpeningType.shaft,
   });
-
 
   Offset get centroid {
     if (boundary.isEmpty) return Offset.zero;
@@ -251,7 +246,6 @@ class ArchitectOpening {
             const [],
         label: json['label'] as String? ?? 'Shaft',
         type: OpeningType.values.firstWhere(
-
           (t) => t.name == json['type'],
           orElse: () => OpeningType.shaft,
         ),
@@ -389,6 +383,8 @@ class ArchitectDimensionAnchor {
       );
 }
 
+enum ArchitectDimensionStyle { exterior, interior, single }
+
 class ArchitectDimension {
   final String id;
   final Offset startPoint;
@@ -398,6 +394,7 @@ class ArchitectDimension {
   final List<ArchitectDimensionAnchor> anchors;
   final Offset? direction;
   final bool showOverall;
+  final ArchitectDimensionStyle style;
 
   const ArchitectDimension({
     required this.id,
@@ -408,6 +405,7 @@ class ArchitectDimension {
     this.anchors = const [],
     this.direction,
     this.showOverall = true,
+    this.style = ArchitectDimensionStyle.exterior,
   });
 
   bool get isChain => anchors.isNotEmpty;
@@ -417,8 +415,37 @@ class ArchitectDimension {
   Offset get normal => Offset(-unitVector.dy, unitVector.dx);
   Offset get lineStart => startPoint + normal * offsetDistance;
   Offset get lineEnd => endPoint + normal * offsetDistance;
-  List<Offset> get witnessPoints =>
-      isChain ? anchors.map((a) => a.point).toList() : [startPoint, endPoint];
+
+  /// Keep all associations, but measure only the inward faces of end walls.
+  /// Both faces of intermediate partitions remain on the interior row.
+  List<ArchitectDimensionAnchor> get measuredAnchors {
+    if (style != ArchitectDimensionStyle.interior) return anchors;
+    double position(ArchitectDimensionAnchor a) =>
+        (a.point - startPoint).dx * unitVector.dx +
+        (a.point - startPoint).dy * unitVector.dy;
+    final faces = anchors.where((a) => a.feature == 'wallFace').toList()
+      ..sort((a, b) => position(a).compareTo(position(b)));
+    if (faces.map((a) => a.elementId).toSet().length < 2) return anchors;
+    final firstId = faces.first.elementId;
+    final lastId = faces.last.elementId;
+    final lower = faces
+        .where((a) => a.elementId == firstId)
+        .map(position)
+        .reduce((a, b) => a > b ? a : b);
+    final upper = faces
+        .where((a) => a.elementId == lastId)
+        .map(position)
+        .reduce((a, b) => a < b ? a : b);
+    return anchors
+        .where(
+          (a) => position(a) >= lower - 1e-6 && position(a) <= upper + 1e-6,
+        )
+        .toList();
+  }
+
+  List<Offset> get witnessPoints => isChain
+      ? measuredAnchors.map((a) => a.point).toList()
+      : [startPoint, endPoint];
   List<Offset> get dimensionPoints {
     final u = unitVector;
     final values = witnessPoints.map((p) {
@@ -452,6 +479,7 @@ class ArchitectDimension {
     List<ArchitectDimensionAnchor>? anchors,
     Offset? direction,
     bool? showOverall,
+    ArchitectDimensionStyle? style,
   }) => ArchitectDimension(
     id: id ?? this.id,
     startPoint: startPoint ?? this.startPoint,
@@ -461,6 +489,7 @@ class ArchitectDimension {
     anchors: anchors ?? this.anchors,
     direction: direction ?? this.direction,
     showOverall: showOverall ?? this.showOverall,
+    style: style ?? this.style,
   );
 
   Map<String, dynamic> toJson() => {
@@ -469,6 +498,7 @@ class ArchitectDimension {
     'endPoint': {'x': endPoint.dx, 'y': endPoint.dy},
     'offsetDistance': offsetDistance,
     'customText': customText,
+    'style': style.name,
     if (anchors.isNotEmpty) 'anchors': anchors.map((a) => a.toJson()).toList(),
     if (direction != null)
       'direction': {'x': direction!.dx, 'y': direction!.dy},
@@ -489,6 +519,11 @@ class ArchitectDimension {
         offsetDistance: (json['offsetDistance'] as num?)?.toDouble() ?? 0.50,
         customText: json['customText'] as String?,
         showOverall: json['showOverall'] as bool? ?? true,
+        style:
+            ArchitectDimensionStyle.values
+                .where((style) => style.name == json['style'])
+                .firstOrNull ??
+            ArchitectDimensionStyle.exterior,
         anchors: (json['anchors'] as List? ?? [])
             .map(
               (a) =>

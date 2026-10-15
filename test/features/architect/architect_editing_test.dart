@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:math' as math;
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -65,7 +66,7 @@ Future<void> selectTool(WidgetTester tester, String name) async {
     'axis' => Icons.grid_on_rounded,
     _ => throw ArgumentError(name),
   };
-  await tester.ensureVisible(find.byIcon(icon));
+  await tool_ui.prepare(tester, icon);
   await tester.tap(find.byIcon(icon));
   await tester.pumpAndSettle();
 }

@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
@@ -146,7 +147,7 @@ void main() {
       await openWorkspace(tester, model);
 
       // Select wall tool
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
 
       // Hold on wall to select it
@@ -189,7 +190,7 @@ void main() {
       await openWorkspace(tester, model);
 
       // Select wall tool
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
 
       // Select wall w1 with hold

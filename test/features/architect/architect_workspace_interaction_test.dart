@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -80,7 +81,7 @@ void main() {
       final model = commands();
       addTearDown(model.dispose);
       await open(tester, model);
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
       await tester.tapAt(screen(tester, Offset.zero));
       await tester.pump();
@@ -90,7 +91,7 @@ void main() {
       );
       await held.moveTo(screen(tester, const Offset(3, .1)));
       await tester.pump();
-      await tester.tap(find.byIcon(Icons.view_column_rounded));
+      await tool_ui.choose(tester, Icons.view_column_rounded);
       await tester.pumpAndSettle();
       await held.up();
       await tester.pumpAndSettle();
@@ -149,16 +150,16 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.ensureVisible(find.byIcon(Icons.view_column_rounded));
-      await tester.tap(find.byIcon(Icons.view_column_rounded));
+      await tool_ui.prepare(tester, Icons.view_column_rounded);
+      await tool_ui.choose(tester, Icons.view_column_rounded);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.tapAt(screen(tester, const Offset(3, 3)));
       await tester.pumpAndSettle();
       expect(model.project.activeStorey.columns.length, 1);
-      await tester.ensureVisible(find.byIcon(Icons.view_column_rounded));
+      await tool_ui.prepare(tester, Icons.view_column_rounded);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.view_column_rounded));
+      await tool_ui.choose(tester, Icons.view_column_rounded);
       await tester.pumpAndSettle();
       await tester.longPressAt(screen(tester, const Offset(3, 3)));
       await tester.pumpAndSettle();
@@ -198,7 +199,7 @@ void main() {
         ),
       ]);
       await open(tester, model);
-      await tester.tap(find.byIcon(Icons.view_column_rounded));
+      await tool_ui.choose(tester, Icons.view_column_rounded);
       await tester.pumpAndSettle();
       await tester.longPressAt(screen(tester, original));
       await tester.pump();
@@ -253,7 +254,7 @@ void main() {
       final model = commands();
       addTearDown(model.dispose);
       await open(tester, model);
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
       await tester.pump();
@@ -286,9 +287,9 @@ void main() {
       final model = commands();
       addTearDown(model.dispose);
       await open(tester, model);
-      await tester.ensureVisible(find.byIcon(Icons.grid_on_rounded));
+      await tool_ui.prepare(tester, Icons.grid_on_rounded);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.grid_on_rounded));
+      await tool_ui.choose(tester, Icons.grid_on_rounded);
       await tester.pumpAndSettle();
       await tester.tapAt(screen(tester, const Offset(-2, -2)));
       await tester.pump();
@@ -306,7 +307,7 @@ void main() {
       final model = commands();
       addTearDown(model.dispose);
       await open(tester, model);
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
       await tester.pump();
@@ -374,7 +375,7 @@ void main() {
       final model = commands();
       addTearDown(model.dispose);
       await open(tester, model);
-      await tester.tap(find.byIcon(Icons.view_column_rounded));
+      await tool_ui.choose(tester, Icons.view_column_rounded);
       await tester.pumpAndSettle();
       final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
       final target = screen(tester, const Offset(2.34567, 2.22222));
@@ -412,7 +413,7 @@ void main() {
         ),
       );
       await open(tester, model);
-      await tester.tap(find.byIcon(Icons.space_dashboard_rounded));
+      await tool_ui.choose(tester, Icons.space_dashboard_rounded);
       await tester.pumpAndSettle();
       await tester.longPressAt(screen(tester, const Offset(2, 2)));
       await tester.pump();
@@ -472,7 +473,7 @@ void main() {
         headerVars: {},
       );
       await open(tester, model, underlays: {'s': doc});
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
       await tester.tapAt(screen(tester, const Offset(1, 1)));
       await tester.pump();

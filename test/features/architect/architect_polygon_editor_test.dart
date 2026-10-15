@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:io';
 import 'dart:ui' show ImageByteFormat;
 import 'dart:math' as math;
@@ -32,7 +33,7 @@ const primitive = ArchitectCadPrimitive(
 );
 ArchitectSnapResult free(Offset point) => ArchitectSnapResult(point: point);
 Future<void> tool(WidgetTester tester, IconData icon) async {
-  await tester.ensureVisible(find.byIcon(icon));
+  await tool_ui.prepare(tester, icon);
   await tester.tap(find.byIcon(icon));
   await tester.pumpAndSettle();
 }

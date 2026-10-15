@@ -5,10 +5,12 @@ import 'architect_wall_drafting_panel.dart';
 
 class ArchitectWorkspaceSettings {
   final ArchitectUnit units;
+  final ArchitectDimensionScale dimensionScale;
   final bool ghostStoreys, grid, magnetic, underlay, darkCanvas;
   final double axisCoreThickness;
   const ArchitectWorkspaceSettings({
     required this.units,
+    this.dimensionScale = ArchitectDimensionScale.scale100,
     required this.ghostStoreys,
     required this.grid,
     required this.magnetic,
@@ -34,6 +36,7 @@ class ArchitectWorkspaceSettingsDialog extends StatefulWidget {
 class _ArchitectWorkspaceSettingsDialogState
     extends State<ArchitectWorkspaceSettingsDialog> {
   late ArchitectUnit units = widget.settings.units;
+  late ArchitectDimensionScale dimensionScale = widget.settings.dimensionScale;
   late bool ghost = widget.settings.ghostStoreys,
       grid = widget.settings.grid,
       magnetic = widget.settings.magnetic,
@@ -92,6 +95,20 @@ class _ArchitectWorkspaceSettingsDialogState
                 ],
                 onChanged: (value) {
                   if (value != null) setState(() => units = value);
+                },
+              ),
+              DropdownButtonFormField<ArchitectDimensionScale>(
+                key: const ValueKey('architect-settings-dimension-scale'),
+                initialValue: dimensionScale,
+                decoration: InputDecoration(
+                  labelText: l.architectDimensionScale,
+                ),
+                items: [
+                  for (final scale in ArchitectDimensionScale.values)
+                    DropdownMenuItem(value: scale, child: Text(scale.ratio)),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => dimensionScale = value);
                 },
               ),
               SwitchListTile(
@@ -155,6 +172,7 @@ class _ArchitectWorkspaceSettingsDialogState
             context,
             ArchitectWorkspaceSettings(
               units: units,
+              dimensionScale: dimensionScale,
               ghostStoreys: ghost,
               grid: grid,
               magnetic: magnetic,

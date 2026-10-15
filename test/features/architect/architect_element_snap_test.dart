@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -404,11 +405,15 @@ void main() {
         );
         addTearDown(model.dispose);
         await workspace.open(tester, model);
-        await tester.ensureVisible(find.byIcon(tool.$1));
+        await tool_ui.prepare(tester, tool.$1);
         await tester.tap(find.byIcon(tool.$1));
         await tester.pumpAndSettle();
         await workspace.wallTap(tester, const Offset(1, -.4));
         await workspace.wallTap(tester, const Offset(8.03, .03));
+        if (tool.$2 == 'dimension') {
+          await tester.tap(find.byKey(const ValueKey('architect-dimension-confirm')));
+          await tester.pump();
+        }
         if (tool.$2 == 'circle') {
           await tester.tap(find.byKey(const ValueKey('shape-save')));
           await tester.pump();
@@ -449,8 +454,8 @@ void main() {
       );
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tester.ensureVisible(find.byIcon(Icons.timeline_rounded));
-      await tester.tap(find.byIcon(Icons.timeline_rounded));
+      await tool_ui.prepare(tester, Icons.timeline_rounded);
+      await tool_ui.choose(tester, Icons.timeline_rounded);
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, const Offset(1, -.4));
       final gesture = await tester.startGesture(
@@ -490,8 +495,8 @@ void main() {
     );
     addTearDown(model.dispose);
     await workspace.open(tester, model);
-    await tester.ensureVisible(find.byIcon(Icons.timeline_rounded));
-    await tester.tap(find.byIcon(Icons.timeline_rounded));
+    await tool_ui.prepare(tester, Icons.timeline_rounded);
+    await tool_ui.choose(tester, Icons.timeline_rounded);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('architect-magnet')));
     await tester.pump();
@@ -526,8 +531,8 @@ void main() {
     );
     addTearDown(model.dispose);
     await workspace.open(tester, model);
-    await tester.ensureVisible(find.byIcon(Icons.timeline_rounded));
-    await tester.tap(find.byIcon(Icons.timeline_rounded));
+    await tool_ui.prepare(tester, Icons.timeline_rounded);
+    await tool_ui.choose(tester, Icons.timeline_rounded);
     await tester.pumpAndSettle();
     await editing.hold(tester, const Offset(1, 3));
     expect(workspace.overlay(tester).selectedElementId, 'moving');
@@ -582,8 +587,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byIcon(Icons.timeline_rounded));
-      await tester.tap(find.byIcon(Icons.timeline_rounded));
+      await tool_ui.prepare(tester, Icons.timeline_rounded);
+      await tool_ui.choose(tester, Icons.timeline_rounded);
       await tester.pumpAndSettle();
       final inputRect = tester.getRect(
         find.byKey(const ValueKey('architect-viewport-input')),

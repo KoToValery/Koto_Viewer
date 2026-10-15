@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -234,7 +235,7 @@ void main() {
           kind == 'line' || kind == 'rect' ? 'CAD' : kind,
         );
         if (kind == 'rect') {
-          await tester.tap(find.byIcon(Icons.crop_square_rounded));
+          await tool_ui.choose(tester, Icons.crop_square_rounded);
           await tester.pumpAndSettle();
         }
         await workspace.wallTap(

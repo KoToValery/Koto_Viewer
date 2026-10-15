@@ -19,12 +19,28 @@ class DimensionTier {
 }
 
 class ArchitectDimensionLayout {
+  static List<(Offset, Offset)> witnessSegments(
+    ArchitectDimension dimension,
+    List<DimensionTier> tiers, {
+    ArchitectDimensionScale dimensionScale = ArchitectDimensionScale.scale100,
+  }) {
+    final n = dimension.normal;
+    final extension = n * dimensionScale.paperToModel(1);
+    // Independent short strokes at each row; never bridge back to the wall.
+    return [
+      for (final tier in tiers)
+        for (final point in tier.points) (point - extension, point + extension),
+    ];
+  }
+
   static (Offset, Offset)? overallSegment(
     ArchitectDimension dimension,
     double scale, {
     bool hasOpenings = false,
   }) {
-    if (!dimension.showOverall || dimension.dimensionPoints.length < 3) {
+    if (dimension.style != ArchitectDimensionStyle.exterior ||
+        !dimension.showOverall ||
+        dimension.dimensionPoints.length < 3) {
       return null;
     }
     final outward = dimension.normal * (dimension.offsetDistance < 0 ? -1 : 1);
@@ -44,17 +60,21 @@ class ArchitectDimensionLayout {
     final outward = n * (dimension.offsetDistance < 0 ? -1 : 1);
     final rowSpacing = math.max(.45, 36 / scale);
 
-    final openingAnchors =
-        dimension.anchors.where((a) => a.feature == 'opening').toList();
-    final hasOpenings = openingAnchors.isNotEmpty;
+    final openingAnchors = dimension.anchors
+        .where((a) => a.feature == 'opening')
+        .toList();
+    final hasOpenings =
+        dimension.style == ArchitectDimensionStyle.exterior &&
+        openingAnchors.isNotEmpty;
 
     final tiers = <DimensionTier>[];
 
     // --- Tier 1: Base / Structural row ---
     final basePoints = <Offset>[];
     if (hasOpenings) {
-      final structuralAnchors =
-          dimension.anchors.where((a) => a.feature != 'opening').toList();
+      final structuralAnchors = dimension.anchors
+          .where((a) => a.feature != 'opening')
+          .toList();
       if (structuralAnchors.length >= 2) {
         final origin = dimension.startPoint;
         final values = structuralAnchors.map((a) {
@@ -93,17 +113,23 @@ class ArchitectDimensionLayout {
     if (hasOpenings) {
       final lineStart2 = dimension.lineStart + outward * rowSpacing;
       final hostWall = storey?.walls.where((w) {
-        return w.doors.any((d) => openingAnchors.any((a) => a.elementId == d.id)) ||
-            w.windows.any((win) => openingAnchors.any((a) => a.elementId == win.id));
+        return w.doors.any(
+              (d) => openingAnchors.any((a) => a.elementId == d.id),
+            ) ||
+            w.windows.any(
+              (win) => openingAnchors.any((a) => a.elementId == win.id),
+            );
       }).firstOrNull;
 
       final openingPoints = <Offset>[];
       final origin = dimension.startPoint;
 
       if (hostWall != null) {
-        final corner1 = hostWall.coreCenterStart +
+        final corner1 =
+            hostWall.coreCenterStart +
             hostWall.exteriorNormal * (hostWall.coreThickness / 2);
-        final corner2 = hostWall.coreCenterEnd +
+        final corner2 =
+            hostWall.coreCenterEnd +
             hostWall.exteriorNormal * (hostWall.coreThickness / 2);
 
         final rawPoints = <Offset>[

@@ -9,12 +9,16 @@ class ArchitectDimensionChainPreview extends CustomPainter {
   final ArchitectDimension? dimension;
   final BimViewportController viewport;
   final ArchitectUnit units;
+  final ArchitectDimensionScale dimensionScale;
   final ArchitectCanvasPalette palette;
+  final ArchitectStorey? storey;
   ArchitectDimensionChainPreview({
     required this.dimension,
     required this.viewport,
     required this.units,
+    this.dimensionScale = ArchitectDimensionScale.scale100,
     required this.palette,
+    this.storey,
   }) : super(repaint: viewport);
   @override
   void paint(Canvas canvas, Size size) {
@@ -24,14 +28,12 @@ class ArchitectDimensionChainPreview extends CustomPainter {
     canvas.scale(viewport.scale);
     ArchitectElementsPainterHelper.drawDimensions(
       canvas: canvas,
-      storey: ArchitectStorey(
-        id: 'preview',
-        name: '',
-        dimensions: [dimension!],
-      ),
+      storey: (storey ?? const ArchitectStorey(id: 'preview', name: ''))
+          .copyWith(dimensions: [dimension!]),
       zoomScale: viewport.scale,
       selectedElementId: dimension!.id,
       unit: units,
+      dimensionScale: dimensionScale,
       palette: palette,
       wallObstacles: Path(),
     );
@@ -41,6 +43,8 @@ class ArchitectDimensionChainPreview extends CustomPainter {
   @override
   bool shouldRepaint(ArchitectDimensionChainPreview old) =>
       old.dimension != dimension ||
+      old.storey != storey ||
       old.units != units ||
+      old.dimensionScale != dimensionScale ||
       old.palette != palette;
 }

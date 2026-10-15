@@ -306,6 +306,7 @@ class Architect2dPainter extends CustomPainter {
     if (layer != ArchitectPaintLayer.interaction) {
       ArchitectElementsPainterHelper.drawDimensions(
         unit: _project.units,
+        dimensionScale: _project.dimensionScale,
         palette: palette,
         canvas: canvas,
         storey: _elementLayerStorey,
@@ -331,6 +332,10 @@ class Architect2dPainter extends CustomPainter {
       );
     }
     if (layer != ArchitectPaintLayer.model) {
+      ArchitectGridAxisPainterHelper.drawNeighborDistances(
+        canvas: canvas, project: _project, selectedAxisId: selectedAxisId,
+        zoomScale: zoomScale, palette: palette, visibleRect: viewport?.visibleRect,
+      );
       ArchitectElementsPainterHelper.drawSlabDrafting(
         canvas: canvas,
         points: slabDraftPoints,

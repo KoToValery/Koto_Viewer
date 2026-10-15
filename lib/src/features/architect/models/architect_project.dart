@@ -12,6 +12,20 @@ import 'architect_fenestration_style.dart';
 
 typedef ArchitectUnit = BimDistanceUnit;
 
+/// Paper-space dimension text sizes; model geometry is always in metres.
+enum ArchitectDimensionScale {
+  scale50(50, 1.5),
+  scale100(100, 2.2);
+
+  final int denominator;
+  final double textHeightMm;
+  const ArchitectDimensionScale(this.denominator, this.textHeightMm);
+
+  double paperToModel(double millimeters) => millimeters * denominator / 1000;
+  double get textHeight => paperToModel(textHeightMm);
+  String get ratio => '1:$denominator';
+}
+
 /// Represents an architectural storey level with its height, elevation, walls, zones,
 /// and comprehensive architectural drafting elements.
 class ArchitectStorey {
@@ -208,6 +222,7 @@ class ArchitectProject {
   final DateTime createdAt;
   final DateTime updatedAt;
   final ArchitectUnit units;
+  final ArchitectDimensionScale dimensionScale;
   final List<ArchitectStorey> storeys;
   final String activeStoreyId;
   final List<StructuralGridAxis> gridAxes;
@@ -220,6 +235,7 @@ class ArchitectProject {
     required this.createdAt,
     required this.updatedAt,
     this.units = ArchitectUnit.meters,
+    this.dimensionScale = ArchitectDimensionScale.scale100,
     required this.storeys,
     required this.activeStoreyId,
     this.gridAxes = const [],
@@ -238,7 +254,6 @@ class ArchitectProject {
     elevation: 0.0,
   );
 
-
   ArchitectProject updateActiveStorey(ArchitectStorey updated) {
     final updatedStoreys = storeys
         .map((s) => s.id == updated.id ? updated : s)
@@ -256,6 +271,7 @@ class ArchitectProject {
     DateTime? createdAt,
     DateTime? updatedAt,
     ArchitectUnit? units,
+    ArchitectDimensionScale? dimensionScale,
     List<ArchitectStorey>? storeys,
     String? activeStoreyId,
     List<StructuralGridAxis>? gridAxes,
@@ -267,6 +283,7 @@ class ArchitectProject {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     units: units ?? this.units,
+    dimensionScale: dimensionScale ?? this.dimensionScale,
     storeys: storeys ?? this.storeys,
     activeStoreyId: activeStoreyId ?? this.activeStoreyId,
     gridAxes: gridAxes ?? this.gridAxes,
@@ -280,6 +297,7 @@ class ArchitectProject {
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'units': units.name,
+    'dimensionScale': dimensionScale.denominator,
     'storeys': storeys.map((s) => s.toJson()).toList(),
     'activeStoreyId': activeStoreyId,
     'gridAxes': gridAxes.map((a) => a.toJson()).toList(),
@@ -299,6 +317,10 @@ class ArchitectProject {
     units: ArchitectUnit.values.firstWhere(
       (u) => u.name == json['units'],
       orElse: () => ArchitectUnit.meters,
+    ),
+    dimensionScale: ArchitectDimensionScale.values.firstWhere(
+      (scale) => scale.denominator == json['dimensionScale'],
+      orElse: () => ArchitectDimensionScale.scale100,
     ),
     storeys:
         (json['storeys'] as List<dynamic>?)
@@ -417,7 +439,6 @@ class ArchitectProject {
           ? '±0.00'
           : '+${currentElevation.toStringAsFixed(2)}';
       storeys.add(
-
         ArchitectStorey(
           id: 'storey_$i',
           name: name,

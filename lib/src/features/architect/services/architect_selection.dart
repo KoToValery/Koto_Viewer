@@ -203,8 +203,9 @@ class ArchitectSelection {
   static String summary(
     ArchitectProject project,
     Set<String> ids,
-    AppLocalizations l,
-  ) {
+    AppLocalizations l, {
+    bool compact = false,
+  }) {
     if (ids.isEmpty) return '';
     final s = project.activeStorey;
     final wallCount = s.walls.where((w) => ids.contains(w.id)).length;
@@ -238,6 +239,7 @@ class ArchitectSelection {
     if (parts.length == 1) {
       return parts.first;
     }
+    if (compact) return l.architectSelectionCount(ids.length);
     if (parts.length > 1) {
       return l.architectSelectionMixedSummary(ids.length, parts.join(', '));
     }

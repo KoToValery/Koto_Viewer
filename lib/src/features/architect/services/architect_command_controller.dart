@@ -1431,6 +1431,13 @@ class ArchitectCommandController
     if (project.units != units) replaceView(project.copyWith(units: units));
   }
 
+  /// Annotation scale is a display setting, independent of geometry history.
+  void setDimensionScale(ArchitectDimensionScale scale) {
+    if (project.dimensionScale != scale) {
+      replaceView(project.copyWith(dimensionScale: scale));
+    }
+  }
+
   static ArchitectProject _retainViewedStorey(
     ArchitectProject snapshot,
     ArchitectProject current,
@@ -1439,9 +1446,14 @@ class ArchitectCommandController
     final viewed = snapshot.storeys.any((s) => s.id == id)
         ? id
         : snapshot.activeStoreyId;
-    if (viewed == snapshot.activeStoreyId && current.units == snapshot.units) {
+    if (viewed == snapshot.activeStoreyId && current.units == snapshot.units &&
+        current.dimensionScale == snapshot.dimensionScale) {
       return snapshot;
     }
-    return snapshot.copyWith(activeStoreyId: viewed, units: current.units);
+    return snapshot.copyWith(
+      activeStoreyId: viewed,
+      units: current.units,
+      dimensionScale: current.dimensionScale,
+    );
   }
 }

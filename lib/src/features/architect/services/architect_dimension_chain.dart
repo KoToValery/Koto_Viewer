@@ -4,6 +4,17 @@ import '../models/architect_elements.dart';
 import '../models/architect_project.dart';
 import '../models/architect_wall.dart';
 
+class ArchitectDimensionEditPoint {
+  final String id;
+  final Offset point;
+  final Set<int> anchorIndices;
+  const ArchitectDimensionEditPoint({
+    required this.id,
+    required this.point,
+    required this.anchorIndices,
+  });
+}
+
 /// Associative dimension geometry, expressed exclusively in model metres.
 class ArchitectDimensionChain {
   static double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
@@ -13,6 +24,7 @@ class ArchitectDimensionChain {
     required List<ArchitectDimensionAnchor> anchors,
     required Offset direction,
     double offset = .5,
+    ArchitectDimensionStyle style = ArchitectDimensionStyle.exterior,
   }) {
     final u = direction / direction.distance;
     final origin = anchors.first.point;
@@ -20,8 +32,17 @@ class ArchitectDimensionChain {
       ..sort(
         (a, b) => dot(a.point - origin, u).compareTo(dot(b.point - origin, u)),
       );
-    final base = sorted.first.point;
-    final last = sorted.last.point;
+    final provisional = ArchitectDimension(
+      id: id,
+      startPoint: sorted.first.point,
+      endPoint: sorted.last.point,
+      anchors: sorted,
+      direction: u,
+      style: style,
+    );
+    final measured = provisional.measuredAnchors;
+    final base = (measured.isEmpty ? sorted : measured).first.point;
+    final last = (measured.isEmpty ? sorted : measured).last.point;
     final projected = base + u * dot(last - base, u);
     return ArchitectDimension(
       id: id,
@@ -30,6 +51,116 @@ class ArchitectDimensionChain {
       startPoint: base,
       endPoint: (last - projected).distance < 1e-9 ? last : projected,
       offsetDistance: offset,
+      style: style,
+    );
+  }
+
+  /// Extend a placed row without moving it, including when its first wall changes.
+  static ArchitectDimension addAnchors(
+    ArchitectDimension dimension,
+    List<ArchitectDimensionAnchor> additions,
+  ) {
+    final anchors = List<ArchitectDimensionAnchor>.of(dimension.anchors);
+    for (final a in additions) {
+      if (!anchors.any(
+        (b) =>
+            a.elementId == b.elementId &&
+            a.feature == b.feature &&
+            a.index == b.index &&
+            a.side == b.side &&
+            (a.feature == 'wallFace' || (a.point - b.point).distance < 1e-6),
+      )) {
+        anchors.add(a);
+      }
+    }
+    final next = build(
+      id: dimension.id,
+      anchors: anchors,
+      direction: dimension.unitVector,
+      style: dimension.style,
+    );
+    return next.copyWith(
+      offsetDistance: dot(dimension.lineStart - next.startPoint, next.normal),
+      showOverall: dimension.showOverall,
+      customText: dimension.customText,
+    );
+  }
+
+  /// A wall/opening is one editable reference, even when it has two faces/jambs.
+  static List<ArchitectDimensionEditPoint> editPoints(
+    ArchitectDimension dimension,
+  ) {
+    final groups = <String, Set<int>>{};
+    for (var i = 0; i < dimension.anchors.length; i++) {
+      final anchor = dimension.anchors[i];
+      final grouped =
+          anchor.elementId != null &&
+          (anchor.feature == 'wallFace' || anchor.feature == 'opening');
+      final id = grouped
+          ? '${anchor.feature}:${anchor.elementId}'
+          : 'anchor:$i';
+      groups.putIfAbsent(id, () => <int>{}).add(i);
+    }
+    final visible = dimension.measuredAnchors.toSet();
+    final result = <ArchitectDimensionEditPoint>[];
+    for (final group in groups.entries) {
+      final all = group.value.map((i) => dimension.anchors[i]);
+      final measured = all.where(visible.contains).toList();
+      final points = measured.isEmpty ? all.toList() : measured;
+      final center =
+          points.map((a) => a.point).reduce((a, b) => a + b) /
+          points.length.toDouble();
+      result.add(
+        ArchitectDimensionEditPoint(
+          id: group.key,
+          point:
+              dimension.lineStart +
+              dimension.unitVector *
+                  dot(center - dimension.startPoint, dimension.unitVector),
+          anchorIndices: Set.unmodifiable(group.value),
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// Remove a reference and merge neighboring spans, keeping the placed line fixed.
+  /// An unusable chain must be deleted explicitly rather than by removing its last point.
+  static ArchitectDimension? removeAnchors(
+    ArchitectDimension dimension,
+    Set<int> indices,
+  ) {
+    final anchors = [
+      for (var i = 0; i < dimension.anchors.length; i++)
+        if (!indices.contains(i)) dimension.anchors[i],
+    ];
+    if (anchors.length < 2) return null;
+    if (dimension.style == ArchitectDimensionStyle.interior &&
+        dimension.anchors
+                .where((a) => a.feature == 'wallFace')
+                .map((a) => a.elementId)
+                .toSet()
+                .length >=
+            2 &&
+        anchors
+                .where((a) => a.feature == 'wallFace')
+                .map((a) => a.elementId)
+                .toSet()
+                .length <
+            2) {
+      return null;
+    }
+    final next = build(
+      id: dimension.id,
+      anchors: anchors,
+      direction: dimension.unitVector,
+      style: dimension.style,
+    );
+    if (next.length < .001 || next.dimensionPoints.length < 2) return null;
+    return next.copyWith(
+      offsetDistance: dot(dimension.lineStart - next.startPoint, next.normal),
+      showOverall: dimension.showOverall,
+      customText: dimension.customText,
     );
   }
 
@@ -38,8 +169,11 @@ class ArchitectDimensionChain {
     ArchitectWall wall,
     Offset pick,
   ) {
-    final ratio = (dot(pick - wall.coreCenterStart, wall.unitVector) / wall.length)
-        .clamp(0.0, 1.0);
+    final ratio =
+        (dot(pick - wall.coreCenterStart, wall.unitVector) / wall.length).clamp(
+          0.0,
+          1.0,
+        );
     return [
       for (final side in [-.5, .5])
         ArchitectDimensionAnchor(
@@ -265,6 +399,7 @@ class ArchitectDimensionChain {
           anchors: anchors,
           direction: dim.unitVector,
           offset: dim.offsetDistance,
+          style: dim.style,
         ).copyWith(customText: dim.customText, showOverall: dim.showOverall);
         // Removing the first witness must not move the already positioned line.
         if (anchors.length != dim.anchors.length) {

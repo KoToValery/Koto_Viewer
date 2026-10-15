@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
@@ -232,7 +233,7 @@ void main() {
       final model = workspace.commands();
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tester.ensureVisible(find.byIcon(entry.value));
+      await tool_ui.prepare(tester, entry.value);
       await tester.tap(find.byIcon(entry.value));
       await tester.pumpAndSettle();
       final old = model.project;

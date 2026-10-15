@@ -5897,6 +5897,30 @@ abstract class AppLocalizations {
   /// **'Spacing Y (m)'**
   String get architectGridSpacingY;
 
+  /// Architectural tool category
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get architectCategoryPlan;
+
+  /// Architectural tool category
+  ///
+  /// In en, this message translates to:
+  /// **'Build'**
+  String get architectCategoryBuild;
+
+  /// Architectural tool category
+  ///
+  /// In en, this message translates to:
+  /// **'Draw'**
+  String get architectCategoryDrawing;
+
+  /// Tooltip for architectural tool category picker
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get architectToolCategories;
+
   /// Selection and navigation tool
   ///
   /// In en, this message translates to:
@@ -6704,7 +6728,7 @@ abstract class AppLocalizations {
   /// Annotations and dimensions category
   ///
   /// In en, this message translates to:
-  /// **'Annotations'**
+  /// **'Notes'**
   String get architectCategoryAnnotations;
 
   /// Freehand CAD drafting category
@@ -7883,6 +7907,12 @@ abstract class AppLocalizations {
   /// **'Duplicate'**
   String get architectRadialDuplicate;
 
+  /// Short radial action for renaming an axis
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get architectRadialRename;
+
   /// Radial menu rotate action
   ///
   /// In en, this message translates to:
@@ -8129,6 +8159,96 @@ abstract class AppLocalizations {
   /// **'Chain'**
   String get architectDimensionChain;
 
+  /// No description provided for @architectDimensionScale.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension scale'**
+  String get architectDimensionScale;
+
+  /// No description provided for @architectDimensionSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Single'**
+  String get architectDimensionSingle;
+
+  /// No description provided for @architectDimensionExterior.
+  ///
+  /// In en, this message translates to:
+  /// **'Exterior'**
+  String get architectDimensionExterior;
+
+  /// No description provided for @architectDimensionInterior.
+  ///
+  /// In en, this message translates to:
+  /// **'Interior'**
+  String get architectDimensionInterior;
+
+  /// No description provided for @architectDimensionInteriorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select end walls and partitions, then position the line.'**
+  String get architectDimensionInteriorHint;
+
+  /// No description provided for @architectDimensionInteriorHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'One row measures between the inner faces of parallel end walls, including both faces of intermediate partitions.'**
+  String get architectDimensionInteriorHelp;
+
+  /// No description provided for @architectDimensionAddWalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Add walls'**
+  String get architectDimensionAddWalls;
+
+  /// No description provided for @architectDimensionEditPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit points'**
+  String get architectDimensionEditPoints;
+
+  /// No description provided for @architectDimensionEditPointsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a wall to add it, or a minus to remove it. The green check saves.'**
+  String get architectDimensionEditPointsHint;
+
+  /// No description provided for @architectDimensionRemoveReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from dimension'**
+  String get architectDimensionRemoveReference;
+
+  /// No description provided for @architectDimensionKeepReferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Add another reference before removing this one; a dimension needs two distinct endpoints.'**
+  String get architectDimensionKeepReferences;
+
+  /// No description provided for @architectDimensionConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Save the displayed dimension'**
+  String get architectDimensionConfirm;
+
+  /// No description provided for @architectDimensionAddWallsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select missing parallel walls, then confirm. The dimension line stays in place.'**
+  String get architectDimensionAddWallsHint;
+
+  /// No description provided for @architectDimensionStartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the first measured point.'**
+  String get architectDimensionStartHint;
+
+  /// No description provided for @architectDimensionEndHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the second measured point, then position the dimension line.'**
+  String get architectDimensionEndHint;
+
   /// No description provided for @architectDimensionContinue.
   ///
   /// In en, this message translates to:
@@ -8150,7 +8270,7 @@ abstract class AppLocalizations {
   /// No description provided for @architectDimensionChainHint.
   ///
   /// In en, this message translates to:
-  /// **'Select parallel walls or element points. Tap empty space to continue or finish.'**
+  /// **'Select walls or points. Green check saves; minus removes a reference.'**
   String get architectDimensionChainHint;
 
   /// No description provided for @architectDimensionDirectionHint.
@@ -8162,13 +8282,13 @@ abstract class AppLocalizations {
   /// No description provided for @architectDimensionPositionHint.
   ///
   /// In en, this message translates to:
-  /// **'Tap to position the chain, or enter an exact offset.'**
+  /// **'Tap to position the dimension line, or enter an exact offset.'**
   String get architectDimensionPositionHint;
 
   /// No description provided for @architectSelectionCycleHelp.
   ///
   /// In en, this message translates to:
-  /// **'Tap again to cycle overlapping elements. Tap the selection label for actions.'**
+  /// **'Tap to add or remove; repeated taps cycle overlaps. Hold for actions.'**
   String get architectSelectionCycleHelp;
 
   /// No description provided for @architectDimensionOverall.

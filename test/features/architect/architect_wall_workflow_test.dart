@@ -1,3 +1,4 @@
+import 'architect_tool_test_helper.dart' as tool_ui;
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -40,7 +41,7 @@ void main() {
       final model = workspace.commands();
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
       await tester.pump();
@@ -94,7 +95,7 @@ void main() {
       final model = workspace.commands();
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
       await tester.pump();
@@ -132,7 +133,7 @@ void main() {
       final model = workspace.commands();
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('wall-dimension-mode')));
       await tester.pump();
@@ -446,7 +447,7 @@ void main() {
       final model = workspace.commands();
       addTearDown(model.dispose);
       await workspace.open(tester, model);
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
       await workspace.wallTap(tester, Offset.zero);
       await workspace.wallTap(tester, const Offset(3, .04));
@@ -474,9 +475,9 @@ void main() {
       expect(model.project.activeStorey.walls.last.startPoint, first.endPoint);
       expect(model.project.activeStorey.walls.last.length, closeTo(3, 1e-9));
       expect(workspace.overlay(tester).activeDraftStart, isNull);
-      await tester.tap(find.byIcon(Icons.view_column_rounded));
+      await tool_ui.choose(tester, Icons.view_column_rounded);
       await tester.pump();
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pump();
       await workspace.wallTap(tester, const Offset(-2, -2));
       await workspace.wallTap(tester, const Offset(-1, -2));
@@ -515,8 +516,8 @@ void main() {
         ),
       );
       await workspace.open(tester, model);
-      await tester.ensureVisible(find.byIcon(Icons.line_weight_rounded));
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.prepare(tester, Icons.line_weight_rounded);
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
       await tester.longPressAt(workspace.screen(tester, const Offset(2, 0)));
       await tester.pump();
@@ -620,8 +621,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byIcon(Icons.line_weight_rounded));
-      await tester.tap(find.byIcon(Icons.line_weight_rounded));
+      await tool_ui.prepare(tester, Icons.line_weight_rounded);
+      await tool_ui.choose(tester, Icons.line_weight_rounded);
       await tester.pumpAndSettle();
       workspace
           .camera(tester)

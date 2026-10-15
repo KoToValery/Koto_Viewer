@@ -3431,6 +3431,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectGridSpacingY => 'Spacing Y (m)';
 
   @override
+  String get architectCategoryPlan => 'Plan';
+
+  @override
+  String get architectCategoryBuild => 'Build';
+
+  @override
+  String get architectCategoryDrawing => 'Draw';
+
+  @override
+  String get architectToolCategories => 'Categories';
+
+  @override
   String get architectToolSelect => 'Select';
 
   @override
@@ -3863,7 +3875,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectCategorySpaces => 'Spaces';
 
   @override
-  String get architectCategoryAnnotations => 'Annotations';
+  String get architectCategoryAnnotations => 'Notes';
 
   @override
   String get architectCategoryCad => 'Drafting';
@@ -4516,6 +4528,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectRadialDuplicate => 'Duplicate';
 
   @override
+  String get architectRadialRename => 'Rename';
+
+  @override
   String get architectRadialRotate => 'Rotate';
 
   @override
@@ -4649,6 +4664,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectDimensionChain => 'Chain';
 
   @override
+  String get architectDimensionScale => 'Dimension scale';
+
+  @override
+  String get architectDimensionSingle => 'Single';
+
+  @override
+  String get architectDimensionExterior => 'Exterior';
+
+  @override
+  String get architectDimensionInterior => 'Interior';
+
+  @override
+  String get architectDimensionInteriorHint =>
+      'Select end walls and partitions, then position the line.';
+
+  @override
+  String get architectDimensionInteriorHelp =>
+      'One row measures between the inner faces of parallel end walls, including both faces of intermediate partitions.';
+
+  @override
+  String get architectDimensionAddWalls => 'Add walls';
+
+  @override
+  String get architectDimensionEditPoints => 'Edit points';
+
+  @override
+  String get architectDimensionEditPointsHint =>
+      'Tap a wall to add it, or a minus to remove it. The green check saves.';
+
+  @override
+  String get architectDimensionRemoveReference => 'Remove from dimension';
+
+  @override
+  String get architectDimensionKeepReferences =>
+      'Add another reference before removing this one; a dimension needs two distinct endpoints.';
+
+  @override
+  String get architectDimensionConfirm => 'Save the displayed dimension';
+
+  @override
+  String get architectDimensionAddWallsHint =>
+      'Select missing parallel walls, then confirm. The dimension line stays in place.';
+
+  @override
+  String get architectDimensionStartHint => 'Select the first measured point.';
+
+  @override
+  String get architectDimensionEndHint =>
+      'Select the second measured point, then position the dimension line.';
+
+  @override
   String get architectDimensionContinue => 'Continue';
 
   @override
@@ -4659,7 +4725,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectDimensionChainHint =>
-      'Select parallel walls or element points. Tap empty space to continue or finish.';
+      'Select walls or points. Green check saves; minus removes a reference.';
 
   @override
   String get architectDimensionDirectionHint =>
@@ -4667,11 +4733,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectDimensionPositionHint =>
-      'Tap to position the chain, or enter an exact offset.';
+      'Tap to position the dimension line, or enter an exact offset.';
 
   @override
   String get architectSelectionCycleHelp =>
-      'Tap again to cycle overlapping elements. Tap the selection label for actions.';
+      'Tap to add or remove; repeated taps cycle overlaps. Hold for actions.';
 
   @override
   String get architectDimensionOverall => 'Overall dimension';
