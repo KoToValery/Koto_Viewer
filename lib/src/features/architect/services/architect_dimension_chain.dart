@@ -33,26 +33,50 @@ class ArchitectDimensionChain {
     );
   }
 
-  /// Selecting a wall includes both physical faces, including insulation.
+  /// Selecting a wall dimensions its structural core (without insulation).
   static List<ArchitectDimensionAnchor> wallFaces(
     ArchitectWall wall,
     Offset pick,
   ) {
-    final ratio = (dot(pick - wall.centerStart, wall.unitVector) / wall.length)
+    final ratio = (dot(pick - wall.coreCenterStart, wall.unitVector) / wall.length)
         .clamp(0.0, 1.0);
     return [
       for (final side in [-.5, .5])
         ArchitectDimensionAnchor(
           point:
-              wall.centerStart +
-              (wall.centerEnd - wall.centerStart) * ratio +
-              wall.normalVector * (wall.thickness * side),
+              wall.coreCenterStart +
+              (wall.coreCenterEnd - wall.coreCenterStart) * ratio +
+              wall.normalVector * (wall.coreThickness * side),
           elementId: wall.id,
           feature: 'wallFace',
           ratio: ratio,
           side: side,
         ),
     ];
+  }
+
+  /// Selecting an opening (door/window) provides anchors for both jambs.
+  static List<ArchitectDimensionAnchor> openingAnchors(
+    ArchitectWall wall,
+    String openingId,
+  ) {
+    for (final o in [
+      ...wall.doors.map((d) => (d.id, d.offsetRatio, d.width)),
+      ...wall.windows.map((w) => (w.id, w.offsetRatio, w.width)),
+    ]) {
+      if (o.$1 != openingId) continue;
+      final center = wall.centerStart + wall.unitVector * (o.$2 * wall.length);
+      return [
+        for (final side in [-.5, .5])
+          ArchitectDimensionAnchor(
+            point: center + wall.unitVector * (o.$3 * side),
+            elementId: openingId,
+            feature: 'opening',
+            side: side,
+          ),
+      ];
+    }
+    return [];
   }
 
   static Iterable<Map<String, dynamic>> _records(
@@ -184,9 +208,9 @@ class ArchitectDimensionChain {
     if (anchor.elementId == null) return anchor.point;
     for (final wall in storey.walls) {
       if (anchor.feature == 'wallFace' && wall.id == anchor.elementId) {
-        return wall.centerStart +
-            (wall.centerEnd - wall.centerStart) * anchor.ratio +
-            wall.normalVector * (wall.thickness * anchor.side);
+        return wall.coreCenterStart +
+            (wall.coreCenterEnd - wall.coreCenterStart) * anchor.ratio +
+            wall.normalVector * (wall.coreThickness * anchor.side);
       }
       if (anchor.feature == 'opening') {
         for (final o in [

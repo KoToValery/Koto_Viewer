@@ -11,6 +11,7 @@ import 'package:kotoview/src/features/architect/models/architect_elements.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
 import 'package:kotoview/src/features/architect/models/architect_column.dart';
+import 'package:kotoview/src/features/architect/models/architect_window.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_dimension_chain_preview.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_dimension_layout.dart';
 import 'package:kotoview/src/features/architect/screens/architect_workspace_screen.dart';
@@ -88,7 +89,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test(
-    'Wall faces produce thicknesses and clear spans, including insulation and references',
+    'Wall faces dimension core thicknesses and clear spans without insulation',
     () {
       for (final reference in WallReferenceLine.values) {
         final s = scene().copyWith(
@@ -105,7 +106,7 @@ void main() {
         expect(
           lengths(d),
           orderedEquals(
-            [.37, 2.63, .37, 2.63, .37].map((v) => closeTo(v, 1e-9)),
+            [.25, 2.75, .25, 2.75, .25].map((v) => closeTo(v, 1e-9)),
           ),
         );
         expect(d.anchors, hasLength(6));
@@ -601,4 +602,112 @@ void main() {
       },
     );
   }
+
+  test(
+    'Opening anchors provide both jambs and resolve associatively on host wall',
+    () {
+      const wall = ArchitectWall(
+        id: 'wall_with_win',
+        startPoint: Offset(0, 0),
+        endPoint: Offset(6, 0),
+        thickness: 0.25,
+        windows: [
+          ArchitectWindow(
+            id: 'win1',
+            wallId: 'wall_with_win',
+            offsetRatio: 0.5,
+            width: 1.20,
+            uuid: 'w1',
+          ),
+        ],
+      );
+      final anchors = ArchitectDimensionChain.openingAnchors(wall, 'win1');
+      expect(anchors, hasLength(2));
+      expect(anchors[0].side, -0.5);
+      expect(anchors[1].side, 0.5);
+      expect((anchors[1].point - anchors[0].point).distance, closeTo(1.20, 1e-6));
+      expect(anchors[0].point.dx, closeTo(2.40, 1e-6));
+      expect(anchors[1].point.dx, closeTo(3.60, 1e-6));
+    },
+  );
+
+  test(
+    '3-tier dimension layout produces base, openings from outer corner, and overall tiers',
+    () {
+      const wall = ArchitectWall(
+        id: 'host_wall',
+        startPoint: Offset(0, 0),
+        endPoint: Offset(6, 0),
+        thickness: 0.25,
+        windows: [
+          ArchitectWindow(
+            id: 'w1',
+            wallId: 'host_wall',
+            offsetRatio: 0.25,
+            width: 1.20,
+            uuid: 'u1',
+          ),
+          ArchitectWindow(
+            id: 'w2',
+            wallId: 'host_wall',
+            offsetRatio: 0.75,
+            width: 1.20,
+            uuid: 'u2',
+          ),
+        ],
+      );
+      final storey = const ArchitectStorey(
+        id: 's',
+        name: 'Floor',
+        walls: [wall],
+      );
+      final openingAnchors = [
+        ...ArchitectDimensionChain.openingAnchors(wall, 'w1'),
+        ...ArchitectDimensionChain.openingAnchors(wall, 'w2'),
+      ];
+      final dim = ArchitectDimensionChain.build(
+        id: 'dim3tier',
+        anchors: [
+          const ArchitectDimensionAnchor(point: Offset(0, 0)),
+          ...openingAnchors,
+          const ArchitectDimensionAnchor(point: Offset(6, 0)),
+        ],
+        direction: const Offset(1, 0),
+        offset: 1.5,
+      );
+
+      final tiers = ArchitectDimensionLayout.layoutTiers(
+        dimension: dim,
+        scale: 50.0,
+        storey: storey,
+      );
+
+      expect(tiers, hasLength(3));
+      expect(tiers[0].tierIndex, 1); // Base row
+      expect(tiers[1].tierIndex, 2); // Openings row
+      expect(tiers[2].tierIndex, 3); // Overall row
+
+      // Tier 2 should start at wall exterior corner (0) and end at (6)
+      final t2Points = tiers[1].points;
+      expect(t2Points.first.dx, closeTo(0.0, 1e-4));
+      expect(t2Points.last.dx, closeTo(6.0, 1e-4));
+
+      // Segments on Tier 2: pier1, win1, pier2, win2, pier3
+      final t2Segments = tiers[1].segments;
+      expect(t2Segments, hasLength(5));
+      final segLengths = [
+        for (final s in t2Segments) (s.$2 - s.$1).distance,
+      ];
+      // sum of all segments must equal wall length (6.0)
+      final totalT2 = segLengths.reduce((a, b) => a + b);
+      expect(totalT2, closeTo(6.0, 1e-4));
+      // Window opening widths should be 1.20
+      expect(segLengths[1], closeTo(1.20, 1e-4));
+      expect(segLengths[3], closeTo(1.20, 1e-4));
+
+      // Tier 3 is the overall row (length 6.0)
+      expect((tiers[2].points[1] - tiers[2].points[0]).distance, closeTo(6.0, 1e-4));
+    },
+  );
 }
+

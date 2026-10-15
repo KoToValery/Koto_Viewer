@@ -364,12 +364,36 @@ class _ArchitectWorkspaceScreenState extends State<ArchitectWorkspaceScreen> {
       return;
     }
     final ids = _selectionCandidates(raw);
+
+    // 1. Check if an opening (window or door) was picked
+    ArchitectWall? openingHostWall;
+    String? openingId;
+    for (final w in _project.activeStorey.walls) {
+      for (final o in [
+        ...w.doors.map((d) => d.id),
+        ...w.windows.map((win) => win.id),
+      ]) {
+        if (ids.contains(o)) {
+          openingHostWall = w;
+          openingId = o;
+          break;
+        }
+      }
+      if (openingId != null) break;
+    }
+
     final wall = _project.activeStorey.walls
         .where((w) => ids.contains(w.id))
         .firstOrNull;
     final snap = _snapElement(raw);
     final anchors = <ArchitectDimensionAnchor>[];
-    if (wall != null) {
+
+    if (openingId != null && openingHostWall != null) {
+      _dimensionDirection ??= openingHostWall.unitVector;
+      anchors.addAll(
+        ArchitectDimensionChain.openingAnchors(openingHostWall, openingId),
+      );
+    } else if (wall != null) {
       final previousWall = _project.activeStorey.walls
           .where(
             (w) => _dimensionAnchors.any(

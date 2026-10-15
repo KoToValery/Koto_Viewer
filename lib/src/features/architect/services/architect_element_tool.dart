@@ -513,12 +513,20 @@ class ArchitectElementTool extends ChangeNotifier {
 
     // Check Dimensions
     for (final dim in storey.dimensions) {
-      final dist = _pointToSegmentDistance(point, dim.lineStart, dim.lineEnd);
-      final overall = ArchitectDimensionLayout.overallSegment(dim, scale);
-      if (dist <= tolerance ||
-          overall != null &&
-              _pointToSegmentDistance(point, overall.$1, overall.$2) <=
-                  tolerance) {
+      final tiers = ArchitectDimensionLayout.layoutTiers(
+        dimension: dim,
+        scale: scale,
+        storey: storey,
+      );
+      bool hit = false;
+      for (final tier in tiers) {
+        if (_pointToSegmentDistance(point, tier.line.$1, tier.line.$2) <=
+            tolerance) {
+          hit = true;
+          break;
+        }
+      }
+      if (hit) {
         yield dim.id;
       }
     }
