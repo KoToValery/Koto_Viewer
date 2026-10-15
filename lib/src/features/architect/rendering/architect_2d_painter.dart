@@ -671,38 +671,7 @@ class Architect2dPainter extends CustomPainter {
       final midPoint = (wall.startPoint + wall.endPoint) / 2;
       canvas.drawCircle(midPoint, 3.2 / zoomScale, midDotPaint);
       canvas.drawCircle(midPoint, 3.2 / zoomScale, midBorderPaint);
-      // A detached end remains visibly capped even when bodies touch.
-      for (final end in [true, false]) {
-        if (end ? wall.connectStart : wall.connectEnd) continue;
-        final corners = wall.polygonCorners;
-        final core = wall.coreCorners;
-        final i = end ? 0 : 1, j = end ? 3 : 2;
-        final midCap = (corners[i] + corners[j]) / 2;
-        if (activeStorey.walls.any(
-          (w) => w.id != wall.id && w.containsPoint(midCap, tolerance: 0.001),
-        )) {
-          continue;
-        }
-        final isCut = wall.isCutAt(activeStorey.cutPlaneHeight);
-        if (isCut) {
-          canvas.drawLine(
-            corners[i],
-            corners[j],
-            Paint()
-              ..color = wallBorderPaint.color
-              ..strokeWidth = ArchitectLineWeights.cutThin / zoomScale,
-          );
-          canvas.drawLine(core[i], core[j], wallBorderPaint);
-        } else {
-          canvas.drawLine(
-            corners[i],
-            corners[j],
-            Paint()
-              ..color = wallBorderPaint.color
-              ..strokeWidth = ArchitectLineWeights.projection / zoomScale,
-          );
-        }
-      }
+
       for (final door in wall.doors) {
         door.paint2D(
           palette: palette,

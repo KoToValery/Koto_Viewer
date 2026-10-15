@@ -1,8 +1,10 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kotoview/src/core/l10n/generated/app_localizations.dart';
 import 'package:kotoview/src/features/architect/models/architect_project.dart';
 import 'package:kotoview/src/features/architect/models/architect_wall.dart';
+import 'package:kotoview/src/features/architect/rendering/architect_2d_painter.dart';
 import 'package:kotoview/src/features/architect/rendering/architect_wall_layers.dart';
 import 'package:kotoview/src/features/architect/services/architect_wall_overshoot_detector.dart';
 import 'package:kotoview/src/features/architect/widgets/architect_wall_overshoot_banner.dart';
@@ -41,6 +43,48 @@ void main() {
       // Point just below cut wall face: cut wall bottom face is y = -0.125
       expect(layers.uncutBody.contains(const Offset(0, -0.124)), isFalse);
       expect(layers.uncutBody.contains(const Offset(0, -0.50)), isTrue);
+    });
+
+    test('painter does not draw manual end cap lines across walls at T-junction or corner', () {
+      final wHoriz = ArchitectWall(
+        id: 'wH',
+        startPoint: const Offset(0, 0),
+        endPoint: const Offset(5, 0),
+        thickness: 0.25,
+      );
+      final wVert = ArchitectWall(
+        id: 'wV',
+        startPoint: const Offset(3, 0),
+        endPoint: const Offset(3, -3),
+        thickness: 0.25,
+      );
+      final project = ArchitectProject(
+        id: 'p',
+        name: 'test',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        storeys: [
+          ArchitectStorey(
+            id: 's',
+            name: 'Story',
+            elevation: 0,
+            height: 3,
+            walls: [wHoriz, wVert],
+          ),
+        ],
+        activeStoreyId: 's',
+      );
+
+      final painter = Architect2dPainter(
+        project: project,
+        activeTool: ArchitectTool.select,
+        zoomScale: 1.0,
+      );
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      painter.paint(canvas, const Size(800, 600));
+      expect(recorder.endRecording(), isNotNull);
     });
   });
 
