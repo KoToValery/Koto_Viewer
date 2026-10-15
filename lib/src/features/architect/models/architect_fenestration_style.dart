@@ -11,6 +11,7 @@ import '../rendering/architect_canvas_palette.dart';
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../core/l10n/generated/app_localizations.dart';
 
 /// Semantic classification of the fenestration element.
 enum FenestrationKind {
@@ -1415,9 +1416,32 @@ class ArchitectFenestrationStyle {
     canvas.restore();
   }
 
+  /// Returns the localized display name for preset styles, or [name] for custom user styles.
+  String localizedName(AppLocalizations l10n) {
+    switch (id) {
+      case 'win_single_casement':
+        return l10n.architectFenestrationPresetSingleCasement;
+      case 'win_double_casement':
+        return l10n.architectFenestrationPresetDoubleCasement;
+      case 'win_double_with_casing':
+        return l10n.architectFenestrationPresetDoubleWithCasing;
+      case 'win_triple_casement':
+        return l10n.architectFenestrationPresetTripleCasement;
+      case 'win_with_transom':
+        return l10n.architectFenestrationPresetWithTransom;
+      case 'door_interior_standard':
+        return l10n.architectFenestrationPresetDoorInterior;
+      case 'door_entrance_casing':
+        return l10n.architectFenestrationPresetDoorEntranceCasing;
+      default:
+        return name;
+    }
+  }
+
   // ===========================================================================
   // SECTION 6: STANDARD PRESETS CATALOG
   // ===========================================================================
+
 
   static List<ArchitectFenestrationStyle> standardCatalog() => [
         // 1. Single Casement Window 80x140 cm (5-chamber, double glazing)

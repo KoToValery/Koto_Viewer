@@ -6821,7 +6821,7 @@ abstract class AppLocalizations {
   /// **'Balcony Parapet 12 cm'**
   String get wallTypeParapet12;
 
-  /// Default name for new architectural project
+  /// Default name for a new architectural project
   ///
   /// In en, this message translates to:
   /// **'Architectural Project'**
@@ -7096,6 +7096,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drag'**
   String get architectSelectionMove;
+
+  /// Select connected chain of elements
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get architectSelectConnected;
+
+  /// Select all elements of the same type
+  ///
+  /// In en, this message translates to:
+  /// **'All of type'**
+  String get architectSelectSimilar;
+
+  /// Smart context menu button
+  ///
+  /// In en, this message translates to:
+  /// **'Menu'**
+  String get architectContextMenu;
+
+  /// Number of items selected
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items'**
+  String architectSelectionCount(int count);
+
+  /// Plural walls count in selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 wall} other{{count} walls}}'**
+  String architectSelectionWallsCount(int count);
+
+  /// Plural columns count in selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 column} other{{count} columns}}'**
+  String architectSelectionColumnsCount(int count);
+
+  /// Plural beams count in selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 beam} other{{count} beams}}'**
+  String architectSelectionBeamsCount(int count);
+
+  /// Plural slabs count in selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 slab} other{{count} slabs}}'**
+  String architectSelectionSlabsCount(int count);
+
+  /// Summary of mixed element selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items: {details}'**
+  String architectSelectionMixedSummary(int count, String details);
 
   /// Deselect active selection
   ///
@@ -8122,6 +8176,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Overall dimension'**
   String get architectDimensionOverall;
+
+  /// Default label for ground floor
+  ///
+  /// In en, this message translates to:
+  /// **'Ground Floor'**
+  String get architectStoreyGround;
+
+  /// Default label for upper storeys
+  ///
+  /// In en, this message translates to:
+  /// **'Floor'**
+  String get architectStoreyFloor;
+
+  /// Plural doors count in selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 door} other{{count} doors}}'**
+  String architectSelectionDoorsCount(int count);
+
+  /// Plural windows count in selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 window} other{{count} windows}}'**
+  String architectSelectionWindowsCount(int count);
+
+  /// Plural zones count in selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 zone} other{{count} zones}}'**
+  String architectSelectionZonesCount(int count);
+
+  /// Plural axes count in selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 axis} other{{count} axes}}'**
+  String architectSelectionAxesCount(int count);
+
+  /// Plural CAD primitives count in selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 CAD} other{{count} CAD}}'**
+  String architectSelectionCadCount(int count);
+
+  /// Snap label for corners
+  ///
+  /// In en, this message translates to:
+  /// **'Corner'**
+  String get snapCorner;
+
+  /// Snap label for edges
+  ///
+  /// In en, this message translates to:
+  /// **'Edge'**
+  String get snapEdge;
+
+  /// Snap label for vertex merging
+  ///
+  /// In en, this message translates to:
+  /// **'Merge'**
+  String get snapMerge;
+
+  /// Door threshold sill none chip
+  ///
+  /// In en, this message translates to:
+  /// **'Sill: 0'**
+  String get architectDoorSillNone;
+
+  /// Door threshold sill 15cm chip
+  ///
+  /// In en, this message translates to:
+  /// **'Step: 15 cm'**
+  String get architectDoorSillStep;
+
+  /// Zone category living room
+  ///
+  /// In en, this message translates to:
+  /// **'Living Room'**
+  String get architectZoneCatLiving;
+
+  /// Zone category bedroom
+  ///
+  /// In en, this message translates to:
+  /// **'Bedroom'**
+  String get architectZoneCatBedroom;
+
+  /// Zone category kitchen
+  ///
+  /// In en, this message translates to:
+  /// **'Kitchen'**
+  String get architectZoneCatKitchen;
+
+  /// Zone category corridor
+  ///
+  /// In en, this message translates to:
+  /// **'Corridor / Hall'**
+  String get architectZoneCatCorridor;
+
+  /// Zone category bathroom
+  ///
+  /// In en, this message translates to:
+  /// **'Bathroom / WC'**
+  String get architectZoneCatBathroom;
+
+  /// Zone category terrace
+  ///
+  /// In en, this message translates to:
+  /// **'Terrace / Balcony'**
+  String get architectZoneCatTerrace;
+
+  /// Zone category storage
+  ///
+  /// In en, this message translates to:
+  /// **'Storage / Utility'**
+  String get architectZoneCatStorage;
+
+  /// Zone category office
+  ///
+  /// In en, this message translates to:
+  /// **'Home Office'**
+  String get architectZoneCatOffice;
+
+  /// Zone category custom space
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Space'**
+  String get architectZoneCatCustom;
+
+  /// Single casement window preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Single casement 80/140 (5-chamber)'**
+  String get architectFenestrationPresetSingleCasement;
+
+  /// Double casement window preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Double casement 140/140 (5-chamber)'**
+  String get architectFenestrationPresetDoubleCasement;
+
+  /// Double casement window with casing preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Double casement 140/140 with casing'**
+  String get architectFenestrationPresetDoubleWithCasing;
+
+  /// Triple casement window preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Triple casement 210/140 (fixed + 2 sashes)'**
+  String get architectFenestrationPresetTripleCasement;
+
+  /// Window with transom preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Window with transom 140/180'**
+  String get architectFenestrationPresetWithTransom;
+
+  /// Interior door preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Interior door 90/200'**
+  String get architectFenestrationPresetDoorInterior;
+
+  /// Exterior entrance door with casing preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Entrance door with casing 100/210'**
+  String get architectFenestrationPresetDoorEntranceCasing;
+
+  /// Parapet wall type name with handrail pipe
+  ///
+  /// In en, this message translates to:
+  /// **'Parapet {thickness} cm (pipe h={height}m)'**
+  String architectWallParapetPipe(int thickness, String height);
+
+  /// Parapet wall type name with concrete cap
+  ///
+  /// In en, this message translates to:
+  /// **'Parapet {thickness} cm (cap h={height}m)'**
+  String architectWallParapetCap(int thickness, String height);
 }
 
 class _AppLocalizationsDelegate

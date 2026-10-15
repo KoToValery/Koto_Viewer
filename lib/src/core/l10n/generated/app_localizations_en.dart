@@ -4079,6 +4079,69 @@ class AppLocalizationsEn extends AppLocalizations {
   String get architectSelectionMove => 'Drag';
 
   @override
+  String get architectSelectConnected => 'Connected';
+
+  @override
+  String get architectSelectSimilar => 'All of type';
+
+  @override
+  String get architectContextMenu => 'Menu';
+
+  @override
+  String architectSelectionCount(int count) {
+    return '$count items';
+  }
+
+  @override
+  String architectSelectionWallsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count walls',
+      one: '1 wall',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionColumnsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count columns',
+      one: '1 column',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionBeamsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count beams',
+      one: '1 beam',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionSlabsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count slabs',
+      one: '1 slab',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionMixedSummary(int count, String details) {
+    return '$count items: $details';
+  }
+
+  @override
   String get architectDeselect => 'Deselect';
 
   @override
@@ -4612,4 +4675,144 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get architectDimensionOverall => 'Overall dimension';
+
+  @override
+  String get architectStoreyGround => 'Ground Floor';
+
+  @override
+  String get architectStoreyFloor => 'Floor';
+
+  @override
+  String architectSelectionDoorsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count doors',
+      one: '1 door',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionWindowsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count windows',
+      one: '1 window',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionZonesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count zones',
+      one: '1 zone',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionAxesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count axes',
+      one: '1 axis',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionCadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count CAD',
+      one: '1 CAD',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get snapCorner => 'Corner';
+
+  @override
+  String get snapEdge => 'Edge';
+
+  @override
+  String get snapMerge => 'Merge';
+
+  @override
+  String get architectDoorSillNone => 'Sill: 0';
+
+  @override
+  String get architectDoorSillStep => 'Step: 15 cm';
+
+  @override
+  String get architectZoneCatLiving => 'Living Room';
+
+  @override
+  String get architectZoneCatBedroom => 'Bedroom';
+
+  @override
+  String get architectZoneCatKitchen => 'Kitchen';
+
+  @override
+  String get architectZoneCatCorridor => 'Corridor / Hall';
+
+  @override
+  String get architectZoneCatBathroom => 'Bathroom / WC';
+
+  @override
+  String get architectZoneCatTerrace => 'Terrace / Balcony';
+
+  @override
+  String get architectZoneCatStorage => 'Storage / Utility';
+
+  @override
+  String get architectZoneCatOffice => 'Home Office';
+
+  @override
+  String get architectZoneCatCustom => 'Custom Space';
+
+  @override
+  String get architectFenestrationPresetSingleCasement =>
+      'Single casement 80/140 (5-chamber)';
+
+  @override
+  String get architectFenestrationPresetDoubleCasement =>
+      'Double casement 140/140 (5-chamber)';
+
+  @override
+  String get architectFenestrationPresetDoubleWithCasing =>
+      'Double casement 140/140 with casing';
+
+  @override
+  String get architectFenestrationPresetTripleCasement =>
+      'Triple casement 210/140 (fixed + 2 sashes)';
+
+  @override
+  String get architectFenestrationPresetWithTransom =>
+      'Window with transom 140/180';
+
+  @override
+  String get architectFenestrationPresetDoorInterior => 'Interior door 90/200';
+
+  @override
+  String get architectFenestrationPresetDoorEntranceCasing =>
+      'Entrance door with casing 100/210';
+
+  @override
+  String architectWallParapetPipe(int thickness, String height) {
+    return 'Parapet $thickness cm (pipe h=${height}m)';
+  }
+
+  @override
+  String architectWallParapetCap(int thickness, String height) {
+    return 'Parapet $thickness cm (cap h=${height}m)';
+  }
 }

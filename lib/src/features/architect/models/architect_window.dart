@@ -40,8 +40,9 @@ class ArchitectWindow {
     this.sillHeight = 0.85,
     this.frameThickness = 0.05,
     this.panesCount = 2,
-    this.specId = 'П1',
+    this.specId = 'W1',
     required this.uuid,
+
     this.styleId,
     this.style,
   });
@@ -99,8 +100,9 @@ class ArchitectWindow {
         sillHeight: (json['sillHeight'] as num?)?.toDouble() ?? 0.85,
         frameThickness: (json['frameThickness'] as num?)?.toDouble() ?? 0.05,
         panesCount: (json['panesCount'] as num?)?.toInt() ?? 2,
-        specId: json['specId'] as String? ?? 'П1',
+        specId: json['specId'] as String? ?? 'W1',
         uuid: json['uuid'] as String? ?? json['id'] as String,
+
         styleId: json['styleId'] as String?,
         style: json['style'] != null
             ? ArchitectFenestrationStyle.fromJson(

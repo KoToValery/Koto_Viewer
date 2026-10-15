@@ -234,9 +234,10 @@ class ArchitectProject {
 
   static const _emptyStorey = ArchitectStorey(
     id: 'default',
-    name: 'Партер ±0.00',
+    name: '±0.00',
     elevation: 0.0,
   );
+
 
   ArchitectProject updateActiveStorey(ArchitectStorey updated) {
     final updatedStoreys = storeys
@@ -412,10 +413,11 @@ class ArchitectProject {
 
     for (int i = 0; i < storeyCount; i++) {
       final h = i == 0 ? groundHeight : typicalHeight;
-      final name = i == 0
-          ? 'Партер ±0.00'
-          : 'Етаж $i (+${currentElevation.toStringAsFixed(2)})';
+      final name = currentElevation.abs() < 1e-4
+          ? '±0.00'
+          : '+${currentElevation.toStringAsFixed(2)}';
       storeys.add(
+
         ArchitectStorey(
           id: 'storey_$i',
           name: name,

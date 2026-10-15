@@ -534,7 +534,7 @@ class ArchitectToolPalette extends StatelessWidget {
             ),
           const SizedBox(width: 6),
           ChoiceChip(
-            label: const Text('hp = 0'),
+            label: Text(l10n.architectDoorSillNone),
             selected: doorSill == 0.0,
             onSelected: (sel) {
               if (sel) onDoorSillChanged(0.0);
@@ -543,7 +543,7 @@ class ArchitectToolPalette extends StatelessWidget {
           ),
           const SizedBox(width: 5),
           ChoiceChip(
-            label: const Text('h = 15 cm'),
+            label: Text(l10n.architectDoorSillStep),
             selected: doorSill == 0.15,
             onSelected: (sel) {
               if (sel) onDoorSillChanged(0.15);
@@ -551,6 +551,7 @@ class ArchitectToolPalette extends StatelessWidget {
             visualDensity: VisualDensity.compact,
           ),
           const SizedBox(width: 8),
+
           ChoiceChip(
             label: Text(
               isHingeLeft
@@ -867,7 +868,7 @@ class ArchitectToolPalette extends StatelessWidget {
               padding: const EdgeInsets.only(right: 5),
               child: ChoiceChip(
                 avatar: Icon(cat.icon, size: 14, color: cat.color),
-                label: Text(cat.defaultBgName),
+                label: Text(cat.localizedName(l10n)),
                 selected: activeZoneCategory == cat,
                 onSelected: (sel) {
                   if (sel) onZoneCategoryChanged(cat);
@@ -948,7 +949,7 @@ class ArchitectToolPalette extends StatelessWidget {
                             : Colors.white54,
                       ),
                       title: Text(
-                        s.name,
+                        s.localizedName(l10n),
                         style: TextStyle(
                           fontWeight: isSelected
                               ? FontWeight.bold

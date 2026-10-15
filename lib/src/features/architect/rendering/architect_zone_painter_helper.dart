@@ -343,6 +343,7 @@ class ArchitectZonePainterHelper {
     required Offset start,
     required Offset end,
     required ArchitectZoneCategory category,
+    String? categoryName,
     required double zoomScale,
   }) {
     final rect = Rect.fromPoints(start, end);
@@ -362,8 +363,10 @@ class ArchitectZonePainterHelper {
     canvas.drawRect(rect, borderPaint);
 
     // Live dimensions badge in center
+    final catName = categoryName ?? category.defaultEnName;
     final label =
-        '${category.defaultBgName}\n${w.toStringAsFixed(2)} × ${h.toStringAsFixed(2)} m\n${area.toStringAsFixed(1)} m²';
+        '$catName\n${w.toStringAsFixed(2)} × ${h.toStringAsFixed(2)} m\n${area.toStringAsFixed(1)} m²';
+
     final tp = TextPainter(
       text: TextSpan(
         text: label,
@@ -697,8 +700,8 @@ class ArchitectZonePainterHelper {
         }
 
         // When closing snap is active (3+ points hovering start):
-        if (isClosingSnap && points.length >= 3) {
-          final badgeText = closeLabel ?? 'Затвори зона (1)';
+        if (isClosingSnap && points.length >= 3 && closeLabel != null && closeLabel.isNotEmpty) {
+          final badgeText = closeLabel;
           final tpClose = TextPainter(
             text: TextSpan(
               text: badgeText,
@@ -743,6 +746,7 @@ class ArchitectZonePainterHelper {
           );
           tpClose.paint(canvas, badgePos);
         }
+
       } else {
         // --- SUBSEQUENT POINTS 2..N: HIGH CONTRAST BADGES ---
         canvas.drawCircle(pt, nodeRadius + 1.5 / zoomScale, nodeShadow);

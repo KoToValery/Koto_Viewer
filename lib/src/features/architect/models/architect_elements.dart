@@ -20,8 +20,9 @@ class ArchitectBeam {
     required this.endPoint,
     this.width = 0.25,
     this.depth = 0.50,
-    this.label = 'Г 25/50',
+    this.label = 'B 25/50',
   });
+
 
   double get length => (endPoint - startPoint).distance;
 
@@ -78,8 +79,9 @@ class ArchitectBeam {
     ),
     width: (json['width'] as num?)?.toDouble() ?? 0.25,
     depth: (json['depth'] as num?)?.toDouble() ?? 0.50,
-    label: json['label'] as String? ?? 'Г 25/50',
+    label: json['label'] as String? ?? 'B 25/50',
   );
+
 
   bool containsPoint(Offset pt, {double tolerance = 0.15}) {
     final len = length;
@@ -107,8 +109,9 @@ class ArchitectSlab {
     required this.id,
     required this.polygon,
     this.thickness = 0.20,
-    this.label = 'Плоча d=20cm',
+    this.label = 'Slab d=20cm',
   });
+
 
   double get area {
     if (polygon.length < 3) return 0.0;
@@ -163,8 +166,9 @@ class ArchitectSlab {
             .toList() ??
         const [],
     thickness: (json['thickness'] as num?)?.toDouble() ?? 0.20,
-    label: json['label'] as String? ?? 'Плоча d=20cm',
+    label: json['label'] as String? ?? 'Slab d=20cm',
   );
+
 
   bool containsPoint(Offset pt) {
     if (polygon.length < 3) return false;
@@ -198,9 +202,10 @@ class ArchitectOpening {
   const ArchitectOpening({
     required this.id,
     required this.boundary,
-    this.label = 'Шахта',
+    this.label = 'Shaft',
     this.type = OpeningType.shaft,
   });
+
 
   Offset get centroid {
     if (boundary.isEmpty) return Offset.zero;
@@ -244,8 +249,9 @@ class ArchitectOpening {
                 )
                 .toList() ??
             const [],
-        label: json['label'] as String? ?? 'Шахта',
+        label: json['label'] as String? ?? 'Shaft',
         type: OpeningType.values.firstWhere(
+
           (t) => t.name == json['type'],
           orElse: () => OpeningType.shaft,
         ),

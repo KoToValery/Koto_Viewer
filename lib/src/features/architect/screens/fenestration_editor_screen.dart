@@ -149,7 +149,7 @@ class _FenestrationEditorScreenState extends State<FenestrationEditorScreen>
               children: [
                 Flexible(
                   child: Text(
-                    _style.name,
+                    _style.localizedName(context.l10n),
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis,
                   ),

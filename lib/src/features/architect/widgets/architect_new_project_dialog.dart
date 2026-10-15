@@ -27,7 +27,15 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: 'Архитектурен проект 1');
+    _nameController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_nameController.text.isEmpty) {
+      _nameController.text = '${context.l10n.architectDefaultProjectName} 1';
+    }
   }
 
   @override
@@ -38,8 +46,9 @@ class _ArchitectNewProjectDialogState extends State<ArchitectNewProjectDialog> {
 
   void _onCreate() {
     final name = _nameController.text.trim().isEmpty
-        ? 'Нов проект'
+        ? '${context.l10n.architectDefaultProjectName} 1'
         : _nameController.text.trim();
+
 
     final project = ArchitectProject.starter(
       name: name,

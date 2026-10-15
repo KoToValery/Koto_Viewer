@@ -7,6 +7,7 @@ import '../models/architect_wall.dart';
 import '../models/architect_wall_type.dart';
 import '../rendering/architect_scene_geometry.dart';
 import 'architect_command_controller.dart';
+import '../../../core/l10n/l10n_extensions.dart';
 
 /// A shared property schema for all persisted architectural element kinds.
 class ArchitectSelection {
@@ -197,6 +198,50 @@ class ArchitectSelection {
     final rect = bounds(project, id);
     if (rect != null) path.addRect(rect.inflate(.015));
     return path;
+  }
+
+  static String summary(
+    ArchitectProject project,
+    Set<String> ids,
+    AppLocalizations l,
+  ) {
+    if (ids.isEmpty) return '';
+    final s = project.activeStorey;
+    final wallCount = s.walls.where((w) => ids.contains(w.id)).length;
+    final colCount = s.columns.where((c) => ids.contains(c.id)).length;
+    final beamCount = s.beams.where((b) => ids.contains(b.id)).length;
+    final slabCount = s.slabs.where((b) => ids.contains(b.id)).length;
+    final zoneCount = s.zones.where((z) => ids.contains(z.id)).length;
+    final doorCount = s.walls
+        .expand((w) => w.doors)
+        .where((d) => ids.contains(d.id))
+        .length;
+    final winCount = s.walls
+        .expand((w) => w.windows)
+        .where((win) => ids.contains(win.id))
+        .length;
+    final axisCount = project.gridAxes.where((a) => ids.contains(a.id)).length;
+    final cadCount = s.cadPrimitives.where((c) => ids.contains(c.id)).length;
+
+    final parts = <String>[];
+    if (wallCount > 0) parts.add(l.architectSelectionWallsCount(wallCount));
+    if (colCount > 0) parts.add(l.architectSelectionColumnsCount(colCount));
+    if (beamCount > 0) parts.add(l.architectSelectionBeamsCount(beamCount));
+    if (slabCount > 0) parts.add(l.architectSelectionSlabsCount(slabCount));
+    if (doorCount > 0) parts.add(l.architectSelectionDoorsCount(doorCount));
+    if (winCount > 0) parts.add(l.architectSelectionWindowsCount(winCount));
+    if (zoneCount > 0) parts.add(l.architectSelectionZonesCount(zoneCount));
+    if (axisCount > 0) parts.add(l.architectSelectionAxesCount(axisCount));
+    if (cadCount > 0) parts.add(l.architectSelectionCadCount(cadCount));
+
+
+    if (parts.length == 1) {
+      return parts.first;
+    }
+    if (parts.length > 1) {
+      return l.architectSelectionMixedSummary(ids.length, parts.join(', '));
+    }
+    return l.architectSelectionCount(ids.length);
   }
 }
 

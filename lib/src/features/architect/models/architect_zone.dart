@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/l10n/generated/app_localizations.dart';
 
 /// Standard architectural functional room categories.
 enum ArchitectZoneCategory {
@@ -68,7 +69,31 @@ enum ArchitectZoneCategory {
     required this.color,
     required this.icon,
   });
+
+  String localizedName(AppLocalizations l10n) {
+    switch (this) {
+      case ArchitectZoneCategory.living:
+        return l10n.architectZoneCatLiving;
+      case ArchitectZoneCategory.bedroom:
+        return l10n.architectZoneCatBedroom;
+      case ArchitectZoneCategory.kitchen:
+        return l10n.architectZoneCatKitchen;
+      case ArchitectZoneCategory.corridor:
+        return l10n.architectZoneCatCorridor;
+      case ArchitectZoneCategory.bathroom:
+        return l10n.architectZoneCatBathroom;
+      case ArchitectZoneCategory.terrace:
+        return l10n.architectZoneCatTerrace;
+      case ArchitectZoneCategory.storage:
+        return l10n.architectZoneCatStorage;
+      case ArchitectZoneCategory.office:
+        return l10n.architectZoneCatOffice;
+      case ArchitectZoneCategory.custom:
+        return l10n.architectZoneCatCustom;
+    }
+  }
 }
+
 
 /// A functional architectural zone (room / space / spatial partition)
 /// defined by a parametric 2D polygon with dynamic vertices and grips.

@@ -903,7 +903,7 @@ class FenestrationPresetsTab extends StatelessWidget {
                 : Icons.door_front_door_rounded,
             color: const Color(0xFF00E5FF),
           ),
-          title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+          title: Text(p.localizedName(l10n), style: const TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text(
             '${(p.defaultWidth * 100).round()}x${(p.defaultHeight * 100).round()} cm'
             '${p.hasCasing ? " • ${l10n.architectFenestrationWithCasing}" : ""}',

@@ -4093,6 +4093,69 @@ class AppLocalizationsBg extends AppLocalizations {
   String get architectSelectionMove => 'Влачене';
 
   @override
+  String get architectSelectConnected => 'Свързани';
+
+  @override
+  String get architectSelectSimilar => 'Всички от типа';
+
+  @override
+  String get architectContextMenu => 'Меню';
+
+  @override
+  String architectSelectionCount(int count) {
+    return '$count елемента';
+  }
+
+  @override
+  String architectSelectionWallsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count стени',
+      one: '1 стена',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionColumnsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count колони',
+      one: '1 колона',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionBeamsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count греди',
+      one: '1 греда',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionSlabsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count плочи',
+      one: '1 плоча',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionMixedSummary(int count, String details) {
+    return '$count елемента: $details';
+  }
+
+  @override
   String get architectDeselect => 'Деселектирай';
 
   @override
@@ -4628,4 +4691,145 @@ class AppLocalizationsBg extends AppLocalizations {
 
   @override
   String get architectDimensionOverall => 'Общ размер';
+
+  @override
+  String get architectStoreyGround => 'Партер';
+
+  @override
+  String get architectStoreyFloor => 'Етаж';
+
+  @override
+  String architectSelectionDoorsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count врати',
+      one: '1 врата',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionWindowsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count прозореца',
+      one: '1 прозорец',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionZonesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count зони',
+      one: '1 зона',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionAxesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count оси',
+      one: '1 ос',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String architectSelectionCadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count CAD',
+      one: '1 CAD',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get snapCorner => 'Ъгъл';
+
+  @override
+  String get snapEdge => 'Ръб';
+
+  @override
+  String get snapMerge => 'Обединяване';
+
+  @override
+  String get architectDoorSillNone => 'Без праг';
+
+  @override
+  String get architectDoorSillStep => 'Праг: 15 cm';
+
+  @override
+  String get architectZoneCatLiving => 'Дневна';
+
+  @override
+  String get architectZoneCatBedroom => 'Спалня';
+
+  @override
+  String get architectZoneCatKitchen => 'Кухня';
+
+  @override
+  String get architectZoneCatCorridor => 'Коридор';
+
+  @override
+  String get architectZoneCatBathroom => 'Баня / WC';
+
+  @override
+  String get architectZoneCatTerrace => 'Тераса';
+
+  @override
+  String get architectZoneCatStorage => 'Склад / Мокро';
+
+  @override
+  String get architectZoneCatOffice => 'Кабинет / Офис';
+
+  @override
+  String get architectZoneCatCustom => 'Помещение';
+
+  @override
+  String get architectFenestrationPresetSingleCasement =>
+      'Еднокрил 80/140 (5-камерен)';
+
+  @override
+  String get architectFenestrationPresetDoubleCasement =>
+      'Двукрил 140/140 (5-камерен)';
+
+  @override
+  String get architectFenestrationPresetDoubleWithCasing =>
+      'Двукрил 140/140 с обрамчване';
+
+  @override
+  String get architectFenestrationPresetTripleCasement =>
+      'Трикрил 210/140 (фикс + 2 крила)';
+
+  @override
+  String get architectFenestrationPresetWithTransom =>
+      'Прозорец с надстройка 140/180';
+
+  @override
+  String get architectFenestrationPresetDoorInterior =>
+      'Интериорна врата 90/200';
+
+  @override
+  String get architectFenestrationPresetDoorEntranceCasing =>
+      'Входна врата с обрамчване 100/210';
+
+  @override
+  String architectWallParapetPipe(int thickness, String height) {
+    return 'Борд $thickness cm (тръба h=${height}m)';
+  }
+
+  @override
+  String architectWallParapetCap(int thickness, String height) {
+    return 'Борд $thickness cm (шапка h=${height}m)';
+  }
 }

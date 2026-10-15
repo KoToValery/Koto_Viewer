@@ -29,6 +29,7 @@ class ArchitectRadialMenu extends StatefulWidget {
   final List<ArchitectRadialMenuItem> items;
   final ValueChanged<ArchitectRadialAction> onActionSelected;
   final VoidCallback onDismiss;
+  final String? title;
 
   const ArchitectRadialMenu({
     super.key,
@@ -36,6 +37,7 @@ class ArchitectRadialMenu extends StatefulWidget {
     required this.items,
     required this.onActionSelected,
     required this.onDismiss,
+    this.title,
   });
 
   @override
@@ -142,20 +144,41 @@ class _ArchitectRadialMenuState extends State<ArchitectRadialMenu>
         return Stack(
           children: [
             Positioned(
-              left: center.dx - 18,
+              left: center.dx - (widget.title != null ? 40 : 18),
               top: center.dy - 18,
               child: IgnorePointer(
                 child: ScaleTransition(
                   scale: _scaleAnim,
                   child: Container(
-                    width: 36,
+                    padding: widget.title != null
+                        ? const EdgeInsets.symmetric(horizontal: 10, vertical: 4)
+                        : null,
+                    width: widget.title != null ? null : 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black38,
-                      border: Border.all(color: Colors.white38, width: 1.5),
+                      borderRadius: BorderRadius.circular(18),
+                      color: const Color(0xEE1E242C),
+                      border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black45,
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    child: const Center(child: ContainerDot()),
+                    child: Center(
+                      child: widget.title != null
+                          ? Text(
+                              widget.title!,
+                              style: const TextStyle(
+                                color: Color(0xFF00E5FF),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : const ContainerDot(),
+                    ),
                   ),
                 ),
               ),

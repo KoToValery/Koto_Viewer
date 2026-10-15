@@ -162,20 +162,23 @@ class _ArchitectZonePropertiesCardState
                     child: ChoiceChip(
                       avatar: Icon(cat.icon, size: 12, color: cat.color),
                       label: Text(
-                        cat.defaultBgName,
+                        cat.localizedName(l10n),
                         style: const TextStyle(fontSize: 11),
                       ),
                       selected: zone.category == cat,
                       onSelected: (sel) {
                         if (sel) {
+                          final currentCat = zone.category;
+                          final isDefaultName = zone.name == currentCat.defaultBgName ||
+                              zone.name == currentCat.defaultEnName ||
+                              zone.name == currentCat.localizedName(l10n);
                           widget.onZoneUpdated(zone.copyWith(
                             category: cat,
-                            name: zone.name == zone.category.defaultBgName
-                                ? cat.defaultBgName
-                                : zone.name,
+                            name: isDefaultName ? cat.localizedName(l10n) : zone.name,
                           ));
                         }
                       },
+
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
@@ -432,7 +435,7 @@ class _ArchitectZonePropertiesCardState
           autofocus: true,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            hintText: widget.zone.category.defaultBgName,
+            hintText: widget.zone.category.localizedName(l10n),
             hintStyle: const TextStyle(color: Colors.white38),
             filled: true,
             fillColor: const Color(0xFF161820),

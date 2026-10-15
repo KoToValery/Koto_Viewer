@@ -68,56 +68,41 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
       elevation: 8,
       shadowColor: Colors.black54,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         side: const BorderSide(color: Colors.white24),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: widget.showDirection
-                        ? IconButton(
-                            tooltip: l10n.architectWallDirection,
-                            onPressed: widget.onUnlock,
-                            icon: const Icon(
-                              Icons.explore_outlined,
-                              size: 20,
-                              color: Colors.cyanAccent,
-                            ),
-                          )
-                        : Text(
-                            widget.title ?? '',
-                            style: const TextStyle(color: Colors.white70),
-                          ),
+            if (widget.title != null && widget.title!.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4, left: 2, right: 2),
+                child: Text(
+                  widget.title!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    iconSize: 18,
-                    onPressed: widget.onCancel,
-                    icon: const Icon(Icons.close, color: Colors.white70),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
             InkWell(
               key: const ValueKey('wall-length-input'),
               onTap: () => setState(() => _keypad = !_keypad),
+              borderRadius: BorderRadius.circular(6),
               child: Container(
-                padding: const EdgeInsets.all(8),
-                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
+                  color: Colors.black26,
                   border: Border.all(
                     color: _valid ? Colors.cyanAccent : Colors.redAccent,
+                    width: 1.2,
                   ),
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -128,14 +113,15 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
                         '${_input ?? widget.length.toStringAsFixed(2)} ${widget.unit}',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 18,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Icons.dialpad,
-                      size: 18,
-                      color: Colors.cyanAccent,
+                      size: 16,
+                      color: _keypad ? Colors.amberAccent : Colors.cyanAccent,
                     ),
                   ],
                 ),
@@ -146,32 +132,127 @@ class _BimDistanceDraftingPanelState extends State<BimDistanceDraftingPanel> {
               BimNumericKeypad(onKey: _key),
             ],
             if (_keypad && widget.minimumLength < 0)
-              TextButton(onPressed: () => _key('±'), child: const Text('±')),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    key: const ValueKey('wall-end'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.cyanAccent,
-                    ),
-                    onPressed: _valid ? widget.onEnd : null,
-                    child: Text(widget.endLabel ?? l10n.architectWallEnd),
-                  ),
+              TextButton(
+                onPressed: () => _key('±'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 28),
+                  padding: EdgeInsets.zero,
                 ),
-                if (widget.showContinue)
-                  Expanded(
-                    child: FilledButton(
-                      key: const ValueKey('wall-continue'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.cyanAccent,
-                        foregroundColor: const Color(0xFF1E242C),
+                child: const Text('±'),
+              ),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 32,
+              child: Row(
+                children: [
+                  if (widget.showDirection) ...[
+                    IconButton(
+                      key: const ValueKey('wall-direction-unlock'),
+                      tooltip: l10n.architectWallDirection,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 32,
+                        height: 32,
                       ),
-                      onPressed: _valid ? widget.onContinue : null,
-                      child: Text(l10n.architectWallContinue),
+                      style: IconButton.styleFrom(
+                        foregroundColor: Colors.cyanAccent,
+                        backgroundColor: Colors.cyanAccent.withValues(alpha: 0.12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          side: const BorderSide(color: Colors.cyanAccent, width: 1.0),
+                        ),
+                      ),
+                      onPressed: widget.onUnlock,
+                      icon: const Icon(
+                        Icons.explore_outlined,
+                        size: 18,
+                        color: Colors.cyanAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const ValueKey('wall-end'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.cyanAccent,
+                        side: const BorderSide(color: Colors.cyanAccent, width: 1.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      onPressed: _valid ? widget.onEnd : null,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          widget.endLabel ?? l10n.architectWallEnd,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-              ],
+                  if (widget.showContinue) ...[
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: FilledButton(
+                        key: const ValueKey('wall-continue'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.cyanAccent,
+                          foregroundColor: const Color(0xFF1E242C),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        onPressed: _valid ? widget.onContinue : null,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            l10n.architectWallContinue,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 6),
+                  IconButton(
+                    key: const ValueKey('wall-cancel'),
+                    tooltip: l10n.cancel,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 32,
+                      height: 32,
+                    ),
+                    style: IconButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      backgroundColor: Colors.redAccent.withValues(alpha: 0.12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        side: const BorderSide(color: Colors.redAccent, width: 1.5),
+                      ),
+                    ),
+                    onPressed: widget.onCancel,
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.redAccent,
+                      size: 19,
+                      weight: 700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

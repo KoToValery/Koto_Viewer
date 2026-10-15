@@ -184,7 +184,7 @@ class ArchitectZoneDraftingBar extends StatelessWidget {
                       Icon(category.icon, size: 14, color: category.color),
                       const SizedBox(width: 4),
                       Text(
-                        category.defaultBgName,
+                        category.localizedName(l10n),
                         style: TextStyle(
                           color: category.color,
                           fontSize: 12,

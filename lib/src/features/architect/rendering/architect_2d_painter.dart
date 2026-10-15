@@ -104,6 +104,8 @@ class Architect2dPainter extends CustomPainter {
   final bool isZoneClosingSnap;
   final bool isZoneDraftingSelfIntersecting;
   final String? zoneCloseLabel;
+  final String? zoneCategoryName;
+
 
   // Edge extrusion preview
   final List<Offset>? zoneExtrudePreviewPolygon;
@@ -179,7 +181,9 @@ class Architect2dPainter extends CustomPainter {
     this.isZoneClosingSnap = false,
     this.isZoneDraftingSelfIntersecting = false,
     this.zoneCloseLabel,
+    this.zoneCategoryName,
     this.zoneExtrudePreviewPolygon,
+
     this.zoneExtrudeV1,
     this.zoneExtrudeV2,
     this.zoneExtrudeNormal,
@@ -859,8 +863,10 @@ class Architect2dPainter extends CustomPainter {
         start: activeDraftStart!,
         end: activeDraftEnd!,
         category: activeZoneCategory ?? ArchitectZoneCategory.living,
+        categoryName: zoneCategoryName,
         zoomScale: zoomScale,
       );
+
       return;
     }
 

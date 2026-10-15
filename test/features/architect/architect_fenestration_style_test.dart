@@ -184,8 +184,7 @@ void main() {
 
       // Canvas hit test with standard canvas size 800x600
       const canvasSize = Size(800, 600);
-      final margin = 0.25;
-      final totalW = style.defaultWidth + margin * 2;
+      const margin = 0.25;
       final totalH = style.defaultHeight + margin * 2;
       final scale = (600 / totalH) * 0.90;
       final origin = Offset(

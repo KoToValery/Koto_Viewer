@@ -817,6 +817,127 @@ class ArchitectElementTool extends ChangeNotifier {
     return storey;
   }
 
+  (ArchitectStorey, List<String>) duplicateElementsByIds(
+    ArchitectStorey storey,
+    Set<String> elementIds, {
+    Offset offset = const Offset(0.5, 0.5),
+  }) {
+    var currentStorey = storey;
+    final newIds = <String>[];
+    for (final id in elementIds) {
+      final (updated, copyId) = duplicateElementById(
+        currentStorey,
+        id,
+        offset: offset,
+      );
+      if (copyId != null) {
+        currentStorey = updated;
+        newIds.add(copyId);
+      }
+    }
+    return (currentStorey, newIds);
+  }
+
+  ArchitectStorey rotateElementsByIds(
+    ArchitectStorey storey,
+    Set<String> elementIds,
+  ) {
+    var currentStorey = storey;
+    for (final id in elementIds) {
+      currentStorey = rotateElementById(currentStorey, id);
+    }
+    return currentStorey;
+  }
+
+  ArchitectStorey flipElementsByIds(
+    ArchitectStorey storey,
+    Set<String> elementIds,
+  ) {
+    var currentStorey = storey;
+    for (final id in elementIds) {
+      currentStorey = flipElementById(currentStorey, id);
+    }
+    return currentStorey;
+  }
+
+  ArchitectStorey deleteElementsByIds(
+    ArchitectStorey storey,
+    Set<String> elementIds,
+  ) {
+    var currentStorey = storey;
+    for (final id in elementIds) {
+      currentStorey = deleteElementById(currentStorey, id);
+    }
+    return currentStorey;
+  }
+
+  Set<String> findConnectedWallChain(
+    ArchitectStorey storey,
+    String startWallId,
+  ) {
+    final startWall =
+        storey.walls.where((w) => w.id == startWallId).firstOrNull;
+    if (startWall == null) return {startWallId};
+
+    final result = <String>{startWallId};
+    final queue = <ArchitectWall>[startWall];
+
+    while (queue.isNotEmpty) {
+      final current = queue.removeLast();
+      final currEndpoints = [current.startPoint, current.endPoint];
+
+      for (final other in storey.walls) {
+        if (result.contains(other.id)) continue;
+
+        final tolerance =
+            math.max(current.thickness, other.thickness) * 1.2 + 0.05;
+        final otherEndpoints = [other.startPoint, other.endPoint];
+
+        bool connected = false;
+        // Corner connection (endpoint to endpoint)
+        for (final p1 in currEndpoints) {
+          for (final p2 in otherEndpoints) {
+            if ((p1 - p2).distance <= tolerance) {
+              connected = true;
+              break;
+            }
+          }
+          if (connected) break;
+        }
+
+        // T-junction (endpoint of one to body of the other)
+        if (!connected) {
+          for (final p in currEndpoints) {
+            if (_pointToSegmentDistance(p, other.startPoint, other.endPoint) <=
+                other.thickness / 2.0 + 0.08) {
+              connected = true;
+              break;
+            }
+          }
+        }
+        if (!connected) {
+          for (final p in otherEndpoints) {
+            if (_pointToSegmentDistance(
+                  p,
+                  current.startPoint,
+                  current.endPoint,
+                ) <=
+                current.thickness / 2.0 + 0.08) {
+              connected = true;
+              break;
+            }
+          }
+        }
+
+        if (connected) {
+          result.add(other.id);
+          queue.add(other);
+        }
+      }
+    }
+    return result;
+  }
+
   // ===========================================================================
   // 14. HELPER GEOMETRY
   // ===========================================================================

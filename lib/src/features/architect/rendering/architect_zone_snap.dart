@@ -89,7 +89,7 @@ class ArchitectZoneSnap {
             point: poly[prevIdx],
             isSnapped: true,
             snapType: ArchitectZoneSnapType.zoneVertex,
-            snapLabel: 'Обединяване (Merge)',
+            snapLabel: 'Merge',
             mergeCandidateIndex: prevIdx,
           );
         }
@@ -98,10 +98,11 @@ class ArchitectZoneSnap {
             point: poly[nextIdx],
             isSnapped: true,
             snapType: ArchitectZoneSnapType.zoneVertex,
-            snapLabel: 'Обединяване (Merge)',
+            snapLabel: 'Merge',
             mergeCandidateIndex: nextIdx,
           );
         }
+
       }
     }
 
@@ -116,7 +117,7 @@ class ArchitectZoneSnap {
           bestDistance = dist;
           bestPoint = v;
           bestType = ArchitectZoneSnapType.zoneVertex;
-          bestLabel = '${zone.name} (Ъгъл)';
+          bestLabel = '${zone.name} (Corner)';
           guides = [
             (v - const Offset(2.0, 0), v + const Offset(2.0, 0)),
             (v - const Offset(0, 2.0), v + const Offset(0, 2.0)),
@@ -169,7 +170,7 @@ class ArchitectZoneSnap {
                   ? ArchitectZoneSnapType.zoneEdge
                   : ArchitectZoneSnapType.zoneWallGap;
               bestLabel = gap == 0.0
-                  ? '${zone.name} (Ръб)'
+                  ? '${zone.name} (Edge)'
                   : '${zone.name} (+${(gap * 100).round()} cm)';
               guides = [(targetA - unitAb * 1.5, targetB + unitAb * 1.5)];
             }
@@ -206,18 +207,19 @@ class ArchitectZoneSnap {
         if (d < distanceX) {
           distanceX = d;
           axisX = Offset(axis.start.dx, raw.dy);
-          labelX = 'Ос ${axis.name}';
+          labelX = 'Axis ${axis.name}';
         }
       } else if (horizontal) {
         final d = (raw.dy - axis.start.dy).abs();
         if (d < distanceY) {
           distanceY = d;
           axisY = Offset(raw.dx, axis.start.dy);
-          labelY = 'Ос ${axis.name}';
+          labelY = 'Axis ${axis.name}';
         }
       } else {
-        considerAxis(axis.projectPoint(raw), 'Ос ${axis.name}');
+        considerAxis(axis.projectPoint(raw), 'Axis ${axis.name}');
       }
+
     }
     if (axisX != null) considerAxis(axisX, labelX!);
     if (axisY != null) considerAxis(axisY, labelY!);

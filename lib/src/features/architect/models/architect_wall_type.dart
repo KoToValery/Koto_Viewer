@@ -1,5 +1,6 @@
 // === SECTION: ARCHITECTURAL WALL TYPE MODELS ===
 import 'dart:ui';
+import '../../../core/l10n/generated/app_localizations.dart';
 
 enum WallCoreMaterial { brick, concrete, timber, panel }
 
@@ -76,38 +77,51 @@ class ArchitectWallType {
   static List<ArchitectWallType> standardCatalog({
     double parapetHeight = 1.05,
     ParapetFinish parapetFinish = ParapetFinish.cap,
+    AppLocalizations? l10n,
   }) {
+    final extName = l10n != null ? '${l10n.architectWallExterior} 25+12 EPS' : 'Exterior 25+12 EPS';
+    final intName = l10n != null ? '${l10n.architectWallPartition} 12 cm' : 'Partition 12 cm';
+    final brickName = l10n != null ? '${l10n.architectWallBrick} 25 cm' : 'Brick 25 cm';
+    final concName = l10n != null ? '${l10n.architectWallConcrete} 25 cm' : 'Concrete 25 cm';
+    final parapetName = l10n != null
+        ? (parapetFinish == ParapetFinish.handrailPipes
+            ? l10n.architectWallParapetPipe(12, parapetHeight.toStringAsFixed(2))
+            : l10n.architectWallParapetCap(12, parapetHeight.toStringAsFixed(2)))
+        : (parapetFinish == ParapetFinish.handrailPipes
+            ? 'Parapet 12 cm (pipe h=${parapetHeight.toStringAsFixed(2)}m)'
+            : 'Parapet 12 cm (cap h=${parapetHeight.toStringAsFixed(2)}m)');
+
     return [
-      const ArchitectWallType(
+      ArchitectWallType(
         id: 'ext_25_12_eps',
-        name: 'Външна 25+12 EPS',
+        name: extName,
         usage: WallUsage.exterior,
         totalThickness: 0.37,
         brickThickness: 0.25,
         insulationThickness: 0.12,
         colorValue: 0xFFEF5350,
       ),
-      const ArchitectWallType(
+      ArchitectWallType(
         id: 'int_12_partition',
-        name: 'Преградна 12 cm',
+        name: intName,
         usage: WallUsage.interior,
         totalThickness: 0.12,
         brickThickness: 0.12,
         insulationThickness: 0.0,
         colorValue: 0xFFFFA726,
       ),
-      const ArchitectWallType(
+      ArchitectWallType(
         id: 'ext_25_brick',
-        name: 'Тухла 25 cm',
+        name: brickName,
         usage: WallUsage.exterior,
         totalThickness: 0.25,
         brickThickness: 0.25,
         insulationThickness: 0.0,
         colorValue: 0xFFFF7043,
       ),
-      const ArchitectWallType(
+      ArchitectWallType(
         id: 'bearing_25_concrete',
-        name: 'Стоманобетон 25 cm',
+        name: concName,
         usage: WallUsage.bearing,
         totalThickness: 0.25,
         brickThickness: 0.25,
@@ -116,9 +130,7 @@ class ArchitectWallType {
       ),
       ArchitectWallType(
         id: 'parapet_12',
-        name: parapetFinish == ParapetFinish.handrailPipes
-            ? 'Борд 12 cm (тръба h=${parapetHeight.toStringAsFixed(2)}m)'
-            : 'Борд 12 cm (шапка h=${parapetHeight.toStringAsFixed(2)}m)',
+        name: parapetName,
         usage: WallUsage.parapet,
         totalThickness: 0.12,
         brickThickness: 0.12,
@@ -129,6 +141,7 @@ class ArchitectWallType {
       ),
     ];
   }
+
 
   ArchitectWallType copyWith({
     String? id,

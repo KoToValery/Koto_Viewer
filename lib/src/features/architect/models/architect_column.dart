@@ -25,8 +25,9 @@ class ArchitectColumn {
     this.depth = 0.25,
     this.rotationDeg = 0.0,
     this.height,
-    this.label = 'К1',
+    this.label = 'C1',
   });
+
 
   ArchitectColumn copyWith({
     String? id,
@@ -74,8 +75,9 @@ class ArchitectColumn {
         depth: (json['depth'] as num?)?.toDouble() ?? 0.25,
         rotationDeg: (json['rotationDeg'] as num?)?.toDouble() ?? 0.0,
         height: (json['height'] as num?)?.toDouble(),
-        label: json['label'] as String? ?? 'К1',
+        label: json['label'] as String? ?? 'C1',
       );
+
 
   bool containsPoint(Offset pt, {double tolerance = 0.10}) {
     if (shape == ColumnShape.circular) {

@@ -3034,6 +3034,61 @@
   "architectWallFlipSide": "Flip exterior side",
   "architectSelectionMulti": "Multi",
   "architectSelectionMove": "Drag",
+  "architectSelectConnected": "Connected",
+  "@architectSelectConnected": {
+    "description": "Select connected chain of elements"
+  },
+  "architectSelectSimilar": "All of type",
+  "@architectSelectSimilar": {
+    "description": "Select all elements of the same type"
+  },
+  "architectContextMenu": "Menu",
+  "@architectContextMenu": {
+    "description": "Smart context menu button"
+  },
+  "architectSelectionCount": "{count} items",
+  "@architectSelectionCount": {
+    "description": "Number of items selected",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "architectSelectionWallsCount": "{count, plural, one{1 wall} other{{count} walls}}",
+  "@architectSelectionWallsCount": {
+    "description": "Plural walls count in selection",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "architectSelectionColumnsCount": "{count, plural, one{1 column} other{{count} columns}}",
+  "@architectSelectionColumnsCount": {
+    "description": "Plural columns count in selection",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "architectSelectionBeamsCount": "{count, plural, one{1 beam} other{{count} beams}}",
+  "@architectSelectionBeamsCount": {
+    "description": "Plural beams count in selection",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "architectSelectionSlabsCount": "{count, plural, one{1 slab} other{{count} slabs}}",
+  "@architectSelectionSlabsCount": {
+    "description": "Plural slabs count in selection",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "architectSelectionMixedSummary": "{count} items: {details}",
+  "@architectSelectionMixedSummary": {
+    "description": "Summary of mixed element selection",
+    "placeholders": {
+      "count": { "type": "int" },
+      "details": { "type": "String" }
+    }
+  },
   "architectDeselect": "Deselect",
   "@architectDeselect": {
     "description": "Deselect active selection"
@@ -3294,5 +3349,95 @@
   "architectDimensionDirectionHint": "Select a wall or line parallel to the dimension line.",
   "architectDimensionPositionHint": "Tap to position the chain, or enter an exact offset.",
   "architectSelectionCycleHelp": "Tap again to cycle overlapping elements. Tap the selection label for actions.",
-  "architectDimensionOverall": "Overall dimension"
+  "architectDimensionOverall": "Overall dimension",
+  "architectDefaultProjectName": "Architectural Project",
+  "@architectDefaultProjectName": { "description": "Default name for a new architectural project" },
+  "architectStoreyGround": "Ground Floor",
+  "@architectStoreyGround": { "description": "Default label for ground floor" },
+  "architectStoreyFloor": "Floor",
+  "@architectStoreyFloor": { "description": "Default label for upper storeys" },
+  "architectSelectionDoorsCount": "{count, plural, one{1 door} other{{count} doors}}",
+  "@architectSelectionDoorsCount": {
+    "description": "Plural doors count in selection",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "architectSelectionWindowsCount": "{count, plural, one{1 window} other{{count} windows}}",
+  "@architectSelectionWindowsCount": {
+    "description": "Plural windows count in selection",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "architectSelectionZonesCount": "{count, plural, one{1 zone} other{{count} zones}}",
+  "@architectSelectionZonesCount": {
+    "description": "Plural zones count in selection",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "architectSelectionAxesCount": "{count, plural, one{1 axis} other{{count} axes}}",
+  "@architectSelectionAxesCount": {
+    "description": "Plural axes count in selection",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "architectSelectionCadCount": "{count, plural, one{1 CAD} other{{count} CAD}}",
+  "@architectSelectionCadCount": {
+    "description": "Plural CAD primitives count in selection",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "snapCorner": "Corner",
+  "@snapCorner": { "description": "Snap label for corners" },
+  "snapEdge": "Edge",
+  "@snapEdge": { "description": "Snap label for edges" },
+  "snapMerge": "Merge",
+  "@snapMerge": { "description": "Snap label for vertex merging" },
+  "architectDoorSillNone": "Sill: 0",
+  "@architectDoorSillNone": { "description": "Door threshold sill none chip" },
+  "architectDoorSillStep": "Step: 15 cm",
+  "@architectDoorSillStep": { "description": "Door threshold sill 15cm chip" },
+  "architectZoneCatLiving": "Living Room",
+  "@architectZoneCatLiving": { "description": "Zone category living room" },
+  "architectZoneCatBedroom": "Bedroom",
+  "@architectZoneCatBedroom": { "description": "Zone category bedroom" },
+  "architectZoneCatKitchen": "Kitchen",
+  "@architectZoneCatKitchen": { "description": "Zone category kitchen" },
+  "architectZoneCatCorridor": "Corridor / Hall",
+  "@architectZoneCatCorridor": { "description": "Zone category corridor" },
+  "architectZoneCatBathroom": "Bathroom / WC",
+  "@architectZoneCatBathroom": { "description": "Zone category bathroom" },
+  "architectZoneCatTerrace": "Terrace / Balcony",
+  "@architectZoneCatTerrace": { "description": "Zone category terrace" },
+  "architectZoneCatStorage": "Storage / Utility",
+  "@architectZoneCatStorage": { "description": "Zone category storage" },
+  "architectZoneCatOffice": "Home Office",
+  "@architectZoneCatOffice": { "description": "Zone category office" },
+  "architectZoneCatCustom": "Custom Space",
+  "@architectZoneCatCustom": { "description": "Zone category custom space" },
+  "architectFenestrationPresetSingleCasement": "Single casement 80/140 (5-chamber)",
+  "@architectFenestrationPresetSingleCasement": { "description": "Single casement window preset name" },
+  "architectFenestrationPresetDoubleCasement": "Double casement 140/140 (5-chamber)",
+  "@architectFenestrationPresetDoubleCasement": { "description": "Double casement window preset name" },
+  "architectFenestrationPresetDoubleWithCasing": "Double casement 140/140 with casing",
+  "@architectFenestrationPresetDoubleWithCasing": { "description": "Double casement window with casing preset name" },
+  "architectFenestrationPresetTripleCasement": "Triple casement 210/140 (fixed + 2 sashes)",
+  "@architectFenestrationPresetTripleCasement": { "description": "Triple casement window preset name" },
+  "architectFenestrationPresetWithTransom": "Window with transom 140/180",
+  "@architectFenestrationPresetWithTransom": { "description": "Window with transom preset name" },
+  "architectFenestrationPresetDoorInterior": "Interior door 90/200",
+  "@architectFenestrationPresetDoorInterior": { "description": "Interior door preset name" },
+  "architectFenestrationPresetDoorEntranceCasing": "Entrance door with casing 100/210",
+  "@architectFenestrationPresetDoorEntranceCasing": { "description": "Exterior entrance door with casing preset name" },
+  "architectWallParapetPipe": "Parapet {thickness} cm (pipe h={height}m)",
+  "@architectWallParapetPipe": {
+    "description": "Parapet wall type name with handrail pipe",
+    "placeholders": {
+      "thickness": { "type": "int" },
+      "height": { "type": "String" }
+    }
+  },
+  "architectWallParapetCap": "Parapet {thickness} cm (cap h={height}m)",
+  "@architectWallParapetCap": {
+    "description": "Parapet wall type name with concrete cap",
+    "placeholders": {
+      "thickness": { "type": "int" },
+      "height": { "type": "String" }
+    }
+  }
 }
+
